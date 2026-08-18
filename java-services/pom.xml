@@ -25,6 +25,7 @@
     </properties>
 
     <modules>
+        <module>auth-service</module>
         <module>thesis-service</module>
     </modules>
 </project>
