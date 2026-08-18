@@ -1,0 +1,73 @@
+{
+  "protocol_version": "1.0",
+  "mission_id": "wukong-example-001",
+  "target_identity": {
+    "kind": "git",
+    "value": "REPLACE_WITH_COMMIT_SHA",
+    "captured_at": "2026-01-01T00:00:00Z"
+  },
+  "claim_status": "INCONCLUSIVE",
+  "recommended_gate": "BLOCK",
+  "severity": "high",
+  "confidence": "low",
+  "evidence_grade": "E1",
+  "mechanism": "The decisive probe has not run.",
+  "hypotheses": [
+    {
+      "id": "H0",
+      "statement": "The bounded claim holds inside the frozen mission scope.",
+      "predicted_observations": ["The decisive probe preserves every tested invariant."],
+      "falsifier": "A current-target observation violates a tested invariant."
+    },
+    {
+      "id": "H1",
+      "statement": "The leading failure mechanism violates the invariant.",
+      "predicted_observations": ["The decisive probe exposes the named failure signal."],
+      "falsifier": "A discriminating probe observes the guard preventing that mechanism."
+    },
+    {
+      "id": "H2",
+      "statement": "A materially different mechanism explains the reported symptom.",
+      "predicted_observations": ["An alternate probe separates this mechanism from H1."],
+      "falsifier": "The alternate mechanism's predicted observation does not occur."
+    }
+  ],
+  "evidence": [
+    {
+      "id": "EV-001",
+      "kind": "OBSERVED",
+      "grade": "E1",
+      "source": "repo-relative/path",
+      "observation": "Static evidence only.",
+      "observation_digest": "b94b1a719dcad1cd22f3fd404bf11b1ccb1a204d1e5164882cc37d610b072ca3",
+      "probe_id": "PR-001",
+      "execution_id": "example-static-inspection-001",
+      "invariant_ids": ["INV-001"],
+      "supports": ["H1"],
+      "contradicts": [],
+      "independence_kind": "primary",
+      "independent_of": [],
+      "reproduction": "Read the cited file at the recorded identity.",
+      "observed_at": "2026-01-01T00:00:00Z",
+      "redactions": []
+    }
+  ],
+  "decisive_evidence_ids": ["EV-001"],
+  "tested_invariants": [],
+  "counterexamples": [],
+  "probe_summary": {
+    "attempted": 1,
+    "passed": 0,
+    "failed": 0,
+    "blocked": 1
+  },
+  "coverage_limits": ["No deterministic execution yet."],
+  "residual_risks": ["The claim remains unverified."],
+  "missing_fields": [],
+  "handoff": {
+    "owner": "tester",
+    "reason": "Run the decisive bounded probe.",
+    "next_action": "Execute the exact regression in a disposable fixture.",
+    "exact_retest": "Replace with the command and expected signal."
+  }
+}

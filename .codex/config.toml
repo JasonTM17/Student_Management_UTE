@@ -1,0 +1,91 @@
+# --- ck-managed-features-start ---
+[features]
+hooks = true
+# --- ck-managed-features-end ---
+
+# --- ak-managed-agents-engineer-start ---
+[agents.explore]
+description = "Explore"
+config_file = "agents/explore.toml"
+
+
+[agents.debugger]
+description = "debugger"
+config_file = "agents/debugger.toml"
+
+
+[agents.docs-manager]
+description = "docs-manager"
+config_file = "agents/docs-manager.toml"
+
+
+[agents.fullstack-developer]
+description = "fullstack-developer"
+config_file = "agents/fullstack-developer.toml"
+
+
+[agents.journal-writer]
+description = "journal-writer"
+config_file = "agents/journal-writer.toml"
+
+
+[agents.kongming]
+description = "kongming"
+config_file = "agents/kongming.toml"
+
+
+[agents.wukong]
+description = "wukong"
+config_file = "agents/wukong.toml"
+
+
+[agents.planner]
+description = "planner"
+config_file = "agents/planner.toml"
+
+
+[agents.project-manager]
+description = "project-manager"
+config_file = "agents/project-manager.toml"
+
+
+[agents.researcher]
+description = "researcher"
+config_file = "agents/researcher.toml"
+
+
+[agents.tester]
+description = "tester"
+config_file = "agents/tester.toml"
+
+
+[agents.advisor]
+description = "advisor"
+config_file = "agents/advisor.toml"
+
+
+[agents.brainstormer]
+description = "brainstormer"
+config_file = "agents/brainstormer.toml"
+
+
+[agents.code-simplifier]
+description = "code-simplifier"
+config_file = "agents/code-simplifier.toml"
+
+
+[agents.code-reviewer]
+description = "code-reviewer"
+config_file = "agents/code-reviewer.toml"
+
+
+[agents.git-manager]
+description = "git-manager"
+config_file = "agents/git-manager.toml"
+
+
+[agents.ui-ux-designer]
+description = "ui-ux-designer"
+config_file = "agents/ui-ux-designer.toml"
+
+# --- ak-managed-agents-engineer-end ---

@@ -1,0 +1,47 @@
+{
+  "protocol_version": "1.0",
+  "mission_id": "wukong-example-001",
+  "mode": "challenge",
+  "target": {
+    "kind": "repo",
+    "locator": ".",
+    "claim": "Replace this with one falsifiable claim.",
+    "identity": {
+      "kind": "git",
+      "value": "REPLACE_WITH_COMMIT_SHA",
+      "captured_at": "2026-01-01T00:00:00Z"
+    }
+  },
+  "scope": {
+    "include": ["src/**"],
+    "exclude": [".env*", "secrets/**"],
+    "non_goals": ["Implement the repair"]
+  },
+  "invariants": [
+    {
+      "id": "INV-001",
+      "statement": "Replace with a must-hold property.",
+      "failure_signal": "Replace with an observable violation.",
+      "severity": "high"
+    }
+  ],
+  "risk": {
+    "severity": "high",
+    "domains": ["portability"]
+  },
+  "authority": {
+    "level": "R0",
+    "write_mode": "report-only",
+    "external_effects": false
+  },
+  "budget": {
+    "depth": "standard",
+    "max_probes": 3,
+    "timeout_seconds": 900
+  },
+  "artifact_dir": "plans/reports/wukong-20260101T000000Z-example",
+  "handoff": {
+    "owner": "controller",
+    "strategy_owner": "kongming"
+  }
+}
