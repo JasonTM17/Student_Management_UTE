@@ -51,6 +51,31 @@ export interface ThesisGroup {
   memberStudentIds: string[];
 }
 
+export interface ThesisCouncil {
+  id: string;
+  roundId: string;
+  departmentId: string;
+  scheduledAt?: string | null;
+  room?: string | null;
+  status: 'DRAFT' | 'SCHEDULED' | 'SCORING_OPEN' | 'FINALIZED' | 'CANCELLED';
+  members: ThesisCouncilMember[];
+}
+
+export interface ThesisCouncilMember {
+  lecturerId: string;
+  memberRole: string;
+  memberOrder: number;
+}
+
+export interface ThesisResult {
+  id: string;
+  groupId: string;
+  totalScore?: number | null;
+  grade?: string | null;
+  status: 'DRAFT' | 'PUBLISHED';
+  publishedAt?: string | null;
+}
+
 export interface AssistantReply {
   answer: string;
   model: string;
@@ -92,6 +117,35 @@ export const thesisApi = {
   assignTopic: async (groupId: string, topicId: string): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(`/thesis/groups/${groupId}/topic`, {
       topicId,
+    });
+    return response.data;
+  },
+
+  getGroup: async (groupId: string): Promise<ThesisGroup> => {
+    const response = await api.get<ThesisGroup>(`/thesis/groups/${groupId}`);
+    return response.data;
+  },
+
+  listCouncils: async (roundId: string): Promise<ThesisCouncil[]> => {
+    const response = await api.get<ThesisCouncil[]>('/thesis/councils', {
+      params: { roundId },
+    });
+    return response.data;
+  },
+
+  submitReview: async (
+    councilId: string,
+    groupId: string,
+    score: number,
+    comment: string,
+  ): Promise<void> => {
+    await api.post('/thesis/reviews', { councilId, groupId, score, comment });
+  },
+
+  publishResult: async (councilId: string, groupId: string): Promise<ThesisResult> => {
+    const response = await api.post<ThesisResult>('/thesis/results/publish', {
+      councilId,
+      groupId,
     });
     return response.data;
   },
