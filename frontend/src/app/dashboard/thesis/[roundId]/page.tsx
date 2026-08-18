@@ -1,0 +1,266 @@
+'use client';
+
+import { useEffect, useState } from 'react';
+import { useParams } from 'next/navigation';
+import {
+  CalendarDays,
+  Check,
+  CircleDot,
+  FileStack,
+  GraduationCap,
+  Scale,
+  UsersRound,
+} from 'lucide-react';
+import { useAuth } from '@/context/AuthContext';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { LocalizedLink } from '@/components/LocalizedLink';
+import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
+import {
+  thesisApi,
+  type ThesisCouncil,
+  type ThesisGroup,
+  type ThesisRound,
+  type ThesisTopic,
+} from '@/lib/thesis-api';
+
+function statusClass(status: string) {
+  if (['APPROVED', 'RESULTS_PUBLISHED', 'PROPOSALS_PUBLISHED'].includes(status)) {
+    return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
+  }
+  if (['REJECTED', 'CANCELLED'].includes(status)) {
+    return 'bg-red-500/12 text-red-700 dark:text-red-300';
+  }
+  return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
+}
+
+export default function ThesisRoundDetailPage() {
+  const { roundId } = useParams<{ roundId: string }>();
+  const { isLecturer, isAdmin } = useAuth();
+  const { formatDateTime, messages } = useI18n();
+  const [round, setRound] = useState<ThesisRound | null>(null);
+  const [topics, setTopics] = useState<ThesisTopic[]>([]);
+  const [groups, setGroups] = useState<ThesisGroup[]>([]);
+  const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
+  const [error, setError] = useState('');
+
+  const canManage = isLecturer || isAdmin;
+  const statusLabel = (status: string) =>
+    messages.thesis.status[status as keyof typeof messages.thesis.status] ?? status;
+
+  useEffect(() => {
+    if (!roundId) return;
+    let cancelled = false;
+    const load = async () => {
+      setIsLoading(true);
+      setError('');
+      try {
+        const [roundsData, topicsData, groupsData, councilsData] = await Promise.all([
+          thesisApi.listRounds(),
+          thesisApi.listTopics(roundId),
+          thesisApi.listGroups(roundId),
+          thesisApi.listCouncils(roundId),
+        ]);
+        if (cancelled) return;
+        setRound(roundsData.find((r) => r.id === roundId) ?? null);
+        setTopics(topicsData);
+        setGroups(groupsData);
+        setCouncils(councilsData);
+      } catch {
+        if (!cancelled) setError(messages.thesis.loadFailed);
+      } finally {
+        if (!cancelled) setIsLoading(false);
+      }
+    };
+    void load();
+    return () => {
+      cancelled = true;
+    };
+  }, [roundId, messages.thesis.loadFailed]);
+
+  if (isLoading) {
+    return <LoadingState label={messages.thesis.loading} />;
+  }
+
+  if (error || !round) {
+    return (
+      <ErrorState
+        title={messages.thesis.loadFailed}
+        description={error || messages.thesis.noRound}
+        retryLabel={messages.thesis.retry}
+        onRetry={() => window.location.reload()}
+      />
+    );
+  }
+
+  return (
+    <div className="space-y-8">
+      <PageHeader
+        eyebrow={<SectionEyebrow>{messages.thesis.eyebrow}</SectionEyebrow>}
+        title={round.name}
+        description={messages.thesis.description}
+        actions={
+          <div className="flex flex-wrap gap-2">
+            <LocalizedLink href="/dashboard/thesis/progress">
+              <span className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary/50">
+                <CalendarDays className="h-4 w-4" />
+                {messages.thesis.progress.eyebrow}
+              </span>
+            </LocalizedLink>
+            {canManage ? (
+              <LocalizedLink href="/dashboard/thesis/reviews">
+                <span className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary/50">
+                  <Scale className="h-4 w-4" />
+                  {messages.thesis.review.eyebrow}
+                </span>
+              </LocalizedLink>
+            ) : null}
+          </div>
+        }
+      />
+
+      <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
+        <MetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warm" />
+        <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="cool" />
+        <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
+        <MetricCard label={messages.thesis.detail.councils} value={councils.length} icon={<GraduationCap className="h-5 w-5" />} tone="violet" />
+      </div>
+
+      <div className="grid gap-6 xl:grid-cols-2">
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
+            <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {topics.length === 0 ? (
+              <EmptyState icon={FileStack} title={messages.thesis.noTopics} description={messages.thesis.noTopicsDescription} className="min-h-[200px]" />
+            ) : (
+              <div className="space-y-3">
+                {topics.map((topic) => (
+                  <article key={topic.id} className="rounded-xl border border-border/70 bg-card p-4">
+                    <div className="flex items-start justify-between gap-3">
+                      <h3 className="text-sm font-semibold leading-6 text-foreground">{topic.title}</h3>
+                      <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(topic.status))}>
+                        {statusLabel(topic.status)}
+                      </span>
+                    </div>
+                    <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{topic.description}</p>
+                    <p className="mt-3 text-xs text-muted-foreground">
+                      {messages.thesis.detail.maxGroups}: {topic.maxGroups}
+                    </p>
+                  </article>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+
+        <Card className="h-full">
+          <CardHeader>
+            <CardTitle>{messages.thesis.detail.groupsTitle}</CardTitle>
+            <CardDescription>{messages.thesis.detail.groupsDescription}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {groups.length === 0 ? (
+              <EmptyState icon={UsersRound} title={messages.thesis.detail.noGroups} description={messages.thesis.detail.noGroupsDescription} className="min-h-[200px]" />
+            ) : (
+              <div className="space-y-3">
+                {groups.map((group, idx) => (
+                  <div key={group.id} className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                        {idx + 1}
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {messages.thesis.review.groupLabel} #{idx + 1}
+                        </p>
+                        <p className="font-mono text-xs text-muted-foreground">{group.memberStudentIds.length} {messages.thesis.detail.members}</p>
+                      </div>
+                    </div>
+                    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(group.approvalStatus))}>
+                      {statusLabel(group.approvalStatus)}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      </div>
+
+      {canManage ? (
+        <Card>
+          <CardHeader>
+            <CardTitle>{messages.thesis.detail.councilsTitle}</CardTitle>
+            <CardDescription>{messages.thesis.detail.councilsDescription}</CardDescription>
+          </CardHeader>
+          <CardContent>
+            {councils.length === 0 ? (
+              <EmptyState icon={GraduationCap} title={messages.thesis.detail.noCouncils} description={messages.thesis.detail.noCouncilsDescription} />
+            ) : (
+              <div className="space-y-3">
+                {councils.map((council) => (
+                  <div key={council.id} className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
+                    <div className="flex items-center gap-3">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/12 text-cyan-700 dark:text-cyan-300">
+                        <GraduationCap className="h-5 w-5" />
+                      </div>
+                      <div>
+                        <p className="text-sm font-semibold text-foreground">
+                          {council.room ?? council.id.slice(0, 8)}
+                        </p>
+                        <p className="text-xs text-muted-foreground">
+                          {council.members.length} {messages.thesis.review.memberCount}
+                          {council.scheduledAt ? ` · ${formatDateTime(council.scheduledAt)}` : ''}
+                        </p>
+                      </div>
+                    </div>
+                    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(council.status))}>
+                      {council.status}
+                    </span>
+                  </div>
+                ))}
+              </div>
+            )}
+          </CardContent>
+        </Card>
+      ) : null}
+    </div>
+  );
+}
+
+function MetricCard({
+  label,
+  value,
+  icon,
+  tone,
+}: {
+  label: string;
+  value: string | number;
+  icon: React.ReactNode;
+  tone: 'warm' | 'cool' | 'success' | 'violet';
+}) {
+  const toneClasses = {
+    warm: 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
+    cool: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300',
+    success: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
+    violet: 'bg-violet-500/12 text-violet-700 dark:text-violet-300',
+  };
+
+  return (
+    <Card variant="elevated">
+      <CardContent className="flex items-start justify-between gap-4 pt-6">
+        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneClasses[tone])}>{icon}</div>
+        <div className="min-w-0 text-right">
+          <div className="break-words text-2xl font-semibold tracking-tight text-foreground">{value}</div>
+          <div className="mt-1 text-sm text-muted-foreground">{label}</div>
+        </div>
+      </CardContent>
+    </Card>
+  );
+}
