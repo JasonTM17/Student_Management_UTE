@@ -38,3 +38,20 @@ mvn -f java-services/pom.xml verify
 
 The current checkout does not claim a production cutover. Existing Node tests
 remain required while the old services are still canonical.
+
+## Implemented slice
+
+- Registration rounds with explicit lifecycle transitions.
+- Published thesis topics and coordinator approval boundary.
+- Student groups with a database-enforced maximum of three members per round.
+- Defense councils with three-to-five-member scheduling validation.
+- Council reviews, score locking, and result publication after all council
+  members submit a score.
+- Server-side read-only assistant with permission-filtered thesis context,
+  Redis rate limiting, bounded provider timeout, and no mutation tools.
+- Next.js bilingual thesis workspace and session-only assistant panel.
+
+The old Node services remain canonical for all existing CampusCore domains. This
+branch is not a full backend cutover and must not be described as production
+ready until remaining service parity, data reconciliation, gateway canary, and
+rollback gates pass.

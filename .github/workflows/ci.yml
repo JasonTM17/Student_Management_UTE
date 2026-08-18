@@ -47,6 +47,27 @@ jobs:
       - name: Enforce documentation hygiene guard
         run: node scripts/check-doc-hygiene.mjs
 
+  java-thesis-quality:
+    name: java-thesis-quality
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: |
+            java-services/pom.xml
+            java-services/thesis-service/pom.xml
+
+      - name: Verify Spring thesis service
+        run: mvn -f java-services/pom.xml verify
+
   core-quality:
     name: core-quality
     runs-on: ubuntu-latest
