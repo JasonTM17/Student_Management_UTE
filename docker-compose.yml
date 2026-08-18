@@ -442,6 +442,7 @@ services:
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
       JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-rotate-before-shared-use}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-dev-readiness-key-12345}
+      REDIS_URL: redis://redis:6379
       SERVER_PORT: 4010
       FLYWAY_ENABLED: "true"
       MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
