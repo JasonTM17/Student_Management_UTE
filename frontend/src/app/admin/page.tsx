@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { ArrowRight, BarChart3, Bell, BookMarked, BookOpen, Building2, CreditCard, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+
 import { useAuth } from '@/context/AuthContext';
 import { analyticsApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
@@ -20,6 +21,13 @@ interface QuickStats {
 }
 
 const menuItems = [
+  {
+    href: '/admin/thesis',
+    icon: GraduationCap,
+    label: 'Thesis management',
+    description: 'Create registration rounds, manage lifecycle, and monitor councils.',
+    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
+  },
   {
     href: '/admin/users',
     icon: Users,
