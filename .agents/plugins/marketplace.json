@@ -1,0 +1,10 @@
+{
+  "name": "agentkit-local",
+  "plugins": [
+    {
+      "name": "ak-engineer",
+      "source": "./engineer",
+      "description": "Engineer-specialized kit. Extends core additively with engineer-unique agents, skills, hooks, schemas, scripts."
+    }
+  ]
+}
