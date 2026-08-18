@@ -26,6 +26,7 @@
 
     <modules>
         <module>academic-service</module>
+        <module>analytics-service</module>
         <module>auth-service</module>
         <module>engagement-service</module>
         <module>finance-service</module>
