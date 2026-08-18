@@ -25,6 +25,7 @@
     </properties>
 
     <modules>
+        <module>academic-service</module>
         <module>auth-service</module>
         <module>engagement-service</module>
         <module>notification-service</module>
