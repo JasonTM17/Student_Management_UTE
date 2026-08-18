@@ -1,0 +1,9 @@
+name: ai-multimodal
+version: "1.0.0"
+description: Multimodal analysis and generation through pinned @mrgoonie/multix CLI.
+
+runtime:
+  node:
+    version: ">=20"
+    packages:
+      - "@mrgoonie/multix@0.2.0"

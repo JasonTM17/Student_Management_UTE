@@ -1,0 +1,165 @@
+{
+  "description": "AgentKit project-local Codex hooks. Commands resolve their script from the Git root; provider credential and network refresh hooks are intentionally not enabled.",
+  "hooks": {
+    "PostToolUse": [
+      {
+        "matcher": "Edit|Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"plan-format-kanban.cjs\"",
+            "timeout": 10,
+            "statusMessage": "Validating AgentKit plan format",
+            "additionalContextLimit": 2000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"dev-rules-reminder.cjs\"",
+            "timeout": 10,
+            "statusMessage": "Refreshing AgentKit development context",
+            "additionalContextLimit": 2400
+          }
+        ]
+      }
+    ],
+    "PreCompact": [
+      {
+        "matcher": "manual|auto",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"precompact-capture.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Capturing AgentKit recovery context"
+          }
+        ]
+      }
+    ],
+    "PreToolUse": [
+      {
+        "matcher": "Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"scout-block.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking AgentKit scout boundary"
+          }
+        ]
+      },
+      {
+        "matcher": "Write",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"descriptive-name.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking a descriptive file name",
+            "additionalContextLimit": 1000
+          }
+        ]
+      },
+      {
+        "matcher": "Write|Edit|Bash",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"privacy-block.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking sensitive file access"
+          }
+        ]
+      }
+    ],
+    "SessionStart": [
+      {
+        "matcher": "startup|resume|clear|compact",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"session-init.cjs\"",
+            "timeout": 12,
+            "statusMessage": "Loading AgentKit session context",
+            "additionalContextLimit": 2400
+          }
+        ]
+      }
+    ],
+    "Stop": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"cook-after-plan-reminder.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking AgentKit plan handoff"
+          },
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"session-state.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Saving AgentKit session state"
+          }
+        ]
+      }
+    ],
+    "SubagentStart": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"subagent-init.cjs\"",
+            "timeout": 10,
+            "statusMessage": "Loading AgentKit subagent context",
+            "additionalContextLimit": 2400
+          }
+        ]
+      }
+    ],
+    "SubagentStop": [
+      {
+        "matcher": "*",
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"session-state.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Saving AgentKit subagent state"
+          }
+        ]
+      }
+    ],
+    "UserPromptSubmit": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"dev-rules-reminder.cjs\"",
+            "timeout": 10,
+            "statusMessage": "Loading AgentKit development context",
+            "additionalContextLimit": 2400
+          },
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"secret-output-guardrail.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking secret-safe output",
+            "additionalContextLimit": 1000
+          },
+          {
+            "type": "command",
+            "command": "node -e \"const c=require('node:child_process'),p=require('node:path'),r=c.execFileSync('git',['rev-parse','--show-toplevel'],{encoding:'utf8'}).trim(),x=c.spawnSync(process.execPath,[p.join(r,'.codex','hooks',process.argv[1])],{stdio:'inherit'});process.exit(x.status ?? 1)\" \"simplify-gate.cjs\"",
+            "timeout": 8,
+            "statusMessage": "Checking request scope"
+          }
+        ]
+      }
+    ]
+  }
+}
