@@ -11,6 +11,7 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { MemberAvatars } from '@/components/thesis/MemberAvatars';
 import {
   thesisApi,
   type ThesisGroup,
@@ -316,18 +317,7 @@ export default function ThesisPage() {
                         <span className="text-muted-foreground">{messages.thesis.memberCount.replace('{count}', String(currentGroup.memberStudentIds.length))}</span>
                         <span className="font-medium text-foreground">{currentGroup.topicId ? messages.thesis.status.SUBMITTED : messages.thesis.chooseTopic}</span>
                       </div>
-                      <div className="flex gap-2">
-                        {currentGroup.memberStudentIds.map((memberId, index) => (
-                          <div key={memberId} className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary text-xs font-semibold text-foreground" title={memberId}>
-                            {index + 1}
-                          </div>
-                        ))}
-                        {Array.from({ length: 3 - currentGroup.memberStudentIds.length }).map((_, index) => (
-                          <div key={`empty-${index}`} className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground">
-                            +
-                          </div>
-                        ))}
-                      </div>
+                      <MemberAvatars memberIds={currentGroup.memberStudentIds} max={3} />
                     </div>
                   </div>
                 )}
