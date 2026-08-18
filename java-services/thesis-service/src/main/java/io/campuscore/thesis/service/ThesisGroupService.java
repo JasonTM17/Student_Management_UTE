@@ -124,8 +124,13 @@ public class ThesisGroupService {
 
     @Transactional(readOnly = true)
     public GroupResponse getResponse(UUID id) {
-        return response(groups.findById(id)
-                .orElseThrow(() -> new DomainExceptions.NotFound("Thesis group not found")));
+        return response(get(id));
+    }
+
+    @Transactional(readOnly = true)
+    public ThesisGroup get(UUID id) {
+        return groups.findById(id)
+                .orElseThrow(() -> new DomainExceptions.NotFound("Thesis group not found"));
     }
 
     private ThesisGroup lockedGroup(UUID groupId) {

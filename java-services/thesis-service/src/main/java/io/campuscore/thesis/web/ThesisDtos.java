@@ -2,7 +2,13 @@ package io.campuscore.thesis.web;
 
 import io.campuscore.thesis.domain.ApprovalStatus;
 import io.campuscore.thesis.domain.GroupStatus;
+import io.campuscore.thesis.domain.CouncilMemberRole;
+import io.campuscore.thesis.domain.CouncilStatus;
 import io.campuscore.thesis.domain.RoundStatus;
+import io.campuscore.thesis.domain.ResultStatus;
+import io.campuscore.thesis.domain.ThesisCouncilMember;
+import io.campuscore.thesis.domain.ThesisDefenseCouncil;
+import io.campuscore.thesis.domain.ThesisResult;
 import io.campuscore.thesis.domain.ThesisGroup;
 import io.campuscore.thesis.domain.ThesisGroupMember;
 import io.campuscore.thesis.domain.ThesisRegistrationRound;
@@ -131,5 +137,79 @@ public final class ThesisDtos {
             @NotNull UUID groupId,
             @NotNull @DecimalMin("0.0") @DecimalMax("10.0") BigDecimal score,
             @Size(max = 2000) String comment) {
+    }
+
+    public record CreateCouncilRequest(
+            @NotNull UUID roundId,
+            @NotNull UUID departmentId) {
+    }
+
+    public record AddCouncilMemberRequest(
+            @NotNull UUID lecturerId,
+            @NotNull CouncilMemberRole memberRole,
+            @NotNull Integer memberOrder) {
+    }
+
+    public record ScheduleCouncilRequest(
+            @NotNull Instant scheduledAt,
+            @NotBlank @Size(max = 120) String room) {
+    }
+
+    public record CouncilResponse(
+            UUID id,
+            UUID roundId,
+            UUID departmentId,
+            Instant scheduledAt,
+            String room,
+            CouncilStatus status,
+            List<CouncilMemberResponse> members) {
+
+        public static CouncilResponse from(ThesisDefenseCouncil council, List<ThesisCouncilMember> members) {
+            return new CouncilResponse(
+                    council.getId(),
+                    council.getRoundId(),
+                    council.getDepartmentId(),
+                    council.getScheduledAt(),
+                    council.getRoom(),
+                    council.getStatus(),
+                    members.stream().map(CouncilMemberResponse::from).toList());
+        }
+    }
+
+    public record CouncilMemberResponse(
+            UUID lecturerId,
+            CouncilMemberRole memberRole,
+            int memberOrder) {
+
+        public static CouncilMemberResponse from(ThesisCouncilMember member) {
+            return new CouncilMemberResponse(
+                    member.getLecturerId(),
+                    member.getMemberRole(),
+                    member.getMemberOrder());
+        }
+    }
+
+    public record PublishResultRequest(
+            @NotNull UUID councilId,
+            @NotNull UUID groupId) {
+    }
+
+    public record ResultResponse(
+            UUID id,
+            UUID groupId,
+            BigDecimal totalScore,
+            String grade,
+            ResultStatus status,
+            Instant publishedAt) {
+
+        public static ResultResponse from(ThesisResult result) {
+            return new ResultResponse(
+                    result.getId(),
+                    result.getGroupId(),
+                    result.getTotalScore(),
+                    result.getGrade(),
+                    result.getStatus(),
+                    result.getPublishedAt());
+        }
     }
 }

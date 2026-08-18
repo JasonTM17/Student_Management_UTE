@@ -4,16 +4,25 @@ import io.campuscore.thesis.domain.RoundStatus;
 import io.campuscore.thesis.domain.TopicStatus;
 import io.campuscore.thesis.security.AccessContext;
 import io.campuscore.thesis.service.ThesisGroupService;
+import io.campuscore.thesis.service.ThesisCouncilService;
 import io.campuscore.thesis.service.ThesisRoundService;
+import io.campuscore.thesis.service.ThesisReviewService;
 import io.campuscore.thesis.service.ThesisTopicService;
 import io.campuscore.thesis.web.ThesisDtos.AddMemberRequest;
 import io.campuscore.thesis.web.ThesisDtos.AssignTopicRequest;
 import io.campuscore.thesis.web.ThesisDtos.CreateGroupRequest;
 import io.campuscore.thesis.web.ThesisDtos.CreateRoundRequest;
 import io.campuscore.thesis.web.ThesisDtos.CreateTopicRequest;
+import io.campuscore.thesis.web.ThesisDtos.CreateCouncilRequest;
+import io.campuscore.thesis.web.ThesisDtos.AddCouncilMemberRequest;
+import io.campuscore.thesis.web.ThesisDtos.ScheduleCouncilRequest;
 import io.campuscore.thesis.web.ThesisDtos.DecideGroupRequest;
 import io.campuscore.thesis.web.ThesisDtos.GroupResponse;
+import io.campuscore.thesis.web.ThesisDtos.CouncilResponse;
+import io.campuscore.thesis.web.ThesisDtos.PublishResultRequest;
 import io.campuscore.thesis.web.ThesisDtos.RoundResponse;
+import io.campuscore.thesis.web.ThesisDtos.ReviewRequest;
+import io.campuscore.thesis.web.ThesisDtos.ResultResponse;
 import io.campuscore.thesis.web.ThesisDtos.TopicResponse;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -35,11 +44,20 @@ public class ThesisController {
     private final ThesisRoundService rounds;
     private final ThesisTopicService topics;
     private final ThesisGroupService groups;
+    private final ThesisCouncilService councils;
+    private final ThesisReviewService reviews;
 
-    public ThesisController(ThesisRoundService rounds, ThesisTopicService topics, ThesisGroupService groups) {
+    public ThesisController(
+            ThesisRoundService rounds,
+            ThesisTopicService topics,
+            ThesisGroupService groups,
+            ThesisCouncilService councils,
+            ThesisReviewService reviews) {
         this.rounds = rounds;
         this.topics = topics;
         this.groups = groups;
+        this.councils = councils;
+        this.reviews = reviews;
     }
 
     @GetMapping("/rounds")
@@ -135,5 +153,54 @@ public class ThesisController {
             @Valid @RequestBody DecideGroupRequest request,
             Authentication authentication) {
         return groups.decide(id, request, AccessContext.from(authentication).userId());
+    }
+
+    @GetMapping("/councils")
+    public List<CouncilResponse> listCouncils(@RequestParam UUID roundId) {
+        return councils.list(roundId);
+    }
+
+    @PostMapping("/councils")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:council:create')")
+    public CouncilResponse createCouncil(@Valid @RequestBody CreateCouncilRequest request) {
+        return councils.create(request);
+    }
+
+    @PostMapping("/councils/{id}/members")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:council:manage')")
+    public CouncilResponse addCouncilMember(
+            @PathVariable UUID id,
+            @Valid @RequestBody AddCouncilMemberRequest request) {
+        return councils.addMember(id, request);
+    }
+
+    @PostMapping("/councils/{id}/schedule")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:council:manage')")
+    public CouncilResponse scheduleCouncil(
+            @PathVariable UUID id,
+            @Valid @RequestBody ScheduleCouncilRequest request) {
+        return councils.schedule(id, request);
+    }
+
+    @PostMapping("/councils/{id}/open-scoring")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:council:manage')")
+    public CouncilResponse openScoring(@PathVariable UUID id) {
+        return councils.openScoring(id);
+    }
+
+    @PostMapping("/reviews")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:review:submit')")
+    public void submitReview(
+            @Valid @RequestBody ReviewRequest request,
+            Authentication authentication) {
+        reviews.submit(request, AccessContext.from(authentication).lecturerId());
+    }
+
+    @PostMapping("/results/publish")
+    @PreAuthorize("@thesisPermissions.has(authentication, 'thesis:result:publish')")
+    public ResultResponse publishResult(
+            @Valid @RequestBody PublishResultRequest request,
+            Authentication authentication) {
+        return reviews.publishResult(request, AccessContext.from(authentication).userId());
     }
 }
