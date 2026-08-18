@@ -1,0 +1,48 @@
+spring:
+  application:
+    name: campuscore-engagement-service
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/campuscore?currentSchema=engagement}
+    username: ${SPRING_DATASOURCE_USERNAME:campuscore}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: engagement
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: engagement
+    schemas: engagement
+    locations: classpath:db/migration
+
+server:
+  port: ${SERVER_PORT:4004}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+security:
+  jwt-secret: ${JWT_SECRET:}
+  access-token-cookie: ${ACCESS_TOKEN_COOKIE:cc_access_token}
+  csrf-cookie: ${CSRF_COOKIE:cc_csrf}
+  csrf-header: ${CSRF_HEADER:X-CSRF-Token}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service: ${spring.application.name}
