@@ -148,8 +148,12 @@ export default function DashboardLayout({
     if (isLoading || isLoggingOut) return;
     if (!user) {
       router.replace(`${href('/login')}?reason=unauthorized`);
+      return;
     }
-  }, [href, user, isLoading, isLoggingOut, router]);
+    if (isAdmin) {
+      router.replace(href('/admin'));
+    }
+  }, [href, user, isLoading, isLoggingOut, isAdmin, router]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
