@@ -10,22 +10,13 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
 import {
   thesisApi,
   type ThesisGroup,
   type ThesisRound,
   type ThesisTopic,
 } from '@/lib/thesis-api';
-
-function statusClass(status: string) {
-  if (['APPROVED', 'RESULTS_PUBLISHED', 'PROPOSALS_PUBLISHED'].includes(status)) {
-    return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
-  }
-  if (['REJECTED', 'CANCELLED'].includes(status)) {
-    return 'bg-red-500/12 text-red-700 dark:text-red-300';
-  }
-  return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
-}
 
 export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin } = useAuth();
@@ -318,9 +309,7 @@ export default function ThesisPage() {
                         </p>
                         <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{currentGroup.id}</p>
                       </div>
-                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(currentGroup.approvalStatus))}>
-                        {statusLabel(currentGroup.approvalStatus)}
-                      </span>
+                      <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
