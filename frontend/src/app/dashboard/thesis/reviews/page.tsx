@@ -2,12 +2,12 @@
 
 import { useEffect, useState } from 'react';
 import {
-  Award,
   Check,
   ClipboardCheck,
   Save,
   Scale,
   Star,
+  Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
@@ -21,6 +21,7 @@ import { cn } from '@/lib/utils';
 import {
   thesisApi,
   type ThesisCouncil,
+  type ThesisGroup,
   type ThesisRound,
 } from '@/lib/thesis-api';
 
@@ -34,6 +35,7 @@ export default function ThesisReviewsPage() {
   const { messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
+  const [groups, setGroups] = useState<ThesisGroup[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const [selectedCouncilId, setSelectedCouncilId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
@@ -69,21 +71,26 @@ export default function ThesisReviewsPage() {
   useEffect(() => {
     if (!selectedRoundId) {
       setCouncils([]);
+      setGroups([]);
       return;
     }
     let cancelled = false;
-    const loadCouncils = async () => {
+    const loadWorkspace = async () => {
       setError('');
       try {
-        const data = await thesisApi.listCouncils(selectedRoundId);
+        const [councilData, groupData] = await Promise.all([
+          thesisApi.listCouncils(selectedRoundId),
+          thesisApi.listGroups(selectedRoundId),
+        ]);
         if (cancelled) return;
-        setCouncils(data);
-        setSelectedCouncilId((curr) => curr || data[0]?.id || '');
+        setCouncils(councilData);
+        setGroups(groupData);
+        setSelectedCouncilId((curr) => curr || councilData[0]?.id || '');
       } catch {
         if (!cancelled) setError(messages.thesis.loadFailed);
       }
     };
-    void loadCouncils();
+    void loadWorkspace();
     return () => {
       cancelled = true;
     };
@@ -246,73 +253,81 @@ export default function ThesisReviewsPage() {
               <CardDescription>{messages.thesis.review.groupsDescription}</CardDescription>
             </CardHeader>
             <CardContent>
-              <div className="space-y-4">
-                {['group-1', 'group-2', 'group-3'].map((groupId, idx) => {
-                  const draft = reviews[groupId];
-                  return (
-                    <div
-                      key={groupId}
-                      className="rounded-xl border border-border/70 bg-card p-5"
-                    >
-                      <div className="flex items-start justify-between gap-4">
-                        <div className="flex items-center gap-3">
-                          <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
-                            {idx + 1}
+              {groups.length === 0 ? (
+                <EmptyState
+                  icon={Users}
+                  title={messages.thesis.review.noGroups}
+                  description={messages.thesis.review.noGroupsDescription}
+                />
+              ) : (
+                <div className="space-y-4">
+                  {groups.map((group, idx) => {
+                    const draft = reviews[group.id];
+                    return (
+                      <div
+                        key={group.id}
+                        className="rounded-xl border border-border/70 bg-card p-5"
+                      >
+                        <div className="flex items-start justify-between gap-4">
+                          <div className="flex items-center gap-3">
+                            <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
+                              {idx + 1}
+                            </div>
+                            <div>
+                              <p className="text-sm font-semibold text-foreground">
+                                {messages.thesis.review.groupLabel} #{idx + 1}
+                              </p>
+                              <p className="font-mono text-xs text-muted-foreground">
+                                {group.id.slice(0, 8)}…
+                              </p>
+                            </div>
                           </div>
-                          <div>
-                            <p className="text-sm font-semibold text-foreground">
-                              {messages.thesis.review.groupLabel} #{idx + 1}
-                            </p>
-                            <p className="font-mono text-xs text-muted-foreground">
-                              {groupId}
-                            </p>
+                          <div className="flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
+                            <Star className="h-3 w-3" />
+                            {draft?.score || '-'} / 10
                           </div>
                         </div>
-                        <div className="flex items-center gap-1 rounded-full bg-amber-500/12 px-2.5 py-1 text-xs font-semibold text-amber-700 dark:text-amber-300">
-                          <Star className="h-3 w-3" />
-                          {draft?.score || '-'} / 10
+                        <div className="mt-4 grid gap-4 sm:grid-cols-[10rem_1fr]">
+                          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {messages.thesis.review.score}
+                            <Input
+                              type="number"
+                              min="0"
+                              max="10"
+                              step="0.1"
+                              placeholder="0–10"
+                              value={draft?.score ?? ''}
+                              onChange={(e) => updateReview(group.id, { score: e.target.value })}
+                              className="normal-case tracking-normal"
+                            />
+                          </label>
+                          <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {messages.thesis.review.comment}
+                            <Textarea
+                              placeholder={messages.thesis.review.commentPlaceholder}
+                              value={draft?.comment ?? ''}
+                              onChange={(e) => updateReview(group.id, { comment: e.target.value })}
+                              rows={2}
+                              className="normal-case tracking-normal"
+                            />
+                          </label>
+                        </div>
+                        <div className="mt-4 flex justify-end">
+                          <Button
+                            type="button"
+                            size="sm"
+                            onClick={() => void submitReview(group.id)}
+                            disabled={isSaving}
+                          >
+                            <Save className="mr-2 h-4 w-4" />
+                            {messages.thesis.review.submit}
+                          </Button>
                         </div>
                       </div>
-                      <div className="mt-4 grid gap-4 sm:grid-cols-[10rem_1fr]">
-                        <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {messages.thesis.review.score}
-                          <Input
-                            type="number"
-                            min="0"
-                            max="10"
-                            step="0.1"
-                            placeholder="0–10"
-                            value={draft?.score ?? ''}
-                            onChange={(e) => updateReview(groupId, { score: e.target.value })}
-                            className="normal-case tracking-normal"
-                          />
-                        </label>
-                        <label className="flex flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {messages.thesis.review.comment}
-                          <Textarea
-                            placeholder={messages.thesis.review.commentPlaceholder}
-                            value={draft?.comment ?? ''}
-                            onChange={(e) => updateReview(groupId, { comment: e.target.value })}
-                            rows={2}
-                            className="normal-case tracking-normal"
-                          />
-                        </label>
-                      </div>
-                      <div className="mt-4 flex justify-end">
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => void submitReview(groupId)}
-                          disabled={isSaving}
-                        >
-                          <Save className="mr-2 h-4 w-4" />
-                          {messages.thesis.review.submit}
-                        </Button>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
+                    );
+                  })}
+                </div>
+              )}
             </CardContent>
           </Card>
         </div>
