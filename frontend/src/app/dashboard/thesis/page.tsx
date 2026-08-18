@@ -1,12 +1,13 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, CalendarDays, Check, CircleDot, FileStack, UsersRound } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, Check, CircleDot, ClipboardCheck, FileStack, Gauge, UsersRound } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
@@ -228,6 +229,43 @@ export default function ThesisPage() {
             <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="cool" />
             <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
             <MetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} tone="violet" />
+          </div>
+
+          <div className="grid gap-4 sm:grid-cols-2">
+            <LocalizedLink
+              href="/dashboard/thesis/progress"
+              className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/45 hover:bg-secondary/30"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-amber-500/12 text-amber-700 dark:text-amber-300">
+                <Gauge className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                  {messages.thesis.progress.title}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {messages.thesis.progress.description}
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </LocalizedLink>
+            <LocalizedLink
+              href="/dashboard/thesis/reviews"
+              className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/45 hover:bg-secondary/30"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-500/12 text-cyan-700 dark:text-cyan-300">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                  {messages.thesis.review.title}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {messages.thesis.review.description}
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </LocalizedLink>
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
