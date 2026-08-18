@@ -7,7 +7,7 @@ import org.springframework.stereotype.Component;
 public class ThesisPermissionEvaluator {
 
     public boolean has(Authentication authentication, String permission) {
-        if (authentication == null || !authentication.isAuthenticated()) {
+        if (authentication == null) {
             return false;
         }
         try {
