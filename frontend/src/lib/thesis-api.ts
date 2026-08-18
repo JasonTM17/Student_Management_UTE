@@ -51,6 +51,12 @@ export interface ThesisGroup {
   memberStudentIds: string[];
 }
 
+export interface AssistantReply {
+  answer: string;
+  model: string;
+  degraded: boolean;
+}
+
 export const thesisApi = {
   listRounds: async (): Promise<ThesisRound[]> => {
     const response = await api.get<ThesisRound[]>('/thesis/rounds');
@@ -86,6 +92,14 @@ export const thesisApi = {
   assignTopic: async (groupId: string, topicId: string): Promise<ThesisGroup> => {
     const response = await api.post<ThesisGroup>(`/thesis/groups/${groupId}/topic`, {
       topicId,
+    });
+    return response.data;
+  },
+
+  chat: async (message: string, locale: 'en' | 'vi'): Promise<AssistantReply> => {
+    const response = await api.post<AssistantReply>('/thesis/assistant/chat', {
+      message,
+      locale,
     });
     return response.data;
   },

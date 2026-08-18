@@ -14,6 +14,7 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
 import { StudentContextRail } from '@/components/dashboard/StudentContextRail';
+import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
@@ -672,6 +673,7 @@ export default function DashboardLayout({
           )}
         </div>
       </div>
+      <AssistantPanel />
     </div>
   );
 }

@@ -903,6 +903,18 @@ export const en = {
       COMPLETED: 'Completed',
     },
   },
+  assistant: {
+    label: 'AI assistant',
+    title: 'Thesis guide',
+    description: 'Ask about the current thesis workflow and published topic context.',
+    open: 'Open thesis assistant',
+    close: 'Close thesis assistant',
+    placeholder: 'Ask about registration, topics, groups, or reviews...',
+    send: 'Send message',
+    thinking: 'Checking the authorized thesis context...',
+    empty: 'Start with a question about your current thesis round.',
+    unavailable: 'The assistant is not available right now. Your thesis data is unchanged.',
+  },
 } as const;
 
 type DeepWiden<T> = T extends string
@@ -1816,6 +1828,18 @@ export const vi: I18nMessages = {
       SUBMITTED: 'Đã gửi',
       COMPLETED: 'Đã hoàn thành',
     },
+  },
+  assistant: {
+    label: 'Trợ lý AI',
+    title: 'Hướng dẫn luận văn',
+    description: 'Hỏi về quy trình luận văn và ngữ cảnh đề tài đã được công bố.',
+    open: 'Mở trợ lý luận văn',
+    close: 'Đóng trợ lý luận văn',
+    placeholder: 'Hỏi về đăng ký, đề tài, nhóm hoặc phản biện...',
+    send: 'Gửi tin nhắn',
+    thinking: 'Đang kiểm tra ngữ cảnh luận văn được phép xem...',
+    empty: 'Bắt đầu bằng câu hỏi về đợt luận văn hiện tại của bạn.',
+    unavailable: 'Trợ lý hiện chưa sẵn sàng. Dữ liệu luận văn của bạn không bị thay đổi.',
   },
 };
 
