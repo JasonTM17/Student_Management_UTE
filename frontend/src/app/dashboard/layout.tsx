@@ -7,7 +7,7 @@ import {
   useState,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Calendar, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileText, LayoutDashboard, LogOut, Menu, School, Settings, User, Users, X, BookOpen, DoorOpen, BarChart3 } from 'lucide-react';
+import { Bell, Calendar, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileText, LayoutDashboard, LogOut, Menu, School, Settings, User, Users, X, BookOpen, DoorOpen, BarChart3, ScrollText } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -27,6 +27,7 @@ const studentMenuItems = [
   { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
   { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
   { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
+  { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
   { href: '/dashboard/invoices', icon: CreditCard, labelKey: 'invoices' },
   { href: '/dashboard/announcements', icon: Bell, labelKey: 'announcements' },
 ];
@@ -35,6 +36,7 @@ const lecturerMenuItems = [
   { href: '/dashboard/lecturer', icon: LayoutDashboard, labelKey: 'dashboard' },
   { href: '/dashboard/lecturer/schedule', icon: Calendar, labelKey: 'teachingSchedule' },
   { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
+  { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
   { href: '/dashboard/lecturer/announcements', icon: Bell, labelKey: 'announcements' },
 ];
 
@@ -104,6 +106,10 @@ export default function DashboardLayout({
       '/dashboard/transcript': {
         title: messages.dashboardShell.menu.transcript,
         description: messages.dashboardShell.routeDescriptions.transcript,
+      },
+      '/dashboard/thesis': {
+        title: messages.dashboardShell.menu.thesis,
+        description: messages.dashboardShell.routeDescriptions.thesis,
       },
       '/dashboard/invoices': {
         title: messages.dashboardShell.menu.invoices,
