@@ -88,6 +88,19 @@ export const thesisApi = {
     return response.data;
   },
 
+  createRound: async (data: {
+    name: string;
+    thesisType: string;
+    registrationStart: string;
+    registrationEnd: string;
+    proposalPublishAt?: string;
+    reportDate?: string;
+    defenseDate?: string;
+  }): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>('/thesis/rounds', data);
+    return response.data;
+  },
+
   openRegistration: async (roundId: string): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>(`/thesis/rounds/${roundId}/open-registration`);
     return response.data;
@@ -167,6 +180,33 @@ export const thesisApi = {
 
   publishTopic: async (topicId: string): Promise<ThesisTopic> => {
     const response = await api.post<ThesisTopic>(`/thesis/topics/${topicId}/publish`);
+    return response.data;
+  },
+
+  createTopic: async (data: {
+    roundId: string;
+    departmentId: string;
+    title: string;
+    description: string;
+    maxGroups: number;
+  }): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>('/thesis/topics', data);
+    return response.data;
+  },
+
+  createCouncil: async (data: {
+    roundId: string;
+    departmentId: string;
+  }): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>('/thesis/councils', data);
+    return response.data;
+  },
+
+  addCouncilMember: async (
+    councilId: string,
+    data: { lecturerId: string; memberRole: string; memberOrder: number },
+  ): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(`/thesis/councils/${councilId}/members`, data);
     return response.data;
   },
 
