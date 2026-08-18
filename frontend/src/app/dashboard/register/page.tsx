@@ -625,6 +625,33 @@ export default function RegisterPage() {
     setCourses(deriveCoursesFromSections(sections, selectedDepartment));
   }, [sections, selectedDepartment]);
 
+  useEffect(() => {
+    if (!selectedSemester) {
+      return;
+    }
+
+    const semesterSectionIds = new Set(
+      sections
+        .filter((section) => section.semesterId === selectedSemester)
+        .map((section) => section.id),
+    );
+
+    setPlannedSectionIds((current) =>
+      current.filter((id) => semesterSectionIds.has(id)),
+    );
+
+    const currentDepartmentSections = sections.filter(
+      (section) =>
+        section.semesterId === selectedSemester &&
+        section.course?.departmentId === selectedDepartment,
+    );
+
+    if (currentDepartmentSections.length === 0 && selectedDepartment) {
+      setSelectedDepartment('');
+      setSelectedCourse('');
+    }
+  }, [selectedSemester, sections, selectedDepartment]);
+
   const selectedSemesterRecord = useMemo(
     () => semesters.find((semester) => semester.id === selectedSemester) ?? null,
     [selectedSemester, semesters],

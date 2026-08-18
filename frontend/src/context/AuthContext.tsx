@@ -115,6 +115,7 @@ export function useRequireAuth(
   const router = useRouter();
   const { href } = useI18n();
   const [hasAccess, setHasAccess] = useState(false);
+  const rolesKey = requiredRoles?.join(',') ?? '';
 
   useEffect(() => {
     if (isLoading || isLoggingOut) {
@@ -149,7 +150,7 @@ export function useRequireAuth(
     }
 
     setHasAccess(true);
-  }, [href, user, isLoading, isLoggingOut, requiredRoles, router]);
+  }, [href, user, isLoading, isLoggingOut, rolesKey, router]);
 
   return { user, isLoading, hasAccess };
 }
