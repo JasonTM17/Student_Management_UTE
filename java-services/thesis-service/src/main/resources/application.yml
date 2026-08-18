@@ -64,3 +64,5 @@ assistant:
   model: ${DEEPSEEK_MODEL:}
   max-requests-per-minute: ${ASSISTANT_MAX_REQUESTS_PER_MINUTE:20}
   max-message-length: ${ASSISTANT_MAX_MESSAGE_LENGTH:2000}
+  timeout-ms: ${ASSISTANT_TIMEOUT_MS:10000}
+  max-output-tokens: ${ASSISTANT_MAX_OUTPUT_TOKENS:800}

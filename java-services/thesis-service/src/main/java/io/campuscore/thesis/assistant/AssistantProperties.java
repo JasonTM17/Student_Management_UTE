@@ -11,6 +11,8 @@ public class AssistantProperties {
     private String model = "";
     private int maxRequestsPerMinute = 20;
     private int maxMessageLength = 2000;
+    private int timeoutMs = 10000;
+    private int maxOutputTokens = 800;
 
     public boolean isEnabled() {
         return enabled;
@@ -60,12 +62,30 @@ public class AssistantProperties {
         this.maxMessageLength = maxMessageLength;
     }
 
+    public int getTimeoutMs() {
+        return timeoutMs;
+    }
+
+    public void setTimeoutMs(int timeoutMs) {
+        this.timeoutMs = timeoutMs;
+    }
+
+    public int getMaxOutputTokens() {
+        return maxOutputTokens;
+    }
+
+    public void setMaxOutputTokens(int maxOutputTokens) {
+        this.maxOutputTokens = maxOutputTokens;
+    }
+
     public boolean isConfigured() {
         return enabled
                 && !baseUrl.isBlank()
                 && !apiKey.isBlank()
                 && !model.isBlank()
                 && maxRequestsPerMinute > 0
-                && maxMessageLength > 0;
+                && maxMessageLength > 0
+                && timeoutMs > 0
+                && maxOutputTokens > 0;
     }
 }

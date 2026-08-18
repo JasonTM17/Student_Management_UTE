@@ -45,6 +45,7 @@ public class AssistantService {
         String systemMessage = AssistantPrompt.systemMessage(request.locale(), actor, contextService.build(actor));
         Map<String, Object> payload = Map.of(
                 "model", properties.getModel(),
+                "max_tokens", properties.getMaxOutputTokens(),
                 "messages", List.of(
                         Map.of("role", "system", "content", systemMessage),
                         Map.of("role", "user", "content", message)));
