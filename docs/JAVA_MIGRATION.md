@@ -9,7 +9,8 @@ gates.
 
 `java-services/thesis-service` is an isolated Spring Boot service. It is not yet
 a replacement for `academic-service` and must not receive public traffic until
-the gateway and deployment checks are added in a later change.
+the gateway and deployment checks are added in a later change. Its tables use a
+dedicated `thesis` schema so legacy Prisma `db push` cannot own or remove them.
 
 The service targets Java 21, uses Flyway for versioned SQL migrations, validates
 existing access-token JWTs with `JWT_SECRET`, accepts the legacy access-token

@@ -1,6 +1,6 @@
-CREATE SCHEMA IF NOT EXISTS academic;
+CREATE SCHEMA IF NOT EXISTS thesis;
 
-CREATE TABLE academic.thesis_registration_round (
+CREATE TABLE thesis.thesis_registration_round (
     id UUID PRIMARY KEY,
     name VARCHAR(180) NOT NULL,
     thesis_type VARCHAR(40) NOT NULL,
@@ -17,11 +17,11 @@ CREATE TABLE academic.thesis_registration_round (
 );
 
 CREATE INDEX thesis_round_status_idx
-    ON academic.thesis_registration_round (status);
+    ON thesis.thesis_registration_round (status);
 
-CREATE TABLE academic.thesis_topic (
+CREATE TABLE thesis.thesis_topic (
     id UUID PRIMARY KEY,
-    round_id UUID NOT NULL REFERENCES academic.thesis_registration_round (id),
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
     department_id UUID NOT NULL,
     title VARCHAR(240) NOT NULL,
     description TEXT NOT NULL,
@@ -35,13 +35,13 @@ CREATE TABLE academic.thesis_topic (
 );
 
 CREATE INDEX thesis_topic_round_idx
-    ON academic.thesis_topic (round_id, status);
+    ON thesis.thesis_topic (round_id, status);
 CREATE INDEX thesis_topic_department_idx
-    ON academic.thesis_topic (department_id, status);
+    ON thesis.thesis_topic (department_id, status);
 
-CREATE TABLE academic.thesis_topic_supervisor (
+CREATE TABLE thesis.thesis_topic_supervisor (
     id UUID PRIMARY KEY,
-    topic_id UUID NOT NULL REFERENCES academic.thesis_topic (id) ON DELETE CASCADE,
+    topic_id UUID NOT NULL REFERENCES thesis.thesis_topic (id) ON DELETE CASCADE,
     lecturer_id UUID NOT NULL,
     supervisor_order INTEGER NOT NULL,
     created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
@@ -50,11 +50,11 @@ CREATE TABLE academic.thesis_topic_supervisor (
     CONSTRAINT thesis_topic_supervisor_order_unique UNIQUE (topic_id, supervisor_order)
 );
 
-CREATE TABLE academic.thesis_group (
+CREATE TABLE thesis.thesis_group (
     id UUID PRIMARY KEY,
-    round_id UUID NOT NULL REFERENCES academic.thesis_registration_round (id),
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
     leader_student_id UUID NOT NULL,
-    topic_id UUID REFERENCES academic.thesis_topic (id),
+    topic_id UUID REFERENCES thesis.thesis_topic (id),
     status VARCHAR(32) NOT NULL,
     approval_status VARCHAR(32) NOT NULL,
     approved_by UUID,
@@ -66,12 +66,12 @@ CREATE TABLE academic.thesis_group (
 );
 
 CREATE INDEX thesis_group_round_idx
-    ON academic.thesis_group (round_id, status, approval_status);
+    ON thesis.thesis_group (round_id, status, approval_status);
 
-CREATE TABLE academic.thesis_group_member (
+CREATE TABLE thesis.thesis_group_member (
     id UUID PRIMARY KEY,
-    group_id UUID NOT NULL REFERENCES academic.thesis_group (id) ON DELETE CASCADE,
-    round_id UUID NOT NULL REFERENCES academic.thesis_registration_round (id),
+    group_id UUID NOT NULL REFERENCES thesis.thesis_group (id) ON DELETE CASCADE,
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
     student_id UUID NOT NULL,
     member_order INTEGER NOT NULL,
     is_leader BOOLEAN NOT NULL DEFAULT FALSE,
@@ -81,9 +81,9 @@ CREATE TABLE academic.thesis_group_member (
     CONSTRAINT thesis_student_one_group_per_round UNIQUE (round_id, student_id)
 );
 
-CREATE TABLE academic.thesis_defense_council (
+CREATE TABLE thesis.thesis_defense_council (
     id UUID PRIMARY KEY,
-    round_id UUID NOT NULL REFERENCES academic.thesis_registration_round (id),
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
     department_id UUID NOT NULL,
     scheduled_at TIMESTAMPTZ,
     room VARCHAR(120),
@@ -94,11 +94,11 @@ CREATE TABLE academic.thesis_defense_council (
 );
 
 CREATE INDEX thesis_council_round_idx
-    ON academic.thesis_defense_council (round_id, status);
+    ON thesis.thesis_defense_council (round_id, status);
 
-CREATE TABLE academic.thesis_council_member (
+CREATE TABLE thesis.thesis_council_member (
     id UUID PRIMARY KEY,
-    council_id UUID NOT NULL REFERENCES academic.thesis_defense_council (id) ON DELETE CASCADE,
+    council_id UUID NOT NULL REFERENCES thesis.thesis_defense_council (id) ON DELETE CASCADE,
     lecturer_id UUID NOT NULL,
     member_role VARCHAR(32) NOT NULL,
     member_order INTEGER NOT NULL,
@@ -108,10 +108,10 @@ CREATE TABLE academic.thesis_council_member (
     CONSTRAINT thesis_council_member_order_unique UNIQUE (council_id, member_order)
 );
 
-CREATE TABLE academic.thesis_review (
+CREATE TABLE thesis.thesis_review (
     id UUID PRIMARY KEY,
-    council_id UUID NOT NULL REFERENCES academic.thesis_defense_council (id) ON DELETE CASCADE,
-    group_id UUID NOT NULL REFERENCES academic.thesis_group (id),
+    council_id UUID NOT NULL REFERENCES thesis.thesis_defense_council (id) ON DELETE CASCADE,
+    group_id UUID NOT NULL REFERENCES thesis.thesis_group (id),
     reviewer_id UUID NOT NULL,
     score NUMERIC(5, 2) NOT NULL,
     comment VARCHAR(2000),
@@ -121,9 +121,9 @@ CREATE TABLE academic.thesis_review (
     CONSTRAINT thesis_review_unique UNIQUE (council_id, group_id, reviewer_id)
 );
 
-CREATE TABLE academic.thesis_result (
+CREATE TABLE thesis.thesis_result (
     id UUID PRIMARY KEY,
-    group_id UUID NOT NULL REFERENCES academic.thesis_group (id),
+    group_id UUID NOT NULL REFERENCES thesis.thesis_group (id),
     total_score NUMERIC(5, 2) NOT NULL,
     grade VARCHAR(16) NOT NULL,
     status VARCHAR(32) NOT NULL,

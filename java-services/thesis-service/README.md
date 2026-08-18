@@ -8,7 +8,7 @@ until API, data ownership, authorization, and rollback gates pass.
 
 - Java 21 and Spring Boot 3.4.
 - Public prefix: `/api/v1`.
-- Database schema: `academic`.
+- Database schema: `thesis` (owned by the academic bounded context).
 - Existing access-token cookie: `cc_access_token`.
 - Cookie-authenticated writes require `X-CSRF-Token` to match `cc_csrf`.
 - Flyway owns new migrations; Hibernate never creates or mutates schema.

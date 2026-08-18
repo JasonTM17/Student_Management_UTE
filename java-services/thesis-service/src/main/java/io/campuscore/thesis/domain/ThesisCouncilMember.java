@@ -11,7 +11,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "thesis_council_member", schema = "academic")
+@Table(name = "thesis_council_member", schema = "thesis")
 public class ThesisCouncilMember {
 
     @Id

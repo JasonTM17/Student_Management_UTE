@@ -2,7 +2,7 @@ spring:
   application:
     name: campuscore-thesis-service
   datasource:
-    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/campuscore?currentSchema=academic}
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/campuscore?currentSchema=thesis}
     username: ${SPRING_DATASOURCE_USERNAME:campuscore}
     password: ${SPRING_DATASOURCE_PASSWORD:}
   jpa:
@@ -11,14 +11,14 @@ spring:
     open-in-view: false
     properties:
       hibernate:
-        default_schema: academic
+        default_schema: thesis
         jdbc:
           time_zone: UTC
   flyway:
     enabled: ${FLYWAY_ENABLED:true}
     create-schemas: true
-    default-schema: academic
-    schemas: academic
+    default-schema: thesis
+    schemas: thesis
     locations: classpath:db/migration
 
 server:

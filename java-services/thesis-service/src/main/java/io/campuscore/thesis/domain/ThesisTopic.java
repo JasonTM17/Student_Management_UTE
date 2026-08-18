@@ -13,7 +13,7 @@ import java.time.Instant;
 import java.util.UUID;
 
 @Entity
-@Table(name = "thesis_topic", schema = "academic")
+@Table(name = "thesis_topic", schema = "thesis")
 public class ThesisTopic {
 
     @Id
