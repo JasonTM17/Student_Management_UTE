@@ -1,0 +1,4 @@
+interface:
+  display_name: "Wukong"
+  short_description: "Challenge risky claims with bounded evidence"
+  default_prompt: "Use Wukong to challenge this system claim, find the smallest counterexample, grade the evidence, and recommend a safe gate."
