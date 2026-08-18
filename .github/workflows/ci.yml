@@ -65,7 +65,7 @@ jobs:
             java-services/pom.xml
             java-services/thesis-service/pom.xml
 
-      - name: Verify Spring thesis service
+      - name: Verify Spring Java services
         run: mvn -f java-services/pom.xml verify
 
   core-quality:
