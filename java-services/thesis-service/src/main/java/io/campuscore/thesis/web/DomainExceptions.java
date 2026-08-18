@@ -22,4 +22,16 @@ public final class DomainExceptions {
             super(message);
         }
     }
+
+    public static class RateLimited extends RuntimeException {
+        public RateLimited(String message) {
+            super(message);
+        }
+    }
+
+    public static class ServiceUnavailable extends RuntimeException {
+        public ServiceUnavailable(String message) {
+            super(message);
+        }
+    }
 }

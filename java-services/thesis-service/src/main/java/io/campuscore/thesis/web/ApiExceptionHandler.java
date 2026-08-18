@@ -24,6 +24,16 @@ public class ApiExceptionHandler {
         return error(HttpStatus.CONFLICT, exception.getMessage(), request);
     }
 
+    @ExceptionHandler(DomainExceptions.RateLimited.class)
+    ResponseEntity<ApiError> rateLimited(DomainExceptions.RateLimited exception, HttpServletRequest request) {
+        return error(HttpStatus.TOO_MANY_REQUESTS, exception.getMessage(), request);
+    }
+
+    @ExceptionHandler(DomainExceptions.ServiceUnavailable.class)
+    ResponseEntity<ApiError> unavailable(DomainExceptions.ServiceUnavailable exception, HttpServletRequest request) {
+        return error(HttpStatus.SERVICE_UNAVAILABLE, exception.getMessage(), request);
+    }
+
     @ExceptionHandler(MethodArgumentNotValidException.class)
     ResponseEntity<ApiError> invalid(MethodArgumentNotValidException exception, HttpServletRequest request) {
         Map<String, String> fields = exception.getBindingResult().getFieldErrors().stream()

@@ -17,4 +17,6 @@ public interface ThesisGroupMemberRepository extends JpaRepository<ThesisGroupMe
     boolean existsByRoundIdAndStudentId(UUID roundId, UUID studentId);
 
     List<ThesisGroupMember> findAllByGroupIdOrderByMemberOrder(UUID groupId);
+
+    List<ThesisGroupMember> findAllByRoundIdAndStudentId(UUID roundId, UUID studentId);
 }

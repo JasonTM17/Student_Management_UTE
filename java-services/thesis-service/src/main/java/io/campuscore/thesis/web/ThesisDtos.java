@@ -212,4 +212,15 @@ public final class ThesisDtos {
                     result.getPublishedAt());
         }
     }
+
+    public record ChatRequest(
+            @NotBlank @Size(max = 2000) String message,
+            @Size(max = 8) String locale) {
+    }
+
+    public record ChatResponse(
+            String answer,
+            String model,
+            boolean degraded) {
+    }
 }

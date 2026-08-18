@@ -10,5 +10,7 @@ public interface ThesisTopicRepository extends JpaRepository<ThesisTopic, UUID> 
 
     List<ThesisTopic> findAllByRoundIdAndStatusOrderByTitle(UUID roundId, TopicStatus status);
 
+    List<ThesisTopic> findAllByStatusOrderByTitle(TopicStatus status);
+
     long countByRoundIdAndId(UUID roundId, UUID id);
 }

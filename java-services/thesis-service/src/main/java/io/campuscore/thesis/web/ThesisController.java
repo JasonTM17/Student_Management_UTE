@@ -2,6 +2,7 @@ package io.campuscore.thesis.web;
 
 import io.campuscore.thesis.domain.RoundStatus;
 import io.campuscore.thesis.domain.TopicStatus;
+import io.campuscore.thesis.assistant.AssistantService;
 import io.campuscore.thesis.security.AccessContext;
 import io.campuscore.thesis.service.ThesisGroupService;
 import io.campuscore.thesis.service.ThesisCouncilService;
@@ -9,6 +10,8 @@ import io.campuscore.thesis.service.ThesisRoundService;
 import io.campuscore.thesis.service.ThesisReviewService;
 import io.campuscore.thesis.service.ThesisTopicService;
 import io.campuscore.thesis.web.ThesisDtos.AddMemberRequest;
+import io.campuscore.thesis.web.ThesisDtos.ChatRequest;
+import io.campuscore.thesis.web.ThesisDtos.ChatResponse;
 import io.campuscore.thesis.web.ThesisDtos.AssignTopicRequest;
 import io.campuscore.thesis.web.ThesisDtos.CreateGroupRequest;
 import io.campuscore.thesis.web.ThesisDtos.CreateRoundRequest;
@@ -46,18 +49,21 @@ public class ThesisController {
     private final ThesisGroupService groups;
     private final ThesisCouncilService councils;
     private final ThesisReviewService reviews;
+    private final AssistantService assistant;
 
     public ThesisController(
             ThesisRoundService rounds,
             ThesisTopicService topics,
             ThesisGroupService groups,
             ThesisCouncilService councils,
-            ThesisReviewService reviews) {
+            ThesisReviewService reviews,
+            AssistantService assistant) {
         this.rounds = rounds;
         this.topics = topics;
         this.groups = groups;
         this.councils = councils;
         this.reviews = reviews;
+        this.assistant = assistant;
     }
 
     @GetMapping("/rounds")
@@ -202,5 +208,13 @@ public class ThesisController {
             @Valid @RequestBody PublishResultRequest request,
             Authentication authentication) {
         return reviews.publishResult(request, AccessContext.from(authentication).userId());
+    }
+
+    @PostMapping("/assistant/chat")
+    @PreAuthorize("isAuthenticated()")
+    public ChatResponse chat(
+            @Valid @RequestBody ChatRequest request,
+            Authentication authentication) {
+        return assistant.chat(request, AccessContext.from(authentication));
     }
 }

@@ -20,6 +20,9 @@ spring:
     default-schema: thesis
     schemas: thesis
     locations: classpath:db/migration
+  data:
+    redis:
+      url: ${REDIS_URL:redis://localhost:6379}
 
 server:
   port: ${SERVER_PORT:4010}
@@ -53,3 +56,11 @@ springdoc:
     path: /api/docs/openapi.json
   swagger-ui:
     path: /api/docs
+
+assistant:
+  enabled: ${ASSISTANT_ENABLED:false}
+  base-url: ${DEEPSEEK_BASE_URL:}
+  api-key: ${DEEPSEEK_API_KEY:}
+  model: ${DEEPSEEK_MODEL:}
+  max-requests-per-minute: ${ASSISTANT_MAX_REQUESTS_PER_MINUTE:20}
+  max-message-length: ${ASSISTANT_MAX_MESSAGE_LENGTH:2000}
