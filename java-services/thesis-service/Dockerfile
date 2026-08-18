@@ -9,6 +9,9 @@ RUN mvn -pl thesis-service -am -DskipTests package
 FROM eclipse-temurin:21-jre
 
 WORKDIR /app
+RUN apt-get update \
+    && apt-get install --no-install-recommends --yes curl \
+    && rm -rf /var/lib/apt/lists/*
 RUN useradd --system --create-home --uid 10001 campuscore
 COPY --from=build /workspace/thesis-service/target/campuscore-thesis-service-0.1.0-SNAPSHOT.jar /app/app.jar
 USER 10001

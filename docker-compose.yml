@@ -430,6 +430,34 @@ services:
       retries: 3
       start_period: 40s
 
+  thesis-service:
+    build:
+      context: ./java-services
+      dockerfile: thesis-service/Dockerfile
+    image: campuscore-thesis-service:local
+    container_name: campuscore-thesis-service
+    environment:
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/campuscore?currentSchema=thesis
+      SPRING_DATASOURCE_USERNAME: campuscore
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      JWT_SECRET: ${JWT_SECRET:-local-dev-jwt-secret-rotate-before-shared-use}
+      HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-dev-readiness-key-12345}
+      SERVER_PORT: 4010
+      FLYWAY_ENABLED: "true"
+      MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE: health,info,prometheus
+    ports:
+      - "127.0.0.1:4010:4010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "curl --fail --silent --show-error --header \"X-Health-Key: ${HEALTH_READINESS_KEY:-local-dev-readiness-key-12345}\" http://localhost:4010/api/v1/health/readiness >/dev/null"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 45s
+
   engagement-service:
     build:
       context: .
@@ -558,6 +586,8 @@ services:
         condition: service_healthy
       analytics-service:
         condition: service_healthy
+      thesis-service:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "node -e \"fetch('http://127.0.0.1:3000').then((res) => process.exit(res.ok ? 0 : 1)).catch(() => process.exit(1))\""]
@@ -590,6 +620,8 @@ services:
       people-service:
         condition: service_healthy
       analytics-service:
+        condition: service_healthy
+      thesis-service:
         condition: service_healthy
       frontend:
         condition: service_healthy
