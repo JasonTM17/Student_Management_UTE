@@ -65,6 +65,10 @@ frontend/.env.local
 frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
+frontend/src/designs/
+
+# Stitch design exports (reference artifacts)
+src/designs/
 
 # Cursor IDE local data
 .cursor/
