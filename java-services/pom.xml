@@ -27,6 +27,7 @@
     <modules>
         <module>auth-service</module>
         <module>engagement-service</module>
+        <module>notification-service</module>
         <module>thesis-service</module>
     </modules>
 </project>
