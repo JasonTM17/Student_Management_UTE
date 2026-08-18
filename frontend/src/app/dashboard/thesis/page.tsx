@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, CalendarDays, Check, CircleDot, ClipboardCheck, FileStack, Gauge, UsersRound } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, Check, CircleDot, ClipboardCheck, FileStack, Gauge, GraduationCap, UsersRound } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -28,7 +28,7 @@ function statusClass(status: string) {
 }
 
 export default function ThesisPage() {
-  const { user, isStudent } = useAuth();
+  const { user, isStudent, isLecturer, isAdmin } = useAuth();
   const { formatDateTime, messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
@@ -266,6 +266,25 @@ export default function ThesisPage() {
               </div>
               <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
             </LocalizedLink>
+            {(isLecturer || isAdmin) ? (
+              <LocalizedLink
+                href="/dashboard/thesis/councils"
+                className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/45 hover:bg-secondary/30"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-700 dark:text-violet-300">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                    {messages.thesis.councils.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {messages.thesis.councils.description}
+                  </p>
+                </div>
+                <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </LocalizedLink>
+            ) : null}
           </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
