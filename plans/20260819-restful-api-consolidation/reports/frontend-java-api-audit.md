@@ -18,7 +18,9 @@ canonical route and writer owner.
 - `frontend/next.config.mjs` also retains health, docs, notifications, and
   Socket.IO rewrites.
 - `mobile/src/api/client.ts` uses one bearer-oriented base URL and the stable
-  Java error fields `code`, `message`, and request id when available.
+  Java error fields `code`, `message`, and request id when available. It now
+  defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls
+  require explicit `EXPO_PUBLIC_API_MODE=live`.
 
 ## Route status
 
