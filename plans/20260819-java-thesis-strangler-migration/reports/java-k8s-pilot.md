@@ -40,9 +40,14 @@
   18 tests with zero failures/errors, including the readiness controller tests.
 - `mvn -q -f java-services/thesis-service/pom.xml verify`: PASS with exit code
   0; the same 18-test Surefire report remains clean.
+- Monitored current-source Docker build for
+  `campuscore-thesis-service:pilot-local`: `ABORTED_LOW_DISK` at 267 MB free
+  after the configured 0.70 GB safety threshold; no image tag was produced.
+- `docker builder prune --force`: PASS, 241.4 MB logical build-cache reclaim;
+  physical C: free remained approximately 0.27 GB.
 - Runtime smoke, Java image verification and apply: `NOT_RUN`; C: has
-  approximately 1.05 GB free after Maven and heavy commands are intentionally
-  held. `msrdc.exe` is active and recently updated ETL files under
+  approximately 0.27 GB free and heavy commands are intentionally held.
+  `msrdc.exe` is active and recently updated ETL files under
   `DiagOutputDir` remain preserved; Docker update and Node compile caches are
   also retained as active/recent data.
 - Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
