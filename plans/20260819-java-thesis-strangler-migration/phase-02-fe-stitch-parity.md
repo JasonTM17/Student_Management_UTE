@@ -38,10 +38,13 @@ The read-only atlas is recorded in
 - Converted Admin Courses and Admin Classrooms to the same stacked mobile-card
   pattern with readable metadata and accessible actions; desktop tables remain
   available above the mobile breakpoint.
+- Converted Admin Departments, Semesters, and Lecturers to stacked mobile cards
+  with their key metadata and accessible actions; desktop tables remain
+  available above the mobile breakpoint.
 
 ## Acceptance criteria
 
-- [x] `npm test` passes (23 tests at the current candidate).
+- [x] `npm test` passes (24 tests at the current candidate).
 - [x] `npm run typecheck` passes.
 - [x] `npm run lint` passes with zero warnings.
 - [x] `git diff --check` passes.
@@ -51,8 +54,8 @@ The read-only atlas is recorded in
   for dashboard, notifications, thesis, profile, registration, lecturer, and
   admin route families; the captured matrix is 56/56 PASS.
 - [ ] Admin mobile data views are fully converted from horizontal-scroll-first
-  tables to stacked cards/lists where Stitch requires it; Admin Users, Courses,
-  and Classrooms are bounded conversions, while the remaining dense tables stay
+  tables to stacked cards/lists where Stitch requires it; six admin identity and
+  catalog views are bounded conversions, while the remaining dense tables stay
   open.
 - [x] The 22-screen Stitch atlas is attached to the candidate, with a larger
   28-route × 2-viewport rendered evidence matrix.
