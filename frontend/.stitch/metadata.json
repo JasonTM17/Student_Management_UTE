@@ -1,0 +1,49 @@
+{
+  "name": "projects/16486483525927292845",
+  "projectId": "16486483525927292845",
+  "title": "Smart Student Management Portal",
+  "visibility": "PRIVATE",
+  "createTime": "2026-08-18T11:35:05.392198Z",
+  "updateTime": "2026-08-18T13:08:19.802291Z",
+  "projectType": "TEXT_TO_UI_PRO",
+  "deviceType": "MOBILE",
+  "designTheme": {
+    "colorMode": "LIGHT",
+    "font": "BE_VIETNAM_PRO",
+    "customColor": "#0056b3",
+    "roundness": "ROUND_FOUR",
+    "spacingBase": "4px"
+  },
+  "inventory": {
+    "observedAt": "2026-08-19",
+    "screenCount": 22,
+    "desktopCount": 9,
+    "mobileCount": 13,
+    "supplementaryImageCount": 1,
+    "note": "All named screen records have HTML and screenshot references. The supplementary image is excluded from the screen map."
+  },
+  "screens": {
+    "web-dashboard": { "id": "0037b2522057432ea1d1b536360d6142", "title": "Dashboard - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2234 },
+    "web-student-management": { "id": "1d9fd9991df84254a3ad7aa8b54696b2", "title": "Quản lý Sinh viên - Web Admin", "deviceType": "DESKTOP", "width": 2560, "height": 2048 },
+    "web-thesis-evaluation": { "id": "2ed47add8916420d83c52fb012aabdc7", "title": "Đánh giá Đề tài - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2466 },
+    "web-thesis-registration": { "id": "4047937d6ad74fec9265c35c8c819dde", "title": "Đăng ký Đề tài - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2048 },
+    "web-lecturer-directory": { "id": "538cba8b58674dfc93d356072df75498", "title": "Danh sách Giảng viên - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2048 },
+    "web-student-profile": { "id": "705f87c14f5a491999e1d365430f7457", "title": "Hồ sơ Sinh viên - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2048 },
+    "web-notifications": { "id": "746d46a2c9e84d5080ecbe3d85ce6ced", "title": "Trung tâm thông báo - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2122 },
+    "web-registration-rounds": { "id": "7aa86afceaeb4416842789336826cf0e", "title": "Danh sách đợt đăng ký - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2200 },
+    "web-thesis-progress": { "id": "7e36ca4735fb4cf3a90e8d8ea09c4d3c", "title": "Theo dõi tiến độ - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 3012 },
+    "mobile-profile": { "id": "1a12e27f4365459eb1d4ed274514d04d", "title": "Hồ sơ Sinh viên - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 1768 },
+    "mobile-thesis-evaluation": { "id": "3073bce589eb4d4e97ef9775e921a506", "title": "Đánh giá Đề tài - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 3462 },
+    "mobile-lecturer-directory": { "id": "36c60dec6ed9458a80bc5b1cfe6f82a5", "title": "Danh sách Giảng viên - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 2134 },
+    "mobile-thesis-topics": { "id": "3d1a0cf1dd494919ab9095b738f0c8e4", "title": "Danh sách Đề tài", "deviceType": "MOBILE", "width": 780, "height": 2790 },
+    "mobile-thesis-registration": { "id": "4ac0f22ff9c14155b071bf3c8ffa699c", "title": "Đăng ký Đề tài - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 3264 },
+    "mobile-registration-rounds-variant": { "id": "4f5dfbb559504aa38f58b22599f361e4", "title": "Danh sách đợt đăng ký - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 2320 },
+    "mobile-thesis-progress": { "id": "5cb62add07304fa689a98c8512495482", "title": "Theo dõi tiến độ - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 2566 },
+    "mobile-sign-in": { "id": "67e517e324ef454c810e2b41b4acdc99", "title": "Đăng nhập - Hệ thống Quản lý Đề tài", "deviceType": "MOBILE", "width": 780, "height": 1768 },
+    "mobile-registration-rounds": { "id": "05a2b1b196034830bc559ae72b82b6f9", "title": "Danh sách Đợt đăng ký", "deviceType": "MOBILE", "width": 780, "height": 3196 },
+    "mobile-dashboard": { "id": "55abc697e13e416aa87c89fd331e6c62", "title": "Dashboard - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 1768 },
+    "mobile-student-dashboard": { "id": "89b8434a99dd4fcb87ce3c84469e3186", "title": "Trang chủ - Dashboard", "deviceType": "MOBILE", "width": 780, "height": 2494 },
+    "mobile-notifications": { "id": "a8940ff416834cf59245e878780e2135", "title": "Trung tâm thông báo - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 2710 },
+    "mobile-thesis-detail": { "id": "be1ea000e675492d829254077907039a", "title": "Chi tiết Đề tài", "deviceType": "MOBILE", "width": 780, "height": 1768 }
+  }
+}

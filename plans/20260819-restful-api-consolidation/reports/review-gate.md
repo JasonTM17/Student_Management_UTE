@@ -30,6 +30,26 @@ returned Advisor `CONDITIONAL`, Kongming `CONDITIONAL`, and Wukong
 `FALSIFIED` for a direct four-block collapse. That review remains useful as a
 design baseline only; it is stale for the current snapshot.
 
+## Bounded Kongming sequencing advisory
+
+- Reviewed target: `cbd6b64dfd06f53e6ee6890664ac0f488767c5b2`.
+- Result: `CONDITIONAL` for planning one read-only Java notification-inbox
+  slice; `HOLD` for public route ownership, writer handoff, service retirement,
+  or production claims. No source files were changed and no services ran.
+- Candidate only: `GET /api/v1/notifications/my` plus the tightly coupled
+  `GET /api/v1/notifications/my/unread-count`. During such a slice, the legacy
+  notification service remains public default, canonical writer, Socket.IO,
+  and RabbitMQ owner; Java must perform no notification DDL or writes.
+- Required before any canary: freeze the actual Node contract, verify the
+  `notifications` schema on an isolated restored PostgreSQL copy, grant Java a
+  read-only role, prove subject-derived user isolation, compare legacy and Java
+  responses, and exercise a router/feature-flag rollback. PostgreSQL,
+  differential, authenticated E2E, browser/Expo device, and rollback evidence
+  were all `NOT_RUN`.
+
+This advisory predates the current uncommitted mobile changes and is sequencing
+input only. It is not an exact-head approval.
+
 ## Evidence behind the gate
 
 - The repository currently has multiple NestJS domain owners, multiple Prisma

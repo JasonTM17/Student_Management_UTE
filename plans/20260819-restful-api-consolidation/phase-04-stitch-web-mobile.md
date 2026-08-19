@@ -27,8 +27,8 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 
 ### In scope
 
-- `frontend/.stitch/DESIGN.md`, `SITE.md`, and `next-prompt.md` as the canonical
-  Stitch baton and evidence boundary.
+- `frontend/.stitch/DESIGN.md`, `SITE.md`, `metadata.json`, and
+  `next-prompt.md` as the canonical Stitch baton and evidence boundary.
 - Shared web layout fixes in dashboard metrics, assistant placement, canvas,
   content cap, and tablet navigation.
 - `mobile/` Expo scaffold, native token file, API client seam, reusable UI,
@@ -47,12 +47,13 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 
 | Evidence | Result | Limitation |
 | --- | --- | --- |
-| Stitch MCP project inventory | `PASS` | 23 records: 9 desktop, 13 mobile, 1 supplementary image; 22 screen records have HTML and screenshot references. |
+| Stitch MCP project inventory | `PASS` | Fresh 2026-08-19 read: 23 records, 9 desktop, 13 mobile, 1 supplementary image; 22 screen records have HTML and screenshot references. The local metadata ledger records the 22 named screens. |
 | Existing web visual QA | `PASS` | 28 logical routes × 2 viewports = 56/56 captures, 0 measured overflow, 0 missing mobile-nav findings. It does not cover all current routes, tablet, full-page states, or reference pixel diff. |
 | Independent Stitch/FE audit | `HOLD` | Found metric wrapping, assistant occlusion, missing current-route captures, token/breakpoint drift, and un-gated console errors. Browser rerun was `NOT_RUN`. |
 | Web P0 repair | `PASS` source-level | Metric wrapping, assistant offset/z-index, exact background, 1280px cap, and tablet bottom-nav boundary are covered by a new smoke assertion. Rendered proof remains open. |
-| Web smoke/typecheck/lint | `PASS` | 27 smoke tests, Next route type generation/TypeScript, and ESLint zero-warning gate pass on the current web tree. |
-| Native mobile source transpile | `PASS` | TypeScript syntax transpile passed for all mobile `.ts/.tsx` files. This is not dependency-aware typecheck. |
+| Web smoke/typecheck/lint | `PASS` | 28 smoke tests, Next route type generation/TypeScript, and ESLint zero-warning gate pass on the current web tree. |
+| Native route/role/reference regression | `PASS` source-level | Five dependency-free tests prove 23 unique registry-to-component bindings, 13 direct mobile Stitch references backed by the 22-screen metadata ledger, role-specific bottom navigation, unauthorized-route fallback, and transparent preview sign-in. |
+| Native mobile source transpile | `PASS` | TypeScript syntax transpile passed for all 14 mobile `.ts/.tsx` files. This is not dependency-aware typecheck. |
 | Native API preview guard | `PASS` source-level | The client defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls require explicit `EXPO_PUBLIC_API_MODE=live`. |
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
 | Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target has shell probes plus conditional thesis-topic read only; auth, academic, finance, notification, analytics, complete thesis, and chatbot routes are not yet implemented. |
@@ -73,7 +74,8 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 1. Freeze the Stitch project/token/screen inventory and update the baton.
 2. Repair web P0 layout hazards and add source-level regression assertions.
 3. Finish the native app registry, shared components, API client, role-aware
-   menu, and all 23 screen definitions.
+   menu and bottom navigation, direct Stitch-reference ledger, and all 23
+   screen definitions.
 4. Map each mobile/web API call to Java `implemented`, `candidate`, or
    `unverified` status; do not route clients to an incomplete Java app.
 5. Run web static/smoke gates and native syntax checks under the disk budget.

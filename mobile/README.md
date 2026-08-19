@@ -16,8 +16,9 @@ The UI follows the canonical `Academic Continuity` evidence in
   with `#0056B3` for filled emphasis.
 - Spacing uses a 4px baseline, with a 16px mobile gutter and 8px card radius.
 - Interactive controls use a minimum 44px touch target.
-- High-frequency mobile navigation is a bottom bar; the menu panel exposes the
-  complete screen registry.
+- High-frequency mobile navigation is a role-specific bottom bar; the menu
+  panel exposes only routes that the active preview role may access. Navigator
+  policy also rejects a direct transition to an unauthorized route.
 
 ## Run later
 
@@ -45,6 +46,9 @@ The default mode is `preview`: API calls fail closed with
 incomplete Java candidate. To exercise a deliberately provisioned runtime,
 set `EXPO_PUBLIC_API_MODE=live` and `EXPO_PUBLIC_API_URL` from `.env.example`.
 The app uses one base URL for all requests and does not embed credentials.
+The local preview entry point is deliberately labeled as a preview; it does not
+represent a successful Java authentication. When live mode is selected, sign
+in stays disabled until the Java auth contract exists and has runtime evidence.
 
 ## API seam
 
