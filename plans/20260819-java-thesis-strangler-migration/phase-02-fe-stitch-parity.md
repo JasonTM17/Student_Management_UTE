@@ -35,7 +35,7 @@ The read-only atlas is recorded in
 
 ## Acceptance criteria
 
-- [x] `npm test` passes (20 tests at the current candidate).
+- [x] `npm test` passes (21 tests at the current candidate).
 - [x] `npm run typecheck` passes.
 - [x] `npm run lint` passes with zero warnings.
 - [x] `git diff --check` passes.

@@ -36,8 +36,11 @@
   thesis pilot contract; `docker compose -f docker-compose.yml config`: PASS.
 - `node scripts/check-thesis-contract.mjs`: PASS for 22 Java mappings and 8 FE
   bindings. This remains source-level evidence only.
-- Runtime smoke, Java/Maven verification and apply: `NOT_RUN`; C: has
-  approximately 0.56 GB free and heavy commands are intentionally held.
+- `mvn -q -f java-services/thesis-service/pom.xml test`: PASS; Surefire records
+  18 tests with zero failures/errors, including the readiness controller tests.
+- Runtime smoke, Java image verification and apply: `NOT_RUN`; C: has
+  approximately 0.33 GB free after Maven and heavy commands are intentionally
+  held.
 - Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
   registry publication, provenance, image smoke, or deployment evidence.
 - Schema bootstrap, differential contract, reconciliation/restore, canary,

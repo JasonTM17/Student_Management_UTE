@@ -52,7 +52,7 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 
 ## Verification record
 
-- `frontend`: `npm test` — PASS, 20/20.
+- `frontend`: `npm test` — PASS, 21/21.
 - `frontend`: `npm run typecheck` — PASS.
 - `frontend`: `npm run lint` — PASS, zero warnings.
 - Latest bounded a11y patch: explicit `htmlFor`/`id` associations for
