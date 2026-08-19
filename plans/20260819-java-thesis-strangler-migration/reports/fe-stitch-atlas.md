@@ -59,9 +59,9 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 - `frontend`: `npm run build` — PASS.
 - `java-services`: `mvn -q verify` — PASS; H2/Spring tests ran, with normal Mockito/Byte Buddy warnings.
 - Browser visual QA: `assets/fe-stitch-visual-qa/summary.json` records 56/56 PASS at 1280×900 and 390×844, zero overflow, and zero missing mobile navigation findings.
-- External Playwright: targeted checkout and Vietnamese invoice tests — PASS; full external suite — 18/20 PASS, with two 429 auth-throttle failures.
+- External Playwright: full suite — 20/20 PASS twice with explicit direct auth-service session setup; edge auth/CSRF/security tests still exercise nginx. The shared Compose database and mutating checkout fixture remain outside isolation proof.
 - Isolated E2E runner: `npm run test:e2e` — NOT RUN to completion because the local `backend` workspace has no installed Prisma CLI (`backend/node_modules/.bin/prisma` missing); the runner's temporary database cleanup path ran.
 
 ## Release interpretation
 
-The visual evidence is strong enough to accept the FE candidate as a Stitch-aligned implementation snapshot, not as a production-ready release claim. The full external E2E gate remains HOLD until the isolated runner is provisioned and the full suite passes twice without relying on the shared Compose database or auth-throttle timing.
+The visual evidence is strong enough to accept the FE candidate as a Stitch-aligned implementation snapshot, not as a production-ready release claim. The external suite is repeatable under the documented direct-auth setup, but release acceptance remains HOLD until an isolated database run covers the mutating checkout fixture and the Java deploy/cutover gates are proven.

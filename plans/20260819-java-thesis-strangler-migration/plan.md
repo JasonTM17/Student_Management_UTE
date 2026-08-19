@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Head: `8a042ba5c71f10812947da58cb77a78eec3cc879`.
+- Head: `8a5905348a37545b29c98069be9736384fa8af65`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
 - `mvn -q test` in `java-services` passes.
@@ -49,9 +49,9 @@ Authority:
 - The FE candidate now has a real notifications center for unprefixed and localized dashboard routes, mobile bottom navigation, and focused thesis topic/progress/evaluation routes.
 - Frontend smoke, typecheck, lint, and `git diff --check` pass on the current dirty candidate.
 - Frontend production build passes, and the rendered visual QA artifact records 28 routes × 2 viewports = 56/56 captures with zero horizontal overflow and zero missing mobile navigation findings.
-- External Compose Playwright targeted finance tests pass; the full external suite currently records 18/20 passing because two login attempts hit the service's 429 auth throttle. The shared Compose DB is not accepted as an isolation proof.
+- External Compose Playwright full suite passes 20/20 twice when `E2E_AUTH_LOGIN_URL=http://127.0.0.1:4007/api/v1` is used for seeded session setup; edge auth/CSRF/security tests still run through nginx. The shared Compose DB and the mutating checkout fixture are not accepted as an isolation proof.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
-- During this continuation, Docker Desktop was restarted without elevated service control; no broad filesystem deletion was performed. C: was observed with approximately 9.69 GB free after bounded cache/build cleanup.
+- During this continuation, Docker Desktop was restarted without elevated service control; no broad filesystem deletion was performed. Docker build cache was pruned with 5.835 GB reclaimed logically; C: was last observed with approximately 2.35 GB free, so heavy dependency installation remains deferred.
 - Stitch project `16486483525927292845` defines the academic reference system:
   - `Be Vietnam Pro`
   - blue fidelity palette
@@ -174,5 +174,5 @@ plus whatever exact smoke and rollback commands the deploy path uses.
 
 - Live deploy-path proof is still missing.
 - Auth is still shadow-only on the Java side.
-- The shared external E2E suite still needs a throttle-independent isolated run; the isolated runner needs local Node service dependencies installed before it can execute.
+- External E2E is repeatable with the explicit direct-auth session setup, but the shared database/checkout mutation still needs an isolated run. The isolated runner needs local Node service dependencies installed before it can execute; low C: space currently makes that unsafe.
 - FE accessibility, business mutation parity, and full Stitch-to-production acceptance are still open despite the green visual capture matrix.
