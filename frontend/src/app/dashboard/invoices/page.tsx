@@ -951,7 +951,89 @@ export default function StudentInvoicesPage() {
             }
             contentClassName="space-y-4"
           >
-            <div className="overflow-x-auto">
+            <div
+              className="space-y-3 md:hidden"
+              role="list"
+              aria-label={copy.billingRecords}
+            >
+              {invoices.map((invoice) => (
+                <article
+                  key={`${invoice.id}-mobile`}
+                  className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                  role="listitem"
+                >
+                  <div className="flex items-start justify-between gap-3">
+                    <div className="min-w-0">
+                      <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                        {invoice.invoiceNumber}
+                      </p>
+                      <p className="mt-1 break-words text-sm text-muted-foreground">
+                        {getLocalizedName(
+                          locale,
+                          semestersById.get(invoice.semesterId),
+                          getLocalizedFlatLabel(
+                            locale,
+                            invoice.semesterName,
+                            invoice.semesterNameEn,
+                            invoice.semesterNameVi,
+                            invoice.semesterName,
+                          ),
+                        )}
+                      </p>
+                    </div>
+                    <span
+                      className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${
+                        invoiceStatusTone[invoice.status] ??
+                        'bg-secondary text-foreground'
+                      }`}
+                    >
+                      {getInvoiceStatusLabel(locale, invoice.status)}
+                    </span>
+                  </div>
+                  <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {copy.table.total}
+                      </dt>
+                      <dd className="mt-1 text-foreground">{formatMoney(invoice.total)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {copy.table.paid}
+                      </dt>
+                      <dd className="mt-1 text-foreground">{formatMoney(invoice.paidAmount)}</dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {copy.table.balance}
+                      </dt>
+                      <dd className="mt-1 font-medium text-foreground">
+                        {formatMoney(invoice.balance)}
+                      </dd>
+                    </div>
+                    <div>
+                      <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                        {copy.table.dueDate}
+                      </dt>
+                      <dd className="mt-1 text-foreground">{formatDate(invoice.dueDate)}</dd>
+                    </div>
+                  </dl>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="sm"
+                    className="mt-4 w-full"
+                    onClick={() => void openInvoiceDetail(invoice)}
+                    aria-label={copy.viewDetailsLabel(invoice.invoiceNumber)}
+                    title={copy.viewDetailsLabel(invoice.invoiceNumber)}
+                  >
+                    <Eye className="mr-2 h-4 w-4" />
+                    {copy.details}
+                  </Button>
+                </article>
+              ))}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[920px] text-sm">
                 <thead>
                   <tr className="border-b border-border/70 text-left text-muted-foreground">

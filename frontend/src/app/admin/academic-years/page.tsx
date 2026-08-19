@@ -351,7 +351,61 @@ export default function AdminAcademicYearsPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {academicYears.map((record) => (
+                  <article
+                    key={`${record.id}-mobile`}
+                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    role="listitem"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground">{record.year}</h3>
+                        <p className="mt-1 text-sm text-muted-foreground">{copy.headers.year}</p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        {record.isActive || record.isCurrent ? copy.active : copy.inactive}
+                      </span>
+                    </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.startDate}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{formatDate(record.startDate)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.endDate}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{formatDate(record.endDate)}</dd>
+                      </div>
+                    </dl>
+                    <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEdit(record)}
+                        aria-label={copy.editLabel(record.year)}
+                        title={copy.editLabel(record.year)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => void handleDelete(record)}
+                        aria-label={copy.deleteLabel(record.year)}
+                        title={copy.deleteLabel(record.year)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AdminRowActions>
+                  </article>
+                ))}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

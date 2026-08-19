@@ -532,6 +532,32 @@ test('admin invoice, enrollment, and section views expose mobile card lists', ()
   }
 });
 
+test('admin academic-year and analytics views expose mobile card lists', () => {
+  const academicYearSource = read('src/app/admin/academic-years/page.tsx');
+  assert.match(academicYearSource, /role="list"/);
+  assert.match(academicYearSource, /className="space-y-3 md:hidden"/);
+  assert.match(academicYearSource, /<AdminTableScroll className="hidden md:block">/);
+
+  const analyticsSource = read('src/app/admin/analytics/page.tsx');
+  assert.match(analyticsSource, /role="list"/);
+  assert.match(analyticsSource, /className="mt-5 space-y-3 md:hidden"/);
+  assert.match(analyticsSource, /<AdminTableScroll className="mt-5 hidden md:block">/);
+});
+
+test('workspace grade and invoice views expose mobile card lists', () => {
+  for (const relPath of [
+    'src/app/dashboard/grades/page.tsx',
+    'src/app/dashboard/invoices/page.tsx',
+    'src/app/dashboard/transcript/page.tsx',
+    'src/app/dashboard/lecturer/grades/[id]/page.tsx',
+  ]) {
+    const source = read(relPath);
+    assert.match(source, /role="list"/);
+    assert.match(source, /className="space-y-3 md:hidden"/);
+    assert.match(source, /className="hidden overflow-x-auto md:block"/);
+  }
+});
+
 test('homepage copy avoids demo placeholders and dead hrefs', () => {
   const source = read('src/app/page.tsx');
   const deadHrefPattern = new RegExp('href="' + '#"');

@@ -568,7 +568,66 @@ export default function AdminAnalyticsPage() {
                 </div>
               </div>
 
-              <AdminTableScroll className="mt-5">
+              <div
+                className="mt-5 space-y-3 md:hidden"
+                role="list"
+                aria-label={locale === 'vi' ? 'Tóm tắt kênh thanh toán' : 'Payment provider summary'}
+              >
+                {cockpit.finance.providerFunnel.length === 0 ? (
+                  <div
+                    role="status"
+                    className="rounded-lg border border-border/70 bg-secondary/20 px-4 py-6 text-sm text-muted-foreground"
+                  >
+                    {locale === 'vi'
+                      ? 'Chưa có hoạt động thanh toán theo provider.'
+                      : 'No provider payment activity yet.'}
+                  </div>
+                ) : (
+                  cockpit.finance.providerFunnel.map((item) => (
+                    <article
+                      key={`mobile-${item.provider}-${item.status}`}
+                      role="listitem"
+                      className="rounded-lg border border-border/70 bg-background/60 p-4 shadow-sm"
+                    >
+                      <div className="flex flex-wrap items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="break-words font-medium text-foreground">
+                            {formatProviderLabel(item.provider)}
+                          </div>
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {locale === 'vi' ? 'Kênh thanh toán' : 'Provider'}
+                          </div>
+                        </div>
+                        <span
+                          className={`shrink-0 text-sm font-semibold ${statusTone(item.status)}`}
+                        >
+                          {formatStatusLabel(locale, item.status)}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-2 gap-3 text-sm">
+                        <div className="min-w-0">
+                          <dt className="text-xs text-muted-foreground">
+                            {locale === 'vi' ? 'Số lượng' : 'Count'}
+                          </dt>
+                          <dd className="mt-1 font-medium text-foreground">
+                            {formatNumber(item.count)}
+                          </dd>
+                        </div>
+                        <div className="min-w-0 text-right">
+                          <dt className="text-xs text-muted-foreground">
+                            {locale === 'vi' ? 'Số tiền' : 'Amount'}
+                          </dt>
+                          <dd className="mt-1 break-words font-medium text-foreground">
+                            {formatCurrency(item.amount, 'USD')}
+                          </dd>
+                        </div>
+                      </dl>
+                    </article>
+                  ))
+                )}
+              </div>
+
+              <AdminTableScroll className="mt-5 hidden md:block">
                 <table className="w-full min-w-[520px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

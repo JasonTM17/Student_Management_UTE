@@ -459,7 +459,97 @@ export default function SectionGradingPage() {
             <CardTitle className="text-xl">{copy.tableTitle}</CardTitle>
           </CardHeader>
           <CardContent>
-            <div className="overflow-x-auto">
+            <div
+              className="space-y-3 md:hidden"
+              role="list"
+              aria-label={copy.tableTitle}
+            >
+              {sectionData.enrollments.map((enrollment) => {
+                const current = grades.get(enrollment.id) ?? {
+                  enrollmentId: enrollment.id,
+                  finalGrade: enrollment.finalGrade ?? 0,
+                  letterGrade:
+                    enrollment.letterGrade ??
+                    calculateGrade(enrollment.finalGrade ?? 0),
+                };
+                const isPublished = enrollment.gradeStatus === 'PUBLISHED';
+
+                return (
+                  <article
+                    key={`${enrollment.id}-mobile`}
+                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    role="listitem"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="break-words font-semibold text-foreground">
+                          {enrollment.studentName}
+                        </h3>
+                        <p className="mt-1 break-words text-sm text-muted-foreground">
+                          {enrollment.studentCode}
+                        </p>
+                        <p className="mt-1 break-words text-sm text-muted-foreground">
+                          {enrollment.email ?? copy.unavailableEmail}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        {isPublished
+                          ? copy.publishedStatus
+                          : enrollment.gradeStatus ?? copy.draftStatus}
+                      </span>
+                    </div>
+                    <div className="mt-4 grid gap-4 border-t border-border/60 pt-3 sm:grid-cols-2">
+                      <label className="space-y-1.5 text-sm">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.score}
+                        </span>
+                        <Input
+                          type="number"
+                          min="0"
+                          max="100"
+                          step="0.1"
+                          value={current.finalGrade}
+                          onChange={(event) =>
+                            handleGradeChange(
+                              enrollment.id,
+                              'finalGrade',
+                              Number(event.target.value) || 0,
+                            )
+                          }
+                          disabled={isPublished}
+                          aria-label={copy.finalScoreLabel(enrollment.studentName)}
+                        />
+                      </label>
+                      <label className="space-y-1.5 text-sm">
+                        <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.grade}
+                        </span>
+                        <select
+                          className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                          value={current.letterGrade}
+                          onChange={(event) =>
+                            handleGradeChange(
+                              enrollment.id,
+                              'letterGrade',
+                              event.target.value,
+                            )
+                          }
+                          disabled={isPublished}
+                          aria-label={copy.letterGradeLabel(enrollment.studentName)}
+                        >
+                          {letterGrades.map((grade) => (
+                            <option key={grade} value={grade}>
+                              {grade}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    </div>
+                  </article>
+                );
+              })}
+            </div>
+            <div className="hidden overflow-x-auto md:block">
               <table className="w-full min-w-[960px] text-sm">
                 <thead>
                   <tr className="border-b border-border/70 text-left text-muted-foreground">
