@@ -153,9 +153,10 @@ the retirement gates pass.
 - Phase 04 Stitch web/mobile client track: in progress; see
   `phase-04-stitch-web-mobile.md` and `reports/fe-stitch-audit.md`. It has no
   browser rerun, Expo/device proof, or Java client cutover.
-- Phase 05 notification read contract: planned/HOLD; see
-  `phase-05-notification-read-contract.md`. It is a read-only strangler slice
-  proposal only; no public route or writer ownership has moved.
+- Phase 05 notification read contract: source-level candidate/HOLD; see
+  `phase-05-notification-read-contract.md` and
+  `reports/notification-read-candidate.md`. The feature-flagged Java read
+  adapter exists, but no public route or writer ownership has moved.
 
 # Acceptance and verification
 

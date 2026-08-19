@@ -8,6 +8,8 @@ health:
 migration:
   thesis-read:
     enabled: true
+  notifications-read:
+    enabled: false
 
 spring:
   datasource:

@@ -50,6 +50,9 @@ runtime state without deleting or restarting anything.
 - `analytics-service` hiện đọc từ `public` theo hướng low-risk.
 - `java-services/thesis-service` dùng schema `thesis`; Flyway sở hữu migration
   của pilot, còn Node/Prisma không được `db push` vào schema này.
+- `java-services/restful-api` có notification read candidate JDBC opt-in qua
+  `NOTIFICATIONS_READ_ENABLED=true`; candidate đọc schema `notifications` mà
+  không tạo DDL hay nhận ownership writer/realtime/public route.
 - Shared auth contract được gom về `packages/platform-auth` để giảm lặp lại cookie/JWT/CSRF logic giữa các service.
 - Kustomize manifests cho canonical topology nằm tại `k8s/base`; overlay
   `k8s/overlays/thesis-pilot` là môi trường cô lập để kiểm tra Java boundary,
@@ -87,3 +90,7 @@ Các path này không public qua `nginx` và yêu cầu `X-Service-Token`.
 - Java thesis pilot chưa có image public, differential contract report, canary,
   reconciliation/restore evidence hoặc rollback approval; không được gọi là
   production cutover.
+- Notification read candidate của `restful-api` mới có H2/source-level proof;
+  PostgreSQL read-only permission, authenticated differential, canary và
+  rollback vẫn đang HOLD. Legacy `notification-service` vẫn là canonical
+  public/writer/realtime owner.
