@@ -40,7 +40,7 @@ export function MobileNavigator() {
       setMenuOpen(false);
     },
     enterPreview() {
-      if (apiClient.mode !== 'preview') {
+      if (route !== 'auth.signIn' || apiClient.mode !== 'preview') {
         return;
       }
       setSessionKind('preview');
