@@ -29,6 +29,9 @@ The read-only atlas is recorded in
 - Added bilingual copy and smoke/E2E route coverage for the new surfaces.
 - Added a compact admin mobile quick-nav, automatic `label`/control IDs for
   single-control admin fields, and non-truncating mobile dashboard labels.
+- Added explicit `htmlFor`/`id` associations to forgot-password, reset-password,
+  and profile controls so high-frequency auth/profile forms remain usable with
+  label navigation and assistive technology.
 
 ## Acceptance criteria
 
@@ -62,4 +65,6 @@ The independent FE audit remains `INCONCLUSIVE/HOLD`: ten route families still
 need capture, the Stitch reference-size image-diff is not implemented, several
 data views remain horizontal-scroll-first on mobile, and console/network error
 allowlisting plus axe/keyboard coverage are open. The bounded shell/a11y fixes
-above pass typecheck and lint but do not close those release gates.
+above pass typecheck and lint but do not close those release gates. The latest
+auth/profile label patch has not been rerun through the browser screenshot or
+isolated E2E matrix yet.

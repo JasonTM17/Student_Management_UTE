@@ -88,10 +88,11 @@ export default function ForgotPasswordPage() {
         ) : (
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
+              <label htmlFor="forgot-password-email" className="text-sm font-medium text-foreground">
                 {messages.forgotPassword.emailLabel}
               </label>
               <Input
+                id="forgot-password-email"
                 type="email"
                 value={email}
                 onChange={(e) => setEmail(e.target.value)}

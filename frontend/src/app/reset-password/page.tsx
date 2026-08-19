@@ -99,11 +99,12 @@ function ResetPasswordForm() {
 
           <form onSubmit={handleSubmit} className="space-y-5">
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
+              <label htmlFor="reset-password-new" className="text-sm font-medium text-foreground">
                 {messages.resetPassword.newPassword}
               </label>
               <div className="relative">
                 <Input
+                  id="reset-password-new"
                   type={showPassword ? 'text' : 'password'}
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
@@ -131,10 +132,11 @@ function ResetPasswordForm() {
             </div>
 
             <div className="space-y-2">
-              <label className="text-sm font-medium text-foreground">
+              <label htmlFor="reset-password-confirm" className="text-sm font-medium text-foreground">
                 {messages.resetPassword.confirmPassword}
               </label>
               <Input
+                id="reset-password-confirm"
                 type={showPassword ? 'text' : 'password'}
                 value={confirmPassword}
                 onChange={(e) => setConfirmPassword(e.target.value)}

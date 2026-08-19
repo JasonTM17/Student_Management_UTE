@@ -134,10 +134,11 @@ export default function ProfilePage() {
             <form onSubmit={handleSubmit} className="space-y-4">
               <div className="grid gap-4 md:grid-cols-2">
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-first-name" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.firstName}
                   </label>
                   <Input
+                    id="profile-first-name"
                     type="text"
                     value={formData.firstName}
                     onChange={(e) =>
@@ -147,10 +148,11 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-last-name" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.lastName}
                   </label>
                   <Input
+                    id="profile-last-name"
                     type="text"
                     value={formData.lastName}
                     onChange={(e) =>
@@ -160,8 +162,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">{messages.profile.fields.email}</label>
+                  <label htmlFor="profile-email" className="text-sm font-medium text-foreground">{messages.profile.fields.email}</label>
                   <Input
+                    id="profile-email"
                     type="email"
                     value={user?.email || ''}
                     disabled
@@ -170,8 +173,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">{messages.profile.fields.phone}</label>
+                  <label htmlFor="profile-phone" className="text-sm font-medium text-foreground">{messages.profile.fields.phone}</label>
                   <Input
+                    id="profile-phone"
                     type="tel"
                     value={formData.phone}
                     onChange={(e) =>
@@ -182,10 +186,11 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-date-of-birth" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.dateOfBirth}
                   </label>
                   <Input
+                    id="profile-date-of-birth"
                     type="date"
                     value={formData.dateOfBirth}
                     onChange={(e) =>
@@ -195,8 +200,9 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">{messages.profile.fields.address}</label>
+                  <label htmlFor="profile-address" className="text-sm font-medium text-foreground">{messages.profile.fields.address}</label>
                   <Input
+                    id="profile-address"
                     type="text"
                     value={formData.address}
                     onChange={(e) =>
@@ -230,10 +236,11 @@ export default function ProfilePage() {
               ) : null}
               <form className="space-y-4" onSubmit={handlePasswordSubmit}>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-current-password" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.currentPassword}
                   </label>
                   <Input
+                    id="profile-current-password"
                     name="oldPassword"
                     type="password"
                     placeholder={messages.profile.fields.currentPasswordPlaceholder}
@@ -242,10 +249,11 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-new-password" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.newPassword}
                   </label>
                   <Input
+                    id="profile-new-password"
                     name="newPassword"
                     type="password"
                     placeholder={messages.profile.fields.newPasswordPlaceholder}
@@ -256,10 +264,11 @@ export default function ProfilePage() {
                   />
                 </div>
                 <div className="space-y-2">
-                  <label className="text-sm font-medium text-foreground">
+                  <label htmlFor="profile-confirm-password" className="text-sm font-medium text-foreground">
                     {messages.profile.fields.confirmNewPassword}
                   </label>
                   <Input
+                    id="profile-confirm-password"
                     name="confirmPassword"
                     type="password"
                     placeholder={messages.profile.fields.confirmNewPasswordPlaceholder}
