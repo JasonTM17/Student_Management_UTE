@@ -6,7 +6,7 @@ import { BottomNavigation } from '../components/BottomNavigation';
 import { MenuPanel } from '../components/MenuPanel';
 import { tokens } from '../design/tokens';
 import { screenComponents } from '../screens';
-import type { ScreenName, UserRole } from './routes';
+import { canAccessScreen, type ScreenName, type UserRole } from './routes';
 import type { MobileNavigation } from './types';
 
 const roleHome: Record<UserRole, ScreenName> = {
@@ -23,6 +23,11 @@ export function MobileNavigator() {
 
   const navigation: MobileNavigation = {
     navigate(nextRoute) {
+      if (!canAccessScreen(role, nextRoute)) {
+        setRoute(roleHome[role]);
+        setMenuOpen(false);
+        return;
+      }
       setRoute(nextRoute);
       setMenuOpen(false);
     },
@@ -53,6 +58,7 @@ export function MobileNavigator() {
         {isSignedIn ? (
           <BottomNavigation
             activeRoute={route}
+            role={role}
             onNavigate={navigation.navigate}
             onMenu={() => setMenuOpen(true)}
           />
@@ -75,4 +81,3 @@ const styles = StyleSheet.create({
   safeArea: { backgroundColor: tokens.colors.background, flex: 1 },
   container: { flex: 1 },
 });
-

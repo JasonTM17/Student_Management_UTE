@@ -9,14 +9,18 @@ existing route, smoke, typecheck, lint, and historical 56/56 visual evidence.
 
 ## Next bounded pass
 
-1. Reconcile the native `mobile/` screen registry with the mobile Stitch
-   records for dashboard, registration, thesis, evaluation, notifications,
-   profile, and role-specific operations.
+1. Keep the explicit mobile Stitch-reference mapping current for dashboard,
+   registration, thesis, evaluation, notifications, profile, sign-in, and
+   lecturer operations. Each new direct reference must include its screen ID
+   and a regression assertion; do not mark an inferred screen as direct visual
+   parity.
 2. Keep web and native clients on the same `/api/v1` Java RESTful API seam;
    record any endpoint not yet implemented as a contract blocker, not fake
    client success.
-3. Exercise loading, empty, error, permission, and long-text states for each
-   touched web component and preserve 44px touch targets and bottom navigation.
+3. Preserve role-aware navigation: a preview role must not navigate to a route
+   outside its registry authorization. Continue to exercise loading, empty,
+   error, permission, and long-text states for each touched web component and
+   preserve 44px touch targets and bottom navigation.
 4. Run the available web tests/typecheck/lint. Run Expo typecheck only after
    dependencies are intentionally provisioned; do not install while C: is in
    the current low-space state.

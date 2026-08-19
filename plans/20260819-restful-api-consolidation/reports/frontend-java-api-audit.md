@@ -20,7 +20,9 @@ canonical route and writer owner.
 - `mobile/src/api/client.ts` uses one bearer-oriented base URL and the stable
   Java error fields `code`, `message`, and request id when available. It now
   defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls
-  require explicit `EXPO_PUBLIC_API_MODE=live`.
+  require explicit `EXPO_PUBLIC_API_MODE=live`. The mobile sign-in UI labels
+  local preview data explicitly and disables live sign-in until Java implements
+  the auth contract, so navigation cannot be mistaken for authenticated parity.
 
 ## Route status
 

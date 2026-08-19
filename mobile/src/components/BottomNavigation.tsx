@@ -1,20 +1,27 @@
 import { Pressable, StyleSheet, View } from 'react-native';
 
 import { tokens } from '../design/tokens';
-import { bottomNavigation, type ScreenName } from '../navigation/routes';
+import {
+  getBottomNavigation,
+  type ScreenName,
+  type UserRole,
+} from '../navigation/routes';
 import { UiText } from './Ui';
 
 interface BottomNavigationProps {
   activeRoute: ScreenName;
+  role: UserRole;
   onNavigate(route: ScreenName): void;
   onMenu(): void;
 }
 
-export function BottomNavigation({ activeRoute, onNavigate, onMenu }: BottomNavigationProps) {
+export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: BottomNavigationProps) {
+  const items = getBottomNavigation(role);
+
   return (
     <View style={styles.navigation}>
       <View style={styles.navigationInner}>
-        {bottomNavigation.map((item) => {
+        {items.map((item) => {
           const active = item.route === activeRoute;
 
           return (
@@ -71,4 +78,3 @@ const styles = StyleSheet.create({
   activeIcon: { backgroundColor: tokens.colors.primary },
   pressed: { opacity: 0.72 },
 });
-

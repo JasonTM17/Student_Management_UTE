@@ -40,6 +40,17 @@ export interface ScreenDefinition {
   icon: string;
 }
 
+export interface BottomNavigationItem {
+  route: ScreenName;
+  label: string;
+  icon: string;
+}
+
+export interface StitchMobileReference {
+  id: string;
+  title: string;
+}
+
 const allRoles: readonly UserRole[] = ['student', 'lecturer', 'admin'];
 const studentRoles: readonly UserRole[] = ['student'];
 const lecturerRoles: readonly UserRole[] = ['lecturer', 'admin'];
@@ -71,16 +82,68 @@ export const screenRegistry: readonly ScreenDefinition[] = [
   { name: 'lecturer.attendance', title: 'Class attendance', family: 'operations', roles: lecturerRoles, icon: 'P' },
 ];
 
-export const bottomNavigation = [
-  { route: 'dashboard.student', label: 'Home', icon: '⌂' },
-  { route: 'schedule', label: 'Schedule', icon: '◷' },
-  { route: 'courses', label: 'Courses', icon: '▦' },
-  { route: 'notifications', label: 'Alerts', icon: '!' },
-] as const satisfies ReadonlyArray<{
-  route: ScreenName;
-  label: string;
-  icon: string;
-}>;
+const bottomNavigationByRole: Readonly<Record<UserRole, readonly BottomNavigationItem[]>> = {
+  student: [
+    { route: 'dashboard.student', label: 'Home', icon: '⌂' },
+    { route: 'schedule', label: 'Schedule', icon: '◷' },
+    { route: 'courses', label: 'Courses', icon: '▦' },
+    { route: 'notifications', label: 'Alerts', icon: '!' },
+  ],
+  lecturer: [
+    { route: 'lecturer.dashboard', label: 'Home', icon: '⌂' },
+    { route: 'lecturer.schedule', label: 'Schedule', icon: '◷' },
+    { route: 'lecturer.grading', label: 'Gradebook', icon: 'G' },
+    { route: 'notifications', label: 'Alerts', icon: '!' },
+  ],
+  admin: [
+    { route: 'admin.dashboard', label: 'Home', icon: '⌂' },
+    { route: 'admin.students', label: 'Students', icon: 'S' },
+    { route: 'admin.lecturers', label: 'Lecturers', icon: 'L' },
+    { route: 'notifications', label: 'Alerts', icon: '!' },
+  ],
+};
+
+// Direct references only. Other registry screens derive from the same token and
+// interaction contract until a dedicated Stitch screen is added.
+export const stitchMobileReferences: Readonly<
+  Partial<Record<ScreenName, readonly StitchMobileReference[]>>
+> = {
+  'auth.signIn': [
+    { id: '67e517e324ef454c810e2b41b4acdc99', title: 'Đăng nhập - Hệ thống Quản lý Đề tài' },
+  ],
+  'dashboard.student': [
+    { id: '55abc697e13e416aa87c89fd331e6c62', title: 'Dashboard - Mobile App' },
+    { id: '89b8434a99dd4fcb87ce3c84469e3186', title: 'Trang chủ - Dashboard' },
+  ],
+  registration: [
+    { id: '05a2b1b196034830bc559ae72b82b6f9', title: 'Danh sách Đợt đăng ký' },
+    { id: '4f5dfbb559504aa38f58b22599f361e4', title: 'Danh sách đợt đăng ký - Mobile App' },
+  ],
+  notifications: [
+    { id: 'a8940ff416834cf59245e878780e2135', title: 'Trung tâm thông báo - Mobile App' },
+  ],
+  profile: [
+    { id: '1a12e27f4365459eb1d4ed274514d04d', title: 'Hồ sơ Sinh viên - Mobile App' },
+  ],
+  'thesis.topics': [
+    { id: '3d1a0cf1dd494919ab9095b738f0c8e4', title: 'Danh sách Đề tài' },
+  ],
+  'thesis.detail': [
+    { id: 'be1ea000e675492d829254077907039a', title: 'Chi tiết Đề tài' },
+  ],
+  'thesis.registration': [
+    { id: '4ac0f22ff9c14155b071bf3c8ffa699c', title: 'Đăng ký Đề tài - Mobile App' },
+  ],
+  'thesis.progress': [
+    { id: '5cb62add07304fa689a98c8512495482', title: 'Theo dõi tiến độ - Mobile App' },
+  ],
+  'thesis.evaluation': [
+    { id: '3073bce589eb4d4e97ef9775e921a506', title: 'Đánh giá Đề tài - Mobile App' },
+  ],
+  'admin.lecturers': [
+    { id: '36c60dec6ed9458a80bc5b1cfe6f82a5', title: 'Danh sách Giảng viên - Mobile App' },
+  ],
+};
 
 export const menuSections = [
   {
@@ -97,3 +160,10 @@ export function getScreenDefinition(route: ScreenName) {
   return screenRegistry.find((screen) => screen.name === route);
 }
 
+export function canAccessScreen(role: UserRole, route: ScreenName) {
+  return getScreenDefinition(route)?.roles.includes(role) ?? false;
+}
+
+export function getBottomNavigation(role: UserRole) {
+  return bottomNavigationByRole[role];
+}

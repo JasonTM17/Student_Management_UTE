@@ -3,6 +3,9 @@
 ## Canonical reference
 
 - Stitch project: `16486483525927292845` (Smart Student Management Portal).
+- The direct screen ledger is [`metadata.json`](./metadata.json), refreshed
+  from Stitch on 2026-08-19. It records 22 named reference screens and keeps
+  the supplementary image separate from implementation scope.
 - Design system: Academic Continuity; the local token contract is
   [`DESIGN.md`](./DESIGN.md).
 - Current Stitch atlas observed on 2026-08-19: 23 screen records — 9 desktop,

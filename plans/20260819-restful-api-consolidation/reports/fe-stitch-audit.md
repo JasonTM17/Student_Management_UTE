@@ -12,7 +12,8 @@ than reference-diff evidence and several current routes/states are not covered.
   templates in unlocalized and `[locale]` variants.
 - Stitch project `16486483525927292845`: 23 records, 9 desktop, 13 mobile,
   plus one supplementary image; 22 records expose HTML and screenshot
-  references.
+  references. `frontend/.stitch/metadata.json` records the 22 named screens
+  without pretending that metadata is a rendered visual diff.
 - Existing web capture artifact:
   `plans/20260819-java-thesis-strangler-migration/assets/fe-stitch-visual-qa/summary.json`
   reports 28 routes × 2 viewports, 56/56, zero measured overflow and zero
@@ -21,10 +22,11 @@ than reference-diff evidence and several current routes/states are not covered.
   admin academic-years, classrooms, departments, enrollments, lecturers,
   sections, semesters; lecturer grade detail; dashboard sign-out; and thesis
   topic detail.
-- The native scaffold now defines 23 navigable screens under `mobile/`.
-  The read-only audit snapshot reported zero native screens because it ran
-  before this scaffold was completed; current source presence does not replace
-  Expo/device evidence.
+- The native scaffold now defines 23 unique registry-to-component bindings
+  under `mobile/`; 13 direct mobile Stitch references are checked against the
+  shared metadata ledger. The read-only audit snapshot reported zero native
+  screens because it ran before this scaffold was completed; current
+  source-level evidence does not replace Expo/device evidence.
 
 ## Findings and repairs
 
@@ -38,6 +40,13 @@ than reference-diff evidence and several current routes/states are not covered.
    `#F9F9FF`, and major admin/workspace surfaces use a 1280px cap.
 4. The 768–1023px tablet boundary now receives the fluid content layout without
    reserving mobile bottom-bar space; the hamburger remains available.
+5. The initial mobile bottom bar always exposed student destinations and the
+   navigator accepted any screen name. The navigation now selects destinations
+   per active preview role and falls back to that role's home screen when an
+   unauthorized direct transition is attempted.
+6. The initial mobile sign-in preview could look like a successful Java login.
+   It now labels the local flow as preview-only and disables live sign-in until
+   a real Java auth contract exists and has runtime evidence.
 
 ## Remaining P0/P1 gates
 
