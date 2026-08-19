@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Current committed head: `cbb2671` (`fix: add mobile cards for admin catalog views`).
+- Current committed head: `c96dd17` (`docs: record admin catalog mobile progress`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
