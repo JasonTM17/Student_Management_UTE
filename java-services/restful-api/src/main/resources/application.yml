@@ -3,6 +3,15 @@ spring:
     name: campuscore-restful-api
   main:
     banner-mode: off
+  mvc:
+    throw-exception-if-no-handler-found: true
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
+      - org.springframework.boot.autoconfigure.jdbc.DataSourceTransactionManagerAutoConfiguration
+      - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
+      - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
+      - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
 
 server:
   port: ${SERVER_PORT:4010}
@@ -15,6 +24,7 @@ security:
   jwt:
     secret: ${JWT_SECRET:}
   access-token-cookie: ${ACCESS_TOKEN_COOKIE:cc_access_token}
+  refresh-token-cookie: ${REFRESH_TOKEN_COOKIE:cc_refresh_token}
   csrf-cookie: ${CSRF_COOKIE:cc_csrf}
   csrf-header: ${CSRF_HEADER:X-CSRF-Token}
 
@@ -39,3 +49,30 @@ springdoc:
     path: /api/docs/openapi.json
   swagger-ui:
     path: /api/docs
+
+---
+spring:
+  config:
+    activate:
+      on-profile: persistence
+  autoconfigure:
+    exclude: []
+  datasource:
+    url: ${SPRING_DATASOURCE_URL:jdbc:postgresql://localhost:5432/campuscore?currentSchema=thesis}
+    username: ${SPRING_DATASOURCE_USERNAME:campuscore}
+    password: ${SPRING_DATASOURCE_PASSWORD:}
+  jpa:
+    hibernate:
+      ddl-auto: validate
+    open-in-view: false
+    properties:
+      hibernate:
+        default_schema: thesis
+        jdbc:
+          time_zone: UTC
+  flyway:
+    enabled: ${FLYWAY_ENABLED:true}
+    create-schemas: true
+    default-schema: thesis
+    schemas: thesis
+    locations: classpath:db/migration

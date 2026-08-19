@@ -8,6 +8,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
+import io.campuscore.restfulapi.web.ApiErrorWriter;
+import org.springframework.http.HttpStatus;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.HttpMethod;
 import org.springframework.stereotype.Component;
@@ -18,16 +20,22 @@ import org.springframework.web.filter.OncePerRequestFilter;
 public class CsrfCookieFilter extends OncePerRequestFilter {
 
     private final String accessTokenCookie;
+    private final String refreshTokenCookie;
     private final String csrfCookie;
     private final String csrfHeader;
+    private final ApiErrorWriter errorWriter;
 
     public CsrfCookieFilter(
             @Value("${security.access-token-cookie:cc_access_token}") String accessTokenCookie,
+            @Value("${security.refresh-token-cookie:cc_refresh_token}") String refreshTokenCookie,
             @Value("${security.csrf-cookie:cc_csrf}") String csrfCookie,
-            @Value("${security.csrf-header:X-CSRF-Token}") String csrfHeader) {
+            @Value("${security.csrf-header:X-CSRF-Token}") String csrfHeader,
+            ApiErrorWriter errorWriter) {
         this.accessTokenCookie = accessTokenCookie;
+        this.refreshTokenCookie = refreshTokenCookie;
         this.csrfCookie = csrfCookie;
         this.csrfHeader = csrfHeader;
+        this.errorWriter = errorWriter;
     }
 
     @Override
@@ -37,7 +45,7 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         if (isSafeMethod(request.getMethod())
                 || hasBearerHeader(request)
-                || !hasCookie(request, accessTokenCookie)) {
+                || !hasSessionCookie(request)) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -47,7 +55,12 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
         if (csrfCookieValue == null
                 || csrfHeaderValue == null
                 || !sameSecret(csrfCookieValue, csrfHeaderValue)) {
-            response.sendError(HttpServletResponse.SC_FORBIDDEN, "Invalid CSRF token");
+            errorWriter.write(
+                    request,
+                    response,
+                    HttpStatus.FORBIDDEN,
+                    "CSRF_INVALID",
+                    "Invalid CSRF token");
             return;
         }
 
@@ -62,11 +75,12 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
 
     private boolean hasBearerHeader(HttpServletRequest request) {
         String authorization = request.getHeader("Authorization");
-        return authorization != null && authorization.regionMatches(true, 0, "Bearer ", 0, 7);
+        return authorization != null && authorization.startsWith("Bearer ");
     }
 
-    private boolean hasCookie(HttpServletRequest request, String name) {
-        return cookieValue(request, name) != null;
+    private boolean hasSessionCookie(HttpServletRequest request) {
+        return cookieValue(request, accessTokenCookie) != null
+                || cookieValue(request, refreshTokenCookie) != null;
     }
 
     private String cookieValue(HttpServletRequest request, String name) {

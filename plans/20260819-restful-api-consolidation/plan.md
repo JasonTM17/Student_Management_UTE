@@ -146,8 +146,9 @@ the retirement gates pass.
 - Phase 01 architecture contract: complete at `426e024`.
 - Phase 02 single-app shell: complete at `e086c04`; see
   `phase-02-single-app-shell.md`.
-- Phase 03 persistence/migration seam: pending; this is the next implementation
-  boundary and must not begin with a public route switch.
+- Phase 03 persistence/migration seam: implementation candidate in progress; see
+  `phase-03-persistence-thesis-read.md`. It has no public route or writer
+  handoff yet.
 
 # Acceptance and verification
 
@@ -194,6 +195,7 @@ until rollback has been exercised and evidence is stored under this plan.
 
 - Canonical architecture decision: `phase-01-architecture-contract.md`.
 - Single-app implementation evidence: `phase-02-single-app-shell.md`.
+- Persistence/read-path evidence: `phase-03-persistence-thesis-read.md`.
 - Independent review record: `reports/review-gate.md`.
 - Current topology remains documented in `docs/ARCHITECTURE.md`; this plan is a
   planned target, not a claim that cutover already happened.

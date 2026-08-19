@@ -16,9 +16,12 @@ shell, not a domain-parity or cutover claim.
 - Actuator and OpenAPI paths;
 - a non-root Dockerfile for the eventual single image.
 
-No database, legacy route, payment provider or LLM provider is wired yet. Those
-dependencies enter through later migration phases with one canonical writer and
-explicit rollback evidence.
+The default profile intentionally excludes database auto-configuration, so the
+shell can be tested without a running service dependency. The `persistence`
+profile enables one PostgreSQL datasource, one Flyway migration owner and the
+first thesis read path. No legacy route, payment provider or LLM provider is
+cut over; those dependencies enter through later migration phases with one
+canonical writer and explicit rollback evidence.
 
 ## Local verification
 
@@ -26,6 +29,9 @@ From the repository root:
 
 ```powershell
 mvn -q -f java-services/restful-api/pom.xml test
+
+# Persistence rehearsal uses the H2 test profile; it does not touch Postgres.
+mvn -q -f java-services/restful-api/pom.xml -Dspring.profiles.active=test,persistence test
 ```
 
 For a local process, provide a real server-side `JWT_SECRET` with at least 32
@@ -34,4 +40,6 @@ client bundles or committed `.env` files.
 
 The endpoint `/api/v1/contract` intentionally reports `migration: not-cut-over`.
 It is a phase probe and must be removed or replaced by real module contracts
-before any public route switch.
+before any public route switch. The persistence profile is not a production
+readiness signal until it has been exercised against a disposable PostgreSQL
+restore as well as H2.
