@@ -528,6 +528,29 @@ test('auth client uses cookie sessions and CSRF headers', () => {
   );
 });
 
+test('high-frequency auth and profile forms associate labels with controls', () => {
+  const associations = [
+    ['src/app/forgot-password/page.tsx', 'forgot-password-email'],
+    ['src/app/reset-password/page.tsx', 'reset-password-new'],
+    ['src/app/reset-password/page.tsx', 'reset-password-confirm'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-first-name'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-last-name'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-email'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-phone'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-date-of-birth'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-address'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-current-password'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-new-password'],
+    ['src/app/dashboard/profile/page.tsx', 'profile-confirm-password'],
+  ];
+
+  for (const [relPath, controlId] of associations) {
+    const source = read(relPath);
+    assert.match(source, new RegExp(`htmlFor="${controlId}"`));
+    assert.match(source, new RegExp(`id="${controlId}"`));
+  }
+});
+
 test('frontend config exposes local edge rewrites and SEO runtime files', () => {
   const nextConfigSource = fs.readFileSync(
     path.join(root, 'next.config.mjs'),
