@@ -52,7 +52,7 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 
 ## Verification record
 
-- `frontend`: `npm test` — PASS, 25/25.
+- `frontend`: `npm test` — PASS, 27/27.
 - `frontend`: `npm run typecheck` — PASS.
 - `frontend`: `npm run lint` — PASS, zero warnings.
 - Latest bounded a11y patch: explicit `htmlFor`/`id` associations for
@@ -68,6 +68,10 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
   cards with desktop-table fallbacks; invoice detail items receive the same
   mobile treatment. Smoke/typecheck/lint PASS after the patch. Academic-years,
   analytics, and other dense tables remain open for later bounded passes.
+- Admin Academic Years and Analytics now render mobile cards, and student
+  Grades, Invoices, Transcript, and lecturer Section Grading now use the same
+  card-first mobile contract while retaining editable grading controls and
+  desktop-table fallbacks. Smoke/typecheck/lint PASS after the patch.
 - `frontend`: `git diff --check` — PASS.
 - `frontend`: `npm run build` — PASS.
 - `java-services`: `mvn -q verify` — PASS; H2/Spring tests ran, with normal Mockito/Byte Buddy warnings.
