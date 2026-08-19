@@ -19,9 +19,10 @@ shell, not a domain-parity or cutover claim.
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
 profile enables one PostgreSQL datasource, one Flyway migration owner and the
-first thesis read path. No legacy route, payment provider or LLM provider is
-cut over; those dependencies enter through later migration phases with one
-canonical writer and explicit rollback evidence.
+first thesis read path only when `THESIS_READ_ENABLED=true` is also supplied.
+No legacy route, payment provider or LLM provider is cut over; those
+dependencies enter through later migration phases with one canonical writer and
+explicit rollback evidence.
 
 ## Local verification
 

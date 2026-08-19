@@ -6,11 +6,13 @@ import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
 @Service
 @Profile("persistence")
+@ConditionalOnProperty(prefix = "migration.thesis-read", name = "enabled", havingValue = "true")
 public class ThesisTopicService {
 
     private final ThesisTopicRepository topics;
