@@ -346,7 +346,91 @@ export default function TranscriptPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  <div
+                    className="space-y-3 md:hidden"
+                    role="list"
+                    aria-label={copy.headers.course}
+                  >
+                    {semester.records.map((record) => (
+                      <article
+                        key={`${record.id}-mobile`}
+                        className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                        role="listitem"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                              {record.courseCode}
+                            </p>
+                            <h3 className="mt-1 break-words font-semibold text-foreground">
+                              {getLocalizedFlatLabel(
+                                locale,
+                                record.courseName,
+                                record.courseNameEn,
+                                record.courseNameVi,
+                                record.courseName,
+                              )}
+                            </h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {record.sectionCode}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
+                          >
+                            {record.letterGrade || '-'}
+                          </span>
+                        </div>
+                        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.headers.credits}
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {formatNumber(record.credits)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.headers.score}
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {typeof record.finalGrade === 'number'
+                                ? record.finalGrade.toFixed(1)
+                                : '-'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.headers.points}
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {typeof getGradePoint(record) === 'number'
+                                ? getGradePoint(record)?.toFixed(1)
+                                : '-'}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.headers.enrollment}
+                            </dt>
+                            <dd className="mt-1 break-words text-foreground">
+                              {record.enrollmentStatus}
+                            </dd>
+                          </div>
+                          <div className="col-span-2 border-t border-border/60 pt-3">
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.headers.gradeStatus}
+                            </dt>
+                            <dd className="mt-1 break-words text-foreground">
+                              {record.gradeStatus}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[840px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">

@@ -333,7 +333,81 @@ export default function GradesPage() {
                   </div>
                 </CardHeader>
                 <CardContent>
-                  <div className="overflow-x-auto">
+                  <div
+                    className="space-y-3 md:hidden"
+                    role="list"
+                    aria-label={copy.tableHeaders.course}
+                  >
+                    {records.map((record) => (
+                      <article
+                        key={`${record.id}-mobile`}
+                        className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                        role="listitem"
+                      >
+                        <div className="flex items-start justify-between gap-3">
+                          <div className="min-w-0">
+                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                              {record.courseCode}
+                            </p>
+                            <h3 className="mt-1 break-words font-semibold text-foreground">
+                              {getLocalizedFlatLabel(
+                                locale,
+                                record.courseName,
+                                record.courseNameEn,
+                                record.courseNameVi,
+                                record.courseName,
+                              )}
+                            </h3>
+                            <p className="mt-1 text-sm text-muted-foreground">
+                              {record.sectionCode}
+                            </p>
+                          </div>
+                          <span
+                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
+                          >
+                            {record.letterGrade || '-'}
+                          </span>
+                        </div>
+                        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                          <div className="min-w-0">
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.tableHeaders.lecturer}
+                            </dt>
+                            <dd className="mt-1 break-words text-foreground">
+                              {record.lecturerName ?? copy.pendingAssignment}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.tableHeaders.credits}
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {formatNumber(record.credits)}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.tableHeaders.score}
+                            </dt>
+                            <dd className="mt-1 text-foreground">
+                              {record.finalGrade !== null
+                                ? record.finalGrade.toFixed(1)
+                                : copy.notPublished}
+                            </dd>
+                          </div>
+                          <div>
+                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                              {copy.tableHeaders.status}
+                            </dt>
+                            <dd className="mt-1 break-words text-foreground">
+                              {record.gradeStatus}
+                            </dd>
+                          </div>
+                        </dl>
+                      </article>
+                    ))}
+                  </div>
+                  <div className="hidden overflow-x-auto md:block">
                     <table className="w-full min-w-[760px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">
