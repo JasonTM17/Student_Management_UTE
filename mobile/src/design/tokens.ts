@@ -1,0 +1,56 @@
+export const tokens = {
+  colors: {
+    background: '#F9F9FF',
+    surfaceLow: '#F2F3FC',
+    surface: '#EDEDF6',
+    surfaceHigh: '#E7E8F0',
+    card: '#FFFFFF',
+    text: '#191C21',
+    textMuted: '#424752',
+    primary: '#003F87',
+    primaryContainer: '#0056B3',
+    primaryFixed: '#D7E2FF',
+    secondary: '#505F76',
+    secondaryContainer: '#D0E1FB',
+    outline: '#727784',
+    outlineVariant: '#C2C6D4',
+    error: '#BA1A1A',
+    success: '#217A42',
+    warning: '#9A6700',
+    onPrimary: '#FFFFFF',
+  },
+  spacing: {
+    unit: 4,
+    xs: 4,
+    sm: 8,
+    md: 16,
+    lg: 24,
+    xl: 32,
+  },
+  radii: {
+    control: 4,
+    card: 8,
+    pill: 999,
+  },
+  layout: {
+    mobileGutter: 16,
+    bottomNavigationHeight: 72,
+    touchTarget: 44,
+  },
+  typography: {
+    family: 'Be Vietnam Pro',
+    fallback: 'System',
+    display: { fontSize: 36, lineHeight: 44, fontWeight: '700' as const },
+    headlineLarge: { fontSize: 28, lineHeight: 36, fontWeight: '600' as const },
+    headlineMedium: { fontSize: 24, lineHeight: 32, fontWeight: '600' as const },
+    headlineSmall: { fontSize: 20, lineHeight: 28, fontWeight: '600' as const },
+    bodyLarge: { fontSize: 18, lineHeight: 28, fontWeight: '400' as const },
+    bodyMedium: { fontSize: 16, lineHeight: 24, fontWeight: '400' as const },
+    bodySmall: { fontSize: 14, lineHeight: 20, fontWeight: '400' as const },
+    label: { fontSize: 13, lineHeight: 18, fontWeight: '600' as const },
+    meta: { fontSize: 12, lineHeight: 16, fontWeight: '600' as const },
+  },
+} as const;
+
+export type DesignTokens = typeof tokens;
+

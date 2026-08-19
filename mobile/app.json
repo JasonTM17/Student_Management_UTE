@@ -1,0 +1,17 @@
+{
+  "expo": {
+    "name": "CampusCore Mobile",
+    "slug": "campuscore-mobile",
+    "version": "0.1.0",
+    "orientation": "portrait",
+    "userInterfaceStyle": "light",
+    "scheme": "campuscore",
+    "ios": {
+      "bundleIdentifier": "io.campuscore.mobile"
+    },
+    "android": {
+      "package": "io.campuscore.mobile"
+    }
+  }
+}
+
