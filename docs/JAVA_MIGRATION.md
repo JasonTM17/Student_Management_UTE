@@ -8,9 +8,12 @@ gates.
 ## First boundary
 
 `java-services/thesis-service` is an isolated Spring Boot service. It is not yet
-a replacement for `academic-service` and must not receive public traffic until
-the gateway and deployment checks are added in a later change. Its tables use a
-dedicated `thesis` schema so legacy Prisma `db push` cannot own or remove them.
+a replacement for `academic-service` and must not receive shared staging or
+production traffic. The dedicated `k8s/overlays/thesis-pilot` overlay now gives
+it an isolated namespace, readiness-gated Deployment, and explicit nginx route
+for production-shaped validation; the canonical base and generic overlays stay
+on the nine-image release baseline. Its tables use a dedicated `thesis` schema
+so legacy Prisma `db push` cannot own or remove them.
 
 The service targets Java 21, uses Flyway for versioned SQL migrations, validates
 existing access-token JWTs with `JWT_SECRET`, accepts the legacy access-token
@@ -50,8 +53,15 @@ remain required while the old services are still canonical.
 - Server-side read-only assistant with permission-filtered thesis context,
   Redis rate limiting, bounded provider timeout, and no mutation tools.
 - Next.js bilingual thesis workspace and session-only assistant panel.
+- Isolated Kubernetes thesis pilot route with Postgres/Redis startup waits,
+  secret-backed JWT/readiness settings, and local-only Java image provenance.
 
 The old Node services remain canonical for all existing CampusCore domains. This
 branch is not a full backend cutover and must not be described as production
-ready until remaining service parity, data reconciliation, gateway canary, and
-rollback gates pass.
+ready until differential parity, data reconciliation, gateway canary, image
+provenance, and rollback gates pass.
+
+The local Compose thesis route is enabled only when the matching Java service
+and route fragments are mounted. The semver production Compose file mounts
+comment-only fragments, so a release containing only the nine public images
+cannot accidentally resolve `thesis-service:4010`.

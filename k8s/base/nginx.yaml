@@ -23,6 +23,12 @@ spec:
             - name: config
               mountPath: /etc/nginx/nginx.conf
               subPath: nginx.conf
+            - name: thesis-pilot-config
+              mountPath: /etc/nginx/thesis-pilot-upstream.conf
+              subPath: thesis-pilot-upstream.conf
+            - name: thesis-pilot-config
+              mountPath: /etc/nginx/thesis-pilot-routes.conf
+              subPath: thesis-pilot-routes.conf
           readinessProbe:
             httpGet:
               path: /__nginx_health
@@ -55,6 +61,9 @@ spec:
         - name: config
           configMap:
             name: campuscore-nginx-config
+        - name: thesis-pilot-config
+          configMap:
+            name: campuscore-nginx-thesis-pilot-config
 ---
 apiVersion: v1
 kind: Service

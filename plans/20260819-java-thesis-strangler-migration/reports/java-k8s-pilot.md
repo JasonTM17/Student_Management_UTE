@@ -1,0 +1,47 @@
+# Java K8s Pilot Evidence
+
+## Snapshot
+
+- Base snapshot before this patch: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
+- Branch: `feature/java-thesis-platform`.
+- `.agents/` is unrelated untracked state and remains unmodified.
+- Candidate scope: optional nginx fragments, `k8s/overlays/thesis-pilot`, Java
+  Deployment/Service, Kustomize preflight and docs.
+
+## What is implemented
+
+- Canonical base keeps comments-only thesis fragments, so it has no Java thesis
+  upstream or route.
+- Pilot replaces the fragments, creates namespace
+  `campuscore-thesis-pilot`, starts Java after Postgres/Redis, and proxies only
+  `/api/v1/thesis` to `thesis-service:4010`.
+- Java uses the existing access-token/JWT and health-key contract, `thesis`
+  schema, pilot-only Flyway bootstrap, Redis URL, non-root runtime settings,
+  dependency-backed readiness, and probes.
+- Existing nine-image release parity checks now also render and inspect the
+  pilot overlay, assert the pilot nginx mount and ClusterIP edge, while
+  rejecting a public GHCR thesis image.
+
+## Evidence and limits
+
+- `git diff --check`: PASS before the next commit.
+- `kubectl kustomize k8s/base`: PASS.
+- `kubectl kustomize k8s/overlays/thesis-pilot`: PASS.
+- `node scripts/run-k8s-preflight.mjs`: PASS for the canonical overlays and
+  thesis pilot contract; `docker compose -f docker-compose.yml config`: PASS.
+- Runtime smoke, Java/Maven verification and apply: `NOT_RUN`; C: has
+  approximately 0.45 GB free and heavy commands are intentionally held.
+- Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
+  registry publication, provenance, image smoke, or deployment evidence.
+- Schema bootstrap, differential contract, reconciliation/restore, canary,
+  observability and rollback: NOT_RUN/open.
+- Production Compose now mounts disabled thesis fragments; local Compose mounts
+  the Java fragments and waits for Redis as well as Postgres.
+- The route is pilot-only and is not a shared staging/prod cutover.
+
+## Review status
+
+- Advisor review of the pre-patch exact head: conditional GO for design,
+  NO-GO for apply/public cutover; no approval inferred for this new snapshot.
+- Kongming/Wukong and FE/disk sidecar reviews are pending or must be rerun on
+  the frozen post-commit exact head.

@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Head: `8a5905348a37545b29c98069be9736384fa8af65`.
+- Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
 - `mvn -q test` in `java-services` passes.
@@ -50,8 +50,10 @@ Authority:
 - Frontend smoke, typecheck, lint, and `git diff --check` pass on the current dirty candidate.
 - Frontend production build passes, and the rendered visual QA artifact records 28 routes × 2 viewports = 56/56 captures with zero horizontal overflow and zero missing mobile navigation findings.
 - External Compose Playwright full suite passes 20/20 twice when `E2E_AUTH_LOGIN_URL=http://127.0.0.1:4007/api/v1` is used for seeded session setup; edge auth/CSRF/security tests still run through nginx. The shared Compose DB and the mutating checkout fixture are not accepted as an isolation proof.
+- After the Java pilot and FE accessibility patch, `kubectl kustomize k8s/base`, `kubectl kustomize k8s/overlays/thesis-pilot`, `node scripts/run-k8s-preflight.mjs`, `docker compose -f docker-compose.yml config`, frontend typecheck, frontend lint, and `git diff --check` pass. No K8s apply, Java build, image build, or runtime pilot smoke has been run.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
-- During this continuation, Docker Desktop was restarted without elevated service control; no broad filesystem deletion was performed. Docker build cache was pruned with 5.835 GB reclaimed logically; C: was last observed with approximately 2.35 GB free, so heavy dependency installation remains deferred.
+- During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; active RDP trace data under `DiagOutputDir` was inspected and preserved. C: is currently approximately 0.45 GB free, so heavy dependency installation, image builds, and full local deploy runs remain deferred.
+- The working-tree candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
 - Stitch project `16486483525927292845` defines the academic reference system:
   - `Be Vietnam Pro`
   - blue fidelity palette
@@ -80,7 +82,7 @@ Authority:
 1. Freeze baseline and record exact evidence. **Complete for the base snapshot; candidate remains dirty.**
 2. Audit FE against Stitch and classify drift. **Complete for the 22-screen atlas plus 56 rendered web/mobile captures; accessibility and mutation parity remain open.**
 3. Lock migration strategy and write release gates. **In progress through this plan and phase documents.**
-4. Make `thesis-service` the first Java public boundary. **Not complete; local Java tests pass, public edge ownership is not cut over.**
+4. Make `thesis-service` the first Java public boundary. **Pilot overlay implemented in the working tree; not complete until Kustomize/runtime, differential, schema, and rollback gates pass.**
 5. Move adjacent public behavior in controlled waves. **Pending.**
 6. Prove data reconciliation, observability, and rollback. **Pending and release-blocking.**
 7. Align frontend implementation to the Stitch system. **In progress; tokens, notifications, mobile nav, and thesis decomposition are implemented, and the 56-capture matrix is green; accessibility, table/card parity, and isolated E2E remain open.**
@@ -131,6 +133,17 @@ Release gates:
 git diff --check
 ```
 
+Kubernetes pilot render (read-only):
+
+```powershell
+kubectl kustomize k8s/base
+kubectl kustomize k8s/overlays/thesis-pilot
+node scripts/run-k8s-preflight.mjs
+```
+
+The pilot render commands pass, but Java/Maven, image build, runtime smoke, and
+apply remain deferred while C: remains below 1 GB free.
+
 Rendered FE QA (requires an authenticated local runtime):
 
 ```text
@@ -155,6 +168,11 @@ plus whatever exact smoke and rollback commands the deploy path uses.
 - False confidence from local tests that do not cover deploy topology.
 - FE drift if the Stitch tokens are not applied to actual runtime surfaces.
 - A local preview that cannot reach the auth/API services can only prove public/login rendering, not authenticated dashboard parity.
+- The optional nginx fragment mechanism must remain empty in base and resolve
+  only in the thesis-pilot overlay; a stale or duplicated gateway config would
+  invalidate route ownership evidence.
+- The pilot image is local-only and has no digest, provenance, registry smoke,
+  or release publication evidence.
 
 # Rollback and Recovery
 
@@ -167,6 +185,8 @@ plus whatever exact smoke and rollback commands the deploy path uses.
 
 - Update `docs/RELEASE.md` with Java-specific release lanes.
 - Update architecture docs when ownership changes.
+- Keep the Java pilot overlay and its preflight contract documented without
+  adding it to the public nine-image release list.
 - Keep handoff notes for each boundary cutover.
 - Record any FE token changes in the UI docs or design notes.
 
@@ -176,3 +196,10 @@ plus whatever exact smoke and rollback commands the deploy path uses.
 - Auth is still shadow-only on the Java side.
 - External E2E is repeatable with the explicit direct-auth session setup, but the shared database/checkout mutation still needs an isolated run. The isolated runner needs local Node service dependencies installed before it can execute; low C: space currently makes that unsafe.
 - FE accessibility, business mutation parity, and full Stitch-to-production acceptance are still open despite the green visual capture matrix.
+- Exact-head Advisor/Kongming/Wukong review of the post-patch snapshot is still
+  required. The first Advisor review was conditional and read-only on the
+  pre-patch head; no approval is inferred from it.
+- Java thesis schema bootstrap/ownership, differential contract coverage,
+  authenticated pilot smoke, metrics/logs/traces, canary, and rollback evidence
+  remain open. `FLYWAY_ENABLED=true` is pilot-only for now and must not be
+  silently carried into a shared production-like environment.

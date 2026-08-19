@@ -1,7 +1,15 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowLeft, LogOut } from 'lucide-react';
+import { usePathname } from 'next/navigation';
+import {
+  ArrowLeft,
+  BarChart3,
+  BookOpen,
+  LayoutDashboard,
+  LogOut,
+  Users,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { BrandMark } from '@/components/BrandMark';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -10,6 +18,8 @@ import { Button } from '@/components/ui/button';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
+import { stripLocaleFromPathname } from '@/i18n/paths';
+import { cn } from '@/lib/utils';
 
 interface AdminFrameProps {
   title: string;
@@ -32,9 +42,28 @@ export function AdminFrame({
 }: AdminFrameProps) {
   const { user, logout } = useAuth();
   const { messages } = useI18n();
+  const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
 
   const resolvedEyebrow = eyebrow || messages.adminShell.eyebrow;
   const resolvedBackLabel = backLabel || messages.adminShell.backToDashboard;
+  const mobileNavItems = [
+    { href: '/admin', icon: LayoutDashboard, label: messages.admin.title },
+    {
+      href: '/admin/users',
+      icon: Users,
+      label: messages.admin.menuItems[0]?.[0] ?? 'Users',
+    },
+    {
+      href: '/admin/courses',
+      icon: BookOpen,
+      label: messages.admin.menuItems[2]?.[0] ?? 'Courses',
+    },
+    {
+      href: '/admin/analytics',
+      icon: BarChart3,
+      label: messages.admin.menuItems[8]?.[0] ?? 'Analytics',
+    },
+  ];
 
   return (
     <div className="min-h-screen bg-background">
@@ -73,6 +102,37 @@ export function AdminFrame({
               </span>
             </Button>
           </div>
+        </div>
+      </nav>
+
+      <nav
+        className="border-b border-border/60 bg-card/80 px-4 py-2 sm:hidden"
+        aria-label={messages.adminShell.mobileNavigation}
+      >
+        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto pb-0.5">
+          {mobileNavItems.map((item) => {
+            const isActive =
+              pathname === item.href ||
+              (item.href !== '/admin' && pathname.startsWith(`${item.href}/`));
+            const Icon = item.icon;
+
+            return (
+              <LocalizedLink
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'inline-flex min-h-10 shrink-0 items-center gap-2 whitespace-nowrap rounded-lg px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive
+                    ? 'bg-primary/10 text-primary'
+                    : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+                )}
+              >
+                <Icon className="h-4 w-4" aria-hidden="true" />
+                {item.label}
+              </LocalizedLink>
+            );
+          })}
         </div>
       </nav>
 

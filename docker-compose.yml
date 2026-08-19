@@ -451,6 +451,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      redis:
+        condition: service_healthy
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "curl --fail --silent --show-error --header \"X-Health-Key: ${HEALTH_READINESS_KEY:-local-dev-readiness-key-12345}\" http://localhost:4010/api/v1/health/readiness >/dev/null"]
@@ -604,6 +606,8 @@ services:
       - "127.0.0.1:80:80"
     volumes:
       - ./nginx/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./nginx/thesis-pilot-upstream.conf:/etc/nginx/thesis-pilot-upstream.conf:ro
+      - ./nginx/thesis-pilot-routes.conf:/etc/nginx/thesis-pilot-routes.conf:ro
       - nginx_logs:/var/log/nginx
     depends_on:
       core-api:

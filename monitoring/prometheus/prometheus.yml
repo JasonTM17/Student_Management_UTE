@@ -73,3 +73,8 @@ scrape_configs:
     http_headers:
       X-Health-Key:
         values: ["local-dev-readiness-key-12345"]
+
+  - job_name: thesis-service
+    metrics_path: /actuator/prometheus
+    static_configs:
+      - targets: ["thesis-service:4010"]

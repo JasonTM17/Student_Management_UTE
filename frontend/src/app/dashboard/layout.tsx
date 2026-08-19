@@ -745,7 +745,9 @@ export default function DashboardLayout({
                         </span>
                       ) : null}
                     </span>
-                    <span className="max-w-full truncate">{item.label}</span>
+                    <span className="whitespace-nowrap text-center text-[10px] leading-tight">
+                      {item.label}
+                    </span>
                   </LocalizedLink>
                 );
               })}

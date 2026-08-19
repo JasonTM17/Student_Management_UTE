@@ -353,6 +353,7 @@ export const en = {
     eyebrow: 'Admin workspace',
     signOut: 'Sign out',
     backToDashboard: 'Back to admin dashboard',
+    mobileNavigation: 'Admin mobile navigation',
   },
   admin: {
     title: 'Admin dashboard',
@@ -1332,6 +1333,7 @@ export const vi: I18nMessages = {
     eyebrow: 'Workspace quản trị',
     signOut: 'Đăng xuất',
     backToDashboard: 'Quay lại dashboard quản trị',
+    mobileNavigation: 'Điều hướng quản trị trên mobile',
   },
   admin: {
     title: 'Dashboard quản trị',

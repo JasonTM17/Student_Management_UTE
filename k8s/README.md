@@ -1,6 +1,8 @@
 # CampusCore Kubernetes
 
-CampusCore hiện có bộ manifests Kustomize cho đúng topology 9 image đang chạy ở Docker Compose:
+CampusCore hiện có bộ manifests Kustomize cho canonical topology 9 image đang
+chạy ở Docker Compose. Java thesis có một overlay pilot riêng để kiểm tra
+production-shaped routing mà không làm thay đổi release baseline:
 
 - `core-api`
 - `auth-service`
@@ -14,6 +16,10 @@ CampusCore hiện có bộ manifests Kustomize cho đúng topology 9 image đang
 - `nginx`
 - PostgreSQL, Redis, RabbitMQ, MinIO
 
+`k8s/overlays/thesis-pilot` thêm `thesis-service` Java 21 trong namespace cô
+lập `campuscore-thesis-pilot`. Overlay này không phải public release, không
+được thêm vào danh sách GHCR images, và không được hiểu là production cutover.
+
 ## Mục tiêu
 
 - Giữ nguyên boundary runtime đang có trong repo.
@@ -23,6 +29,9 @@ CampusCore hiện có bộ manifests Kustomize cho đúng topology 9 image đang
 ## Base và overlay
 
 - `k8s/base`: canonical production-like runtime base cho topology hiện tại.
+- `k8s/overlays/thesis-pilot`: candidate Java boundary với route nginx riêng,
+  readiness/secret contract và image local-only; dùng để kiểm tra parity,
+  migration, rollback trước khi mở staging/prod.
 - `k8s/bootstrap`: one-shot init jobs theo đúng thứ tự bootstrap schema/data.
 - `k8s/overlays/docker-desktop`: local-first overlay cho Docker Desktop Kubernetes.
 
@@ -32,6 +41,39 @@ Overlay Docker Desktop giữ nguyên boundary service nhưng vá đúng các đi
 - `SWAGGER_ENABLED=true` để local smoke kiểm được `/api/docs`.
 - `COOKIE_SECURE=false` và `FRONTEND_URL=http://127.0.0.1:8080` để browser auth flow chạy được trên HTTP local.
 - Secret dùng giá trị local-only, không phải production secret.
+
+## Java thesis pilot
+
+Pilot overlay dựng lại canonical runtime trong namespace riêng rồi thêm Java
+thesis service và hai fragment nginx có phạm vi rõ:
+
+- `k8s/base` giữ fragment rỗng, nên canonical nine-image runtime không resolve
+  tới `thesis-service`.
+- `k8s/overlays/thesis-pilot` thay fragment bằng upstream `thesis-service:4010`
+  và chỉ route `/api/v1/thesis` vào Java.
+- Deployment chờ Postgres và Redis, dùng `thesis` schema qua Flyway, secret-backed
+  `JWT_SECRET`/`HEALTH_READINESS_KEY`, và readiness/liveness probes.
+- Image mặc định là `campuscore-thesis-service:pilot-local`; operator phải
+  build/load image vào cluster hoặc patch sang một digest đã publish trong
+  private overlay. Repo chưa publish image này.
+
+Render kiểm tra (không tự apply):
+
+```bash
+docker build -f java-services/thesis-service/Dockerfile -t campuscore-thesis-service:pilot-local java-services
+kubectl kustomize k8s/overlays/thesis-pilot
+```
+
+Chỉ sau khi đã có image local và secret phù hợp mới apply:
+
+```bash
+kubectl apply -k k8s/overlays/thesis-pilot
+```
+
+Pilot không thay thế các overlay staging/prod. Trước khi mở route vào shared
+environment vẫn phải có differential contract, schema/reconciliation/restore,
+canary, rollback, metrics/logs/traces và exact-head Advisor/Kongming/Wukong
+evidence.
 
 ## Dùng với Docker Desktop Kubernetes
 
@@ -231,7 +273,7 @@ Repo đã có sẵn hai overlay generic cho pha vận hành kế tiếp:
 
 Hai overlay này:
 
-- giữ nguyên topology 9 image và boundary hiện tại
+- giữ nguyên topology canonical 9 image và boundary hiện tại
 - thêm `Ingress` chuẩn Kubernetes
 - dùng hostname placeholder và TLS secret name placeholder
 - không commit secret thật

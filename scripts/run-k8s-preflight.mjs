@@ -14,6 +14,12 @@ const dockerDesktopOverlayDir = path.join(
   'overlays',
   'docker-desktop',
 );
+const thesisPilotOverlayDir = path.join(
+  repoRoot,
+  'k8s',
+  'overlays',
+  'thesis-pilot',
+);
 const stagingGenericOverlayDir = path.join(
   repoRoot,
   'k8s',
@@ -199,6 +205,7 @@ async function main() {
   const baseRender = await kubectlKustomize(baseDir);
   const bootstrapRender = await kubectlKustomize(bootstrapDir);
   const dockerDesktopRender = await kubectlKustomize(dockerDesktopOverlayDir);
+  const thesisPilotRender = await kubectlKustomize(thesisPilotOverlayDir);
   const genericRenders = await Promise.all(
     genericOverlayExpectations.map(async (overlay) => ({
       ...overlay,
@@ -219,9 +226,12 @@ async function main() {
     })),
   );
 
+  assertCanonicalBaseHasNoThesisRoute(baseRender);
+
   const baseTag = getResolvedTag(baseRender, runtimeImages);
   const bootstrapTag = getResolvedTag(bootstrapRender, bootstrapImages);
   const overlayTag = getResolvedTag(dockerDesktopRender, runtimeImages);
+  const thesisPilotTag = getResolvedTag(thesisPilotRender, runtimeImages);
   const genericTags = genericRenders.map((overlay) =>
     getResolvedTag(overlay.renderedYaml, runtimeImages),
   );
@@ -238,6 +248,7 @@ async function main() {
   if (
     baseTag !== bootstrapTag ||
     baseTag !== overlayTag ||
+    baseTag !== thesisPilotTag ||
     genericTags.some((tag) => tag !== baseTag) ||
     operatorTags.some((tag) => tag !== baseTag) ||
     privateTemplateTags.some((tag) => tag !== baseTag) ||
@@ -260,6 +271,13 @@ async function main() {
     baseTag,
     'k8s/overlays/docker-desktop',
   );
+  assertGhcrImages(
+    thesisPilotRender,
+    runtimeImages,
+    baseTag,
+    'k8s/overlays/thesis-pilot',
+  );
+  assertThesisPilotOverlay(thesisPilotRender);
   for (const overlay of genericRenders) {
     assertGhcrImages(
       overlay.renderedYaml,
@@ -324,6 +342,9 @@ async function main() {
   console.log('[k8s-preflight] Bootstrap renders clean.');
   console.log(
     `[k8s-preflight] Docker Desktop overlay renders clean with release tag ${baseTag}.`,
+  );
+  console.log(
+    `[k8s-preflight] Thesis pilot overlay renders clean with canonical release tag ${baseTag}; Java image remains local-only and is not a release image.`,
   );
   for (const overlay of genericRenders) {
     console.log(
@@ -427,6 +448,94 @@ function assertGenericOverlay(overlay) {
 
   if (!renderedYaml.includes(`${placeholderPrefix}postgres-password`)) {
     throw new Error(`${label} is missing environment-specific secret placeholders.`);
+  }
+}
+
+function assertCanonicalBaseHasNoThesisRoute(renderedYaml) {
+  if (hasDocument(renderedYaml, 'Deployment', 'thesis-service')) {
+    throw new Error('k8s/base must not render the Java thesis Deployment.');
+  }
+  if (hasDocument(renderedYaml, 'Service', 'thesis-service')) {
+    throw new Error('k8s/base must not render the Java thesis Service.');
+  }
+  for (const forbidden of [
+    'server thesis-service:4010;',
+    'location = /api/v1/thesis {',
+    'location ^~ /api/v1/thesis/ {',
+  ]) {
+    if (renderedYaml.includes(forbidden)) {
+      throw new Error(`k8s/base must not render the Java thesis contract: ${forbidden}`);
+    }
+  }
+}
+
+function assertThesisPilotOverlay(renderedYaml) {
+  extractDocument(renderedYaml, 'Namespace', 'campuscore-thesis-pilot');
+  const deployment = extractDocument(renderedYaml, 'Deployment', 'thesis-service');
+  const service = extractDocument(renderedYaml, 'Service', 'thesis-service');
+  const nginxDeployment = extractDocument(renderedYaml, 'Deployment', 'nginx');
+  const nginxService = extractDocument(renderedYaml, 'Service', 'campuscore-nginx');
+
+  for (const expected of [
+    'image: campuscore-thesis-service:pilot-local',
+    'imagePullPolicy: IfNotPresent',
+    'containerPort: 4010',
+    'SPRING_DATASOURCE_URL',
+    'currentSchema=thesis',
+    'REDIS_URL',
+    'FLYWAY_ENABLED',
+    'HEALTH_READINESS_KEY',
+    '/api/v1/health/readiness',
+    '/api/v1/health/liveness',
+  ]) {
+    if (!deployment.includes(expected)) {
+      throw new Error(
+        `k8s/overlays/thesis-pilot deployment is missing the expected contract: ${expected}`,
+      );
+    }
+  }
+
+  if (!service.includes('port: 4010') || !service.includes('targetPort: 4010')) {
+    throw new Error(
+      'k8s/overlays/thesis-pilot service must expose thesis-service on port 4010.',
+    );
+  }
+
+  if (!/type:\s*ClusterIP/u.test(nginxService)) {
+    throw new Error(
+      'k8s/overlays/thesis-pilot must keep campuscore-nginx behind ClusterIP.',
+    );
+  }
+
+  for (const expected of [
+    'name: thesis-pilot-config',
+    '/etc/nginx/thesis-pilot-upstream.conf',
+    '/etc/nginx/thesis-pilot-routes.conf',
+    'campuscore-nginx-thesis-pilot-config',
+  ]) {
+    if (!nginxDeployment.includes(expected)) {
+      throw new Error(
+        `k8s/overlays/thesis-pilot nginx Deployment is missing the actual fragment mount: ${expected}`,
+      );
+    }
+  }
+
+  for (const expected of [
+    'server thesis-service:4010;',
+    'location = /api/v1/thesis {',
+    'location ^~ /api/v1/thesis/ {',
+  ]) {
+    if (!renderedYaml.includes(expected)) {
+      throw new Error(
+        `k8s/overlays/thesis-pilot is missing the expected nginx contract: ${expected}`,
+      );
+    }
+  }
+
+  if (renderedYaml.includes('ghcr.io/jasontm17/campuscore-thesis-service:')) {
+    throw new Error(
+      'k8s/overlays/thesis-pilot must not imply that the unpublished Java image is a public release image.',
+    );
   }
 }
 

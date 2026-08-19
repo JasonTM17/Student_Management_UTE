@@ -1393,6 +1393,9 @@ jobs:
       - name: Render Docker Desktop Kubernetes overlay
         run: kubectl kustomize k8s/overlays/docker-desktop > /dev/null
 
+      - name: Render isolated Java thesis pilot overlay
+        run: kubectl kustomize k8s/overlays/thesis-pilot > /dev/null
+
       - name: Render staging generic Kubernetes overlay
         run: kubectl kustomize k8s/overlays/staging-generic > /dev/null
 

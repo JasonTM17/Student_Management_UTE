@@ -31,6 +31,10 @@ configMapGenerator:
   - name: campuscore-nginx-config
     files:
       - nginx.conf
+  - name: campuscore-nginx-thesis-pilot-config
+    files:
+      - thesis-pilot-upstream.conf
+      - thesis-pilot-routes.conf
 
 generatorOptions:
   disableNameSuffixHash: true

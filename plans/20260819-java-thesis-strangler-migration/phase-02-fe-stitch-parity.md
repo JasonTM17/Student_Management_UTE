@@ -27,6 +27,8 @@ The read-only atlas is recorded in
 - Added focused thesis routes for topic catalog, topic detail, progress, and
   defense/evaluation, using only current thesis and Java council read APIs.
 - Added bilingual copy and smoke/E2E route coverage for the new surfaces.
+- Added a compact admin mobile quick-nav, automatic `label`/control IDs for
+  single-control admin fields, and non-truncating mobile dashboard labels.
 
 ## Acceptance criteria
 
@@ -55,3 +57,9 @@ an accessibility audit or a substitute for isolated E2E: the shared Compose
 full suite now passes twice with direct auth-service session setup, but its
 checkout fixture still mutates the shared database and the isolated runner
 needs its local service dependencies installed before it can be accepted.
+
+The independent FE audit remains `INCONCLUSIVE/HOLD`: ten route families still
+need capture, the Stitch reference-size image-diff is not implemented, several
+data views remain horizontal-scroll-first on mobile, and console/network error
+allowlisting plus axe/keyboard coverage are open. The bounded shell/a11y fixes
+above pass typecheck and lint but do not close those release gates.
