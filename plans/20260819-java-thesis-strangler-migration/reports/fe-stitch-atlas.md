@@ -55,6 +55,9 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 - `frontend`: `npm test` — PASS, 20/20.
 - `frontend`: `npm run typecheck` — PASS.
 - `frontend`: `npm run lint` — PASS, zero warnings.
+- Latest bounded a11y patch: explicit `htmlFor`/`id` associations for
+  forgot-password, reset-password, and profile controls; typecheck and lint
+  PASS after the patch. Browser and E2E reruns remain open.
 - `frontend`: `git diff --check` — PASS.
 - `frontend`: `npm run build` — PASS.
 - `java-services`: `mvn -q verify` — PASS; H2/Spring tests ran, with normal Mockito/Byte Buddy warnings.
