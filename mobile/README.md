@@ -40,9 +40,11 @@ real `npm run typecheck` remains deferred until Expo/React Native dependencies
 are provisioned in a bounded environment; source transpile has been checked,
 but transpile is not a substitute for Expo typechecking.
 
-Set `EXPO_PUBLIC_API_URL` from `.env.example` when the Java REST API is not
-reachable at the local default. The app uses one base URL for all requests and
-does not embed credentials.
+The default mode is `preview`: API calls fail closed with
+`MOBILE_API_PREVIEW`, so the scaffold cannot accidentally target the
+incomplete Java candidate. To exercise a deliberately provisioned runtime,
+set `EXPO_PUBLIC_API_MODE=live` and `EXPO_PUBLIC_API_URL` from `.env.example`.
+The app uses one base URL for all requests and does not embed credentials.
 
 ## API seam
 

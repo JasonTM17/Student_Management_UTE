@@ -35,3 +35,11 @@ test('native tokens preserve the Academic Continuity contract', () => {
   assert.match(tokens, /touchTarget: 44/);
   assert.match(tokens, /family: 'Be Vietnam Pro'/);
 });
+
+test('native API seam fails closed until live mode is explicitly enabled', () => {
+  const client = fs.readFileSync(path.join(mobileRoot, 'src/api/client.ts'), 'utf8');
+
+  assert.match(client, /EXPO_PUBLIC_API_MODE === 'live'/);
+  assert.match(client, /MOBILE_API_PREVIEW/);
+  assert.match(client, /mode: ApiMode/);
+});

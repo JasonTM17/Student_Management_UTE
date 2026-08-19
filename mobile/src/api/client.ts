@@ -2,11 +2,15 @@ export type JsonObject = Record<string, unknown>;
 
 export interface ApiClientOptions {
   baseUrl?: string;
+  mode?: ApiMode;
   getAccessToken?: () => string | undefined;
 }
 
+export type ApiMode = 'preview' | 'live';
+
 export interface ApiClient {
   readonly baseUrl: string;
+  readonly mode: ApiMode;
   setAccessToken(token: string | undefined): void;
   clearAccessToken(): void;
   request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
@@ -34,6 +38,7 @@ export class ApiClientError extends Error {
 export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:4010/api/v1';
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_URL;
+const configuredApiMode: ApiMode = process.env.EXPO_PUBLIC_API_MODE === 'live' ? 'live' : 'preview';
 
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/+$/, '');
@@ -80,11 +85,13 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = normalizeBaseUrl(
     options.baseUrl ?? configuredApiBaseUrl ?? DEFAULT_API_BASE_URL,
   );
+  const mode = options.mode ?? configuredApiMode;
   let accessToken: string | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
 
   const client: ApiClient = {
     baseUrl,
+    mode,
 
     setAccessToken(token) {
       accessToken = token;
@@ -96,6 +103,14 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     async request<TResponse>(path, init = {}) {
       const requestId = createRequestId();
+      if (mode !== 'live') {
+        throw new ApiClientError(
+          'Live mobile API mode is disabled for this preview build',
+          0,
+          requestId,
+          'MOBILE_API_PREVIEW',
+        );
+      }
       const headers = new Headers(init.headers);
       const token = getAccessToken();
 
@@ -195,4 +210,3 @@ export const campusApi = {
   assistantChat: (message: string) =>
     apiClient.post<JsonObject>(apiRoutes.thesis.assistantChat, { message }),
 };
-
