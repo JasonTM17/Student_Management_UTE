@@ -559,7 +559,123 @@ export default function AdminEnrollmentsPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {enrollments.map((enrollment) => {
+                  const learnerLabel = enrollment.student?.user
+                    ? `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`
+                    : enrollment.studentId;
+                  const courseLabel = enrollment.section?.course
+                    ? getLocalizedCourseLabel(
+                        locale,
+                        enrollment.section.course,
+                        `${enrollment.section.course.code || ''} ${enrollment.section.course.name || ''}`.trim(),
+                      )
+                    : copy.noCourseName;
+                  const semesterLabel = enrollment.semester
+                    ? getLocalizedName(
+                        locale,
+                        enrollment.semester,
+                        enrollment.semester.name,
+                      )
+                    : copy.unassigned;
+                  const lecturerLabel = enrollment.section?.lecturer?.user
+                    ? `${enrollment.section.lecturer.user.firstName} ${enrollment.section.lecturer.user.lastName}`
+                    : copy.unassigned;
+                  const statusLabel =
+                    copy.statusOptions[enrollment.status as keyof typeof copy.statusOptions] ??
+                    enrollment.status;
+
+                  return (
+                    <article
+                      key={`${enrollment.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            {enrollment.student?.studentCode || enrollment.studentId}
+                          </p>
+                          <h3 className="mt-1 break-words font-semibold text-foreground">
+                            {learnerLabel}
+                          </h3>
+                          <p className="mt-1 break-words text-sm text-muted-foreground">
+                            {enrollment.student?.user?.email || copy.noEmail}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || 'bg-secondary text-foreground'}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid gap-3 border-t border-border/60 pt-3 text-sm sm:grid-cols-2">
+                        <div className="min-w-0">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.course}
+                          </dt>
+                          <dd className="mt-1 break-words text-foreground">
+                            <span className="font-medium">
+                              {enrollment.section?.course?.code || copy.unknownCourse}
+                            </span>
+                            <span className="block text-muted-foreground">{courseLabel}</span>
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.section}
+                          </dt>
+                          <dd className="mt-1 break-words text-foreground">
+                            {enrollment.section?.sectionNumber || copy.unknownSection}
+                          </dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.semester}
+                          </dt>
+                          <dd className="mt-1 break-words text-foreground">{semesterLabel}</dd>
+                        </div>
+                        <div className="min-w-0">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.lecturer}
+                          </dt>
+                          <dd className="mt-1 break-words text-foreground">{lecturerLabel}</dd>
+                        </div>
+                        <div className="min-w-0 sm:col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.enrolledDate}
+                          </dt>
+                          <dd className="mt-1 break-words text-foreground">
+                            {formatDate(enrollment.enrolledAt)}
+                          </dd>
+                        </div>
+                      </dl>
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleViewDetail(enrollment)}
+                          aria-label={copy.viewLabel(learnerLabel)}
+                          title={copy.viewLabel(learnerLabel)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(enrollment)}
+                          aria-label={copy.deleteLabel(learnerLabel)}
+                          title={copy.deleteLabel(learnerLabel)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[1100px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

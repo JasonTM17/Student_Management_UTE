@@ -606,7 +606,146 @@ export default function AdminSectionsPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {sections.map((section) => {
+                  const courseLabel = section.course
+                    ? getLocalizedCourseLabel(
+                        locale,
+                        section.course,
+                        `${section.course.code} - ${section.course.name}`,
+                      )
+                    : copy.unknownCourse;
+                  const semesterLabel = section.semester
+                    ? getLocalizedName(
+                        locale,
+                        section.semester,
+                        section.semester.name,
+                      )
+                    : copy.unassigned;
+                  const lecturerLabel = section.lecturer?.user
+                    ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`
+                    : copy.unassigned;
+
+                  return (
+                    <article
+                      key={`${section.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            {copy.headers.course}
+                          </p>
+                          <h3 className="mt-1 font-semibold text-foreground">
+                            {courseLabel}
+                          </h3>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          {section.status}
+                        </span>
+                      </div>
+
+                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.section}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{section.sectionNumber}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.semester}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{semesterLabel}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.lecturer}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{lecturerLabel}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.capacity}
+                          </dt>
+                          <dd className="mt-1 text-foreground">
+                            {formatNumber(section.capacity)}
+                          </dd>
+                        </div>
+                      </dl>
+
+                      <div className="mt-4 border-t border-border/60 pt-3">
+                        <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.schedule}
+                        </p>
+                        {section.schedules && section.schedules.length > 0 ? (
+                          <div className="mt-2 space-y-1">
+                            {section.schedules.map((schedule, index) => (
+                              <div
+                                key={schedule.id || index}
+                                className="text-sm text-foreground"
+                              >
+                                <span className="font-medium">
+                                  {dayNames[schedule.dayOfWeek]}
+                                </span>{' '}
+                                <span className="text-muted-foreground">
+                                  {schedule.startTime}-{schedule.endTime}
+                                </span>{' '}
+                                <span className="text-muted-foreground">
+                                  {schedule.classroom?.building}
+                                  {schedule.classroom?.roomNumber
+                                    ? ` ${schedule.classroom.roomNumber}`
+                                    : ''}
+                                </span>
+                              </div>
+                            ))}
+                          </div>
+                        ) : (
+                          <p className="mt-2 text-sm text-muted-foreground">
+                            {copy.noSchedule}
+                          </p>
+                        )}
+                      </div>
+
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void openEdit(section)}
+                          aria-label={copy.editLabel(
+                            section.sectionNumber,
+                            section.course?.code || copy.unknownCourse,
+                          )}
+                          title={copy.editLabel(
+                            section.sectionNumber,
+                            section.course?.code || copy.unknownCourse,
+                          )}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(section)}
+                          aria-label={copy.deleteLabel(
+                            section.sectionNumber,
+                            section.course?.code || copy.unknownCourse,
+                          )}
+                          title={copy.deleteLabel(
+                            section.sectionNumber,
+                            section.course?.code || copy.unknownCourse,
+                          )}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[1120px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

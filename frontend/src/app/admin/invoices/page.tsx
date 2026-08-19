@@ -555,7 +555,92 @@ export default function AdminInvoicesPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {invoices.map((invoice) => {
+                  const studentLabel = invoice.student?.user
+                    ? `${invoice.student.user.firstName} ${invoice.student.user.lastName}`
+                    : invoice.studentId;
+                  const semesterLabel = getLocalizedName(
+                    locale,
+                    semesterLookup.get(invoice.semesterId) ?? invoice.semester,
+                    invoice.semester?.name || copy.unassigned,
+                  );
+                  const statusLabel =
+                    copy.statusOptions[invoice.status as keyof typeof copy.statusOptions] ??
+                    invoice.status.replace(/_/g, ' ');
+
+                  return (
+                    <article
+                      key={`${invoice.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            {invoice.invoiceNumber}
+                          </p>
+                          <h3 className="mt-1 truncate font-semibold text-foreground">
+                            {studentLabel}
+                          </h3>
+                          <p className="mt-1 truncate text-sm text-muted-foreground">
+                            {invoice.student?.user?.email || copy.noEmail}
+                          </p>
+                        </div>
+                        <span
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[invoice.status] || 'bg-secondary text-foreground'}`}
+                        >
+                          {statusLabel}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.semester}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{semesterLabel}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.amount}
+                          </dt>
+                          <dd className="mt-1 font-medium text-foreground">
+                            {formatCurrency(Number(invoice.total))}
+                          </dd>
+                        </div>
+                        <div className="col-span-2">
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.dueDate}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{formatDate(invoice.dueDate)}</dd>
+                        </div>
+                      </dl>
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => void handleViewDetail(invoice)}
+                          aria-label={copy.viewLabel(invoice.invoiceNumber)}
+                          title={copy.viewLabel(invoice.invoiceNumber)}
+                        >
+                          <Eye className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(invoice)}
+                          aria-label={copy.deleteLabel(invoice.invoiceNumber)}
+                          title={copy.deleteLabel(invoice.invoiceNumber)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[900px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">
@@ -670,7 +755,48 @@ export default function AdminInvoicesPage() {
 
             <div>
               <h4 className="font-semibold text-foreground">{copy.invoiceItems}</h4>
-              <AdminTableScroll className="mt-3">
+              <div className="mt-3 space-y-3 md:hidden" role="list" aria-label={copy.invoiceItems}>
+                {selectedInvoice.items?.map((item) => (
+                  <article
+                    key={`${item.id}-mobile`}
+                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    role="listitem"
+                  >
+                    <p className="font-medium text-foreground">
+                      {getLocalizedInvoiceItemDescription(locale, item.description)}
+                    </p>
+                    <dl className="mt-3 grid grid-cols-2 gap-3 text-sm">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.quantity}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{item.quantity}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.unitPrice}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{formatCurrency(item.unitPrice)}</dd>
+                      </div>
+                      <div className="col-span-2 border-t border-border/60 pt-3">
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.totalLabel}
+                        </dt>
+                        <dd className="mt-1 font-semibold text-foreground">
+                          {formatCurrency(item.total)}
+                        </dd>
+                      </div>
+                    </dl>
+                  </article>
+                ))}
+                <div className="flex items-center justify-between border-t border-border/70 pt-3 text-sm">
+                  <span className="font-semibold text-foreground">{copy.totalLabel}</span>
+                  <span className="font-semibold text-foreground">
+                    {formatCurrency(Number(selectedInvoice.total))}
+                  </span>
+                </div>
+              </div>
+              <AdminTableScroll className="mt-3 hidden md:block">
                 <table className="w-full min-w-[560px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

@@ -519,6 +519,19 @@ test('admin department, semester, and lecturer views expose mobile card lists', 
   }
 });
 
+test('admin invoice, enrollment, and section views expose mobile card lists', () => {
+  for (const relPath of [
+    'src/app/admin/invoices/page.tsx',
+    'src/app/admin/enrollments/page.tsx',
+    'src/app/admin/sections/page.tsx',
+  ]) {
+    const source = read(relPath);
+    assert.match(source, /role="list"/);
+    assert.match(source, /className="space-y-3 md:hidden"/);
+    assert.match(source, /<AdminTableScroll className="hidden md:block">/);
+  }
+});
+
 test('homepage copy avoids demo placeholders and dead hrefs', () => {
   const source = read('src/app/page.tsx');
   const deadHrefPattern = new RegExp('href="' + '#"');
