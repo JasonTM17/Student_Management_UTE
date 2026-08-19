@@ -52,7 +52,7 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 
 ## Verification record
 
-- `frontend`: `npm test` — PASS, 24/24.
+- `frontend`: `npm test` — PASS, 25/25.
 - `frontend`: `npm run typecheck` — PASS.
 - `frontend`: `npm run lint` — PASS, zero warnings.
 - Latest bounded a11y patch: explicit `htmlFor`/`id` associations for
@@ -64,6 +64,10 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
   desktop-table fallbacks; smoke/typecheck/lint PASS after the patch.
 - Admin Departments, Semesters, and Lecturers now also render stacked mobile
   cards with desktop-table fallbacks; smoke/typecheck/lint PASS after the patch.
+- Admin Invoices, Enrollments, and Sections now also render stacked mobile
+  cards with desktop-table fallbacks; invoice detail items receive the same
+  mobile treatment. Smoke/typecheck/lint PASS after the patch. Academic-years,
+  analytics, and other dense tables remain open for later bounded passes.
 - `frontend`: `git diff --check` — PASS.
 - `frontend`: `npm run build` — PASS.
 - `java-services`: `mvn -q verify` — PASS; H2/Spring tests ran, with normal Mockito/Byte Buddy warnings.
