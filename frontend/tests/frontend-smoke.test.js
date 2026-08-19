@@ -800,6 +800,20 @@ test('student and lecturer workspace surfaces use shared dashboard primitives', 
   assert.match(lecturerGradesSource, /WorkspacePanel/);
 });
 
+test('Stitch workspace guardrails keep long values and assistant clear of mobile navigation', () => {
+  const metricSource = read('src/components/dashboard/WorkspaceSurface.tsx');
+  const studentDashboardSource = read('src/app/dashboard/page.tsx');
+  const assistantSource = read('src/components/assistant/AssistantPanel.tsx');
+  const shellSource = read('src/app/dashboard/layout.tsx');
+  const globalsSource = read('src/app/globals.css');
+
+  assert.match(metricSource, /break-normal/);
+  assert.match(studentDashboardSource, /valueClassName="text-xl sm:text-2xl"/);
+  assert.match(assistantSource, /bottom-\[5\.75rem\].*z-50/);
+  assert.match(shellSource, /backdrop-blur md:hidden/);
+  assert.match(globalsSource, /--background: 240 100% 98\.8%/);
+});
+
 test('key frontend surfaces label icon-only buttons', () => {
   assertPatterns('src/app/login/page.tsx', [
     /aria-label=\{showPassword \? messages\.login\.hidePassword : messages\.login\.showPassword\}/,

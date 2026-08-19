@@ -19,6 +19,7 @@ interface WorkspaceMetricCardProps {
   icon: React.ReactNode;
   detail?: React.ReactNode;
   toneClassName?: string;
+  valueClassName?: string;
   compact?: boolean;
   className?: string;
 }
@@ -29,6 +30,7 @@ export function WorkspaceMetricCard({
   icon,
   detail,
   toneClassName,
+  valueClassName,
   compact = false,
   className,
 }: WorkspaceMetricCardProps) {
@@ -40,7 +42,7 @@ export function WorkspaceMetricCard({
           compact ? 'gap-3' : 'gap-4',
         )}
       >
-        <div className="flex items-start justify-between gap-4">
+        <div className="flex items-start gap-3">
           <div
             className={cn(
               'flex h-11 w-11 shrink-0 items-center justify-center rounded-lg',
@@ -49,16 +51,17 @@ export function WorkspaceMetricCard({
           >
             {icon}
           </div>
-          <div className="min-w-0 text-right">
+          <div className="min-w-0 flex-1 text-right">
             <div
               className={cn(
-                'break-words font-semibold tracking-tight text-foreground',
+                'min-w-0 break-normal font-semibold leading-tight tracking-tight text-foreground',
                 compact ? 'text-2xl' : 'text-3xl',
+                valueClassName,
               )}
             >
               {value}
             </div>
-            <div className="text-sm text-muted-foreground">{label}</div>
+            <div className="mt-1 break-words text-sm leading-5 text-muted-foreground">{label}</div>
           </div>
         </div>
         {detail ? (

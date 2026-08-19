@@ -190,6 +190,7 @@ export default function DashboardPage() {
               value={currentSemesterName}
               icon={<Calendar className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[3]}
+              valueClassName="text-xl sm:text-2xl"
               toneClassName="bg-violet-500/12 text-violet-600 dark:text-violet-400"
             />
           </div>
