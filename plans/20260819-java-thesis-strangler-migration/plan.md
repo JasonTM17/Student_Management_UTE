@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Current committed head: `15d8ee3` (`docs: refresh safe disk evidence`).
+- Current committed head: `ed7b022` (`docs: record thesis module verify gate`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
