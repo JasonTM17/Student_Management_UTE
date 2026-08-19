@@ -17,6 +17,12 @@ export const apiBaseURL =
   (isExternalStack
     ? 'http://127.0.0.1/api/v1'
     : 'http://127.0.0.1:4100/api/v1');
+// Session setup may use a separately published auth-service endpoint in the
+// shared external Compose stack. This keeps seeded-session creation from
+// exhausting the public gateway throttle while the edge auth contract remains
+// covered by the dedicated gateway tests.
+export const authLoginBaseURL =
+  process.env.E2E_AUTH_LOGIN_URL ?? apiBaseURL;
 export const apiOrigin = new URL(apiBaseURL).origin;
 export const notificationsURL = new URL(
   '/notifications',
@@ -885,7 +891,7 @@ export async function loginThroughApi(
     student: '198.51.100.11',
     lecturer: '198.51.100.12',
   } as const;
-  const response = await request.post(`${apiBaseURL}/auth/login`, {
+  const response = await request.post(`${authLoginBaseURL}/auth/login`, {
     data: SEEDED_USERS[user],
     headers: {
       'X-Forwarded-For': forwardedForByUser[user],

@@ -22,6 +22,13 @@ One-shot init hiện tại:
 
 - Fast local E2E: `node scripts/run-fast-e2e.mjs`
 - Edge E2E qua `nginx`: `node scripts/run-edge-e2e.mjs`
+- Shared Compose E2E (repeatable session setup): from `frontend`, set
+  `E2E_EXTERNAL_STACK=1` and
+  `E2E_AUTH_LOGIN_URL=http://127.0.0.1:4007/api/v1`, then run
+  `npx playwright test`. The direct auth URL is only a seeded-session harness
+  path; edge auth, CSRF, and gateway security tests still use nginx. This does
+  not replace an isolated database run because the finance checkout fixture is
+  mutating by design.
 - Production-like image smoke: `node scripts/run-image-smoke.mjs`
 - Local security sweep: `node scripts/run-security-local.mjs`
 - Production compose preflight: `node scripts/check-production-compose-config.mjs`

@@ -52,5 +52,6 @@ The read-only atlas is recorded in
 The captured visual matrix proves the supplied authenticated runtime stayed on
 the expected routes and found no automated layout/overflow failures. It is not
 an accessibility audit or a substitute for isolated E2E: the shared Compose
-full suite still hit auth throttling, and the isolated runner needs its local
-service dependencies installed before it can be accepted.
+full suite now passes twice with direct auth-service session setup, but its
+checkout fixture still mutates the shared database and the isolated runner
+needs its local service dependencies installed before it can be accepted.
