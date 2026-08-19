@@ -28,7 +28,7 @@ the web at a 390px viewport; compare native mobile against the mobile atlas.
 
 ## Evidence boundary
 
-- Web smoke: 27/27 PASS; typecheck PASS; lint PASS with zero warnings on the
+- Web smoke: 28/28 PASS; typecheck PASS; lint PASS with zero warnings on the
   current frontend source.
 - Existing visual QA artifact: 28 web routes × 2 viewports = 56/56 captures,
   0 overflow findings, and 0 missing mobile navigation findings.
