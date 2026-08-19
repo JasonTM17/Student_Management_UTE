@@ -497,6 +497,15 @@ test('admin users exposes a mobile card list alongside the desktop table', () =>
   assert.match(source, /<AdminTableScroll className="hidden md:block">/);
 });
 
+test('admin course and classroom views expose mobile card lists', () => {
+  for (const relPath of ['src/app/admin/courses/page.tsx', 'src/app/admin/classrooms/page.tsx']) {
+    const source = read(relPath);
+    assert.match(source, /role="list"/);
+    assert.match(source, /className="space-y-3 md:hidden"/);
+    assert.match(source, /<AdminTableScroll className="hidden md:block">/);
+  }
+});
+
 test('homepage copy avoids demo placeholders and dead hrefs', () => {
   const source = read('src/app/page.tsx');
   const deadHrefPattern = new RegExp('href="' + '#"');
