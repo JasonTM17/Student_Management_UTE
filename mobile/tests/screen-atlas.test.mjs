@@ -71,6 +71,7 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /if \(!isPreviewSession\) \{\s*return;/);
   assert.match(navigator, /type SessionKind = 'signedOut' \| 'preview' \| 'authenticated'/);
   assert.match(navigator, /const isAuthenticated = sessionKind === 'authenticated'/);
+  assert.match(navigator, /if \(route !== 'auth\.signIn' \|\| apiClient\.mode !== 'preview'\)/);
   assert.match(navigationTypes, /enterPreview\(\): void/);
 });
 
