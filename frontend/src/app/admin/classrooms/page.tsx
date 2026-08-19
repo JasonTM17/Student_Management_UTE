@@ -386,7 +386,63 @@ export default function AdminClassroomsPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {classrooms.map((room) => (
+                  <article
+                    key={`${room.id}-mobile`}
+                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    role="listitem"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                          {room.building}
+                        </p>
+                        <h3 className="mt-1 font-semibold text-foreground">{room.roomNumber}</h3>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        {room.isActive ? copy.active : copy.inactive}
+                      </span>
+                    </div>
+                    <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.capacity}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{formatNumber(room.capacity)}</dd>
+                      </div>
+                      <div>
+                        <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                          {copy.headers.type}
+                        </dt>
+                        <dd className="mt-1 text-foreground">{room.type}</dd>
+                      </div>
+                    </dl>
+                    <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEdit(room)}
+                        aria-label={copy.editLabel(room.building, room.roomNumber)}
+                        title={copy.editLabel(room.building, room.roomNumber)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => void handleDelete(room)}
+                        aria-label={copy.deleteLabel(room.building, room.roomNumber)}
+                        title={copy.deleteLabel(room.building, room.roomNumber)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AdminRowActions>
+                  </article>
+                ))}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">
