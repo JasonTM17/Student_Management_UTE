@@ -146,7 +146,7 @@ the retirement gates pass.
 - Phase 01 architecture contract: complete at `426e024`.
 - Phase 02 single-app shell: complete at `e086c04`; see
   `phase-02-single-app-shell.md`.
-- Phase 03 persistence/migration seam: bounded candidate committed at `b3a4de1`;
+- Phase 03 persistence/migration seam: bounded candidate committed at `0064df8`;
   see `phase-03-persistence-thesis-read.md`. It has no public route or writer
   handoff yet, and PostgreSQL/rollback/review gates remain open.
 

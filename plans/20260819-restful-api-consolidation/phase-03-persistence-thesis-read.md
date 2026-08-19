@@ -2,7 +2,7 @@
 
 ## Status
 
-The bounded implementation is committed at `b3a4de1` (with the persistence
+The bounded implementation is committed at `0064df8` (with the persistence
 seam introduced by `8c904a1`). The phase remains **in progress** because the
 PostgreSQL, differential, backup/restore and exact-head review gates are still
 open.
@@ -39,7 +39,10 @@ of repository/controller wiring, not PostgreSQL compatibility proof.
   `java-services/restful-api/src/test/resources/db/migration-h2/V1__create_thesis_schema.sql`.
 - Internal `thesis` package with `ThesisTopic`, `TopicStatus`, repository,
   service and REST controller.
-- Authenticated and anonymous negative tests for the new read path.
+- A read-side round-existence port that preserves the legacy `404` response for
+  an unknown registration round instead of returning an empty list.
+- Authenticated and anonymous negative tests plus a role-baseline matrix for
+  student, lecturer and admin readers on an existing round.
 - Auth contract repair found by Wukong:
   - access **or refresh** session cookie triggers CSRF on unsafe methods;
   - bearer bypass matches the legacy case-sensitive `Bearer ` prefix;
@@ -51,14 +54,15 @@ of repository/controller wiring, not PostgreSQL compatibility proof.
 
 | Command/check | Result | Limitation |
 | --- | --- | --- |
-| `mvn -q -f java-services/restful-api/pom.xml test` | `PASS` | 17 tests: 9 API/security contract, 5 CSRF, 3 persistence/read-path; 0 failures/errors. Maven log uses JDK 24.0.2. |
-| `mvn -q -f java-services/restful-api/pom.xml '-Dtest=RestfulApiContractTest,CsrfCookieFilterTest,ThesisTopicPersistenceTest' test` | `PASS` | Focused rerun after adding the `THESIS_READ_ENABLED` route gate; 17 tests, 0 failures/errors. |
+| `mvn -q -f java-services/restful-api/pom.xml test` | `PASS` | 21 tests: 9 API/security contract, 5 CSRF, 7 persistence/read-path; 0 failures/errors. Maven log uses JDK 24.0.2. |
+| `mvn -q -f java-services/restful-api/pom.xml '-Dtest=RestfulApiContractTest,CsrfCookieFilterTest,ThesisTopicPersistenceTest' test` | `PASS` | Focused rerun after the round-existence parity fix; 21 tests, 0 failures/errors. |
+| `src/test/resources/mockito-extensions/org.mockito.plugins.MockMaker` | `PASS` | Test-only subclass mock maker keeps the harness runnable on the current JDK without changing production runtime behavior. |
 | Flyway H2 profile | `PASS` | Creates a disposable in-memory `thesis` schema and repository mapping. H2 2.3 emits a Flyway support-version warning. |
 | Production PostgreSQL Flyway script | `NOT_RUN` | No disposable PostgreSQL restore was created; the running shared DB was not mutated. |
 | Legacy differential/API parity | `NOT_RUN` | New route is not wired to nginx/Compose and no route owner changed. |
 | Backup/restore/reconciliation | `NOT_RUN` | Required before any writer handoff. |
 | Frontend/mobile E2E | `NOT_RUN` | Clients still use legacy topology; no mobile app exists yet. |
-| `git diff --check` | `PASS` | Clean at the `b3a4de1` implementation handoff. |
+| `git diff --check` | `PASS` | Clean at the `0064df8` implementation handoff; unrelated `.agents/` remains untracked and unstaged. |
 
 The first H2 rehearsal intentionally exposed that H2 2.3 does not accept the
 PostgreSQL `TIMESTAMPTZ` alias used by the production-compatible script. The
@@ -83,9 +87,11 @@ the workaround are recorded rather than treated as PostgreSQL proof.
    legacy owner without making the legacy writer dual-write.
 2. Run the production migration against a disposable PostgreSQL database and
    compare schema history/checksum with the existing thesis migration.
-3. Define the thesis read authorization matrix (student/lecturer/admin and
-   department/round ownership) before exposing more than the current
-   authenticated-only list.
+3. The candidate now proves the baseline that authenticated students,
+   lecturers and admins can read an existing round, matching the current legacy
+   controller. Define and test department/round ownership rules before
+   exposing more than this authenticated-only list; those rules are not
+   inferred from the current legacy read contract.
 4. Install the phase-03 exact-head Advisor/Kongming/Wukong review after commit.
 5. Only after these gates may an opt-in runtime route be considered; public
    cutover and writer handoff remain `HOLD`.
