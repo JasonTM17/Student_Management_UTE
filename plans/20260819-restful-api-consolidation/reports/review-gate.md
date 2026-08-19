@@ -1,14 +1,15 @@
 # Architecture review gate — one RESTful API direction
 
-## Current snapshot
+## Review ledger snapshot
 
-- Current exact head: `313537d9a1fb1312ef409dc4f5a421508ebe7df0`
+- Reviewed exact head: `313537d9a1fb1312ef409dc4f5a421508ebe7df0`
+- Ledger freeze commit: `6f9a2dab74be6dd9cee3f638949f00390d664dc6`
 - Branch: `feature/java-thesis-platform`
 - Review mode: read-only, independent sidecar tasks
 - Scope: whether the current bounded Java, Stitch web and native mobile work is
   safe to continue without an unsafe public collapse
 
-## Current exact-head verdicts
+## Exact-head verdicts for the reviewed snapshot
 
 | Reviewer | Verdict | Meaning |
 | --- | --- | --- |
@@ -16,9 +17,11 @@
 | Kongming | `NOT_RUN` | Fresh review at `313537d` was shut down after bounded waits. The prior `CONDITIONAL` verdict was for `b83805f` and is stale. |
 | Wukong | `NOT_RUN` | Fresh adversarial review at `313537d` was not completed; an earlier retry also hit model capacity. |
 
-The current gate is therefore **HOLD**, not acceptance. A `CONDITIONAL`
+The branch gate is therefore **HOLD**, not acceptance. A `CONDITIONAL`
 Kongming review exists for `b83805f` and supports the migration direction, but
-it cannot approve `313537d` after the mobile preview-boundary commits.
+it cannot approve the reviewed `313537d` snapshot after the mobile
+preview-boundary commits. The later ledger-only commit does not create a fresh
+approval for the implementation.
 
 ## Historical baseline verdicts
 
