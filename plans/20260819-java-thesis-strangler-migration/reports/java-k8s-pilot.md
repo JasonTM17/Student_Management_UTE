@@ -3,6 +3,7 @@
 ## Snapshot
 
 - Base snapshot before this patch: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
+- Committed candidate snapshot: `7353d8e` (`feat: add isolated Java thesis pilot path`).
 - Branch: `feature/java-thesis-platform`.
 - `.agents/` is unrelated untracked state and remains unmodified.
 - Candidate scope: optional nginx fragments, `k8s/overlays/thesis-pilot`, Java
@@ -43,5 +44,7 @@
 
 - Advisor review of the pre-patch exact head: conditional GO for design,
   NO-GO for apply/public cutover; no approval inferred for this new snapshot.
-- Kongming/Wukong and FE/disk sidecar reviews are pending or must be rerun on
-  the frozen post-commit exact head.
+- Fresh post-commit Advisor, Kongming, Wukong, and disk-audit sidecars were
+  dispatched against `7353d8e`; two bounded wait windows expired without a
+  result, so all four are recorded as `NOT_RUN`, not approval. The sidecars
+  were closed without edits or cleanup.
