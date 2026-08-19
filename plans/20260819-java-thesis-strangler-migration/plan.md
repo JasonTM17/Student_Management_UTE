@@ -41,6 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
+- Current committed head: `1fcf258` (`docs: record exact-head pilot review timeout`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
@@ -51,9 +52,10 @@ Authority:
 - Frontend production build passes, and the rendered visual QA artifact records 28 routes × 2 viewports = 56/56 captures with zero horizontal overflow and zero missing mobile navigation findings.
 - External Compose Playwright full suite passes 20/20 twice when `E2E_AUTH_LOGIN_URL=http://127.0.0.1:4007/api/v1` is used for seeded session setup; edge auth/CSRF/security tests still run through nginx. The shared Compose DB and the mutating checkout fixture are not accepted as an isolation proof.
 - After the Java pilot and FE accessibility patch, `kubectl kustomize k8s/base`, `kubectl kustomize k8s/overlays/thesis-pilot`, `node scripts/run-k8s-preflight.mjs`, `docker compose -f docker-compose.yml config`, frontend typecheck, frontend lint, and `git diff --check` pass. No K8s apply, Java build, image build, or runtime pilot smoke has been run.
+- `node scripts/check-thesis-contract.mjs` passes a source-level oracle for all 22 Java thesis mappings, 8 current FE bindings, and the enabled/disabled nginx route fragments. This is not runtime response, authorization, mutation, data, or rollback parity.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
-- During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; active RDP trace data under `DiagOutputDir` was inspected and preserved. C: is currently approximately 0.45 GB free, so heavy dependency installation, image builds, and full local deploy runs remain deferred.
-- The working-tree candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
+- During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; active RDP trace data under `DiagOutputDir` was inspected and preserved. The latest C: observation is approximately 0.56 GB free, so heavy dependency installation, image builds, and full local deploy runs remain deferred.
+- The committed candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
 - Stitch project `16486483525927292845` defines the academic reference system:
   - `Be Vietnam Pro`
   - blue fidelity palette
@@ -139,10 +141,12 @@ Kubernetes pilot render (read-only):
 kubectl kustomize k8s/base
 kubectl kustomize k8s/overlays/thesis-pilot
 node scripts/run-k8s-preflight.mjs
+node scripts/check-thesis-contract.mjs
 ```
 
 The pilot render commands pass, but Java/Maven, image build, runtime smoke, and
-apply remain deferred while C: remains below 1 GB free.
+apply remain deferred while C: remains below 1 GB free. The source contract
+checker is green but does not substitute for runtime parity.
 
 Rendered FE QA (requires an authenticated local runtime):
 

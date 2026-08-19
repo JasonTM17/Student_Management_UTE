@@ -4,6 +4,7 @@
 
 - Base snapshot before this patch: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Committed candidate snapshot: `7353d8e` (`feat: add isolated Java thesis pilot path`).
+- Documentation follow-up snapshot: `1fcf258` (`docs: record exact-head pilot review timeout`).
 - Branch: `feature/java-thesis-platform`.
 - `.agents/` is unrelated untracked state and remains unmodified.
 - Candidate scope: optional nginx fragments, `k8s/overlays/thesis-pilot`, Java
@@ -22,6 +23,9 @@
 - Existing nine-image release parity checks now also render and inspect the
   pilot overlay, assert the pilot nginx mount and ClusterIP edge, while
   rejecting a public GHCR thesis image.
+- `contracts/thesis-public-contract.json` and `scripts/check-thesis-contract.mjs`
+  add a source-level oracle for all 22 Java controller mappings, 8 FE thesis
+  bindings, and the local-enabled/production-disabled nginx fragments.
 
 ## Evidence and limits
 
@@ -30,8 +34,10 @@
 - `kubectl kustomize k8s/overlays/thesis-pilot`: PASS.
 - `node scripts/run-k8s-preflight.mjs`: PASS for the canonical overlays and
   thesis pilot contract; `docker compose -f docker-compose.yml config`: PASS.
+- `node scripts/check-thesis-contract.mjs`: PASS for 22 Java mappings and 8 FE
+  bindings. This remains source-level evidence only.
 - Runtime smoke, Java/Maven verification and apply: `NOT_RUN`; C: has
-  approximately 0.45 GB free and heavy commands are intentionally held.
+  approximately 0.56 GB free and heavy commands are intentionally held.
 - Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
   registry publication, provenance, image smoke, or deployment evidence.
 - Schema bootstrap, differential contract, reconciliation/restore, canary,
