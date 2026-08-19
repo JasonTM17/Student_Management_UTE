@@ -1,5 +1,12 @@
 # Phase 03 — persistence seam and thesis read path
 
+## Status
+
+The bounded implementation is committed at `b3a4de1` (with the persistence
+seam introduced by `8c904a1`). The phase remains **in progress** because the
+PostgreSQL, differential, backup/restore and exact-head review gates are still
+open.
+
 ## Scope and owner
 
 This phase adds persistence behind the standalone `restful-api` app and ports
@@ -45,12 +52,19 @@ of repository/controller wiring, not PostgreSQL compatibility proof.
 | Command/check | Result | Limitation |
 | --- | --- | --- |
 | `mvn -q -f java-services/restful-api/pom.xml test` | `PASS` | 17 tests: 9 API/security contract, 5 CSRF, 3 persistence/read-path; 0 failures/errors. Maven log uses JDK 24.0.2. |
+| `mvn -q -f java-services/restful-api/pom.xml '-Dtest=RestfulApiContractTest,CsrfCookieFilterTest,ThesisTopicPersistenceTest' test` | `PASS` | Focused rerun after adding the `THESIS_READ_ENABLED` route gate; 17 tests, 0 failures/errors. |
 | Flyway H2 profile | `PASS` | Creates a disposable in-memory `thesis` schema and repository mapping. H2 2.3 emits a Flyway support-version warning. |
 | Production PostgreSQL Flyway script | `NOT_RUN` | No disposable PostgreSQL restore was created; the running shared DB was not mutated. |
 | Legacy differential/API parity | `NOT_RUN` | New route is not wired to nginx/Compose and no route owner changed. |
 | Backup/restore/reconciliation | `NOT_RUN` | Required before any writer handoff. |
 | Frontend/mobile E2E | `NOT_RUN` | Clients still use legacy topology; no mobile app exists yet. |
-| `git diff --check` | `PENDING` | Must run after the phase files are staged, before commit. |
+| `git diff --check` | `PASS` | Clean at the `b3a4de1` implementation handoff. |
+
+The first H2 rehearsal intentionally exposed that H2 2.3 does not accept the
+PostgreSQL `TIMESTAMPTZ` alias used by the production-compatible script. The
+production migration was preserved; a reduced H2-only script with
+`TIMESTAMP WITH TIME ZONE` is used for the in-memory rehearsal. This failure and
+the workaround are recorded rather than treated as PostgreSQL proof.
 
 ## Canonical writer and rollback
 
