@@ -2,26 +2,27 @@
 
 ## Review ledger snapshot
 
-- Reviewed exact head: `313537d9a1fb1312ef409dc4f5a421508ebe7df0`
-- Ledger freeze commit: `6f9a2dab74be6dd9cee3f638949f00390d664dc6`
+- Reviewed exact head: `01c2155e9b95b5a41b44e9f2934256fed797b958`
+- Prior ledger freeze: `6f9a2dab74be6dd9cee3f638949f00390d664dc6`
 - Branch: `feature/java-thesis-platform`
 - Review mode: read-only, independent sidecar tasks
 - Scope: whether the current bounded Java, Stitch web and native mobile work is
   safe to continue without an unsafe public collapse
 
-## Exact-head verdicts for the reviewed snapshot
+## Exact-head verdicts for `01c2155`
 
 | Reviewer | Verdict | Meaning |
 | --- | --- | --- |
-| Advisor | `NOT_RUN` | Fresh review at `313537d` was not completed after bounded waits/capacity failures. Prior Advisor verdicts are stale. |
-| Kongming | `NOT_RUN` | Fresh review at `313537d` was shut down after bounded waits. The prior `CONDITIONAL` verdict was for `b83805f` and is stale. |
-| Wukong | `NOT_RUN` | Fresh adversarial review at `313537d` was not completed; an earlier retry also hit model capacity. |
+| Advisor | `HOLD` | The source atlas records 22 named Stitch screens (9 desktop, 13 mobile) plus one supplementary record, and the native registry asserts 23 routes; browser visual capture, Expo/device runtime, and live API proof remain `NOT_RUN`. |
+| Kongming | `HOLD` | The planned notification GET slice preserves Node as writer/public/realtime owner, but isolated PostgreSQL permissions, subject isolation, differential parity, and rollback evidence are missing. |
+| Wukong | `NOT_FALSIFIED` | The bounded mobile session/route claim was not falsified after restricting preview entry to `auth.signIn` plus preview mode; this is source-level only and does not prove server authorization. |
 
-The branch gate is therefore **HOLD**, not acceptance. A `CONDITIONAL`
-Kongming review exists for `b83805f` and supports the migration direction, but
-it cannot approve the reviewed `313537d` snapshot after the mobile
-preview-boundary commits. The later ledger-only commit does not create a fresh
-approval for the implementation.
+The branch gate is therefore **HOLD**, not acceptance. Wukong closes only the
+specific mobile source-level falsification found at `b5df849`; Advisor and
+Kongming still require runtime and migration evidence. These verdicts do not
+approve authenticated parity, visual fidelity, Java cutover, or production
+readiness. A later documentation-only commit does not create implementation
+approval.
 
 ## Historical baseline verdicts
 
@@ -47,8 +48,9 @@ design baseline only; it is stale for the current snapshot.
   differential, authenticated E2E, browser/Expo device, and rollback evidence
   were all `NOT_RUN`.
 
-This advisory predates the current uncommitted mobile changes and is sequencing
-input only. It is not an exact-head approval.
+This advisory predates the `1692e7e` session-state fix and remains sequencing
+input only. The phase-05 contract now records the same ownership and runtime
+preconditions. It is not an exact-head approval for the current branch.
 
 ## Evidence behind the gate
 
@@ -61,7 +63,8 @@ input only. It is not an exact-head approval.
   needs a deliberate polling compatibility strategy.
 - Finance has payment/idempotency and internal-context coupling; it cannot be
   treated as a trivial package move.
-- The FE has Stitch-aligned web evidence, but no standalone native mobile app.
+- The FE has Stitch-aligned web evidence and a native source scaffold, but no
+  Expo/device runtime evidence.
 - The Java image/runtime, authenticated parity, migration reconciliation and
   exercised rollback remain open. The pre-existing local Java image is stale
   relative to current source and is not accepted as proof.
