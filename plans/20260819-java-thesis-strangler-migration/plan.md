@@ -204,6 +204,8 @@ plus whatever exact smoke and rollback commands the deploy path uses.
   still required. Fresh bounded sidecars for `7353d8e` timed out and were
   recorded as `NOT_RUN`; the first Advisor review was conditional and
   read-only on the pre-patch head, so no approval is inferred.
+- A second exact-head set for `cf7f9bc` (Advisor, Kongming, Wukong, and FE
+  Stitch/a11y) also timed out in two bounded windows and remains `NOT_RUN`.
 - Java thesis schema bootstrap/ownership, differential contract coverage,
   authenticated pilot smoke, metrics/logs/traces, canary, and rollback evidence
   remain open. `FLYWAY_ENABLED=true` is pilot-only for now and must not be

@@ -54,3 +54,7 @@
   dispatched against `7353d8e`; two bounded wait windows expired without a
   result, so all four are recorded as `NOT_RUN`, not approval. The sidecars
   were closed without edits or cleanup.
+- A second exact-head set of Advisor, Kongming, Wukong, and FE Stitch/a11y
+  sidecars was dispatched against `cf7f9bc`; two bounded wait windows again
+  expired without a result. They are recorded as `NOT_RUN`, not approval, and
+  were closed without edits.
