@@ -75,8 +75,9 @@ exact HEAD:
   MinIO và observability.
 - `java-services` hiện có 4 Maven service (`auth`, `engagement`, `notification`,
   `thesis`), trong đó thesis mới là pilot; chưa có REST API monolith hoàn chỉnh.
-- FE đã có 22 Stitch-relevant web screens và responsive evidence; chưa có
-  project Expo/React Native/Android/iOS độc lập.
+- FE đã có 22 Stitch-relevant web screens và responsive evidence; `mobile/` đã
+  có native Expo/React Native scaffold với 23 screen definitions, nhưng chưa có
+  typecheck theo dependency đầy đủ hay Android/iOS runtime evidence.
 - Chatbot hiện là assistant adapter trong Java thesis pilot và `AssistantPanel`
   của Next.js, chưa phải một deployable độc lập đã được kiểm chứng.
 - Runtime Java image hiện có là image cũ, không được dùng làm source-current
@@ -149,6 +150,9 @@ the retirement gates pass.
 - Phase 03 persistence/migration seam: bounded candidate committed at `0064df8`;
   see `phase-03-persistence-thesis-read.md`. It has no public route or writer
   handoff yet, and PostgreSQL/rollback/review gates remain open.
+- Phase 04 Stitch web/mobile client track: in progress; see
+  `phase-04-stitch-web-mobile.md` and `reports/fe-stitch-audit.md`. It has no
+  browser rerun, Expo/device proof, or Java client cutover.
 
 # Acceptance and verification
 
@@ -196,6 +200,8 @@ until rollback has been exercised and evidence is stored under this plan.
 - Canonical architecture decision: `phase-01-architecture-contract.md`.
 - Single-app implementation evidence: `phase-02-single-app-shell.md`.
 - Persistence/read-path evidence: `phase-03-persistence-thesis-read.md`.
+- Stitch web/mobile evidence: `phase-04-stitch-web-mobile.md` and
+  `reports/fe-stitch-audit.md`.
 - Independent review record: `reports/review-gate.md`.
 - Current topology remains documented in `docs/ARCHITECTURE.md`; this plan is a
   planned target, not a claim that cutover already happened.
