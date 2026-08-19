@@ -32,10 +32,13 @@ The read-only atlas is recorded in
 - Added explicit `htmlFor`/`id` associations to forgot-password, reset-password,
   and profile controls so high-frequency auth/profile forms remain usable with
   label navigation and assistive technology.
+- Converted the Admin Users mobile surface to stacked cards with visible status,
+  created date, and accessible row actions; the desktop table remains intact
+  from the `md` breakpoint upward.
 
 ## Acceptance criteria
 
-- [x] `npm test` passes (21 tests at the current candidate).
+- [x] `npm test` passes (22 tests at the current candidate).
 - [x] `npm run typecheck` passes.
 - [x] `npm run lint` passes with zero warnings.
 - [x] `git diff --check` passes.
@@ -45,8 +48,8 @@ The read-only atlas is recorded in
   for dashboard, notifications, thesis, profile, registration, lecturer, and
   admin route families; the captured matrix is 56/56 PASS.
 - [ ] Admin mobile data views are fully converted from horizontal-scroll-first
-  tables to stacked cards/lists where Stitch requires it; current work keeps
-  narrow tables usable with bounded scroll and repaired chart overflow.
+  tables to stacked cards/lists where Stitch requires it; Admin Users is the
+  first bounded conversion, while the remaining dense tables stay open.
 - [x] The 22-screen Stitch atlas is attached to the candidate, with a larger
   28-route × 2-viewport rendered evidence matrix.
 - [ ] Accessibility, authenticated mutation parity, and isolated repeatable

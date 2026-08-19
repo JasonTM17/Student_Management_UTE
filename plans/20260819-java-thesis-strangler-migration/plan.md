@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Current committed head: `dd93d92` (`docs: record guarded image build abort`).
+- Current committed head: `e87d1a0` (`fix: add admin users mobile cards`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
@@ -55,6 +55,7 @@ Authority:
 - After the Java pilot and FE accessibility patch, `kubectl kustomize k8s/base`, `kubectl kustomize k8s/overlays/thesis-pilot`, `node scripts/run-k8s-preflight.mjs`, `docker compose -f docker-compose.yml config`, frontend typecheck, frontend lint, and `git diff --check` pass. No K8s apply, Java build, image build, or runtime pilot smoke has been run.
 - `node scripts/check-thesis-contract.mjs` passes a source-level oracle for all 22 Java thesis mappings, 8 current FE bindings, and the enabled/disabled nginx route fragments. This is not runtime response, authorization, mutation, data, or rollback parity.
 - The latest FE bounded a11y pass adds explicit label/control associations to auth and profile forms; frontend typecheck and lint pass after that patch, while browser and isolated E2E reruns remain open.
+- Admin Users now has a bounded stacked mobile-card implementation with desktop-table fallback; the latest frontend smoke is 22/22, typecheck and lint pass, and the remaining dense admin tables are still open.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
 - During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; `msrdc.exe` is still active and `DiagOutputDir` ETL files were recently updated, so that directory remains preserved. A monitored current-source Docker build was aborted at the 0.70 GB safety threshold; no `pilot-local` image was produced. The resulting unused build cache was pruned once (241.4 MB logical reclaim, C: physical free stayed near 0.27 GB). Heavy image and deploy work remains deferred.
 - The committed candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
