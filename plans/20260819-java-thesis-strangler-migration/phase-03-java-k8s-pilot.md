@@ -86,7 +86,7 @@ K8s preflight, Compose config render, `node scripts/check-thesis-contract.mjs`,
 and focused `mvn -q -f java-services/thesis-service/pom.xml test` PASS; the
 focused Java run records 18 tests with zero failures/errors. Runtime pilot
 smoke, image provenance, and apply are still `NOT_RUN`; C: is approximately
-0.33 GB after Maven and heavy commands are now held. The source checker is not
+0.41 GB after Maven and heavy commands are now held. The source checker is not
 runtime parity evidence. Advisor's pre-patch review was conditional GO for this
 design and NO-GO for apply/public cutover; exact-head post-patch reviews remain
 required. The four sidecars dispatched against `cf7f9bc` timed out twice and
