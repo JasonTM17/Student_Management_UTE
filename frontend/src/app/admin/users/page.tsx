@@ -359,7 +359,57 @@ export default function AdminUsersPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {users.map((record) => (
+                  <article
+                    key={`${record.id}-mobile`}
+                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    role="listitem"
+                  >
+                    <div className="flex items-start justify-between gap-3">
+                      <div className="min-w-0">
+                        <h3 className="font-semibold text-foreground">
+                          {record.firstName} {record.lastName}
+                        </h3>
+                        <p className="mt-1 break-all text-sm text-muted-foreground">
+                          {record.email}
+                        </p>
+                      </div>
+                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        {record.status}
+                      </span>
+                    </div>
+                    <dl className="mt-4 border-t border-border/60 pt-3">
+                      <div className="flex items-center justify-between gap-4 text-sm">
+                        <dt className="text-muted-foreground">{copy.headers.created}</dt>
+                        <dd className="text-right text-foreground">{formatDate(record.createdAt)}</dd>
+                      </div>
+                    </dl>
+                    <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        onClick={() => openEdit(record)}
+                        aria-label={copy.editUserLabel(record.firstName, record.lastName)}
+                        title={copy.editUserLabel(record.firstName, record.lastName)}
+                      >
+                        <Pencil className="h-4 w-4" />
+                      </Button>
+                      <Button
+                        size="icon"
+                        variant="ghost"
+                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                        onClick={() => void handleDelete(record)}
+                        aria-label={copy.deleteUserLabel(record.firstName, record.lastName)}
+                        title={copy.deleteUserLabel(record.firstName, record.lastName)}
+                      >
+                        <Trash2 className="h-4 w-4" />
+                      </Button>
+                    </AdminRowActions>
+                  </article>
+                ))}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">
