@@ -25,7 +25,8 @@
   rejecting a public GHCR thesis image.
 - `contracts/thesis-public-contract.json` and `scripts/check-thesis-contract.mjs`
   add a source-level oracle for all 22 Java controller mappings, 8 FE thesis
-  bindings, and the local-enabled/production-disabled nginx fragments.
+  bindings, security permits, pilot image/readiness/Prometheus markers, and the
+  local-enabled/production-disabled nginx fragments.
 
 ## Evidence and limits
 
@@ -34,8 +35,9 @@
 - `kubectl kustomize k8s/overlays/thesis-pilot`: PASS.
 - `node scripts/run-k8s-preflight.mjs`: PASS for the canonical overlays and
   thesis pilot contract; `docker compose -f docker-compose.yml config`: PASS.
-- `node scripts/check-thesis-contract.mjs`: PASS for 22 Java mappings and 8 FE
-  bindings. This remains source-level evidence only.
+- `node scripts/check-thesis-contract.mjs`: PASS for 22 Java mappings, 8 FE
+  bindings, and pilot security/readiness/observability markers. This remains
+  source-level evidence only.
 - `mvn -q -f java-services/thesis-service/pom.xml test`: PASS; Surefire records
   18 tests with zero failures/errors, including the readiness controller tests.
 - `mvn -q -f java-services/thesis-service/pom.xml verify`: PASS with exit code
@@ -52,6 +54,12 @@
   also retained as active/recent data.
 - Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
   registry publication, provenance, image smoke, or deployment evidence.
+- A pre-existing `campuscore-thesis-service:local` container is healthy and
+  liveness returned 200, but its unlabelled digest
+  `sha256:3a0c1a66262a5aa4f96da06c84bc9662c9609941d60160ba3b3c4960ae40d6be`
+  was created at `2026-08-19T06:30:16Z`; unauthenticated Prometheus returned
+  401 even though the current source permits `/actuator/prometheus`. This is
+  stale/unpinned runtime evidence, not proof of the current source or pilot.
 - Schema bootstrap, differential contract, reconciliation/restore, canary,
   observability and rollback: NOT_RUN/open.
 - Production Compose now mounts disabled thesis fragments; local Compose mounts
@@ -70,3 +78,6 @@
   sidecars was dispatched against `cf7f9bc`; two bounded wait windows again
   expired without a result. They are recorded as `NOT_RUN`, not approval, and
   were closed without edits.
+- A latest exact-head set was dispatched after the responsive and contract-gate
+  commits; its bounded review window also expired, so current Advisor/Kongming/
+  Wukong/disk evidence remains `NOT_RUN` where no result was returned.
