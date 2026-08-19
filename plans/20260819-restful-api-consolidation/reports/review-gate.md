@@ -1,20 +1,31 @@
 # Architecture review gate — one RESTful API direction
 
-## Snapshot
+## Current snapshot
 
-- Reviewed exact head: `9ec033b5cd126c5d2051d45ac52bf7a8aee46b73`
+- Current exact head: `313537d9a1fb1312ef409dc4f5a421508ebe7df0`
 - Branch: `feature/java-thesis-platform`
 - Review mode: read-only, independent sidecar tasks
-- Scope: whether the current microservice topology can be simplified to one
-  Java RESTful API without an unsafe direct collapse
+- Scope: whether the current bounded Java, Stitch web and native mobile work is
+  safe to continue without an unsafe public collapse
 
-## Verdicts
+## Current exact-head verdicts
 
 | Reviewer | Verdict | Meaning |
 | --- | --- | --- |
-| Advisor | `CONDITIONAL` | The simplification is a good course-level direction, but Java runtime, parity and rollback are not proven. |
-| Kongming | `CONDITIONAL` | Design one Java modular monolith and migrate by boundary; preserve legacy services and contracts until gates pass. |
-| Wukong | `FALSIFIED` | The claim that a direct four-block collapse preserves all current behavior is false; route/auth/data/realtime/file/payment counterexamples exist. |
+| Advisor | `NOT_RUN` | Fresh review at `313537d` was not completed after bounded waits/capacity failures. Prior Advisor verdicts are stale. |
+| Kongming | `NOT_RUN` | Fresh review at `313537d` was shut down after bounded waits. The prior `CONDITIONAL` verdict was for `b83805f` and is stale. |
+| Wukong | `NOT_RUN` | Fresh adversarial review at `313537d` was not completed; an earlier retry also hit model capacity. |
+
+The current gate is therefore **HOLD**, not acceptance. A `CONDITIONAL`
+Kongming review exists for `b83805f` and supports the migration direction, but
+it cannot approve `313537d` after the mobile preview-boundary commits.
+
+## Historical baseline verdicts
+
+The original architecture review at `9ec033b5cd126c5d2051d45ac52bf7a8aee46b73`
+returned Advisor `CONDITIONAL`, Kongming `CONDITIONAL`, and Wukong
+`FALSIFIED` for a direct four-block collapse. That review remains useful as a
+design baseline only; it is stale for the current snapshot.
 
 ## Evidence behind the gate
 
@@ -31,6 +42,11 @@
 - The Java image/runtime, authenticated parity, migration reconciliation and
   exercised rollback remain open. The pre-existing local Java image is stale
   relative to current source and is not accepted as proof.
+- The native mobile scaffold now has 23 source screen definitions and a
+  dependency-free atlas test, but defaults to preview mode and has no Expo,
+  emulator, device or live API evidence.
+- The Stitch web repair has source-level regression coverage, while fresh
+  browser/reference-diff evidence remains `NOT_RUN`.
 
 ## Accepted decision
 
@@ -51,7 +67,7 @@ tests, runtime smoke, rollback proof and a fresh exact-head review.
 
 ## Handoff
 
-The integration owner may now create the single-app shell and migration fixtures
-under the phase plan. The next review must pin the new exact commit and rerun all
-three gates; these verdicts become stale as soon as the reviewed snapshot
-changes.
+The integration owner may continue bounded client/domain work under the phase
+plan. Before any route switch, writer handoff, release or retirement, pin the
+final exact commit and rerun all three gates independently; any verdict becomes
+stale as soon as the reviewed snapshot changes.
