@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Current committed head: `cd8696f` (`fix: add mobile cards for admin identity views`).
+- Current committed head: `c0f41e2` (`docs: record six admin mobile card views`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
