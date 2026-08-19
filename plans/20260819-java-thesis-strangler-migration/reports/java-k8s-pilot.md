@@ -39,8 +39,10 @@
 - `mvn -q -f java-services/thesis-service/pom.xml test`: PASS; Surefire records
   18 tests with zero failures/errors, including the readiness controller tests.
 - Runtime smoke, Java image verification and apply: `NOT_RUN`; C: has
-  approximately 0.33 GB free after Maven and heavy commands are intentionally
-  held.
+  approximately 0.41 GB free after Maven and heavy commands are intentionally
+  held. `msrdc.exe` is active and recently updated ETL files under
+  `DiagOutputDir` remain preserved; Docker update and Node compile caches are
+  also retained as active/recent data.
 - Java image: local-only `campuscore-thesis-service:pilot-local`; no digest,
   registry publication, provenance, image smoke, or deployment evidence.
 - Schema bootstrap, differential contract, reconciliation/restore, canary,
