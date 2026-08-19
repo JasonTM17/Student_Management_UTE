@@ -119,8 +119,8 @@ Source-level gates:
 
 ```powershell
 Set-Location java-services/restful-api
-./mvnw.cmd -q -DskipTests compile
-./mvnw.cmd -q test
+mvn -q -f pom.xml -DskipTests compile
+mvn -q -f pom.xml test
 Set-Location ../..
 git diff --check
 ```
