@@ -427,7 +427,79 @@ export default function AdminLecturersPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {lecturers.map((lecturer) => {
+                  const lecturerLabel = lecturer.user
+                    ? `${lecturer.user.firstName} ${lecturer.user.lastName}`
+                    : copy.unlinkedAccount;
+                  const departmentLabel = getLocalizedName(
+                    locale,
+                    lecturer.department,
+                    lecturer.department?.name || copy.unassigned,
+                  );
+
+                  return (
+                    <article
+                      key={`${lecturer.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            {lecturer.employeeId}
+                          </p>
+                          <h3 className="mt-1 font-semibold text-foreground">{lecturerLabel}</h3>
+                          <p className="mt-1 break-all text-sm text-muted-foreground">
+                            {lecturer.user?.email || copy.noEmail}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          {lecturer.isActive ? copy.active : copy.inactive}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.department}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{departmentLabel}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.specialization}
+                          </dt>
+                          <dd className="mt-1 text-foreground">
+                            {lecturer.specialization || copy.notProvided}
+                          </dd>
+                        </div>
+                      </dl>
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(lecturer)}
+                          aria-label={copy.editLabel(lecturer.employeeId)}
+                          title={copy.editLabel(lecturer.employeeId)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(lecturer)}
+                          aria-label={copy.deleteLabel(lecturer.employeeId)}
+                          title={copy.deleteLabel(lecturer.employeeId)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[860px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

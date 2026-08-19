@@ -394,7 +394,61 @@ export default function AdminDepartmentsPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {departments.map((department) => {
+                  const departmentLabel = getLocalizedName(locale, department, department.name);
+                  const departmentDescription = getLocalizedDescription(
+                    locale,
+                    department,
+                    copy.noDescription,
+                  );
+
+                  return (
+                    <article
+                      key={`${department.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                            {department.code}
+                          </p>
+                          <h3 className="mt-1 font-semibold text-foreground">{departmentLabel}</h3>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          {department.isActive ? copy.active : copy.inactive}
+                        </span>
+                      </div>
+                      <p className="mt-4 border-t border-border/60 pt-3 text-sm leading-6 text-muted-foreground">
+                        {departmentDescription}
+                      </p>
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(department)}
+                          aria-label={copy.editLabel(departmentLabel)}
+                          title={copy.editLabel(departmentLabel)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(department)}
+                          aria-label={copy.deleteLabel(departmentLabel)}
+                          title={copy.deleteLabel(departmentLabel)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

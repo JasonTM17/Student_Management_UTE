@@ -439,7 +439,67 @@ export default function AdminSemestersPage() {
               />
             }
           >
-              <AdminTableScroll>
+              <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
+                {semesters.map((semester) => {
+                  const semesterLabel = getLocalizedName(locale, semester, semester.name);
+
+                  return (
+                    <article
+                      key={`${semester.id}-mobile`}
+                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      role="listitem"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <h3 className="font-semibold text-foreground">{semesterLabel}</h3>
+                          <p className="mt-1 text-sm text-muted-foreground">
+                            {getSemesterTypeLabel(semester.type)} · {semester.academicYear?.year || copy.unassigned}
+                          </p>
+                        </div>
+                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          {semester.status.replace(/_/g, ' ')}
+                        </span>
+                      </div>
+                      <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.startDate}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{formatDate(semester.startDate)}</dd>
+                        </div>
+                        <div>
+                          <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                            {copy.headers.endDate}
+                          </dt>
+                          <dd className="mt-1 text-foreground">{formatDate(semester.endDate)}</dd>
+                        </div>
+                      </dl>
+                      <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          onClick={() => openEdit(semester)}
+                          aria-label={copy.editLabel(semesterLabel)}
+                          title={copy.editLabel(semesterLabel)}
+                        >
+                          <Pencil className="h-4 w-4" />
+                        </Button>
+                        <Button
+                          size="icon"
+                          variant="ghost"
+                          className="text-destructive hover:bg-destructive/10 hover:text-destructive"
+                          onClick={() => void handleDelete(semester)}
+                          aria-label={copy.deleteLabel(semesterLabel)}
+                          title={copy.deleteLabel(semesterLabel)}
+                        >
+                          <Trash2 className="h-4 w-4" />
+                        </Button>
+                      </AdminRowActions>
+                    </article>
+                  );
+                })}
+              </div>
+              <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[840px] text-sm">
                   <thead>
                     <tr className="border-b border-border/70 text-left text-muted-foreground">

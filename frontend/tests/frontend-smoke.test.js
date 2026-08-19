@@ -506,6 +506,19 @@ test('admin course and classroom views expose mobile card lists', () => {
   }
 });
 
+test('admin department, semester, and lecturer views expose mobile card lists', () => {
+  for (const relPath of [
+    'src/app/admin/departments/page.tsx',
+    'src/app/admin/semesters/page.tsx',
+    'src/app/admin/lecturers/page.tsx',
+  ]) {
+    const source = read(relPath);
+    assert.match(source, /role="list"/);
+    assert.match(source, /className="space-y-3 md:hidden"/);
+    assert.match(source, /<AdminTableScroll className="hidden md:block">/);
+  }
+});
+
 test('homepage copy avoids demo placeholders and dead hrefs', () => {
   const source = read('src/app/page.tsx');
   const deadHrefPattern = new RegExp('href="' + '#"');
