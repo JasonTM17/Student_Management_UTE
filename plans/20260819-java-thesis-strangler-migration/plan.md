@@ -196,9 +196,10 @@ plus whatever exact smoke and rollback commands the deploy path uses.
 - Auth is still shadow-only on the Java side.
 - External E2E is repeatable with the explicit direct-auth session setup, but the shared database/checkout mutation still needs an isolated run. The isolated runner needs local Node service dependencies installed before it can execute; low C: space currently makes that unsafe.
 - FE accessibility, business mutation parity, and full Stitch-to-production acceptance are still open despite the green visual capture matrix.
-- Exact-head Advisor/Kongming/Wukong review of the post-patch snapshot is still
-  required. The first Advisor review was conditional and read-only on the
-  pre-patch head; no approval is inferred from it.
+- Exact-head Advisor/Kongming/Wukong review of the post-commit snapshot is
+  still required. Fresh bounded sidecars for `7353d8e` timed out and were
+  recorded as `NOT_RUN`; the first Advisor review was conditional and
+  read-only on the pre-patch head, so no approval is inferred.
 - Java thesis schema bootstrap/ownership, differential contract coverage,
   authenticated pilot smoke, metrics/logs/traces, canary, and rollback evidence
   remain open. `FLYWAY_ENABLED=true` is pilot-only for now and must not be
