@@ -34,6 +34,8 @@ health:
 migration:
   thesis-read:
     enabled: ${THESIS_READ_ENABLED:false}
+  notifications-read:
+    enabled: ${NOTIFICATIONS_READ_ENABLED:false}
 
 management:
   endpoints:

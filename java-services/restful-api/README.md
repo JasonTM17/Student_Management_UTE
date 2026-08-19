@@ -15,14 +15,19 @@ shell, not a domain-parity or cutover claim.
 - stable validation/error envelope;
 - Actuator and OpenAPI paths;
 - a non-root Dockerfile for the eventual single image.
+- a disabled-by-default, read-only notification inbox candidate behind
+  `NOTIFICATIONS_READ_ENABLED=true` in the `persistence` profile; it does not
+  own notification writes, realtime delivery, or public routing.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
 profile enables one PostgreSQL datasource, one Flyway migration owner and the
 first thesis read path only when `THESIS_READ_ENABLED=true` is also supplied.
-No legacy route, payment provider or LLM provider is cut over; those
-dependencies enter through later migration phases with one canonical writer and
-explicit rollback evidence.
+The notification read candidate is separately gated by
+`NOTIFICATIONS_READ_ENABLED=true` and reads the legacy schema through JDBC
+without adding notification DDL. No legacy route, payment provider or LLM
+provider is cut over; those dependencies enter through later migration phases
+with one canonical writer and explicit rollback evidence.
 
 ## Local verification
 

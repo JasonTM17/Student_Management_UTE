@@ -2,10 +2,11 @@
 
 ## Status
 
-**Planned / HOLD before implementation.** This phase defines the next bounded
-strangler slice. It does not move public traffic or add a second notification
-writer. Implementation must wait for an isolated PostgreSQL schema check,
-subject-claim/auth verification, and a differential Node-versus-Java run.
+**Candidate implemented / HOLD for runtime acceptance.** The disabled-by-
+default JDBC read adapter and source-level tests are present. No public traffic
+or writer ownership moved. Acceptance still requires an isolated PostgreSQL
+schema/permission check, subject-claim/auth verification, and a differential
+Node-versus-Java run.
 
 ## Outcome and success signal
 
@@ -67,6 +68,14 @@ the deployed legacy service before implementation is accepted:
 | Legacy table | `notifications.notification`, indexed by `(user_id, created_at)` and `is_read`. | Read-only schema inspection and permission check. |
 | Frontend consumer | `notificationsApi.getMy` consumes `data`/`meta` and normalizes `message` to `content`; unread count is used by the dashboard shell. | Browser/API contract run with real auth; no preview success may be counted. |
 
+## Candidate implementation evidence
+
+The source-level candidate is documented in
+`reports/notification-read-candidate.md`. It uses string-preserving JDBC,
+qualified `notifications.notification` reads, an explicit
+`migration.notifications-read.enabled` flag, and no Flyway migration or write
+path. The default route-disabled contract remains covered.
+
 The existing standalone Java notification service is useful as source
 material, but it is not proof for the monolith: it currently has separate
 application configuration and its list implementation must be checked for
@@ -93,19 +102,19 @@ isolated PostgreSQL copy are available. Do not silently infer them from H2.
 
 ## Ordered work and ownership
 
-1. **Contract freeze — integration owner.** Capture legacy OpenAPI/HTTP
-   examples, auth subject format, pagination edge cases, and a sanitized
-   fixture hash.
-2. **Schema read audit — backend owner.** Restore or provision a bounded
+1. **Source contract inventory — integration owner (complete).** The current
+   Node source, Prisma schema, fixtures, and frontend envelope are recorded;
+   live HTTP/auth freeze remains open.
+2. **Schema read audit — backend owner (open).** Restore or provision a bounded
    PostgreSQL copy, inspect the exact table/indexes, create a read-only role,
    and prove no write/DDL permission.
-3. **Java read model — backend owner.** Implement only the two GET routes and
-   the feature flag; add unit and Spring MVC tests for positive and negative
-   cases.
-4. **Differential gate — integration owner.** Run Node and Java against the
+3. **Java read model — backend owner (source-level complete).** Implemented
+   only the two GET routes and the feature flag; added Spring MVC/H2 positive
+   and negative tests. PostgreSQL runtime remains open.
+4. **Differential gate — integration owner (open).** Run Node and Java against the
    same immutable fixture and compare normalized JSON, ordering, pagination,
    filtering, counts, and error envelopes.
-5. **Independent review — Advisor/Kongming/Wukong.** Freeze the exact commit;
+5. **Independent review — Advisor/Kongming/Wukong (open for this new code).** Freeze the exact commit;
    review architecture and auth isolation read-only; adversarially test the
    claim that no user can read another user's rows. Any verdict is stale after
    a rebase or code change.

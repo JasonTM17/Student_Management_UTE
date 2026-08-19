@@ -37,6 +37,7 @@ canonical route and writer owner.
 | `/api/v1/contract`, `/api/v1/contract/ping` | Temporary shell probes | Not a domain contract. |
 | `/api/v1/me` | Identity probe | Shape differs from frontend `User` and `/auth/me`. |
 | `/api/v1/thesis/topics` | Opt-in read candidate | Requires `persistence` and `THESIS_READ_ENABLED`; unknown round now preserves legacy `404`; no public route switch. |
+| `/api/v1/notifications/my` and `/api/v1/notifications/my/unread-count` | Disabled-by-default read candidate | Requires `persistence` and `NOTIFICATIONS_READ_ENABLED`; JDBC source-level/H2 tests pass; Node remains canonical writer/public/realtime owner; PostgreSQL/auth/differential/rollback are open. |
 
 ### Missing for current frontend behavior
 
@@ -45,7 +46,7 @@ canonical route and writer owner.
   years, users, lecturers, enrollment, grades, transcript and exports.
 - Finance invoices, checkout, idempotency, provider callbacks/webhooks,
   payment-intent polling, admin writes, exports and reconciliation.
-- Engagement announcements; notification REST reads and mutations; legacy
+- Engagement announcements; notification REST mutations; legacy
   Socket.IO realtime behavior.
 - Analytics dashboards and cockpit routes.
 - Thesis rounds, groups, councils, mutations, review/result flows, and the
