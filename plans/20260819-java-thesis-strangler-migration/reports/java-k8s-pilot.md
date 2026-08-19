@@ -38,8 +38,10 @@
   bindings. This remains source-level evidence only.
 - `mvn -q -f java-services/thesis-service/pom.xml test`: PASS; Surefire records
   18 tests with zero failures/errors, including the readiness controller tests.
+- `mvn -q -f java-services/thesis-service/pom.xml verify`: PASS with exit code
+  0; the same 18-test Surefire report remains clean.
 - Runtime smoke, Java image verification and apply: `NOT_RUN`; C: has
-  approximately 0.41 GB free after Maven and heavy commands are intentionally
+  approximately 1.05 GB free after Maven and heavy commands are intentionally
   held. `msrdc.exe` is active and recently updated ETL files under
   `DiagOutputDir` remain preserved; Docker update and Node compile caches are
   also retained as active/recent data.

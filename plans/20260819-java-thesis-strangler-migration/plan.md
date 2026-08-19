@@ -45,7 +45,7 @@ Authority:
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
-- Focused `mvn -q -f java-services/thesis-service/pom.xml test` passes after the readiness patch; Surefire records 18 tests with zero failures/errors, including the three `HealthControllerTest` cases.
+- Focused `mvn -q -f java-services/thesis-service/pom.xml test` and `verify` both pass after the readiness patch; Surefire records 18 tests with zero failures/errors, including the three `HealthControllerTest` cases.
 - `mvn -q test` in `java-services` passes.
 - The FE candidate now has a Stitch-aligned contract in `frontend/.stitch/DESIGN.md` and a short implementation pointer in `frontend/DESIGN.md`.
 - The FE candidate now has a real notifications center for unprefixed and localized dashboard routes, mobile bottom navigation, and focused thesis topic/progress/evaluation routes.
@@ -56,7 +56,7 @@ Authority:
 - `node scripts/check-thesis-contract.mjs` passes a source-level oracle for all 22 Java thesis mappings, 8 current FE bindings, and the enabled/disabled nginx route fragments. This is not runtime response, authorization, mutation, data, or rollback parity.
 - The latest FE bounded a11y pass adds explicit label/control associations to auth and profile forms; frontend typecheck and lint pass after that patch, while browser and isolated E2E reruns remain open.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
-- During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; `msrdc.exe` is still active and `DiagOutputDir` ETL files were recently updated, so that directory remains preserved. The latest C: observation is approximately 0.41 GB free after the focused Maven test, so heavy dependency installation, image builds, and full local deploy runs remain deferred.
+- During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; `msrdc.exe` is still active and `DiagOutputDir` ETL files were recently updated, so that directory remains preserved. The latest C: observation is approximately 1.05 GB free after the focused Maven verify, but Docker image builds and full local deploy runs remain deferred because their peak usage is not bounded here.
 - The committed candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
 - Stitch project `16486483525927292845` defines the academic reference system:
   - `Be Vietnam Pro`
