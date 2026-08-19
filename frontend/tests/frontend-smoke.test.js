@@ -489,6 +489,14 @@ test('admin hub only links to implemented routes', () => {
   assert.doesNotMatch(source, /\/admin\/students/);
 });
 
+test('admin users exposes a mobile card list alongside the desktop table', () => {
+  const source = read('src/app/admin/users/page.tsx');
+
+  assert.match(source, /role="list"/);
+  assert.match(source, /className="space-y-3 md:hidden"/);
+  assert.match(source, /<AdminTableScroll className="hidden md:block">/);
+});
+
 test('homepage copy avoids demo placeholders and dead hrefs', () => {
   const source = read('src/app/page.tsx');
   const deadHrefPattern = new RegExp('href="' + '#"');
