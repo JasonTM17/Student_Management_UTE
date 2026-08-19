@@ -15,14 +15,22 @@ const roleHome: Record<UserRole, ScreenName> = {
   admin: 'admin.dashboard',
 };
 
+type SessionKind = 'signedOut' | 'preview' | 'authenticated';
+
 export function MobileNavigator() {
   const [route, setRoute] = useState<ScreenName>('auth.signIn');
   const [role, setRole] = useState<UserRole>('student');
+  const [sessionKind, setSessionKind] = useState<SessionKind>('signedOut');
   const [menuOpen, setMenuOpen] = useState(false);
-  const isSignedIn = route !== 'auth.signIn';
+  const isPreviewSession = sessionKind === 'preview';
+  const isAuthenticated = sessionKind === 'authenticated';
+  const hasActiveSession = isPreviewSession || isAuthenticated;
 
   const navigation: MobileNavigation = {
     navigate(nextRoute) {
+      if (!hasActiveSession) {
+        return;
+      }
       if (!canAccessScreen(role, nextRoute)) {
         setRoute(roleHome[role]);
         setMenuOpen(false);
@@ -31,17 +39,29 @@ export function MobileNavigator() {
       setRoute(nextRoute);
       setMenuOpen(false);
     },
-    goBack() {
+    enterPreview() {
+      if (apiClient.mode !== 'preview') {
+        return;
+      }
+      setSessionKind('preview');
       setRoute(roleHome[role]);
+      setMenuOpen(false);
+    },
+    goBack() {
+      setRoute(hasActiveSession ? roleHome[role] : 'auth.signIn');
       setMenuOpen(false);
     },
     signOut() {
       apiClient.clearAccessToken();
+      setSessionKind('signedOut');
       setRole('student');
       setRoute('auth.signIn');
       setMenuOpen(false);
     },
     switchRole(nextRole) {
+      if (!isPreviewSession) {
+        return;
+      }
       setRole(nextRole);
       setRoute(roleHome[nextRole]);
       setMenuOpen(false);
@@ -55,7 +75,7 @@ export function MobileNavigator() {
       <StatusBar barStyle="dark-content" backgroundColor={tokens.colors.background} />
       <View style={styles.container}>
         <ScreenComponent navigation={navigation} role={role} />
-        {isSignedIn ? (
+        {hasActiveSession ? (
           <BottomNavigation
             activeRoute={route}
             role={role}

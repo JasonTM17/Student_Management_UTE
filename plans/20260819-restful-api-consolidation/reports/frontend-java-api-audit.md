@@ -23,6 +23,8 @@ canonical route and writer owner.
   require explicit `EXPO_PUBLIC_API_MODE=live`. The mobile sign-in UI labels
   local preview data explicitly and disables live sign-in until Java implements
   the auth contract, so navigation cannot be mistaken for authenticated parity.
+  The navigator separately models `signedOut`, `preview`, and
+  `authenticated`; the current candidate can enter only the preview state.
 
 ## Route status
 
