@@ -41,7 +41,7 @@ Authority:
 # Current Evidence
 
 - Branch: `feature/java-thesis-platform`.
-- Code candidate under review: `81f0863` (`fix: add mobile cards for dense admin lists`).
+- Code candidate under review: `0f724ec` (`fix: make workspace tables mobile friendly`).
 - Base head: `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`.
 - Untracked workspace state: `.agents/`.
 - Java stack exists and is already testable: parent Maven build plus `auth`, `engagement`, `notification`, and `thesis` modules.
@@ -55,7 +55,7 @@ Authority:
 - After the Java pilot and FE accessibility patch, `kubectl kustomize k8s/base`, `kubectl kustomize k8s/overlays/thesis-pilot`, `node scripts/run-k8s-preflight.mjs`, `docker compose -f docker-compose.yml config`, frontend typecheck, frontend lint, and `git diff --check` pass. No K8s apply, Java build, image build, or runtime pilot smoke has been run.
 - `node scripts/check-thesis-contract.mjs` passes a source-level oracle for all 22 Java thesis mappings, 8 current FE bindings, and the enabled/disabled nginx route fragments. This is not runtime response, authorization, mutation, data, or rollback parity.
 - The latest FE bounded a11y pass adds explicit label/control associations to auth and profile forms; frontend typecheck and lint pass after that patch, while browser and isolated E2E reruns remain open.
-- Nine Admin Users/Courses/Classrooms/Departments/Semesters/Lecturers/Invoices/Enrollments/Sections views now have bounded stacked mobile-card implementations with desktop-table fallbacks; invoice detail items also have a mobile card treatment. The latest frontend smoke is 25/25, typecheck and lint pass, and academic-years, analytics, and other dense admin tables remain open.
+- Eleven Admin Users/Courses/Classrooms/Departments/Semesters/Lecturers/Invoices/Enrollments/Sections/Academic Years/Analytics views now have bounded stacked mobile-card implementations with desktop-table fallbacks; invoice detail items also have a mobile card treatment. Student Grades/Invoices/Transcript and lecturer Section Grading now use the same mobile contract, including editable grade controls. The latest frontend smoke is 27/27, typecheck and lint pass, and other dense tables plus browser reruns remain open.
 - The isolated `npm run test:e2e` runner is present but did not complete because local service dependencies are not installed (`backend/node_modules/.bin/prisma` is missing); this is recorded as NOT_RUN, not PASS.
 - During this continuation, Docker Desktop was restarted without elevated service control. A bounded `WinGet` FFmpeg cache under the user Temp directory was validated and permanently removed after its Recycle Bin copy kept consuming space; `msrdc.exe` is still active and `DiagOutputDir` ETL files were recently updated, so that directory remains preserved. A monitored current-source Docker build was aborted at the 0.70 GB safety threshold; no `pilot-local` image was produced. The resulting unused build cache was pruned once (241.4 MB logical reclaim, C: physical free stayed near 0.27 GB). Heavy image and deploy work remains deferred.
 - The committed candidate adds an isolated `k8s/overlays/thesis-pilot` route and Java Deployment/Service with Postgres/Redis waits, while keeping the canonical base/generic nine-image release path unchanged. Base nginx receives only empty optional fragments so the pilot can avoid duplicating the full gateway config; no thesis upstream or route resolves in the canonical base.
@@ -90,7 +90,7 @@ Authority:
 4. Make `thesis-service` the first Java public boundary. **Pilot overlay implemented in the working tree; not complete until Kustomize/runtime, differential, schema, and rollback gates pass.**
 5. Move adjacent public behavior in controlled waves. **Pending.**
 6. Prove data reconciliation, observability, and rollback. **Pending and release-blocking.**
-7. Align frontend implementation to the Stitch system. **In progress; tokens, notifications, mobile nav, thesis decomposition, and nine bounded admin mobile-card conversions are implemented, and the 56-capture matrix is green; accessibility, remaining table/card parity, and isolated E2E remain open.**
+7. Align frontend implementation to the Stitch system. **In progress; tokens, notifications, mobile nav, thesis decomposition, eleven bounded admin mobile-card conversions, and four workspace card conversions are implemented, and the 56-capture matrix is green; accessibility, remaining table/card parity, browser reruns, and isolated E2E remain open.**
 8. Remove remaining Node public ownership only after parity and rollback are proven. **Pending.**
 
 # Acceptance Criteria
