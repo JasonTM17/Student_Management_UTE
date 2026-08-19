@@ -41,6 +41,32 @@ Current required lanes:
 - `security-scan`
 - `quality-gate`
 
+## Java strangler migration lane
+
+The Java services are migration candidates, not additional public release
+images yet. `java-services/thesis-service` is the first pilot boundary and
+remains behind the existing Node canonical owner until every gate below passes
+on the exact candidate SHA.
+
+Required before a Java boundary can enter a public release:
+
+- `mvn -f java-services/pom.xml verify` passes with the supported JDK.
+- The service is exercised in the production-shaped Compose/Kubernetes path,
+  including readiness, metrics, logs, traces, and gateway routing.
+- Differential contract tests compare Node and Java status, body, headers,
+  cookies, errors, authorization, CSRF, and emitted events.
+- Schema ownership, expand/contract migration, reconciliation, backup restore,
+  and write rollback are demonstrated with recorded evidence.
+- A gateway canary routes the selected boundary to Java and a bounded rollback
+  returns traffic to Node without data loss or auth/session drift.
+- Advisor and Kongming review the same exact snapshot; Wukong independently
+  falsifies the cutover and rollback claims.
+
+Until then, do not add the Java image to the nine-image public release list or
+describe the repository as fully Java-converted. The current status and
+remaining blockers are tracked in
+`plans/20260819-java-thesis-strangler-migration/plan.md`.
+
 ## Public images
 
 Each public release must publish these nine images:

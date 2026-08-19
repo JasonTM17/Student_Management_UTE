@@ -62,20 +62,26 @@ export default function HomePage() {
       />
       <nav className="border-b border-border/70 bg-background/95 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
-          <BrandMark href="/" subtitle={messages.home.navSubtitle} compact />
-          <div className="flex items-center gap-2">
+          <BrandMark
+            href="/"
+            subtitle={messages.home.navSubtitle}
+            compact
+            className="min-w-0"
+            subtitleClassName="hidden sm:block"
+          />
+          <div className="flex shrink-0 items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
             {!isLoading &&
               (user ? (
-                <LocalizedLink href="/dashboard">
+                <LocalizedLink href="/dashboard" className="hidden sm:inline-flex">
                   <Button>
                     {messages.common.actions.openDashboard}
                     <ArrowRight className="ml-2 h-4 w-4" />
                   </Button>
                 </LocalizedLink>
               ) : (
-                <LocalizedLink href="/login">
+                <LocalizedLink href="/login" className="hidden sm:inline-flex">
                   <Button variant="outline">{messages.common.actions.signIn}</Button>
                 </LocalizedLink>
               ))}

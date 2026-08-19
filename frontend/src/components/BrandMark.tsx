@@ -9,6 +9,7 @@ interface BrandMarkProps {
   className?: string;
   markClassName?: string;
   titleClassName?: string;
+  subtitleClassName?: string;
   subtitle?: string;
   compact?: boolean;
 }
@@ -18,6 +19,7 @@ export function BrandMark({
   className,
   markClassName,
   titleClassName,
+  subtitleClassName,
   subtitle,
   compact = false,
 }: BrandMarkProps) {
@@ -43,7 +45,7 @@ export function BrandMark({
           CampusCore
         </div>
         {subtitle ? (
-          <div className="truncate text-sm text-muted-foreground">
+          <div className={cn('truncate text-sm text-muted-foreground', subtitleClassName)}>
             {subtitle}
           </div>
         ) : null}
@@ -56,7 +58,7 @@ export function BrandMark({
   }
 
   return (
-    <LocalizedLink href={href} className="inline-flex">
+    <LocalizedLink href={href} className="inline-flex min-w-0">
       {content}
     </LocalizedLink>
   );

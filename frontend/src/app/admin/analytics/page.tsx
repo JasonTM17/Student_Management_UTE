@@ -341,57 +341,59 @@ export default function AdminAnalyticsPage() {
               description={cockpitCopy.panels.enrollmentFlow.description}
               className="h-full min-w-0"
             >
-              <div className="flex min-h-[300px] items-end gap-3 overflow-x-auto pb-2">
-                {cockpit.enrollmentTrends.map((trend) => {
-                  const total =
-                    trend.totalActivity ??
-                    trend.enrolled + trend.completed + trend.dropped;
-                  const enrolledHeight = Math.max(
-                    (trend.enrolled / trendMax) * 220,
-                    trend.enrolled > 0 ? 10 : 0,
-                  );
-                  const completedHeight = Math.max(
-                    (trend.completed / trendMax) * 220,
-                    trend.completed > 0 ? 10 : 0,
-                  );
-                  const droppedHeight = Math.max(
-                    (trend.dropped / trendMax) * 220,
-                    trend.dropped > 0 ? 10 : 0,
-                  );
+              <div className="min-w-0 max-w-full overflow-x-auto pb-2">
+                <div className="flex min-h-[300px] w-max min-w-full items-end gap-3">
+                  {cockpit.enrollmentTrends.map((trend) => {
+                    const total =
+                      trend.totalActivity ??
+                      trend.enrolled + trend.completed + trend.dropped;
+                    const enrolledHeight = Math.max(
+                      (trend.enrolled / trendMax) * 220,
+                      trend.enrolled > 0 ? 10 : 0,
+                    );
+                    const completedHeight = Math.max(
+                      (trend.completed / trendMax) * 220,
+                      trend.completed > 0 ? 10 : 0,
+                    );
+                    const droppedHeight = Math.max(
+                      (trend.dropped / trendMax) * 220,
+                      trend.dropped > 0 ? 10 : 0,
+                    );
 
-                  return (
-                    <div
-                      key={trend.month}
-                      className="flex min-w-[78px] flex-1 flex-col items-center gap-3"
-                    >
-                      <div className="flex h-[230px] w-full items-end justify-center gap-1 rounded-lg border border-border/70 bg-secondary/20 px-2 py-2">
-                        <div
-                          className="w-3 rounded-t bg-sky-500"
-                          title={`${messages.adminAnalytics.tableHeaders.grades.enrolled}: ${trend.enrolled}`}
-                          style={{ height: enrolledHeight }}
-                        />
-                        <div
-                          className="w-3 rounded-t bg-emerald-500"
-                          title={`${messages.adminAnalytics.tableHeaders.grades.completed}: ${trend.completed}`}
-                          style={{ height: completedHeight }}
-                        />
-                        <div
-                          className="w-3 rounded-t bg-red-500"
-                          title={`${messages.adminAnalytics.tableHeaders.grades.dropped}: ${trend.dropped}`}
-                          style={{ height: droppedHeight }}
-                        />
-                      </div>
-                      <div className="space-y-1 text-center">
-                        <div className="text-xs font-medium text-foreground">
-                          {formatTrendLabel(locale, trend)}
+                    return (
+                      <div
+                        key={trend.month}
+                        className="flex w-[78px] shrink-0 flex-col items-center gap-3"
+                      >
+                        <div className="flex h-[230px] w-full items-end justify-center gap-1 rounded-lg border border-border/70 bg-secondary/20 px-2 py-2">
+                          <div
+                            className="w-3 rounded-t bg-sky-500"
+                            title={`${messages.adminAnalytics.tableHeaders.grades.enrolled}: ${trend.enrolled}`}
+                            style={{ height: enrolledHeight }}
+                          />
+                          <div
+                            className="w-3 rounded-t bg-emerald-500"
+                            title={`${messages.adminAnalytics.tableHeaders.grades.completed}: ${trend.completed}`}
+                            style={{ height: completedHeight }}
+                          />
+                          <div
+                            className="w-3 rounded-t bg-red-500"
+                            title={`${messages.adminAnalytics.tableHeaders.grades.dropped}: ${trend.dropped}`}
+                            style={{ height: droppedHeight }}
+                          />
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                          {formatNumber(total)}
+                        <div className="space-y-1 text-center">
+                          <div className="text-xs font-medium text-foreground">
+                            {formatTrendLabel(locale, trend)}
+                          </div>
+                          <div className="text-xs text-muted-foreground">
+                            {formatNumber(total)}
+                          </div>
                         </div>
                       </div>
-                    </div>
-                  );
-                })}
+                    );
+                  })}
+                </div>
               </div>
               <div className="mt-4 flex flex-wrap gap-3 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-2">

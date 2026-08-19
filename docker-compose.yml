@@ -21,7 +21,7 @@ services:
     image: redis:7-alpine
     container_name: campuscore-redis
     ports:
-      - "127.0.0.1:6379:6379"
+      - "127.0.0.1:${REDIS_HOST_PORT:-6379}:6379"
     volumes:
       - redis_data:/data
     healthcheck:
@@ -38,8 +38,8 @@ services:
       RABBITMQ_DEFAULT_USER: ${RABBITMQ_USER:-campuscore}
       RABBITMQ_DEFAULT_PASS: ${RABBITMQ_PASSWORD:-campuscore_password}
     ports:
-      - "127.0.0.1:5672:5672"
-      - "127.0.0.1:15672:15672"
+      - "127.0.0.1:${RABBITMQ_HOST_PORT:-5672}:5672"
+      - "127.0.0.1:${RABBITMQ_MANAGEMENT_HOST_PORT:-15672}:15672"
     volumes:
       - rabbitmq_data:/var/lib/rabbitmq
     healthcheck:
@@ -56,8 +56,8 @@ services:
       MINIO_ROOT_USER: ${MINIO_USER:-campuscore}
       MINIO_ROOT_PASSWORD: ${MINIO_PASSWORD:-campuscore_password}
     ports:
-      - "127.0.0.1:9000:9000"
-      - "127.0.0.1:9001:9001"
+      - "127.0.0.1:${MINIO_HOST_PORT:-9000}:9000"
+      - "127.0.0.1:${MINIO_CONSOLE_HOST_PORT:-9001}:9001"
     volumes:
       - minio_data:/data
     command: server /data --console-address ":9001"
