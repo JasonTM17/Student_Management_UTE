@@ -82,9 +82,11 @@ release readiness.
 The overlay, preflight contract, and source-level thesis contract checker are
 implemented after base commit `fdc547c8d3d42abb4e986e91c06f520c8b3aae46` and
 committed in the current candidate. Base and pilot Kustomize renders, the full
-K8s preflight, Compose config render, and `node scripts/check-thesis-contract.mjs`
-PASS. Runtime pilot smoke, Java/Maven verification, image provenance, and apply
-are still `NOT_RUN`; C: is approximately 0.56 GB. The source checker is not
+K8s preflight, Compose config render, `node scripts/check-thesis-contract.mjs`,
+and focused `mvn -q -f java-services/thesis-service/pom.xml test` PASS; the
+focused Java run records 18 tests with zero failures/errors. Runtime pilot
+smoke, image provenance, and apply are still `NOT_RUN`; C: is approximately
+0.33 GB after Maven and heavy commands are now held. The source checker is not
 runtime parity evidence. Advisor's pre-patch review was conditional GO for this
 design and NO-GO for apply/public cutover; exact-head post-patch reviews remain
 required. The four sidecars dispatched against `cf7f9bc` timed out twice and
