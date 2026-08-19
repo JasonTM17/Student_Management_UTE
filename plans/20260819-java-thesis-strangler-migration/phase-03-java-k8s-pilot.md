@@ -87,4 +87,5 @@ PASS. Runtime pilot smoke, Java/Maven verification, image provenance, and apply
 are still `NOT_RUN`; C: is approximately 0.56 GB. The source checker is not
 runtime parity evidence. Advisor's pre-patch review was conditional GO for this
 design and NO-GO for apply/public cutover; exact-head post-patch reviews remain
-required.
+required. The four sidecars dispatched against `cf7f9bc` timed out twice and
+are recorded as `NOT_RUN`, not approval.
