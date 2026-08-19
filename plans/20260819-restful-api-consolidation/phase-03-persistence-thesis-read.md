@@ -61,7 +61,7 @@ of repository/controller wiring, not PostgreSQL compatibility proof.
 | Production PostgreSQL Flyway script | `NOT_RUN` | No disposable PostgreSQL restore was created; the running shared DB was not mutated. |
 | Legacy differential/API parity | `NOT_RUN` | New route is not wired to nginx/Compose and no route owner changed. |
 | Backup/restore/reconciliation | `NOT_RUN` | Required before any writer handoff. |
-| Frontend/mobile E2E | `NOT_RUN` | Clients still use legacy topology; no mobile app exists yet. |
+| Frontend/mobile E2E | `NOT_RUN` | Web client still uses legacy topology; a 23-screen native scaffold now exists, but Expo/device/API runtime evidence is not available. |
 | `git diff --check` | `PASS` | Clean at the `0064df8` implementation handoff; unrelated `.agents/` remains untracked and unstaged. |
 
 The first H2 rehearsal intentionally exposed that H2 2.3 does not accept the
