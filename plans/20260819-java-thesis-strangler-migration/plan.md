@@ -1,7 +1,13 @@
 ---
-title: Java Thesis Strangler Migration and Stitch Alignment
-status: pending
+title: Java Thesis Strangler Migration and Stitch Alignment (superseded)
+status: cancelled
 ---
+
+> Superseded on 2026-08-19 by
+> `plans/20260819-restful-api-consolidation/plan.md`. The evidence recorded in
+> this directory remains historical and is not an authorization to cut over or
+> delete services. Thesis migration is now one wave inside the single RESTful
+> API plan.
 
 # Outcome
 
