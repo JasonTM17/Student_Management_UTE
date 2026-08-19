@@ -53,6 +53,7 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | Web P0 repair | `PASS` source-level | Metric wrapping, assistant offset/z-index, exact background, 1280px cap, and tablet bottom-nav boundary are covered by a new smoke assertion. Rendered proof remains open. |
 | Web smoke/typecheck/lint | `PASS` | 27 smoke tests, Next route type generation/TypeScript, and ESLint zero-warning gate pass on the current web tree. |
 | Native mobile source transpile | `PASS` | TypeScript syntax transpile passed for all mobile `.ts/.tsx` files. This is not dependency-aware typecheck. |
+| Native API preview guard | `PASS` source-level | The client defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls require explicit `EXPO_PUBLIC_API_MODE=live`. |
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
 | Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target has shell probes plus conditional thesis-topic read only; auth, academic, finance, notification, analytics, complete thesis, and chatbot routes are not yet implemented. |
 
