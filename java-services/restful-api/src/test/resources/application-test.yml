@@ -5,6 +5,10 @@ security:
 health:
   readiness-key: test-health-key
 
+migration:
+  thesis-read:
+    enabled: true
+
 spring:
   datasource:
     url: jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1

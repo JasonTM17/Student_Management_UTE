@@ -31,6 +31,10 @@ security:
 health:
   readiness-key: ${HEALTH_READINESS_KEY:}
 
+migration:
+  thesis-read:
+    enabled: ${THESIS_READ_ENABLED:false}
+
 management:
   endpoints:
     web:

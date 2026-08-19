@@ -12,6 +12,8 @@ GET /api/v1/thesis/topics?roundId=<uuid>&status=<optional>
 The new Java app is a **read-only candidate** for this path. The existing Java
 thesis pilot/legacy owners remain the canonical writer and public route owner.
 No nginx, Compose, Kubernetes or frontend API base URL has been changed.
+The controller is additionally gated by `THESIS_READ_ENABLED`; the persistence
+profile alone does not expose the read route.
 
 The production Flyway script is intentionally copied with the existing `V1`
 filename/content shape so an eventual handoff can compare checksum/history. The
