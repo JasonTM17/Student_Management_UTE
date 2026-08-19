@@ -58,7 +58,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
           label={isPreview ? 'Explore preview' : 'Live sign in unavailable'}
           onPress={() => {
             if (isPreview) {
-              navigation.navigate('dashboard.student');
+              navigation.enterPreview();
             }
           }}
           style={styles.submit}

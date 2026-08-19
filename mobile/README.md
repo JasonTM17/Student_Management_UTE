@@ -49,6 +49,9 @@ The app uses one base URL for all requests and does not embed credentials.
 The local preview entry point is deliberately labeled as a preview; it does not
 represent a successful Java authentication. When live mode is selected, sign
 in stays disabled until the Java auth contract exists and has runtime evidence.
+The navigator keeps `signedOut`, `preview`, and `authenticated` as distinct
+session states; role switching is available only inside the explicit preview
+state and is never an authorization substitute.
 
 ## API seam
 

@@ -47,6 +47,11 @@ than reference-diff evidence and several current routes/states are not covered.
 6. The initial mobile sign-in preview could look like a successful Java login.
    It now labels the local flow as preview-only and disables live sign-in until
    a real Java auth contract exists and has runtime evidence.
+7. Wukong's exact-head review found that route presence had been conflated with
+   signed-in state. The navigator now models `signedOut`, `preview`, and
+   `authenticated` separately; preview role switching is explicitly limited to
+   the preview state. This repairs the source-level ambiguity, but it is not
+   server authorization or authenticated runtime parity.
 
 ## Remaining P0/P1 gates
 

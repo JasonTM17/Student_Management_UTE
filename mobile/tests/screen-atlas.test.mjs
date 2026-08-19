@@ -11,6 +11,7 @@ const readme = fs.readFileSync(path.join(mobileRoot, 'README.md'), 'utf8');
 const navigator = fs.readFileSync(path.join(mobileRoot, 'src/navigation/MobileNavigator.tsx'), 'utf8');
 const bottomNavigation = fs.readFileSync(path.join(mobileRoot, 'src/components/BottomNavigation.tsx'), 'utf8');
 const signIn = fs.readFileSync(path.join(mobileRoot, 'src/screens/auth/SignInScreen.tsx'), 'utf8');
+const navigationTypes = fs.readFileSync(path.join(mobileRoot, 'src/navigation/types.ts'), 'utf8');
 const screenComponents = fs.readFileSync(path.join(mobileRoot, 'src/screens/index.ts'), 'utf8');
 const stitchMetadata = JSON.parse(
   fs.readFileSync(path.join(mobileRoot, '..', 'frontend', '.stitch', 'metadata.json'), 'utf8'),
@@ -66,6 +67,11 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /<BottomNavigation[\s\S]*?role=\{role\}/);
   assert.match(bottomNavigation, /getBottomNavigation\(role\)/);
   assert.match(bottomNavigation, /role: UserRole/);
+  assert.match(navigator, /if \(!hasActiveSession\) \{\s*return;/);
+  assert.match(navigator, /if \(!isPreviewSession\) \{\s*return;/);
+  assert.match(navigator, /type SessionKind = 'signedOut' \| 'preview' \| 'authenticated'/);
+  assert.match(navigator, /const isAuthenticated = sessionKind === 'authenticated'/);
+  assert.match(navigationTypes, /enterPreview\(\): void/);
 });
 
 test('Stitch mobile references stay traceable and preview sign-in does not impersonate live authentication', () => {
@@ -91,6 +97,8 @@ test('Stitch mobile references stay traceable and preview sign-in does not imper
   assert.match(routes, /'admin\.lecturers': \[[\s\S]*?36c60dec6ed9458a80bc5b1cfe6f82a5/);
   assert.match(signIn, /const isPreview = apiClient\.mode === 'preview'/);
   assert.match(signIn, /label=\{isPreview \? 'Explore preview' : 'Live sign in unavailable'\}/);
+  assert.match(signIn, /navigation\.enterPreview\(\)/);
+  assert.doesNotMatch(signIn, /navigation\.navigate\('dashboard\.student'\)/);
   assert.match(signIn, /No account is authenticated until the Java auth contract is implemented and verified/);
   assert.match(readme, /role-specific bottom bar/);
 });
