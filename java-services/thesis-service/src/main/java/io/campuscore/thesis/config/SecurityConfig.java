@@ -51,6 +51,7 @@ public class SecurityConfig {
                                 "/api/v1/health/**",
                                 "/error",
                                 "/actuator/health/**",
+                                "/actuator/prometheus",
                                 "/api/docs/**",
                                 "/api/docs/openapi.json",
                                 "/v3/api-docs/**")

@@ -1,6 +1,9 @@
 # Architecture
 
-CampusCore hiện chạy như một stack microservices production-like với một `core-api`, một `auth-service`, sáu domain service, một `frontend`, và một `nginx gateway`.
+CampusCore hiện chạy như một stack microservices production-like với một
+`core-api`, một `auth-service`, sáu domain service, một `frontend`, và một
+`nginx gateway`. `java-services/thesis-service` là boundary migration pilot
+opt-in, không nằm trong canonical nine-image runtime.
 
 ## Runtime boundary
 
@@ -14,6 +17,7 @@ CampusCore hiện chạy như một stack microservices production-like với m�
 | `engagement-service`   | announcements, support tickets                                                                   |
 | `people-service`       | `students`, `lecturers`, shadow-sync outbound events                                             |
 | `analytics-service`    | `/api/v1/analytics/*`, dashboards, lecturer reporting, finance-academic reporting                |
+| `java-services/thesis-service` | opt-in `/api/v1/thesis/*` pilot trong `k8s/overlays/thesis-pilot`; chưa là public owner chung |
 | `frontend`             | Next.js standalone web app                                                                       |
 | `nginx`                | single public edge and path router                                                               |
 
@@ -44,8 +48,12 @@ runtime state without deleting or restarting anything.
 - `engagement-service` dùng `engagement`.
 - `people-service` dùng `people`.
 - `analytics-service` hiện đọc từ `public` theo hướng low-risk.
+- `java-services/thesis-service` dùng schema `thesis`; Flyway sở hữu migration
+  của pilot, còn Node/Prisma không được `db push` vào schema này.
 - Shared auth contract được gom về `packages/platform-auth` để giảm lặp lại cookie/JWT/CSRF logic giữa các service.
-- Kustomize manifests cho cùng topology hiện đã nằm tại `k8s/base`, giữ đúng boundary runtime hiện tại thay vì tạo một topology khác chỉ để trình diễn.
+- Kustomize manifests cho canonical topology nằm tại `k8s/base`; overlay
+  `k8s/overlays/thesis-pilot` là môi trường cô lập để kiểm tra Java boundary,
+  không thay đổi public release manifests.
 
 ## Public routing
 
@@ -57,6 +65,8 @@ runtime state without deleting or restarting anything.
 - `/api/v1/announcements/*`, `/api/v1/support-tickets/*` -> `engagement-service`
 - `/api/v1/students/*`, `/api/v1/lecturers/*` -> `people-service`
 - `/api/v1/analytics/*` -> `analytics-service`
+- `/api/v1/thesis/*` -> `java-services/thesis-service` **chỉ trong
+  `k8s/overlays/thesis-pilot`**; base/generic overlays chưa bật cutover này.
 
 ## Internal contracts
 
@@ -74,3 +84,6 @@ Các path này không public qua `nginx` và yêu cầu `X-Service-Token`.
 - `core-api` chỉ giữ shadow compatibility cho IAM trong một release chuyển tiếp.
 - `people-service` dùng mô hình hybrid một release với shadow sync để giữ JWT claims `studentId` và `lecturerId`.
 - `analytics-service` chưa có schema riêng để tránh refactor ownership sâu hơn trong cùng đợt hardening này.
+- Java thesis pilot chưa có image public, differential contract report, canary,
+  reconciliation/restore evidence hoặc rollback approval; không được gọi là
+  production cutover.

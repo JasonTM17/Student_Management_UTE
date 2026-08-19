@@ -239,10 +239,29 @@ export function AdminFormField({
   children,
   className,
 }: AdminFormFieldProps) {
+  const generatedId = `admin-field-${React.useId().replace(/:/g, '')}`;
+  const childNodes = React.Children.toArray(children);
+  const child = childNodes.length === 1 ? childNodes[0] : null;
+  const control = React.isValidElement(child)
+    ? (() => {
+        const element = child as React.ReactElement<{ id?: string }>;
+        const controlId = element.props.id ?? generatedId;
+        return {
+          id: controlId,
+          node: React.cloneElement(element, { id: controlId }),
+        };
+      })()
+    : null;
+
   return (
     <div className={cn('space-y-2', className)}>
-      <label className="text-sm font-medium text-foreground">{label}</label>
-      {children}
+      <label
+        htmlFor={control?.id}
+        className="text-sm font-medium text-foreground"
+      >
+        {label}
+      </label>
+      {control?.node ?? children}
       {description ? (
         <p className="text-sm text-muted-foreground">{description}</p>
       ) : null}
