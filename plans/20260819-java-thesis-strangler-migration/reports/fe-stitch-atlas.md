@@ -52,7 +52,7 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
 
 ## Verification record
 
-- `frontend`: `npm test` — PASS, 22/22.
+- `frontend`: `npm test` — PASS, 23/23.
 - `frontend`: `npm run typecheck` — PASS.
 - `frontend`: `npm run lint` — PASS, zero warnings.
 - Latest bounded a11y patch: explicit `htmlFor`/`id` associations for
@@ -60,6 +60,8 @@ Total Stitch screen count: 22 relevant screens (web and mobile combined).
   PASS after the patch. Browser and E2E reruns remain open.
 - Latest bounded responsive patch: Admin Users now renders stacked mobile cards
   and retains the desktop table; smoke/typecheck/lint PASS after the patch.
+- Admin Courses and Admin Classrooms now also render stacked mobile cards with
+  desktop-table fallbacks; smoke/typecheck/lint PASS after the patch.
 - `frontend`: `git diff --check` — PASS.
 - `frontend`: `npm run build` — PASS.
 - `java-services`: `mvn -q verify` — PASS; H2/Spring tests ran, with normal Mockito/Byte Buddy warnings.
