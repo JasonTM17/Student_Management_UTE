@@ -45,7 +45,15 @@ class RestfulApiContractTest {
     @Test
     void protectedRoutesRejectAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/me"))
-                .andExpect(status().isUnauthorized());
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void unknownRoutesReturnTheStableNotFoundEnvelope() throws Exception {
+        mvc.perform(get("/api/v1/does-not-exist").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
@@ -72,6 +80,23 @@ class RestfulApiContractTest {
                 .andExpect(jsonPath("$.status").value("ok"))
                 .andExpect(jsonPath("$.echo").value("shell"))
                 .andExpect(jsonPath("$.writer").value("restful-api-shell"));
+    }
+
+    @Test
+    void malformedJsonReturnsTheStableRequestEnvelope() throws Exception {
+        mvc.perform(post("/api/v1/contract/ping")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("not-json"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void malformedBearerTokensReturnTheStableAuthenticationEnvelope() throws Exception {
+        mvc.perform(get("/api/v1/me").header("Authorization", "Bearer not-a-jwt"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
     @Test

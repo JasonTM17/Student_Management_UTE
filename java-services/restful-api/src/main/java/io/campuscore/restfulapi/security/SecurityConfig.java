@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.security;
 
+import io.campuscore.restfulapi.web.ApiErrorWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -20,6 +21,8 @@ import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
+import org.springframework.security.web.access.AccessDeniedHandler;
+import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
 
 @Configuration
@@ -42,7 +45,8 @@ public class SecurityConfig {
     SecurityFilterChain securityFilterChain(
             HttpSecurity http,
             CookieOrBearerTokenResolver tokenResolver,
-            CsrfCookieFilter csrfCookieFilter) throws Exception {
+            CsrfCookieFilter csrfCookieFilter,
+            ApiErrorWriter errorWriter) throws Exception {
         http
                 .csrf(AbstractHttpConfigurer::disable)
                 .cors(AbstractHttpConfigurer::disable)
@@ -59,12 +63,34 @@ public class SecurityConfig {
                         .permitAll()
                         .anyRequest()
                         .authenticated())
+                .exceptionHandling(exceptions -> exceptions
+                        .authenticationEntryPoint(authenticationEntryPoint(errorWriter))
+                        .accessDeniedHandler(accessDeniedHandler(errorWriter)))
                 .oauth2ResourceServer(oauth -> oauth
                         .bearerTokenResolver(tokenResolver)
+                        .authenticationEntryPoint(authenticationEntryPoint(errorWriter))
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .addFilterAfter(csrfCookieFilter, BearerTokenAuthenticationFilter.class);
 
         return http.build();
+    }
+
+    private AuthenticationEntryPoint authenticationEntryPoint(ApiErrorWriter errorWriter) {
+        return (request, response, exception) -> errorWriter.write(
+                request,
+                response,
+                org.springframework.http.HttpStatus.UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Authentication is required");
+    }
+
+    private AccessDeniedHandler accessDeniedHandler(ApiErrorWriter errorWriter) {
+        return (request, response, exception) -> errorWriter.write(
+                request,
+                response,
+                org.springframework.http.HttpStatus.FORBIDDEN,
+                "ACCESS_DENIED",
+                "Access denied");
     }
 
     private JwtAuthenticationConverter jwtAuthenticationConverter() {
