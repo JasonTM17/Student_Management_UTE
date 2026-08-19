@@ -49,7 +49,7 @@ export function AssistantPanel() {
   };
 
   return (
-    <div className="fixed bottom-4 right-4 z-40 w-[min(24rem,calc(100vw-2rem))] sm:bottom-6 sm:right-6">
+    <div className="fixed bottom-[5.75rem] right-4 z-50 w-[min(24rem,calc(100vw-2rem))] md:bottom-6 sm:right-6">
       {!open ? (
         <Button
           type="button"

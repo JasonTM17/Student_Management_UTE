@@ -68,7 +68,7 @@ export function AdminFrame({
   return (
     <div className="min-h-screen bg-background">
       <nav className="border-b border-border/70 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
+        <div className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-4 px-4 sm:px-6 lg:px-8">
           <div className="flex items-center gap-3">
             <BrandMark href="/admin" compact />
             <LocalizedLink
@@ -109,7 +109,7 @@ export function AdminFrame({
         className="border-b border-border/60 bg-card/80 px-4 py-2 sm:hidden"
         aria-label={messages.adminShell.mobileNavigation}
       >
-        <div className="mx-auto flex max-w-6xl gap-2 overflow-x-auto pb-0.5">
+        <div className="mx-auto flex max-w-[1280px] gap-2 overflow-x-auto pb-0.5">
           {mobileNavItems.map((item) => {
             const isActive =
               pathname === item.href ||
@@ -136,7 +136,7 @@ export function AdminFrame({
         </div>
       </nav>
 
-      <main className="mx-auto min-w-0 max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto min-w-0 max-w-[1280px] px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           eyebrow={<SectionEyebrow>{resolvedEyebrow}</SectionEyebrow>}
           title={title}

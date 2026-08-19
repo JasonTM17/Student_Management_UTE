@@ -680,7 +680,7 @@ export default function DashboardLayout({
           </>
         ) : null}
 
-        <div className="px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">
+        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-8">
           {showStudentRail ? (
             <div
               className={cn(
@@ -710,7 +710,7 @@ export default function DashboardLayout({
 
         {!isAdmin ? (
           <nav
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/95 px-2 pt-2 shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/95 px-2 pt-2 shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.45)] backdrop-blur md:hidden"
             style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
             aria-label={messages.dashboardShell.controls.mobileNavigation}
           >

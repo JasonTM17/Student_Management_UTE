@@ -5,7 +5,7 @@
 @layer base {
   :root {
     --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --background: 240 100% 99%;
+    --background: 240 100% 98.8%;
     --foreground: 220 14% 11%;
     --card: 0 0% 100%;
     --card-foreground: 220 24% 14%;
