@@ -1,0 +1,87 @@
+package io.campuscore.restfulapi;
+
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.util.List;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles("test")
+class RestfulApiContractTest {
+
+    @Autowired
+    private MockMvc mvc;
+
+    @Test
+    void livenessIsPublicAndIdentifiesTheSingleApp() throws Exception {
+        mvc.perform(get("/api/v1/health/liveness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.service").value("restful-api"));
+    }
+
+    @Test
+    void readinessRequiresTheSharedHealthKey() throws Exception {
+        mvc.perform(get("/api/v1/health/readiness"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
+        mvc.perform(get("/api/v1/health/readiness").header("X-Health-Key", "test-health-key"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ready"))
+                .andExpect(jsonPath("$.dependencies[0]").value("application-shell"));
+    }
+
+    @Test
+    void protectedRoutesRejectAnonymousRequests() throws Exception {
+        mvc.perform(get("/api/v1/me"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
+    void identityClaimsAreAvailableToEveryFutureModule() throws Exception {
+        mvc.perform(get("/api/v1/me").with(jwt().jwt(token -> token
+                        .subject("user-123")
+                        .claim("roles", List.of("STUDENT"))
+                        .claim("permissions", List.of("thesis:read"))
+                        .claim("studentId", "student-123"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subject").value("user-123"))
+                .andExpect(jsonPath("$.roles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.permissions[0]").value("thesis:read"))
+                .andExpect(jsonPath("$.studentId").value("student-123"));
+    }
+
+    @Test
+    void authenticatedMutationUsesTheStableRestContract() throws Exception {
+        mvc.perform(post("/api/v1/contract/ping")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"message\":\"shell\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ok"))
+                .andExpect(jsonPath("$.echo").value("shell"))
+                .andExpect(jsonPath("$.writer").value("restful-api-shell"));
+    }
+
+    @Test
+    void invalidMutationReturnsAStableValidationEnvelope() throws Exception {
+        mvc.perform(post("/api/v1/contract/ping")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"message\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
+                .andExpect(jsonPath("$.fields.message").value("message is required"));
+    }
+}

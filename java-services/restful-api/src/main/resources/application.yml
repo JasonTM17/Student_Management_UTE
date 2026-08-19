@@ -1,0 +1,41 @@
+spring:
+  application:
+    name: campuscore-restful-api
+  main:
+    banner-mode: off
+
+server:
+  port: ${SERVER_PORT:4010}
+  forward-headers-strategy: framework
+  error:
+    include-message: never
+    include-stacktrace: never
+
+security:
+  jwt:
+    secret: ${JWT_SECRET:}
+  access-token-cookie: ${ACCESS_TOKEN_COOKIE:cc_access_token}
+  csrf-cookie: ${CSRF_COOKIE:cc_csrf}
+  csrf-header: ${CSRF_HEADER:X-CSRF-Token}
+
+health:
+  readiness-key: ${HEALTH_READINESS_KEY:}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,prometheus
+  endpoint:
+    health:
+      probes:
+        enabled: true
+  metrics:
+    tags:
+      service: ${spring.application.name}
+
+springdoc:
+  api-docs:
+    path: /api/docs/openapi.json
+  swagger-ui:
+    path: /api/docs
