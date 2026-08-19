@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import io.campuscore.restfulapi.thesis.repository.ThesisRoundReadPort;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import java.util.List;
@@ -16,13 +17,16 @@ import org.springframework.transaction.annotation.Transactional;
 public class ThesisTopicService {
 
     private final ThesisTopicRepository topics;
+    private final ThesisRoundReadPort rounds;
 
-    public ThesisTopicService(ThesisTopicRepository topics) {
+    public ThesisTopicService(ThesisTopicRepository topics, ThesisRoundReadPort rounds) {
         this.topics = topics;
+        this.rounds = rounds;
     }
 
     @Transactional(readOnly = true)
     public List<TopicResponse> list(UUID roundId, TopicStatus status) {
+        rounds.requireExisting(roundId);
         TopicStatus requestedStatus = status == null ? TopicStatus.PUBLISHED : status;
         return topics.findAllByRoundIdAndStatusOrderByTitle(roundId, requestedStatus)
                 .stream()

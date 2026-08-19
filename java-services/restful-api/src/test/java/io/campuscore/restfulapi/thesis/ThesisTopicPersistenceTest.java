@@ -9,9 +9,12 @@ import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.ValueSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -91,6 +94,27 @@ class ThesisTopicPersistenceTest {
                         .queryParam("roundId", UUID.randomUUID().toString()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
+    void thesisReadPathRejectsUnknownRoundsInsteadOfReturningAnEmptyList() throws Exception {
+        mvc.perform(get("/api/v1/thesis/topics")
+                        .queryParam("roundId", UUID.randomUUID().toString())
+                        .with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+    }
+
+    @ParameterizedTest(name = "{0} can read an existing round")
+    @ValueSource(strings = {"STUDENT", "LECTURER", "ADMIN"})
+    void thesisReadPathPreservesAuthenticatedRoleBaseline(String role) throws Exception {
+        UUID roundId = insertRound();
+
+        mvc.perform(get("/api/v1/thesis/topics")
+                        .queryParam("roundId", roundId.toString())
+                        .with(jwt().jwt(token -> token.claim("roles", List.of(role)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isArray());
     }
 
     private UUID insertRound() {
