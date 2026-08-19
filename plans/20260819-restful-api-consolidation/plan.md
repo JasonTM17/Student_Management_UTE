@@ -141,6 +141,14 @@ the retirement gates pass.
    Kongming and Wukong again, canary by route, observe a rollback window, then
    retire old services only with explicit evidence.
 
+## Phase ledger
+
+- Phase 01 architecture contract: complete at `426e024`.
+- Phase 02 single-app shell: complete at `e086c04`; see
+  `phase-02-single-app-shell.md`.
+- Phase 03 persistence/migration seam: pending; this is the next implementation
+  boundary and must not begin with a public route switch.
+
 # Acceptance and verification
 
 Every phase records command, result, environment and limitation. The minimum
@@ -185,6 +193,7 @@ until rollback has been exercised and evidence is stored under this plan.
 # Documentation and handoff
 
 - Canonical architecture decision: `phase-01-architecture-contract.md`.
+- Single-app implementation evidence: `phase-02-single-app-shell.md`.
 - Independent review record: `reports/review-gate.md`.
 - Current topology remains documented in `docs/ARCHITECTURE.md`; this plan is a
   planned target, not a claim that cutover already happened.
