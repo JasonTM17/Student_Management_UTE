@@ -20,6 +20,13 @@ existing access-token JWTs with `JWT_SECRET`, accepts the legacy access-token
 cookie or bearer header, and applies the existing cookie CSRF contract to
 mutating requests.
 
+`contracts/thesis-public-contract.json` is the checked-in source contract for
+the 22 Java thesis mappings currently exposed by the controller. The
+`scripts/check-thesis-contract.mjs` gate also checks the eight FE bindings and
+the pilot-enabled versus production-disabled nginx fragments. It catches source
+drift only; it does not prove response, auth, database, event, or rollback
+parity.
+
 ## Migration rules
 
 1. Keep one canonical writer for each migrated domain.

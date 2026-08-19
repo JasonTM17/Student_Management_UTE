@@ -16,6 +16,8 @@ In scope:
   Postgres/Redis startup waits, and health probes.
 - Explicit nginx upstream/routes available only through the pilot overlay.
 - Kustomize preflight checks and documentation of the unpublished image gate.
+- A source-level thesis contract manifest/checker covering Java mappings, FE
+  bindings, and enabled/disabled nginx route fragments.
 
 Out of scope:
 
@@ -67,6 +69,7 @@ Run when disk headroom is restored:
 kubectl kustomize k8s/base
 kubectl kustomize k8s/overlays/thesis-pilot
 node scripts/run-k8s-preflight.mjs
+node scripts/check-thesis-contract.mjs
 mvn -f java-services/pom.xml verify
 ```
 
@@ -76,10 +79,12 @@ release readiness.
 
 ## Current status
 
-The overlay and preflight contract are implemented in the working tree after
-base commit `fdc547c8d3d42abb4e986e91c06f520c8b3aae46`. Base and pilot
-Kustomize renders, the full K8s preflight, and Compose config render PASS.
-Runtime pilot smoke, Java/Maven verification, image provenance, and apply are
-still `NOT_RUN`; C: is approximately 0.45 GB. Advisor's pre-patch review was
-conditional GO for this design and NO-GO for apply/public cutover; exact-head
-post-patch reviews remain required.
+The overlay, preflight contract, and source-level thesis contract checker are
+implemented after base commit `fdc547c8d3d42abb4e986e91c06f520c8b3aae46` and
+committed in the current candidate. Base and pilot Kustomize renders, the full
+K8s preflight, Compose config render, and `node scripts/check-thesis-contract.mjs`
+PASS. Runtime pilot smoke, Java/Maven verification, image provenance, and apply
+are still `NOT_RUN`; C: is approximately 0.56 GB. The source checker is not
+runtime parity evidence. Advisor's pre-patch review was conditional GO for this
+design and NO-GO for apply/public cutover; exact-head post-patch reviews remain
+required.
