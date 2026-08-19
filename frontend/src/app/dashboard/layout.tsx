@@ -31,6 +31,7 @@ const studentMenuItems = [
   { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
   { href: '/dashboard/invoices', icon: CreditCard, labelKey: 'invoices' },
   { href: '/dashboard/announcements', icon: Bell, labelKey: 'announcements' },
+  { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
 ];
 
 const lecturerMenuItems = [
@@ -39,6 +40,7 @@ const lecturerMenuItems = [
   { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
   { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
   { href: '/dashboard/lecturer/announcements', icon: Bell, labelKey: 'announcements' },
+  { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
 ];
 
 interface NotificationItem {
@@ -77,6 +79,19 @@ export default function DashboardLayout({
         ...item,
         label: menuLabels[item.labelKey as keyof typeof menuLabels],
       }));
+  const mobileMenuItems = isLecturer
+    ? [
+        { href: '/dashboard/lecturer', icon: LayoutDashboard, label: menuLabels.dashboard },
+        { href: '/dashboard/thesis', icon: ScrollText, label: menuLabels.thesis },
+        { href: '/dashboard/notifications', icon: Bell, label: menuLabels.notifications },
+        { href: '/dashboard/profile', icon: User, label: menuLabels.profile },
+      ]
+    : [
+        { href: '/dashboard', icon: LayoutDashboard, label: menuLabels.dashboard },
+        { href: '/dashboard/thesis', icon: ScrollText, label: menuLabels.thesis },
+        { href: '/dashboard/notifications', icon: Bell, label: menuLabels.notifications },
+        { href: '/dashboard/profile', icon: User, label: menuLabels.profile },
+      ];
 
   const pageMetadata = useMemo<Record<string, { title: string; description: string }>>(
     () => ({
@@ -112,6 +127,18 @@ export default function DashboardLayout({
         title: messages.dashboardShell.menu.thesis,
         description: messages.dashboardShell.routeDescriptions.thesis,
       },
+      '/dashboard/thesis/topics': {
+        title: messages.thesis.catalogTitle,
+        description: messages.thesis.catalogDescription,
+      },
+      '/dashboard/thesis/progress': {
+        title: messages.thesis.progressTitle,
+        description: messages.thesis.progressDescription,
+      },
+      '/dashboard/thesis/evaluation': {
+        title: messages.thesis.evaluationTitle,
+        description: messages.thesis.evaluationDescription,
+      },
       '/dashboard/invoices': {
         title: messages.dashboardShell.menu.invoices,
         description: messages.dashboardShell.routeDescriptions.invoices,
@@ -123,6 +150,10 @@ export default function DashboardLayout({
       '/dashboard/announcements': {
         title: messages.dashboardShell.menu.announcements,
         description: messages.dashboardShell.routeDescriptions.announcements,
+      },
+      '/dashboard/notifications': {
+        title: messages.dashboardShell.menu.notifications,
+        description: messages.dashboardShell.routeDescriptions.notifications,
       },
       '/dashboard/lecturer': {
         title: messages.lecturerDashboard.eyebrow,
@@ -543,11 +574,11 @@ export default function DashboardLayout({
                     </div>
                     <div className="border-t border-border/70 px-4 py-3">
                       <LocalizedLink
-                        href={isLecturer ? '/dashboard/lecturer/announcements' : '/dashboard/announcements'}
+                        href="/dashboard/notifications"
                         className="text-sm font-medium text-primary hover:underline"
                         onClick={() => setNotificationsOpen(false)}
                       >
-                        {messages.dashboardShell.notifications.openAnnouncements}
+                        {messages.dashboardShell.notifications.openNotifications}
                       </LocalizedLink>
                     </div>
                   </div>
@@ -649,7 +680,7 @@ export default function DashboardLayout({
           </>
         ) : null}
 
-        <div className="px-4 py-6 sm:px-6 lg:px-8">
+        <div className="px-4 py-6 pb-24 sm:px-6 lg:px-8 lg:pb-8">
           {showStudentRail ? (
             <div
               className={cn(
@@ -676,6 +707,51 @@ export default function DashboardLayout({
             <main>{children}</main>
           )}
         </div>
+
+        {!isAdmin ? (
+          <nav
+            className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/95 px-2 pt-2 shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.45)] backdrop-blur lg:hidden"
+            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
+            aria-label={messages.dashboardShell.controls.mobileNavigation}
+          >
+            <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
+              {mobileMenuItems.map((item) => {
+                const isActive =
+                  pathname === item.href ||
+                  (item.href !== '/dashboard' &&
+                    item.href !== '/dashboard/lecturer' &&
+                    pathname.startsWith(item.href));
+                const Icon = item.icon;
+
+                return (
+                  <LocalizedLink
+                    key={item.href}
+                    href={item.href}
+                    onClick={() => setSidebarOpen(false)}
+                    aria-label={item.label}
+                    aria-current={isActive ? 'page' : undefined}
+                    className={cn(
+                      'relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      isActive
+                        ? 'bg-primary/10 text-primary'
+                        : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
+                    )}
+                  >
+                    <span className="relative">
+                      <Icon className="h-5 w-5" />
+                      {item.href === '/dashboard/notifications' && unreadCount > 0 ? (
+                        <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--accent-warm))] px-1 text-[9px] font-bold text-white">
+                          {unreadCount > 9 ? '9+' : unreadCount}
+                        </span>
+                      ) : null}
+                    </span>
+                    <span className="max-w-full truncate">{item.label}</span>
+                  </LocalizedLink>
+                );
+              })}
+            </div>
+          </nav>
+        ) : null}
       </div>
       <AssistantPanel />
     </div>

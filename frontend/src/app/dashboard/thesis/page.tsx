@@ -4,6 +4,7 @@ import { useEffect, useState } from 'react';
 import { ArrowUpRight, CalendarDays, Check, CircleDot, FileStack, UsersRound } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -229,6 +230,31 @@ export default function ThesisPage() {
             <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
             <MetricCard label={messages.thesis.groupsTitle} value={currentGroup ? currentGroup.memberStudentIds.length : 0} icon={<Check className="h-5 w-5" />} tone="violet" />
           </div>
+
+          <Card variant="muted">
+            <CardHeader>
+              <CardTitle>{messages.thesis.lifecycleViewsTitle}</CardTitle>
+              <CardDescription>{messages.thesis.lifecycleViewsDescription}</CardDescription>
+            </CardHeader>
+            <CardContent className="grid gap-3 sm:grid-cols-3">
+              {([
+                ['catalog', '/dashboard/thesis/topics'],
+                ['progress', '/dashboard/thesis/progress'],
+                ['evaluation', '/dashboard/thesis/evaluation'],
+              ] as const).map(([key, href]) => (
+                <LocalizedLink
+                  key={key}
+                  href={href}
+                  className="group rounded-lg border border-border/70 bg-card p-4 transition-colors hover:border-primary/50 hover:bg-primary/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                >
+                  <div className="flex items-center justify-between gap-3">
+                    <span className="font-semibold text-foreground">{messages.thesis.navigation[key]}</span>
+                    <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+                  </div>
+                </LocalizedLink>
+              ))}
+            </CardContent>
+          </Card>
 
           <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
             <Card variant="muted" className="h-full">

@@ -17,6 +17,13 @@ export type ThesisGroupStatus = 'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' 
 
 export type ThesisApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
+export type ThesisCouncilStatus =
+  | 'DRAFT'
+  | 'SCHEDULED'
+  | 'SCORING_OPEN'
+  | 'FINALIZED'
+  | 'CANCELLED';
+
 export interface ThesisRound {
   id: string;
   name: string;
@@ -51,6 +58,22 @@ export interface ThesisGroup {
   memberStudentIds: string[];
 }
 
+export interface ThesisCouncilMember {
+  lecturerId: string;
+  memberRole: string;
+  memberOrder: number;
+}
+
+export interface ThesisCouncil {
+  id: string;
+  roundId: string;
+  departmentId: string;
+  scheduledAt?: string | null;
+  room?: string | null;
+  status: ThesisCouncilStatus;
+  members: ThesisCouncilMember[];
+}
+
 export interface AssistantReply {
   answer: string;
   model: string;
@@ -72,6 +95,13 @@ export const thesisApi = {
 
   listGroups: async (roundId: string): Promise<ThesisGroup[]> => {
     const response = await api.get<ThesisGroup[]>('/thesis/groups', {
+      params: { roundId },
+    });
+    return response.data;
+  },
+
+  listCouncils: async (roundId: string): Promise<ThesisCouncil[]> => {
+    const response = await api.get<ThesisCouncil[]>('/thesis/councils', {
       params: { roundId },
     });
     return response.data;

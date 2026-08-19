@@ -1,7 +1,7 @@
 'use client';
 
 import * as React from 'react';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, LogOut } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { BrandMark } from '@/components/BrandMark';
 import { LanguageToggle } from '@/components/LanguageToggle';
@@ -53,27 +53,37 @@ export function AdminFrame({
             </LocalizedLink>
           </div>
 
-          <div className="flex items-center gap-2">
+          <div className="flex shrink-0 items-center gap-2">
             <LanguageToggle />
             <ThemeToggle />
             <div className="hidden text-sm text-muted-foreground md:block">
               {user?.firstName}
             </div>
-            <Button type="button" variant="outline" onClick={() => void logout()}>
-              {messages.common.actions.signOut}
+            <Button
+              type="button"
+              variant="outline"
+              className="h-10 w-10 px-0 sm:w-auto sm:px-4"
+              onClick={() => void logout()}
+              aria-label={messages.common.actions.signOut}
+              title={messages.common.actions.signOut}
+            >
+              <LogOut className="h-4 w-4 sm:mr-2" />
+              <span className="sr-only sm:not-sr-only">
+                {messages.common.actions.signOut}
+              </span>
             </Button>
           </div>
         </div>
       </nav>
 
-      <main className="mx-auto max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
+      <main className="mx-auto min-w-0 max-w-6xl px-4 py-8 sm:px-6 lg:px-8">
         <PageHeader
           eyebrow={<SectionEyebrow>{resolvedEyebrow}</SectionEyebrow>}
           title={title}
           description={description}
           actions={actions}
         />
-        <div className="pt-8">{children}</div>
+        <div className="min-w-0 pt-8">{children}</div>
       </main>
     </div>
   );

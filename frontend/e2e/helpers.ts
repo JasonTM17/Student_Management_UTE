@@ -143,6 +143,10 @@ export const studentRoutes: RouteSpec[] = [
     },
   },
   { path: '/dashboard/announcements', heading: 'Announcements' },
+  { path: '/dashboard/notifications', heading: 'Notifications' },
+  { path: '/dashboard/thesis/topics', heading: /Published topic catalog/i },
+  { path: '/dashboard/thesis/progress', heading: /Thesis progress/i },
+  { path: '/dashboard/thesis/evaluation', heading: /Defense and evaluation/i },
   {
     path: '/dashboard/profile',
     heading: /Profile settings/i,
@@ -404,6 +408,10 @@ export const lecturerRoutes: RouteSpec[] = [
     heading: 'Announcements',
     controls: [{ role: 'link', name: lecturerBackLinkName }],
   },
+  { path: '/dashboard/notifications', heading: 'Notifications' },
+  { path: '/dashboard/thesis/topics', heading: /Published topic catalog/i },
+  { path: '/dashboard/thesis/progress', heading: /Thesis progress/i },
+  { path: '/dashboard/thesis/evaluation', heading: /Defense and evaluation/i },
 ];
 
 let loginAttemptCounter = 0;

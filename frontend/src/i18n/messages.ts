@@ -579,6 +579,7 @@ export const en = {
       transcript: 'Transcript',
       invoices: 'Invoices',
       announcements: 'Announcements',
+      notifications: 'Notifications',
       thesis: 'Thesis workspace',
       teachingSchedule: 'Teaching schedule',
       gradeManagement: 'Grade management',
@@ -594,6 +595,20 @@ export const en = {
       fallbackTitle: 'New update',
       fallbackContent: 'A new notification has arrived for your account.',
       openAnnouncements: 'Open announcements',
+      openNotifications: 'Open notifications center',
+      description:
+        'Keep account alerts, academic deadlines, and workflow updates in one focused inbox.',
+      refresh: 'Refresh notifications',
+      markAllRead: 'Mark all as read',
+      markRead: 'Mark as read',
+      unread: 'Unread',
+      all: 'All notifications',
+      read: 'Read',
+      noUnread: 'You have no unread notifications.',
+      noAll: 'Your notification inbox is empty.',
+      loadFailed: 'Notifications could not be loaded right now.',
+      updateFailed: 'The notification could not be updated. Try again.',
+      updatedCount: '{count} notifications marked as read.',
     },
     controls: {
       openSidebar: 'Open sidebar navigation',
@@ -605,6 +620,7 @@ export const en = {
       closeStudentRailOverlay: 'Close student context overlay',
       toggleNotifications: 'Toggle notifications panel',
       toggleProfile: 'Toggle profile menu',
+      mobileNavigation: 'Mobile workspace navigation',
     },
     pageDefaults: {
       description:
@@ -635,6 +651,8 @@ export const en = {
       transcript: 'View cumulative academic history and semester outcomes.',
       invoices: 'Review billing status and payment history.',
       announcements: 'Read campus-wide updates and shared notices.',
+      notifications:
+        'Review account alerts, academic deadlines, and workflow updates in one focused inbox.',
       lecturer:
         'Keep teaching tasks, grading queues, section context, and announcements in one lecturer workspace.',
       lecturerSchedule: 'Track assigned sections, rooms, and meeting windows.',
@@ -886,6 +904,41 @@ export const en = {
     noTopics: 'No published topics yet.',
     noTopicsDescription:
       'The department will publish the available directions before topic selection opens.',
+    navigation: {
+      catalog: 'Topic catalog',
+      progress: 'Thesis progress',
+      evaluation: 'Defense and evaluation',
+    },
+    catalogTitle: 'Published topic catalog',
+    catalogDescription:
+      'Scan the published directions first, then open a focused detail view before choosing a topic for your group.',
+    topicDetailTitle: 'Topic detail',
+    topicDetailDescription:
+      'Review the full topic brief, capacity, department, and current selection state.',
+    progressTitle: 'Thesis progress',
+    progressDescription:
+      'Follow the current group and registration-round state without inventing progress that the service has not recorded.',
+    progressCurrentStage: 'Current stage',
+    progressGroupRequired: 'Create or join a group to see group-specific progress.',
+    progressSteps: [
+      'Registration round selected',
+      'Thesis group prepared',
+      'Topic proposal submitted',
+      'Coordinator decision recorded',
+      'Defense and result published',
+    ],
+    evaluationTitle: 'Defense and evaluation',
+    evaluationDescription:
+      'Keep council scheduling and evaluation readiness visible while scores remain owned by the academic service.',
+    councilsTitle: 'Defense councils',
+    noCouncils: 'No defense council has been scheduled for this round yet.',
+    defenseScheduled: 'Scheduled defense',
+    room: 'Room',
+    councilStatus: 'Council status',
+    backToWorkspace: 'Back to thesis workspace',
+    lifecycleViewsTitle: 'Thesis lifecycle views',
+    lifecycleViewsDescription:
+      'Open a focused screen for topics, recorded progress, or defense readiness.',
     status: {
       DRAFT: 'Draft',
       REGISTRATION_OPEN: 'Registration open',
@@ -1505,6 +1558,7 @@ export const vi: I18nMessages = {
       transcript: 'Bảng điểm',
       invoices: 'Hóa đơn',
       announcements: 'Thông báo',
+      notifications: 'Trung tâm thông báo',
       thesis: 'Không gian luận văn',
       teachingSchedule: 'Lịch giảng dạy',
       gradeManagement: 'Quản lý điểm',
@@ -1520,6 +1574,20 @@ export const vi: I18nMessages = {
       fallbackTitle: 'Cập nhật mới',
       fallbackContent: 'Tài khoản của bạn vừa nhận một thông báo mới.',
       openAnnouncements: 'Mở trang thông báo',
+      openNotifications: 'Mở trung tâm thông báo',
+      description:
+        'Giữ cảnh báo tài khoản, hạn học vụ và cập nhật quy trình trong một hộp thư tập trung.',
+      refresh: 'Làm mới thông báo',
+      markAllRead: 'Đánh dấu đã đọc tất cả',
+      markRead: 'Đánh dấu đã đọc',
+      unread: 'Chưa đọc',
+      all: 'Tất cả thông báo',
+      read: 'Đã đọc',
+      noUnread: 'Bạn không có thông báo chưa đọc.',
+      noAll: 'Hộp thư thông báo đang trống.',
+      loadFailed: 'Hiện chưa thể tải thông báo.',
+      updateFailed: 'Không thể cập nhật thông báo này. Hãy thử lại.',
+      updatedCount: 'Đã đánh dấu {count} thông báo là đã đọc.',
     },
     controls: {
       openSidebar: 'Mở điều hướng sidebar',
@@ -1531,6 +1599,7 @@ export const vi: I18nMessages = {
       closeStudentRailOverlay: 'Đóng lớp phủ cột ngữ cảnh sinh viên',
       toggleNotifications: 'Bật tắt bảng thông báo',
       toggleProfile: 'Bật tắt menu hồ sơ',
+      mobileNavigation: 'Điều hướng workspace trên mobile',
     },
     pageDefaults: {
       description:
@@ -1561,6 +1630,8 @@ export const vi: I18nMessages = {
       transcript: 'Xem lịch sử học tập tích lũy và kết quả theo học kỳ.',
       invoices: 'Xem tình trạng hóa đơn và lịch sử thanh toán.',
       announcements: 'Đọc các cập nhật dùng chung trên toàn campus.',
+      notifications:
+        'Xem cảnh báo tài khoản, hạn học vụ và cập nhật quy trình trong một hộp thư tập trung.',
       lecturer:
         'Giữ tác vụ giảng dạy, hàng chờ chấm điểm, ngữ cảnh section và thông báo trong cùng một không gian giảng viên.',
       lecturerSchedule: 'Theo dõi section được giao, phòng học và khung giờ lên lớp.',
@@ -1812,6 +1883,41 @@ export const vi: I18nMessages = {
     noTopics: 'Chưa có đề tài được công bố.',
     noTopicsDescription:
       'Bộ môn sẽ công bố các hướng đề tài trước khi mở bước lựa chọn.',
+    navigation: {
+      catalog: 'Danh mục đề tài',
+      progress: 'Tiến độ luận văn',
+      evaluation: 'Bảo vệ và đánh giá',
+    },
+    catalogTitle: 'Danh mục đề tài đã công bố',
+    catalogDescription:
+      'Xem nhanh các hướng đã công bố, sau đó mở chi tiết trước khi chọn đề tài cho nhóm.',
+    topicDetailTitle: 'Chi tiết đề tài',
+    topicDetailDescription:
+      'Xem đầy đủ mô tả, số nhóm tối đa, bộ môn và trạng thái lựa chọn hiện tại.',
+    progressTitle: 'Tiến độ luận văn',
+    progressDescription:
+      'Theo dõi trạng thái nhóm và đợt đăng ký hiện tại mà không tự suy diễn dữ liệu dịch vụ chưa ghi nhận.',
+    progressCurrentStage: 'Giai đoạn hiện tại',
+    progressGroupRequired: 'Hãy tạo hoặc tham gia nhóm để xem tiến độ gắn với nhóm.',
+    progressSteps: [
+      'Đã chọn đợt đăng ký',
+      'Đã chuẩn bị nhóm luận văn',
+      'Đã gửi đề xuất đề tài',
+      'Đã ghi nhận quyết định điều phối',
+      'Đã công bố lịch bảo vệ và kết quả',
+    ],
+    evaluationTitle: 'Bảo vệ và đánh giá',
+    evaluationDescription:
+      'Giữ lịch hội đồng và trạng thái sẵn sàng đánh giá trong tầm nhìn, còn điểm số vẫn thuộc quyền sở hữu của academic service.',
+    councilsTitle: 'Hội đồng bảo vệ',
+    noCouncils: 'Chưa có hội đồng bảo vệ nào được xếp lịch cho đợt này.',
+    defenseScheduled: 'Lịch bảo vệ',
+    room: 'Phòng',
+    councilStatus: 'Trạng thái hội đồng',
+    backToWorkspace: 'Quay lại không gian luận văn',
+    lifecycleViewsTitle: 'Các màn hình trong vòng đời luận văn',
+    lifecycleViewsDescription:
+      'Mở màn hình tập trung cho đề tài, tiến độ đã ghi nhận hoặc trạng thái sẵn sàng bảo vệ.',
     status: {
       DRAFT: 'Bản nháp',
       REGISTRATION_OPEN: 'Đang mở đăng ký',

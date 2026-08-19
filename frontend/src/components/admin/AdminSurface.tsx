@@ -126,12 +126,12 @@ export function AdminTableCard({
   contentClassName,
 }: AdminTableCardProps) {
   return (
-    <Card variant="elevated" className={className}>
-      <CardHeader>
+    <Card variant="elevated" className={cn('min-w-0', className)}>
+      <CardHeader className="min-w-0">
         <CardTitle>{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
-      <CardContent className={cn('space-y-0', contentClassName)}>
+      <CardContent className={cn('min-w-0 space-y-0', contentClassName)}>
         {children}
         {footer ? footer : null}
       </CardContent>
@@ -148,7 +148,11 @@ export function AdminTableScroll({
   children,
   className,
 }: AdminTableScrollProps) {
-  return <div className={cn('overflow-x-auto', className)}>{children}</div>;
+  return (
+    <div className={cn('min-w-0 max-w-full overflow-x-auto', className)}>
+      {children}
+    </div>
+  );
 }
 
 interface AdminPaginationFooterProps {

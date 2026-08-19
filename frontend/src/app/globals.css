@@ -4,33 +4,33 @@
 
 @layer base {
   :root {
-    --font-sans: system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --background: 24 20% 97%;
-    --foreground: 220 24% 14%;
+    --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --background: 240 100% 99%;
+    --foreground: 220 14% 11%;
     --card: 0 0% 100%;
     --card-foreground: 220 24% 14%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 24% 14%;
-    --primary: 220 33% 18%;
-    --primary-foreground: 24 20% 97%;
-    --secondary: 30 18% 92%;
-    --secondary-foreground: 220 20% 18%;
-    --muted: 24 14% 93%;
-    --muted-foreground: 218 11% 43%;
-    --accent: 197 73% 44%;
-    --accent-foreground: 210 40% 98%;
-    --destructive: 0 72% 53%;
-    --destructive-foreground: 210 40% 98%;
-    --border: 24 12% 84%;
-    --input: 24 12% 84%;
-    --ring: 197 73% 44%;
+    --primary: 212 100% 26.5%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 214 73% 90%;
+    --secondary-foreground: 214 64% 12%;
+    --muted: 236 68% 97%;
+    --muted-foreground: 220 13% 29%;
+    --accent: 212 100% 35%;
+    --accent-foreground: 0 0% 100%;
+    --destructive: 0 75% 41%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 226 17% 80%;
+    --input: 226 17% 80%;
+    --ring: 212 100% 35%;
     --radius: 0.5rem;
-    --canvas-subtle: 30 18% 94%;
+    --canvas-subtle: 236 68% 97%;
     --surface-raised: 0 0% 100%;
-    --surface-alt: 32 18% 95%;
-    --ink-soft: 220 16% 26%;
-    --accent-warm: 22 84% 52%;
-    --accent-cool: 197 73% 44%;
+    --surface-alt: 236 68% 97%;
+    --ink-soft: 220 13% 29%;
+    --accent-warm: 36 88% 48%;
+    --accent-cool: 212 100% 35%;
     --success: 152 57% 38%;
   }
 

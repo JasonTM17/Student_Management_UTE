@@ -1,4 +1,8 @@
 import "./globals.css";
+import "@fontsource/be-vietnam-pro/400.css";
+import "@fontsource/be-vietnam-pro/500.css";
+import "@fontsource/be-vietnam-pro/600.css";
+import "@fontsource/be-vietnam-pro/700.css";
 import type { Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
@@ -16,7 +20,7 @@ export const dynamic = 'force-dynamic';
 
 export const viewport: Viewport = {
   themeColor: [
-    { media: '(prefers-color-scheme: light)', color: '#f7f4ef' },
+    { media: '(prefers-color-scheme: light)', color: '#F9F9FF' },
     { media: '(prefers-color-scheme: dark)', color: '#12161d' },
   ],
 };

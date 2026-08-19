@@ -339,6 +339,7 @@ function collectCoveredE2ERoutes() {
   const coveredRoutes = new Set([
     '/admin',
     '/dashboard/thesis',
+    '/dashboard/thesis/topics/[id]',
     '/dashboard/lecturer/grades/[id]',
     '/dashboard/sign-out',
   ]);
@@ -463,11 +464,14 @@ test('ThemeProvider always renders through the context provider', () => {
   );
 });
 
-test('dashboard chrome no longer exposes dead internal links', () => {
+test('dashboard chrome exposes the implemented notifications center', () => {
   const source = read('src/app/dashboard/layout.tsx');
 
   assert.doesNotMatch(source, /\/admin\/students/);
-  assert.doesNotMatch(source, /\/dashboard\/notifications/);
+  assert.match(source, /\/dashboard\/notifications/);
+  assert.ok(
+    fs.existsSync(path.join(root, 'src', 'app', 'dashboard', 'notifications', 'page.tsx')),
+  );
   assert.doesNotMatch(source, /\/dashboard\/settings/);
   assert.match(
     source,
@@ -600,7 +604,7 @@ test('root layout uses a stable internal font stack for Vietnamese UI copy', () 
   const globalsSource = read('src/app/globals.css');
 
   assert.doesNotMatch(layoutSource, /next\/font\/google/);
-  assert.match(globalsSource, /--font-sans:\s*system-ui,\s*"Segoe UI",\s*Roboto,\s*"Helvetica Neue",\s*Arial,\s*sans-serif;/);
+  assert.match(globalsSource, /--font-sans:\s*"Be Vietnam Pro",\s*system-ui,\s*"Segoe UI",\s*Roboto,\s*"Helvetica Neue",\s*Arial,\s*sans-serif;/);
   assert.match(globalsSource, /font-family:\s*var\(--font-sans\),/);
   assert.match(globalsSource, /button,\s*[\r\n]+\s*input,\s*[\r\n]+\s*select,\s*[\r\n]+\s*textarea\s*\{/);
 });

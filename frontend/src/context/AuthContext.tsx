@@ -6,6 +6,7 @@ import React, {
   useCallback,
   useContext,
   useEffect,
+  useMemo,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
@@ -116,6 +117,13 @@ export function useRequireAuth(
   const { href } = useI18n();
   const [hasAccess, setHasAccess] = useState(false);
   const rolesKey = requiredRoles?.join(',') ?? '';
+  const requiredRolesList = useMemo(
+    () =>
+      rolesKey
+        ? (rolesKey.split(',') as ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[])
+        : [],
+    [rolesKey],
+  );
 
   useEffect(() => {
     if (isLoading || isLoggingOut) {
@@ -129,8 +137,8 @@ export function useRequireAuth(
       return;
     }
 
-    if (requiredRoles && requiredRoles.length > 0) {
-      const hasRole = requiredRoles.some((role) => {
+    if (requiredRolesList.length > 0) {
+      const hasRole = requiredRolesList.some((role) => {
         if (role === 'ADMIN') {
           return user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN');
         }
@@ -150,7 +158,7 @@ export function useRequireAuth(
     }
 
     setHasAccess(true);
-  }, [href, user, isLoading, isLoggingOut, rolesKey, router]);
+  }, [href, user, isLoading, isLoggingOut, requiredRolesList, router]);
 
   return { user, isLoading, hasAccess };
 }

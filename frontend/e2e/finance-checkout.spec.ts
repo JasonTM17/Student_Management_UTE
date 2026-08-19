@@ -1,7 +1,8 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type APIRequestContext } from '@playwright/test';
 import {
   apiUrl,
   buildCookieHeaders,
+  buildMutatingSessionHeaders,
   expectOkResponse,
   getSharedSessionArtifacts,
   seedBrowserSession,
@@ -11,6 +12,79 @@ function escapeForRegExp(value: string) {
   return value.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
 
+type InvoiceSummary = {
+  id: string;
+  invoiceNumber: string;
+  status: string;
+  balance: number;
+  semesterId?: string;
+};
+
+async function listStudentInvoices(
+  studentApi: APIRequestContext,
+  session: Awaited<ReturnType<typeof getSharedSessionArtifacts>>,
+) {
+  const invoicesResponse = await studentApi.get(apiUrl('/finance/my/invoices'), {
+    headers: buildCookieHeaders(session),
+  });
+  await expectOkResponse(invoicesResponse, 'GET /finance/my/invoices');
+  return (await invoicesResponse.json()) as InvoiceSummary[];
+}
+
+async function ensureCheckoutInvoice(
+  playwright: Parameters<typeof getSharedSessionArtifacts>[0],
+  studentApi: APIRequestContext,
+) {
+  const session = await getSharedSessionArtifacts(playwright, 'student');
+  const invoices = await listStudentInvoices(studentApi, session);
+  const outstandingInvoice = invoices.find((invoice) => invoice.balance > 0);
+
+  if (outstandingInvoice) {
+    return { session, targetInvoice: outstandingInvoice };
+  }
+
+  const studentId = session.authData.user.studentId as string | undefined;
+  const semesterId = invoices.find((invoice) => invoice.semesterId)?.semesterId;
+  expect(
+    studentId,
+    'Expected seeded student session to expose a student profile id',
+  ).toBeTruthy();
+  expect(
+    semesterId,
+    'Expected seeded finance data to expose at least one semester id',
+  ).toBeTruthy();
+
+  const adminSession = await getSharedSessionArtifacts(playwright, 'admin');
+  const createInvoiceResponse = await studentApi.post(apiUrl('/finance/invoices'), {
+    headers: buildMutatingSessionHeaders(adminSession, {
+      Authorization: `Bearer ${adminSession.authData.accessToken}`,
+    }),
+    data: {
+      studentId,
+      semesterId,
+      dueDate: new Date(Date.now() + 1000 * 60 * 60 * 24 * 30).toISOString(),
+      notes:
+        'E2E checkout fixture: recreated when a previous run paid every outstanding seeded invoice.',
+      items: [
+        {
+          description: 'E2E checkout regression balance',
+          quantity: 1,
+          unitPrice: 42,
+        },
+      ],
+    },
+  });
+  await expectOkResponse(
+    createInvoiceResponse,
+    'POST /finance/invoices checkout fixture',
+  );
+
+  const targetInvoice = (await createInvoiceResponse.json()) as InvoiceSummary;
+  expect(targetInvoice.balance).toBeGreaterThan(0);
+
+  return { session, targetInvoice };
+}
+
 test('student checkout can switch providers before completing the sandbox handoff', async ({
   page,
   playwright,
@@ -18,24 +92,10 @@ test('student checkout can switch providers before completing the sandbox handof
   const studentApi = await playwright.request.newContext();
 
   try {
-    const session = await getSharedSessionArtifacts(playwright, 'student');
-    const invoicesResponse = await studentApi.get(apiUrl('/finance/my/invoices'), {
-      headers: buildCookieHeaders(session),
-    });
-    await expectOkResponse(invoicesResponse, 'GET /finance/my/invoices');
-
-    const invoices = (await invoicesResponse.json()) as Array<{
-      id: string;
-      invoiceNumber: string;
-      status: string;
-      balance: number;
-    }>;
-    const targetInvoice = invoices.find((invoice) => invoice.balance > 0);
-
-    expect(
-      targetInvoice,
-      'Expected at least one invoice with an outstanding balance',
-    ).toBeTruthy();
+    const { session, targetInvoice } = await ensureCheckoutInvoice(
+      playwright,
+      studentApi,
+    );
 
     await seedBrowserSession(page, playwright, 'student', { shared: true });
     await page.goto('/dashboard/invoices');
@@ -44,7 +104,7 @@ test('student checkout can switch providers before completing the sandbox handof
       .getByRole('button', {
         name: new RegExp(
           `View details for invoice ${escapeForRegExp(
-            targetInvoice!.invoiceNumber,
+            targetInvoice.invoiceNumber,
           )}`,
           'i',
         ),
@@ -93,7 +153,7 @@ test('student checkout can switch providers before completing the sandbox handof
     ).toBeVisible();
 
     const detailResponse = await studentApi.get(
-      apiUrl(`/finance/my/invoices/${targetInvoice!.id}`),
+      apiUrl(`/finance/my/invoices/${targetInvoice.id}`),
       {
         headers: buildCookieHeaders(session),
       },
