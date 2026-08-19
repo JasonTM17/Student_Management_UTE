@@ -11,6 +11,10 @@ const controller = readText(
 );
 const thesisClient = readText('frontend/src/lib/thesis-api.ts');
 const apiClient = readText('frontend/src/lib/api.ts');
+const securityConfig = readText(
+  'java-services/thesis-service/src/main/java/io/campuscore/thesis/config/SecurityConfig.java',
+);
+const pilotDeployment = readText('k8s/overlays/thesis-pilot/thesis-service.yaml');
 const enabledRoutes = readText('nginx/thesis-pilot-routes.conf');
 const disabledRoutes = readText('nginx/thesis-pilot-routes.disabled.conf');
 const disabledUpstream = readText('nginx/thesis-pilot-upstream.disabled.conf');
@@ -68,6 +72,25 @@ if (!apiClient.includes("process.env.NEXT_PUBLIC_API_URL || '/api/v1'")) {
   failures.push('Frontend API client no longer defaults to the /api/v1 gateway base.');
 }
 
+for (const [label, contents, marker] of [
+  ['Java security config', securityConfig, '"/api/v1/health/**"'],
+  ['Java security config', securityConfig, '"/actuator/prometheus"'],
+  ['thesis pilot deployment', pilotDeployment, 'image: campuscore-thesis-service:pilot-local'],
+  ['thesis pilot deployment', pilotDeployment, 'imagePullPolicy: IfNotPresent'],
+  ['thesis pilot deployment', pilotDeployment, 'runAsNonRoot: true'],
+  ['thesis pilot deployment', pilotDeployment, 'runAsUser: 10001'],
+  ['thesis pilot deployment', pilotDeployment, 'prometheus.io/path: /actuator/prometheus'],
+  ['thesis pilot deployment', pilotDeployment, 'prometheus.io/port: "4010"'],
+  ['thesis pilot deployment', pilotDeployment, 'MANAGEMENT_ENDPOINTS_WEB_EXPOSURE_INCLUDE'],
+  ['thesis pilot deployment', pilotDeployment, 'value: health,info,prometheus'],
+  ['thesis pilot deployment', pilotDeployment, 'X-Health-Key: $HEALTH_READINESS_KEY'],
+  ['thesis pilot deployment', pilotDeployment, '/api/v1/health/readiness'],
+]) {
+  if (!contents.includes(marker)) {
+    failures.push(`${label} is missing required pilot marker ${marker}.`);
+  }
+}
+
 for (const marker of [
   `location = ${contract.gateway.enabledRoute}`,
   `location ^~ ${contract.gateway.enabledPrefixRoute}`,
@@ -98,10 +121,10 @@ if (failures.length > 0) {
 
 const clientBindings = contract.endpoints.filter((endpoint) => endpoint.clientSource).length;
 console.log(
-  `[thesis-contract] PASS: ${contract.endpoints.length} Java endpoints, ${clientBindings} FE bindings, and pilot/production gateway markers are aligned.`,
+  `[thesis-contract] PASS: ${contract.endpoints.length} Java endpoints, ${clientBindings} FE bindings, pilot security/readiness/observability markers, and pilot/production gateway markers are aligned.`,
 );
 console.log(
-  '[thesis-contract] Static source contract only; runtime response, auth, mutation, data, and rollback parity remain separate gates.',
+  '[thesis-contract] Static source contract only; runtime response, auth, mutation, data, image provenance, and rollback parity remain separate gates.',
 );
 
 function readText(relativePath) {
