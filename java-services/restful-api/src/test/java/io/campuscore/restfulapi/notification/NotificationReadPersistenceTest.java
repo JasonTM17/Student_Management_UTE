@@ -20,7 +20,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
-@TestPropertySource(properties = "migration.notifications-read.enabled=true")
+@TestPropertySource(properties = {
+        "migration.thesis-read.enabled=false",
+        "migration.notifications-read.enabled=true",
+        "spring.flyway.enabled=false"
+})
 class NotificationReadPersistenceTest {
 
     private static final String STUDENT = "student-user-1";

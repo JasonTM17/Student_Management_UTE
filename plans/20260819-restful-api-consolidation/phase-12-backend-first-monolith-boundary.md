@@ -79,3 +79,23 @@ no unrelated worktree changes.
 Rollback is a small source revert of the reactor metadata only. It does not
 need to restart or reroute a runtime because this phase intentionally makes no
 runtime change.
+
+## Follow-up safety repair — notification-only startup
+
+After the canonical-reactor commit, a bounded Wukong probe falsified the broader
+claim that every read candidate could start in isolation: notification tests
+were still masked by thesis/Flyway defaults. The repair generalizes the
+read-only migration safety seam so both engagement and notification read flags
+disable Hibernate schema management and reject accidental Flyway execution.
+
+The focused source/H2 gate is:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=NotificationReadPersistenceTest,MigrationSafetyConfigTest' test
+```
+
+It passes with `migration.thesis-read.enabled=false`,
+`migration.notifications-read.enabled=true`, and `spring.flyway.enabled=false`,
+so notification read startup is no longer relying on a test-created thesis
+schema. This is still source/H2 evidence only; it does not prove PostgreSQL
+runtime parity, shared-database isolation, canary, rollback, or cutover.

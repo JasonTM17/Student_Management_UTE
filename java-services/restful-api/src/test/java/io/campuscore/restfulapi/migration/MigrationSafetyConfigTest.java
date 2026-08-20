@@ -10,21 +10,21 @@ import org.junit.jupiter.api.Test;
 class MigrationSafetyConfigTest {
 
     @Test
-    void engagementReadStrategyRefusesFlywayMigration() {
+    void readOnlyCandidateStrategyRefusesFlywayMigration() {
         MigrationSafetyConfig config = new MigrationSafetyConfig();
 
         assertThrows(
                 IllegalStateException.class,
-                () -> config.rejectFlywayForEngagementRead().migrate(null));
+                () -> config.rejectFlywayForReadOnlyCandidates().migrate(null));
     }
 
     @Test
-    void engagementReadDisablesHibernateSchemaManagement() {
+    void readOnlyCandidateDisablesHibernateSchemaManagement() {
         MigrationSafetyConfig config = new MigrationSafetyConfig();
         Map<String, Object> properties = new HashMap<>();
         properties.put("hibernate.hbm2ddl.auto", "validate");
 
-        config.disableHibernateSchemaManagementForEngagementRead().customize(properties);
+        config.disableHibernateSchemaManagementForReadOnlyCandidates().customize(properties);
 
         assertEquals("none", properties.get("hibernate.hbm2ddl.auto"));
     }
