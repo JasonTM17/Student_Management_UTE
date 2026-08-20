@@ -197,7 +197,12 @@ class AcademicEnrollmentReadPersistenceTest {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."AcademicYear" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "year" INTEGER NOT NULL
+                    "year" INTEGER NOT NULL,
+                    "startDate" TIMESTAMP NOT NULL,
+                    "endDate" TIMESTAMP NOT NULL,
+                    "isCurrent" BOOLEAN NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
         jdbc.execute("""
@@ -208,7 +213,15 @@ class AcademicEnrollmentReadPersistenceTest {
                     "nameVi" VARCHAR(120),
                     "type" VARCHAR(40) NOT NULL,
                     "academicYearId" VARCHAR(120) NOT NULL,
-                    "startDate" TIMESTAMP NOT NULL
+                    "startDate" TIMESTAMP NOT NULL,
+                    "endDate" TIMESTAMP NOT NULL,
+                    "registrationStart" TIMESTAMP,
+                    "registrationEnd" TIMESTAMP,
+                    "addDropStart" TIMESTAMP,
+                    "addDropEnd" TIMESTAMP,
+                    "status" VARCHAR(40) NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
         jdbc.execute("""
@@ -218,7 +231,15 @@ class AcademicEnrollmentReadPersistenceTest {
                     "name" VARCHAR(200) NOT NULL,
                     "nameEn" VARCHAR(200),
                     "nameVi" VARCHAR(200),
-                    "credits" INTEGER NOT NULL
+                    "description" VARCHAR(1000),
+                    "descriptionEn" VARCHAR(1000),
+                    "descriptionVi" VARCHAR(1000),
+                    "credits" INTEGER NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120),
+                    "isActive" BOOLEAN NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
         jdbc.execute("""
@@ -318,16 +339,37 @@ class AcademicEnrollmentReadPersistenceTest {
                 "department-1",
                 "L001",
                 true);
-        jdbc.update("INSERT INTO \"academic\".\"AcademicYear\" (\"id\", \"year\") VALUES (?, ?)", "ay-2026", 2026);
         jdbc.update(
-                "INSERT INTO \"academic\".\"Semester\" (\"id\", \"name\", \"nameEn\", \"nameVi\", \"type\", \"academicYearId\", \"startDate\")"
+                "INSERT INTO \"academic\".\"AcademicYear\""
+                        + " (\"id\", \"year\", \"startDate\", \"endDate\", \"isCurrent\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                "ay-2026",
+                2026,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME.plusSeconds(31_536_000)),
+                true,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Semester\""
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"type\", \"academicYearId\", \"startDate\","
+                        + " \"endDate\", \"registrationStart\", \"registrationEnd\", \"addDropStart\", \"addDropEnd\","
+                        + " \"status\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 "semester-1",
                 "Fall 2026",
                 "Fall 2026",
                 "Hoc ky Thu 2026",
                 "FALL",
                 "ay-2026",
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME.plusSeconds(10_368_000)),
+                null,
+                null,
+                null,
+                null,
+                "ACTIVE",
+                localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
         insertCourse("course-1", "CS101", "Intro", null, null, 4);
         insertCourse("course-2", "SE401", "Web Development", "Web Development", "Lap trinh web", 3);
@@ -389,13 +431,23 @@ class AcademicEnrollmentReadPersistenceTest {
     private void insertCourse(String id, String code, String name, String nameEn, String nameVi, int credits) {
         jdbc.update(
                 "INSERT INTO \"academic\".\"Course\""
-                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"credits\") VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\","
+                        + " \"descriptionVi\", \"credits\", \"departmentId\", \"semesterId\", \"isActive\","
+                        + " \"createdAt\", \"updatedAt\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id,
                 code,
                 name,
                 nameEn,
                 nameVi,
-                credits);
+                null,
+                null,
+                null,
+                credits,
+                "department-1",
+                "semester-1",
+                true,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
     }
 
     private void insertSection(String id, String sectionNumber, String courseId) {
