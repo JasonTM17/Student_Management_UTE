@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.engagement.web;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -11,7 +12,9 @@ import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -37,6 +40,14 @@ public class AnnouncementWriteController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateAnnouncementRequest request) {
         return announcements.create(subject(jwt), request);
+    }
+
+    @PutMapping("{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public AnnouncementResponse update(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateAnnouncementRequest request) {
+        return announcements.update(id, request);
     }
 
     private static String subject(Jwt jwt) {

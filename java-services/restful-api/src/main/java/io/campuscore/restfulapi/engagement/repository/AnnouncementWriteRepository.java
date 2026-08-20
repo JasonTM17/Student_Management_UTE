@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.LecturerSumm
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SectionSummary;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSummary;
 import java.sql.Array;
+import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -82,12 +83,117 @@ public class AnnouncementWriteRepository {
                 .orElseThrow(() -> new IllegalStateException("created announcement was not found"));
     }
 
+    public void update(UpdateAnnouncementCommand command) {
+        List<String> assignments = new ArrayList<>();
+        List<SqlBinder> binders = new ArrayList<>();
+        addString(assignments, binders, "title", command.title());
+        addString(assignments, binders, "content", command.content());
+        addString(assignments, binders, "priority", command.priority());
+        addStringArray(assignments, binders, "targetRoles", command.targetRoles());
+        addIntegerArray(assignments, binders, "targetYears", command.targetYears());
+        addBoolean(assignments, binders, "isGlobal", command.isGlobal());
+        addInstant(assignments, binders, "publishAt", command.publishAt());
+        addInstant(assignments, binders, "expiresAt", command.expiresAt());
+        addString(assignments, binders, "semesterId", command.semesterId());
+        clearString(assignments, binders, command.semesterId(), "semesterName");
+        addString(assignments, binders, "sectionId", command.sectionId());
+        clearString(assignments, binders, command.sectionId(), "sectionNumber");
+        clearString(assignments, binders, command.sectionId(), "courseCode");
+        clearString(assignments, binders, command.sectionId(), "courseName");
+        addString(assignments, binders, "lecturerId", command.lecturerId());
+        clearString(assignments, binders, command.lecturerId(), "lecturerDisplayName");
+        assignments.add("\"updatedAt\" = ?");
+        binders.add((statement, index, ignored) -> timestamp(statement, index, command.updatedAt()));
+
+        jdbc.getJdbcOperations().execute((ConnectionCallback<Void>) connection -> {
+            String sql = "UPDATE \"engagement\".\"Announcement\" SET "
+                    + String.join(", ", assignments) + " WHERE \"id\" = ?";
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                int index = 1;
+                for (SqlBinder binder : binders) {
+                    binder.bind(statement, index++, connection);
+                }
+                statement.setString(index, command.id());
+                statement.executeUpdate();
+            }
+            return null;
+        });
+    }
+
     public Optional<AnnouncementResponse> findById(String id) {
         List<AnnouncementResponse> announcements = jdbc.query(
                 "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + " WHERE \"id\" = :id",
                 new MapSqlParameterSource("id", id),
                 AnnouncementWriteRepository::mapRow);
         return announcements.stream().findFirst();
+    }
+
+    private static void addString(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String column,
+            String value) {
+        if (value != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, ignored) -> statement.setString(index, value));
+        }
+    }
+
+    private static void clearString(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String ownerValue,
+            String column) {
+        if (ownerValue != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, ignored) -> statement.setNull(index, Types.VARCHAR));
+        }
+    }
+
+    private static void addStringArray(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String column,
+            List<String> values) {
+        if (values != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, connection) ->
+                    statement.setArray(index, connection.createArrayOf("VARCHAR", values.toArray())));
+        }
+    }
+
+    private static void addIntegerArray(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String column,
+            List<Integer> values) {
+        if (values != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, connection) ->
+                    statement.setArray(index, connection.createArrayOf("INTEGER", values.toArray())));
+        }
+    }
+
+    private static void addBoolean(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String column,
+            Boolean value) {
+        if (value != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, ignored) -> statement.setBoolean(index, value));
+        }
+    }
+
+    private static void addInstant(
+            List<String> assignments,
+            List<SqlBinder> binders,
+            String column,
+            Instant value) {
+        if (value != null) {
+            assignments.add("\"" + column + "\" = ?");
+            binders.add((statement, index, ignored) -> timestamp(statement, index, value));
+        }
     }
 
     private static void timestamp(PreparedStatement statement, int index, Instant value)
@@ -200,5 +306,26 @@ public class AnnouncementWriteRepository {
             String sectionId,
             String lecturerId,
             Instant createdAt) {
+    }
+
+    public record UpdateAnnouncementCommand(
+            String id,
+            String title,
+            String content,
+            String priority,
+            List<String> targetRoles,
+            List<Integer> targetYears,
+            Boolean isGlobal,
+            Instant publishAt,
+            Instant expiresAt,
+            String semesterId,
+            String sectionId,
+            String lecturerId,
+            Instant updatedAt) {
+    }
+
+    @FunctionalInterface
+    private interface SqlBinder {
+        void bind(PreparedStatement statement, int index, Connection connection) throws SQLException;
     }
 }

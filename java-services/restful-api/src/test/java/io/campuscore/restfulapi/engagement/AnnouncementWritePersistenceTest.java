@@ -2,9 +2,11 @@ package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -25,6 +27,8 @@ import org.springframework.test.web.servlet.MockMvc;
         "spring.flyway.enabled=false"
 })
 class AnnouncementWritePersistenceTest {
+
+    private static final Instant BASE_TIME = Instant.parse("2026-08-20T00:00:00Z");
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -205,11 +209,133 @@ class AnnouncementWritePersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
+    @Test
+    void adminUpdatesAnnouncementPartiallyWithoutChangingPublisherOrInventingNames() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "title": "Updated title",
+                                  "content": "",
+                                  "priority": "URGENT",
+                                  "targetRoles": ["STUDENT"],
+                                  "targetYears": [2],
+                                  "isGlobal": true,
+                                  "publishAt": "2026-08-21T08:00:00Z",
+                                  "expiresAt": "2026-09-21T08:00:00Z",
+                                  "semesterId": "semester-2",
+                                  "sectionId": "section-2",
+                                  "lecturerId": "lecturer-2"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("existing-announcement"))
+                .andExpect(jsonPath("$.title").value("Updated title"))
+                .andExpect(jsonPath("$.content").value(""))
+                .andExpect(jsonPath("$.priority").value("URGENT"))
+                .andExpect(jsonPath("$.targetRoles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.targetYears[0]").value(2))
+                .andExpect(jsonPath("$.isGlobal").value(true))
+                .andExpect(jsonPath("$.publishAt").value("2026-08-21T08:00:00.000Z"))
+                .andExpect(jsonPath("$.expiresAt").value("2026-09-21T08:00:00.000Z"))
+                .andExpect(jsonPath("$.publishedBy").value("admin-1"))
+                .andExpect(jsonPath("$.semesterId").value("semester-2"))
+                .andExpect(jsonPath("$.semester").doesNotExist())
+                .andExpect(jsonPath("$.sectionId").value("section-2"))
+                .andExpect(jsonPath("$.section").exists())
+                .andExpect(jsonPath("$.lecturer.id").value("lecturer-2"))
+                .andExpect(jsonPath("$.lecturer.displayName").doesNotExist());
+
+        Integer updated = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement' AND \"title\" = 'Updated title'"
+                        + " AND \"content\" = '' AND \"priority\" = 'URGENT'"
+                        + " AND \"publishedBy\" = 'admin-1' AND CARDINALITY(\"targetRoles\") = 1"
+                        + " AND CARDINALITY(\"targetYears\") = 1 AND \"createdAt\" = ?"
+                        + " AND \"updatedAt\" > ?",
+                Integer.class,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
+        org.junit.jupiter.api.Assertions.assertEquals(1, updated);
+    }
+
+    @Test
+    void updateBoundaryFailsClosedForStudentMissingAnnouncementAndInvalidValues() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("student-1")
+                                        .claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Nope\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(put("/api/v1/announcements/missing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Missing\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"priority\":\"CRITICAL\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"targetYears\":[0]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt(String subject) {
         return jwt()
                 .jwt(token -> token
                         .subject(subject)
                         .claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private void seedAnnouncement() {
+        jdbc.update(
+                "INSERT INTO \"engagement\".\"Announcement\""
+                        + " (\"id\", \"title\", \"content\", \"priority\", \"targetRoles\", \"targetYears\","
+                        + " \"isGlobal\", \"publishAt\", \"expiresAt\", \"publishedBy\", \"semesterId\","
+                        + " \"semesterName\", \"sectionId\", \"sectionNumber\", \"courseCode\", \"courseName\","
+                        + " \"lecturerId\", \"lecturerDisplayName\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ARRAY['ADMIN'], ARRAY[1], ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "existing-announcement",
+                "Original title",
+                "Original content",
+                "NORMAL",
+                false,
+                null,
+                null,
+                "admin-1",
+                "semester-1",
+                "Semester 1",
+                "section-1",
+                "01",
+                "CS101",
+                "Web Programming",
+                "lecturer-1",
+                "Lecturer One",
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
+    }
+
+    private static java.time.LocalDateTime localDateTime(Instant value) {
+        return java.time.LocalDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
     }
 }

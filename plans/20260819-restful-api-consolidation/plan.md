@@ -300,6 +300,13 @@ the retirement gates pass.
   publisher, target arrays, optional publish/expiry windows and response shape.
   RabbitMQ announcement-created publication, PostgreSQL write rehearsal, canary
   routing, rollback and public writer handoff remain open.
+- Phase 27 backend-first engagement announcement update foundation:
+  source candidate/HOLD; see `phase-27-engagement-announcement-update.md`.
+  It adds feature-default-off Java `PUT /api/v1/announcements/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving partial legacy field updates, unchanged
+  publisher/created timestamp, updated timestamp behavior and the shared
+  announcement response shape. Delete, RabbitMQ/event parity, PostgreSQL write
+  rehearsal, canary routing, rollback and public writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
