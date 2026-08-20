@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.analytics.web;
 
 import java.math.BigDecimal;
+import java.time.Instant;
 import java.util.List;
 
 /** Legacy-compatible DTOs for the feature-gated analytics read candidate. */
@@ -55,5 +56,26 @@ public final class AnalyticsReadDtos {
             String status,
             long count,
             BigDecimal amount) {
+    }
+
+    public record NotificationSummaryResponse(
+            long total,
+            long unread,
+            long read,
+            List<NotificationTypeBucket> byType,
+            List<RecentAttentionNotification> recentAttention) {
+    }
+
+    public record NotificationTypeBucket(
+            String type,
+            long count) {
+    }
+
+    public record RecentAttentionNotification(
+            String id,
+            String title,
+            String message,
+            String type,
+            Instant createdAt) {
     }
 }

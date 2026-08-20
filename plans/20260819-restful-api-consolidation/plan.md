@@ -366,6 +366,15 @@ the retirement gates pass.
   generated id, unread default, null `readAt`, detail response shape and
   admin-only authorization. PostgreSQL write parity, realtime/event parity,
   canary routing, rollback and public notification writer handoff remain open.
+- Phase 35 backend-first analytics notification summary foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-35-analytics-notification-summary.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/notification-summary` for `ADMIN`/`SUPER_ADMIN`,
+  preserving total/unread/read aggregates, type buckets and recent
+  warning/error attention rows from the analytics service's legacy Prisma
+  `public.Notification` table. PostgreSQL read parity, cockpit composition,
+  canary routing, rollback and public analytics route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

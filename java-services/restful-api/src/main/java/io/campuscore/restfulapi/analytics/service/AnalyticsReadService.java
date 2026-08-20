@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
@@ -78,5 +79,17 @@ public class AnalyticsReadService {
                 invoiceStatus,
                 paymentStatus,
                 providerFunnel);
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationSummaryResponse notificationSummary() {
+        long total = analytics.countNotifications();
+        long unread = analytics.countUnreadNotifications();
+        return new NotificationSummaryResponse(
+                total,
+                unread,
+                Math.max(total - unread, 0),
+                analytics.notificationTypeBuckets(),
+                analytics.recentAttentionNotifications());
     }
 }

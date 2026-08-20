@@ -69,8 +69,22 @@ class AnalyticsReadPersistenceTest {
                     "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Notification" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "title" VARCHAR(200) NOT NULL,
+                    "message" VARCHAR(2000) NOT NULL,
+                    "type" VARCHAR(40) NOT NULL,
+                    "link" VARCHAR(500),
+                    "isRead" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "readAt" TIMESTAMP,
+                    "createdAt" TIMESTAMP NOT NULL
+                )
+                """);
 
         for (String table : List.of(
+                "Notification",
                 "Payment",
                 "Invoice",
                 "Student",
@@ -137,6 +151,54 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void notificationSummaryPreservesLegacyAggregateShapeForAdmins() throws Exception {
+        insertNotification(
+                "notification-info-read",
+                "INFO",
+                true,
+                BASE_TIME.minusSeconds(300),
+                "Welcome",
+                "Welcome message");
+        insertNotification(
+                "notification-warning",
+                "WARNING",
+                false,
+                BASE_TIME.minusSeconds(100),
+                "Capacity warning",
+                "A section is near capacity.");
+        insertNotification(
+                "notification-error-new",
+                "ERROR",
+                false,
+                BASE_TIME,
+                "Delivery failed",
+                "Email provider failed.");
+        insertNotification(
+                "notification-success",
+                "SUCCESS",
+                true,
+                BASE_TIME.minusSeconds(200),
+                "Payment posted",
+                "Payment notification delivered.");
+
+        mvc.perform(get("/api/v1/analytics/notification-summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(4))
+                .andExpect(jsonPath("$.unread").value(2))
+                .andExpect(jsonPath("$.read").value(2))
+                .andExpect(jsonPath("$.byType.length()").value(4))
+                .andExpect(jsonPath("$.byType[0].type").value("ERROR"))
+                .andExpect(jsonPath("$.byType[0].count").value(1))
+                .andExpect(jsonPath("$.recentAttention.length()").value(2))
+                .andExpect(jsonPath("$.recentAttention[0].id").value("notification-error-new"))
+                .andExpect(jsonPath("$.recentAttention[0].title").value("Delivery failed"))
+                .andExpect(jsonPath("$.recentAttention[0].message").value("Email provider failed."))
+                .andExpect(jsonPath("$.recentAttention[0].type").value("ERROR"))
+                .andExpect(jsonPath("$.recentAttention[0].createdAt").value("2026-08-20T00:00:00Z"))
+                .andExpect(jsonPath("$.recentAttention[1].id").value("notification-warning"));
+    }
+
+    @Test
     void analyticsReadBoundaryFailsClosedForAnonymousRolesAndUnexpectedQueries() throws Exception {
         mvc.perform(get("/api/v1/analytics/overview"))
                 .andExpect(status().isUnauthorized())
@@ -150,7 +212,17 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/notification-summary").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/overview")
+                        .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/notification-summary")
                         .queryParam("months", "12")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
@@ -189,6 +261,28 @@ class AnalyticsReadPersistenceTest {
                 status,
                 amount,
                 localDateTime(BASE_TIME));
+    }
+
+    private void insertNotification(
+            String id,
+            String type,
+            boolean read,
+            Instant createdAt,
+            String title,
+            String message) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Notification\""
+                        + " (\"id\", \"userId\", \"title\", \"message\", \"type\", \"link\","
+                        + " \"isRead\", \"readAt\", \"createdAt\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                "student-user",
+                title,
+                message,
+                type,
+                null,
+                read,
+                read ? localDateTime(createdAt.plusSeconds(1)) : null,
+                localDateTime(createdAt));
     }
 
     private static RequestPostProcessor adminJwt() {
