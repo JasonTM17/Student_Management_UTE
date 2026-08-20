@@ -114,7 +114,7 @@ async function main() {
     legacyArtifactSha256: legacyIdentity.artifactSha256,
     legacyBuildLogSha256: legacyIdentity.buildLogSha256,
     nodeExecutableSha256: legacyIdentity.nodeExecutableSha256,
-    nestCliSha256: legacyIdentity.nestCliSha256,
+    typescriptCompilerSha256: legacyIdentity.typescriptCompilerSha256,
     cases,
   };
   writeOptionalReport(report, runRoot);
@@ -899,20 +899,24 @@ function buildLegacyIdentity(repoRoot, runRoot, sourceHead, buildIdentity) {
   };
   try {
     const nodeExecutable = fs.realpathSync(process.execPath);
-    const nestCli = path.resolve(
+    const typescriptCompiler = path.resolve(
       repoRoot,
-      'engagement-service/node_modules/@nestjs/cli/bin/nest.js',
+      'engagement-service/node_modules/typescript/bin/tsc',
     );
-    const buildOutput = execFileSync(nodeExecutable, [nestCli, 'build'], {
-      cwd: moduleRoot,
-      encoding: 'utf8',
-      env: buildChildEnvironment({
-        NODE_ENV: 'test',
-        NODE_OPTIONS: '--max-old-space-size=192',
-      }),
-      maxBuffer: 20 * 1024 * 1024,
-      windowsHide: true,
-    });
+    const buildOutput = execFileSync(
+      nodeExecutable,
+      [typescriptCompiler, '-p', 'tsconfig.build.json'],
+      {
+        cwd: moduleRoot,
+        encoding: 'utf8',
+        env: buildChildEnvironment({
+          NODE_ENV: 'test',
+          NODE_OPTIONS: '--max-old-space-size=256',
+        }),
+        maxBuffer: 20 * 1024 * 1024,
+        windowsHide: true,
+      },
+    );
     assert.equal(
       requireCleanCheckout(repoRoot),
       sourceHead,
@@ -931,7 +935,7 @@ function buildLegacyIdentity(repoRoot, runRoot, sourceHead, buildIdentity) {
       artifactSha256: fileSha256(entry),
       buildLogSha256: fileSha256(buildLog),
       nodeExecutableSha256: fileSha256(nodeExecutable),
-      nestCliSha256: fileSha256(nestCli),
+      typescriptCompilerSha256: fileSha256(typescriptCompiler),
       ...dependencyLinks,
     };
   } catch (error) {
