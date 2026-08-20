@@ -36,8 +36,8 @@ feature-default-off source candidate, not a public route handoff.
 ## Verification observed
 
 - Focused H2/source gate passed on 2026-08-20:
-  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
-- Observed focused result: 57 tests, 0 failures, 0 errors, 0 skipped.
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketWriteServiceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
+- Observed focused result: 58 tests, 0 failures, 0 errors, 0 skipped.
 - Full Java reactor gate passed on 2026-08-20:
   `mvn -q -f java-services/pom.xml test`.
 - Observed reactor result: 116 tests, 0 failures, 0 errors, 0 skipped.
