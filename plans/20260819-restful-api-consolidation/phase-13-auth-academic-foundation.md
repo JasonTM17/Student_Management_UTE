@@ -21,8 +21,10 @@ web/mobile authenticated parity wave:
 
 This is not an auth cutover, registration implementation, password reset/email
 implementation, audit publisher, public route switch, enrollment/grade
-migration, PostgreSQL parity claim, canary, rollback, frontend change or mobile
-runtime claim.
+migration, PostgreSQL parity claim, canary, rollback, frontend cutover or
+mobile runtime claim. A mobile source seam may call the feature-gated Java auth
+candidate only in explicit live mode, but that still does not prove a running
+Java auth environment.
 
 ## Scope and authority
 
@@ -57,7 +59,8 @@ Non-goals:
   in this phase;
 - no schema DDL, Flyway migration, enrollment, timetable, class, grade or
   academic write path;
-- no client rewiring and no claim that Stitch authenticated E2E is now complete.
+- no public client cutover and no claim that Stitch authenticated E2E is now
+  complete.
 
 ## Acceptance criteria
 

@@ -3,6 +3,7 @@ import type { ScreenName, UserRole } from './routes';
 export interface MobileNavigation {
   navigate(route: ScreenName): void;
   enterPreview(): void;
+  completeSignIn(role: UserRole): void;
   goBack(): void;
   signOut(): void;
   switchRole(role: UserRole): void;

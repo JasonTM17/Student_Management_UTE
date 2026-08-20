@@ -7,6 +7,23 @@ export interface AssistantReply {
   degraded: boolean;
 }
 
+export interface AuthUser {
+  id: string;
+  email: string;
+  firstName?: string | null;
+  lastName?: string | null;
+  roles?: string[];
+  permissions?: string[];
+  studentId?: string | null;
+  lecturerId?: string | null;
+}
+
+export interface LoginResponse {
+  user: AuthUser;
+  accessToken: string;
+  refreshToken: string;
+}
+
 export interface ApiClientOptions {
   baseUrl?: string;
   mode?: ApiMode;
@@ -209,7 +226,7 @@ export const campusApi = {
   contract: () => apiClient.get<JsonObject>(apiRoutes.contract),
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   login: (email: string, password: string) =>
-    apiClient.post<JsonObject>(apiRoutes.auth.login, { email, password }),
+    apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
   refresh: () => apiClient.post<JsonObject>(apiRoutes.auth.refresh, {}),
   logout: () => apiClient.post<void>(apiRoutes.auth.logout, {}),
   notifications: () => apiClient.get<JsonObject>(apiRoutes.notifications),
