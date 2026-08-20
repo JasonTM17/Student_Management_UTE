@@ -70,8 +70,8 @@ inspection are not substitutes for PostgreSQL parity or rollback proof.
 
 Verdict: **bounded runtime PASS; production cutover HOLD**.
 
-The exact guarded-probe checkpoint was
-`8dfda244c46107d345a02e0c4e1efd8cbf4f7b91`. The Java timestamp source commit
+The exact provenance-bound probe checkpoint was
+`4c0e79b7448235d581469d995652c42a28ed0466`. The Java timestamp source commit
 was `b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57` and no Java production source
 changed between those identities. The rebuilt Spring Boot artifact was
 deterministic across the pre-commit and exact-head package runs:
@@ -79,15 +79,17 @@ deterministic across the pre-commit and exact-head package runs:
 - JAR SHA-256:
   `1866AA8719B67A218D77C11CA1FE0A6087C0C9451A9EE099F6C64F73BD929BE8`;
 - Java reference artifact SHA-256:
-  `AA54C871E8F1F331E47FC1D96A8598E7FF7023B533438D12714A3A30158E5539`;
+  `C35AB883F93A0F62A6D446F99692F86CE048604F21782F616A9847922E631A69`;
 - sequential differential report SHA-256:
-  `A2B074B770F5C8CC76F0F4BAA18BAAEA7D14A239E71915DA9A3E1248B2E5BFF9`;
+  `B6A7654FC17A2D7BB284400793B92F7CFB2E02F19FB29FA5E62591BC000FF1DE`;
 - legacy Nest `dist/src/main.js` SHA-256:
   `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`.
 
 The response artifacts are outside Git in the D-hosted Phase 11 recovery root.
 They contain response data and source/artifact identities, but no bearer or
-cookie token values.
+cookie token values. The capture derives the Git HEAD and artifact hashes from
+the checkout and files it actually observes; it rejects a tracked-dirty
+checkout instead of accepting caller-supplied identity strings.
 
 ### Isolated database and startup evidence
 
@@ -125,7 +127,7 @@ shape was selected because the C drive had only about 0.3 GiB free and a prior
 Jest/ts-jest attempt exhausted its bounded Node heap before running tests; that
 attempt remains `NOT_RUN`, not a functional failure.
 
-The guarded checkpoint fails before importing `AppModule` unless every
+The provenance-bound checkpoint fails before importing `AppModule` unless every
 isolation invariant is present: `NODE_ENV=test`; no inherited RabbitMQ URL; an
 exact `postgresql://engagement_reader@127.0.0.1:56432/engagement_rehearsal`
 target with the `engagement` schema; a D-hosted Phase 11 run root; and a live
@@ -133,8 +135,11 @@ target with the `engagement` schema; a D-hosted Phase 11 run root; and a live
 match that root. Reference and report paths must be descendants of the same
 root. The probe deletes the absent RabbitMQ environment key before Nest config
 loads, so an `.env` file or inherited broker URL cannot activate queue setup.
-The report also records and verifies the exact Java reference SHA, exact legacy
-source HEAD and legacy entry-artifact SHA.
+Java capture additionally requires the exact loopback URL
+`http://127.0.0.1:56410/`, rejects credentials/query/fragment and redirects,
+and binds the listener PID command line to the exact D-hosted JAR whose hash it
+records. The report then verifies the immutable Java reference hash, actual
+clean source HEAD, JAR path/hash/PID and actual legacy entry-artifact hash.
 
 Thirteen signed/negative cases produced equal HTTP status and normalized
 content type. Status, successful response body and normalized content type are
@@ -162,7 +167,15 @@ decision and is not represented as full parity.
 
 - `node --check engagement-service/test/engagement-read.rehearsal.cjs`: PASS.
 - negative preflight cases for a substring-smuggled active database URL,
-  inherited RabbitMQ URL and C-hosted run root: all rejected before app import.
+  inherited RabbitMQ URL, C-hosted run root and a userinfo-smuggled Java URL:
+  all rejected before app import or network use.
+- exact-head Java capture: 13/13 cases PASS with the listener bound to PID
+  `15988` and the JAR/hash shown above; Java was stopped before legacy startup.
+- sequential differential: 13/13 status/content-type assertions PASS and 7/7
+  successful full-body assertions PASS; the six intentional error-envelope
+  differences remained visible as `errorBodyParity=false`.
+- post-request fixture proof: nine rows and checksum
+  `7a3d71488910b1e7f0e84a8819130320`, unchanged from baseline.
 - focused `AnnouncementReadPersistenceTest`: 6/6 PASS.
 - full Java test suite: 45/45 PASS, zero failure/error/skip, run after the exact
   source commit.
