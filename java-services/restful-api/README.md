@@ -26,9 +26,15 @@ shell, not a domain-parity or cutover claim.
 - a disabled-by-default auth session candidate behind `AUTH_LOGIN_ENABLED=true`
   in the `persistence` profile; it verifies BCrypt passwords against the
   legacy `auth` schema, issues and refreshes shared web cookies plus body
-  tokens, rotates hashed refresh sessions, and clears session state on logout.
-  It does not own password reset/change, audit publishing, public routing or
-  full auth cutover.
+  tokens, returns the current authenticated user through `/api/v1/auth/me`,
+  rotates hashed refresh sessions, and clears session state on logout. It does
+  not own profile writes, password reset/change, audit publishing, public
+  routing or full auth cutover.
+- a disabled-by-default people read candidate behind `PEOPLE_READ_ENABLED=true`
+  in the `persistence` profile; it reads student and lecturer list/detail
+  profiles from the migrated legacy `people` schema. It does not own people
+  writes, enrollment history, RabbitMQ events, public routing or full people
+  cutover.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
@@ -40,11 +46,13 @@ without adding notification DDL. The academic catalog read candidate follows
 the same pattern with `ACADEMIC_READ_ENABLED=true` and reads the legacy
 `academic` schema through JDBC without adding academic DDL. The auth session
 candidate is gated by `AUTH_LOGIN_ENABLED=true` and writes only the expected
-auth/session login, refresh-rotation and logout-clearing state in the legacy
-`auth` schema; the legacy auth service remains the public owner. No legacy
-route, payment provider or LLM provider is cut over; those dependencies enter
-through later migration phases with one canonical writer and explicit rollback
-evidence.
+auth/session login, current-user read, refresh-rotation and logout-clearing
+state in the legacy `auth` schema; the legacy auth service remains the public
+owner. The people read candidate uses `PEOPLE_READ_ENABLED=true` and reads the
+migrated `people` schema without adding people DDL or moving create/update/delete
+ownership. No legacy route, payment provider or LLM provider is cut over; those
+dependencies enter through later migration phases with one canonical writer and
+explicit rollback evidence.
 
 ## Local verification
 

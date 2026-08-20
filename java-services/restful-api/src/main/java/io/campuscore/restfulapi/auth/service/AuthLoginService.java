@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
+import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
@@ -125,6 +126,16 @@ public class AuthLoginService {
                 new LoginResponse(user.toResponse(), accessToken.accessToken(), nextRefreshToken.refreshToken()),
                 accessToken.expiresAt(),
                 nextRefreshToken.expiresAt());
+    }
+
+    @Transactional(readOnly = true)
+    public AuthUserResponse me(String userId) {
+        AuthUserRecord user = users.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid session"));
+        if (!"ACTIVE".equals(user.status())) {
+            throw new BadCredentialsException("Invalid session");
+        }
+        return user.toResponse();
     }
 
     @Transactional

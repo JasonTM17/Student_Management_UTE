@@ -59,6 +59,24 @@ public class AuthUserRepository {
                 findPermissions(user.id())));
     }
 
+    public Optional<AuthUserRecord> findById(String userId) {
+        List<AuthUserRecord> matches = jdbc.query(
+                "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
+                        + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
+                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
+                        + " l.\"id\" AS lecturer_id"
+                        + " FROM " + USER_TABLE + " u"
+                        + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
+                        + " WHERE u.\"id\" = :id",
+                new MapSqlParameterSource("id", userId),
+                USER_MAPPER);
+        return matches.stream().findFirst().map(user -> user.withAuthorities(
+                findRoles(user.id()),
+                findPermissions(user.id())));
+    }
+
     public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
