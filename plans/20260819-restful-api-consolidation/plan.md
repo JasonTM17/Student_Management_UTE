@@ -350,6 +350,14 @@ the retirement gates pass.
   not-found behavior. PostgreSQL write parity, realtime/admin create-update
   parity, canary routing, rollback and public notification writer handoff remain
   open.
+- Phase 33 backend-first notification admin update foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-33-notification-admin-update.md`.
+  It adds feature-default-off Java `PUT /api/v1/notifications/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving partial legacy field edits, enum validation,
+  optional `link` clearing, detail response shape and not-found behavior.
+  PostgreSQL write parity, realtime/admin create parity, canary routing,
+  rollback and public notification writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

@@ -4,6 +4,8 @@ import io.campuscore.restfulapi.notification.web.NotificationReadDtos.Notificati
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -79,6 +81,36 @@ public class NotificationWriteRepository {
                 new MapSqlParameterSource("id", notificationId));
     }
 
+    public void update(UpdateNotificationCommand command) {
+        List<String> assignments = new ArrayList<>();
+        MapSqlParameterSource parameters = new MapSqlParameterSource("id", command.id());
+        add(assignments, parameters, "user_id", "userId", command.userId());
+        add(assignments, parameters, "title", "title", command.title());
+        add(assignments, parameters, "message", "message", command.message());
+        add(assignments, parameters, "type", "type", command.type());
+        add(assignments, parameters, "link", "link", command.link());
+        if (assignments.isEmpty()) {
+            return;
+        }
+        assignments.add("updated_at = CURRENT_TIMESTAMP");
+        jdbc.update(
+                "UPDATE " + TABLE + " SET " + String.join(", ", assignments) + " WHERE id = :id",
+                parameters);
+    }
+
+    private static void add(
+            List<String> assignments,
+            MapSqlParameterSource parameters,
+            String column,
+            String parameter,
+            PatchValue<String> value) {
+        if (!value.present()) {
+            return;
+        }
+        assignments.add(column + " = :" + parameter);
+        parameters.addValue(parameter, value.value());
+    }
+
     private static NotificationResponse mapRow(ResultSet resultSet, int rowNumber)
             throws SQLException {
         return new NotificationResponse(
@@ -96,5 +128,25 @@ public class NotificationWriteRepository {
 
     private static java.time.Instant instant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    public record UpdateNotificationCommand(
+            String id,
+            PatchValue<String> userId,
+            PatchValue<String> title,
+            PatchValue<String> message,
+            PatchValue<String> type,
+            PatchValue<String> link) {
+    }
+
+    public record PatchValue<T>(boolean present, T value) {
+
+        public static <T> PatchValue<T> omitted() {
+            return new PatchValue<>(false, null);
+        }
+
+        public static <T> PatchValue<T> present(T value) {
+            return new PatchValue<>(true, value);
+        }
     }
 }

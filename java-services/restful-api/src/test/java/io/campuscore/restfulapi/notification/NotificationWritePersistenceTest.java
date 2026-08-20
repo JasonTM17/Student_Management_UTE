@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -15,6 +16,7 @@ import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
@@ -164,6 +166,80 @@ class NotificationWritePersistenceTest {
         assertThat(rowCount("other")).isEqualTo(1);
     }
 
+    @Test
+    void adminUpdatePreservesPartialLegacyShapeAndAllowsLinkClear() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("target", STUDENT, false, now);
+
+        mvc.perform(put("/api/v1/notifications/target")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": "student-user-2",
+                                  "title": "Updated title",
+                                  "message": "Updated message",
+                                  "type": "SUCCESS",
+                                  "link": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("target"))
+                .andExpect(jsonPath("$.userId").value(OTHER_USER))
+                .andExpect(jsonPath("$.title").value("Updated title"))
+                .andExpect(jsonPath("$.message").value("Updated message"))
+                .andExpect(jsonPath("$.type").value("SUCCESS"))
+                .andExpect(jsonPath("$.link").doesNotExist())
+                .andExpect(jsonPath("$.isRead").value(false));
+
+        assertThat(textValue("target", "user_id")).isEqualTo(OTHER_USER);
+        assertThat(textValue("target", "title")).isEqualTo("Updated title");
+        assertThat(textValue("target", "message")).isEqualTo("Updated message");
+        assertThat(textValue("target", "type")).isEqualTo("SUCCESS");
+        assertThat(textValue("target", "link")).isNull();
+    }
+
+    @Test
+    void adminUpdateFailsClosedForInvalidBodyMissingNotificationAndStudentRole() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("target", STUDENT, false, now);
+
+        mvc.perform(put("/api/v1/notifications/target")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"type\":\"ALERT\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/notifications/target")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unexpected\":\"value\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/notifications/missing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Updated\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.message").value("Notification not found"));
+
+        mvc.perform(put("/api/v1/notifications/target")
+                        .with(jwt().jwt(token -> token
+                                .subject(STUDENT)
+                                .claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"title\":\"Student edit\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        assertThat(textValue("target", "title")).isEqualTo("Title target");
+        assertThat(textValue("target", "type")).isEqualTo("INFO");
+    }
+
     private void insert(String id, String userId, boolean read, Instant createdAt) {
         jdbc.update(
                 "INSERT INTO notifications.notification "
@@ -209,6 +285,13 @@ class NotificationWritePersistenceTest {
                 Integer.class,
                 id);
         return count == null ? 0 : count;
+    }
+
+    private String textValue(String id, String column) {
+        return jdbc.queryForObject(
+                "SELECT " + column + " FROM notifications.notification WHERE id = ?",
+                String.class,
+                id);
     }
 
     private RequestPostProcessor adminJwt() {
