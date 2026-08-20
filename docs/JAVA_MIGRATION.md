@@ -65,6 +65,17 @@ detail routes only. These candidates use JDBC against legacy schemas when their
 feature flags are explicitly enabled under the `persistence` profile; they do
 not add DDL, write data, or own public traffic.
 
+## RESTful API auth candidate
+
+The monolith also contains a disabled-by-default Java login candidate behind
+`AUTH_LOGIN_ENABLED=true`. It verifies BCrypt passwords against the migrated
+legacy `auth` schema, emits the shared `cc_access_token`, `cc_refresh_token`
+and `cc_csrf` browser cookies, returns body tokens for mobile clients, records
+failed login attempts, locks after the fifth failed attempt, and stores hashed
+refresh sessions. It is not a full auth cutover: refresh, logout, password
+flows, audit publishing, PostgreSQL parity, route canary and rollback evidence
+remain required before public ownership can move.
+
 ## Implemented slice
 
 - Registration rounds with explicit lifecycle transitions.

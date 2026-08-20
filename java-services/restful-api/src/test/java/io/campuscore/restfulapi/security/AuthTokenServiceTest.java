@@ -18,6 +18,7 @@ import org.springframework.security.oauth2.jwt.Jwt;
 class AuthTokenServiceTest {
 
     private static final String SECRET = "test-only-restful-api-secret-with-at-least-32-characters";
+    private static final String REFRESH_SECRET = "test-only-refresh-secret-with-at-least-32-characters";
     private static final Instant NOW = Instant.parse("2099-08-20T12:00:00Z");
 
     @Test
@@ -25,8 +26,10 @@ class AuthTokenServiceTest {
         SecurityConfig config = new SecurityConfig();
         AuthTokenService service = new AuthTokenService(
                 config.jwtEncoder(SECRET),
+                config.jwtEncoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofMinutes(15));
+                Duration.ofMinutes(15),
+                Duration.ofDays(7));
 
         AuthTokenService.IssuedAccessToken issued = service.issueAccessToken(new AuthPrincipal(
                 "user-1",
@@ -56,12 +59,45 @@ class AuthTokenServiceTest {
     }
 
     @Test
+    void issuedRefreshTokenUsesDedicatedSecretAndMinimalClaims() {
+        SecurityConfig config = new SecurityConfig();
+        AuthTokenService service = new AuthTokenService(
+                config.jwtEncoder(SECRET),
+                config.jwtEncoder(REFRESH_SECRET),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(15),
+                Duration.ofDays(7));
+
+        AuthTokenService.IssuedRefreshToken issued = service.issueRefreshToken(new AuthPrincipal(
+                "user-1",
+                "student@campuscore.edu",
+                "Student",
+                "One",
+                "ACTIVE",
+                List.of("STUDENT"),
+                List.of("thesis:read"),
+                "student-1",
+                2,
+                null));
+
+        Jwt decoded = config.jwtDecoder(REFRESH_SECRET).decode(issued.refreshToken());
+        assertEquals("user-1", decoded.getSubject());
+        assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
+        assertEquals("refresh", decoded.getClaimAsString("tokenType"));
+        assertEquals(null, decoded.getClaims().get("roles"));
+        assertEquals(null, decoded.getClaims().get("permissions"));
+        assertEquals(NOW.plus(Duration.ofDays(7)), issued.expiresAt());
+    }
+
+    @Test
     void tokenIssuerRejectsInvalidIdentityAndAuthorityClaims() {
         SecurityConfig config = new SecurityConfig();
         AuthTokenService service = new AuthTokenService(
                 config.jwtEncoder(SECRET),
+                config.jwtEncoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
-                Duration.ofMinutes(15));
+                Duration.ofMinutes(15),
+                Duration.ofDays(7));
 
         assertThrows(BadCredentialsException.class, () -> service.issueAccessToken(new AuthPrincipal(
                 "",
@@ -94,7 +130,16 @@ class AuthTokenServiceTest {
 
         assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
                 config.jwtEncoder(SECRET),
+                config.jwtEncoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ZERO,
+                Duration.ofDays(7)));
+
+        assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
+                config.jwtEncoder(SECRET),
+                config.jwtEncoder(REFRESH_SECRET),
+                Clock.fixed(NOW, ZoneOffset.UTC),
+                Duration.ofMinutes(15),
                 Duration.ZERO));
     }
 }

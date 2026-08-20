@@ -23,11 +23,14 @@ server:
 security:
   jwt:
     secret: ${JWT_SECRET:}
+    refresh-secret: ${JWT_REFRESH_SECRET:${JWT_SECRET:}}
     access-token-ttl-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:900}
+    refresh-token-ttl-seconds: ${JWT_REFRESH_TOKEN_TTL_SECONDS:604800}
   access-token-cookie: ${ACCESS_TOKEN_COOKIE:cc_access_token}
   refresh-token-cookie: ${REFRESH_TOKEN_COOKIE:cc_refresh_token}
   csrf-cookie: ${CSRF_COOKIE:cc_csrf}
   csrf-header: ${CSRF_HEADER:X-CSRF-Token}
+  cookie-secure: ${COOKIE_SECURE:false}
 
 health:
   readiness-key: ${HEALTH_READINESS_KEY:}
@@ -41,6 +44,8 @@ migration:
     enabled: ${ENGAGEMENT_READ_ENABLED:false}
   academic-read:
     enabled: ${ACADEMIC_READ_ENABLED:false}
+  auth-login:
+    enabled: ${AUTH_LOGIN_ENABLED:false}
 
 management:
   endpoints:
