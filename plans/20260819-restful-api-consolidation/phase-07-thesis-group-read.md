@@ -15,3 +15,9 @@ The retained feature-on H2 test covers group sort order, ordered member IDs,
 nullable topic/rejection fields, and group/round not-found behavior. Its source
 compiles with `mvn -DskipTests test-compile`; it still needs an observed green
 Spring execution on a host with sufficient commit memory.
+
+Follow-up coverage adds empty-round, malformed UUID, and anonymous-request
+cases. A later bounded-heap `test-compile` attempt was itself
+`BLOCKED_CAPABILITY`: Windows rejected the JVM G1 virtual-space allocation
+before compilation. It produced `hs_err_pid40696.log` (~17 KB); the current
+environment blocks its exact deletion, so no cleanup workaround was used.

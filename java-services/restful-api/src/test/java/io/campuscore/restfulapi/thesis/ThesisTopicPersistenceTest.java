@@ -136,6 +136,21 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
+    void groupsAllowAnEmptyExistingRoundAndRejectMalformedOrAnonymousRequests() throws Exception {
+        UUID roundId = insertRound();
+
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", "not-a-uuid").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
     void thesisReadPathRejectsAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/thesis/topics")
                         .queryParam("roundId", UUID.randomUUID().toString()))
