@@ -44,19 +44,20 @@ and rollback owner.
 - The monolith shell contract covers feature-default-off behavior for
   `POST /api/v1/support-tickets/{id}/respond`.
 
-## Remaining gates
-
 ## Verification observed
 
-Current exact-head focused gate passed locally on Windows, using Maven heap and
-temp settings that kept test artifacts off the low-space system drive:
+Current focused and full Java gates passed locally on Windows, using Maven heap
+and temp settings that kept test artifacts off the low-space system drive:
 
 ```powershell
 $env:JAVA_HOME='<java-home>'
 $env:Path="$env:JAVA_HOME\bin;$env:Path"
 $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-temp>'
-mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWriteServiceTest,io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
+mvn -q -pl restful-api '-Dtest=SupportTicketWritePersistenceTest,SupportTicketWriteServiceTest,SupportTicketReadPersistenceTest,RestfulApiContractTest,MigrationSafetyConfigTest' test
+mvn -q -f java-services/pom.xml test
 ```
+
+## Remaining gates
 
 This is still source/H2 evidence only. PostgreSQL write parity, status
 transition parity under the real schema, event/notification parity, route

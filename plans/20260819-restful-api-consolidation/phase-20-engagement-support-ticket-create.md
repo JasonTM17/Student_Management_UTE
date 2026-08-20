@@ -57,17 +57,25 @@ assignment owner, event publisher, route owner, and rollback target.
   mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWriteServiceTest,io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
   ```
 
-- Full Java reactor gate was not rerun after the numbering guard change; it is
-  not current evidence for this exact head.
+- Full Java reactor gate passed again after the later response/update candidate
+  wave on the same local host/JDK:
+
+  ```powershell
+  $env:JAVA_HOME='<java-home>'
+  $env:Path="$env:JAVA_HOME\bin;$env:Path"
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-temp>'
+  mvn -q -f java-services/pom.xml test
+  ```
 
 - `node scripts/check-doc-hygiene.mjs`: PASS.
 - `node scripts/check-architecture.mjs`: PASS.
 - `node scripts/check-thesis-contract.mjs`: PASS as a static source contract
   gate; runtime response, auth, mutation, data, image provenance, and rollback
   parity remain separate gates.
-- Runtime engagement write/DDL scan found only the intended support-ticket
-  `INSERT`; no `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE` or
-  `MERGE` statement was present in the engagement runtime package.
+- The create path still performs only the intended support-ticket `INSERT`.
+  Later response/update phases add their own expected `TicketResponse` `INSERT`
+  and `SupportTicket` `UPDATE` statements. No engagement runtime `DELETE`,
+  `CREATE`, `ALTER`, `DROP`, `TRUNCATE` or `MERGE` statement was present.
 
 This evidence is H2/Spring source evidence only. PostgreSQL differential writes,
 true concurrent insert pressure, idempotency semantics, event parity,

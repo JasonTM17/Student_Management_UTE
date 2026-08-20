@@ -181,6 +181,17 @@ public class SupportTicketWriteRepository {
                 parameters);
     }
 
+    public void assign(String id, String assignedTo, Instant updatedAt) {
+        jdbc.update(
+                "UPDATE " + TICKET
+                        + " SET \"assignedTo\" = :assignedTo, \"updatedAt\" = :updatedAt"
+                        + " WHERE \"id\" = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", id)
+                        .addValue("assignedTo", assignedTo)
+                        .addValue("updatedAt", LocalDateTime.ofInstant(updatedAt, ZoneOffset.UTC)));
+    }
+
     public Optional<SupportTicketResponse> findTicket(String id) {
         List<TicketRow> tickets = jdbc.query(
                 "SELECT " + TICKET_COLUMNS + " FROM " + TICKET + " WHERE \"id\" = :id",

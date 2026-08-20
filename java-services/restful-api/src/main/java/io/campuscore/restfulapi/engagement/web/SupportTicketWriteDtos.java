@@ -27,4 +27,8 @@ public final class SupportTicketWriteDtos {
             String priority,
             String status) {
     }
+
+    public record AssignSupportTicketRequest(
+            @NotNull String assignedTo) {
+    }
 }

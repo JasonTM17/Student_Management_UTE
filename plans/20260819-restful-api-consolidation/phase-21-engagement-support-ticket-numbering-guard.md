@@ -34,6 +34,8 @@ engagement service as the only public writer.
 - The focused test suite covers:
   - default `TKT-00002` creation from an existing `TKT-00001`;
   - `TKT-00003` allocation when `TKT-00001` is absent but `TKT-00002` exists;
+  - fail-safe rejection when the maximum existing numeric suffix is already
+    `Long.MAX_VALUE`, preventing `TKT--...` overflow output;
   - service-level retry after a translated unique-key collision;
   - default priority/status, explicit priority, email fallback, auth failures
     and validation errors.
@@ -52,10 +54,22 @@ Static/docs gates observed:
 - `git diff --check`: PASS.
 - `node scripts/check-doc-hygiene.mjs`: PASS.
 - `node scripts/check-architecture.mjs`: PASS.
-- Engagement runtime SQL scan: PASS; only the intended support-ticket `INSERT`
-  appears in the Java engagement runtime package.
-- Full Java reactor, PostgreSQL write rehearsal and browser/mobile runtime are
-  `NOT_RUN` for this phase.
+- Engagement runtime SQL scan: PASS for the current candidate boundary: create
+  uses the intended `SupportTicket` `INSERT`; response/update phases add their
+  expected `TicketResponse` `INSERT` and `SupportTicket` `UPDATE` statements;
+  no engagement runtime `DELETE`, DDL or `MERGE` statement is present.
+- Full Java reactor passed locally after the later response/update candidate
+  wave:
+
+  ```powershell
+  $env:JAVA_HOME='<java-home>'
+  $env:Path="$env:JAVA_HOME\bin;$env:Path"
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-temp>'
+  mvn -q -f java-services/pom.xml test
+  ```
+
+- PostgreSQL write rehearsal and browser/mobile runtime are `NOT_RUN` for this
+  phase.
 
 ## Remaining gates
 

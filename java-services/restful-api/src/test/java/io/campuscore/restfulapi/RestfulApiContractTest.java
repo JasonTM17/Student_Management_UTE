@@ -94,6 +94,13 @@ class RestfulApiContractTest {
                         .content("{\"status\":\"RESOLVED\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(post("/api/v1/support-tickets/ticket-1/assign")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"assignedTo\":\"lecturer-1\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

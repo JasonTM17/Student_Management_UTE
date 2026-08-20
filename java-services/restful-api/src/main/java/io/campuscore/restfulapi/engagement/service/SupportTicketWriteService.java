@@ -5,6 +5,7 @@ import io.campuscore.restfulapi.engagement.repository.SupportTicketWriteReposito
 import io.campuscore.restfulapi.engagement.repository.SupportTicketWriteRepository.CreateTicketCommand;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTicketResponse;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.AssignSupportTicketRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.UpdateSupportTicketRequest;
@@ -108,6 +109,19 @@ public class SupportTicketWriteService {
                 priority,
                 status,
                 Instant.now(clock)));
+        return tickets.findTicket(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+    }
+
+    @Transactional
+    public SupportTicketResponse assign(String ticketId, AssignSupportTicketRequest request) {
+        String id = requireText(ticketId, "ticket id");
+        tickets.findTicketStatus(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+        if (request.assignedTo() == null) {
+            throw new IllegalArgumentException("assignedTo is required");
+        }
+        tickets.assign(id, request.assignedTo(), Instant.now(clock));
         return tickets.findTicket(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
     }
