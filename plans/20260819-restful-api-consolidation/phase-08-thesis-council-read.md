@@ -43,15 +43,12 @@ runtime, parity, canary and rollback gates pass.
 - With bounded JVM memory, `mvn -q -f java-services/restful-api/pom.xml
   '-Dtest=ThesisTopicPersistenceTest,RestfulApiContractTest'
   '-DargLine=-Xmx256m -XX:MaxMetaspaceSize=160m' test` passed locally on
-  2026-08-20. It covers the feature-on H2/Flyway contract and feature-default
-  disabled route, but not a live PostgreSQL runtime.
-- The follow-up `councilsAllowAnExistingRoundWithoutCouncils` assertion was
-  added after that run in source checkpoint `646ad94`; it is explicitly
-  `NOT_RUN` on that exact HEAD because C: dropped to roughly 353 MiB free.
+  2026-08-20 on exact source checkpoint `24f5e8b`. It covers the feature-on
+  H2/Flyway contract, feature-default disabled route, and the follow-up
+  `councilsAllowAnExistingRoundWithoutCouncils` assertion, but not a live
+  PostgreSQL runtime.
 
 ## Remaining limitations
 
-The local disk constraint does not currently leave a safe JVM margin for the
-exact-head rerun. PostgreSQL differential reads, authenticated live smoke,
-canary and rollback remain open. The source test result is not runtime/cutover
-proof.
+PostgreSQL differential reads, authenticated live smoke, canary and rollback
+remain open. The source test result is not runtime/cutover proof.

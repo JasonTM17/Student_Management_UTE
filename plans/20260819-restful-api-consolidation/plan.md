@@ -164,10 +164,10 @@ the retirement gates pass.
 - Phase 07 thesis group read: source candidate; see
   `phase-07-thesis-group-read.md`. It is JDBC-only and compile-verified; the
   same host resource limit blocks Spring persistence verification.
-- Phase 08 thesis council read: source candidate at `34a99fc`; JDBC-only,
-  feature-gated list reads and bounded H2/Spring contract tests passed. Legacy
-  writer/public traffic ownership, PostgreSQL parity, canary and rollback are
-  still open.
+- Phase 08 thesis council read: source candidate through `24f5e8b`; JDBC-only,
+  feature-gated list reads and bounded H2/Spring contract tests passed on the
+  exact source checkpoint. Legacy writer/public traffic ownership, PostgreSQL
+  parity, canary and rollback are still open.
 
 # Acceptance and verification
 
