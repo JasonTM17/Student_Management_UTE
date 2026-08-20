@@ -43,7 +43,8 @@ announcement writer, RabbitMQ publisher and rollback target.
   - targeted creation with roles, years, priority, global flag, publish/expiry
     timestamps and academic pointers;
   - student access denied, missing required body fields, invalid priority and
-    invalid target year failure envelopes.
+    invalid target role/year failure envelopes, including wrong-type role
+    entries and fractional years that Jackson would otherwise coerce.
 - The monolith shell contract covers feature-default-off behavior for
   `POST /api/v1/announcements`.
 

@@ -68,27 +68,31 @@ public class AnnouncementWriteService {
         return value;
     }
 
-    private static List<String> immutableStrings(List<String> values, String name) {
+    private static List<String> immutableStrings(List<?> values, String name) {
         if (values == null) {
             return List.of();
         }
-        for (String value : values) {
-            if (value == null) {
+        List<String> result = new java.util.ArrayList<>(values.size());
+        for (Object value : values) {
+            if (!(value instanceof String text)) {
                 throw new IllegalArgumentException(name + " must contain strings");
             }
+            result.add(text);
         }
-        return List.copyOf(values);
+        return List.copyOf(result);
     }
 
-    private static List<Integer> immutableYears(List<Integer> values) {
+    private static List<Integer> immutableYears(List<?> values) {
         if (values == null) {
             return List.of();
         }
-        for (Integer value : values) {
-            if (value == null || value < 1) {
+        List<Integer> result = new java.util.ArrayList<>(values.size());
+        for (Object value : values) {
+            if (!(value instanceof Integer year) || year < 1) {
                 throw new IllegalArgumentException("targetYears must be positive integers");
             }
+            result.add(year);
         }
-        return List.copyOf(values);
+        return List.copyOf(result);
     }
 }
