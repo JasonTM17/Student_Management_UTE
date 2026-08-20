@@ -1,8 +1,9 @@
 'use strict';
 
 const assert = require('node:assert/strict');
-const { execFileSync } = require('node:child_process');
+const { execFileSync, spawn } = require('node:child_process');
 const { createHash } = require('node:crypto');
+const { once } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
@@ -16,45 +17,77 @@ async function main() {
   const sourceHead = requireCleanCheckout(repoRoot);
   const corpus = buildCorpus();
   const referenceFile = resolveReferenceFile(runRoot);
-
+  const ownedDifferential = process.env.RUN_OWNED_JAVA_DIFFERENTIAL === 'true';
   if (process.env.CAPTURE_JAVA_REFERENCE === 'true') {
-    const javaBaseUrl = requireLoopbackJavaBaseUrl();
-    const javaIdentity = requireJavaIdentity(repoRoot);
-    const artifact = await captureJavaReference(
-      javaBaseUrl,
-      corpus,
-      sourceHead,
-      javaIdentity,
+    throw new Error(
+      'CAPTURE_JAVA_REFERENCE is retired; use RUN_OWNED_JAVA_DIFFERENTIAL',
     );
+  }
+  if (referenceFile && !ownedDifferential) {
+    throw new Error('External Java reference comparison is not permitted');
+  }
+
+  let reference = null;
+  if (ownedDifferential) {
+    const javaBaseUrl = requireLoopbackJavaBaseUrl();
+    const javaExecutable = requireExecutable(
+      'REHEARSAL_JAVA_EXECUTABLE',
+      'java.exe',
+    );
+    const buildIdentity = rebuildJavaArtifact(
+      repoRoot,
+      runRoot,
+      sourceHead,
+      javaExecutable,
+    );
+    const ownedJava = await startOwnedJava(
+      runRoot,
+      sourceHead,
+      buildIdentity,
+      javaExecutable,
+    );
+    try {
+      await waitForJavaReady(javaBaseUrl, ownedJava.child);
+      const javaIdentity = requireOwnedJavaIdentity(
+        repoRoot,
+        buildIdentity,
+        ownedJava,
+      );
+      reference = await captureJavaReference(
+        javaBaseUrl,
+        corpus,
+        sourceHead,
+        javaIdentity,
+      );
+      assert.equal(
+        fileSha256(buildIdentity.artifactFile),
+        buildIdentity.artifactSha256,
+        'Java artifact must not change during capture',
+      );
+    } finally {
+      await stopOwnedJava(ownedJava.child);
+    }
+    reference.javaLogSha256 = fileSha256(ownedJava.javaLog);
     fs.mkdirSync(path.dirname(referenceFile), { recursive: true });
-    fs.writeFileSync(referenceFile, `${JSON.stringify(artifact, null, 2)}\n`, {
+    fs.writeFileSync(referenceFile, `${JSON.stringify(reference, null, 2)}\n`, {
       encoding: 'utf8',
       flag: 'wx',
     });
-    process.stdout.write(
-      `${JSON.stringify({
-        status: 'PASS',
-        mode: 'java-reference-capture',
-        sourceHead: artifact.sourceHead,
-        cases: summarizeReferenceCases(artifact.cases),
-      }, null, 2)}\n`,
-    );
-    return;
   }
 
-  const reference = referenceFile ? readReference(referenceFile) : null;
-  if (reference) {
-    assert.equal(reference.sourceHead, sourceHead, 'Java and legacy source HEAD');
-  }
   const cases = await runLegacyProbe(corpus, reference);
   const legacyIdentity = requireLegacyIdentity(repoRoot, sourceHead);
   const report = {
     status: 'PASS',
-    mode: reference ? 'sequential-differential' : 'legacy-only',
+    mode: reference ? 'owned-java-sequential-differential' : 'legacy-only',
     referenceSourceHead: reference?.sourceHead ?? null,
     referenceArtifactSha256: referenceFile ? fileSha256(referenceFile) : null,
     javaArtifactPath: reference?.artifactPath ?? null,
     javaArtifactSha256: reference?.artifactSha256 ?? null,
+    javaBuildLogSha256: reference?.buildLogSha256 ?? null,
+    mavenExecutableSha256: reference?.mavenExecutableSha256 ?? null,
+    javaExecutableSha256: reference?.javaExecutableSha256 ?? null,
+    javaLogSha256: reference?.javaLogSha256 ?? null,
     javaProcessId: reference?.javaProcessId ?? null,
     legacySourceHead: legacyIdentity.sourceHead,
     legacyArtifactSha256: legacyIdentity.artifactSha256,
@@ -152,32 +185,178 @@ function runGit(repoRoot, args) {
   });
 }
 
-function requireJavaIdentity(repoRoot) {
-  const configured = process.env.REHEARSAL_JAVA_ARTIFACT_FILE;
-  if (!configured) {
-    throw new Error('REHEARSAL_JAVA_ARTIFACT_FILE is required');
-  }
-  const artifactFile = path.resolve(configured);
-  const expectedArtifact = path.resolve(
+function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
+  const mavenExecutable = requireExecutable(
+    'REHEARSAL_MAVEN_EXECUTABLE',
+    'mvn.cmd',
+  );
+  const moduleRoot = path.resolve(repoRoot, 'java-services/restful-api');
+  const mavenCommand = `"${mavenExecutable}" -o -DskipTests clean package`;
+  const buildOutput = execFileSync(
+    process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe',
+    ['/d', '/s', '/c', mavenCommand],
+    {
+      cwd: moduleRoot,
+      encoding: 'utf8',
+      env: {
+        ...process.env,
+        JAVA_HOME: path.dirname(path.dirname(javaExecutable)),
+        MAVEN_OPTS: '-Xms32m -Xmx192m -XX:MaxMetaspaceSize=160m',
+      },
+      maxBuffer: 20 * 1024 * 1024,
+      windowsHide: true,
+    },
+  );
+  assert.equal(
+    requireCleanCheckout(repoRoot),
+    sourceHead,
+    'source HEAD after owned clean build',
+  );
+  const buildLog = path.resolve(
+    runRoot,
+    `java-build-${sourceHead.slice(0, 12)}.log`,
+  );
+  fs.writeFileSync(buildLog, buildOutput, { encoding: 'utf8', flag: 'wx' });
+  const artifactFile = path.resolve(
     repoRoot,
     'java-services/restful-api/target/campuscore-restful-api-0.1.0-SNAPSHOT.jar',
   );
-  assert.equal(
-    artifactFile.toLowerCase(),
-    expectedArtifact.toLowerCase(),
-    'Java rehearsal artifact path',
-  );
-  const listener = readJavaListener();
-  assert.equal(listener.localAddress, '127.0.0.1', 'Java listen address');
-  assert.ok(
-    listener.commandLine.toLowerCase().includes(artifactFile.toLowerCase()),
-    'Java listener command line must reference the hashed artifact',
-  );
   return {
+    artifactFile,
     artifactPath: path.relative(repoRoot, artifactFile).replaceAll('\\', '/'),
     artifactSha256: fileSha256(artifactFile),
-    processId: listener.processId,
+    buildLogSha256: fileSha256(buildLog),
+    mavenExecutableSha256: fileSha256(mavenExecutable),
   };
+}
+
+function requireExecutable(environmentKey, expectedName) {
+  const configured = process.env[environmentKey];
+  if (!configured) {
+    throw new Error(`${environmentKey} is required`);
+  }
+  const executable = fs.realpathSync(path.resolve(configured));
+  assert.equal(
+    path.basename(executable).toLowerCase(),
+    expectedName,
+    `${environmentKey} executable name`,
+  );
+  return executable;
+}
+
+async function startOwnedJava(
+  runRoot,
+  sourceHead,
+  buildIdentity,
+  javaExecutable,
+) {
+  const javaArgs = [
+    '-Xms32m',
+    '-Xmx192m',
+    '-XX:MaxMetaspaceSize=160m',
+    '-jar',
+    buildIdentity.artifactFile,
+  ];
+  const javaLog = path.resolve(
+    runRoot,
+    `java-owned-${sourceHead.slice(0, 12)}.log`,
+  );
+  const logHandle = fs.openSync(javaLog, 'wx');
+  const child = spawn(javaExecutable, javaArgs, {
+    cwd: runRoot,
+    env: {
+      ...process.env,
+      SERVER_PORT: '56410',
+      SERVER_ADDRESS: '127.0.0.1',
+      SPRING_PROFILES_ACTIVE: 'persistence',
+      SPRING_DATASOURCE_URL:
+        `jdbc:postgresql://127.0.0.1:56432/engagement_rehearsal` +
+        `?currentSchema=thesis&ApplicationName=java-engagement-${sourceHead.slice(0, 7)}`,
+      SPRING_DATASOURCE_USERNAME: 'engagement_reader',
+      SPRING_DATASOURCE_PASSWORD: '',
+      ENGAGEMENT_READ_ENABLED: 'true',
+      FLYWAY_ENABLED: 'false',
+      JWT_SECRET: process.env.JWT_SECRET,
+    },
+    stdio: ['ignore', logHandle, logHandle],
+    windowsHide: true,
+  });
+  try {
+    await Promise.race([
+      once(child, 'spawn'),
+      once(child, 'error').then(([error]) => Promise.reject(error)),
+    ]);
+  } finally {
+    fs.closeSync(logHandle);
+  }
+  return {
+    child,
+    javaArgs,
+    javaExecutableSha256: fileSha256(javaExecutable),
+    javaLog,
+  };
+}
+
+async function waitForJavaReady(javaBaseUrl, child) {
+  for (let attempt = 0; attempt < 60; attempt += 1) {
+    if (child.exitCode !== null) {
+      throw new Error(`Owned Java process exited with code ${child.exitCode}`);
+    }
+    try {
+      const response = await fetch(`${javaBaseUrl}/actuator/health`, {
+        redirect: 'error',
+        signal: AbortSignal.timeout(1_000),
+      });
+      if (response.ok) {
+        return;
+      }
+    } catch {
+      // Startup is bounded below; failed probes are retried until the deadline.
+    }
+    await new Promise((resolve) => setTimeout(resolve, 500));
+  }
+  throw new Error('Owned Java process did not become ready within 30 seconds');
+}
+
+function requireOwnedJavaIdentity(repoRoot, buildIdentity, ownedJava) {
+  const listener = readJavaListener();
+  assert.equal(listener.localAddress, '127.0.0.1', 'Java listen address');
+  assert.equal(
+    listener.processId,
+    ownedJava.child.pid,
+    'Java listener must belong to the process spawned by this probe',
+  );
+  assert.deepEqual(
+    ownedJava.javaArgs.slice(-2),
+    ['-jar', buildIdentity.artifactFile],
+    'owned Java launch artifact argv',
+  );
+  return {
+    artifactPath: buildIdentity.artifactPath,
+    artifactSha256: buildIdentity.artifactSha256,
+    buildLogSha256: buildIdentity.buildLogSha256,
+    mavenExecutableSha256: buildIdentity.mavenExecutableSha256,
+    javaExecutableSha256: ownedJava.javaExecutableSha256,
+    processId: ownedJava.child.pid,
+    sourceHead: requireCleanCheckout(repoRoot),
+  };
+}
+
+async function stopOwnedJava(child) {
+  if (child.exitCode !== null) {
+    return;
+  }
+  child.kill('SIGTERM');
+  const exited = await Promise.race([
+    once(child, 'exit').then(() => true),
+    new Promise((resolve) => setTimeout(() => resolve(false), 10_000)),
+  ]);
+  if (!exited) {
+    execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+      windowsHide: true,
+    });
+    await once(child, 'exit');
+  }
 }
 
 function readJavaListener() {
@@ -187,9 +366,7 @@ function readJavaListener() {
   const script = [
     "$listener = Get-NetTCPConnection -State Listen -LocalPort 56410 | Where-Object LocalAddress -eq '127.0.0.1' | Select-Object -First 1",
     "if ($null -eq $listener) { throw 'Java rehearsal listener not found' }",
-    '$process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)"',
-    "if ($null -eq $process) { throw 'Java rehearsal process not found' }",
-    "[pscustomobject]@{ localAddress=$listener.LocalAddress; processId=$listener.OwningProcess; commandLine=$process.CommandLine } | ConvertTo-Json -Compress",
+    "[pscustomobject]@{ localAddress=$listener.LocalAddress; processId=$listener.OwningProcess } | ConvertTo-Json -Compress",
   ].join('; ');
   const output = execFileSync('powershell.exe', [
     '-NoProfile',
@@ -201,21 +378,29 @@ function readJavaListener() {
     windowsHide: true,
   });
   const listener = JSON.parse(output);
-  assert.equal(typeof listener.commandLine, 'string', 'Java command line');
+  assert.ok(Number.isInteger(listener.processId), 'Java listener process ID');
   return listener;
 }
 
 function resolveReferenceFile(runRoot) {
   const configured = process.env.REHEARSAL_REFERENCE_FILE;
   if (!configured) {
-    if (process.env.CAPTURE_JAVA_REFERENCE === 'true') {
-      throw new Error('REHEARSAL_REFERENCE_FILE is required for Java capture');
+    if (process.env.RUN_OWNED_JAVA_DIFFERENTIAL === 'true') {
+      throw new Error(
+        'REHEARSAL_REFERENCE_FILE is required for the owned Java differential',
+      );
     }
     return null;
   }
   const resolved = path.resolve(configured);
   if (!isInside(runRoot, resolved)) {
     throw new Error('Reference artifact must stay inside REHEARSAL_RUN_ROOT');
+  }
+  if (
+    process.env.RUN_OWNED_JAVA_DIFFERENTIAL === 'true' &&
+    fs.existsSync(resolved)
+  ) {
+    throw new Error('Owned Java reference artifact must not already exist');
   }
   return resolved;
 }
@@ -408,11 +593,15 @@ async function captureJavaReference(
       body: result.body,
     });
   }
+  assert.equal(javaIdentity.sourceHead, sourceHead, 'owned Java source HEAD');
   return {
-    schemaVersion: 2,
+    schemaVersion: 3,
     sourceHead,
     artifactPath: javaIdentity.artifactPath,
     artifactSha256: javaIdentity.artifactSha256,
+    buildLogSha256: javaIdentity.buildLogSha256,
+    mavenExecutableSha256: javaIdentity.mavenExecutableSha256,
+    javaExecutableSha256: javaIdentity.javaExecutableSha256,
     javaProcessId: javaIdentity.processId,
     capturedAt: new Date().toISOString(),
     cases,
@@ -518,21 +707,6 @@ function normalizeContentType(value) {
   return value?.split(';', 1)[0].trim().toLowerCase() ?? null;
 }
 
-function readReference(referenceFile) {
-  const artifact = JSON.parse(fs.readFileSync(referenceFile, 'utf8'));
-  assert.equal(artifact.schemaVersion, 2, 'reference schema version');
-  assert.ok(Array.isArray(artifact.cases), 'reference cases');
-  assert.match(artifact.sourceHead, /^[0-9a-f]{40}$/i, 'reference source HEAD');
-  assert.equal(
-    artifact.artifactPath,
-    'java-services/restful-api/target/campuscore-restful-api-0.1.0-SNAPSHOT.jar',
-    'reference Java artifact path',
-  );
-  assert.match(artifact.artifactSha256, /^[0-9a-f]{64}$/i, 'reference JAR SHA-256');
-  assert.ok(Number.isInteger(artifact.javaProcessId), 'reference Java process ID');
-  return artifact;
-}
-
 function requireLegacyIdentity(repoRoot, sourceHead) {
   const entry = path.resolve(__dirname, '../dist/src/main.js');
   assert.equal(
@@ -567,16 +741,6 @@ function writeOptionalReport(report, runRoot) {
     encoding: 'utf8',
     flag: 'wx',
   });
-}
-
-function summarizeReferenceCases(cases) {
-  return cases.map(({ name, status, contentType, body }) => ({
-    name,
-    status,
-    contentType,
-    code: body?.code ?? null,
-    ids: Array.isArray(body?.data) ? body.data.map(({ id }) => id) : null,
-  }));
 }
 
 main().catch((error) => {
