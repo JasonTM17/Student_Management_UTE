@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.analytics.service;
 
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
@@ -95,6 +96,11 @@ public class AnalyticsReadService {
                 invoiceStatus,
                 paymentStatus,
                 providerFunnel);
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnrollmentBySemesterBucket> enrollmentsBySemester() {
+        return analytics.enrollmentsBySemester();
     }
 
     @Transactional(readOnly = true)

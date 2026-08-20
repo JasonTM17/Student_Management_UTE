@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
@@ -47,6 +48,14 @@ public class AnalyticsReadController {
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of());
         return analytics.financeSummary();
+    }
+
+    @GetMapping("enrollments-by-semester")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public List<EnrollmentBySemesterBucket> enrollmentsBySemester(
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.enrollmentsBySemester();
     }
 
     @GetMapping("grade-distribution")

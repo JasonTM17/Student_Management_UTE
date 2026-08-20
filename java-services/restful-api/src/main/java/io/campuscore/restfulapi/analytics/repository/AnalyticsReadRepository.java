@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.analytics.repository;
 
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationTypeBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
@@ -112,6 +113,27 @@ public class AnalyticsReadRepository {
                         resultSet.getString("status"),
                         resultSet.getLong("count"),
                         amount(resultSet, "amount")));
+    }
+
+    public List<EnrollmentBySemesterBucket> enrollmentsBySemester() {
+        return jdbc.query(
+                "SELECT s.\"id\" AS \"semesterId\", s.\"name\" AS \"semesterName\","
+                        + " s.\"nameEn\" AS \"semesterNameEn\", s.\"nameVi\" AS \"semesterNameVi\","
+                        + " ay.\"year\" AS \"academicYear\", COUNT(e.\"id\") AS \"enrollmentCount\""
+                        + " FROM " + table("\"Semester\"") + " s"
+                        + " JOIN " + table("\"AcademicYear\"") + " ay ON ay.\"id\" = s.\"academicYearId\""
+                        + " JOIN " + table("\"Enrollment\"") + " e ON e.\"semesterId\" = s.\"id\""
+                        + " WHERE e.\"status\" IN ('CONFIRMED', 'COMPLETED')"
+                        + " GROUP BY s.\"id\", s.\"name\", s.\"nameEn\", s.\"nameVi\", ay.\"year\", s.\"startDate\""
+                        + " ORDER BY s.\"startDate\" DESC"
+                        + " LIMIT 10",
+                (resultSet, ignored) -> new EnrollmentBySemesterBucket(
+                        resultSet.getString("semesterId"),
+                        resultSet.getString("semesterName"),
+                        resultSet.getString("semesterNameEn"),
+                        resultSet.getString("semesterNameVi"),
+                        resultSet.getInt("academicYear"),
+                        resultSet.getLong("enrollmentCount")));
     }
 
     public Map<String, Long> completedLetterGradeCounts() {
