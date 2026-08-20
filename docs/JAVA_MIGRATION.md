@@ -68,9 +68,13 @@ with checkout, provider callbacks/webhooks, exports and writes still owned by
 the legacy finance service. The analytics slice covers dashboard overview counts
 and the finance-summary aggregate only, with trends, cockpit composition,
 lecturer analytics, attendance and metrics still owned by the legacy analytics
-service. These candidates use JDBC against legacy schemas when their feature
-flags are explicitly enabled under the `persistence` profile; they do not add
-DDL, write data, or own public traffic.
+service. The academic enrollment slice covers current-student enrollment list,
+student grade/transcript reads, admin enrollment list/detail, and lecturer/
+admin grade item/student-grade read aggregation, with enroll/drop, waitlist,
+grade editing/publishing, timetable, CSV export and writes still owned by the
+legacy academic service. These candidates use JDBC against legacy schemas when
+their feature flags are explicitly enabled under the `persistence` profile;
+they do not add DDL, write data, or own public traffic.
 
 ## RESTful API auth candidate
 
