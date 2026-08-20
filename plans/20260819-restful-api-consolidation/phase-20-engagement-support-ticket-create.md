@@ -27,15 +27,19 @@ assignment owner, event publisher, route owner, and rollback target.
 - Preserve priority validation for `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL`.
 - Feature-default-off behavior must continue returning the stable Java 404
   envelope for `POST /api/v1/support-tickets`.
-- Because ticket-number generation follows the legacy count-based shape, public
-  route ownership still needs a PostgreSQL concurrency/retry decision before
-  cutover.
+- Ticket-number generation preserves the legacy `TKT-xxxxx` shape but now
+  allocates from the maximum existing numeric suffix and retries bounded unique
+  collisions. Public route ownership still needs PostgreSQL concurrency and
+  idempotency proof before cutover.
 
 ## Acceptance and verification
 
-- Feature-on H2 tests cover ticket creation, default priority/status, explicit
-  priority, email display fallback, anonymous access, missing email claim,
-  invalid priority, and validation errors.
+- Feature-on H2 tests cover ticket creation, max-suffix ticket-number
+  allocation, default priority/status, explicit priority, email display
+  fallback, anonymous access, missing email claim, invalid priority, and
+  validation errors.
+- A focused service unit test covers bounded retry after a translated unique-key
+  collision.
 - The monolith shell contract covers feature-default-off behavior.
 - `migration.engagement-write.enabled=true` participates in the migration
   safety condition, so Flyway/Hibernate schema ownership is rejected while this
@@ -43,23 +47,22 @@ assignment owner, event publisher, route owner, and rollback target.
 
 ## Verification observed
 
-- Current exact-head focused gate passed locally on Windows with Java 24, using
-  Maven heap and temp settings that kept test artifacts off the low-space
-  system drive:
+- Current exact-head focused gate passed locally on Windows, using Maven heap
+  and temp settings that kept test artifacts off the low-space system drive:
 
   ```powershell
-  $env:JAVA_HOME='C:\Program Files\Java\jdk-24'
+  $env:JAVA_HOME='<java-home>'
   $env:Path="$env:JAVA_HOME\bin;$env:Path"
-  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp'
-  mvn -q -pl restful-api '-Dtest=SupportTicketWritePersistenceTest,SupportTicketReadPersistenceTest,RestfulApiContractTest,MigrationSafetyConfigTest' test
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<workspace>\.tmp'
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
   ```
 
 - Full Java reactor gate also passed locally on the same host/JDK:
 
   ```powershell
-  $env:JAVA_HOME='C:\Program Files\Java\jdk-24'
+  $env:JAVA_HOME='<java-home>'
   $env:Path="$env:JAVA_HOME\bin;$env:Path"
-  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp'
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<workspace>\.tmp'
   mvn -q -f java-services/pom.xml test
   ```
 
@@ -73,14 +76,15 @@ assignment owner, event publisher, route owner, and rollback target.
   `MERGE` statement was present in the engagement runtime package.
 
 This evidence is H2/Spring source evidence only. PostgreSQL differential writes,
-idempotency/concurrency behavior, event parity, notification fan-out, route
-canary, live runtime smoke, writer handoff, rollback and independent exact-head
-review remain `NOT_RUN`.
+true concurrent insert pressure, idempotency semantics, event parity,
+notification fan-out, route canary, live runtime smoke, writer handoff, rollback
+and independent exact-head review remain `NOT_RUN`.
 
 ## Remaining gates
 
 No source or H2 result authorizes traffic. Before any write ownership move,
 freeze the legacy create contract, compare Java and Node responses against a
-disposable PostgreSQL restore, decide the ticket-number concurrency strategy,
-prove event/notification behavior or explicitly defer it, rehearse route
-rollback, and run fresh exact-head Advisor/Kongming/Wukong review.
+disposable PostgreSQL restore, prove the bounded ticket-number retry under real
+PostgreSQL contention, decide idempotency behavior, prove event/notification
+behavior or explicitly defer it, rehearse route rollback, and run fresh
+exact-head Advisor/Kongming/Wukong review.
