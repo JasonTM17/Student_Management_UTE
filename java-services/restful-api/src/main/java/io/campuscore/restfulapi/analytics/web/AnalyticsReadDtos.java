@@ -49,6 +49,19 @@ public final class AnalyticsReadDtos {
             long totalEnrollments) {
     }
 
+    public record StudentStatisticsResponse(
+            long total,
+            long active,
+            long graduated,
+            long suspended,
+            List<StudentYearBucket> byYear) {
+    }
+
+    public record StudentYearBucket(
+            int year,
+            long count) {
+    }
+
     public record EnrollmentBySemesterBucket(
             String semesterId,
             String semesterName,

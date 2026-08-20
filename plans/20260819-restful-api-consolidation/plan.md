@@ -414,6 +414,15 @@ the retirement gates pass.
   enrollment totals, descending total-enrollment sort and default/custom limit
   behavior. PostgreSQL read parity, cockpit composition, canary routing,
   rollback and public analytics route handoff remain open.
+- Phase 40 backend-first analytics student statistics foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-40-analytics-student-statistics.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/student-statistics` for `ADMIN`/`SUPER_ADMIN`,
+  preserving the legacy total, active, graduated, suspended and by-year
+  student aggregate response shape. PostgreSQL read parity, cockpit
+  composition, canary routing, rollback and public analytics route handoff
+  remain open.
 
 ## Backend foundation gate before Stitch implementation
 

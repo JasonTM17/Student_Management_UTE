@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBuc
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentYearBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
@@ -80,6 +81,24 @@ public class AnalyticsReadRepository {
 
     public long countClassrooms() {
         return count("\"Classroom\"");
+    }
+
+    public long countStudentsByStatus(String status) {
+        Long count = jdbc.getJdbcTemplate().queryForObject(
+                "SELECT COUNT(*) FROM " + table("\"Student\"") + " WHERE \"status\" = ?",
+                Long.class,
+                status);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public List<StudentYearBucket> studentCountsByYear() {
+        return jdbc.query(
+                "SELECT \"year\", COUNT(\"id\") AS \"count\""
+                        + " FROM " + table("\"Student\"")
+                        + " GROUP BY \"year\" ORDER BY \"year\" ASC",
+                (resultSet, ignored) -> new StudentYearBucket(
+                        resultSet.getInt("year"),
+                        resultSet.getLong("count")));
     }
 
     public List<InvoiceStatusBucket> invoiceStatusBuckets() {

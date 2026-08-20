@@ -42,11 +42,17 @@ class AnalyticsReadPersistenceTest {
     @BeforeEach
     void prepareAnalyticsFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"public\"");
-        createCountTable("Student");
         createCountTable("Lecturer");
         createCountTable("Department");
         createCountTable("Faculty");
         createCountTable("Classroom");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "status" VARCHAR(40),
+                    "year" INTEGER
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Course" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -291,6 +297,32 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void studentStatisticsPreservesLegacyStatusTotalsAndYearBuckets() throws Exception {
+        insertStudent("student-active-1", "ACTIVE", 1);
+        insertStudent("student-active-2", "ACTIVE", 1);
+        insertStudent("student-active-3", "ACTIVE", 2);
+        insertStudent("student-graduated", "GRADUATED", 4);
+        insertStudent("student-suspended", "SUSPENDED", 3);
+        insertStudent("student-withdrawn", "WITHDRAWN", 2);
+
+        mvc.perform(get("/api/v1/analytics/student-statistics").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.total").value(6))
+                .andExpect(jsonPath("$.active").value(3))
+                .andExpect(jsonPath("$.graduated").value(1))
+                .andExpect(jsonPath("$.suspended").value(1))
+                .andExpect(jsonPath("$.byYear.length()").value(4))
+                .andExpect(jsonPath("$.byYear[0].year").value(1))
+                .andExpect(jsonPath("$.byYear[0].count").value(2))
+                .andExpect(jsonPath("$.byYear[1].year").value(2))
+                .andExpect(jsonPath("$.byYear[1].count").value(2))
+                .andExpect(jsonPath("$.byYear[2].year").value(3))
+                .andExpect(jsonPath("$.byYear[2].count").value(1))
+                .andExpect(jsonPath("$.byYear[3].year").value(4))
+                .andExpect(jsonPath("$.byYear[3].count").value(1));
+    }
+
+    @Test
     void financeSummaryPreservesLegacyAggregatesAndFinanceOfficerAccess() throws Exception {
         insertInvoice("invoice-pending", "PENDING", BigDecimal.valueOf(1000));
         insertInvoice("invoice-overdue", "OVERDUE", BigDecimal.valueOf(700));
@@ -412,6 +444,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/student-statistics").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/grade-distribution").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -441,6 +477,12 @@ class AnalyticsReadPersistenceTest {
         mvc.perform(get("/api/v1/analytics/top-courses")
                         .queryParam("limit", "2")
                         .queryParam("limit", "3")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/student-statistics")
+                        .queryParam("year", "1")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -475,6 +517,14 @@ class AnalyticsReadPersistenceTest {
         jdbc.update(
                 "INSERT INTO \"public\".\"AcademicYear\" (\"id\", \"year\") VALUES (?, ?)",
                 id,
+                year);
+    }
+
+    private void insertStudent(String id, String status, int year) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Student\" (\"id\", \"status\", \"year\") VALUES (?, ?, ?)",
+                id,
+                status,
                 year);
     }
 
