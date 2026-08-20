@@ -35,6 +35,10 @@ RabbitMQ event publisher, and rollback target.
   `SUPER_ADMIN`.
 - Responses retain flattened Prisma fields plus the derived `user` object on
   tickets and responses, including display-name fallback to email.
+- Internal response visibility currently follows the legacy service shape for
+  parity. Before any public route ownership move, decide whether `isInternal`
+  responses should remain visible on `/my` routes or require a coordinated
+  legacy+Java security change.
 - Mutating legacy routes (`POST`, `PUT`, `assign`, `respond`, `DELETE`) remain
   out of scope and legacy-owned until writer handoff and rollback evidence pass.
 
@@ -52,19 +56,28 @@ RabbitMQ event publisher, and rollback target.
 
 ## Verification observed
 
-- Focused support-ticket command passed locally on Windows with Java 24, using
-  D: for JVM temporary files:
+- Focused support-ticket command passed locally on Windows with Java 24. The
+  run used a workspace-local temporary directory outside the low-space system
+  drive:
 
   ```powershell
-  $env:JAVA_HOME='C:\Program Files\Java\jdk-24'
-  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp'
-  mvn -q -pl restful-api '-Dtest=SupportTicketReadPersistenceTest' test
+  $env:TEMP='<workspace>\.tmp'
+  $env:TMP='<workspace>\.tmp'
+  $env:MAVEN_OPTS='-Xmx768m -XX:MaxMetaspaceSize=256m'
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest' '-DforkCount=0' test
   ```
 
 - Engagement pair regression passed:
 
   ```powershell
-  mvn -q -pl restful-api '-Dtest=AnnouncementReadPersistenceTest,SupportTicketReadPersistenceTest' test
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest' '-DforkCount=0' test
+  ```
+
+- Current exact-head continuation reran support-ticket, announcement and
+  monolith shell contracts together:
+
+  ```powershell
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test
   ```
 
 - Static engagement scan found no runtime JDBC mutation/DDL statement and no
