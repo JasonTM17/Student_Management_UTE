@@ -46,12 +46,18 @@ class AnalyticsReadPersistenceTest {
         createCountTable("Lecturer");
         createCountTable("Course");
         createCountTable("Section");
-        createCountTable("Enrollment");
         createCountTable("Department");
         createCountTable("Faculty");
         createCountTable("AcademicYear");
         createCountTable("Semester");
         createCountTable("Classroom");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "status" VARCHAR(40),
+                    "letterGrade" VARCHAR(10)
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Invoice" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -151,6 +157,32 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void gradeDistributionPreservesLegacyBucketsAndPercentagesForAdmins() throws Exception {
+        insertEnrollment("enrollment-a-1", "COMPLETED", "A");
+        insertEnrollment("enrollment-a-2", "COMPLETED", "A");
+        insertEnrollment("enrollment-b-plus", "COMPLETED", "B+");
+        insertEnrollment("enrollment-f", "COMPLETED", "F");
+        insertEnrollment("enrollment-confirmed", "CONFIRMED", "A");
+        insertEnrollment("enrollment-ungraded", "COMPLETED", null);
+
+        mvc.perform(get("/api/v1/analytics/grade-distribution").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(12))
+                .andExpect(jsonPath("$[0].grade").value("A"))
+                .andExpect(jsonPath("$[0].count").value(2))
+                .andExpect(jsonPath("$[0].percentage").value(50))
+                .andExpect(jsonPath("$[1].grade").value("A-"))
+                .andExpect(jsonPath("$[1].count").value(0))
+                .andExpect(jsonPath("$[1].percentage").value(0))
+                .andExpect(jsonPath("$[2].grade").value("B+"))
+                .andExpect(jsonPath("$[2].count").value(1))
+                .andExpect(jsonPath("$[2].percentage").value(25))
+                .andExpect(jsonPath("$[11].grade").value("F"))
+                .andExpect(jsonPath("$[11].count").value(1))
+                .andExpect(jsonPath("$[11].percentage").value(25));
+    }
+
+    @Test
     void notificationSummaryPreservesLegacyAggregateShapeForAdmins() throws Exception {
         insertNotification(
                 "notification-info-read",
@@ -212,12 +244,22 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/grade-distribution").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/notification-summary").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mvc.perform(get("/api/v1/analytics/overview")
                         .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/grade-distribution")
+                        .queryParam("semesterId", "semester-1")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -250,6 +292,15 @@ class AnalyticsReadPersistenceTest {
                 status,
                 total,
                 localDateTime(BASE_TIME));
+    }
+
+    private void insertEnrollment(String id, String status, String letterGrade) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Enrollment\""
+                        + " (\"id\", \"status\", \"letterGrade\") VALUES (?, ?, ?)",
+                id,
+                status,
+                letterGrade);
     }
 
     private void insertPayment(String id, String method, String status, BigDecimal amount) {

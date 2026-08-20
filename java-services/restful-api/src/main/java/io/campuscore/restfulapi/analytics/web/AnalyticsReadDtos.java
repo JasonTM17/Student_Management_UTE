@@ -58,6 +58,12 @@ public final class AnalyticsReadDtos {
             BigDecimal amount) {
     }
 
+    public record GradeDistributionBucket(
+            String grade,
+            long count,
+            int percentage) {
+    }
+
     public record NotificationSummaryResponse(
             long total,
             long unread,
