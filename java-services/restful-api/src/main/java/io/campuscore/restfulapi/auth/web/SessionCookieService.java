@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.auth.web;
 
+import jakarta.servlet.http.Cookie;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.security.SecureRandom;
@@ -41,6 +42,28 @@ public class SessionCookieService {
         addCookie(response, accessTokenCookie, accessToken, true, maxAge(now, accessTokenExpiresAt));
         addCookie(response, refreshTokenCookie, refreshToken, true, maxAge(now, refreshTokenExpiresAt));
         addCookie(response, csrfCookie, csrfToken(), false, maxAge(now, refreshTokenExpiresAt));
+    }
+
+    public void clear(HttpServletResponse response) {
+        addCookie(response, accessTokenCookie, "", true, Duration.ZERO);
+        addCookie(response, refreshTokenCookie, "", true, Duration.ZERO);
+        addCookie(response, csrfCookie, "", false, Duration.ZERO);
+    }
+
+    public String refreshToken(HttpServletRequest request, String bodyRefreshToken) {
+        if (bodyRefreshToken != null && !bodyRefreshToken.isBlank()) {
+            return bodyRefreshToken;
+        }
+        Cookie[] cookies = request.getCookies();
+        if (cookies == null) {
+            return null;
+        }
+        for (Cookie cookie : cookies) {
+            if (refreshTokenCookie.equals(cookie.getName()) && !cookie.getValue().isBlank()) {
+                return cookie.getValue();
+            }
+        }
+        return null;
     }
 
     private void addCookie(

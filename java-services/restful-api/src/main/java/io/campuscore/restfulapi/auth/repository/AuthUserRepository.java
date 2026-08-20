@@ -59,6 +59,28 @@ public class AuthUserRepository {
                 findPermissions(user.id())));
     }
 
+    public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
+        List<AuthUserRecord> matches = jdbc.query(
+                "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
+                        + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
+                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
+                        + " l.\"id\" AS lecturer_id"
+                        + " FROM " + SESSION_TABLE + " se"
+                        + " INNER JOIN " + USER_TABLE + " u ON u.\"id\" = se.\"userId\""
+                        + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
+                        + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
+                        + " WHERE se.\"refreshToken\" = :refreshToken"
+                        + " AND se.\"expiresAt\" > :now",
+                new MapSqlParameterSource()
+                        .addValue("refreshToken", refreshTokenHash)
+                        .addValue("now", localDateTime(now)),
+                USER_MAPPER);
+        return matches.stream().findFirst().map(user -> user.withAuthorities(
+                findRoles(user.id()),
+                findPermissions(user.id())));
+    }
+
     public void recordFailedLogin(String userId, int nextAttemptCount, Instant lockedUntil) {
         jdbc.update(
                 "UPDATE " + USER_TABLE + " SET \"failedLoginAttempts\" = :attempts,"
@@ -104,6 +126,28 @@ public class AuthUserRepository {
                 "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :userId",
                 parameters);
+    }
+
+    public void deleteRefreshSession(String userId, String refreshTokenHash) {
+        jdbc.update(
+                "DELETE FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"refreshToken\" = :refreshToken",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("refreshToken", refreshTokenHash));
+    }
+
+    public void deleteAllRefreshSessions(String userId) {
+        jdbc.update(
+                "DELETE FROM " + SESSION_TABLE + " WHERE \"userId\" = :userId",
+                new MapSqlParameterSource("userId", userId));
+    }
+
+    public void clearUserRefreshToken(String userId) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"refreshToken\" = NULL, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                new MapSqlParameterSource("userId", userId));
     }
 
     private List<String> findRoles(String userId) {

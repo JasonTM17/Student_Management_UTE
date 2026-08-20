@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.notNullValue;
+import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,11 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import jakarta.servlet.http.Cookie;
+import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.util.HexFormat;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -163,12 +169,7 @@ class AuthLoginPersistenceTest {
 
     @Test
     void loginIssuesBodyTokensCookiesAndPersistsHashedRefreshSession() throws Exception {
-        MvcResult result = mvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .header("User-Agent", "jest-java-login")
-                        .content("""
-                                {"email":"student@campuscore.edu","password":"password123"}
-                                """))
+        MvcResult result = loginStudent()
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value("student-user"))
                 .andExpect(jsonPath("$.user.email").value("student@campuscore.edu"))
@@ -202,6 +203,135 @@ class AuthLoginPersistenceTest {
         org.junit.jupiter.api.Assertions.assertEquals(0, failedAttempts);
         org.junit.jupiter.api.Assertions.assertEquals(1, sessions);
         org.junit.jupiter.api.Assertions.assertEquals(64, storedRefresh.length());
+    }
+
+    @Test
+    void refreshRequiresCookieCsrfAndRotatesTheStoredRefreshSession() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String oldRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/refresh").cookie(refreshCookie, csrfCookie))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+
+        MvcResult refresh = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .header("User-Agent", "jest-java-refresh"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("student-user"))
+                .andExpect(jsonPath("$.accessToken", notNullValue()))
+                .andExpect(jsonPath("$.refreshToken", notNullValue()))
+                .andExpect(cookie().value("cc_access_token", notNullValue()))
+                .andExpect(cookie().value("cc_refresh_token", notNullValue()))
+                .andExpect(cookie().value("cc_csrf", notNullValue()))
+                .andReturn();
+
+        JsonNode refreshBody = objectMapper.readTree(refresh.getResponse().getContentAsString());
+        String newRefreshToken = refreshBody.get("refreshToken").asText();
+        assertNotEquals(oldRefreshToken, newRefreshToken);
+
+        Integer sessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        String storedRefresh = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, sessions);
+        org.junit.jupiter.api.Assertions.assertNotEquals(sha256(oldRefreshToken), storedRefresh);
+        org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
+    }
+
+    @Test
+    void refreshAcceptsBodyRefreshTokenWithoutCookieForMobileClients() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String oldRefreshToken = loginBody.get("refreshToken").asText();
+
+        MvcResult refresh = mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "jest-java-mobile-refresh")
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(oldRefreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("student-user"))
+                .andExpect(jsonPath("$.accessToken", notNullValue()))
+                .andExpect(jsonPath("$.refreshToken", notNullValue()))
+                .andReturn();
+
+        JsonNode refreshBody = objectMapper.readTree(refresh.getResponse().getContentAsString());
+        String newRefreshToken = refreshBody.get("refreshToken").asText();
+        assertNotEquals(oldRefreshToken, newRefreshToken);
+
+        String storedRefresh = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
+    }
+
+    @Test
+    void logoutRequiresCookieCsrfAndClearsTheRefreshSession() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(post("/api/v1/auth/logout").cookie(accessCookie, refreshCookie, csrfCookie))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .cookie(accessCookie, refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logged out successfully"))
+                .andExpect(cookie().maxAge("cc_access_token", 0))
+                .andExpect(cookie().maxAge("cc_refresh_token", 0))
+                .andExpect(cookie().maxAge("cc_csrf", 0));
+
+        Integer sessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        String storedRefresh = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
+                String.class);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
+        org.junit.jupiter.api.Assertions.assertNull(storedRefresh);
+    }
+
+    @Test
+    void logoutAcceptsBearerAndBodyRefreshTokenForMobileClients() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String accessToken = loginBody.get("accessToken").asText();
+        String refreshToken = loginBody.get("refreshToken").asText();
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .content("""
+                                {"refreshToken":"%s"}
+                                """.formatted(refreshToken)))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Logged out successfully"))
+                .andExpect(cookie().maxAge("cc_access_token", 0))
+                .andExpect(cookie().maxAge("cc_refresh_token", 0))
+                .andExpect(cookie().maxAge("cc_csrf", 0));
+
+        Integer sessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        String storedRefresh = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
+                String.class);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
+        org.junit.jupiter.api.Assertions.assertNull(storedRefresh);
     }
 
     @Test
@@ -310,5 +440,23 @@ class AuthLoginPersistenceTest {
 
     private static LocalDateTime localDateTime(Instant value) {
         return value == null ? null : LocalDateTime.ofInstant(value, ZoneOffset.UTC);
+    }
+
+    private org.springframework.test.web.servlet.ResultActions loginStudent() throws Exception {
+        return mvc.perform(post("/api/v1/auth/login")
+                .contentType(MediaType.APPLICATION_JSON)
+                .header("User-Agent", "jest-java-login")
+                .content("""
+                        {"email":"student@campuscore.edu","password":"password123"}
+                        """));
+    }
+
+    private static String sha256(String value) {
+        try {
+            byte[] digest = MessageDigest.getInstance("SHA-256").digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(digest);
+        } catch (NoSuchAlgorithmException exception) {
+            throw new IllegalStateException("SHA-256 is required", exception);
+        }
     }
 }
