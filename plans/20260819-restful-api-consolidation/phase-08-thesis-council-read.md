@@ -47,6 +47,9 @@ runtime, parity, canary and rollback gates pass.
   H2/Flyway contract, feature-default disabled route, and the follow-up
   `councilsAllowAnExistingRoundWithoutCouncils` assertion, but not a live
   PostgreSQL runtime.
+- The complete `restful-api` Maven test suite also passed locally with the
+  same bounded JVM limits on exact source checkpoint `c884934`, covering the
+  notification persistence, shell contract and thesis test classes together.
 
 ## Remaining limitations
 
