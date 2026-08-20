@@ -287,6 +287,28 @@ class SupportTicketWritePersistenceTest {
     }
 
     @Test
+    void adminAssignsTicketWithoutInventingDisplayName() throws Exception {
+        seedResponse("response-1", "existing-ticket", "agent-1", "agent@campuscore.edu", "Agent One");
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/assign")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"assignedTo\":\"lecturer-1\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").value("existing-ticket"))
+                .andExpect(jsonPath("$.assignedTo").value("lecturer-1"))
+                .andExpect(jsonPath("$.assignedToDisplayName").doesNotExist())
+                .andExpect(jsonPath("$.responses.length()").value(1));
+
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"SupportTicket\""
+                        + " WHERE \"id\" = 'existing-ticket' AND \"assignedTo\" = 'lecturer-1'"
+                        + " AND \"assignedToDisplayName\" IS NULL",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, count);
+    }
+
+    @Test
     void createBoundaryFailsClosedForAnonymousInvalidClaimsAndBadRequests() throws Exception {
         mvc.perform(post("/api/v1/support-tickets")
                         .contentType("application/json")
@@ -389,6 +411,30 @@ class SupportTicketWritePersistenceTest {
                         .content("{\"priority\":\"URGENT\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void assignBoundaryFailsClosedForStudentMissingTicketAndMissingAssignee() throws Exception {
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/assign")
+                        .with(userJwt("user-1", "student@campuscore.edu", "Student", "One"))
+                        .contentType("application/json")
+                        .content("{\"assignedTo\":\"lecturer-1\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(post("/api/v1/support-tickets/missing-ticket/assign")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"assignedTo\":\"lecturer-1\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/assign")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     private static RequestPostProcessor userJwt(

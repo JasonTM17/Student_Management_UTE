@@ -280,6 +280,12 @@ the retirement gates pass.
   priority/status edits plus the legacy `RESOLVED` and `CLOSED` timestamp
   side effects. Assignment, delete, event/notification parity, PostgreSQL write
   rehearsal, canary routing, rollback and public update handoff remain open.
+- Phase 24 backend-first engagement support-ticket assignment foundation:
+  source candidate/HOLD; see `phase-24-engagement-support-ticket-assign.md`.
+  It adds feature-default-off Java `POST /api/v1/support-tickets/{id}/assign`
+  for `ADMIN`/`SUPER_ADMIN`, preserving the legacy `assignedTo`-only update and
+  hydrated ticket response. Delete, event/notification parity, PostgreSQL write
+  rehearsal, canary routing, rollback and public assignment handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

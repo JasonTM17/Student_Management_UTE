@@ -84,10 +84,12 @@ support-ticket response slice adds feature-default-off
 shape, `isInternal=false` default and `OPEN` to `IN_PROGRESS` transition, while
 the support-ticket update slice adds feature-default-off
 `PUT /api/v1/support-tickets/{id}` for admins with partial ticket edits and the
-legacy `RESOLVED`/`CLOSED` timestamp side effects. Assignment, deletion,
-event/notification parity, PostgreSQL write rehearsal, route canary and
-rollback remain owned by the legacy engagement service until proven. The thesis
-assistant/chatbotAI slice covers the web/mobile
+legacy `RESOLVED`/`CLOSED` timestamp side effects. The support-ticket assignment
+slice adds feature-default-off `POST /api/v1/support-tickets/{id}/assign` for
+admins and preserves the legacy `assignedTo`-only update without inventing an
+assignee display name. Deletion, event/notification parity, PostgreSQL write
+rehearsal, route canary and rollback remain owned by the legacy engagement
+service until proven. The thesis assistant/chatbotAI slice covers the web/mobile
 `/api/v1/thesis/assistant/chat` contract with a deterministic local fallback
 response when `THESIS_ASSISTANT_ENABLED=true`; provider-backed LLM mode, prompt
 governance, moderation, telemetry, rate limiting, canary and rollback evidence

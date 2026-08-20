@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.engagement.service.SupportTicketWriteService;
 import io.campuscore.restfulapi.engagement.service.SupportTicketWriteService.CurrentTicketUser;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTicketResponse;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.AssignSupportTicketRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.UpdateSupportTicketRequest;
@@ -60,6 +61,15 @@ public class SupportTicketWriteController {
             @PathVariable String id,
             @Valid @RequestBody UpdateSupportTicketRequest request) {
         return tickets.update(id, request);
+    }
+
+    @PostMapping("{id}/assign")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public SupportTicketResponse assign(
+            @PathVariable String id,
+            @Valid @RequestBody AssignSupportTicketRequest request) {
+        return tickets.assign(id, request);
     }
 
     private static CurrentTicketUser user(Jwt jwt) {
