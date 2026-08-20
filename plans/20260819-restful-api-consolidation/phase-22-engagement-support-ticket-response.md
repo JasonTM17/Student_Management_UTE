@@ -26,6 +26,8 @@ and rollback owner.
 - Preserve current-admin identity mapping from JWT subject/email and first/last
   display-name fallback to email.
 - Preserve `isInternal=false` default when the request omits it.
+- Reject unknown body properties instead of silently ignoring request typos,
+  matching the legacy Nest validation-pipe posture.
 - Preserve legacy behavior where a response to an `OPEN` ticket moves the ticket
   to `IN_PROGRESS`, while responses to already closed/non-open tickets do not
   reopen them.
@@ -39,8 +41,8 @@ and rollback owner.
   - `OPEN` to `IN_PROGRESS` transition;
   - explicit `isInternal=true` and email display fallback;
   - closed ticket response without reopening;
-  - student access denied, missing ticket, invalid JWT claims and missing
-    message validation.
+  - student access denied, missing ticket, invalid JWT claims, missing message
+    validation and unknown-body rejection.
 - The monolith shell contract covers feature-default-off behavior for
   `POST /api/v1/support-tickets/{id}/respond`.
 

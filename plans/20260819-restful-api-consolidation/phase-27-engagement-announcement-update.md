@@ -27,7 +27,10 @@ announcement writer, event publisher and rollback target.
   `targetRoles`, `targetYears`, `isGlobal`, `publishAt`, `expiresAt`,
   `semesterId`, `sectionId` and `lecturerId`.
 - Preserve partial-update behavior: omitted fields remain unchanged, while
-  provided scalar, array and timestamp fields are written.
+  provided scalar, array and timestamp fields are written. Explicit JSON `null`
+  clears nullable timestamp and academic pointer fields.
+- Reject unknown body properties instead of silently ignoring typos, matching
+  the legacy Nest validation-pipe posture.
 - Preserve existing `publishedBy` and `createdAt`; Java does not invent
   academic names or lecturer display names when only IDs are supplied.
 - Preserve feature-default-off behavior so the Java shell returns the stable 404
@@ -40,10 +43,13 @@ announcement writer, event publisher and rollback target.
 - Feature-on H2 tests cover:
   - admin partial update with strings, priority, arrays, global flag, dates and
     academic pointers;
+  - explicit-null clearing for `publishAt`, `expiresAt`, `semesterId`,
+    `sectionId` and `lecturerId`;
   - preservation of `publishedBy` and `createdAt`;
   - no invented semester/course/lecturer display data;
-  - student access denied, missing announcement, invalid priority and invalid
-    target year failure envelopes.
+  - student access denied, missing announcement, unknown body property, invalid
+    priority, invalid target role type and invalid target year failure
+    envelopes.
 - The monolith shell contract covers feature-default-off behavior for
   `PUT /api/v1/announcements/{id}`.
 
@@ -63,6 +69,10 @@ announcement writer, event publisher and rollback target.
   changing `semesterId`, `sectionId` or `lecturerId` could leave the prior
   semester/course/lecturer display snapshot attached. The repository now clears
   those stale snapshot fields when the owning IDs are updated.
+- Independent exact-head review at `0a931d9` then found that omitted and
+  explicit-null update fields were indistinguishable. The DTO/repository now use
+  presence-aware patch values so explicit nulls clear nullable fields while
+  omitted fields remain unchanged.
 
 ## Remaining gates
 

@@ -25,6 +25,8 @@ assignment owner, event publisher, route owner, and rollback target.
   status, `MEDIUM` default priority, JWT subject/email ownership, and display
   name fallback to email.
 - Preserve priority validation for `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL`.
+- Reject unknown body properties instead of silently ignoring request typos,
+  matching the legacy Nest validation-pipe posture.
 - Feature-default-off behavior must continue returning the stable Java 404
   envelope for `POST /api/v1/support-tickets`.
 - Ticket-number generation preserves the legacy `TKT-xxxxx` shape but now
@@ -37,7 +39,7 @@ assignment owner, event publisher, route owner, and rollback target.
 - Feature-on H2 tests cover ticket creation, max-suffix ticket-number
   allocation, default priority/status, explicit priority, email display
   fallback, anonymous access, missing email claim, invalid priority, and
-  validation errors.
+  validation/unknown-body errors.
 - A focused service unit test covers bounded retry after a translated unique-key
   collision.
 - The monolith shell contract covers feature-default-off behavior.

@@ -23,6 +23,8 @@ assignment owner and rollback target.
 ## Compatibility contract
 
 - Preserve the legacy path and request field: `assignedTo`.
+- Reject unknown body properties instead of silently ignoring request typos,
+  matching the legacy Nest validation-pipe posture.
 - Preserve the legacy `assignedTo`-only write; Java does not invent or resolve
   `assignedToDisplayName`.
 - Preserve existing response hydration and current ticket fields after the
@@ -36,7 +38,8 @@ assignment owner and rollback target.
   - admin assignment and hydrated response shape;
   - preservation of `assignedToDisplayName = null`;
   - response hydration after assignment;
-  - student access denied, missing ticket and missing assignee validation.
+  - student access denied, missing ticket, missing assignee validation and
+    unknown-body rejection.
 - The monolith shell contract covers feature-default-off behavior for
   `POST /api/v1/support-tickets/{id}/assign`.
 
