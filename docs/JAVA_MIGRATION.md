@@ -60,10 +60,12 @@ remain required while the old services are still canonical.
 
 The `java-services/restful-api` monolith now contains disabled-by-default,
 read-only candidates for thesis, notification, engagement announcement and
-academic catalog reads. The academic slice covers semester/course list and
-detail routes only. These candidates use JDBC against legacy schemas when their
-feature flags are explicitly enabled under the `persistence` profile; they do
-not add DDL, write data, or own public traffic.
+academic catalog reads plus people student/lecturer profile reads. The academic
+slice covers semester/course list and detail routes only. The people slice
+covers student/lecturer list and detail routes only. These candidates use JDBC
+against legacy schemas when their feature flags are explicitly enabled under
+the `persistence` profile; they do not add DDL, write data, or own public
+traffic.
 
 ## RESTful API auth candidate
 
@@ -72,8 +74,9 @@ behind `AUTH_LOGIN_ENABLED=true`. It verifies BCrypt passwords against the
 migrated legacy `auth` schema, emits and clears the shared `cc_access_token`,
 `cc_refresh_token` and `cc_csrf` browser cookies, returns body tokens for mobile
 clients, records failed login attempts, locks after the fifth failed attempt,
-stores only hashed refresh sessions, rotates refresh tokens, and clears sessions
-on logout. It is not a full auth cutover: password flows, audit publishing,
+stores only hashed refresh sessions, returns the current authenticated user at
+`/api/v1/auth/me`, rotates refresh tokens, and clears sessions on logout. It is
+not a full auth cutover: profile writes, password flows, audit publishing,
 PostgreSQL parity, route canary and rollback evidence remain required before
 public ownership can move.
 

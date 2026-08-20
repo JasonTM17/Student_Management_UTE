@@ -11,6 +11,7 @@ final class ReadOnlyMigrationCandidateCondition implements Condition {
         return enabled(context, "migration.engagement-read.enabled")
                 || enabled(context, "migration.notifications-read.enabled")
                 || enabled(context, "migration.academic-read.enabled")
+                || enabled(context, "migration.people-read.enabled")
                 || enabled(context, "migration.auth-login.enabled");
     }
 

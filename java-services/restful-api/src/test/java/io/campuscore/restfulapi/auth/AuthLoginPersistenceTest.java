@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -271,6 +272,30 @@ class AuthLoginPersistenceTest {
                 "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 String.class);
         org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
+    }
+
+    @Test
+    void meReturnsCurrentUserForBearerAndCookieSessions() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String accessToken = loginBody.get("accessToken").asText();
+        Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
+
+        mvc.perform(get("/api/v1/auth/me")
+                        .header("Authorization", "Bearer " + accessToken))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"))
+                .andExpect(jsonPath("$.email").value("student@campuscore.edu"))
+                .andExpect(jsonPath("$.roles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.permissions[0]").value("thesis:read"))
+                .andExpect(jsonPath("$.studentId").value("student-profile-student-user"))
+                .andExpect(jsonPath("$.student.year").value(2));
+
+        mvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"))
+                .andExpect(jsonPath("$.email").value("student@campuscore.edu"))
+                .andExpect(jsonPath("$.roles[0]").value("STUDENT"));
     }
 
     @Test
