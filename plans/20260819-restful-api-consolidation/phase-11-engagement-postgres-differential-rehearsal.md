@@ -71,27 +71,36 @@ inspection are not substitutes for PostgreSQL parity or rollback proof.
 Verdict: **bounded runtime PASS; production cutover HOLD**.
 
 The exact provenance-bound probe checkpoint was
-`70eaaf260f462928b696395816beba39b8918995`. The Java timestamp source commit
+`27ef0d03a8f7ee36d84eb99fb6189962be94cef3`. The Java timestamp source commit
 was `b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57` and no Java production source
-changed between those identities. The owned probe ran offline Maven
-`clean package` from that tracked-clean HEAD with the selected Java runtime,
-then hashed the resulting Spring Boot artifact before launching it. This binds
-the observed run to one exact clean build; it is not a reproducible-build claim:
+changed between those identities. The owned probe exported only the committed
+Java module from that exact HEAD with `git archive`, extracted it into an
+isolated D-hosted snapshot, and ran offline Maven `clean package` there with a
+narrow environment and the selected Java runtime. It then hashed the resulting
+Spring Boot artifact before launching it. This binds the observed run to one
+exact isolated build; it is not a reproducible-build claim:
 
 - JAR SHA-256:
-  `9A33174446FC1F71982ADE7825CF6E1786BF8FB32389A23D2C35A0871B79B855`;
+  `5BF28281052A90494A4364D53C5C39714FC029684579B280399BDC75A42A5CFE`;
 - Java reference artifact SHA-256:
-  `C1AAF8084CBF25F0E909DD1096624886E1A95C4E34060035C615EB4B6152799D`;
+  `E8031D9B66C17396C0228FA4A5F569055F86A088C51B0529A65E424722C4E9CD`;
 - sequential differential report SHA-256:
-  `E6F3F463C2DC4F97D29123B808AF051B95C903F9E81AD3E0B3BAD6E65F1911CC`;
+  `AB7B297A1978E91E0609D53F1921F1B7A263C7ABA5EF57A199F67D1798C530B3`;
+- committed Java source archive SHA-256:
+  `87BF4485521B45CE0EB89B151556E7C7F0D08EF7C9D33F7E177082EA4CDBFB40`;
 - Maven clean-build log SHA-256:
-  `AF64D41141B08E7674D24E6FFD9045696C0BF6C8D39E98D8604C9F13C55DDFCC`;
+  `5530800164356EC9C6528836BECA18149FBBA35419CDCDB221EB978650C5C6B8`;
 - selected Maven launcher SHA-256:
   `5F9B8EAC523030CD9818DAA0EB337635E06137D0DA95A66A0A5425D668050E12`;
 - selected Java executable SHA-256:
   `94DC54724B34717DAD127855DC8228AF8BC2E021C19B233FFF0DF4525F7698B3`;
 - owned Java log SHA-256:
-  `2FDB65AE07F0117C5529F2B2E156E63418F6B5B2E2B94419DC1BC48820A5B545`;
+  `E504EFF2136F7D153A3F16EED9E64C7F5955C94F02D8934378B044EE0A9EABF2`;
+- selected Git/CMD/TAR/PowerShell executable SHA-256 values:
+  `54194A1AF7CFB6730448CE14B8F2C1DDDD9F950B7F995DC351C1ED16EB179249`,
+  `8DD1EBB0B969370C70A5EE7F7EE347949AA7046AA5E1A33FCD7B1E9415B21FC3`,
+  `9B77D4C912F2EDAE8C241D0ECE1094D2AC068B084269CEAF85D7C7B085D2AE86`,
+  and `7600FFE12DA441FE89D035B13801E8E91D064BC544A27B19A5CF49F6AB8B18F5`;
 - legacy Nest `dist/src/main.js` SHA-256:
   `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`.
 
@@ -131,7 +140,8 @@ instead of accepting caller-supplied identity strings.
 
 The reusable probe is
 `engagement-service/test/engagement-read.rehearsal.cjs`. In one process it runs
-an offline clean Maven build, spawns Java with a fixed structured `-jar` argv,
+an exact-commit `git archive` plus isolated offline clean Maven build, spawns
+Java with a fixed structured `-jar` argv and a narrow allowlisted environment,
 requires the loopback listener PID to equal that owned child PID, captures Java
 responses in memory, verifies that the JAR hash did not change, stops Java, and
 only then starts the in-process Nest application for comparison. It writes the
@@ -152,8 +162,11 @@ Owned Java execution additionally requires the exact loopback URL
 `http://127.0.0.1:56410/`, rejects credentials/query/fragment and redirects,
 rejects the retired split capture mode and any caller-provided reference, and
 binds the listener PID to the child process it spawned from the freshly built
-D-hosted JAR. The report records the Java reference hash, actual clean source
-HEAD, build/JAR/tool/log hashes, owned PID and actual legacy entry-artifact hash.
+D-hosted JAR. Maven and Java receive only required Windows process keys plus
+explicit rehearsal values; inherited Spring/JVM/Maven overrides are not copied.
+The report records the Java reference hash, actual clean source HEAD, source
+archive/build/JAR/tool/log hashes, owned PID and actual legacy entry-artifact
+hash.
 
 Thirteen signed/negative cases produced equal HTTP status and normalized
 content type. Status, successful response body and normalized content type are
@@ -185,9 +198,14 @@ decision and is not represented as full parity.
   all rejected before app import or network use.
 - external reference comparison and the retired split capture mode: both
   rejected before build or network use.
+- build-input/environment contamination regression: an untracked Java source
+  placed inside the normal module and malicious parent `SPRING_APPLICATION_JSON`
+  plus `JAVA_TOOL_OPTIONS` were present during the run; the source archive and
+  JAR excluded the sentinel, the override values were not inherited, and the
+  differential still passed. The temporary sentinel was then removed.
 - exact-head owned Java capture: 13/13 cases PASS with the listener bound to the
-  spawned PID `42080` and the clean-built JAR/hash shown above; Java was stopped
-  before legacy startup and port `56410` was closed after the run.
+  spawned PID `43068` and the isolated clean-built JAR/hash shown above; Java
+  was stopped before legacy startup and port `56410` was closed after the run.
 - sequential differential: 13/13 status/content-type assertions PASS and 7/7
   successful full-body assertions PASS; the six intentional error-envelope
   differences remained visible as `errorBodyParity=false`.
