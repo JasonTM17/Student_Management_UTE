@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { execFileSync } = require('node:child_process');
 const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
@@ -11,12 +12,20 @@ const EXPECTED_META_LIMIT = 20;
 
 async function main() {
   const runRoot = assertSafeEnvironment();
+  const repoRoot = path.resolve(__dirname, '../..');
+  const sourceHead = requireCleanCheckout(repoRoot);
   const corpus = buildCorpus();
   const referenceFile = resolveReferenceFile(runRoot);
 
   if (process.env.CAPTURE_JAVA_REFERENCE === 'true') {
     const javaBaseUrl = requireLoopbackJavaBaseUrl();
-    const artifact = await captureJavaReference(javaBaseUrl, corpus);
+    const javaIdentity = requireJavaIdentity(repoRoot);
+    const artifact = await captureJavaReference(
+      javaBaseUrl,
+      corpus,
+      sourceHead,
+      javaIdentity,
+    );
     fs.mkdirSync(path.dirname(referenceFile), { recursive: true });
     fs.writeFileSync(referenceFile, `${JSON.stringify(artifact, null, 2)}\n`, {
       encoding: 'utf8',
@@ -34,13 +43,19 @@ async function main() {
   }
 
   const reference = referenceFile ? readReference(referenceFile) : null;
+  if (reference) {
+    assert.equal(reference.sourceHead, sourceHead, 'Java and legacy source HEAD');
+  }
   const cases = await runLegacyProbe(corpus, reference);
-  const legacyIdentity = requireLegacyIdentity();
+  const legacyIdentity = requireLegacyIdentity(repoRoot, sourceHead);
   const report = {
     status: 'PASS',
     mode: reference ? 'sequential-differential' : 'legacy-only',
     referenceSourceHead: reference?.sourceHead ?? null,
     referenceArtifactSha256: referenceFile ? fileSha256(referenceFile) : null,
+    javaArtifactPath: reference?.artifactPath ?? null,
+    javaArtifactSha256: reference?.artifactSha256 ?? null,
+    javaProcessId: reference?.javaProcessId ?? null,
     legacySourceHead: legacyIdentity.sourceHead,
     legacyArtifactSha256: legacyIdentity.artifactSha256,
     cases,
@@ -117,6 +132,79 @@ function requireRehearsalRunRoot() {
   return runRoot;
 }
 
+function requireCleanCheckout(repoRoot) {
+  const trackedStatus = runGit(repoRoot, [
+    'status',
+    '--porcelain',
+    '--untracked-files=no',
+  ]);
+  assert.equal(trackedStatus.trim(), '', 'tracked checkout must be clean');
+  const sourceHead = runGit(repoRoot, ['rev-parse', 'HEAD']).trim();
+  assert.match(sourceHead, /^[0-9a-f]{40}$/i, 'actual Git HEAD');
+  return sourceHead.toLowerCase();
+}
+
+function runGit(repoRoot, args) {
+  return execFileSync('git', args, {
+    cwd: repoRoot,
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+}
+
+function requireJavaIdentity(repoRoot) {
+  const configured = process.env.REHEARSAL_JAVA_ARTIFACT_FILE;
+  if (!configured) {
+    throw new Error('REHEARSAL_JAVA_ARTIFACT_FILE is required');
+  }
+  const artifactFile = path.resolve(configured);
+  const expectedArtifact = path.resolve(
+    repoRoot,
+    'java-services/restful-api/target/campuscore-restful-api-0.1.0-SNAPSHOT.jar',
+  );
+  assert.equal(
+    artifactFile.toLowerCase(),
+    expectedArtifact.toLowerCase(),
+    'Java rehearsal artifact path',
+  );
+  const listener = readJavaListener();
+  assert.equal(listener.localAddress, '127.0.0.1', 'Java listen address');
+  assert.ok(
+    listener.commandLine.toLowerCase().includes(artifactFile.toLowerCase()),
+    'Java listener command line must reference the hashed artifact',
+  );
+  return {
+    artifactPath: path.relative(repoRoot, artifactFile).replaceAll('\\', '/'),
+    artifactSha256: fileSha256(artifactFile),
+    processId: listener.processId,
+  };
+}
+
+function readJavaListener() {
+  if (process.platform !== 'win32') {
+    throw new Error('The Phase 11 listener identity check requires Windows');
+  }
+  const script = [
+    "$listener = Get-NetTCPConnection -State Listen -LocalPort 56410 | Where-Object LocalAddress -eq '127.0.0.1' | Select-Object -First 1",
+    "if ($null -eq $listener) { throw 'Java rehearsal listener not found' }",
+    '$process = Get-CimInstance Win32_Process -Filter "ProcessId=$($listener.OwningProcess)"',
+    "if ($null -eq $process) { throw 'Java rehearsal process not found' }",
+    "[pscustomobject]@{ localAddress=$listener.LocalAddress; processId=$listener.OwningProcess; commandLine=$process.CommandLine } | ConvertTo-Json -Compress",
+  ].join('; ');
+  const output = execFileSync('powershell.exe', [
+    '-NoProfile',
+    '-NonInteractive',
+    '-Command',
+    script,
+  ], {
+    encoding: 'utf8',
+    windowsHide: true,
+  });
+  const listener = JSON.parse(output);
+  assert.equal(typeof listener.commandLine, 'string', 'Java command line');
+  return listener;
+}
+
 function resolveReferenceFile(runRoot) {
   const configured = process.env.REHEARSAL_REFERENCE_FILE;
   if (!configured) {
@@ -133,11 +221,28 @@ function resolveReferenceFile(runRoot) {
 }
 
 function requireLoopbackJavaBaseUrl() {
-  const javaBaseUrl = process.env.JAVA_REHEARSAL_BASE_URL;
-  if (!javaBaseUrl?.startsWith('http://127.0.0.1:')) {
-    throw new Error('JAVA_REHEARSAL_BASE_URL must be loopback-only');
+  let javaBaseUrl;
+  try {
+    javaBaseUrl = new URL(process.env.JAVA_REHEARSAL_BASE_URL);
+  } catch {
+    throw new Error('JAVA_REHEARSAL_BASE_URL must be a valid URL');
   }
-  return javaBaseUrl.replace(/\/$/, '');
+  const expected = {
+    protocol: 'http:',
+    hostname: '127.0.0.1',
+    port: '56410',
+    pathname: '/',
+    username: '',
+    password: '',
+    search: '',
+    hash: '',
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    if (javaBaseUrl[field] !== value) {
+      throw new Error(`JAVA_REHEARSAL_BASE_URL ${field} must be ${value}`);
+    }
+  }
+  return javaBaseUrl.origin;
 }
 
 function buildCorpus() {
@@ -285,7 +390,12 @@ function issueToken(user) {
   );
 }
 
-async function captureJavaReference(javaBaseUrl, corpus) {
+async function captureJavaReference(
+  javaBaseUrl,
+  corpus,
+  sourceHead,
+  javaIdentity,
+) {
   const cases = [];
   for (const spec of corpus) {
     const result = await invokeJava(javaBaseUrl, spec);
@@ -299,9 +409,11 @@ async function captureJavaReference(javaBaseUrl, corpus) {
     });
   }
   return {
-    schemaVersion: 1,
-    sourceHead: requireSha('REHEARSAL_SOURCE_HEAD', 40),
-    artifactSha256: requireSha('REHEARSAL_ARTIFACT_SHA256', 64),
+    schemaVersion: 2,
+    sourceHead,
+    artifactPath: javaIdentity.artifactPath,
+    artifactSha256: javaIdentity.artifactSha256,
+    javaProcessId: javaIdentity.processId,
     capturedAt: new Date().toISOString(),
     cases,
   };
@@ -310,6 +422,7 @@ async function captureJavaReference(javaBaseUrl, corpus) {
 async function invokeJava(javaBaseUrl, spec) {
   const response = await fetch(`${javaBaseUrl}${spec.requestPath}`, {
     headers: spec.headers,
+    redirect: 'error',
   });
   const text = await response.text();
   return {
@@ -407,36 +520,28 @@ function normalizeContentType(value) {
 
 function readReference(referenceFile) {
   const artifact = JSON.parse(fs.readFileSync(referenceFile, 'utf8'));
-  assert.equal(artifact.schemaVersion, 1, 'reference schema version');
+  assert.equal(artifact.schemaVersion, 2, 'reference schema version');
   assert.ok(Array.isArray(artifact.cases), 'reference cases');
   assert.match(artifact.sourceHead, /^[0-9a-f]{40}$/i, 'reference source HEAD');
+  assert.equal(
+    artifact.artifactPath,
+    'java-services/restful-api/target/campuscore-restful-api-0.1.0-SNAPSHOT.jar',
+    'reference Java artifact path',
+  );
   assert.match(artifact.artifactSha256, /^[0-9a-f]{64}$/i, 'reference JAR SHA-256');
+  assert.ok(Number.isInteger(artifact.javaProcessId), 'reference Java process ID');
   return artifact;
 }
 
-function requireLegacyIdentity() {
-  const sourceHead = requireSha('REHEARSAL_LEGACY_SOURCE_HEAD', 40);
-  const expectedArtifactSha256 = requireSha(
-    'REHEARSAL_LEGACY_ARTIFACT_SHA256',
-    64,
-  );
+function requireLegacyIdentity(repoRoot, sourceHead) {
   const entry = path.resolve(__dirname, '../dist/src/main.js');
-  const artifactSha256 = fileSha256(entry);
   assert.equal(
-    artifactSha256,
-    expectedArtifactSha256,
-    'legacy Nest entry artifact SHA-256',
+    entry.toLowerCase(),
+    path.resolve(repoRoot, 'engagement-service/dist/src/main.js').toLowerCase(),
+    'legacy Nest entry path',
   );
+  const artifactSha256 = fileSha256(entry);
   return { sourceHead, artifactSha256 };
-}
-
-function requireSha(name, length) {
-  const value = process.env[name];
-  const pattern = new RegExp(`^[0-9a-f]{${length}}$`, 'i');
-  if (!value || !pattern.test(value)) {
-    throw new Error(`${name} must be a ${length}-character hexadecimal identity`);
-  }
-  return value.toLowerCase();
 }
 
 function fileSha256(file) {
