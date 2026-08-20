@@ -76,6 +76,13 @@ qualified `notifications.notification` reads, an explicit
 `migration.notifications-read.enabled` flag, and no Flyway migration or write
 path. The default route-disabled contract remains covered.
 
+The current local compose PostgreSQL stack is **not** the required fixture: a
+catalog-only read on 2026-08-20 found the `notifications` schema but no
+`notifications.notification` table, and a legacy notification-service log
+showed a database-connectivity error. No bootstrap, migration, restart, or
+other mutation was attempted. Treat this as `BLOCKED_CAPABILITY` for the
+PostgreSQL gate, not as proof of absence in the intended legacy deployment.
+
 The existing standalone Java notification service is useful as source
 material, but it is not proof for the monolith: it currently has separate
 application configuration and its list implementation must be checked for

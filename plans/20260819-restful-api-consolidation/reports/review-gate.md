@@ -2,27 +2,34 @@
 
 ## Review ledger snapshot
 
-- Reviewed exact head: `01c2155e9b95b5a41b44e9f2934256fed797b958`
+- Reviewed exact head: `7f389f2deaaba53ad5f7368b9136f48cab41685a`
 - Prior ledger freeze: `6f9a2dab74be6dd9cee3f638949f00390d664dc6`
 - Branch: `feature/java-thesis-platform`
 - Review mode: read-only, independent sidecar tasks
 - Scope: whether the current bounded Java, Stitch web and native mobile work is
   safe to continue without an unsafe public collapse
 
-## Exact-head verdicts for `01c2155`
+## Exact-head verdicts for `7f389f2`
 
 | Reviewer | Verdict | Meaning |
 | --- | --- | --- |
-| Advisor | `HOLD` | The source atlas records 22 named Stitch screens (9 desktop, 13 mobile) plus one supplementary record, and the native registry asserts 23 routes; browser visual capture, Expo/device runtime, and live API proof remain `NOT_RUN`. |
-| Kongming | `HOLD` | The planned notification GET slice preserves Node as writer/public/realtime owner, but isolated PostgreSQL permissions, subject isolation, differential parity, and rollback evidence are missing. |
-| Wukong | `NOT_FALSIFIED` | The bounded mobile session/route claim was not falsified after restricting preview entry to `auth.signIn` plus preview mode; this is source-level only and does not prove server authorization. |
+| Advisor | `HOLD` | Stitch evidence remains 22 named references plus a 23-route native source atlas; browser visual capture, Expo/device runtime, live auth, and client cutover proof remain `NOT_RUN`. |
+| Kongming | `CONDITIONAL` | The notification candidate can continue only as a disabled, read-only validation slice; public cutover/writer handoff remains `HOLD` pending PostgreSQL, auth, differential, canary, and rollback proof. |
+| Wukong | `NOT_FALSIFIED` | The candidate exposes only subject-derived, feature-gated GET routes; the inspected JDBC adapter has no mutation path and tests cover subject isolation. This is source/H2 evidence, not upstream-token or PostgreSQL proof. |
 
-The branch gate is therefore **HOLD**, not acceptance. Wukong closes only the
-specific mobile source-level falsification found at `b5df849`; Advisor and
-Kongming still require runtime and migration evidence. These verdicts do not
-approve authenticated parity, visual fidelity, Java cutover, or production
-readiness. A later documentation-only commit does not create implementation
-approval.
+The branch gate is therefore **HOLD**, not acceptance. The source candidate
+may continue to bounded runtime validation, but none of these verdicts approve
+authenticated parity, visual fidelity, Java cutover, writer handoff, or
+production readiness. A later documentation-only commit does not create a new
+implementation approval.
+
+## Previous exact-head client/planning review
+
+The `01c2155e9b95b5a41b44e9f2934256fed797b958` review recorded Advisor
+`HOLD`, Kongming `HOLD`, and Wukong `NOT_FALSIFIED` for the earlier Stitch
+mobile/session and notification-planning snapshot. It remains historical
+evidence only; the current candidate verdicts above supersede it for this
+branch head.
 
 ## Historical baseline verdicts
 

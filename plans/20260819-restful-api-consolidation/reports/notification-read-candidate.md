@@ -65,13 +65,33 @@ Environment: Windows 11, Maven 3.9.12, Java 24.0.2, H2 2.3, local checkout.
 | Default route-disabled assertion | `PASS` | Proves fail-closed configuration, not edge behavior. |
 | `git diff --check` | `PASS` before staging | Must rerun at final commit. |
 
+## Observed local PostgreSQL/runtime audit
+
+On 2026-08-20, a read-only `psql` transaction ran inside the existing local
+`campuscore-db` container. It queried only catalog metadata and ended with
+`ROLLBACK`; it did not inspect notification rows, alter database state, or
+print credentials.
+
+Result: the `notifications` schema exists, but
+`to_regclass('notifications.notification')` returned absent. The catalog query
+therefore returned no candidate columns or indexes. The local legacy
+notification-service logs also contain a database-connectivity error during a
+readiness check. This stack is not an isolated restored notification fixture
+and cannot validate table shape, permissions, authenticated parity, or a Java
+shadow run.
+
+Status: `BLOCKED_CAPABILITY` for PostgreSQL acceptance in this environment;
+not a failure of the Java source candidate and not permission to initialize,
+migrate, restart, or otherwise mutate the shared local stack.
+
 ## Open runtime gates
 
 The candidate remains `HOLD` until all of the following are observed on an
 isolated restored PostgreSQL copy and the exact reviewed implementation:
 
-1. The legacy table schema, casing, timestamp precision, and index behavior
-   are inspected without granting the Java process write or DDL permission.
+1. An isolated restored fixture contains the legacy table; its schema, casing,
+   timestamp precision, and index behavior are inspected without granting the
+   Java process write or DDL permission.
 2. Real bearer/cookie auth proves the JWT subject format and rejects missing,
    malformed, and cross-user access cases.
 3. Node and Java responses are compared against the same immutable fixture for

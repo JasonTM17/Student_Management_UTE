@@ -22,6 +22,12 @@ than reference-diff evidence and several current routes/states are not covered.
   admin academic-years, classrooms, departments, enrollments, lecturers,
   sections, semesters; lecturer grade detail; dashboard sign-out; and thesis
   topic detail.
+- Fresh browser smoke on 2026-08-20: the locally running public landing page
+  rendered at 1440px, 390px, and 768px with zero measured horizontal overflow;
+  the page console returned no errors. This is a limited runtime observation:
+  the `campuscore-frontend:local` image has no source-revision label, so it is
+  not accepted as exact-current-source, authenticated, or Stitch pixel-diff
+  evidence.
 - The native scaffold now defines 23 unique registry-to-component bindings
   under `mobile/`; 13 direct mobile Stitch references are checked against the
   shared metadata ledger. The read-only audit snapshot reported zero native
@@ -55,7 +61,9 @@ than reference-diff evidence and several current routes/states are not covered.
 
 ## Remaining P0/P1 gates
 
-- Fresh browser/Playwright visual rerun is `NOT_RUN` in this environment.
+- Exact-source browser/Playwright visual rerun remains `NOT_RUN`; the public
+  landing-page-only browser smoke does not cover authenticated routes or a
+  Stitch reference diff.
 - Capture all 38 route families at desktop, 390px, and 768–1023px widths,
   including both locales and the ten missing routes.
 - Add normalized/reference-size Stitch diff or an explicitly reviewed visual
