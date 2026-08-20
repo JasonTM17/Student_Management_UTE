@@ -338,7 +338,11 @@ function collectImplementedAppRoutes() {
 function collectCoveredE2ERoutes() {
   const coveredRoutes = new Set([
     '/admin',
+    '/admin/thesis',
     '/dashboard/thesis',
+    '/dashboard/thesis/[roundId]',
+    '/dashboard/thesis/councils',
+    '/dashboard/thesis/reviews',
     '/dashboard/thesis/topics/[id]',
     '/dashboard/lecturer/grades/[id]',
     '/dashboard/sign-out',
