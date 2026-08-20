@@ -84,7 +84,13 @@ async function main() {
     referenceArtifactSha256: referenceFile ? fileSha256(referenceFile) : null,
     javaArtifactPath: reference?.artifactPath ?? null,
     javaArtifactSha256: reference?.artifactSha256 ?? null,
+    javaSourceArchiveSha256: reference?.sourceArchiveSha256 ?? null,
+    tarExecutableSha256: reference?.tarExecutableSha256 ?? null,
+    powershellExecutableSha256:
+      reference?.powershellExecutableSha256 ?? null,
     javaBuildLogSha256: reference?.buildLogSha256 ?? null,
+    cmdExecutableSha256: reference?.cmdExecutableSha256 ?? null,
+    gitExecutableSha256: reference?.gitExecutableSha256 ?? null,
     mavenExecutableSha256: reference?.mavenExecutableSha256 ?? null,
     javaExecutableSha256: reference?.javaExecutableSha256 ?? null,
     javaLogSha256: reference?.javaLogSha256 ?? null,
@@ -178,9 +184,14 @@ function requireCleanCheckout(repoRoot) {
 }
 
 function runGit(repoRoot, args) {
-  return execFileSync('git', args, {
+  const gitExecutable = requireExecutable(
+    'REHEARSAL_GIT_EXECUTABLE',
+    'git.exe',
+  );
+  return execFileSync(gitExecutable, args, {
     cwd: repoRoot,
     encoding: 'utf8',
+    env: buildChildEnvironment({ GIT_CONFIG_NOSYSTEM: '1' }),
     windowsHide: true,
   });
 }
@@ -190,20 +201,76 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
     'REHEARSAL_MAVEN_EXECUTABLE',
     'mvn.cmd',
   );
-  const moduleRoot = path.resolve(repoRoot, 'java-services/restful-api');
+  const mavenRepository = requireDirectory('REHEARSAL_MAVEN_REPOSITORY');
+  const sourceArchive = path.resolve(
+    runRoot,
+    `java-source-${sourceHead.slice(0, 12)}.tar`,
+  );
+  const sourceSnapshot = path.resolve(
+    runRoot,
+    `java-source-${sourceHead.slice(0, 12)}`,
+  );
+  if (fs.existsSync(sourceArchive) || fs.existsSync(sourceSnapshot)) {
+    throw new Error('Isolated Java source snapshot must not already exist');
+  }
+  runGit(repoRoot, [
+    'archive',
+    '--format=tar',
+    '-o',
+    sourceArchive,
+    sourceHead,
+    'java-services/restful-api',
+  ]);
+  fs.mkdirSync(sourceSnapshot, { recursive: false });
+  const tarExecutable = requireExecutable(
+    'REHEARSAL_TAR_EXECUTABLE',
+    'tar.exe',
+  );
+  const cmdExecutable = requireExecutable(
+    'REHEARSAL_CMD_EXECUTABLE',
+    'cmd.exe',
+  );
+  execFileSync(tarExecutable, ['-xf', sourceArchive, '-C', sourceSnapshot], {
+    env: buildChildEnvironment({}),
+    windowsHide: true,
+  });
+  const moduleRoot = path.resolve(
+    sourceSnapshot,
+    'java-services/restful-api',
+  );
+  assert.ok(fs.existsSync(path.join(moduleRoot, 'pom.xml')), 'archived Java pom');
+  assert.ok(!fs.existsSync(path.join(sourceSnapshot, '.git')), 'archive has no Git metadata');
+  const settingsFile = path.resolve(
+    sourceSnapshot,
+    'rehearsal-maven-settings.xml',
+  );
+  fs.writeFileSync(
+    settingsFile,
+    [
+      '<settings xmlns="http://maven.apache.org/SETTINGS/1.2.0">',
+      `  <localRepository>${escapeXml(mavenRepository)}</localRepository>`,
+      '  <offline>true</offline>',
+      '</settings>',
+      '',
+    ].join('\n'),
+    { encoding: 'utf8', flag: 'wx' },
+  );
   const mavenCommand =
-    `call "${mavenExecutable}" -o -DskipTests clean package`;
+    `call ${quoteCmdArgument(mavenExecutable)} -o ` +
+    `-s ${quoteCmdArgument(settingsFile)} ` +
+    `-gs ${quoteCmdArgument(settingsFile)} -DskipTests clean package`;
   const buildOutput = execFileSync(
-    process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe',
+    cmdExecutable,
     ['/d', '/s', '/c', mavenCommand],
     {
       cwd: moduleRoot,
       encoding: 'utf8',
-      env: {
-        ...process.env,
+      env: buildChildEnvironment({
+        ComSpec: cmdExecutable,
         JAVA_HOME: path.dirname(path.dirname(javaExecutable)),
         MAVEN_OPTS: '-Xms32m -Xmx192m -XX:MaxMetaspaceSize=160m',
-      },
+        MAVEN_SKIP_RC: 'true',
+      }),
       maxBuffer: 20 * 1024 * 1024,
       windowsHide: true,
       windowsVerbatimArguments: true,
@@ -220,15 +287,24 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
   );
   fs.writeFileSync(buildLog, buildOutput, { encoding: 'utf8', flag: 'wx' });
   const artifactFile = path.resolve(
-    repoRoot,
+    sourceSnapshot,
     'java-services/restful-api/target/campuscore-restful-api-0.1.0-SNAPSHOT.jar',
   );
   return {
     artifactFile,
-    artifactPath: path.relative(repoRoot, artifactFile).replaceAll('\\', '/'),
+    artifactPath: path.relative(runRoot, artifactFile).replaceAll('\\', '/'),
     artifactSha256: fileSha256(artifactFile),
     buildLogSha256: fileSha256(buildLog),
     mavenExecutableSha256: fileSha256(mavenExecutable),
+    cmdExecutableSha256: fileSha256(cmdExecutable),
+    gitExecutableSha256: fileSha256(
+      requireExecutable('REHEARSAL_GIT_EXECUTABLE', 'git.exe'),
+    ),
+    sourceArchiveSha256: fileSha256(sourceArchive),
+    tarExecutableSha256: fileSha256(tarExecutable),
+    powershellExecutableSha256: fileSha256(
+      requireExecutable('REHEARSAL_POWERSHELL_EXECUTABLE', 'powershell.exe'),
+    ),
   };
 }
 
@@ -244,6 +320,45 @@ function requireExecutable(environmentKey, expectedName) {
     `${environmentKey} executable name`,
   );
   return executable;
+}
+
+function requireDirectory(environmentKey) {
+  const configured = process.env[environmentKey];
+  if (!configured) {
+    throw new Error(`${environmentKey} is required`);
+  }
+  const directory = fs.realpathSync(path.resolve(configured));
+  assert.ok(fs.statSync(directory).isDirectory(), `${environmentKey} directory`);
+  return directory;
+}
+
+function quoteCmdArgument(value) {
+  if (/["&|<>^%!]/.test(value)) {
+    throw new Error('Maven command path contains an unsupported cmd metacharacter');
+  }
+  return `"${value}"`;
+}
+
+function escapeXml(value) {
+  return value
+    .replaceAll('&', '&amp;')
+    .replaceAll('<', '&lt;')
+    .replaceAll('>', '&gt;')
+    .replaceAll('"', '&quot;')
+    .replaceAll("'", '&apos;');
+}
+
+function buildChildEnvironment(overrides) {
+  const environment = {};
+  for (const key of ['SystemRoot', 'WINDIR', 'TEMP', 'TMP']) {
+    const inheritedKey = Object.keys(process.env).find(
+      (candidate) => candidate.toLowerCase() === key.toLowerCase(),
+    );
+    if (inheritedKey && process.env[inheritedKey]) {
+      environment[key] = process.env[inheritedKey];
+    }
+  }
+  return { ...environment, ...overrides };
 }
 
 async function startOwnedJava(
@@ -266,8 +381,7 @@ async function startOwnedJava(
   const logHandle = fs.openSync(javaLog, 'wx');
   const child = spawn(javaExecutable, javaArgs, {
     cwd: runRoot,
-    env: {
-      ...process.env,
+    env: buildChildEnvironment({
       SERVER_PORT: '56410',
       SERVER_ADDRESS: '127.0.0.1',
       SPRING_PROFILES_ACTIVE: 'persistence',
@@ -279,7 +393,7 @@ async function startOwnedJava(
       ENGAGEMENT_READ_ENABLED: 'true',
       FLYWAY_ENABLED: 'false',
       JWT_SECRET: process.env.JWT_SECRET,
-    },
+    }),
     stdio: ['ignore', logHandle, logHandle],
     windowsHide: true,
   });
@@ -336,7 +450,13 @@ function requireOwnedJavaIdentity(repoRoot, buildIdentity, ownedJava) {
   return {
     artifactPath: buildIdentity.artifactPath,
     artifactSha256: buildIdentity.artifactSha256,
+    sourceArchiveSha256: buildIdentity.sourceArchiveSha256,
+    tarExecutableSha256: buildIdentity.tarExecutableSha256,
+    powershellExecutableSha256:
+      buildIdentity.powershellExecutableSha256,
     buildLogSha256: buildIdentity.buildLogSha256,
+    cmdExecutableSha256: buildIdentity.cmdExecutableSha256,
+    gitExecutableSha256: buildIdentity.gitExecutableSha256,
     mavenExecutableSha256: buildIdentity.mavenExecutableSha256,
     javaExecutableSha256: ownedJava.javaExecutableSha256,
     processId: ownedJava.child.pid,
@@ -354,7 +474,12 @@ async function stopOwnedJava(child) {
     new Promise((resolve) => setTimeout(() => resolve(false), 10_000)),
   ]);
   if (!exited) {
-    execFileSync('taskkill.exe', ['/PID', String(child.pid), '/T', '/F'], {
+    const taskkillExecutable = requireExecutable(
+      'REHEARSAL_TASKKILL_EXECUTABLE',
+      'taskkill.exe',
+    );
+    execFileSync(taskkillExecutable, ['/PID', String(child.pid), '/T', '/F'], {
+      env: buildChildEnvironment({}),
       windowsHide: true,
     });
     await once(child, 'exit');
@@ -370,13 +495,18 @@ function readJavaListener() {
     "if ($null -eq $listener) { throw 'Java rehearsal listener not found' }",
     "[pscustomobject]@{ localAddress=$listener.LocalAddress; processId=$listener.OwningProcess } | ConvertTo-Json -Compress",
   ].join('; ');
-  const output = execFileSync('powershell.exe', [
+  const powershellExecutable = requireExecutable(
+    'REHEARSAL_POWERSHELL_EXECUTABLE',
+    'powershell.exe',
+  );
+  const output = execFileSync(powershellExecutable, [
     '-NoProfile',
     '-NonInteractive',
     '-Command',
     script,
   ], {
     encoding: 'utf8',
+    env: buildChildEnvironment({}),
     windowsHide: true,
   });
   const listener = JSON.parse(output);
@@ -601,7 +731,13 @@ async function captureJavaReference(
     sourceHead,
     artifactPath: javaIdentity.artifactPath,
     artifactSha256: javaIdentity.artifactSha256,
+    sourceArchiveSha256: javaIdentity.sourceArchiveSha256,
+    tarExecutableSha256: javaIdentity.tarExecutableSha256,
+    powershellExecutableSha256:
+      javaIdentity.powershellExecutableSha256,
     buildLogSha256: javaIdentity.buildLogSha256,
+    cmdExecutableSha256: javaIdentity.cmdExecutableSha256,
+    gitExecutableSha256: javaIdentity.gitExecutableSha256,
     mavenExecutableSha256: javaIdentity.mavenExecutableSha256,
     javaExecutableSha256: javaIdentity.javaExecutableSha256,
     javaProcessId: javaIdentity.processId,
