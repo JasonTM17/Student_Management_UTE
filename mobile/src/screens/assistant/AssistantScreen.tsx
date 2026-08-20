@@ -75,4 +75,3 @@ const styles = StyleSheet.create({
   composer: { padding: tokens.spacing.md },
   progressButton: { marginTop: tokens.spacing.sm },
 });
-

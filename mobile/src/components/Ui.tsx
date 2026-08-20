@@ -463,4 +463,3 @@ const progressTones = {
   success: { backgroundColor: tokens.colors.success },
   warning: { backgroundColor: tokens.colors.warning },
 } satisfies Record<NonNullable<ProgressBarProps['tone']>, ViewStyle>;
-

@@ -57,4 +57,3 @@ export const screenComponents: Record<ScreenName, ComponentType<MobileScreenProp
   'lecturer.grading': LecturerGradingScreen,
   'lecturer.attendance': LecturerAttendanceScreen,
 };
-

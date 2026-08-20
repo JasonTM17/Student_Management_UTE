@@ -129,4 +129,3 @@ const styles = StyleSheet.create({
   menuLabel: { flex: 1, marginLeft: tokens.spacing.sm },
   menuNote: { paddingTop: tokens.spacing.sm },
 });
-

@@ -210,4 +210,3 @@ const styles = StyleSheet.create({
   progressHero: { padding: tokens.spacing.lg },
   evaluationHero: { padding: tokens.spacing.lg },
 });
-
