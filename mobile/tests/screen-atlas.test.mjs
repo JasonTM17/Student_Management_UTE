@@ -11,6 +11,7 @@ const readme = fs.readFileSync(path.join(mobileRoot, 'README.md'), 'utf8');
 const navigator = fs.readFileSync(path.join(mobileRoot, 'src/navigation/MobileNavigator.tsx'), 'utf8');
 const bottomNavigation = fs.readFileSync(path.join(mobileRoot, 'src/components/BottomNavigation.tsx'), 'utf8');
 const signIn = fs.readFileSync(path.join(mobileRoot, 'src/screens/auth/SignInScreen.tsx'), 'utf8');
+const assistant = fs.readFileSync(path.join(mobileRoot, 'src/screens/assistant/AssistantScreen.tsx'), 'utf8');
 const navigationTypes = fs.readFileSync(path.join(mobileRoot, 'src/navigation/types.ts'), 'utf8');
 const screenComponents = fs.readFileSync(path.join(mobileRoot, 'src/screens/index.ts'), 'utf8');
 const stitchMetadata = JSON.parse(
@@ -113,4 +114,15 @@ test('Stitch mobile references stay traceable and preview sign-in does not imper
   assert.match(signIn, /No account is authenticated until the Java auth contract is implemented and verified/);
   assert.match(signIn, /enters the app only after a bearer token is returned/);
   assert.match(readme, /role-specific bottom bar/);
+});
+
+test('mobile assistant keeps preview local and calls the Java route only in live mode', () => {
+  assert.match(assistant, /const isPreview = apiClient\.mode === 'preview'/);
+  assert.match(assistant, /if \(isPreview\) \{/);
+  assert.match(assistant, /Preview noted\. Live mode will answer through the Java assistant contract after authentication\./);
+  assert.match(assistant, /campusApi\.assistantChat\(trimmedMessage, 'en'\)/);
+  assert.match(assistant, /reply\.degraded/);
+  assert.match(assistant, /Local fallback · \$\{reply\.model\}/);
+  assert.match(assistant, /The Java assistant route could not answer yet/);
+  assert.match(assistant, /loading=\{isSending\}/);
 });

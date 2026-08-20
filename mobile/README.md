@@ -60,8 +60,10 @@ inside the explicit preview state and is never an authorization substitute.
 GET/POST/PATCH/PUT/DELETE helpers plus named probes for auth, identity, health,
 notifications, thesis topics, and the assistant route. The assistant seam sends
 `{ message, locale }` and expects the Java/web-compatible
-`{ answer, model, degraded }` shape. The current Java RESTful API shell only
-publishes a subset of those contracts; the remaining screen families
+`{ answer, model, degraded }` shape. The assistant screen keeps preview
+responses local, then calls the Java assistant route only in explicit live mode
+after sign-in has supplied a bearer token. The current Java RESTful API shell
+only publishes a subset of those contracts; the remaining screen families
 intentionally use representative local data until their public routes are cut
 over.
 

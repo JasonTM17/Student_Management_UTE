@@ -78,6 +78,11 @@ evidence required by this phase.
   `/auth/login` only in explicit live mode, stores the returned bearer token in
   memory, and enters `authenticated` only after a token-bearing response.
 
+- `npm test --prefix mobile`: PASS, 6/6 dependency-free atlas/API/navigation
+  tests after wiring the assistant screen. Preview assistant responses remain
+  local; explicit live mode calls the Java `/thesis/assistant/chat` route after
+  bearer sign-in and surfaces the Java `degraded` fallback label.
+
 This is source-level client evidence only. It is not Expo typecheck, emulator,
 device, live Java API, authenticated E2E, gateway canary, or production cutover
 evidence.
