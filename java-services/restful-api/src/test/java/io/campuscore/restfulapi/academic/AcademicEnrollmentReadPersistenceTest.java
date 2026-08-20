@@ -130,6 +130,13 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(jsonPath("$.grades.length()").value(2))
                 .andExpect(jsonPath("$.calculatedTotal").value(86.0))
                 .andExpect(jsonPath("$.totalWeight").value(100.0));
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-2").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollment.id").value("enrollment-2"))
+                .andExpect(jsonPath("$.grades.length()").value(0))
+                .andExpect(jsonPath("$.calculatedTotal").doesNotExist())
+                .andExpect(jsonPath("$.totalWeight").value(0));
     }
 
     @Test
@@ -472,6 +479,13 @@ class AcademicEnrollmentReadPersistenceTest {
                 "grade-item-2",
                 "enrollment-1",
                 new java.math.BigDecimal("90.00"));
+        jdbc.update(
+                "INSERT INTO \"academic\".\"StudentGrade\""
+                        + " (\"id\", \"gradeItemId\", \"enrollmentId\", \"score\") VALUES (?, ?, ?, ?)",
+                "student-grade-cross-section",
+                "grade-item-1",
+                "enrollment-2",
+                new java.math.BigDecimal("99.00"));
     }
 
     private void insertUser(String id, String email, String firstName, String lastName) {

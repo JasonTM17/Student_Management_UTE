@@ -351,7 +351,7 @@ public class AcademicEnrollmentReadService {
         Map<String, StudentGradeAccumulator> grouped = new LinkedHashMap<>();
         for (StudentGradeRow row : rows) {
             StudentGradeAccumulator accumulator = grouped.computeIfAbsent(row.enrollmentId(), ignored -> new StudentGradeAccumulator(row));
-            if (row.gradeId() != null) {
+            if (row.gradeId() != null && row.gradeItemId() != null) {
                 accumulator.grades.add(new StudentGradeLine(
                         row.gradeId(),
                         row.gradeItemId(),
