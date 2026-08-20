@@ -246,4 +246,3 @@ const styles = StyleSheet.create({
   secondaryButton: { marginTop: tokens.spacing.sm },
   attendanceSummary: { padding: tokens.spacing.md },
 });
-

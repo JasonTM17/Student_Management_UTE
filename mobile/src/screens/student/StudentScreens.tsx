@@ -402,4 +402,3 @@ const styles = StyleSheet.create({
   profileCopy: { flex: 1, marginLeft: tokens.spacing.md },
   signOut: { marginTop: tokens.spacing.md },
 });
-
