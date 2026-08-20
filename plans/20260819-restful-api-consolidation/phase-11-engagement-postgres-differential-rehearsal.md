@@ -70,16 +70,20 @@ inspection are not substitutes for PostgreSQL parity or rollback proof.
 
 Verdict: **bounded runtime PASS; production cutover HOLD**.
 
-The exact source checkpoint was
-`b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57`. The rebuilt Spring Boot artifact
-was deterministic across the pre-commit and exact-head package runs:
+The exact guarded-probe checkpoint was
+`8dfda244c46107d345a02e0c4e1efd8cbf4f7b91`. The Java timestamp source commit
+was `b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57` and no Java production source
+changed between those identities. The rebuilt Spring Boot artifact was
+deterministic across the pre-commit and exact-head package runs:
 
 - JAR SHA-256:
   `1866AA8719B67A218D77C11CA1FE0A6087C0C9451A9EE099F6C64F73BD929BE8`;
 - Java reference artifact SHA-256:
-  `08A4FCBF60638D7AF4DDE62896F9E48407AA33273245A987FE5BC4E60F5DCF01`;
+  `AA54C871E8F1F331E47FC1D96A8598E7FF7023B533438D12714A3A30158E5539`;
 - sequential differential report SHA-256:
-  `A2F23D8B805A811E3CC2C5F6233FD5CBD5966382BE5568C852FB2AC94261B9C4`.
+  `A2B074B770F5C8CC76F0F4BAA18BAAEA7D14A239E71915DA9A3E1248B2E5BFF9`;
+- legacy Nest `dist/src/main.js` SHA-256:
+  `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`.
 
 The response artifacts are outside Git in the D-hosted Phase 11 recovery root.
 They contain response data and source/artifact identities, but no bearer or
@@ -121,8 +125,20 @@ shape was selected because the C drive had only about 0.3 GiB free and a prior
 Jest/ts-jest attempt exhausted its bounded Node heap before running tests; that
 attempt remains `NOT_RUN`, not a functional failure.
 
+The guarded checkpoint fails before importing `AppModule` unless every
+isolation invariant is present: `NODE_ENV=test`; no inherited RabbitMQ URL; an
+exact `postgresql://engagement_reader@127.0.0.1:56432/engagement_rehearsal`
+target with the `engagement` schema; a D-hosted Phase 11 run root; and a live
+`postmaster.pid` whose data directory, port, listen address and ready marker
+match that root. Reference and report paths must be descendants of the same
+root. The probe deletes the absent RabbitMQ environment key before Nest config
+loads, so an `.env` file or inherited broker URL cannot activate queue setup.
+The report also records and verifies the exact Java reference SHA, exact legacy
+source HEAD and legacy entry-artifact SHA.
+
 Thirteen signed/negative cases produced equal HTTP status and normalized
-content type:
+content type. Status, successful response body and normalized content type are
+assertions; a mismatch cannot produce `PASS`:
 
 - student bearer and cookie, lecturer bearer and combined admin filters;
 - student/admin pagination and an empty page;
@@ -145,6 +161,8 @@ decision and is not represented as full parity.
 ### Verification observed at the exact checkpoint
 
 - `node --check engagement-service/test/engagement-read.rehearsal.cjs`: PASS.
+- negative preflight cases for a substring-smuggled active database URL,
+  inherited RabbitMQ URL and C-hosted run root: all rejected before app import.
 - focused `AnnouncementReadPersistenceTest`: 6/6 PASS.
 - full Java test suite: 45/45 PASS, zero failure/error/skip, run after the exact
   source commit.
