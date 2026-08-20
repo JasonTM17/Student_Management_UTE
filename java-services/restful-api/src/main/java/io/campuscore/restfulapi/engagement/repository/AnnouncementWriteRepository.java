@@ -132,19 +132,25 @@ public class AnnouncementWriteRepository {
             List<String> assignments,
             List<SqlBinder> binders,
             String column,
-            String value) {
-        if (value != null) {
+            PatchValue<String> value) {
+        if (value.present()) {
             assignments.add("\"" + column + "\" = ?");
-            binders.add((statement, index, ignored) -> statement.setString(index, value));
+            binders.add((statement, index, ignored) -> {
+                if (value.value() == null) {
+                    statement.setNull(index, Types.VARCHAR);
+                } else {
+                    statement.setString(index, value.value());
+                }
+            });
         }
     }
 
     private static void clearString(
             List<String> assignments,
             List<SqlBinder> binders,
-            String ownerValue,
+            PatchValue<String> ownerValue,
             String column) {
-        if (ownerValue != null) {
+        if (ownerValue.present()) {
             assignments.add("\"" + column + "\" = ?");
             binders.add((statement, index, ignored) -> statement.setNull(index, Types.VARCHAR));
         }
@@ -154,11 +160,16 @@ public class AnnouncementWriteRepository {
             List<String> assignments,
             List<SqlBinder> binders,
             String column,
-            List<String> values) {
-        if (values != null) {
+            PatchValue<List<String>> values) {
+        if (values.present()) {
             assignments.add("\"" + column + "\" = ?");
-            binders.add((statement, index, connection) ->
-                    statement.setArray(index, connection.createArrayOf("VARCHAR", values.toArray())));
+            binders.add((statement, index, connection) -> {
+                if (values.value() == null) {
+                    statement.setNull(index, Types.ARRAY);
+                } else {
+                    statement.setArray(index, connection.createArrayOf("VARCHAR", values.value().toArray()));
+                }
+            });
         }
     }
 
@@ -166,11 +177,16 @@ public class AnnouncementWriteRepository {
             List<String> assignments,
             List<SqlBinder> binders,
             String column,
-            List<Integer> values) {
-        if (values != null) {
+            PatchValue<List<Integer>> values) {
+        if (values.present()) {
             assignments.add("\"" + column + "\" = ?");
-            binders.add((statement, index, connection) ->
-                    statement.setArray(index, connection.createArrayOf("INTEGER", values.toArray())));
+            binders.add((statement, index, connection) -> {
+                if (values.value() == null) {
+                    statement.setNull(index, Types.ARRAY);
+                } else {
+                    statement.setArray(index, connection.createArrayOf("INTEGER", values.value().toArray()));
+                }
+            });
         }
     }
 
@@ -178,10 +194,16 @@ public class AnnouncementWriteRepository {
             List<String> assignments,
             List<SqlBinder> binders,
             String column,
-            Boolean value) {
-        if (value != null) {
+            PatchValue<Boolean> value) {
+        if (value.present()) {
             assignments.add("\"" + column + "\" = ?");
-            binders.add((statement, index, ignored) -> statement.setBoolean(index, value));
+            binders.add((statement, index, ignored) -> {
+                if (value.value() == null) {
+                    statement.setNull(index, Types.BOOLEAN);
+                } else {
+                    statement.setBoolean(index, value.value());
+                }
+            });
         }
     }
 
@@ -189,10 +211,10 @@ public class AnnouncementWriteRepository {
             List<String> assignments,
             List<SqlBinder> binders,
             String column,
-            Instant value) {
-        if (value != null) {
+            PatchValue<Instant> value) {
+        if (value.present()) {
             assignments.add("\"" + column + "\" = ?");
-            binders.add((statement, index, ignored) -> timestamp(statement, index, value));
+            binders.add((statement, index, ignored) -> timestamp(statement, index, value.value()));
         }
     }
 
@@ -310,18 +332,29 @@ public class AnnouncementWriteRepository {
 
     public record UpdateAnnouncementCommand(
             String id,
-            String title,
-            String content,
-            String priority,
-            List<String> targetRoles,
-            List<Integer> targetYears,
-            Boolean isGlobal,
-            Instant publishAt,
-            Instant expiresAt,
-            String semesterId,
-            String sectionId,
-            String lecturerId,
+            PatchValue<String> title,
+            PatchValue<String> content,
+            PatchValue<String> priority,
+            PatchValue<List<String>> targetRoles,
+            PatchValue<List<Integer>> targetYears,
+            PatchValue<Boolean> isGlobal,
+            PatchValue<Instant> publishAt,
+            PatchValue<Instant> expiresAt,
+            PatchValue<String> semesterId,
+            PatchValue<String> sectionId,
+            PatchValue<String> lecturerId,
             Instant updatedAt) {
+    }
+
+    public record PatchValue<T>(boolean present, T value) {
+
+        public static <T> PatchValue<T> present(T value) {
+            return new PatchValue<>(true, value);
+        }
+
+        public static <T> PatchValue<T> omitted() {
+            return new PatchValue<>(false, null);
+        }
     }
 
     @FunctionalInterface

@@ -86,9 +86,9 @@ class SupportTicketReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].user.id").value("user-1"))
                 .andExpect(jsonPath("$.data[0].user.displayName").value("student@campuscore.edu"))
                 .andExpect(jsonPath("$.data[1].id").value("ticket-1"))
-                .andExpect(jsonPath("$.data[1].responses.length()").value(2))
+                .andExpect(jsonPath("$.data[1].responses.length()").value(1))
                 .andExpect(jsonPath("$.data[1].responses[0].user.displayName").value("Student One"))
-                .andExpect(jsonPath("$.data[1].responses[1].isInternal").value(true))
+                .andExpect(jsonPath("$.data[1].responses[0].isInternal").value(false))
                 .andExpect(jsonPath("$.meta.total").value(2))
                 .andExpect(jsonPath("$.meta.page").value(1))
                 .andExpect(jsonPath("$.meta.limit").value(20))
@@ -105,7 +105,7 @@ class SupportTicketReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("ticket-1"))
                 .andExpect(jsonPath("$.subject").value("Login help"))
-                .andExpect(jsonPath("$.responses.length()").value(2))
+                .andExpect(jsonPath("$.responses.length()").value(1))
                 .andExpect(jsonPath("$.responses[0].createdAt").value("2026-08-20T00:01:00.000Z"))
                 .andExpect(jsonPath("$.createdAt").value("2026-08-20T00:00:00.000Z"))
                 .andExpect(jsonPath("$.updatedAt").value("2026-08-20T00:00:10.000Z"));
@@ -130,6 +130,11 @@ class SupportTicketReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("ticket-3"))
                 .andExpect(jsonPath("$.user.id").value("user-2"));
+
+        mvc.perform(get("/api/v1/support-tickets/ticket-1").with(userJwt("admin-user", "ADMIN")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.responses.length()").value(2))
+                .andExpect(jsonPath("$.responses[1].isInternal").value(true));
     }
 
     @Test

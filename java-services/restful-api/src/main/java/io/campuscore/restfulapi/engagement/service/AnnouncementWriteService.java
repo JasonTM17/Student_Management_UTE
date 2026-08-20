@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement.service;
 
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.PatchValue;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
@@ -64,22 +65,28 @@ public class AnnouncementWriteService {
         String id = requireText(announcementId, "announcement id");
         announcements.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
-        if (request.priority() != null && !PRIORITIES.contains(request.priority())) {
+        if (request.has("priority") && !PRIORITIES.contains(request.priority())) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
         }
         announcements.update(new UpdateAnnouncementCommand(
                 id,
-                request.title(),
-                request.content(),
-                request.priority(),
-                request.targetRoles() == null ? null : immutableStrings(request.targetRoles(), "targetRoles"),
-                request.targetYears() == null ? null : immutableYears(request.targetYears()),
-                request.isGlobal(),
-                request.publishAt(),
-                request.expiresAt(),
-                request.semesterId(),
-                request.sectionId(),
-                request.lecturerId(),
+                patch(request, "title", request.title()),
+                patch(request, "content", request.content()),
+                patch(request, "priority", request.priority()),
+                patch(
+                        request,
+                        "targetRoles",
+                        request.has("targetRoles") ? immutableStrings(request.targetRoles(), "targetRoles") : null),
+                patch(
+                        request,
+                        "targetYears",
+                        request.has("targetYears") ? immutableYears(request.targetYears()) : null),
+                patch(request, "isGlobal", request.isGlobal()),
+                patch(request, "publishAt", request.publishAt()),
+                patch(request, "expiresAt", request.expiresAt()),
+                patch(request, "semesterId", request.semesterId()),
+                patch(request, "sectionId", request.sectionId()),
+                patch(request, "lecturerId", request.lecturerId()),
                 Instant.now(clock)));
         return announcements.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
@@ -125,5 +132,9 @@ public class AnnouncementWriteService {
             result.add(year);
         }
         return List.copyOf(result);
+    }
+
+    private static <T> PatchValue<T> patch(UpdateAnnouncementRequest request, String field, T value) {
+        return request.has(field) ? PatchValue.present(value) : PatchValue.omitted();
     }
 }

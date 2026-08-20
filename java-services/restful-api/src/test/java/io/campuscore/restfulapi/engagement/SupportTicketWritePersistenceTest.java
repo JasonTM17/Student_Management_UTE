@@ -401,6 +401,13 @@ class SupportTicketWritePersistenceTest {
                         .content("{\"description\":\"Missing subject\",\"category\":\"TECHNICAL\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mvc.perform(post("/api/v1/support-tickets")
+                        .with(userJwt("user-1", "student@campuscore.edu", "Student", "One"))
+                        .contentType("application/json")
+                        .content("{\"subject\":\"Need help\",\"description\":\"Body\",\"category\":\"TECHNICAL\",\"unexpected\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -435,6 +442,13 @@ class SupportTicketWritePersistenceTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"message\":\"ok\",\"unexpected\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -466,6 +480,13 @@ class SupportTicketWritePersistenceTest {
                         .content("{\"priority\":\"URGENT\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"RESOLVED\",\"unexpected\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test
@@ -490,6 +511,13 @@ class SupportTicketWritePersistenceTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/assign")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"assignedTo\":\"lecturer-1\",\"unexpected\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test

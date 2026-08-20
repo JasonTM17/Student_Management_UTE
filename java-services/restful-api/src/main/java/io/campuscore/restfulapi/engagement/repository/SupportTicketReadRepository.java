@@ -63,7 +63,7 @@ public class SupportTicketReadRepository {
                         + " ORDER BY \"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 SupportTicketReadRepository::mapTicketRow);
-        return hydrate(tickets);
+        return hydrate(tickets, false);
     }
 
     public long countByUser(String userId) {
@@ -82,7 +82,7 @@ public class SupportTicketReadRepository {
                         .addValue("id", id)
                         .addValue("userId", userId),
                 SupportTicketReadRepository::mapTicketRow);
-        return hydrate(tickets).stream().findFirst();
+        return hydrate(tickets, false).stream().findFirst();
     }
 
     public List<SupportTicketResponse> findAll(SupportTicketFilter filter, long offset, int limit) {
@@ -93,7 +93,7 @@ public class SupportTicketReadRepository {
                         + " ORDER BY \"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 where.parameters(),
                 SupportTicketReadRepository::mapTicketRow);
-        return hydrate(tickets);
+        return hydrate(tickets, true);
     }
 
     public long countAll(SupportTicketFilter filter) {
@@ -110,18 +110,19 @@ public class SupportTicketReadRepository {
                 "SELECT " + TICKET_COLUMNS + " FROM " + TICKET + " WHERE \"id\" = :id",
                 new MapSqlParameterSource("id", id),
                 SupportTicketReadRepository::mapTicketRow);
-        return hydrate(tickets).stream().findFirst();
+        return hydrate(tickets, true).stream().findFirst();
     }
 
-    private List<SupportTicketResponse> hydrate(List<TicketRow> tickets) {
+    private List<SupportTicketResponse> hydrate(List<TicketRow> tickets, boolean includeInternalResponses) {
         if (tickets.isEmpty()) {
             return List.of();
         }
         List<String> ids = tickets.stream().map(TicketRow::id).toList();
         Map<String, List<TicketResponse>> responsesByTicket = new LinkedHashMap<>();
+        String responseVisibilityPredicate = includeInternalResponses ? "" : " AND \"isInternal\" = FALSE";
         for (TicketResponse response : jdbc.query(
                 "SELECT " + RESPONSE_COLUMNS + " FROM " + RESPONSE
-                        + " WHERE \"ticketId\" IN (:ids)"
+                        + " WHERE \"ticketId\" IN (:ids)" + responseVisibilityPredicate
                         + " ORDER BY \"ticketId\" ASC, \"createdAt\" ASC",
                 new MapSqlParameterSource("ids", ids),
                 SupportTicketReadRepository::mapResponse)) {
