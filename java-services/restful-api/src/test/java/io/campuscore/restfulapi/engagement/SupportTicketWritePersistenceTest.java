@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -40,8 +41,10 @@ class SupportTicketWritePersistenceTest {
     @BeforeEach
     void prepareWriteFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"TicketResponse\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"SupportTicket\"");
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "engagement"."SupportTicket" (
+                CREATE TABLE "engagement"."SupportTicket" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "ticketNumber" VARCHAR(120) NOT NULL,
                     "userId" VARCHAR(120) NOT NULL,
@@ -62,7 +65,7 @@ class SupportTicketWritePersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "engagement"."TicketResponse" (
+                CREATE TABLE "engagement"."TicketResponse" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "ticketId" VARCHAR(120) NOT NULL,
                     "userId" VARCHAR(120) NOT NULL,
@@ -70,11 +73,13 @@ class SupportTicketWritePersistenceTest {
                     "userDisplayName" VARCHAR(200),
                     "message" VARCHAR(2000) NOT NULL,
                     "isInternal" BOOLEAN NOT NULL,
-                    "createdAt" TIMESTAMP NOT NULL
+                    "createdAt" TIMESTAMP NOT NULL,
+                    CONSTRAINT "fk_ticket_response_ticket"
+                        FOREIGN KEY ("ticketId")
+                        REFERENCES "engagement"."SupportTicket" ("id")
+                        ON DELETE CASCADE
                 )
                 """);
-        jdbc.update("DELETE FROM \"engagement\".\"TicketResponse\"");
-        jdbc.update("DELETE FROM \"engagement\".\"SupportTicket\"");
         jdbc.update(
                 "INSERT INTO \"engagement\".\"SupportTicket\""
                         + " (\"id\", \"ticketNumber\", \"userId\", \"userEmail\", \"userDisplayName\","
@@ -435,6 +440,39 @@ class SupportTicketWritePersistenceTest {
                         .content("{}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void adminDeletesTicketAndDatabaseCascadesResponses() throws Exception {
+        seedResponse("response-1", "existing-ticket", "agent-1", "agent@campuscore.edu", "Agent One");
+
+        mvc.perform(delete("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Support ticket deleted successfully"));
+
+        Integer tickets = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"SupportTicket\" WHERE \"id\" = 'existing-ticket'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, tickets);
+
+        Integer responses = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"TicketResponse\" WHERE \"ticketId\" = 'existing-ticket'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, responses);
+    }
+
+    @Test
+    void deleteBoundaryFailsClosedForStudentAndMissingTicket() throws Exception {
+        mvc.perform(delete("/api/v1/support-tickets/existing-ticket")
+                        .with(userJwt("user-1", "student@campuscore.edu", "Student", "One")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(delete("/api/v1/support-tickets/missing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
     }
 
     private static RequestPostProcessor userJwt(

@@ -31,4 +31,7 @@ public final class SupportTicketWriteDtos {
     public record AssignSupportTicketRequest(
             @NotNull String assignedTo) {
     }
+
+    public record DeleteSupportTicketResponse(String message) {
+    }
 }

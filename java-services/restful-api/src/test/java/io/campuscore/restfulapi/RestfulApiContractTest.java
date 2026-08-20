@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -99,6 +100,11 @@ class RestfulApiContractTest {
                         .with(jwt())
                         .contentType("application/json")
                         .content("{\"assignedTo\":\"lecturer-1\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(delete("/api/v1/support-tickets/ticket-1")
+                        .with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
