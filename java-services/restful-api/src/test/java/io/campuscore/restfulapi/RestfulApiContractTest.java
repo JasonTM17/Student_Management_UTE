@@ -109,6 +109,17 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void analyticsReadBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/analytics/overview").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/analytics/finance-summary").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void authLoginBoundaryIsDisabledByDefault() throws Exception {
         mvc.perform(post("/api/v1/auth/login")
                         .contentType("application/json")

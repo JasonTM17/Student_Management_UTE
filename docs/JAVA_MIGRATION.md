@@ -65,9 +65,12 @@ slice covers semester/course list and detail routes only. The people slice
 covers student/lecturer list and detail routes only. The finance slice covers
 student invoice list/detail plus admin invoice/payment list/detail routes only,
 with checkout, provider callbacks/webhooks, exports and writes still owned by
-the legacy finance service. These candidates use JDBC against legacy schemas
-when their feature flags are explicitly enabled under the `persistence` profile;
-they do not add DDL, write data, or own public traffic.
+the legacy finance service. The analytics slice covers dashboard overview counts
+and the finance-summary aggregate only, with trends, cockpit composition,
+lecturer analytics, attendance and metrics still owned by the legacy analytics
+service. These candidates use JDBC against legacy schemas when their feature
+flags are explicitly enabled under the `persistence` profile; they do not add
+DDL, write data, or own public traffic.
 
 ## RESTful API auth candidate
 

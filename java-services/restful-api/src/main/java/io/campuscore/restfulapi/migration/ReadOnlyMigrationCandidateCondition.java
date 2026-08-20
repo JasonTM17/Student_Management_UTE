@@ -13,6 +13,7 @@ final class ReadOnlyMigrationCandidateCondition implements Condition {
                 || enabled(context, "migration.academic-read.enabled")
                 || enabled(context, "migration.people-read.enabled")
                 || enabled(context, "migration.finance-read.enabled")
+                || enabled(context, "migration.analytics-read.enabled")
                 || enabled(context, "migration.auth-login.enabled");
     }
 

@@ -214,6 +214,13 @@ the retirement gates pass.
   joins. Finance writes, checkout/payment provider orchestration, exports,
   PostgreSQL parity, route canary, rollback and frontend convergence remain
   open.
+- Phase 16 backend-first analytics read foundation:
+  source candidate/HOLD; see `phase-16-analytics-read-foundation.md`. It adds
+  feature-default-off Java analytics overview and finance-summary reads against
+  the analytics service's legacy Prisma `public` schema, preserving selected
+  dashboard aggregate shapes and role boundaries. Trends, cockpit composition,
+  lecturer analytics, attendance, metrics/events, PostgreSQL parity, route
+  canary, rollback and frontend convergence remain open.
 
 ## Backend foundation gate before Stitch implementation
 

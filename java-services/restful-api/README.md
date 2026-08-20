@@ -42,6 +42,12 @@ shell, not a domain-parity or cutover claim.
   migrated legacy `finance` schema. It does not own invoice/payment writes,
   checkout orchestration, provider callbacks/webhooks, CSV exports, public
   routing or full finance cutover.
+- a disabled-by-default analytics read candidate behind
+  `ANALYTICS_READ_ENABLED=true` in the `persistence` profile; it reads dashboard
+  overview counts and finance-summary aggregates from the legacy Prisma
+  `public` schema. It does not own enrollment trends, section occupancy,
+  grade distribution, cockpit composition, lecturer analytics, attendance,
+  metrics export, public routing or full analytics cutover.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
@@ -60,7 +66,10 @@ legacy auth service remains the public owner. The people read candidate uses
 adding people DDL or moving create/update/delete ownership. No legacy route,
 payment provider or LLM provider is cut over; the finance read candidate uses
 `FINANCE_READ_ENABLED=true` for invoice/payment reads only and does not move
-checkout, provider callback/webhook, export or write ownership. Those
+checkout, provider callback/webhook, export or write ownership. The analytics
+read candidate uses `ANALYTICS_READ_ENABLED=true` for overview and
+finance-summary reads only and does not move cockpit/trend/attendance/lecturer
+analytics ownership. Those
 dependencies enter through later migration phases with one canonical writer and
 explicit rollback evidence.
 
