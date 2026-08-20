@@ -54,6 +54,16 @@ public class NotificationWriteService {
         return new DeleteNotificationResponse("Notification deleted successfully");
     }
 
+    @Transactional
+    public DeleteNotificationResponse delete(String notificationId) {
+        requireText(notificationId, "notification id");
+        if (notifications.findById(notificationId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
+        }
+        notifications.delete(notificationId);
+        return new DeleteNotificationResponse("Notification deleted successfully");
+    }
+
     private static void requireSubject(String userId) {
         if (userId == null || userId.isBlank()) {
             throw new IllegalArgumentException("Authenticated subject is required");

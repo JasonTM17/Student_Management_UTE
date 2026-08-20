@@ -84,6 +84,10 @@ class RestfulApiContractTest {
         mvc.perform(delete("/api/v1/notifications/my/notification-1").with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(delete("/api/v1/notifications/notification-1").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test
