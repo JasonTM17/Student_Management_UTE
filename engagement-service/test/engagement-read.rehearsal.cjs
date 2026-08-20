@@ -2,12 +2,11 @@
 
 const assert = require('node:assert/strict');
 const { execFileSync, spawn } = require('node:child_process');
-const { createHash } = require('node:crypto');
+const { createHash, createHmac } = require('node:crypto');
 const { once } = require('node:events');
 const fs = require('node:fs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
-const jsonwebtoken = require('jsonwebtoken');
 
 const EXPECTED_META_LIMIT = 20;
 
@@ -85,12 +84,7 @@ async function main() {
     sourceHead,
     buildIdentity,
   );
-  let cases;
-  try {
-    cases = await runLegacyProbe(corpus, reference, legacyIdentity.moduleRoot);
-  } finally {
-    removeLegacyDependencyLinks(legacyIdentity);
-  }
+  const cases = await runLegacyProbe(corpus, reference, legacyIdentity.moduleRoot);
   const report = {
     status: 'PASS',
     mode: 'owned-java-sequential-differential',
@@ -113,7 +107,14 @@ async function main() {
     legacyArtifactPath: legacyIdentity.artifactPath,
     legacyArtifactSha256: legacyIdentity.artifactSha256,
     legacyBuildLogSha256: legacyIdentity.buildLogSha256,
+    legacyInstallLogSha256: legacyIdentity.installLogSha256,
+    legacyNpmConfigSha256: legacyIdentity.npmConfigSha256,
+    legacyPackageLockSha256: legacyIdentity.packageLockSha256,
+    legacyDependencyManifestSha256:
+      legacyIdentity.dependencyManifestSha256,
+    legacyDependencyFiles: legacyIdentity.dependencyFiles,
     nodeExecutableSha256: legacyIdentity.nodeExecutableSha256,
+    npmCliSha256: legacyIdentity.npmCliSha256,
     typescriptCompilerSha256: legacyIdentity.typescriptCompilerSha256,
     cases,
   };
@@ -136,7 +137,9 @@ function assertSafeEnvironment() {
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET must contain at least 32 characters');
   }
-  return requireRehearsalRunRoot();
+  const runRoot = requireRehearsalRunRoot();
+  assertSafeTemporaryDirectory(runRoot);
+  return runRoot;
 }
 
 function assertDatabaseUrl() {
@@ -172,13 +175,24 @@ function requireRehearsalRunRoot() {
     throw new Error('REHEARSAL_RUN_ROOT is required');
   }
   const runRoot = path.resolve(configured);
-  if (path.parse(runRoot).root.toUpperCase() !== 'D:\\') {
+  const physicalRunRoot = fs.realpathSync.native(runRoot);
+  if (path.parse(physicalRunRoot).root.toUpperCase() !== 'D:\\') {
     throw new Error('REHEARSAL_RUN_ROOT must be on D:');
   }
+  assert.equal(
+    physicalRunRoot.toLowerCase(),
+    runRoot.toLowerCase(),
+    'REHEARSAL_RUN_ROOT must not traverse a junction or symbolic link',
+  );
   if (!path.basename(runRoot).toLowerCase().startsWith('phase11-engagement-')) {
     throw new Error('REHEARSAL_RUN_ROOT must identify the Phase 11 rehearsal');
   }
   const pgData = path.join(runRoot, 'pgdata');
+  assert.equal(
+    fs.realpathSync.native(pgData).toLowerCase(),
+    pgData.toLowerCase(),
+    'PostgreSQL data root must not traverse a junction or symbolic link',
+  );
   const lines = fs
     .readFileSync(path.join(pgData, 'postmaster.pid'), 'utf8')
     .split(/\r?\n/);
@@ -187,6 +201,25 @@ function requireRehearsalRunRoot() {
   assert.equal(lines[5], '127.0.0.1', 'PostgreSQL listen address');
   assert.equal(lines[7], 'ready   ', 'PostgreSQL readiness marker');
   return runRoot;
+}
+
+function assertSafeTemporaryDirectory(runRoot) {
+  for (const key of ['TEMP', 'TMP']) {
+    const configured = process.env[key];
+    if (!configured) {
+      throw new Error(`${key} is required`);
+    }
+    const resolved = path.resolve(configured);
+    const physical = fs.realpathSync.native(resolved);
+    assert.equal(
+      physical.toLowerCase(),
+      resolved.toLowerCase(),
+      `${key} must not traverse a junction or symbolic link`,
+    );
+    if (!isInside(runRoot, physical)) {
+      throw new Error(`${key} must stay inside REHEARSAL_RUN_ROOT`);
+    }
+  }
 }
 
 function requireCleanCheckout(repoRoot) {
@@ -325,6 +358,7 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
     powershellExecutableSha256: fileSha256(
       requireExecutable('REHEARSAL_POWERSHELL_EXECUTABLE', 'powershell.exe'),
     ),
+    cmdExecutable,
     sourceSnapshot,
   };
 }
@@ -549,6 +583,11 @@ function resolveReferenceFile(runRoot) {
   if (!isInside(runRoot, resolved)) {
     throw new Error('Reference artifact must stay inside REHEARSAL_RUN_ROOT');
   }
+  assert.equal(
+    path.dirname(resolved).toLowerCase(),
+    runRoot.toLowerCase(),
+    'Reference artifact must be a direct child of REHEARSAL_RUN_ROOT',
+  );
   if (
     process.env.RUN_OWNED_JAVA_DIFFERENTIAL === 'true' &&
     fs.existsSync(resolved)
@@ -711,8 +750,12 @@ function statusCase(name, requestPath, headers, expectedStatus) {
 }
 
 function issueToken(user) {
-  return jsonwebtoken.sign(
-    {
+  const issuedAt = Math.floor(Date.now() / 1000);
+  const header = Buffer.from(
+    JSON.stringify({ alg: 'HS256', typ: 'JWT' }),
+  ).toString('base64url');
+  const payload = Buffer.from(
+    JSON.stringify({
       sub: user.id,
       email: user.email,
       firstName: 'Phase',
@@ -722,10 +765,15 @@ function issueToken(user) {
       studentId: user.studentId ?? null,
       lecturerId: user.lecturerId ?? null,
       student: user.student ?? null,
-    },
-    process.env.JWT_SECRET,
-    { algorithm: 'HS256', expiresIn: '15m' },
-  );
+      iat: issuedAt,
+      exp: issuedAt + 15 * 60,
+    }),
+  ).toString('base64url');
+  const signingInput = `${header}.${payload}`;
+  const signature = createHmac('sha256', process.env.JWT_SECRET)
+    .update(signingInput)
+    .digest('base64url');
+  return `${signingInput}.${signature}`;
 }
 
 async function captureJavaReference(
@@ -781,8 +829,10 @@ async function invokeJava(javaBaseUrl, spec) {
 }
 
 async function runLegacyProbe(corpus, reference, moduleRoot) {
-  const { Test } = require('@nestjs/testing');
-  const request = require('supertest');
+  const { Test } = require(
+    path.join(moduleRoot, 'node_modules/@nestjs/testing')
+  );
+  const request = require(path.join(moduleRoot, 'node_modules/supertest'));
   const { configureHttpApp } = require(
     path.join(moduleRoot, 'dist/src/bootstrap.js')
   );
@@ -873,102 +923,171 @@ function buildLegacyIdentity(repoRoot, runRoot, sourceHead, buildIdentity) {
     buildIdentity.sourceSnapshot,
     'engagement-service',
   );
-  const sharedNodeModules = path.resolve(
+  const nodeExecutable = fs.realpathSync.native(process.execPath);
+  const npmCli = requireFile('REHEARSAL_NPM_CLI_FILE', 'npm-cli.js');
+  const npmCache = requireDirectory('REHEARSAL_NPM_CACHE');
+  if (path.parse(npmCache).root.toUpperCase() !== 'D:\\') {
+    throw new Error('REHEARSAL_NPM_CACHE must be on D:');
+  }
+  const npmConfig = path.resolve(
     buildIdentity.sourceSnapshot,
-    'node_modules',
+    'rehearsal.npmrc',
   );
-  const serviceNodeModules = path.resolve(moduleRoot, 'node_modules');
-  const campuscoreScope = path.resolve(serviceNodeModules, '@campuscore');
-  const platformAuthLink = path.resolve(campuscoreScope, 'platform-auth');
-  fs.symlinkSync(
-    path.resolve(repoRoot, 'engagement-service/node_modules'),
-    sharedNodeModules,
-    'junction',
+  fs.writeFileSync(
+    npmConfig,
+    ['offline=true', 'audit=false', 'fund=false', 'update-notifier=false', ''].join('\n'),
+    { encoding: 'utf8', flag: 'wx' },
   );
-  fs.mkdirSync(campuscoreScope, { recursive: true });
-  fs.symlinkSync(
-    path.resolve(buildIdentity.sourceSnapshot, 'packages/platform-auth'),
-    platformAuthLink,
-    'junction',
+  const packageLock = path.resolve(moduleRoot, 'package-lock.json');
+  const packageLockSha256 = fileSha256(packageLock);
+  const installOutput = execFileSync(
+    nodeExecutable,
+    [npmCli, 'ci', '--offline', '--no-audit', '--no-fund'],
+    {
+      cwd: moduleRoot,
+      encoding: 'utf8',
+      env: buildChildEnvironment({
+        ComSpec: buildIdentity.cmdExecutable,
+        NODE_ENV: 'test',
+        NODE_OPTIONS: '--max-old-space-size=256',
+        Path: path.dirname(nodeExecutable),
+        NPM_CONFIG_CACHE: npmCache,
+        NPM_CONFIG_OFFLINE: 'true',
+        NPM_CONFIG_AUDIT: 'false',
+        NPM_CONFIG_FUND: 'false',
+        NPM_CONFIG_UPDATE_NOTIFIER: 'false',
+        NPM_CONFIG_PROGRESS: 'false',
+        NPM_CONFIG_USERCONFIG: npmConfig,
+        NPM_CONFIG_GLOBALCONFIG: npmConfig,
+      }),
+      maxBuffer: 20 * 1024 * 1024,
+      windowsHide: true,
+    },
   );
-  const dependencyLinks = {
-    sharedNodeModules,
-    serviceNodeModules,
-    campuscoreScope,
-    platformAuthLink,
+  assert.equal(
+    fileSha256(packageLock),
+    packageLockSha256,
+    'npm ci must not change the committed package lock',
+  );
+  const installLog = path.resolve(
+    runRoot,
+    `legacy-install-${sourceHead.slice(0, 12)}.log`,
+  );
+  fs.writeFileSync(installLog, installOutput, { encoding: 'utf8', flag: 'wx' });
+  const dependencyManifest = path.resolve(
+    runRoot,
+    `legacy-dependencies-${sourceHead.slice(0, 12)}.jsonl`,
+  );
+  const dependencyFiles = writeDirectoryManifest(
+    path.resolve(moduleRoot, 'node_modules'),
+    dependencyManifest,
+    buildIdentity.sourceSnapshot,
+  );
+  const typescriptCompiler = path.resolve(
+    moduleRoot,
+    'node_modules/typescript/bin/tsc',
+  );
+  const buildOutput = execFileSync(
+    nodeExecutable,
+    [typescriptCompiler, '-p', 'tsconfig.build.json'],
+    {
+      cwd: moduleRoot,
+      encoding: 'utf8',
+      env: buildChildEnvironment({
+        NODE_ENV: 'test',
+        NODE_OPTIONS: '--max-old-space-size=256',
+      }),
+      maxBuffer: 20 * 1024 * 1024,
+      windowsHide: true,
+    },
+  );
+  assert.equal(
+    requireCleanCheckout(repoRoot),
+    sourceHead,
+    'source HEAD after isolated legacy build',
+  );
+  const buildLog = path.resolve(
+    runRoot,
+    `legacy-build-${sourceHead.slice(0, 12)}.log`,
+  );
+  fs.writeFileSync(buildLog, buildOutput, { encoding: 'utf8', flag: 'wx' });
+  const entry = path.resolve(moduleRoot, 'dist/src/main.js');
+  return {
+    sourceHead,
+    moduleRoot,
+    artifactPath: path.relative(runRoot, entry).replaceAll('\\', '/'),
+    artifactSha256: fileSha256(entry),
+    buildLogSha256: fileSha256(buildLog),
+    installLogSha256: fileSha256(installLog),
+    npmConfigSha256: fileSha256(npmConfig),
+    packageLockSha256,
+    dependencyManifestSha256: fileSha256(dependencyManifest),
+    dependencyFiles,
+    nodeExecutableSha256: fileSha256(nodeExecutable),
+    npmCliSha256: fileSha256(npmCli),
+    typescriptCompilerSha256: fileSha256(typescriptCompiler),
   };
-  try {
-    const nodeExecutable = fs.realpathSync(process.execPath);
-    const typescriptCompiler = path.resolve(
-      repoRoot,
-      'engagement-service/node_modules/typescript/bin/tsc',
-    );
-    const buildOutput = execFileSync(
-      nodeExecutable,
-      [typescriptCompiler, '-p', 'tsconfig.build.json'],
-      {
-        cwd: moduleRoot,
-        encoding: 'utf8',
-        env: buildChildEnvironment({
-          NODE_ENV: 'test',
-          NODE_OPTIONS: '--max-old-space-size=256',
-        }),
-        maxBuffer: 20 * 1024 * 1024,
-        windowsHide: true,
-      },
-    );
-    assert.equal(
-      requireCleanCheckout(repoRoot),
-      sourceHead,
-      'source HEAD after isolated legacy build',
-    );
-    const buildLog = path.resolve(
-      runRoot,
-      `legacy-build-${sourceHead.slice(0, 12)}.log`,
-    );
-    fs.writeFileSync(buildLog, buildOutput, { encoding: 'utf8', flag: 'wx' });
-    const entry = path.resolve(moduleRoot, 'dist/src/main.js');
-    return {
-      sourceHead,
-      moduleRoot,
-      artifactPath: path.relative(runRoot, entry).replaceAll('\\', '/'),
-      artifactSha256: fileSha256(entry),
-      buildLogSha256: fileSha256(buildLog),
-      nodeExecutableSha256: fileSha256(nodeExecutable),
-      typescriptCompilerSha256: fileSha256(typescriptCompiler),
-      ...dependencyLinks,
-    };
-  } catch (error) {
-    removeLegacyDependencyLinks(dependencyLinks);
-    throw error;
+}
+
+function requireFile(environmentKey, expectedName) {
+  const configured = process.env[environmentKey];
+  if (!configured) {
+    throw new Error(`${environmentKey} is required`);
   }
+  const file = fs.realpathSync.native(path.resolve(configured));
+  assert.equal(
+    path.basename(file).toLowerCase(),
+    expectedName,
+    `${environmentKey} file name`,
+  );
+  assert.ok(fs.statSync(file).isFile(), `${environmentKey} file`);
+  return file;
 }
 
-function removeLegacyDependencyLinks(legacyIdentity) {
-  unlinkIfPresent(legacyIdentity.platformAuthLink);
-  removeEmptyDirectoryIfPresent(legacyIdentity.campuscoreScope);
-  removeEmptyDirectoryIfPresent(legacyIdentity.serviceNodeModules);
-  unlinkIfPresent(legacyIdentity.sharedNodeModules);
-}
-
-function unlinkIfPresent(target) {
-  try {
-    fs.unlinkSync(target);
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
+function writeDirectoryManifest(root, manifestFile, allowedRoot) {
+  const records = [];
+  const visit = (current) => {
+    const entries = fs
+      .readdirSync(current, { withFileTypes: true })
+      .sort((left, right) => left.name.localeCompare(right.name));
+    for (const entry of entries) {
+      const absolute = path.join(current, entry.name);
+      const relative = path.relative(root, absolute).replaceAll('\\', '/');
+      const stat = fs.lstatSync(absolute);
+      if (stat.isSymbolicLink()) {
+        const target = fs.realpathSync.native(absolute);
+        if (!isInside(allowedRoot, target)) {
+          throw new Error(`Dependency link escapes isolated snapshot: ${relative}`);
+        }
+        records.push(
+          JSON.stringify({
+            type: 'link',
+            path: relative,
+            target: path.relative(allowedRoot, target).replaceAll('\\', '/'),
+          }),
+        );
+      } else if (stat.isDirectory()) {
+        visit(absolute);
+      } else if (stat.isFile()) {
+        records.push(
+          JSON.stringify({
+            type: 'file',
+            path: relative,
+            bytes: stat.size,
+            sha256: fileSha256(absolute),
+          }),
+        );
+      } else {
+        throw new Error(`Unsupported dependency entry: ${relative}`);
+      }
     }
-  }
-}
-
-function removeEmptyDirectoryIfPresent(target) {
-  try {
-    fs.rmdirSync(target);
-  } catch (error) {
-    if (error.code !== 'ENOENT') {
-      throw error;
-    }
-  }
+  };
+  visit(root);
+  fs.writeFileSync(manifestFile, `${records.join('\n')}\n`, {
+    encoding: 'utf8',
+    flag: 'wx',
+  });
+  return records.length;
 }
 
 function fileSha256(file) {
@@ -989,6 +1108,11 @@ function writeOptionalReport(report, runRoot) {
   if (!isInside(runRoot, reportFile)) {
     throw new Error('Differential report must stay inside REHEARSAL_RUN_ROOT');
   }
+  assert.equal(
+    path.dirname(reportFile).toLowerCase(),
+    runRoot.toLowerCase(),
+    'Differential report must be a direct child of REHEARSAL_RUN_ROOT',
+  );
   fs.mkdirSync(path.dirname(reportFile), { recursive: true });
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, {
     encoding: 'utf8',
