@@ -3,14 +3,18 @@ package io.campuscore.restfulapi.engagement.web;
 import io.campuscore.restfulapi.engagement.service.SupportTicketWriteService;
 import io.campuscore.restfulapi.engagement.service.SupportTicketWriteService.CurrentTicketUser;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -36,6 +40,16 @@ public class SupportTicketWriteController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateSupportTicketRequest request) {
         return tickets.create(user(jwt), request);
+    }
+
+    @PostMapping("{id}/respond")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @ResponseStatus(HttpStatus.CREATED)
+    public TicketResponse respond(
+            @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateTicketResponseRequest request) {
+        return tickets.respond(id, user(jwt), request);
     }
 
     private static CurrentTicketUser user(Jwt jwt) {

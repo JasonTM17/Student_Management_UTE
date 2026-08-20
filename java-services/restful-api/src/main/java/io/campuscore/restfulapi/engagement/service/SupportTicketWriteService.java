@@ -1,8 +1,11 @@
 package io.campuscore.restfulapi.engagement.service;
 
 import io.campuscore.restfulapi.engagement.repository.SupportTicketWriteRepository;
+import io.campuscore.restfulapi.engagement.repository.SupportTicketWriteRepository.CreateTicketResponseCommand;
 import io.campuscore.restfulapi.engagement.repository.SupportTicketWriteRepository.CreateTicketCommand;
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -11,7 +14,10 @@ import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DuplicateKeyException;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Bounded write service for feature-gated support-ticket creation. */
 @Service
@@ -57,6 +63,26 @@ public class SupportTicketWriteService {
             }
         }
         throw new IllegalStateException("unable to allocate support ticket number");
+    }
+
+    @Transactional
+    public TicketResponse respond(String ticketId, CurrentTicketUser user, CreateTicketResponseRequest request) {
+        String id = requireText(ticketId, "ticket id");
+        String status = tickets.findTicketStatus(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+        TicketResponse response = tickets.addResponse(new CreateTicketResponseCommand(
+                UUID.randomUUID().toString(),
+                id,
+                requireText(user.id(), "user id"),
+                requireText(user.email(), "email"),
+                user.displayName(),
+                requireText(request.message(), "message"),
+                Boolean.TRUE.equals(request.isInternal()),
+                Instant.now(clock)));
+        if ("OPEN".equals(status)) {
+            tickets.markOpenTicketInProgress(id, Instant.now(clock));
+        }
+        return response;
     }
 
     private static String requireText(String value, String name) {

@@ -80,6 +80,13 @@ class RestfulApiContractTest {
                         .content("{\"subject\":\"Need help\",\"description\":\"Cannot login\",\"category\":\"AUTH\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(post("/api/v1/support-tickets/ticket-1/respond")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"message\":\"We are checking this.\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

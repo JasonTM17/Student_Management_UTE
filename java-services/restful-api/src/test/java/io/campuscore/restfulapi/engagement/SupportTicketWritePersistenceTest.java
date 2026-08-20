@@ -60,6 +60,19 @@ class SupportTicketWritePersistenceTest {
                     CONSTRAINT "uk_support_ticket_number" UNIQUE ("ticketNumber")
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "engagement"."TicketResponse" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "ticketId" VARCHAR(120) NOT NULL,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "userEmail" VARCHAR(200) NOT NULL,
+                    "userDisplayName" VARCHAR(200),
+                    "message" VARCHAR(2000) NOT NULL,
+                    "isInternal" BOOLEAN NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.update("DELETE FROM \"engagement\".\"TicketResponse\"");
         jdbc.update("DELETE FROM \"engagement\".\"SupportTicket\"");
         jdbc.update(
                 "INSERT INTO \"engagement\".\"SupportTicket\""
@@ -147,6 +160,61 @@ class SupportTicketWritePersistenceTest {
     }
 
     @Test
+    void adminRespondsToOpenTicketAndMovesItInProgress() throws Exception {
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "message": "We refreshed your enrollment cache. Please try again."
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketId").value("existing-ticket"))
+                .andExpect(jsonPath("$.userId").value("admin-1"))
+                .andExpect(jsonPath("$.user.email").value("admin@campuscore.edu"))
+                .andExpect(jsonPath("$.user.displayName").value("Admin One"))
+                .andExpect(jsonPath("$.message").value("We refreshed your enrollment cache. Please try again."))
+                .andExpect(jsonPath("$.isInternal").value(false));
+
+        Integer responses = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"TicketResponse\""
+                        + " WHERE \"ticketId\" = 'existing-ticket' AND \"userId\" = 'admin-1'"
+                        + " AND \"isInternal\" = FALSE",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, responses);
+
+        String status = jdbc.queryForObject(
+                "SELECT \"status\" FROM \"engagement\".\"SupportTicket\" WHERE \"id\" = 'existing-ticket'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals("IN_PROGRESS", status);
+    }
+
+    @Test
+    void respondPreservesInternalFlagAndDoesNotReopenClosedTickets() throws Exception {
+        jdbc.update(
+                "UPDATE \"engagement\".\"SupportTicket\" SET \"status\" = 'CLOSED' WHERE \"id\" = 'existing-ticket'");
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(adminJwt("admin-2", "admin2@campuscore.edu", null, null))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "message": "Internal note",
+                                  "isInternal": true
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.isInternal").value(true))
+                .andExpect(jsonPath("$.user.displayName").value("admin2@campuscore.edu"));
+
+        String status = jdbc.queryForObject(
+                "SELECT \"status\" FROM \"engagement\".\"SupportTicket\" WHERE \"id\" = 'existing-ticket'",
+                String.class);
+        org.junit.jupiter.api.Assertions.assertEquals("CLOSED", status);
+    }
+
+    @Test
     void createBoundaryFailsClosedForAnonymousInvalidClaimsAndBadRequests() throws Exception {
         mvc.perform(post("/api/v1/support-tickets")
                         .contentType("application/json")
@@ -186,6 +254,40 @@ class SupportTicketWritePersistenceTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    void respondBoundaryFailsClosedForStudentMissingTicketInvalidClaimsAndBadRequests() throws Exception {
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(userJwt("user-1", "student@campuscore.edu", "Student", "One"))
+                        .contentType("application/json")
+                        .content("{\"message\":\"student response\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(post("/api/v1/support-tickets/missing-ticket/respond")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"message\":\"missing ticket\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(jwt().jwt(token -> token
+                                .subject("admin-without-email")
+                                .claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .contentType("application/json")
+                        .content("{\"message\":\"invalid claims\"}"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
     private static RequestPostProcessor userJwt(
             String subject,
             String email,
@@ -203,6 +305,25 @@ class SupportTicketWritePersistenceTest {
                     }
                 })
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private static RequestPostProcessor adminJwt(
+            String subject,
+            String email,
+            String firstName,
+            String lastName) {
+        return jwt().jwt(token -> {
+                    token.subject(subject)
+                            .claim("email", email)
+                            .claim("roles", List.of("ADMIN"));
+                    if (firstName != null) {
+                        token.claim("firstName", firstName);
+                    }
+                    if (lastName != null) {
+                        token.claim("lastName", lastName);
+                    }
+                })
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
     private static String validBody() {
