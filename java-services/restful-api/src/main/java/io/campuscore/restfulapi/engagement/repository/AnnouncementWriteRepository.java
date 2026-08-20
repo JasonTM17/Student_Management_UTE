@@ -128,6 +128,12 @@ public class AnnouncementWriteRepository {
         return announcements.stream().findFirst();
     }
 
+    public void delete(String id) {
+        jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id));
+    }
+
     private static void addString(
             List<String> assignments,
             List<SqlBinder> binders,

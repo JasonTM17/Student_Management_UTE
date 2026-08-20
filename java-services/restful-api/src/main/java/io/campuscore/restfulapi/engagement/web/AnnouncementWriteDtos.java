@@ -99,6 +99,9 @@ public final class AnnouncementWriteDtos {
         }
     }
 
+    public record DeleteAnnouncementResponse(String message) {
+    }
+
     private static ObjectNode objectBody(JsonNode body) {
         if (body == null || body.isNull()) {
             throw new IllegalArgumentException("request body is required");

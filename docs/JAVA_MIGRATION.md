@@ -71,8 +71,11 @@ remain with the legacy engagement service. The announcement update slice adds
 feature-default-off `PUT /api/v1/announcements/{id}` for admins with partial
 legacy field updates and the shared announcement response shape, while still
 leaving RabbitMQ/event parity and public writer ownership with the legacy
-engagement service. The academic slice covers semester/course list and detail
-routes only. The people slice covers student/lecturer list and
+engagement service. The announcement deletion slice adds feature-default-off
+`DELETE /api/v1/announcements/{id}` for admins with the legacy success message
+and no Java RabbitMQ/event publication. The academic slice covers
+semester/course list and detail routes only. The people slice covers
+student/lecturer list and
 detail routes only. The finance slice covers student invoice list/detail plus
 admin invoice/payment list/detail routes only, with checkout, provider
 callbacks/webhooks, exports and writes still owned by the legacy finance
