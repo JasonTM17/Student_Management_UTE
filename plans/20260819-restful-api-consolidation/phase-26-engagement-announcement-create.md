@@ -49,25 +49,22 @@ announcement writer, RabbitMQ publisher and rollback target.
 
 ## Verification observed
 
-Current focused Java gates passed locally on Windows with Java 24 and Maven temp
-directed to the D drive:
+Current focused Java gate passed locally on Windows with Java 24 and repository
+temp directed to the D drive:
 
 ```powershell
-$env:JAVA_HOME='<java-home>'
-$env:Path="$env:JAVA_HOME\bin;$env:Path"
-$env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-temp>'
-mvn -q -pl restful-api '-Dtest=AnnouncementWritePersistenceTest,SupportTicketWritePersistenceTest,RestfulApiContractTest' test
+$env:TEMP='<d-drive-repo-temp>'
+$env:TMP='<d-drive-repo-temp>'
+$env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-repo-temp>'
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
 ```
 
-The same working tree also passed the full Java reactor gate:
+Surefire recorded:
 
-```powershell
-mvn -q -f java-services/pom.xml test
-```
-
-Surefire currently records `AnnouncementWritePersistenceTest` 3/3 passed,
-`SupportTicketWritePersistenceTest` 17/17 passed, `RestfulApiContractTest`
-21/21 passed, and 113 Java tests total across the reactor.
+- `AnnouncementWritePersistenceTest`: 3/3 passed.
+- `AnnouncementReadPersistenceTest`: 6/6 passed.
+- `RestfulApiContractTest`: 21/21 passed.
+- `MigrationSafetyConfigTest`: 3/3 passed.
 
 ## Remaining gates
 
