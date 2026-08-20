@@ -25,6 +25,8 @@ owner and rollback target.
   `subject`, `description`, `category`, `priority`, and `status`.
 - Preserve priority values `LOW`, `MEDIUM`, `HIGH`, and `CRITICAL`.
 - Preserve status values `OPEN`, `IN_PROGRESS`, `RESOLVED`, and `CLOSED`.
+- Reject unknown body properties instead of silently ignoring request typos,
+  matching the legacy Nest validation-pipe posture.
 - Preserve the legacy timestamp side effects: setting status `RESOLVED` sets
   `resolvedAt`; setting status `CLOSED` sets `closedAt`.
 - Preserve feature-default-off behavior so the Java shell returns the stable 404
@@ -37,7 +39,8 @@ owner and rollback target.
   - response hydration after update;
   - `RESOLVED` timestamp side effect;
   - `CLOSED` timestamp side effect while preserving an existing `resolvedAt`;
-  - student access denied, missing ticket, invalid status and invalid priority.
+  - student access denied, missing ticket, invalid status, invalid priority and
+    unknown-body rejection.
 - The monolith shell contract covers feature-default-off behavior for
   `PUT /api/v1/support-tickets/{id}`.
 

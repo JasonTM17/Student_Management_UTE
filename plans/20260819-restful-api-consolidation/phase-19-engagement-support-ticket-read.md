@@ -35,10 +35,11 @@ RabbitMQ event publisher, and rollback target.
   `SUPER_ADMIN`.
 - Responses retain flattened Prisma fields plus the derived `user` object on
   tickets and responses, including display-name fallback to email.
-- Internal response visibility currently follows the legacy service shape for
-  parity. Before any public route ownership move, decide whether `isInternal`
-  responses should remain visible on `/my` routes or require a coordinated
-  legacy+Java security change.
+- Java intentionally hides `isInternal=true` responses from `/my` and
+  `/my/{id}` while preserving full response visibility for admin endpoints.
+  The legacy Node service currently returns internal responses on `/my`; public
+  route ownership therefore remains blocked until the coordinated security
+  change, differential PostgreSQL rehearsal, and rollback plan are accepted.
 - Mutating legacy routes (`POST`, `PUT`, `assign`, `respond`, `DELETE`) remain
   out of scope and legacy-owned until writer handoff and rollback evidence pass.
 
@@ -46,10 +47,11 @@ RabbitMQ event publisher, and rollback target.
 
 - Feature-default-off route behavior remains covered by the monolith shell
   contract through the disabled migration flag posture.
-- Feature-on H2 contract tests cover user list/detail, subject isolation, admin
-  list/detail, filters, nested responses, pagination envelope, anonymous
-  access, admin authorization, missing subject, invalid enum filters and
-  unexpected query parameters.
+- Feature-on H2 contract tests cover user list/detail, subject isolation,
+  user-side internal-response filtering, admin list/detail with internal
+  response visibility, filters, nested responses, pagination envelope,
+  anonymous access, admin authorization, missing subject, invalid enum filters
+  and unexpected query parameters.
 - Static review proves the engagement runtime package contains no write
   statement or schema ownership path; `git diff --check` and the complete Java
   monolith test suite pass before commit when host capacity permits.
