@@ -66,6 +66,21 @@ second database client.
 No module may silently become a new process. If a future module needs isolation,
 that is a separate architecture decision after this course objective.
 
+## 2026-08-20 topology reconciliation
+
+During the branch integration, four newly introduced Java Maven deployables
+(`academic-service`, `analytics-service`, `finance-service`, and
+`people-service`) were deliberately excluded from the current source tree.
+They would expand the course target back toward a multi-runtime topology before
+the single-app boundary has parity, authentication, database, and rollback
+evidence. Their historical commits remain recoverable in Git; this decision
+does not remove legacy Node owners or authorize any cutover.
+
+The active Java implementation target remains only
+`java-services/restful-api`. Existing legacy and earlier shadow services remain
+out of the target deployment path until a separately reviewed retirement phase
+has the required backup, parity, rollback, and runtime evidence.
+
 ### Data ownership
 
 - One PostgreSQL cluster is the target; Flyway is the only schema migration

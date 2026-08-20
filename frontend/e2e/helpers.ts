@@ -211,6 +211,11 @@ export const adminHomeRoute: RouteSpec = {
 
 export const adminRoutes: RouteSpec[] = [
   {
+    path: '/admin/thesis',
+    heading: /Thesis administration/i,
+    controls: [{ role: 'button', name: /Create round/i }],
+  },
+  {
     path: '/admin/users',
     heading: /^User management$/i,
     controls: [
@@ -418,6 +423,14 @@ export const lecturerRoutes: RouteSpec[] = [
   { path: '/dashboard/thesis/topics', heading: /Published topic catalog/i },
   { path: '/dashboard/thesis/progress', heading: /Thesis progress/i },
   { path: '/dashboard/thesis/evaluation', heading: /Defense and evaluation/i },
+  {
+    path: '/dashboard/thesis/councils',
+    heading: /Schedule and manage defense councils/i,
+  },
+  {
+    path: '/dashboard/thesis/reviews',
+    heading: /Score thesis defenses with a calm, structured workflow/i,
+  },
 ];
 
 let loginAttemptCounter = 0;
