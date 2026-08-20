@@ -293,6 +293,13 @@ the retirement gates pass.
   the Prisma-owned response cascade relationship. Event/notification parity,
   PostgreSQL write rehearsal, canary routing, rollback and public deletion
   handoff remain open.
+- Phase 26 backend-first engagement announcement create foundation:
+  source candidate/HOLD; see `phase-26-engagement-announcement-create.md`.
+  It adds feature-default-off Java `POST /api/v1/announcements` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy creation defaults, JWT-subject
+  publisher, target arrays, optional publish/expiry windows and response shape.
+  RabbitMQ announcement-created publication, PostgreSQL write rehearsal, canary
+  routing, rollback and public writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
