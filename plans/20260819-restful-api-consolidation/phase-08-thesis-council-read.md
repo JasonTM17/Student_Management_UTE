@@ -45,9 +45,13 @@ runtime, parity, canary and rollback gates pass.
   '-DargLine=-Xmx256m -XX:MaxMetaspaceSize=160m' test` passed locally on
   2026-08-20. It covers the feature-on H2/Flyway contract and feature-default
   disabled route, but not a live PostgreSQL runtime.
+- The follow-up `councilsAllowAnExistingRoundWithoutCouncils` assertion was
+  added after that run in source checkpoint `646ad94`; it is explicitly
+  `NOT_RUN` on that exact HEAD because C: dropped to roughly 353 MiB free.
 
 ## Remaining limitations
 
-The local disk constraint has eased enough for the bounded test above, but
-PostgreSQL differential reads, authenticated live smoke, canary and rollback
-remain open. The source test result is not runtime/cutover proof.
+The local disk constraint does not currently leave a safe JVM margin for the
+exact-head rerun. PostgreSQL differential reads, authenticated live smoke,
+canary and rollback remain open. The source test result is not runtime/cutover
+proof.
