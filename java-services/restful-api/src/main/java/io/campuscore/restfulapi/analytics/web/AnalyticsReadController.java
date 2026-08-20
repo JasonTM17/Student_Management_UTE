@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributio
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentStatisticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
 import java.util.List;
 import java.util.Map;
@@ -75,6 +76,14 @@ public class AnalyticsReadController {
             @RequestParam(name = "limit", defaultValue = "10") int limit) {
         requireAllowedQuery(queryParameters, Set.of("limit"));
         return analytics.topCourses(limit);
+    }
+
+    @GetMapping("student-statistics")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public StudentStatisticsResponse studentStatistics(
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.studentStatistics();
     }
 
     @GetMapping("grade-distribution")
