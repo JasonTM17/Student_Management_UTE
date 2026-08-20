@@ -43,17 +43,14 @@ announcement writer, RabbitMQ/event publisher and rollback target.
 
 ## Verification observed
 
-- Focused delete/default-off H2 gate passed on 2026-08-21 with JDK `26.0.1`
-  and temp redirected to `D:\Student_Management-recovery\java-test-temp`:
-  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`.
-- Wider engagement write/read and migration shell gate passed on 2026-08-21
-  with JDK `26.0.1` and temp redirected to
-  `D:\Student_Management-recovery\java-test-temp`:
-  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketWriteServiceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
-- Observed wider result: 60 tests, 0 failures, 0 errors, 0 skipped.
-- Full Java reactor gate passed on 2026-08-21 with JDK `26.0.1` and temp
-  redirected to `D:\Student_Management-recovery\java-test-temp`:
-  `mvn -q -f java-services/pom.xml clean test`.
+- Focused announcement delete/default-off H2 gate passed on 2026-08-21 with
+  Java 24.0.2 and temporary files redirected to the repository-local `.tmp`
+  directory:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementWritePersistenceTest,io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
+- Observed focused result: 38 tests, 0 failures, 0 errors, 0 skipped.
+- Full Java reactor gate passed on 2026-08-21 with Java 24.0.2 and temporary
+  files redirected to the repository-local `.tmp` directory:
+  `mvn -q -f java-services/pom.xml test`.
 - Observed reactor result: 118 tests, 0 failures, 0 errors, 0 skipped.
 
 ## Remaining gates
