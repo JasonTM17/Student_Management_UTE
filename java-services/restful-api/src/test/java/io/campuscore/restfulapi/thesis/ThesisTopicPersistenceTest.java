@@ -40,6 +40,8 @@ class ThesisTopicPersistenceTest {
 
     @BeforeEach
     void cleanDatabase() {
+        jdbc.update("DELETE FROM thesis.thesis_council_member");
+        jdbc.update("DELETE FROM thesis.thesis_defense_council");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         topics.deleteAll();
@@ -151,6 +153,38 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
+    void councilsPreservePostgresSortMemberOrderNullableFieldsAndReadBoundaries() throws Exception {
+        UUID roundId = insertRound();
+        UUID firstCouncil = insertCouncil(roundId, Instant.parse("2026-05-10T09:00:00Z"), "A-101", "SCHEDULED");
+        UUID secondCouncil = insertCouncil(roundId, Instant.parse("2026-05-11T09:00:00Z"), "A-102", "SCORING_OPEN");
+        UUID unscheduledCouncil = insertCouncil(roundId, null, null, "DRAFT");
+        UUID firstLecturer = UUID.randomUUID();
+        UUID secondLecturer = UUID.randomUUID();
+        insertCouncilMember(firstCouncil, secondLecturer, "SECRETARY", 2);
+        insertCouncilMember(firstCouncil, firstLecturer, "CHAIR", 1);
+
+        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()).with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(firstCouncil.toString()))
+                .andExpect(jsonPath("$[0].members[0].lecturerId").value(firstLecturer.toString()))
+                .andExpect(jsonPath("$[0].members[0].memberRole").value("CHAIR"))
+                .andExpect(jsonPath("$[0].members[1].lecturerId").value(secondLecturer.toString()))
+                .andExpect(jsonPath("$[1].id").value(secondCouncil.toString()))
+                .andExpect(jsonPath("$[2].id").value(unscheduledCouncil.toString()))
+                .andExpect(jsonPath("$[2].scheduledAt").doesNotExist())
+                .andExpect(jsonPath("$[2].room").doesNotExist());
+
+        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", "not-a-uuid").with(jwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+    }
+
+    @Test
     void thesisReadPathRejectsAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/thesis/topics")
                         .queryParam("roundId", UUID.randomUUID().toString()))
@@ -207,5 +241,26 @@ class ThesisTopicPersistenceTest {
 
     private void insertMember(UUID groupId, UUID roundId, UUID studentId, int memberOrder) {
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), groupId, roundId, studentId, memberOrder, memberOrder == 1);
+    }
+
+    private UUID insertCouncil(UUID roundId, Instant scheduledAt, String room, String status) {
+        UUID councilId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_defense_council "
+                        + "(id, round_id, department_id, scheduled_at, room, status) VALUES (?, ?, ?, ?, ?, ?)",
+                councilId,
+                roundId,
+                UUID.randomUUID(),
+                scheduledAt == null ? null : Timestamp.from(scheduledAt),
+                room,
+                status);
+        return councilId;
+    }
+
+    private void insertCouncilMember(UUID councilId, UUID lecturerId, String memberRole, int memberOrder) {
+        jdbc.update(
+                "INSERT INTO thesis.thesis_council_member "
+                        + "(id, council_id, lecturer_id, member_role, member_order) VALUES (?, ?, ?, ?, ?)",
+                UUID.randomUUID(), councilId, lecturerId, memberRole, memberOrder);
     }
 }

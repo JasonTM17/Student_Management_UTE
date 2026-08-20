@@ -78,6 +78,13 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void thesisCouncilReadBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/thesis/councils").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void identityClaimsAreAvailableToEveryFutureModule() throws Exception {
         mvc.perform(get("/api/v1/me").with(jwt().jwt(token -> token
                         .subject("user-123")
