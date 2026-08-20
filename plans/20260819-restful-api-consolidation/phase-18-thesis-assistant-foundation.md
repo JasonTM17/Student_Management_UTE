@@ -42,7 +42,8 @@ fallback shape remains compatible with web/mobile callers.
 
 - The web client already posts `{ message, locale }` to
   `/api/v1/thesis/assistant/chat` and expects `{ answer, model, degraded }`.
-- The mobile API client has the same route seam.
+- The mobile API client targets the same route seam and must send the same
+  `{ message, locale }` payload shape before live mobile mode can be trusted.
 - The Java monolith did not previously expose this route.
 - Default-off behavior protects the unfinished Java backend from accidental
   public traffic.
@@ -54,6 +55,9 @@ fallback shape remains compatible with web/mobile callers.
 - `java-services/restful-api/src/test/java/io/campuscore/restfulapi/RestfulApiContractTest.java`
 - `java-services/restful-api/src/main/resources/application.yml`
 - `java-services/restful-api/src/test/resources/application-test.yml`
+- `mobile/src/api/client.ts`
+- `mobile/tests/screen-atlas.test.mjs`
+- `mobile/README.md`
 
 ## Acceptance criteria
 
@@ -67,6 +71,8 @@ fallback shape remains compatible with web/mobile callers.
    envelope.
 5. Source checks show the assistant package does not call a provider, store
    prompts, or write database state.
+6. The mobile API seam sends `{ message, locale }` and expects
+   `{ answer, model, degraded }`, matching the web client and Java controller.
 
 ## Verification commands
 
@@ -78,6 +84,7 @@ mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.the
 node scripts/check-doc-hygiene.mjs
 node scripts/check-architecture.mjs
 node scripts/check-thesis-contract.mjs
+npm test --prefix mobile
 git diff --check
 ```
 

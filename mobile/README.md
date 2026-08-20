@@ -57,10 +57,12 @@ state and is never an authorization substitute.
 
 `src/api/client.ts` targets the Java REST API at `/api/v1`. It exposes generic
 GET/POST/PATCH/PUT/DELETE helpers plus named probes for auth, identity, health,
-notifications, thesis topics, and the assistant route. The current Java
-RESTful API shell only publishes a subset of those contracts; the remaining
-screen families intentionally use representative local data until their public
-routes are cut over.
+notifications, thesis topics, and the assistant route. The assistant seam sends
+`{ message, locale }` and expects the Java/web-compatible
+`{ answer, model, degraded }` shape. The current Java RESTful API shell only
+publishes a subset of those contracts; the remaining screen families
+intentionally use representative local data until their public routes are cut
+over.
 
 ## Screen atlas
 

@@ -56,6 +56,9 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /EXPO_PUBLIC_API_MODE === 'live'/);
   assert.match(client, /MOBILE_API_PREVIEW/);
   assert.match(client, /mode: ApiMode/);
+  assert.match(client, /export type AssistantLocale = 'en' \| 'vi'/);
+  assert.match(client, /assistantChat: \(message: string, locale: AssistantLocale = 'en'\)/);
+  assert.match(client, /apiClient\.post<AssistantReply>\(apiRoutes\.thesis\.assistantChat, \{ message, locale \}\)/);
 });
 
 test('mobile role navigation rejects unauthorized routes and uses role-specific primary navigation', () => {

@@ -1,4 +1,11 @@
 export type JsonObject = Record<string, unknown>;
+export type AssistantLocale = 'en' | 'vi';
+
+export interface AssistantReply {
+  answer: string;
+  model: string;
+  degraded: boolean;
+}
 
 export interface ApiClientOptions {
   baseUrl?: string;
@@ -207,6 +214,6 @@ export const campusApi = {
   logout: () => apiClient.post<void>(apiRoutes.auth.logout, {}),
   notifications: () => apiClient.get<JsonObject>(apiRoutes.notifications),
   thesisTopics: () => apiClient.get<JsonObject>(apiRoutes.thesis.topics),
-  assistantChat: (message: string) =>
-    apiClient.post<JsonObject>(apiRoutes.thesis.assistantChat, { message }),
+  assistantChat: (message: string, locale: AssistantLocale = 'en') =>
+    apiClient.post<AssistantReply>(apiRoutes.thesis.assistantChat, { message, locale }),
 };
