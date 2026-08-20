@@ -168,6 +168,10 @@ the retirement gates pass.
   feature-gated list reads and bounded H2/Spring contract tests passed on the
   exact source checkpoint. Legacy writer/public traffic ownership, PostgreSQL
   parity, canary and rollback are still open.
+- Phase 09 PostgreSQL differential rehearsal: planned and explicitly blocked
+  on an isolated disposable restore; see
+  `phase-09-postgres-differential-rehearsal.md`. The active shared CampusCore
+  PostgreSQL container is not an authorized rehearsal target.
 
 # Acceptance and verification
 
