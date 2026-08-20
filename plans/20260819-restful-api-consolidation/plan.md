@@ -375,6 +375,15 @@ the retirement gates pass.
   warning/error attention rows from the analytics service's legacy Prisma
   `public.Notification` table. PostgreSQL read parity, cockpit composition,
   canary routing, rollback and public analytics route handoff remain open.
+- Phase 36 backend-first analytics grade distribution foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-36-analytics-grade-distribution.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/grade-distribution` for `ADMIN`/`SUPER_ADMIN`,
+  preserving the legacy fixed `A` through `F` grade bucket order, count and
+  percentage semantics for completed enrollments with non-null letter grades.
+  PostgreSQL read parity, cockpit composition, canary routing, rollback and
+  public analytics route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

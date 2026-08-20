@@ -10,7 +10,9 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -112,6 +114,20 @@ public class AnalyticsReadRepository {
                         amount(resultSet, "amount")));
     }
 
+    public Map<String, Long> completedLetterGradeCounts() {
+        Map<String, Long> counts = new LinkedHashMap<>();
+        jdbc.query(
+                "SELECT \"letterGrade\", COUNT(\"id\") AS \"count\""
+                        + " FROM " + table("\"Enrollment\"")
+                        + " WHERE \"status\" = 'COMPLETED' AND \"letterGrade\" IS NOT NULL"
+                        + " GROUP BY \"letterGrade\"",
+                (resultSet, ignored) -> new GradeCount(
+                        resultSet.getString("letterGrade"),
+                        resultSet.getLong("count")))
+                .forEach(bucket -> counts.put(bucket.grade(), bucket.count()));
+        return counts;
+    }
+
     public long countNotifications() {
         return count("\"Notification\"");
     }
@@ -167,5 +183,8 @@ public class AnalyticsReadRepository {
     private static java.time.Instant instant(ResultSet resultSet, String column) throws SQLException {
         LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
         return value == null ? null : value.toInstant(ZoneOffset.UTC);
+    }
+
+    private record GradeCount(String grade, long count) {
     }
 }

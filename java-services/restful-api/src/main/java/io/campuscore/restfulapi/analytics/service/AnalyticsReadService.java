@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.analytics.service;
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
@@ -10,6 +11,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBuc
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import java.math.BigDecimal;
 import java.util.List;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
@@ -20,6 +22,20 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "migration.analytics-read", name = "enabled", havingValue = "true")
 public class AnalyticsReadService {
+
+    private static final List<String> LETTER_GRADES = List.of(
+            "A",
+            "A-",
+            "B+",
+            "B",
+            "B-",
+            "C+",
+            "C",
+            "C-",
+            "D+",
+            "D",
+            "D-",
+            "F");
 
     private final AnalyticsReadRepository analytics;
 
@@ -82,6 +98,15 @@ public class AnalyticsReadService {
     }
 
     @Transactional(readOnly = true)
+    public List<GradeDistributionBucket> gradeDistribution() {
+        Map<String, Long> counts = analytics.completedLetterGradeCounts();
+        long total = counts.values().stream().mapToLong(Long::longValue).sum();
+        return LETTER_GRADES.stream()
+                .map(grade -> bucket(grade, counts.getOrDefault(grade, 0L), total))
+                .toList();
+    }
+
+    @Transactional(readOnly = true)
     public NotificationSummaryResponse notificationSummary() {
         long total = analytics.countNotifications();
         long unread = analytics.countUnreadNotifications();
@@ -91,5 +116,10 @@ public class AnalyticsReadService {
                 Math.max(total - unread, 0),
                 analytics.notificationTypeBuckets(),
                 analytics.recentAttentionNotifications());
+    }
+
+    private static GradeDistributionBucket bucket(String grade, long count, long total) {
+        int percentage = total > 0 ? (int) Math.round((count / (double) total) * 100) : 0;
+        return new GradeDistributionBucket(grade, count, percentage);
     }
 }
