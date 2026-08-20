@@ -342,6 +342,14 @@ the retirement gates pass.
   ordering, optional `userId` filter and not-found detail behavior. PostgreSQL
   read parity, realtime/admin write parity, canary routing, rollback and public
   notification route handoff remain open.
+- Phase 32 backend-first notification admin deletion foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-32-notification-admin-delete.md`.
+  It adds feature-default-off Java `DELETE /api/v1/notifications/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy success message and pre-delete
+  not-found behavior. PostgreSQL write parity, realtime/admin create-update
+  parity, canary routing, rollback and public notification writer handoff remain
+  open.
 
 ## Backend foundation gate before Stitch implementation
 

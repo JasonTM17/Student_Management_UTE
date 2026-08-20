@@ -71,8 +71,11 @@ separate feature-default-off `PATCH /api/v1/notifications/my/{id}/read`,
 `PATCH /api/v1/notifications/my/read-all` and
 `DELETE /api/v1/notifications/my/{id}` candidates for the authenticated user,
 preserving ownership isolation and the legacy response envelopes while realtime
-delivery, admin notification writes and public ownership remain with the legacy
-notification service. The announcement create slice adds a separate
+delivery and public ownership remain with the legacy notification service. The
+notification admin deletion slice adds feature-default-off
+`DELETE /api/v1/notifications/{id}` for admins with the legacy success message
+and pre-delete not-found behavior; admin create/update still remain legacy-owned.
+The announcement create slice adds a separate
 feature-default-off `POST /api/v1/announcements` candidate for admins with
 legacy defaults, publisher ownership from the JWT subject and the shared
 announcement response shape; RabbitMQ publication and public writer ownership

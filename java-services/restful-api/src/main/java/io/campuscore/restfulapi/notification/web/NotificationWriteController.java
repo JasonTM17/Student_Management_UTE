@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.DeleteNot
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.MarkAllReadResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
@@ -50,6 +51,12 @@ public class NotificationWriteController {
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String id) {
         return notifications.deleteMyNotification(subject(jwt), id);
+    }
+
+    @DeleteMapping("{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public DeleteNotificationResponse delete(@PathVariable String id) {
+        return notifications.delete(id);
     }
 
     private String subject(Jwt jwt) {

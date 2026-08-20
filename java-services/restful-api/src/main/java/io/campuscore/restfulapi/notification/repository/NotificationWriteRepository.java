@@ -46,6 +46,17 @@ public class NotificationWriteRepository {
                 .findFirst();
     }
 
+    public Optional<NotificationResponse> findById(String notificationId) {
+        return jdbc.query(
+                        "SELECT " + SELECT_COLUMNS
+                                + " FROM " + TABLE
+                                + " WHERE id = :id",
+                        new MapSqlParameterSource("id", notificationId),
+                        ROW_MAPPER)
+                .stream()
+                .findFirst();
+    }
+
     public void markRead(String notificationId) {
         jdbc.update(
                 "UPDATE " + TABLE

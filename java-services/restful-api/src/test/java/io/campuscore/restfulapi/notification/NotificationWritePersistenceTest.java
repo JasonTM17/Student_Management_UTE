@@ -9,15 +9,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -134,6 +137,33 @@ class NotificationWritePersistenceTest {
         assertThat(rowCount("other")).isEqualTo(1);
     }
 
+    @Test
+    void adminDeletePreservesLegacySuccessAndNotFoundBoundary() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("target", STUDENT, false, now);
+        insert("other", OTHER_USER, false, now.plusSeconds(60));
+
+        mvc.perform(delete("/api/v1/notifications/target").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Notification deleted successfully"));
+
+        mvc.perform(delete("/api/v1/notifications/missing").with(adminJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.message").value("Notification not found"));
+
+        mvc.perform(delete("/api/v1/notifications/other")
+                        .with(jwt().jwt(token -> token
+                                .subject(STUDENT)
+                                .claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        assertThat(rowCount("target")).isZero();
+        assertThat(rowCount("other")).isEqualTo(1);
+    }
+
     private void insert(String id, String userId, boolean read, Instant createdAt) {
         jdbc.update(
                 "INSERT INTO notifications.notification "
@@ -179,5 +209,12 @@ class NotificationWritePersistenceTest {
                 Integer.class,
                 id);
         return count == null ? 0 : count;
+    }
+
+    private RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("admin-user")
+                        .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 }
