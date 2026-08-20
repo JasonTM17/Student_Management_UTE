@@ -1,15 +1,17 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowUpRight, CalendarDays, Check, CircleDot, FileStack, UsersRound } from 'lucide-react';
+import { ArrowUpRight, CalendarDays, Check, CircleDot, ClipboardCheck, FileStack, GraduationCap, UsersRound } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
-import { LocalizedLink } from '@/components/LocalizedLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { MemberAvatars } from '@/components/thesis/MemberAvatars';
 import {
   thesisApi,
   type ThesisGroup,
@@ -17,18 +19,8 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
-function statusClass(status: string) {
-  if (['APPROVED', 'RESULTS_PUBLISHED', 'PROPOSALS_PUBLISHED'].includes(status)) {
-    return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
-  }
-  if (['REJECTED', 'CANCELLED'].includes(status)) {
-    return 'bg-red-500/12 text-red-700 dark:text-red-300';
-  }
-  return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
-}
-
 export default function ThesisPage() {
-  const { user, isStudent } = useAuth();
+  const { user, isStudent, isLecturer, isAdmin } = useAuth();
   const { formatDateTime, messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
@@ -255,6 +247,44 @@ export default function ThesisPage() {
               ))}
             </CardContent>
           </Card>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <LocalizedLink
+              href="/dashboard/thesis/reviews"
+              className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/45 hover:bg-secondary/30"
+            >
+              <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-cyan-500/12 text-cyan-700 dark:text-cyan-300">
+                <ClipboardCheck className="h-5 w-5" />
+              </div>
+              <div className="min-w-0 flex-1">
+                <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                  {messages.thesis.review.title}
+                </h3>
+                <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                  {messages.thesis.review.description}
+                </p>
+              </div>
+              <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+            </LocalizedLink>
+            {(isLecturer || isAdmin) ? (
+              <LocalizedLink
+                href="/dashboard/thesis/councils"
+                className="group flex items-center gap-4 rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/45 hover:bg-secondary/30"
+              >
+                <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-violet-500/12 text-violet-700 dark:text-violet-300">
+                  <GraduationCap className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                  <h3 className="text-sm font-semibold text-foreground transition-colors group-hover:text-primary">
+                    {messages.thesis.councils.title}
+                  </h3>
+                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
+                    {messages.thesis.councils.description}
+                  </p>
+                </div>
+                <ArrowUpRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
+              </LocalizedLink>
+            ) : null}
+          </div>
 
           <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
             <Card variant="muted" className="h-full">
@@ -287,27 +317,14 @@ export default function ThesisPage() {
                         </p>
                         <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{currentGroup.id}</p>
                       </div>
-                      <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(currentGroup.approvalStatus))}>
-                        {statusLabel(currentGroup.approvalStatus)}
-                      </span>
+                      <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
                     </div>
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
                         <span className="text-muted-foreground">{messages.thesis.memberCount.replace('{count}', String(currentGroup.memberStudentIds.length))}</span>
                         <span className="font-medium text-foreground">{currentGroup.topicId ? messages.thesis.status.SUBMITTED : messages.thesis.chooseTopic}</span>
                       </div>
-                      <div className="flex gap-2">
-                        {currentGroup.memberStudentIds.map((memberId, index) => (
-                          <div key={memberId} className="flex h-10 w-10 items-center justify-center rounded-full border border-border bg-secondary text-xs font-semibold text-foreground" title={memberId}>
-                            {index + 1}
-                          </div>
-                        ))}
-                        {Array.from({ length: 3 - currentGroup.memberStudentIds.length }).map((_, index) => (
-                          <div key={`empty-${index}`} className="flex h-10 w-10 items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground">
-                            +
-                          </div>
-                        ))}
-                      </div>
+                      <MemberAvatars memberIds={currentGroup.memberStudentIds} max={3} />
                     </div>
                   </div>
                 )}

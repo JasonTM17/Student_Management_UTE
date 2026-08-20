@@ -74,6 +74,15 @@ export interface ThesisCouncil {
   members: ThesisCouncilMember[];
 }
 
+export interface ThesisResult {
+  id: string;
+  groupId: string;
+  totalScore?: number | null;
+  grade?: string | null;
+  status: 'DRAFT' | 'PUBLISHED';
+  publishedAt?: string | null;
+}
+
 export interface AssistantReply {
   answer: string;
   model: string;
@@ -86,6 +95,34 @@ export const thesisApi = {
     return response.data;
   },
 
+  createRound: async (data: {
+    name: string;
+    thesisType: string;
+    registrationStart: string;
+    registrationEnd: string;
+    proposalPublishAt?: string;
+    reportDate?: string;
+    defenseDate?: string;
+  }): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>('/thesis/rounds', data);
+    return response.data;
+  },
+
+  openRegistration: async (roundId: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(`/thesis/rounds/${roundId}/open-registration`);
+    return response.data;
+  },
+
+  closeRegistration: async (roundId: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(`/thesis/rounds/${roundId}/close-registration`);
+    return response.data;
+  },
+
+  publishProposals: async (roundId: string): Promise<ThesisRound> => {
+    const response = await api.post<ThesisRound>(`/thesis/rounds/${roundId}/publish-proposals`);
+    return response.data;
+  },
+
   listTopics: async (roundId: string): Promise<ThesisTopic[]> => {
     const response = await api.get<ThesisTopic[]>('/thesis/topics', {
       params: { roundId, status: 'PUBLISHED' },
@@ -95,13 +132,6 @@ export const thesisApi = {
 
   listGroups: async (roundId: string): Promise<ThesisGroup[]> => {
     const response = await api.get<ThesisGroup[]>('/thesis/groups', {
-      params: { roundId },
-    });
-    return response.data;
-  },
-
-  listCouncils: async (roundId: string): Promise<ThesisCouncil[]> => {
-    const response = await api.get<ThesisCouncil[]>('/thesis/councils', {
       params: { roundId },
     });
     return response.data;
@@ -123,6 +153,88 @@ export const thesisApi = {
     const response = await api.post<ThesisGroup>(`/thesis/groups/${groupId}/topic`, {
       topicId,
     });
+    return response.data;
+  },
+
+  getGroup: async (groupId: string): Promise<ThesisGroup> => {
+    const response = await api.get<ThesisGroup>(`/thesis/groups/${groupId}`);
+    return response.data;
+  },
+
+  listCouncils: async (roundId: string): Promise<ThesisCouncil[]> => {
+    const response = await api.get<ThesisCouncil[]>('/thesis/councils', {
+      params: { roundId },
+    });
+    return response.data;
+  },
+
+  submitReview: async (
+    councilId: string,
+    groupId: string,
+    score: number,
+    comment: string,
+  ): Promise<void> => {
+    await api.post('/thesis/reviews', { councilId, groupId, score, comment });
+  },
+
+  publishResult: async (councilId: string, groupId: string): Promise<ThesisResult> => {
+    const response = await api.post<ThesisResult>('/thesis/results/publish', {
+      councilId,
+      groupId,
+    });
+    return response.data;
+  },
+
+  publishTopic: async (topicId: string): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>(`/thesis/topics/${topicId}/publish`);
+    return response.data;
+  },
+
+  createTopic: async (data: {
+    roundId: string;
+    departmentId: string;
+    title: string;
+    description: string;
+    maxGroups: number;
+  }): Promise<ThesisTopic> => {
+    const response = await api.post<ThesisTopic>('/thesis/topics', data);
+    return response.data;
+  },
+
+  createCouncil: async (data: {
+    roundId: string;
+    departmentId: string;
+  }): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>('/thesis/councils', data);
+    return response.data;
+  },
+
+  addCouncilMember: async (
+    councilId: string,
+    data: { lecturerId: string; memberRole: string; memberOrder: number },
+  ): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(`/thesis/councils/${councilId}/members`, data);
+    return response.data;
+  },
+
+  decideGroup: async (groupId: string, approved: boolean, reason?: string): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(`/thesis/groups/${groupId}/decision`, {
+      approved,
+      reason,
+    });
+    return response.data;
+  },
+
+  scheduleCouncil: async (councilId: string, scheduledAt: string, room: string): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(`/thesis/councils/${councilId}/schedule`, {
+      scheduledAt,
+      room,
+    });
+    return response.data;
+  },
+
+  openScoring: async (councilId: string): Promise<ThesisCouncil> => {
+    const response = await api.post<ThesisCouncil>(`/thesis/councils/${councilId}/open-scoring`);
     return response.data;
   },
 
