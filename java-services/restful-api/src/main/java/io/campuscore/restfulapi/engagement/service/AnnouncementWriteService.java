@@ -2,8 +2,10 @@ package io.campuscore.restfulapi.engagement.service;
 
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.CreateAnnouncementCommand;
+import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.List;
@@ -11,7 +13,10 @@ import java.util.Set;
 import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
+import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Bounded write service for feature-gated announcement creation. */
 @Service
@@ -52,6 +57,32 @@ public class AnnouncementWriteService {
                 request.sectionId(),
                 request.lecturerId(),
                 now));
+    }
+
+    @Transactional
+    public AnnouncementResponse update(String announcementId, UpdateAnnouncementRequest request) {
+        String id = requireText(announcementId, "announcement id");
+        announcements.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
+        if (request.priority() != null && !PRIORITIES.contains(request.priority())) {
+            throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
+        }
+        announcements.update(new UpdateAnnouncementCommand(
+                id,
+                request.title(),
+                request.content(),
+                request.priority(),
+                request.targetRoles() == null ? null : immutableStrings(request.targetRoles(), "targetRoles"),
+                request.targetYears() == null ? null : immutableYears(request.targetYears()),
+                request.isGlobal(),
+                request.publishAt(),
+                request.expiresAt(),
+                request.semesterId(),
+                request.sectionId(),
+                request.lecturerId(),
+                Instant.now(clock)));
+        return announcements.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
     }
 
     private static String requireText(String value, String name) {

@@ -23,4 +23,18 @@ public final class AnnouncementWriteDtos {
             String sectionId,
             String lecturerId) {
     }
+
+    public record UpdateAnnouncementRequest(
+            String title,
+            String content,
+            String priority,
+            List<?> targetRoles,
+            List<?> targetYears,
+            Boolean isGlobal,
+            Instant publishAt,
+            Instant expiresAt,
+            String semesterId,
+            String sectionId,
+            String lecturerId) {
+    }
 }
