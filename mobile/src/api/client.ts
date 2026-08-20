@@ -1,6 +1,10 @@
 export type JsonObject = Record<string, unknown>;
 export type AssistantLocale = 'en' | 'vi';
 
+declare const process: {
+  env: Record<string, string | undefined>;
+};
+
 export interface AssistantReply {
   answer: string;
   model: string;
@@ -107,6 +111,16 @@ function getErrorDetails(body: unknown) {
   };
 }
 
+function shouldRefreshAfterUnauthorized(path: string, status: number) {
+  const normalizedPath = normalizePath(path);
+  return (
+    status === 401 &&
+    !normalizedPath.startsWith('/auth/login') &&
+    !normalizedPath.startsWith('/auth/refresh') &&
+    !normalizedPath.startsWith('/auth/logout')
+  );
+}
+
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = normalizeBaseUrl(
     options.baseUrl ?? configuredApiBaseUrl ?? DEFAULT_API_BASE_URL,
@@ -115,6 +129,51 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   let accessToken: string | undefined;
   let refreshToken: string | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
+
+  async function refreshMobileSession(requestId: string) {
+    if (!refreshToken) {
+      return false;
+    }
+
+    const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Request-Id': `${requestId}-refresh`,
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const body = await readResponseBody(response);
+
+    if (!response.ok) {
+      accessToken = undefined;
+      refreshToken = undefined;
+      const details = getErrorDetails(body);
+      throw new ApiClientError(
+        details.message,
+        response.status,
+        requestId,
+        details.code,
+      );
+    }
+
+    const nextSession = body as LoginResponse;
+    if (!nextSession?.accessToken || !nextSession.refreshToken) {
+      accessToken = undefined;
+      refreshToken = undefined;
+      throw new ApiClientError(
+        'The Java auth refresh response did not include rotated tokens',
+        401,
+        requestId,
+        'INVALID_REFRESH_RESPONSE',
+      );
+    }
+
+    accessToken = nextSession.accessToken;
+    refreshToken = nextSession.refreshToken;
+    return true;
+  }
 
   const client: ApiClient = {
     baseUrl,
@@ -138,7 +197,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       refreshToken = undefined;
     },
 
-    async request<TResponse>(path, init = {}) {
+    async request<TResponse>(path: string, init: RequestInit = {}) {
       const requestId = createRequestId();
       if (mode !== 'live') {
         throw new ApiClientError(
@@ -160,11 +219,23 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
         headers.set('Authorization', `Bearer ${token}`);
       }
 
-      const response = await fetch(`${baseUrl}${normalizePath(path)}`, {
+      let response = await fetch(`${baseUrl}${normalizePath(path)}`, {
         ...init,
         headers,
       });
-      const body = await readResponseBody(response);
+      let body = await readResponseBody(response);
+
+      if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
+        const refreshed = await refreshMobileSession(requestId);
+        if (refreshed && accessToken) {
+          headers.set('Authorization', `Bearer ${accessToken}`);
+          response = await fetch(`${baseUrl}${normalizePath(path)}`, {
+            ...init,
+            headers,
+          });
+          body = await readResponseBody(response);
+        }
+      }
 
       if (!response.ok) {
         const details = getErrorDetails(body);
@@ -240,8 +311,14 @@ export const campusApi = {
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
-  refresh: () =>
-    apiClient.post<LoginResponse>(apiRoutes.auth.refresh, { refreshToken: apiClient.getRefreshToken() }),
+  refresh: async () => {
+    const response = await apiClient.post<LoginResponse>(
+      apiRoutes.auth.refresh,
+      { refreshToken: apiClient.getRefreshToken() },
+    );
+    apiClient.setSessionTokens(response.accessToken, response.refreshToken);
+    return response;
+  },
   logout: () =>
     apiClient.post<void>(apiRoutes.auth.logout, { refreshToken: apiClient.getRefreshToken() }),
   notifications: () => apiClient.get<JsonObject>(apiRoutes.notifications),

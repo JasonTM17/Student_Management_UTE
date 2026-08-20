@@ -82,6 +82,9 @@ Non-goals:
   sends the refresh token in refresh/logout request bodies, and clears session
   tokens on sign-out. This is source-level parity only, not durable secure
   storage or runtime proof.
+- Live mobile requests that receive `401` attempt one Java refresh-token
+  rotation and retry once, excluding login/refresh/logout to avoid recursive
+  auth loops.
 - `/api/v1/auth/me` returns the same FE-facing user shape for bearer and cookie
   access sessions while inactive or missing users fail closed.
 - `/api/v1/auth/profile` preserves existing values when fields are omitted,
@@ -118,6 +121,7 @@ smoke, route canary, rollback and independent final review remain open.
 Continuation source evidence: the mobile API client now has in-memory
 `setSessionTokens` and `getRefreshToken` helpers. Explicit live-mode sign-in
 stores the Java login access/refresh body tokens, refresh/logout use the
-body-token contract, and live sign-out attempts Java logout before clearing the
-local token state. This does not prove Expo runtime, secure device storage,
-server availability, authenticated E2E or cutover.
+body-token contract, live sign-out attempts Java logout before clearing the
+local token state, and non-auth requests retry once after a successful Java
+refresh-token rotation. This does not prove Expo runtime, secure device
+storage, server availability, authenticated E2E or cutover.

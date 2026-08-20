@@ -88,6 +88,10 @@ evidence required by this phase.
   mode. This keeps preview non-impersonating while matching the Java mobile
   body-token refresh/logout contract at source level.
 
+- `npm test --prefix mobile`: PASS, 6/6 dependency-free atlas/API/navigation
+  tests after adding a one-shot live refresh retry for non-auth `401`
+  responses. Login, refresh and logout routes are excluded from retry loops.
+
 This is source-level client evidence only. It is not Expo typecheck, emulator,
 device, live Java API, authenticated E2E, gateway canary, or production cutover
 evidence.

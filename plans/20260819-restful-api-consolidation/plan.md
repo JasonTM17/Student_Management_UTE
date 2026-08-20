@@ -275,8 +275,9 @@ Observed low-disk-safe gates:
   anchors, preview/live API separation, role navigation, non-impersonating
   preview sign-in, explicit live Java auth handoff, assistant locale payload
   parity, the mobile assistant screen's live-only Java route handoff, and
-  in-memory access/refresh token handling for the Java mobile auth contract. It
-  is not Expo typecheck, emulator, device, secure storage, or live API proof.
+  in-memory access/refresh token handling plus one-shot refresh retry for the
+  Java mobile auth contract. It is not Expo typecheck, emulator, device, secure
+  storage, or live API proof.
 - `npm test --prefix frontend`: PASS, 28/28 frontend smoke tests. This is source
   and structural coverage only; it is not a fresh authenticated browser matrix,
   Stitch pixel/reference diff, or production build evidence.

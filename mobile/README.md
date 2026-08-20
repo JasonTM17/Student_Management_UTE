@@ -52,9 +52,12 @@ in calls `/auth/login`, stores the returned bearer access token in the in-memory
 API client together with the body refresh token, and enters the role-specific
 home screen only after the Java auth candidate returns a token. Refresh and
 logout requests send the in-memory refresh token in the request body, matching
-the Java mobile-token contract. The navigator keeps `signedOut`, `preview`,
-and `authenticated` as distinct session states; role switching is available
-only inside the explicit preview state and is never an authorization
+the Java mobile-token contract; an explicit refresh call stores the rotated
+access and refresh tokens returned by Java. A live request that receives `401`
+will attempt one Java refresh-token rotation and retry once, excluding
+login/refresh/logout to avoid auth loops. The navigator keeps `signedOut`,
+`preview`, and `authenticated` as distinct session states; role switching is
+available only inside the explicit preview state and is never an authorization
 substitute.
 
 ## API seam
