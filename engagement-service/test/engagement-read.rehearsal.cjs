@@ -206,6 +206,7 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
       },
       maxBuffer: 20 * 1024 * 1024,
       windowsHide: true,
+      windowsVerbatimArguments: true,
     },
   );
   assert.equal(
