@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
@@ -14,6 +15,9 @@ import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
+import java.time.LocalDate;
+import java.time.ZoneOffset;
+import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -28,7 +32,7 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Feature-gated Java login candidate for the monolith cutover path. */
+/** Feature-gated Java auth session candidate for the monolith cutover path. */
 @Service
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
@@ -130,12 +134,37 @@ public class AuthLoginService {
 
     @Transactional(readOnly = true)
     public AuthUserResponse me(String userId) {
-        AuthUserRecord user = users.findById(userId)
-                .orElseThrow(() -> new BadCredentialsException("Invalid session"));
-        if (!"ACTIVE".equals(user.status())) {
-            throw new BadCredentialsException("Invalid session");
+        return requireActiveUser(userId).toResponse();
+    }
+
+    @Transactional
+    public AuthUserResponse updateProfile(String userId, UpdateProfileRequest request) {
+        AuthUserRecord user = requireActiveUser(userId);
+        users.updateProfile(
+                user.id(),
+                request != null && request.firstName() != null ? request.firstName() : user.firstName(),
+                request != null && request.lastName() != null ? request.lastName() : user.lastName(),
+                request != null && request.phone() != null ? request.phone() : user.phone(),
+                request != null && request.dateOfBirth() != null ? parseDate(request.dateOfBirth()) : user.dateOfBirth(),
+                request != null && request.address() != null ? request.address() : user.address());
+        return requireActiveUser(user.id()).toResponse();
+    }
+
+    @Transactional
+    public void changePassword(String userId, String oldPassword, String newPassword) {
+        AuthUserRecord user = requireActiveUser(userId);
+        if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password fields are required");
         }
-        return user.toResponse();
+        if (newPassword.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "New password must contain at least 8 characters");
+        }
+        if (!passwordEncoder.matches(oldPassword, user.passwordHash())) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Invalid old password");
+        }
+
+        users.changePassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
+        users.deleteAllRefreshSessions(user.id());
     }
 
     @Transactional
@@ -153,6 +182,23 @@ public class AuthLoginService {
             return tokens.decodeRefreshToken(refreshTokenValue);
         } catch (JwtException exception) {
             throw new BadCredentialsException("Invalid refresh token", exception);
+        }
+    }
+
+    private AuthUserRecord requireActiveUser(String userId) {
+        AuthUserRecord user = users.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid session"));
+        if (!"ACTIVE".equals(user.status())) {
+            throw new BadCredentialsException("Invalid session");
+        }
+        return user;
+    }
+
+    private static Instant parseDate(String value) {
+        try {
+            return LocalDate.parse(value).atStartOfDay().toInstant(ZoneOffset.UTC);
+        } catch (DateTimeParseException exception) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateOfBirth must be an ISO date", exception);
         }
     }
 

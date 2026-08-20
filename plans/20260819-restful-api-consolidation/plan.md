@@ -192,12 +192,13 @@ the retirement gates pass.
 - Phase 13 backend-first auth and academic read foundation:
   source candidate/HOLD; see `phase-13-auth-academic-foundation.md`. It adds
   Java access/refresh token issuing, a feature-default-off Java auth session
-  candidate for login, current-user read, refresh rotation and logout clearing
-  against the migrated legacy `auth` schema, and feature-default-off academic
-  semester/course reads through the legacy academic schema. Legacy
-  auth/academic services remain public route owners and canonical writers;
-  profile writes, password flows, audit publishing, PostgreSQL parity, route
-  canary, rollback and frontend convergence remain open.
+  candidate for login, current-user read, profile update, password change,
+  refresh rotation and logout clearing against the migrated legacy `auth`
+  schema, and feature-default-off academic semester/course reads through the
+  legacy academic schema. Legacy auth/academic services remain public route
+  owners and canonical writers; registration, forgot/reset password, email
+  verification, audit publishing, PostgreSQL parity, route canary, rollback and
+  frontend convergence remain open.
 - Phase 14 backend-first people read foundation:
   source candidate/HOLD; see `phase-14-people-read-foundation.md`. It adds
   feature-default-off Java student and lecturer list/detail reads against the

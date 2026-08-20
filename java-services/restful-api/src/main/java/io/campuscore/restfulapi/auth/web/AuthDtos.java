@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth.web;
 import com.fasterxml.jackson.annotation.JsonInclude;
 import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
@@ -21,6 +22,22 @@ public final class AuthDtos {
     }
 
     public record LogoutRequest(String refreshToken) {
+    }
+
+    public record UpdateProfileRequest(
+            String firstName,
+            String lastName,
+            String phone,
+            String dateOfBirth,
+            String address) {
+    }
+
+    public record ChangePasswordRequest(
+            @NotBlank String oldPassword,
+            @NotBlank @Size(min = 8) String newPassword) {
+    }
+
+    public record MessageResponse(String message) {
     }
 
     public record AuthUserResponse(

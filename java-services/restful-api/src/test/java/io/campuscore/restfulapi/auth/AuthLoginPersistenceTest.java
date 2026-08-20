@@ -5,6 +5,7 @@ import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -296,6 +297,113 @@ class AuthLoginPersistenceTest {
                 .andExpect(jsonPath("$.id").value("student-user"))
                 .andExpect(jsonPath("$.email").value("student@campuscore.edu"))
                 .andExpect(jsonPath("$.roles[0]").value("STUDENT"));
+    }
+
+    @Test
+    void updateProfileRequiresCookieCsrfAndPersistsLegacyUserFields() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        mvc.perform(put("/api/v1/auth/profile")
+                        .cookie(accessCookie, csrfCookie)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"firstName":"Updated","lastName":"Student"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("CSRF_INVALID"));
+
+        mvc.perform(put("/api/v1/auth/profile")
+                        .cookie(accessCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "firstName":"Updated",
+                                  "lastName":"Student",
+                                  "phone":"+84999999999",
+                                  "dateOfBirth":"2001-02-03",
+                                  "address":"Java monolith lane"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("student-user"))
+                .andExpect(jsonPath("$.firstName").value("Updated"))
+                .andExpect(jsonPath("$.lastName").value("Student"))
+                .andExpect(jsonPath("$.phone").value("+84999999999"))
+                .andExpect(jsonPath("$.address").value("Java monolith lane"))
+                .andExpect(jsonPath("$.roles[0]").value("STUDENT"));
+
+        mvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.firstName").value("Updated"))
+                .andExpect(jsonPath("$.lastName").value("Student"))
+                .andExpect(jsonPath("$.phone").value("+84999999999"))
+                .andExpect(jsonPath("$.address").value("Java monolith lane"));
+    }
+
+    @Test
+    void changePasswordRequiresAuthenticationUpdatesHashAndRevokesRefreshSessions() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String accessToken = loginBody.get("accessToken").asText();
+
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"oldPassword":"password123","newPassword":"newpass123"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .content("""
+                                {"oldPassword":"wrong-password","newPassword":"newpass123"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.message").value("Invalid old password"));
+
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("Authorization", "Bearer " + accessToken)
+                        .content("""
+                                {"oldPassword":"password123","newPassword":"newpass123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Password changed successfully"));
+
+        Integer sessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        String storedRefresh = jdbc.queryForObject(
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
+                String.class);
+        Object passwordChangedAt = jdbc.queryForObject(
+                "SELECT \"passwordChangedAt\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Object.class);
+
+        org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
+        org.junit.jupiter.api.Assertions.assertNull(storedRefresh);
+        org.junit.jupiter.api.Assertions.assertNotNull(passwordChangedAt);
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"student@campuscore.edu","password":"password123"}
+                                """))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"student@campuscore.edu","password":"newpass123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("student-user"));
     }
 
     @Test
