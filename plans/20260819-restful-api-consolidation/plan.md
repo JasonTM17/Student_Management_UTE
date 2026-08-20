@@ -307,6 +307,15 @@ the retirement gates pass.
   publisher/created timestamp, updated timestamp behavior and the shared
   announcement response shape. Delete, RabbitMQ/event parity, PostgreSQL write
   rehearsal, canary routing, rollback and public writer handoff remain open.
+- Phase 28 engagement contract hardening:
+  source candidate/HOLD; see `phase-28-engagement-contract-hardening.md`.
+  It tightens Java engagement request parsing and read visibility after exact
+  review found that some JSON bodies could be coerced or ignored too loosely.
+  Java now rejects unknown write-body properties, preserves omitted-versus-null
+  announcement update semantics, and hides internal support-ticket responses
+  from user self-service reads while leaving admin visibility intact. Legacy
+  route ownership, PostgreSQL parity, RabbitMQ/event parity, canary routing and
+  rollback remain open.
 
 ## Backend foundation gate before Stitch implementation
 
