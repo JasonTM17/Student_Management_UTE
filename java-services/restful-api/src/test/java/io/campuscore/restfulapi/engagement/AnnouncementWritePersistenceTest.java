@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -365,6 +366,47 @@ class AnnouncementWritePersistenceTest {
                         .content("{\"targetYears\":[1.9]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void adminDeletesAnnouncementWithLegacySuccessMessage() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(delete("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Announcement deleted successfully"));
+
+        Integer remaining = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
+    }
+
+    @Test
+    void deleteBoundaryFailsClosedForStudentAndMissingAnnouncement() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(delete("/api/v1/announcements/existing-announcement")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("student-1")
+                                        .claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(delete("/api/v1/announcements/missing-announcement")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        Integer remaining = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, remaining);
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt(String subject) {

@@ -316,6 +316,13 @@ the retirement gates pass.
   from user self-service reads while leaving admin visibility intact. Legacy
   route ownership, PostgreSQL parity, RabbitMQ/event parity, canary routing and
   rollback remain open.
+- Phase 29 backend-first engagement announcement deletion foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-29-engagement-announcement-delete.md`.
+  It adds feature-default-off Java `DELETE /api/v1/announcements/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy success message and pre-delete
+  not-found behavior. RabbitMQ/event parity, PostgreSQL write rehearsal, canary
+  routing, rollback and public announcement writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

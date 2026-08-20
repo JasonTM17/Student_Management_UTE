@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepositor
 import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository.UpdateAnnouncementCommand;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.DeleteAnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -90,6 +91,15 @@ public class AnnouncementWriteService {
                 Instant.now(clock)));
         return announcements.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
+    }
+
+    @Transactional
+    public DeleteAnnouncementResponse delete(String announcementId) {
+        String id = requireText(announcementId, "announcement id");
+        announcements.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
+        announcements.delete(id);
+        return new DeleteAnnouncementResponse("Announcement deleted successfully");
     }
 
     private static String requireText(String value, String name) {
