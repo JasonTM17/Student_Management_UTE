@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement.web;
 
 import io.campuscore.restfulapi.engagement.service.AnnouncementReadService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementListResponse;
+import java.math.BigInteger;
 import java.util.Collection;
 import java.util.List;
 import java.util.Map;
@@ -76,7 +77,7 @@ public class AnnouncementReadController {
                 limit,
                 legacyOptional(semesterId),
                 legacyOptional(sectionId),
-                legacyOptional(priority));
+                priority);
     }
 
     private static void requireAllowedQuery(
@@ -120,8 +121,9 @@ public class AnnouncementReadController {
             return List.of();
         }
         return values.stream()
-                .filter(value -> value != null && !value.toString().isBlank())
-                .map(Object::toString)
+                .filter(String.class::isInstance)
+                .map(String.class::cast)
+                .filter(value -> !value.isBlank())
                 .toList();
     }
 
@@ -130,10 +132,9 @@ public class AnnouncementReadController {
             return null;
         }
         Object value = jwt.getClaims().get(claimName);
-        if (value == null) {
+        if (!(value instanceof String text)) {
             return null;
         }
-        String text = value.toString();
         return text.isEmpty() ? null : text;
     }
 
@@ -142,6 +143,19 @@ public class AnnouncementReadController {
             return null;
         }
         Object year = student.get("year");
-        return year instanceof Number number ? number.intValue() : null;
+        if (year instanceof Byte || year instanceof Short || year instanceof Integer) {
+            return ((Number) year).intValue();
+        }
+        if (year instanceof Long longYear
+                && longYear >= Integer.MIN_VALUE
+                && longYear <= Integer.MAX_VALUE) {
+            return longYear.intValue();
+        }
+        if (year instanceof BigInteger bigYear
+                && bigYear.compareTo(BigInteger.valueOf(Integer.MIN_VALUE)) >= 0
+                && bigYear.compareTo(BigInteger.valueOf(Integer.MAX_VALUE)) <= 0) {
+            return bigYear.intValue();
+        }
+        return null;
     }
 }

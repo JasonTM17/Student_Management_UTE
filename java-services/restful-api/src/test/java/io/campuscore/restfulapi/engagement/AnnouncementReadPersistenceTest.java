@@ -27,8 +27,7 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "migration.engagement-read.enabled=true",
-        "spring.flyway.enabled=false",
-        "spring.jpa.hibernate.ddl-auto=none"
+        "spring.flyway.enabled=false"
 })
 class AnnouncementReadPersistenceTest {
 
@@ -106,6 +105,36 @@ class AnnouncementReadPersistenceTest {
                                 .claim("student", Map.of("year", 2)))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("student-with-numeric-id")
+                                .claim("email", "student3@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", 42)
+                                .claim("student", Map.of("year", 2)))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("student-with-fractional-year")
+                                .claim("email", "student4@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2.5)))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("student-with-overflow-year")
+                                .claim("email", "student5@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", Long.MAX_VALUE)))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -133,6 +162,15 @@ class AnnouncementReadPersistenceTest {
                                 .subject("lecturer-without-profile")
                                 .claim("email", "lecturer2@campuscore.edu")
                                 .claim("roles", List.of("LECTURER")))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("lecturer-with-numeric-profile")
+                                .claim("email", "lecturer3@campuscore.edu")
+                                .claim("roles", List.of("LECTURER"))
+                                .claim("lecturerId", 42))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
@@ -217,6 +255,17 @@ class AnnouncementReadPersistenceTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("priority", "")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("admin-user")
+                                        .claim("email", "admin@campuscore.edu")
+                                        .claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
         mvc.perform(get("/api/v1/announcements/my")
                         .queryParam("unknown", "value")
                         .with(jwt().jwt(token -> token
@@ -254,6 +303,13 @@ class AnnouncementReadPersistenceTest {
 
         mvc.perform(get("/api/v1/announcements/my")
                         .with(jwt().jwt(token -> token.subject("missing-email"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("numeric-email")
+                                .claim("email", 42))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
