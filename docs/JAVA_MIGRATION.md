@@ -63,7 +63,11 @@ candidates for thesis, notification, engagement announcement,
 engagement support-ticket, academic catalog, people student/lecturer profile,
 finance, analytics and academic enrollment boundaries. Read candidates use JDBC
 against legacy schemas under the `persistence` profile and do not add DDL,
-write data or own public traffic. The academic slice covers semester/course
+write data or own public traffic. The announcement create slice adds a separate
+feature-default-off `POST /api/v1/announcements` candidate for admins with
+legacy defaults, publisher ownership from the JWT subject and the shared
+announcement response shape; RabbitMQ publication and public writer ownership
+remain with the legacy engagement service. The academic slice covers semester/course
 list and detail routes only. The people slice covers student/lecturer list and
 detail routes only. The finance slice covers student invoice list/detail plus
 admin invoice/payment list/detail routes only, with checkout, provider
