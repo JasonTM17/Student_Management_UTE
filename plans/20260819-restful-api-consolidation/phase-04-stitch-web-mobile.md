@@ -83,6 +83,11 @@ evidence required by this phase.
   local; explicit live mode calls the Java `/thesis/assistant/chat` route after
   bearer sign-in and surfaces the Java `degraded` fallback label.
 
+- `npm test --prefix mobile`: PASS, 6/6 dependency-free atlas/API/navigation
+  tests after wiring in-memory access/refresh token handling for explicit live
+  mode. This keeps preview non-impersonating while matching the Java mobile
+  body-token refresh/logout contract at source level.
+
 This is source-level client evidence only. It is not Expo typecheck, emulator,
 device, live Java API, authenticated E2E, gateway canary, or production cutover
 evidence.

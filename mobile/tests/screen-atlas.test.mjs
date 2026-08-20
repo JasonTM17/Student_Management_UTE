@@ -57,6 +57,10 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /EXPO_PUBLIC_API_MODE === 'live'/);
   assert.match(client, /MOBILE_API_PREVIEW/);
   assert.match(client, /mode: ApiMode/);
+  assert.match(client, /setSessionTokens\(accessToken: string \| undefined, refreshToken: string \| undefined\): void/);
+  assert.match(client, /getRefreshToken\(\): string \| undefined/);
+  assert.match(client, /apiRoutes\.auth\.refresh, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
+  assert.match(client, /apiRoutes\.auth\.logout, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /export type AssistantLocale = 'en' \| 'vi'/);
   assert.match(client, /assistantChat: \(message: string, locale: AssistantLocale = 'en'\)/);
   assert.match(client, /apiClient\.post<AssistantReply>\(apiRoutes\.thesis\.assistantChat, \{ message, locale \}\)/);
@@ -79,6 +83,8 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /completeSignIn\(nextRole\) \{/);
   assert.match(navigator, /if \(route !== 'auth\.signIn' \|\| apiClient\.mode !== 'live'\)/);
   assert.match(navigator, /setSessionKind\('authenticated'\)/);
+  assert.match(navigator, /if \(apiClient\.mode === 'live'\) \{/);
+  assert.match(navigator, /void campusApi\.logout\(\)\.catch\(\(\) => undefined\)\.finally\(\(\) => apiClient\.clearAccessToken\(\)\)/);
   assert.match(navigationTypes, /enterPreview\(\): void/);
   assert.match(navigationTypes, /completeSignIn\(role: UserRole\): void/);
 });
@@ -108,7 +114,7 @@ test('Stitch mobile references stay traceable and preview sign-in does not imper
   assert.match(signIn, /label=\{isPreview \? 'Explore preview' : 'Sign in'\}/);
   assert.match(signIn, /navigation\.enterPreview\(\)/);
   assert.match(signIn, /campusApi\.login\(email\.trim\(\), password\)/);
-  assert.match(signIn, /apiClient\.setAccessToken\(response\.accessToken\)/);
+  assert.match(signIn, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
   assert.match(signIn, /navigation\.completeSignIn\(resolveRole\(response\.user\?\.roles\)\)/);
   assert.doesNotMatch(signIn, /navigation\.navigate\('dashboard\.student'\)/);
   assert.match(signIn, /No account is authenticated until the Java auth contract is implemented and verified/);

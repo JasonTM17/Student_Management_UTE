@@ -36,6 +36,8 @@ export interface ApiClient {
   readonly baseUrl: string;
   readonly mode: ApiMode;
   setAccessToken(token: string | undefined): void;
+  setSessionTokens(accessToken: string | undefined, refreshToken: string | undefined): void;
+  getRefreshToken(): string | undefined;
   clearAccessToken(): void;
   request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
   get<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
@@ -111,6 +113,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   );
   const mode = options.mode ?? configuredApiMode;
   let accessToken: string | undefined;
+  let refreshToken: string | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
 
   const client: ApiClient = {
@@ -121,8 +124,18 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       accessToken = token;
     },
 
+    setSessionTokens(nextAccessToken, nextRefreshToken) {
+      accessToken = nextAccessToken;
+      refreshToken = nextRefreshToken;
+    },
+
+    getRefreshToken() {
+      return refreshToken;
+    },
+
     clearAccessToken() {
       accessToken = undefined;
+      refreshToken = undefined;
     },
 
     async request<TResponse>(path, init = {}) {
@@ -227,8 +240,10 @@ export const campusApi = {
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
-  refresh: () => apiClient.post<JsonObject>(apiRoutes.auth.refresh, {}),
-  logout: () => apiClient.post<void>(apiRoutes.auth.logout, {}),
+  refresh: () =>
+    apiClient.post<LoginResponse>(apiRoutes.auth.refresh, { refreshToken: apiClient.getRefreshToken() }),
+  logout: () =>
+    apiClient.post<void>(apiRoutes.auth.logout, { refreshToken: apiClient.getRefreshToken() }),
   notifications: () => apiClient.get<JsonObject>(apiRoutes.notifications),
   thesisTopics: () => apiClient.get<JsonObject>(apiRoutes.thesis.topics),
   assistantChat: (message: string, locale: AssistantLocale = 'en') =>

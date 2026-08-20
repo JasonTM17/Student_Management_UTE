@@ -78,6 +78,10 @@ Non-goals:
   clears shared cookies plus the stored session.
 - Mobile-style refresh/logout accepts body refresh tokens without depending on
   browser cookies; logout still requires an authenticated access token.
+- The mobile source seam stores Java login access/refresh tokens in memory,
+  sends the refresh token in refresh/logout request bodies, and clears session
+  tokens on sign-out. This is source-level parity only, not durable secure
+  storage or runtime proof.
 - `/api/v1/auth/me` returns the same FE-facing user shape for bearer and cookie
   access sessions while inactive or missing users fail closed.
 - `/api/v1/auth/profile` preserves existing values when fields are omitted,
@@ -110,3 +114,10 @@ git diff --check
 All three commands passed locally against H2/source tests before commit. These
 gates are source/H2/local evidence only. PostgreSQL restore parity, runtime
 smoke, route canary, rollback and independent final review remain open.
+
+Continuation source evidence: the mobile API client now has in-memory
+`setSessionTokens` and `getRefreshToken` helpers. Explicit live-mode sign-in
+stores the Java login access/refresh body tokens, refresh/logout use the
+body-token contract, and live sign-out attempts Java logout before clearing the
+local token state. This does not prove Expo runtime, secure device storage,
+server availability, authenticated E2E or cutover.
