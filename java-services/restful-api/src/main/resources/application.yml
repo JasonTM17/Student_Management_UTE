@@ -52,6 +52,8 @@ migration:
     enabled: ${FINANCE_READ_ENABLED:false}
   analytics-read:
     enabled: ${ANALYTICS_READ_ENABLED:false}
+  thesis-assistant:
+    enabled: ${THESIS_ASSISTANT_ENABLED:false}
   auth-login:
     enabled: ${AUTH_LOGIN_ENABLED:false}
 
