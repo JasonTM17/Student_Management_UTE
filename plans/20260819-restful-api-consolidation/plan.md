@@ -358,6 +358,14 @@ the retirement gates pass.
   optional `link` clearing, detail response shape and not-found behavior.
   PostgreSQL write parity, realtime/admin create parity, canary routing,
   rollback and public notification writer handoff remain open.
+- Phase 34 backend-first notification admin create foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-34-notification-admin-create.md`.
+  It adds feature-default-off Java `POST /api/v1/notifications` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy create fields, `201 Created`,
+  generated id, unread default, null `readAt`, detail response shape and
+  admin-only authorization. PostgreSQL write parity, realtime/event parity,
+  canary routing, rollback and public notification writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

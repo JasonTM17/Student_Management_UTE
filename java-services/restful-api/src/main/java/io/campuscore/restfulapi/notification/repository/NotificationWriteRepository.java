@@ -59,6 +59,23 @@ public class NotificationWriteRepository {
                 .findFirst();
     }
 
+    public NotificationResponse create(CreateNotificationCommand command) {
+        jdbc.update(
+                "INSERT INTO " + TABLE
+                        + " (id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at)"
+                        + " VALUES (:id, :userId, :title, :message, :type, :link, FALSE, NULL, :createdAt, :createdAt)",
+                new MapSqlParameterSource()
+                        .addValue("id", command.id())
+                        .addValue("userId", command.userId())
+                        .addValue("title", command.title())
+                        .addValue("message", command.message())
+                        .addValue("type", command.type())
+                        .addValue("link", command.link())
+                        .addValue("createdAt", Timestamp.from(command.createdAt())));
+        return findById(command.id())
+                .orElseThrow(() -> new IllegalStateException("created notification was not found"));
+    }
+
     public void markRead(String notificationId) {
         jdbc.update(
                 "UPDATE " + TABLE
@@ -128,6 +145,16 @@ public class NotificationWriteRepository {
 
     private static java.time.Instant instant(Timestamp timestamp) {
         return timestamp == null ? null : timestamp.toInstant();
+    }
+
+    public record CreateNotificationCommand(
+            String id,
+            String userId,
+            String title,
+            String message,
+            String type,
+            String link,
+            java.time.Instant createdAt) {
     }
 
     public record UpdateNotificationCommand(

@@ -73,6 +73,20 @@ class RestfulApiContractTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
+        mvc.perform(post("/api/v1/notifications")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "userId": "student-user-1",
+                                  "title": "Payment posted",
+                                  "message": "Your tuition payment was received.",
+                                  "type": "SUCCESS"
+                                }
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
         mvc.perform(patch("/api/v1/notifications/my/notification-1/read").with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
