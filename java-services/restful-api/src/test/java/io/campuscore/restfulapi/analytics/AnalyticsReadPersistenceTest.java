@@ -86,6 +86,7 @@ class AnalyticsReadPersistenceTest {
                     "nameEn" VARCHAR(200),
                     "nameVi" VARCHAR(200),
                     "academicYearId" VARCHAR(120),
+                    "status" VARCHAR(80),
                     "startDate" TIMESTAMP
                 )
                 """);
@@ -96,6 +97,13 @@ class AnalyticsReadPersistenceTest {
                     "semesterId" VARCHAR(120),
                     "status" VARCHAR(40),
                     "letterGrade" VARCHAR(10)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Waitlist" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "sectionId" VARCHAR(120),
+                    "status" VARCHAR(40)
                 )
                 """);
         jdbc.execute("""
@@ -133,6 +141,7 @@ class AnalyticsReadPersistenceTest {
                 "Notification",
                 "Payment",
                 "Invoice",
+                "Waitlist",
                 "Student",
                 "Lecturer",
                 "Course",
@@ -254,6 +263,77 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$[1].sectionId").value("section-java-b"))
                 .andExpect(jsonPath("$[1].enrolledCount").value(3))
                 .andExpect(jsonPath("$[1].occupancyRate").value(50));
+    }
+
+    @Test
+    void registrationPressurePreservesLegacySummaryHighestPressureAndWaitlistShape() throws Exception {
+        insertAcademicYear("academic-year-2026", 2026);
+        insertSemesterWithStatus(
+                "semester-registration",
+                "Registration 2026",
+                "Registration 2026",
+                "Dang ky 2026",
+                "academic-year-2026",
+                "REGISTRATION_OPEN",
+                BASE_TIME);
+        insertSemesterWithStatus(
+                "semester-add-drop",
+                "Add Drop 2026",
+                "Add Drop 2026",
+                "Them bot 2026",
+                "academic-year-2026",
+                "ADD_DROP_OPEN",
+                BASE_TIME.plusSeconds(86_400));
+        insertSemesterWithStatus(
+                "semester-closed",
+                "Closed 2026",
+                "Closed 2026",
+                "Da dong 2026",
+                "academic-year-2026",
+                "CLOSED",
+                BASE_TIME.minusSeconds(86_400));
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web", 3);
+        insertCourse("course-java", "JAVA201", "Java Backend", "Java Backend", "Java Backend", 4);
+        insertCourse("course-db", "DB301", "Databases", "Databases", "Co so du lieu", 3);
+        insertSection("section-full", "A", "course-web", "semester-registration", 2, 0);
+        insertSection("section-near", "B", "course-java", "semester-add-drop", 10, 8);
+        insertSection("section-low", "C", "course-db", "semester-closed", 5, 0);
+        insertEnrollmentInSection("enrollment-full-confirmed", "semester-registration", "section-full", "CONFIRMED");
+        insertEnrollmentInSection("enrollment-full-pending", "semester-registration", "section-full", "PENDING");
+        insertEnrollmentInSection("enrollment-full-completed", "semester-registration", "section-full", "COMPLETED");
+        insertEnrollmentInSection("enrollment-low-pending", "semester-closed", "section-low", "PENDING");
+        insertWaitlist("waitlist-full-active-1", "section-full", "ACTIVE");
+        insertWaitlist("waitlist-full-active-2", "section-full", "ACTIVE");
+        insertWaitlist("waitlist-near-active", "section-near", "ACTIVE");
+        insertWaitlist("waitlist-low-cancelled", "section-low", "CANCELLED");
+
+        mvc.perform(get("/api/v1/analytics/registration-pressure").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.activeSemesters").value(2))
+                .andExpect(jsonPath("$.totalSections").value(3))
+                .andExpect(jsonPath("$.atCapacity").value(1))
+                .andExpect(jsonPath("$.nearCapacity").value(1))
+                .andExpect(jsonPath("$.waitlistActive").value(3))
+                .andExpect(jsonPath("$.averageOccupancy").value(67))
+                .andExpect(jsonPath("$.highestPressure.length()").value(3))
+                .andExpect(jsonPath("$.highestPressure[0].sectionId").value("section-full"))
+                .andExpect(jsonPath("$.highestPressure[0].sectionNumber").value("A"))
+                .andExpect(jsonPath("$.highestPressure[0].courseCode").value("WEB101"))
+                .andExpect(jsonPath("$.highestPressure[0].courseName").value("Web Programming"))
+                .andExpect(jsonPath("$.highestPressure[0].semesterName").value("Registration 2026"))
+                .andExpect(jsonPath("$.highestPressure[0].capacity").value(2))
+                .andExpect(jsonPath("$.highestPressure[0].enrolledCount").value(2))
+                .andExpect(jsonPath("$.highestPressure[0].waitlistCount").value(2))
+                .andExpect(jsonPath("$.highestPressure[0].occupancyRate").value(100))
+                .andExpect(jsonPath("$.highestPressure[1].sectionId").value("section-near"))
+                .andExpect(jsonPath("$.highestPressure[1].enrolledCount").value(8))
+                .andExpect(jsonPath("$.highestPressure[1].waitlistCount").value(1))
+                .andExpect(jsonPath("$.highestPressure[1].occupancyRate").value(80))
+                .andExpect(jsonPath("$.waitlistStatus.length()").value(2))
+                .andExpect(jsonPath("$.waitlistStatus[0].status").value("ACTIVE"))
+                .andExpect(jsonPath("$.waitlistStatus[0].count").value(3))
+                .andExpect(jsonPath("$.waitlistStatus[1].status").value("CANCELLED"))
+                .andExpect(jsonPath("$.waitlistStatus[1].count").value(1));
     }
 
     @Test
@@ -440,6 +520,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/registration-pressure").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/top-courses").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -469,6 +553,12 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/analytics/section-occupancy")
+                        .queryParam("semesterId", "semester-1")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/registration-pressure")
                         .queryParam("semesterId", "semester-1")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
@@ -547,6 +637,27 @@ class AnalyticsReadPersistenceTest {
                 localDateTime(startDate));
     }
 
+    private void insertSemesterWithStatus(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String academicYearId,
+            String status,
+            Instant startDate) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Semester\""
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"academicYearId\", \"status\", \"startDate\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id,
+                name,
+                nameEn,
+                nameVi,
+                academicYearId,
+                status,
+                localDateTime(startDate));
+    }
+
     private void insertCourse(String id, String code, String name, String nameEn, String nameVi, int credits) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Course\""
@@ -620,6 +731,14 @@ class AnalyticsReadPersistenceTest {
                 semesterId,
                 status,
                 null);
+    }
+
+    private void insertWaitlist(String id, String sectionId, String status) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Waitlist\" (\"id\", \"sectionId\", \"status\") VALUES (?, ?, ?)",
+                id,
+                sectionId,
+                status);
     }
 
     private void insertPayment(String id, String method, String status, BigDecimal amount) {

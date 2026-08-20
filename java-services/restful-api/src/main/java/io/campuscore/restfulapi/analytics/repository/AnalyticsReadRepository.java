@@ -6,9 +6,11 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationType
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureSection;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentYearBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.WaitlistStatusBucket;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -176,6 +178,45 @@ public class AnalyticsReadRepository {
                 (resultSet, ignored) -> sectionOccupancyBucket(resultSet));
     }
 
+    public List<RegistrationPressureSection> registrationPressureSections() {
+        return jdbc.query(
+                "SELECT s.\"id\" AS \"sectionId\", s.\"sectionNumber\", c.\"code\" AS \"courseCode\","
+                        + " c.\"name\" AS \"courseName\", c.\"nameEn\" AS \"courseNameEn\","
+                        + " c.\"nameVi\" AS \"courseNameVi\", sm.\"name\" AS \"semesterName\","
+                        + " sm.\"nameEn\" AS \"semesterNameEn\", sm.\"nameVi\" AS \"semesterNameVi\","
+                        + " s.\"capacity\", s.\"enrolledCount\","
+                        + " COUNT(DISTINCT e.\"id\") AS \"countedEnrollments\","
+                        + " COUNT(DISTINCT w.\"id\") AS \"waitlistCount\""
+                        + " FROM " + table("\"Section\"") + " s"
+                        + " JOIN " + table("\"Course\"") + " c ON c.\"id\" = s.\"courseId\""
+                        + " JOIN " + table("\"Semester\"") + " sm ON sm.\"id\" = s.\"semesterId\""
+                        + " LEFT JOIN " + table("\"Enrollment\"") + " e ON e.\"sectionId\" = s.\"id\""
+                        + " AND e.\"status\" IN ('CONFIRMED', 'PENDING')"
+                        + " LEFT JOIN " + table("\"Waitlist\"") + " w ON w.\"sectionId\" = s.\"id\""
+                        + " AND w.\"status\" = 'ACTIVE'"
+                        + " GROUP BY s.\"id\", s.\"sectionNumber\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\","
+                        + " sm.\"name\", sm.\"nameEn\", sm.\"nameVi\", s.\"capacity\", s.\"enrolledCount\"",
+                (resultSet, ignored) -> registrationPressureSection(resultSet));
+    }
+
+    public List<WaitlistStatusBucket> waitlistStatusBuckets() {
+        return jdbc.query(
+                "SELECT \"status\", COUNT(\"id\") AS \"count\""
+                        + " FROM " + table("\"Waitlist\"")
+                        + " GROUP BY \"status\" ORDER BY \"status\" ASC",
+                (resultSet, ignored) -> new WaitlistStatusBucket(
+                        resultSet.getString("status"),
+                        resultSet.getLong("count")));
+    }
+
+    public long countActiveRegistrationSemesters() {
+        Long count = jdbc.getJdbcTemplate().queryForObject(
+                "SELECT COUNT(*) FROM " + table("\"Semester\"")
+                        + " WHERE \"status\" IN ('REGISTRATION_OPEN', 'ADD_DROP_OPEN')",
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
     public List<TopCourseBucket> topCourses(int limit) {
         return jdbc.query(
                 "SELECT c.\"id\" AS \"courseId\", c.\"code\" AS \"courseCode\","
@@ -287,6 +328,30 @@ public class AnalyticsReadRepository {
                 resultSet.getString("semesterNameVi"),
                 capacity,
                 enrolledCount,
+                occupancyRate);
+    }
+
+    private static RegistrationPressureSection registrationPressureSection(ResultSet resultSet) throws SQLException {
+        int capacity = resultSet.getInt("capacity");
+        long countedEnrollments = resultSet.getLong("countedEnrollments");
+        long storedEnrollments = resultSet.getLong("enrolledCount");
+        long enrolledCount = countedEnrollments > 0 ? countedEnrollments : storedEnrollments;
+        int occupancyRate = capacity > 0
+                ? Math.toIntExact(Math.round((enrolledCount * 100.0d) / capacity))
+                : 0;
+        return new RegistrationPressureSection(
+                resultSet.getString("sectionId"),
+                resultSet.getString("sectionNumber"),
+                resultSet.getString("courseCode"),
+                resultSet.getString("courseName"),
+                resultSet.getString("courseNameEn"),
+                resultSet.getString("courseNameVi"),
+                resultSet.getString("semesterName"),
+                resultSet.getString("semesterNameEn"),
+                resultSet.getString("semesterNameVi"),
+                capacity,
+                enrolledCount,
+                resultSet.getLong("waitlistCount"),
                 occupancyRate);
     }
 

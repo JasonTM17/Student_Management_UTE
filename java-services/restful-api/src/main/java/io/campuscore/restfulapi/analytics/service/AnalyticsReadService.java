@@ -10,9 +10,12 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSumm
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureSection;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentStatisticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.WaitlistStatusBucket;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -26,6 +29,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "migration.analytics-read", name = "enabled", havingValue = "true")
 public class AnalyticsReadService {
+
+    private static final int NEAR_CAPACITY_THRESHOLD = 80;
 
     private static final List<String> LETTER_GRADES = List.of(
             "A",
@@ -109,6 +114,45 @@ public class AnalyticsReadService {
     @Transactional(readOnly = true)
     public List<SectionOccupancyBucket> sectionOccupancy() {
         return analytics.sectionOccupancy();
+    }
+
+    @Transactional(readOnly = true)
+    public RegistrationPressureResponse registrationPressure() {
+        List<RegistrationPressureSection> sections = analytics.registrationPressureSections();
+        List<WaitlistStatusBucket> waitlistStatus = analytics.waitlistStatusBuckets();
+        long waitlistActive = waitlistStatus.stream()
+                .filter(bucket -> "ACTIVE".equals(bucket.status()))
+                .mapToLong(WaitlistStatusBucket::count)
+                .sum();
+        int averageOccupancy = sections.isEmpty()
+                ? 0
+                : (int) Math.round(sections.stream()
+                        .mapToInt(RegistrationPressureSection::occupancyRate)
+                        .average()
+                        .orElse(0));
+        List<RegistrationPressureSection> highestPressure = sections.stream()
+                .sorted((left, right) -> {
+                    int occupancyCompare = Integer.compare(right.occupancyRate(), left.occupancyRate());
+                    if (occupancyCompare != 0) {
+                        return occupancyCompare;
+                    }
+                    return Long.compare(right.waitlistCount(), left.waitlistCount());
+                })
+                .limit(8)
+                .toList();
+
+        return new RegistrationPressureResponse(
+                analytics.countActiveRegistrationSemesters(),
+                sections.size(),
+                sections.stream().filter(section -> section.occupancyRate() >= 100).count(),
+                sections.stream()
+                        .filter(section -> section.occupancyRate() >= NEAR_CAPACITY_THRESHOLD
+                                && section.occupancyRate() < 100)
+                        .count(),
+                waitlistActive,
+                averageOccupancy,
+                highestPressure,
+                waitlistStatus);
     }
 
     @Transactional(readOnly = true)
