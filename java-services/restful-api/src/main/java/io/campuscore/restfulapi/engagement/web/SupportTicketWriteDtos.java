@@ -14,4 +14,9 @@ public final class SupportTicketWriteDtos {
             @NotNull String category,
             String priority) {
     }
+
+    public record CreateTicketResponseRequest(
+            @NotNull String message,
+            Boolean isInternal) {
+    }
 }

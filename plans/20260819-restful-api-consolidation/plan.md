@@ -265,6 +265,14 @@ the retirement gates pass.
   row-count allocation before any PostgreSQL rehearsal or writer handoff.
   PostgreSQL duplicate-key translation, true contention/idempotency proof,
   route canary, rollback and independent exact-head review remain open.
+- Phase 22 backend-first engagement support-ticket response foundation:
+  source candidate/HOLD; see `phase-22-engagement-support-ticket-response.md`.
+  It adds feature-default-off Java `POST /api/v1/support-tickets/{id}/respond`
+  for `ADMIN`/`SUPER_ADMIN`, preserving the legacy response shape, current admin
+  identity mapping, `isInternal=false` default and `OPEN` to `IN_PROGRESS`
+  transition. Assignment, status edits beyond this transition, deletion,
+  event/notification parity, PostgreSQL write rehearsal, canary routing,
+  rollback and public responder handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
@@ -318,7 +326,7 @@ Observed low-disk-safe gates:
 
 Disk observation during the same continuation: C: had about 3.40 GB free and D:
 about 39.38 GB free. The exact stale rehearsal snapshot targets under
-`D:\Student_Management-recovery\phase11-engagement-a854f90` were verified, but
+`<recovery-worktree>\phase11-engagement-a854f90` were verified, but
 the environment rejected the bounded `Remove-Item` cleanup, so cleanup remains
 `BLOCKED_CAPABILITY` rather than silently worked around.
 

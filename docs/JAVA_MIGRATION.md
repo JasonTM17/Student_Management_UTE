@@ -78,10 +78,13 @@ editing/publishing, timetable, CSV export and writes still owned by the legacy
 academic service. The support-ticket read slice covers current-user and admin
 list/detail reads with response hydration. The support-ticket create slice adds
 a separate feature-default-off `POST /api/v1/support-tickets` candidate with
-legacy-shaped `TKT-xxxxx` numbering and a bounded unique-collision retry, while
-assignment, response mutation, status updates, deletion, event/notification
-parity, PostgreSQL write rehearsal, route canary and rollback remain owned by
-the legacy engagement service until proven. The thesis assistant/chatbotAI slice
+legacy-shaped `TKT-xxxxx` numbering and a bounded unique-collision retry. The
+support-ticket response slice adds feature-default-off
+`POST /api/v1/support-tickets/{id}/respond` for admins with the legacy response
+shape, `isInternal=false` default and `OPEN` to `IN_PROGRESS` transition, while
+assignment, broader status updates, deletion, event/notification parity,
+PostgreSQL write rehearsal, route canary and rollback remain owned by the
+legacy engagement service until proven. The thesis assistant/chatbotAI slice
 covers the web/mobile
 `/api/v1/thesis/assistant/chat` contract with a deterministic local fallback
 response when `THESIS_ASSISTANT_ENABLED=true`; provider-backed LLM mode, prompt
