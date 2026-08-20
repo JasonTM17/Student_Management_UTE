@@ -26,15 +26,19 @@ async function main() {
   if (referenceFile && !ownedDifferential) {
     throw new Error('External Java reference comparison is not permitted');
   }
+  if (!ownedDifferential) {
+    throw new Error('RUN_OWNED_JAVA_DIFFERENTIAL must be true');
+  }
 
   let reference = null;
+  let buildIdentity = null;
   if (ownedDifferential) {
     const javaBaseUrl = requireLoopbackJavaBaseUrl();
     const javaExecutable = requireExecutable(
       'REHEARSAL_JAVA_EXECUTABLE',
       'java.exe',
     );
-    const buildIdentity = rebuildJavaArtifact(
+    buildIdentity = rebuildJavaArtifact(
       repoRoot,
       runRoot,
       sourceHead,
@@ -75,11 +79,21 @@ async function main() {
     });
   }
 
-  const cases = await runLegacyProbe(corpus, reference);
-  const legacyIdentity = requireLegacyIdentity(repoRoot, sourceHead);
+  const legacyIdentity = buildLegacyIdentity(
+    repoRoot,
+    runRoot,
+    sourceHead,
+    buildIdentity,
+  );
+  let cases;
+  try {
+    cases = await runLegacyProbe(corpus, reference, legacyIdentity.moduleRoot);
+  } finally {
+    removeLegacyDependencyLinks(legacyIdentity);
+  }
   const report = {
     status: 'PASS',
-    mode: reference ? 'owned-java-sequential-differential' : 'legacy-only',
+    mode: 'owned-java-sequential-differential',
     referenceSourceHead: reference?.sourceHead ?? null,
     referenceArtifactSha256: referenceFile ? fileSha256(referenceFile) : null,
     javaArtifactPath: reference?.artifactPath ?? null,
@@ -96,7 +110,11 @@ async function main() {
     javaLogSha256: reference?.javaLogSha256 ?? null,
     javaProcessId: reference?.javaProcessId ?? null,
     legacySourceHead: legacyIdentity.sourceHead,
+    legacyArtifactPath: legacyIdentity.artifactPath,
     legacyArtifactSha256: legacyIdentity.artifactSha256,
+    legacyBuildLogSha256: legacyIdentity.buildLogSha256,
+    nodeExecutableSha256: legacyIdentity.nodeExecutableSha256,
+    nestCliSha256: legacyIdentity.nestCliSha256,
     cases,
   };
   writeOptionalReport(report, runRoot);
@@ -220,6 +238,8 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
     sourceArchive,
     sourceHead,
     'java-services/restful-api',
+    'engagement-service',
+    'packages/platform-auth',
   ]);
   fs.mkdirSync(sourceSnapshot, { recursive: false });
   const tarExecutable = requireExecutable(
@@ -305,6 +325,7 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
     powershellExecutableSha256: fileSha256(
       requireExecutable('REHEARSAL_POWERSHELL_EXECUTABLE', 'powershell.exe'),
     ),
+    sourceSnapshot,
   };
 }
 
@@ -759,11 +780,13 @@ async function invokeJava(javaBaseUrl, spec) {
   };
 }
 
-async function runLegacyProbe(corpus, reference) {
+async function runLegacyProbe(corpus, reference, moduleRoot) {
   const { Test } = require('@nestjs/testing');
   const request = require('supertest');
-  const { configureHttpApp } = require('../dist/src/bootstrap.js');
-  const { AppModule } = require('../dist/src/app.module.js');
+  const { configureHttpApp } = require(
+    path.join(moduleRoot, 'dist/src/bootstrap.js')
+  );
+  const { AppModule } = require(path.join(moduleRoot, 'dist/src/app.module.js'));
   const moduleFixture = await Test.createTestingModule({
     imports: [AppModule],
   }).compile();
@@ -845,15 +868,103 @@ function normalizeContentType(value) {
   return value?.split(';', 1)[0].trim().toLowerCase() ?? null;
 }
 
-function requireLegacyIdentity(repoRoot, sourceHead) {
-  const entry = path.resolve(__dirname, '../dist/src/main.js');
-  assert.equal(
-    entry.toLowerCase(),
-    path.resolve(repoRoot, 'engagement-service/dist/src/main.js').toLowerCase(),
-    'legacy Nest entry path',
+function buildLegacyIdentity(repoRoot, runRoot, sourceHead, buildIdentity) {
+  const moduleRoot = path.resolve(
+    buildIdentity.sourceSnapshot,
+    'engagement-service',
   );
-  const artifactSha256 = fileSha256(entry);
-  return { sourceHead, artifactSha256 };
+  const sharedNodeModules = path.resolve(
+    buildIdentity.sourceSnapshot,
+    'node_modules',
+  );
+  const serviceNodeModules = path.resolve(moduleRoot, 'node_modules');
+  const campuscoreScope = path.resolve(serviceNodeModules, '@campuscore');
+  const platformAuthLink = path.resolve(campuscoreScope, 'platform-auth');
+  fs.symlinkSync(
+    path.resolve(repoRoot, 'engagement-service/node_modules'),
+    sharedNodeModules,
+    'junction',
+  );
+  fs.mkdirSync(campuscoreScope, { recursive: true });
+  fs.symlinkSync(
+    path.resolve(buildIdentity.sourceSnapshot, 'packages/platform-auth'),
+    platformAuthLink,
+    'junction',
+  );
+  const dependencyLinks = {
+    sharedNodeModules,
+    serviceNodeModules,
+    campuscoreScope,
+    platformAuthLink,
+  };
+  try {
+    const nodeExecutable = fs.realpathSync(process.execPath);
+    const nestCli = path.resolve(
+      repoRoot,
+      'engagement-service/node_modules/@nestjs/cli/bin/nest.js',
+    );
+    const buildOutput = execFileSync(nodeExecutable, [nestCli, 'build'], {
+      cwd: moduleRoot,
+      encoding: 'utf8',
+      env: buildChildEnvironment({
+        NODE_ENV: 'test',
+        NODE_OPTIONS: '--max-old-space-size=192',
+      }),
+      maxBuffer: 20 * 1024 * 1024,
+      windowsHide: true,
+    });
+    assert.equal(
+      requireCleanCheckout(repoRoot),
+      sourceHead,
+      'source HEAD after isolated legacy build',
+    );
+    const buildLog = path.resolve(
+      runRoot,
+      `legacy-build-${sourceHead.slice(0, 12)}.log`,
+    );
+    fs.writeFileSync(buildLog, buildOutput, { encoding: 'utf8', flag: 'wx' });
+    const entry = path.resolve(moduleRoot, 'dist/src/main.js');
+    return {
+      sourceHead,
+      moduleRoot,
+      artifactPath: path.relative(runRoot, entry).replaceAll('\\', '/'),
+      artifactSha256: fileSha256(entry),
+      buildLogSha256: fileSha256(buildLog),
+      nodeExecutableSha256: fileSha256(nodeExecutable),
+      nestCliSha256: fileSha256(nestCli),
+      ...dependencyLinks,
+    };
+  } catch (error) {
+    removeLegacyDependencyLinks(dependencyLinks);
+    throw error;
+  }
+}
+
+function removeLegacyDependencyLinks(legacyIdentity) {
+  unlinkIfPresent(legacyIdentity.platformAuthLink);
+  removeEmptyDirectoryIfPresent(legacyIdentity.campuscoreScope);
+  removeEmptyDirectoryIfPresent(legacyIdentity.serviceNodeModules);
+  unlinkIfPresent(legacyIdentity.sharedNodeModules);
+}
+
+function unlinkIfPresent(target) {
+  try {
+    fs.unlinkSync(target);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
+}
+
+function removeEmptyDirectoryIfPresent(target) {
+  try {
+    fs.rmdirSync(target);
+  } catch (error) {
+    if (error.code !== 'ENOENT') {
+      throw error;
+    }
+  }
 }
 
 function fileSha256(file) {
