@@ -58,11 +58,13 @@ remain required while the old services are still canonical.
 
 ## RESTful API read candidates
 
-The `java-services/restful-api` monolith now contains disabled-by-default,
-read-only candidates for thesis, notification, engagement announcement,
-engagement support-ticket and academic catalog reads plus people
-student/lecturer profile reads. The academic slice covers semester/course list
-and detail routes only. The people slice covers student/lecturer list and
+The `java-services/restful-api` monolith now contains disabled-by-default
+candidates for thesis, notification, engagement announcement,
+engagement support-ticket, academic catalog, people student/lecturer profile,
+finance, analytics and academic enrollment boundaries. Read candidates use JDBC
+against legacy schemas under the `persistence` profile and do not add DDL,
+write data or own public traffic. The academic slice covers semester/course
+list and detail routes only. The people slice covers student/lecturer list and
 detail routes only. The finance slice covers student invoice list/detail plus
 admin invoice/payment list/detail routes only, with checkout, provider
 callbacks/webhooks, exports and writes still owned by the legacy finance
@@ -73,16 +75,19 @@ The academic enrollment slice covers current-student enrollment list, student
 grade/transcript reads, admin enrollment list/detail, and lecturer/admin grade
 item/student-grade read aggregation, with enroll/drop, waitlist, grade
 editing/publishing, timetable, CSV export and writes still owned by the legacy
-academic service. The support-ticket slice covers current-user and admin
-list/detail reads with response hydration, while creation, assignment, response
-mutation, status updates and deletion remain owned by the legacy engagement
-service. The thesis assistant/chatbotAI slice covers the web/mobile
+academic service. The support-ticket read slice covers current-user and admin
+list/detail reads with response hydration. The support-ticket create slice adds
+a separate feature-default-off `POST /api/v1/support-tickets` candidate, while
+assignment, response mutation, status updates, deletion, event/notification
+parity, PostgreSQL write rehearsal, route canary and rollback remain owned by
+the legacy engagement service until proven. The thesis assistant/chatbotAI slice
+covers the web/mobile
 `/api/v1/thesis/assistant/chat` contract with a deterministic local fallback
 response when `THESIS_ASSISTANT_ENABLED=true`; provider-backed LLM mode, prompt
 governance, moderation, telemetry, rate limiting, canary and rollback evidence
 remain open. These candidates use feature flags explicitly; the read candidates
-use JDBC against legacy schemas under the `persistence` profile. They do not
-add DDL, write data, call an external LLM provider, or own public traffic.
+and the support-ticket create candidate do not call an external LLM provider or
+own public traffic.
 
 ## RESTful API auth candidate
 

@@ -42,6 +42,8 @@ migration:
     enabled: ${NOTIFICATIONS_READ_ENABLED:false}
   engagement-read:
     enabled: ${ENGAGEMENT_READ_ENABLED:false}
+  engagement-write:
+    enabled: ${ENGAGEMENT_WRITE_ENABLED:false}
   academic-read:
     enabled: ${ACADEMIC_READ_ENABLED:false}
   academic-enrollment-read:

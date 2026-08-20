@@ -248,6 +248,14 @@ the retirement gates pass.
   hydration and nested user display fallback. Ticket creation, assignment,
   response mutation, status updates, deletion, PostgreSQL parity, route canary,
   rollback and frontend convergence remain open.
+- Phase 20 backend-first engagement support-ticket create foundation:
+  source candidate/HOLD; see `phase-20-engagement-support-ticket-create.md`.
+  It adds feature-default-off Java `POST /api/v1/support-tickets` creation with
+  legacy-shaped ticket numbering, ownership from JWT subject/email, `OPEN`
+  status, `MEDIUM` default priority and the shared ticket response shape.
+  Assignment, responses, status updates, deletion, event/notification parity,
+  PostgreSQL write rehearsal, concurrency/idempotency strategy, route canary,
+  rollback and public writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
