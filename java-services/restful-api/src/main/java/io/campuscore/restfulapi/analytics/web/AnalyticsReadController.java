@@ -1,0 +1,59 @@
+package io.campuscore.restfulapi.analytics.web;
+
+import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
+import java.util.List;
+import java.util.Map;
+import java.util.Set;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.util.MultiValueMap;
+import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RestController;
+
+/**
+ * Feature-gated analytics reads. Trends, attendance, lecturer dashboards,
+ * cockpit composition, metrics export and event consumers remain in the legacy
+ * analytics-service for this wave.
+ */
+@RestController
+@Profile("persistence")
+@ConditionalOnProperty(prefix = "migration.analytics-read", name = "enabled", havingValue = "true")
+@RequestMapping("/api/v1/analytics")
+public class AnalyticsReadController {
+
+    private final AnalyticsReadService analytics;
+
+    public AnalyticsReadController(AnalyticsReadService analytics) {
+        this.analytics = analytics;
+    }
+
+    @GetMapping("overview")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public OverviewResponse overview(@RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.overview();
+    }
+
+    @GetMapping("finance-summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'FINANCE_OFFICER')")
+    public FinanceSummaryResponse financeSummary(
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.financeSummary();
+    }
+
+    private static void requireAllowedQuery(
+            MultiValueMap<String, String> queryParameters,
+            Set<String> allowed) {
+        for (Map.Entry<String, List<String>> entry : queryParameters.entrySet()) {
+            if (!allowed.contains(entry.getKey()) || entry.getValue().size() != 1) {
+                throw new IllegalArgumentException("Unexpected or repeated query parameter: " + entry.getKey());
+            }
+        }
+    }
+}

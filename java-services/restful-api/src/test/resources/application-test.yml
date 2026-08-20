@@ -19,6 +19,8 @@ migration:
     enabled: false
   finance-read:
     enabled: false
+  analytics-read:
+    enabled: false
   auth-login:
     enabled: false
 
