@@ -62,10 +62,12 @@ The `java-services/restful-api` monolith now contains disabled-by-default,
 read-only candidates for thesis, notification, engagement announcement and
 academic catalog reads plus people student/lecturer profile reads. The academic
 slice covers semester/course list and detail routes only. The people slice
-covers student/lecturer list and detail routes only. These candidates use JDBC
-against legacy schemas when their feature flags are explicitly enabled under
-the `persistence` profile; they do not add DDL, write data, or own public
-traffic.
+covers student/lecturer list and detail routes only. The finance slice covers
+student invoice list/detail plus admin invoice/payment list/detail routes only,
+with checkout, provider callbacks/webhooks, exports and writes still owned by
+the legacy finance service. These candidates use JDBC against legacy schemas
+when their feature flags are explicitly enabled under the `persistence` profile;
+they do not add DDL, write data, or own public traffic.
 
 ## RESTful API auth candidate
 
