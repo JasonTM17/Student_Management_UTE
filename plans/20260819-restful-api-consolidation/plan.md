@@ -286,6 +286,13 @@ the retirement gates pass.
   for `ADMIN`/`SUPER_ADMIN`, preserving the legacy `assignedTo`-only update and
   hydrated ticket response. Delete, event/notification parity, PostgreSQL write
   rehearsal, canary routing, rollback and public assignment handoff remain open.
+- Phase 25 backend-first engagement support-ticket deletion foundation:
+  source candidate/HOLD; see `phase-25-engagement-support-ticket-delete.md`.
+  It adds feature-default-off Java `DELETE /api/v1/support-tickets/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy success message and relying on
+  the Prisma-owned response cascade relationship. Event/notification parity,
+  PostgreSQL write rehearsal, canary routing, rollback and public deletion
+  handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

@@ -87,9 +87,12 @@ the support-ticket update slice adds feature-default-off
 legacy `RESOLVED`/`CLOSED` timestamp side effects. The support-ticket assignment
 slice adds feature-default-off `POST /api/v1/support-tickets/{id}/assign` for
 admins and preserves the legacy `assignedTo`-only update without inventing an
-assignee display name. Deletion, event/notification parity, PostgreSQL write
-rehearsal, route canary and rollback remain owned by the legacy engagement
-service until proven. The thesis assistant/chatbotAI slice covers the web/mobile
+assignee display name, and the support-ticket deletion slice adds
+feature-default-off `DELETE /api/v1/support-tickets/{id}` for admins with the
+legacy success message while relying on the Prisma-owned cascade relationship
+for responses. Event/notification parity, PostgreSQL write rehearsal, route
+canary and rollback remain owned by the legacy engagement service until proven.
+The thesis assistant/chatbotAI slice covers the web/mobile
 `/api/v1/thesis/assistant/chat` contract with a deterministic local fallback
 response when `THESIS_ASSISTANT_ENABLED=true`; provider-backed LLM mode, prompt
 governance, moderation, telemetry, rate limiting, canary and rollback evidence

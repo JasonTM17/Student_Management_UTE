@@ -8,6 +8,7 @@ import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketRespo
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.AssignSupportTicketRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.DeleteSupportTicketResponse;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.UpdateSupportTicketRequest;
 import java.time.Clock;
 import java.time.Instant;
@@ -124,6 +125,15 @@ public class SupportTicketWriteService {
         tickets.assign(id, request.assignedTo(), Instant.now(clock));
         return tickets.findTicket(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+    }
+
+    @Transactional
+    public DeleteSupportTicketResponse delete(String ticketId) {
+        String id = requireText(ticketId, "ticket id");
+        tickets.findTicketStatus(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+        tickets.delete(id);
+        return new DeleteSupportTicketResponse("Support ticket deleted successfully");
     }
 
     private static String requireText(String value, String name) {

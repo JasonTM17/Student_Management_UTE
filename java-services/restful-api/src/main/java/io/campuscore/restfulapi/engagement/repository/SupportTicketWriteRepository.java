@@ -192,6 +192,12 @@ public class SupportTicketWriteRepository {
                         .addValue("updatedAt", LocalDateTime.ofInstant(updatedAt, ZoneOffset.UTC)));
     }
 
+    public void delete(String id) {
+        jdbc.update(
+                "DELETE FROM " + TICKET + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id));
+    }
+
     public Optional<SupportTicketResponse> findTicket(String id) {
         List<TicketRow> tickets = jdbc.query(
                 "SELECT " + TICKET_COLUMNS + " FROM " + TICKET + " WHERE \"id\" = :id",
