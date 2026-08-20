@@ -47,8 +47,8 @@ jobs:
       - name: Enforce documentation hygiene guard
         run: node scripts/check-doc-hygiene.mjs
 
-  java-thesis-quality:
-    name: java-thesis-quality
+  java-restful-api-quality:
+    name: java-restful-api-quality
     runs-on: ubuntu-latest
 
     steps:
@@ -66,9 +66,9 @@ jobs:
           cache: maven
           cache-dependency-path: |
             java-services/pom.xml
-            java-services/thesis-service/pom.xml
+            java-services/restful-api/pom.xml
 
-      - name: Verify Spring Java services
+      - name: Verify Java modular monolith
         run: mvn -f java-services/pom.xml verify
 
   core-quality:
@@ -2134,6 +2134,7 @@ jobs:
     runs-on: ubuntu-latest
     needs:
       - architecture-guard
+      - java-restful-api-quality
       - core-quality
       - core-integration
       - auth-quality
@@ -2176,6 +2177,7 @@ jobs:
           }
 
           check_required architecture-guard "${{ needs.architecture-guard.result }}"
+          check_required java-restful-api-quality "${{ needs.java-restful-api-quality.result }}"
           check_required core-quality "${{ needs.core-quality.result }}"
           check_required core-integration "${{ needs.core-integration.result }}"
           check_required auth-quality "${{ needs.auth-quality.result }}"
@@ -2211,6 +2213,7 @@ jobs:
             echo "## Quality gate"
             echo ""
             echo "- architecture-guard: ${{ needs.architecture-guard.result }}"
+            echo "- java-restful-api-quality: ${{ needs.java-restful-api-quality.result }}"
             echo "- core-quality: ${{ needs.core-quality.result }}"
             echo "- core-integration: ${{ needs.core-integration.result }}"
             echo "- auth-quality: ${{ needs.auth-quality.result }}"

@@ -2,10 +2,11 @@
 
 ## Status
 
-**In progress / HOLD for runtime visual and device gates.** The web P0 layout
-repairs and native mobile scaffold are present in the working tree, but no
-fresh browser capture, Expo typecheck with installed dependencies, emulator,
-or device run has been observed.
+**Deferred / HOLD by backend-first sequencing.** The web P0 layout repairs and
+native mobile scaffold are preserved, but no further Stitch web/mobile
+implementation will be performed until the backend foundation gate in
+`plan.md` passes. No fresh browser capture, Expo typecheck with installed
+dependencies, emulator, or device run has been observed.
 
 ## Outcome and success signal
 
@@ -58,6 +59,17 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | Native API preview guard | `PASS` source-level | The client defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls require explicit `EXPO_PUBLIC_API_MODE=live`. |
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
 | Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target has shell probes plus conditional thesis-topic read only; auth, academic, finance, notification, analytics, complete thesis, and chatbot routes are not yet implemented. |
+
+### Fresh bounded checks — 2026-08-20, `ba90cf6`
+
+- `npm test --prefix frontend`: PASS, 28/28 smoke tests.
+- `npm test --prefix mobile`: PASS, 5/5 dependency-free atlas/API/navigation
+  tests.
+
+These checks keep the Stitch web/mobile source contract warm at the current
+checkout. They do not replace the open browser visual rerun, authenticated E2E,
+Expo dependency-aware typecheck, emulator/device smoke, or Java API cutover
+evidence required by this phase.
 
 ## Affected components and ownership
 

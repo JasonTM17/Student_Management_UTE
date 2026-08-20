@@ -1,9 +1,12 @@
 # Java Migration Boundary
 
-CampusCore currently runs NestJS/TypeScript services. The Java migration uses a
-strangler path: the NestJS stack remains the canonical writer until a Spring
-service has passed contract, data, authorization, observability, and rollback
-gates.
+CampusCore currently runs NestJS/TypeScript services. The Java target is one
+`java-services/restful-api` modular monolith; the root `java-services/pom.xml`
+reactor builds only that application. The NestJS stack remains the canonical
+writer until a Java wave has passed contract, data, authorization,
+observability, and rollback gates. Retained sibling Java services are
+shadow/rollback source only and must be built through an explicit child
+`pom.xml` when a compatibility rehearsal needs one.
 
 ## First boundary
 
@@ -42,8 +45,12 @@ parity.
 ## Local verification
 
 ```text
+# Canonical Java modular-monolith build
 mvn -f java-services/pom.xml test
 mvn -f java-services/pom.xml verify
+
+# A retained shadow boundary, only when a bounded rehearsal requires it
+mvn -f java-services/thesis-service/pom.xml verify
 ```
 
 The current checkout does not claim a production cutover. Existing Node tests

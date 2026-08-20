@@ -2,7 +2,7 @@ FROM maven:3.9.12-eclipse-temurin-21 AS build
 
 WORKDIR /workspace
 COPY . .
-RUN mvn -pl engagement-service -DskipTests package
+RUN mvn -f engagement-service/pom.xml -DskipTests package
 
 FROM eclipse-temurin:21-jre
 

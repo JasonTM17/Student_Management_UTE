@@ -34,11 +34,19 @@ with one canonical writer and explicit rollback evidence.
 From the repository root:
 
 ```powershell
+# Canonical Java build: the root reactor selects only this modular monolith.
+mvn -q -f java-services/pom.xml test
+
+# Equivalent direct build for this application.
 mvn -q -f java-services/restful-api/pom.xml test
 
 # Persistence rehearsal uses the H2 test profile; it does not touch Postgres.
 mvn -q -f java-services/restful-api/pom.xml -Dspring.profiles.active=test,persistence test
 ```
+
+The sibling Java service directories are retained only as shadow/rollback
+sources. They are not reactor modules or public release artifacts; invoke an
+individual child `pom.xml` explicitly only for a bounded compatibility check.
 
 For a local process, provide a real server-side `JWT_SECRET` with at least 32
 characters and a `HEALTH_READINESS_KEY`. Never put either value in source,

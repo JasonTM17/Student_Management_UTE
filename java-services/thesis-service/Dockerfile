@@ -4,9 +4,8 @@ WORKDIR /workspace
 COPY pom.xml ./pom.xml
 COPY thesis-service/pom.xml ./thesis-service/pom.xml
 COPY thesis-service/src ./thesis-service/src
-# Build this boundary in isolation. The image context intentionally contains
-# only the thesis module, while the repository parent POM also lists other
-# migration modules that are not needed by this service.
+# This retained rollback boundary builds directly. The repository reactor is
+# intentionally reserved for the canonical modular monolith.
 RUN mvn -f thesis-service/pom.xml -DskipTests package
 
 FROM eclipse-temurin:21-jre
