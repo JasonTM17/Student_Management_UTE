@@ -38,6 +38,38 @@ public final class AnalyticsReadDtos {
             int occupancyRate) {
     }
 
+    public record RegistrationPressureResponse(
+            long activeSemesters,
+            long totalSections,
+            long atCapacity,
+            long nearCapacity,
+            long waitlistActive,
+            int averageOccupancy,
+            List<RegistrationPressureSection> highestPressure,
+            List<WaitlistStatusBucket> waitlistStatus) {
+    }
+
+    public record RegistrationPressureSection(
+            String sectionId,
+            String sectionNumber,
+            String courseCode,
+            String courseName,
+            String courseNameEn,
+            String courseNameVi,
+            String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
+            int capacity,
+            long enrolledCount,
+            long waitlistCount,
+            int occupancyRate) {
+    }
+
+    public record WaitlistStatusBucket(
+            String status,
+            long count) {
+    }
+
     public record TopCourseBucket(
             String courseId,
             String courseCode,

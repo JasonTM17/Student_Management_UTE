@@ -423,6 +423,16 @@ the retirement gates pass.
   student aggregate response shape. PostgreSQL read parity, cockpit
   composition, canary routing, rollback and public analytics route handoff
   remain open.
+- Phase 41 backend-first analytics registration pressure foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-41-analytics-registration-pressure.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/registration-pressure` for `ADMIN`/`SUPER_ADMIN`,
+  preserving the legacy active registration semester count, capacity pressure
+  thresholds, ACTIVE waitlist total, rounded average occupancy, highest-pressure
+  ordering and waitlist status bucket shape. PostgreSQL read parity, cockpit
+  composition, canary routing, rollback and public analytics route handoff
+  remain open.
 
 ## Backend foundation gate before Stitch implementation
 
