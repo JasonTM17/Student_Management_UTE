@@ -48,12 +48,27 @@ class AnalyticsReadPersistenceTest {
         createCountTable("Section");
         createCountTable("Department");
         createCountTable("Faculty");
-        createCountTable("AcademicYear");
-        createCountTable("Semester");
         createCountTable("Classroom");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."AcademicYear" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "year" INTEGER
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Semester" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(200),
+                    "nameEn" VARCHAR(200),
+                    "nameVi" VARCHAR(200),
+                    "academicYearId" VARCHAR(120),
+                    "startDate" TIMESTAMP
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Enrollment" (
                     "id" VARCHAR(120) PRIMARY KEY,
+                    "semesterId" VARCHAR(120),
                     "status" VARCHAR(40),
                     "letterGrade" VARCHAR(10)
                 )
@@ -132,6 +147,50 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$.totalAcademicYears").value(2))
                 .andExpect(jsonPath("$.totalSemesters").value(3))
                 .andExpect(jsonPath("$.totalClassrooms").value(7));
+    }
+
+    @Test
+    void enrollmentsBySemesterPreservesLegacyOrderAndConfirmedCompletedFilter() throws Exception {
+        insertAcademicYear("academic-year-2026", 2026);
+        insertAcademicYear("academic-year-2025", 2025);
+        insertSemester(
+                "semester-fall-2026",
+                "Fall 2026",
+                "Fall 2026",
+                "Hoc ky Thu 2026",
+                "academic-year-2026",
+                BASE_TIME.plusSeconds(86_400));
+        insertSemester(
+                "semester-spring-2026",
+                "Spring 2026",
+                "Spring 2026",
+                "Hoc ky Xuan 2026",
+                "academic-year-2026",
+                BASE_TIME);
+        insertSemester(
+                "semester-fall-2025",
+                "Fall 2025",
+                "Fall 2025",
+                "Hoc ky Thu 2025",
+                "academic-year-2025",
+                BASE_TIME.minusSeconds(86_400));
+        insertEnrollmentInSemester("enrollment-fall-confirmed", "semester-fall-2026", "CONFIRMED");
+        insertEnrollmentInSemester("enrollment-fall-completed", "semester-fall-2026", "COMPLETED");
+        insertEnrollmentInSemester("enrollment-fall-pending", "semester-fall-2026", "PENDING");
+        insertEnrollmentInSemester("enrollment-spring-completed", "semester-spring-2026", "COMPLETED");
+        insertEnrollmentInSemester("enrollment-old-pending", "semester-fall-2025", "PENDING");
+
+        mvc.perform(get("/api/v1/analytics/enrollments-by-semester").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].semesterId").value("semester-fall-2026"))
+                .andExpect(jsonPath("$[0].semesterName").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameEn").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameVi").value("Hoc ky Thu 2026"))
+                .andExpect(jsonPath("$[0].academicYear").value(2026))
+                .andExpect(jsonPath("$[0].enrollmentCount").value(2))
+                .andExpect(jsonPath("$[1].semesterId").value("semester-spring-2026"))
+                .andExpect(jsonPath("$[1].enrollmentCount").value(1));
     }
 
     @Test
@@ -244,6 +303,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/enrollments-by-semester").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/grade-distribution").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -253,6 +316,12 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
         mvc.perform(get("/api/v1/analytics/overview")
+                        .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/enrollments-by-semester")
                         .queryParam("months", "12")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
@@ -284,6 +353,32 @@ class AnalyticsReadPersistenceTest {
         }
     }
 
+    private void insertAcademicYear(String id, int year) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"AcademicYear\" (\"id\", \"year\") VALUES (?, ?)",
+                id,
+                year);
+    }
+
+    private void insertSemester(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String academicYearId,
+            Instant startDate) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Semester\""
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"academicYearId\", \"startDate\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                name,
+                nameEn,
+                nameVi,
+                academicYearId,
+                localDateTime(startDate));
+    }
+
     private void insertInvoice(String id, String status, BigDecimal total) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Invoice\""
@@ -297,10 +392,21 @@ class AnalyticsReadPersistenceTest {
     private void insertEnrollment(String id, String status, String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"status\", \"letterGrade\") VALUES (?, ?, ?)",
+                        + " (\"id\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?)",
                 id,
+                null,
                 status,
                 letterGrade);
+    }
+
+    private void insertEnrollmentInSemester(String id, String semesterId, String status) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Enrollment\""
+                        + " (\"id\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?)",
+                id,
+                semesterId,
+                status,
+                null);
     }
 
     private void insertPayment(String id, String method, String status, BigDecimal amount) {

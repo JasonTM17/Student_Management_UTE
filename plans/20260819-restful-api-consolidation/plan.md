@@ -384,6 +384,16 @@ the retirement gates pass.
   percentage semantics for completed enrollments with non-null letter grades.
   PostgreSQL read parity, cockpit composition, canary routing, rollback and
   public analytics route handoff remain open.
+- Phase 37 backend-first analytics enrollments-by-semester foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-37-analytics-enrollments-by-semester.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/enrollments-by-semester` for `ADMIN`/`SUPER_ADMIN`,
+  preserving the legacy `CONFIRMED`/`COMPLETED` enrollment filter, semester
+  start-date descending order, limit 10, semester names and academic-year
+  response shape from the analytics service's legacy Prisma schema.
+  PostgreSQL read parity, cockpit composition, canary routing, rollback and
+  public analytics route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
