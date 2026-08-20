@@ -257,6 +257,14 @@ the retirement gates pass.
   Assignment, responses, status updates, deletion, event/notification parity,
   PostgreSQL write rehearsal, true contention/idempotency proof, route canary,
   rollback and public writer handoff remain open.
+- Phase 21 backend-first engagement support-ticket numbering guard:
+  source candidate/HOLD; see
+  `phase-21-engagement-support-ticket-numbering-guard.md`. It hardens the
+  support-ticket create candidate to allocate from the maximum existing
+  `TKT-xxxxx` suffix and retry bounded unique collisions, replacing raw
+  row-count allocation before any PostgreSQL rehearsal or writer handoff.
+  PostgreSQL duplicate-key translation, true contention/idempotency proof,
+  route canary, rollback and independent exact-head review remain open.
 
 ## Backend foundation gate before Stitch implementation
 
