@@ -1,6 +1,7 @@
 'use strict';
 
 const assert = require('node:assert/strict');
+const { createHash } = require('node:crypto');
 const fs = require('node:fs');
 const path = require('node:path');
 const { isDeepStrictEqual } = require('node:util');
@@ -9,9 +10,9 @@ const jsonwebtoken = require('jsonwebtoken');
 const EXPECTED_META_LIMIT = 20;
 
 async function main() {
-  assertSafeEnvironment();
+  const runRoot = assertSafeEnvironment();
   const corpus = buildCorpus();
-  const referenceFile = resolveReferenceFile();
+  const referenceFile = resolveReferenceFile(runRoot);
 
   if (process.env.CAPTURE_JAVA_REFERENCE === 'true') {
     const javaBaseUrl = requireLoopbackJavaBaseUrl();
@@ -34,13 +35,17 @@ async function main() {
 
   const reference = referenceFile ? readReference(referenceFile) : null;
   const cases = await runLegacyProbe(corpus, reference);
+  const legacyIdentity = requireLegacyIdentity();
   const report = {
     status: 'PASS',
     mode: reference ? 'sequential-differential' : 'legacy-only',
     referenceSourceHead: reference?.sourceHead ?? null,
+    referenceArtifactSha256: referenceFile ? fileSha256(referenceFile) : null,
+    legacySourceHead: legacyIdentity.sourceHead,
+    legacyArtifactSha256: legacyIdentity.artifactSha256,
     cases,
   };
-  writeOptionalReport(report);
+  writeOptionalReport(report, runRoot);
   process.stdout.write(`${JSON.stringify(report, null, 2)}\n`);
 }
 
@@ -48,15 +53,71 @@ function assertSafeEnvironment() {
   if (process.env.RUN_PHASE11_ENGAGEMENT_REHEARSAL !== 'true') {
     throw new Error('RUN_PHASE11_ENGAGEMENT_REHEARSAL must be true');
   }
-  if (!process.env.DATABASE_URL?.includes('engagement_rehearsal')) {
-    throw new Error('Refusing to run without the isolated rehearsal database');
+  if (process.env.NODE_ENV !== 'test') {
+    throw new Error('NODE_ENV must be test so the service cannot load .env');
   }
+  if (process.env.RABBITMQ_URL?.trim()) {
+    throw new Error('RABBITMQ_URL must be absent for the read-only rehearsal');
+  }
+  delete process.env.RABBITMQ_URL;
+  assertDatabaseUrl();
   if (!process.env.JWT_SECRET || process.env.JWT_SECRET.length < 32) {
     throw new Error('JWT_SECRET must contain at least 32 characters');
   }
+  return requireRehearsalRunRoot();
 }
 
-function resolveReferenceFile() {
+function assertDatabaseUrl() {
+  let databaseUrl;
+  try {
+    databaseUrl = new URL(process.env.DATABASE_URL);
+  } catch {
+    throw new Error('DATABASE_URL must be a valid PostgreSQL URL');
+  }
+  const expected = {
+    protocol: 'postgresql:',
+    hostname: '127.0.0.1',
+    port: '56432',
+    pathname: '/engagement_rehearsal',
+    username: 'engagement_reader',
+    schema: 'engagement',
+  };
+  for (const [field, value] of Object.entries(expected)) {
+    const actual =
+      field === 'schema' ? databaseUrl.searchParams.get('schema') : databaseUrl[field];
+    if (actual !== value) {
+      throw new Error(`DATABASE_URL ${field} must be ${value}`);
+    }
+  }
+  if (databaseUrl.password) {
+    throw new Error('Disposable trust-auth rehearsal URL must not contain a password');
+  }
+}
+
+function requireRehearsalRunRoot() {
+  const configured = process.env.REHEARSAL_RUN_ROOT;
+  if (!configured) {
+    throw new Error('REHEARSAL_RUN_ROOT is required');
+  }
+  const runRoot = path.resolve(configured);
+  if (path.parse(runRoot).root.toUpperCase() !== 'D:\\') {
+    throw new Error('REHEARSAL_RUN_ROOT must be on D:');
+  }
+  if (!path.basename(runRoot).toLowerCase().startsWith('phase11-engagement-')) {
+    throw new Error('REHEARSAL_RUN_ROOT must identify the Phase 11 rehearsal');
+  }
+  const pgData = path.join(runRoot, 'pgdata');
+  const lines = fs
+    .readFileSync(path.join(pgData, 'postmaster.pid'), 'utf8')
+    .split(/\r?\n/);
+  assert.equal(path.resolve(lines[1]), path.resolve(pgData), 'PostgreSQL data root');
+  assert.equal(lines[3], '56432', 'PostgreSQL rehearsal port');
+  assert.equal(lines[5], '127.0.0.1', 'PostgreSQL listen address');
+  assert.equal(lines[7], 'ready   ', 'PostgreSQL readiness marker');
+  return runRoot;
+}
+
+function resolveReferenceFile(runRoot) {
   const configured = process.env.REHEARSAL_REFERENCE_FILE;
   if (!configured) {
     if (process.env.CAPTURE_JAVA_REFERENCE === 'true') {
@@ -65,8 +126,8 @@ function resolveReferenceFile() {
     return null;
   }
   const resolved = path.resolve(configured);
-  if (!resolved.toLowerCase().includes('phase11-engagement-')) {
-    throw new Error('Reference artifact must stay inside a Phase 11 rehearsal path');
+  if (!isInside(runRoot, resolved)) {
+    throw new Error('Reference artifact must stay inside REHEARSAL_RUN_ROOT');
   }
   return resolved;
 }
@@ -239,8 +300,8 @@ async function captureJavaReference(javaBaseUrl, corpus) {
   }
   return {
     schemaVersion: 1,
-    sourceHead: process.env.REHEARSAL_SOURCE_HEAD ?? null,
-    artifactSha256: process.env.REHEARSAL_ARTIFACT_SHA256 ?? null,
+    sourceHead: requireSha('REHEARSAL_SOURCE_HEAD', 40),
+    artifactSha256: requireSha('REHEARSAL_ARTIFACT_SHA256', 64),
     capturedAt: new Date().toISOString(),
     cases,
   };
@@ -307,6 +368,11 @@ function compareWithReference(spec, legacy, reference) {
     assert.ok(java, `${spec.name} missing from Java reference`);
     assert.equal(java.requestPath, spec.requestPath, `${spec.name} request identity`);
     assert.equal(java.status, legacy.status, `${spec.name} Java status`);
+    assert.equal(
+      normalizeContentType(java.contentType),
+      normalizeContentType(legacy.contentType),
+      `${spec.name} content type`,
+    );
     if (spec.expectedStatus === 200) {
       assert.deepEqual(java.body, legacy.body, `${spec.name} full response parity`);
     }
@@ -343,17 +409,53 @@ function readReference(referenceFile) {
   const artifact = JSON.parse(fs.readFileSync(referenceFile, 'utf8'));
   assert.equal(artifact.schemaVersion, 1, 'reference schema version');
   assert.ok(Array.isArray(artifact.cases), 'reference cases');
+  assert.match(artifact.sourceHead, /^[0-9a-f]{40}$/i, 'reference source HEAD');
+  assert.match(artifact.artifactSha256, /^[0-9a-f]{64}$/i, 'reference JAR SHA-256');
   return artifact;
 }
 
-function writeOptionalReport(report) {
+function requireLegacyIdentity() {
+  const sourceHead = requireSha('REHEARSAL_LEGACY_SOURCE_HEAD', 40);
+  const expectedArtifactSha256 = requireSha(
+    'REHEARSAL_LEGACY_ARTIFACT_SHA256',
+    64,
+  );
+  const entry = path.resolve(__dirname, '../dist/src/main.js');
+  const artifactSha256 = fileSha256(entry);
+  assert.equal(
+    artifactSha256,
+    expectedArtifactSha256,
+    'legacy Nest entry artifact SHA-256',
+  );
+  return { sourceHead, artifactSha256 };
+}
+
+function requireSha(name, length) {
+  const value = process.env[name];
+  const pattern = new RegExp(`^[0-9a-f]{${length}}$`, 'i');
+  if (!value || !pattern.test(value)) {
+    throw new Error(`${name} must be a ${length}-character hexadecimal identity`);
+  }
+  return value.toLowerCase();
+}
+
+function fileSha256(file) {
+  return createHash('sha256').update(fs.readFileSync(file)).digest('hex');
+}
+
+function isInside(parent, candidate) {
+  const relative = path.relative(parent, candidate);
+  return relative !== '' && !relative.startsWith('..') && !path.isAbsolute(relative);
+}
+
+function writeOptionalReport(report, runRoot) {
   const configured = process.env.REHEARSAL_REPORT_FILE;
   if (!configured) {
     return;
   }
   const reportFile = path.resolve(configured);
-  if (!reportFile.toLowerCase().includes('phase11-engagement-')) {
-    throw new Error('Differential report must stay inside a Phase 11 rehearsal path');
+  if (!isInside(runRoot, reportFile)) {
+    throw new Error('Differential report must stay inside REHEARSAL_RUN_ROOT');
   }
   fs.mkdirSync(path.dirname(reportFile), { recursive: true });
   fs.writeFileSync(reportFile, `${JSON.stringify(report, null, 2)}\n`, {
