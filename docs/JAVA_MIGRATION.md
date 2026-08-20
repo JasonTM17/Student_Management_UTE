@@ -63,7 +63,13 @@ candidates for thesis, notification, engagement announcement,
 engagement support-ticket, academic catalog, people student/lecturer profile,
 finance, analytics and academic enrollment boundaries. Read candidates use JDBC
 against legacy schemas under the `persistence` profile and do not add DDL,
-write data or own public traffic. The announcement create slice adds a separate
+write data or own public traffic. The notification self-service write slice adds
+separate feature-default-off `PATCH /api/v1/notifications/my/{id}/read`,
+`PATCH /api/v1/notifications/my/read-all` and
+`DELETE /api/v1/notifications/my/{id}` candidates for the authenticated user,
+preserving ownership isolation and the legacy response envelopes while realtime
+delivery, admin notification writes and public ownership remain with the legacy
+notification service. The announcement create slice adds a separate
 feature-default-off `POST /api/v1/announcements` candidate for admins with
 legacy defaults, publisher ownership from the JWT subject and the shared
 announcement response shape; RabbitMQ publication and public writer ownership

@@ -1,0 +1,183 @@
+package io.campuscore.restfulapi.notification;
+
+import static org.assertj.core.api.Assertions.assertThat;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+
+import java.sql.Timestamp;
+import java.time.Instant;
+import org.junit.jupiter.api.BeforeEach;
+import org.junit.jupiter.api.Test;
+import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
+import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.MockMvc;
+
+@SpringBootTest
+@AutoConfigureMockMvc
+@ActiveProfiles({"test", "persistence"})
+@TestPropertySource(properties = {
+        "migration.thesis-read.enabled=false",
+        "migration.notifications-write.enabled=true",
+        "spring.flyway.enabled=false"
+})
+class NotificationWritePersistenceTest {
+
+    private static final String STUDENT = "student-user-1";
+    private static final String OTHER_USER = "student-user-2";
+
+    @Autowired
+    private JdbcTemplate jdbc;
+
+    @Autowired
+    private MockMvc mvc;
+
+    @BeforeEach
+    void prepareWriteFixture() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS notifications");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS notifications.notification (
+                    id VARCHAR(120) PRIMARY KEY,
+                    user_id VARCHAR(120) NOT NULL,
+                    title VARCHAR(200) NOT NULL,
+                    message VARCHAR(2000) NOT NULL,
+                    type VARCHAR(40) NOT NULL,
+                    link VARCHAR(500),
+                    is_read BOOLEAN NOT NULL DEFAULT FALSE,
+                    read_at TIMESTAMP,
+                    created_at TIMESTAMP NOT NULL,
+                    updated_at TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.update("DELETE FROM notifications.notification");
+    }
+
+    @Test
+    void markReadUpdatesOnlyOwnedNotificationAndReturnsLegacyShape() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("mine-unread", STUDENT, false, now);
+        insert("other-unread", OTHER_USER, false, now.plusSeconds(60));
+
+        mvc.perform(patch("/api/v1/notifications/my/mine-unread/read")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("mine-unread"))
+                .andExpect(jsonPath("$.userId").value(STUDENT))
+                .andExpect(jsonPath("$.isRead").value(true))
+                .andExpect(jsonPath("$.readAt").exists());
+
+        assertThat(readFlag("mine-unread")).isTrue();
+        assertThat(readAt("mine-unread")).isNotNull();
+        assertThat(readFlag("other-unread")).isFalse();
+        assertThat(readAt("other-unread")).isNull();
+    }
+
+    @Test
+    void markReadFailsClosedForMissingOrOtherUserNotification() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("other-unread", OTHER_USER, false, now);
+
+        mvc.perform(patch("/api/v1/notifications/my/missing/read")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(patch("/api/v1/notifications/my/other-unread/read")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        assertThat(readFlag("other-unread")).isFalse();
+    }
+
+    @Test
+    void markAllReadCountsOnlyCurrentUsersUnreadNotifications() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("mine-unread-1", STUDENT, false, now);
+        insert("mine-unread-2", STUDENT, false, now.minusSeconds(60));
+        insert("mine-read", STUDENT, true, now.minusSeconds(120));
+        insert("other-unread", OTHER_USER, false, now.plusSeconds(60));
+
+        mvc.perform(patch("/api/v1/notifications/my/read-all")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updated").value(2));
+
+        assertThat(unreadCount(STUDENT)).isZero();
+        assertThat(unreadCount(OTHER_USER)).isEqualTo(1);
+    }
+
+    @Test
+    void deleteMyNotificationPreservesLegacySuccessAndOwnershipBoundary() throws Exception {
+        Instant now = Instant.parse("2026-08-21T01:00:00Z");
+        insert("mine", STUDENT, false, now);
+        insert("other", OTHER_USER, false, now.plusSeconds(60));
+
+        mvc.perform(delete("/api/v1/notifications/my/mine")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Notification deleted successfully"));
+
+        mvc.perform(delete("/api/v1/notifications/my/other")
+                        .with(jwt().jwt(token -> token.subject(STUDENT))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"))
+                .andExpect(jsonPath("$.message").value("Cannot delete this notification"));
+
+        assertThat(rowCount("mine")).isZero();
+        assertThat(rowCount("other")).isEqualTo(1);
+    }
+
+    private void insert(String id, String userId, boolean read, Instant createdAt) {
+        jdbc.update(
+                "INSERT INTO notifications.notification "
+                        + "(id, user_id, title, message, type, link, is_read, read_at, created_at, updated_at) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                userId,
+                "Title " + id,
+                "Message " + id,
+                "INFO",
+                null,
+                read,
+                read ? Timestamp.from(createdAt.plusSeconds(1)) : null,
+                Timestamp.from(createdAt),
+                Timestamp.from(createdAt));
+    }
+
+    private boolean readFlag(String id) {
+        return Boolean.TRUE.equals(jdbc.queryForObject(
+                "SELECT is_read FROM notifications.notification WHERE id = ?",
+                Boolean.class,
+                id));
+    }
+
+    private Timestamp readAt(String id) {
+        return jdbc.queryForObject(
+                "SELECT read_at FROM notifications.notification WHERE id = ?",
+                Timestamp.class,
+                id);
+    }
+
+    private int unreadCount(String userId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE user_id = ? AND is_read = FALSE",
+                Integer.class,
+                userId);
+        return count == null ? 0 : count;
+    }
+
+    private int rowCount(String id) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification WHERE id = ?",
+                Integer.class,
+                id);
+        return count == null ? 0 : count;
+    }
+}

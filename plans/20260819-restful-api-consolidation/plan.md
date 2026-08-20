@@ -323,6 +323,16 @@ the retirement gates pass.
   `ADMIN`/`SUPER_ADMIN`, preserving the legacy success message and pre-delete
   not-found behavior. RabbitMQ/event parity, PostgreSQL write rehearsal, canary
   routing, rollback and public announcement writer handoff remain open.
+- Phase 30 backend-first notification self-service write foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-30-notification-self-service-write.md`.
+  It adds feature-default-off Java
+  `PATCH /api/v1/notifications/my/{id}/read`,
+  `PATCH /api/v1/notifications/my/read-all` and
+  `DELETE /api/v1/notifications/my/{id}` for the authenticated user,
+  preserving legacy response envelopes and subject ownership isolation. Realtime
+  delivery, admin notification writes, PostgreSQL write rehearsal, canary
+  routing, rollback and public notification writer handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
