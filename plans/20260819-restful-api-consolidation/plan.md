@@ -333,6 +333,15 @@ the retirement gates pass.
   preserving legacy response envelopes and subject ownership isolation. Realtime
   delivery, admin notification writes, PostgreSQL write rehearsal, canary
   routing, rollback and public notification writer handoff remain open.
+- Phase 31 backend-first notification admin read foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-31-notification-admin-read.md`.
+  It extends the feature-default-off Java notification read candidate with
+  `GET /api/v1/notifications` and `GET /api/v1/notifications/{id}` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy list envelope, created-desc
+  ordering, optional `userId` filter and not-found detail behavior. PostgreSQL
+  read parity, realtime/admin write parity, canary routing, rollback and public
+  notification route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

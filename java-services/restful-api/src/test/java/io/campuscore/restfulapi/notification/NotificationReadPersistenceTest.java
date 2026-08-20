@@ -7,15 +7,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -122,6 +125,57 @@ class NotificationReadPersistenceTest {
     }
 
     @Test
+    void adminListUsesLegacyEnvelopeAndOptionalUserFilter() throws Exception {
+        Instant newest = Instant.parse("2026-08-19T10:00:00Z");
+        insert("student-new", STUDENT, false, newest);
+        insert("student-old", STUDENT, true, newest.minusSeconds(60));
+        insert("other-newest", OTHER_USER, false, newest.plusSeconds(60));
+
+        mvc.perform(get("/api/v1/notifications")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "2")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("other-newest"))
+                .andExpect(jsonPath("$.data[1].id").value("student-new"))
+                .andExpect(jsonPath("$.meta.total").value(3))
+                .andExpect(jsonPath("$.meta.page").value(1))
+                .andExpect(jsonPath("$.meta.limit").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/notifications")
+                        .queryParam("userId", STUDENT)
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].userId").value(STUDENT))
+                .andExpect(jsonPath("$.data[1].userId").value(STUDENT))
+                .andExpect(jsonPath("$.meta.total").value(2));
+    }
+
+    @Test
+    void adminDetailRequiresAdminRoleAndReturnsNotFoundForMissingNotification() throws Exception {
+        Instant now = Instant.parse("2026-08-19T10:00:00Z");
+        insert("detail", STUDENT, false, now);
+
+        mvc.perform(get("/api/v1/notifications/detail").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("detail"))
+                .andExpect(jsonPath("$.userId").value(STUDENT))
+                .andExpect(jsonPath("$.isRead").value(false));
+
+        mvc.perform(get("/api/v1/notifications/detail").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/notifications/missing").with(adminJwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"))
+                .andExpect(jsonPath("$.message").value("Notification not found"));
+    }
+
+    @Test
     void anonymousAndUnboundedRequestsFailClosed() throws Exception {
         mvc.perform(get("/api/v1/notifications/my"))
                 .andExpect(status().isUnauthorized())
@@ -149,5 +203,19 @@ class NotificationReadPersistenceTest {
                 read ? Timestamp.from(createdAt.plusSeconds(1)) : null,
                 Timestamp.from(createdAt),
                 Timestamp.from(createdAt));
+    }
+
+    private RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("admin-user")
+                        .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private RequestPostProcessor studentJwt() {
+        return jwt().jwt(token -> token
+                        .subject(STUDENT)
+                        .claim("roles", List.of("STUDENT")))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 }

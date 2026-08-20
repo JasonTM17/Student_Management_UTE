@@ -8,8 +8,10 @@ import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCoun
 import java.util.List;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Read-only application service for the first notification strangler slice. */
 @Service
@@ -38,19 +40,37 @@ public class NotificationReadService {
         long offset = (long) (page - 1) * limit;
         long total = notifications.countMy(userId, isRead);
         List<NotificationResponse> data = notifications.findMy(userId, offset, limit, isRead);
-        long totalPages = total == 0 ? 0 : ((total - 1) / limit) + 1;
-        if (totalPages > Integer.MAX_VALUE) {
-            throw new IllegalArgumentException("Notification result is too large");
-        }
         return new NotificationListResponse(
                 data,
-                new PageMeta(total, page, limit, (int) totalPages));
+                new PageMeta(total, page, limit, totalPages(total, limit)));
     }
 
     @Transactional(readOnly = true)
     public UnreadCountResponse getUnreadCount(String userId) {
         requireSubject(userId);
         return new UnreadCountResponse(notifications.countUnread(userId));
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationListResponse findAll(
+            int page,
+            int limit,
+            String userId) {
+        requirePage(page, limit);
+        String userFilter = normalizeLegacyOptionalText(userId);
+        long offset = (long) (page - 1) * limit;
+        long total = notifications.countAll(userFilter);
+        List<NotificationResponse> data = notifications.findAll(offset, limit, userFilter);
+        return new NotificationListResponse(
+                data,
+                new PageMeta(total, page, limit, totalPages(total, limit)));
+    }
+
+    @Transactional(readOnly = true)
+    public NotificationResponse findOne(String id) {
+        requireText(id, "notification id");
+        return notifications.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
     }
 
     /**
@@ -67,6 +87,12 @@ public class NotificationReadService {
         }
     }
 
+    private static void requireText(String value, String label) {
+        if (value == null || value.isBlank()) {
+            throw new IllegalArgumentException(label + " is required");
+        }
+    }
+
     private static void requirePage(int page, int limit) {
         if (page < 1) {
             throw new IllegalArgumentException("page must be at least 1");
@@ -74,5 +100,17 @@ public class NotificationReadService {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }
+    }
+
+    private static String normalizeLegacyOptionalText(String value) {
+        return value == null || value.isBlank() ? null : value;
+    }
+
+    private static int totalPages(long total, int limit) {
+        long totalPages = total == 0 ? 0 : ((total - 1) / limit) + 1;
+        if (totalPages > Integer.MAX_VALUE) {
+            throw new IllegalArgumentException("Notification result is too large");
+        }
+        return (int) totalPages;
     }
 }
