@@ -164,6 +164,9 @@ the retirement gates pass.
 - Phase 07 thesis group read: source candidate; see
   `phase-07-thesis-group-read.md`. It is JDBC-only and compile-verified; the
   same host resource limit blocks Spring persistence verification.
+- Phase 08 thesis council read: pending implementation verification; the next
+  JDBC-only, feature-gated read slice preserves the legacy council list shape
+  without moving its writer or public traffic.
 
 # Acceptance and verification
 
