@@ -15,6 +15,10 @@ legacy `thesis-service` owner.
   descending `registrationStart` ordering expected by `frontend/src/lib/thesis-api.ts`.
 - Activate only in the `persistence` profile and when
   `THESIS_READ_ENABLED=true`; the default shell exposes no route.
+- Expose only the two required query methods from the Round repository rather
+  than a generic Spring Data write surface. This is a source-level guard;
+  runtime activation still requires a PostgreSQL credential restricted to
+  `SELECT`.
 - Add tests for the default-disabled route, sorting/filtering, and H2 schema
   parity for optional round dates.
 
