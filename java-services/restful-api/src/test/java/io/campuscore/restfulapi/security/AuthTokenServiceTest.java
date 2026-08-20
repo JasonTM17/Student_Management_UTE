@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.time.Clock;
 import java.time.Duration;
@@ -27,6 +28,7 @@ class AuthTokenServiceTest {
         AuthTokenService service = new AuthTokenService(
                 config.jwtEncoder(SECRET),
                 config.jwtEncoder(REFRESH_SECRET),
+                config.jwtDecoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -64,6 +66,7 @@ class AuthTokenServiceTest {
         AuthTokenService service = new AuthTokenService(
                 config.jwtEncoder(SECRET),
                 config.jwtEncoder(REFRESH_SECRET),
+                config.jwtDecoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -84,6 +87,7 @@ class AuthTokenServiceTest {
         assertEquals("user-1", decoded.getSubject());
         assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
         assertEquals("refresh", decoded.getClaimAsString("tokenType"));
+        assertTrue(decoded.getId() != null && !decoded.getId().isBlank());
         assertEquals(null, decoded.getClaims().get("roles"));
         assertEquals(null, decoded.getClaims().get("permissions"));
         assertEquals(NOW.plus(Duration.ofDays(7)), issued.expiresAt());
@@ -95,6 +99,7 @@ class AuthTokenServiceTest {
         AuthTokenService service = new AuthTokenService(
                 config.jwtEncoder(SECRET),
                 config.jwtEncoder(REFRESH_SECRET),
+                config.jwtDecoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -131,6 +136,7 @@ class AuthTokenServiceTest {
         assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
                 config.jwtEncoder(SECRET),
                 config.jwtEncoder(REFRESH_SECRET),
+                config.jwtDecoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ZERO,
                 Duration.ofDays(7)));
@@ -138,6 +144,7 @@ class AuthTokenServiceTest {
         assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
                 config.jwtEncoder(SECRET),
                 config.jwtEncoder(REFRESH_SECRET),
+                config.jwtDecoder(REFRESH_SECRET),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ZERO));

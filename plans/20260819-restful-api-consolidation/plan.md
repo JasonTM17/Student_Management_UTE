@@ -191,12 +191,13 @@ the retirement gates pass.
   database, image, or client change.
 - Phase 13 backend-first auth and academic read foundation:
   source candidate/HOLD; see `phase-13-auth-academic-foundation.md`. It adds
-  Java access/refresh token issuing, a feature-default-off Java login candidate
-  against the migrated legacy `auth` schema, and feature-default-off academic
-  semester/course reads through the legacy academic schema. Legacy auth/academic
-  services remain public route owners and canonical writers; refresh endpoint,
-  logout, PostgreSQL parity, route canary, rollback and frontend convergence
-  remain open.
+  Java access/refresh token issuing, a feature-default-off Java auth session
+  candidate for login, refresh rotation and logout clearing against the
+  migrated legacy `auth` schema, and feature-default-off academic
+  semester/course reads through the legacy academic schema. Legacy
+  auth/academic services remain public route owners and canonical writers;
+  password flows, audit publishing, PostgreSQL parity, route canary, rollback
+  and frontend convergence remain open.
 
 ## Backend foundation gate before Stitch implementation
 

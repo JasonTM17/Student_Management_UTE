@@ -88,6 +88,19 @@ class RestfulApiContractTest {
                         .content("{\"email\":\"student@campuscore.edu\",\"password\":\"secret\"}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(post("/api/v1/auth/logout")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

@@ -23,11 +23,12 @@ shell, not a domain-parity or cutover claim.
 - a disabled-by-default, read-only academic catalog candidate behind
   `ACADEMIC_READ_ENABLED=true` in the `persistence` profile; it reads semesters
   and courses only, with no enrollment, grade, timetable or write ownership.
-- a disabled-by-default auth login candidate behind `AUTH_LOGIN_ENABLED=true`
+- a disabled-by-default auth session candidate behind `AUTH_LOGIN_ENABLED=true`
   in the `persistence` profile; it verifies BCrypt passwords against the
-  legacy `auth` schema, issues shared web cookies plus body tokens, and stores
-  only hashed refresh sessions. It does not own refresh, logout, password
-  reset/change, audit publishing, public routing or full auth cutover.
+  legacy `auth` schema, issues and refreshes shared web cookies plus body
+  tokens, rotates hashed refresh sessions, and clears session state on logout.
+  It does not own password reset/change, audit publishing, public routing or
+  full auth cutover.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
@@ -37,12 +38,13 @@ The notification read candidate is separately gated by
 `NOTIFICATIONS_READ_ENABLED=true` and reads the legacy schema through JDBC
 without adding notification DDL. The academic catalog read candidate follows
 the same pattern with `ACADEMIC_READ_ENABLED=true` and reads the legacy
-`academic` schema through JDBC without adding academic DDL. The auth login
+`academic` schema through JDBC without adding academic DDL. The auth session
 candidate is gated by `AUTH_LOGIN_ENABLED=true` and writes only the expected
-auth/session login state in the legacy `auth` schema; the legacy auth service
-remains the public owner. No legacy route, payment provider or LLM provider is
-cut over; those dependencies enter through later migration phases with one
-canonical writer and explicit rollback evidence.
+auth/session login, refresh-rotation and logout-clearing state in the legacy
+`auth` schema; the legacy auth service remains the public owner. No legacy
+route, payment provider or LLM provider is cut over; those dependencies enter
+through later migration phases with one canonical writer and explicit rollback
+evidence.
 
 ## Local verification
 

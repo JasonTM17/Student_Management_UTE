@@ -4,11 +4,16 @@ import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.web.AuthDtos.LogoutRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.RefreshRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
+import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -47,5 +52,37 @@ public class AuthLoginController {
                 result.accessTokenExpiresAt(),
                 result.refreshTokenExpiresAt());
         return result.response();
+    }
+
+    @PostMapping("refresh")
+    public LoginResponse refresh(
+            @RequestBody(required = false) RefreshRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        LoginResult result = auth.refresh(
+                cookies.refreshToken(servletRequest, request == null ? null : request.refreshToken()),
+                servletRequest.getRemoteAddr(),
+                servletRequest.getHeader("User-Agent"));
+        cookies.issue(
+                servletRequest,
+                servletResponse,
+                result.response().accessToken(),
+                result.response().refreshToken(),
+                result.accessTokenExpiresAt(),
+                result.refreshTokenExpiresAt());
+        return result.response();
+    }
+
+    @PostMapping("logout")
+    public Map<String, String> logout(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) LogoutRequest request,
+            HttpServletRequest servletRequest,
+            HttpServletResponse servletResponse) {
+        auth.logout(
+                jwt.getSubject(),
+                cookies.refreshToken(servletRequest, request == null ? null : request.refreshToken()));
+        cookies.clear(servletResponse);
+        return Map.of("message", "Logged out successfully");
     }
 }

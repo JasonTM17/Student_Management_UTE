@@ -17,6 +17,12 @@ public final class AuthDtos {
             @NotBlank String password) {
     }
 
+    public record RefreshRequest(String refreshToken) {
+    }
+
+    public record LogoutRequest(String refreshToken) {
+    }
+
     public record AuthUserResponse(
             String id,
             String email,

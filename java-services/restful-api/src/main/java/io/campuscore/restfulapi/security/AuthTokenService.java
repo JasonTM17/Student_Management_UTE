@@ -8,15 +8,19 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.UUID;
 import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.JwsHeader;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtClaimsSet;
+import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.JwtEncoderParameters;
+import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.stereotype.Service;
 
@@ -26,6 +30,7 @@ public class AuthTokenService {
 
     private final JwtEncoder jwtEncoder;
     private final JwtEncoder refreshJwtEncoder;
+    private final JwtDecoder refreshJwtDecoder;
     private final Clock clock;
     private final Duration accessTokenTtl;
     private final Duration refreshTokenTtl;
@@ -39,6 +44,7 @@ public class AuthTokenService {
         this(
                 jwtEncoder,
                 refreshEncoder(refreshSecret),
+                refreshDecoder(refreshSecret),
                 Clock.systemUTC(),
                 Duration.ofSeconds(accessTokenTtlSeconds),
                 Duration.ofSeconds(refreshTokenTtlSeconds));
@@ -47,6 +53,7 @@ public class AuthTokenService {
     AuthTokenService(
             JwtEncoder jwtEncoder,
             JwtEncoder refreshJwtEncoder,
+            JwtDecoder refreshJwtDecoder,
             Clock clock,
             Duration accessTokenTtl,
             Duration refreshTokenTtl) {
@@ -58,6 +65,7 @@ public class AuthTokenService {
         }
         this.jwtEncoder = jwtEncoder;
         this.refreshJwtEncoder = refreshJwtEncoder;
+        this.refreshJwtDecoder = refreshJwtDecoder;
         this.clock = clock;
         this.accessTokenTtl = accessTokenTtl;
         this.refreshTokenTtl = refreshTokenTtl;
@@ -110,6 +118,7 @@ public class AuthTokenService {
                 .issuer("campuscore-restful-api")
                 .issuedAt(issuedAt)
                 .expiresAt(expiresAt)
+                .id(UUID.randomUUID().toString())
                 .subject(principal.id())
                 .claim("email", principal.email())
                 .claim("tokenType", "refresh")
@@ -119,6 +128,15 @@ public class AuthTokenService {
                         claims))
                 .getTokenValue();
         return new IssuedRefreshToken(token, expiresAt);
+    }
+
+    public Jwt decodeRefreshToken(String refreshToken) {
+        requireText(refreshToken, "refresh token");
+        Jwt decoded = refreshJwtDecoder.decode(refreshToken);
+        if (!"refresh".equals(decoded.getClaimAsString("tokenType"))) {
+            throw new BadCredentialsException("Invalid refresh token");
+        }
+        return decoded;
     }
 
     private static List<String> values(List<String> values, String claimName) {
@@ -151,6 +169,16 @@ public class AuthTokenService {
         }
         SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         return new NimbusJwtEncoder(new ImmutableSecret<>(key));
+    }
+
+    private static JwtDecoder refreshDecoder(String secret) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException("JWT_REFRESH_SECRET must contain at least 32 characters");
+        }
+        SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        return NimbusJwtDecoder.withSecretKey(key)
+                .macAlgorithm(MacAlgorithm.HS256)
+                .build();
     }
 
     public record IssuedAccessToken(String accessToken, Instant expiresAt) {
