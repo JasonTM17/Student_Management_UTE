@@ -23,12 +23,22 @@ route owner, canonical writer, RabbitMQ event publisher, and rollback target.
 
 - Preserve the Nest envelope `{ data, meta: { total, page, limit, totalPages } }`,
   one-based pagination, page-size range 1–200, newest-first ordering, optional
-  admin filters, and the existing priority vocabulary.
+  admin filters, blank-filter behavior, rejection of unknown/repeated query
+  parameters, and the existing priority vocabulary.
 - `/my` preserves global-or-role targeting, publish/expiry windows, student-year
   targeting, and lecturer-specific targeting from the signed JWT claims.
+- Announcement routes require both `sub` and `email`, matching the legacy JWT
+  normalization precondition. The Java candidate additionally fails closed for
+  `STUDENT` or `LECTURER` roles missing their profile claims. This deliberate
+  abuse-case hardening differs from legacy malformed-token behavior and must be
+  accepted explicitly before cutover.
 - `/announcements` remains limited to `ADMIN` and `SUPER_ADMIN`.
 - Responses retain both the flattened Prisma fields and the derived semester,
   section/course, and lecturer objects consumed by the frontend.
+- The legacy Nest error body and the shared Java monolith error body are not the
+  same JSON shape. Status/code behavior is covered locally, but exact error-body
+  compatibility remains a declared differential blocker rather than a source
+  parity claim.
 
 ## Acceptance and verification
 
@@ -59,13 +69,35 @@ route owner, canonical writer, RabbitMQ event publisher, and rollback target.
   mvn -q -f java-services/restful-api/pom.xml '-DargLine=-Xmx256m -XX:MaxMetaspaceSize=160m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp' test
   ```
 
-- Maven reported 40 tests with zero failures, errors, or skips: 5 engagement,
-  4 notification, 14 shell contract, 5 CSRF, and 12 thesis tests.
+- The pre-review snapshot reported 40 passing tests. After the adversarial
+  repairs, the complete suite reported 42 tests with zero failures, errors, or
+  skips: 6 engagement, 1 migration-safety, 4 notification, 14 shell contract,
+  5 CSRF, and 12 thesis tests.
 - Source scanning found no JDBC mutation or DDL statement in the production
   engagement package. `git diff --check` passed; line-ending notices are Git's
   existing Windows LF-to-CRLF normalization warning, not whitespace errors.
 - This evidence is H2/Spring source evidence only. No shared CampusCore database
   or running engagement container was queried or changed.
+
+## Adversarial review remediation
+
+The first frozen candidate `1d67fe1` received Advisor `HOLD`, Kongming `HOLD`,
+and degraded Wukong `FALSIFIED`. Their source-level counterexamples were treated
+as stale-gate findings, not approvals:
+
+- blank admin filters and unknown/repeated query parameters now follow the Nest
+  source semantics;
+- announcement routes now enforce the legacy `sub` plus `email` identity
+  precondition and reject missing role-profile claims;
+- Prisma's PostgreSQL default for unannotated `DateTime` is `timestamp(3)`.
+  The JDBC adapter and H2 fixture now use UTC `LocalDateTime` plus SQL
+  `TIMESTAMP`, rather than claiming an unverified timestamptz mapping;
+- enabling the engagement read flag installs a Flyway strategy that throws
+  before migration. The candidate test context explicitly sets Flyway off;
+- Phase 11 now owns an engagement-specific PostgreSQL differential corpus.
+
+All three independent reviews must be repeated on the repaired exact commit;
+the original verdicts cannot approve a changed snapshot.
 
 ## Remaining gates
 
