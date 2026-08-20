@@ -19,4 +19,12 @@ public final class SupportTicketWriteDtos {
             @NotNull String message,
             Boolean isInternal) {
     }
+
+    public record UpdateSupportTicketRequest(
+            String subject,
+            String description,
+            String category,
+            String priority,
+            String status) {
+    }
 }
