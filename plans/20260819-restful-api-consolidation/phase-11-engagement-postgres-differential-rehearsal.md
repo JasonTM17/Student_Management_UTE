@@ -71,38 +71,44 @@ inspection are not substitutes for PostgreSQL parity or rollback proof.
 Verdict: **bounded runtime PASS; production cutover HOLD**.
 
 The exact provenance-bound probe checkpoint was
-`27ef0d03a8f7ee36d84eb99fb6189962be94cef3`. The Java timestamp source commit
+`f4188d7fe10ec0459c70f4ef4ed0f52e24191c33`. The Java timestamp source commit
 was `b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57` and no Java production source
 changed between those identities. The owned probe exported only the committed
-Java module from that exact HEAD with `git archive`, extracted it into an
-isolated D-hosted snapshot, and ran offline Maven `clean package` there with a
-narrow environment and the selected Java runtime. It then hashed the resulting
-Spring Boot artifact before launching it. This binds the observed run to one
-exact isolated build; it is not a reproducible-build claim:
+Java module, engagement service and shared auth package from that exact HEAD
+with `git archive`, extracted them into an isolated D-hosted snapshot, and ran
+offline Maven `clean package` plus a direct TypeScript build there with narrow
+environments. It then hashed the resulting Spring Boot and Nest artifacts
+before loading either runtime. This binds the observed run to one exact
+isolated build; it is not a reproducible-build claim:
 
 - JAR SHA-256:
-  `5BF28281052A90494A4364D53C5C39714FC029684579B280399BDC75A42A5CFE`;
+  `F7051BE0CD7B2398E6EA8C4FF0C3146A877861BB8E836586F1E49EBEFA1EBACD`;
 - Java reference artifact SHA-256:
-  `E8031D9B66C17396C0228FA4A5F569055F86A088C51B0529A65E424722C4E9CD`;
+  `42BE39C5BBB87CB5B44E1B7DC5DBBB17259676A40F0C61F89B9BE046135716E3`;
 - sequential differential report SHA-256:
-  `AB7B297A1978E91E0609D53F1921F1B7A263C7ABA5EF57A199F67D1798C530B3`;
-- committed Java source archive SHA-256:
-  `87BF4485521B45CE0EB89B151556E7C7F0D08EF7C9D33F7E177082EA4CDBFB40`;
+  `248D7FB6FB29AA3734C08BA8EEE0768C1A6E703DAB2D528AE717073574D0711F`;
+- committed rehearsal source archive SHA-256:
+  `CEDC38DE9DAB7C82C41205F306E498FB58BF10B1D3715BB42027FF0B7B713F21`;
 - Maven clean-build log SHA-256:
-  `5530800164356EC9C6528836BECA18149FBBA35419CDCDB221EB978650C5C6B8`;
+  `CD1D7249DA1315F66DC9872B6DBAB7EE243E12A7E0BBC2DE3EC8C401C67C8625`;
 - selected Maven launcher SHA-256:
   `5F9B8EAC523030CD9818DAA0EB337635E06137D0DA95A66A0A5425D668050E12`;
 - selected Java executable SHA-256:
   `94DC54724B34717DAD127855DC8228AF8BC2E021C19B233FFF0DF4525F7698B3`;
 - owned Java log SHA-256:
-  `E504EFF2136F7D153A3F16EED9E64C7F5955C94F02D8934378B044EE0A9EABF2`;
+  `DA0FC1289A01976139B2CF947919ACC63D6A1A2CF8693BB93159EE45EEDDFF49`;
 - selected Git/CMD/TAR/PowerShell executable SHA-256 values:
   `54194A1AF7CFB6730448CE14B8F2C1DDDD9F950B7F995DC351C1ED16EB179249`,
   `8DD1EBB0B969370C70A5EE7F7EE347949AA7046AA5E1A33FCD7B1E9415B21FC3`,
   `9B77D4C912F2EDAE8C241D0ECE1094D2AC068B084269CEAF85D7C7B085D2AE86`,
   and `7600FFE12DA441FE89D035B13801E8E91D064BC544A27B19A5CF49F6AB8B18F5`;
 - legacy Nest `dist/src/main.js` SHA-256:
-  `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`.
+  `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`;
+- legacy TypeScript build log SHA-256 (empty successful stdout):
+  `E3B0C44298FC1C149AFBF4C8996FB92427AE41E4649B934CA495991B7852B855`;
+- selected Node and TypeScript compiler SHA-256 values:
+  `2FFE3ACC0458FDDE999F50D11809BBE7C9B7EF204DCF17094E325D26ACE101D8`
+  and `8D5FA5BD883FEC0979FC2004F1FE1D99AEF40570155D550EADC0B03B55513BF0`.
 
 The response artifacts are outside Git in the D-hosted Phase 11 recovery root.
 They contain response data and source/artifact identities, but no bearer or
@@ -140,13 +146,15 @@ instead of accepting caller-supplied identity strings.
 
 The reusable probe is
 `engagement-service/test/engagement-read.rehearsal.cjs`. In one process it runs
-an exact-commit `git archive` plus isolated offline clean Maven build, spawns
-Java with a fixed structured `-jar` argv and a narrow allowlisted environment,
+an exact-commit `git archive` plus isolated offline clean Java and Nest builds,
+spawns Java with a fixed structured `-jar` argv and a narrow allowlisted environment,
 requires the loopback listener PID to equal that owned child PID, captures Java
 responses in memory, verifies that the JAR hash did not change, stops Java, and
 only then starts the in-process Nest application for comparison. It writes the
 reference artifact after capture for audit, but never reads an external
-reference for comparison. This sequential shape was selected because a prior
+reference for comparison. It loads the freshly built isolated Nest modules, not
+the ignored working-tree `dist`, and removes its temporary dependency junctions
+after the comparison. This sequential shape was selected because a prior
 Jest/ts-jest attempt exhausted its bounded Node heap before running tests; that
 attempt remains `NOT_RUN`, not a functional failure.
 
@@ -165,8 +173,8 @@ binds the listener PID to the child process it spawned from the freshly built
 D-hosted JAR. Maven and Java receive only required Windows process keys plus
 explicit rehearsal values; inherited Spring/JVM/Maven overrides are not copied.
 The report records the Java reference hash, actual clean source HEAD, source
-archive/build/JAR/tool/log hashes, owned PID and actual legacy entry-artifact
-hash.
+archive/build/JAR/Nest/tool/log hashes, owned PID and actual legacy
+entry-artifact hash.
 
 Thirteen signed/negative cases produced equal HTTP status and normalized
 content type. Status, successful response body and normalized content type are
@@ -198,13 +206,18 @@ decision and is not represented as full parity.
   all rejected before app import or network use.
 - external reference comparison and the retired split capture mode: both
   rejected before build or network use.
-- build-input/environment contamination regression: an untracked Java source
-  placed inside the normal module and malicious parent `SPRING_APPLICATION_JSON`
-  plus `JAVA_TOOL_OPTIONS` were present during the run; the source archive and
-  JAR excluded the sentinel, the override values were not inherited, and the
-  differential still passed. The temporary sentinel was then removed.
+- build-input/environment contamination regression: untracked Java and Nest
+  source files were placed inside the normal modules while malicious parent
+  `SPRING_APPLICATION_JSON` plus `JAVA_TOOL_OPTIONS` were present; the source
+  archive, JAR and Nest `dist` excluded both sentinels, override values were not
+  inherited, and the differential still passed. The sentinels were then removed
+  and the temporary dependency junctions were verified absent.
+- the first isolated Nest build attempt used the Nest CLI with a 192 MiB heap
+  and ended in OOM before legacy comparison; it is `NOT_RUN`, not a parity
+  failure. The final checkpoint invokes the exact TypeScript compiler directly
+  with a bounded 256 MiB heap and completed successfully.
 - exact-head owned Java capture: 13/13 cases PASS with the listener bound to the
-  spawned PID `43068` and the isolated clean-built JAR/hash shown above; Java
+  spawned PID `40336` and the isolated clean-built JAR/hash shown above; Java
   was stopped before legacy startup and port `56410` was closed after the run.
 - sequential differential: 13/13 status/content-type assertions PASS and 7/7
   successful full-body assertions PASS; the six intentional error-envelope
