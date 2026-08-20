@@ -36,6 +36,12 @@ shell, not a domain-parity or cutover claim.
   profiles from the migrated legacy `people` schema. It does not own people
   writes, enrollment history, RabbitMQ events, public routing or full people
   cutover.
+- a disabled-by-default finance read candidate behind
+  `FINANCE_READ_ENABLED=true` in the `persistence` profile; it reads student
+  invoice list/detail plus admin invoice/payment list/detail routes from the
+  migrated legacy `finance` schema. It does not own invoice/payment writes,
+  checkout orchestration, provider callbacks/webhooks, CSV exports, public
+  routing or full finance cutover.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
@@ -52,7 +58,9 @@ refresh-rotation and logout-clearing state in the legacy `auth` schema; the
 legacy auth service remains the public owner. The people read candidate uses
 `PEOPLE_READ_ENABLED=true` and reads the migrated `people` schema without
 adding people DDL or moving create/update/delete ownership. No legacy route,
-payment provider or LLM provider is cut over; those
+payment provider or LLM provider is cut over; the finance read candidate uses
+`FINANCE_READ_ENABLED=true` for invoice/payment reads only and does not move
+checkout, provider callback/webhook, export or write ownership. Those
 dependencies enter through later migration phases with one canonical writer and
 explicit rollback evidence.
 
