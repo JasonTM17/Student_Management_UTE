@@ -56,6 +56,15 @@ mvn -f java-services/thesis-service/pom.xml verify
 The current checkout does not claim a production cutover. Existing Node tests
 remain required while the old services are still canonical.
 
+## RESTful API read candidates
+
+The `java-services/restful-api` monolith now contains disabled-by-default,
+read-only candidates for thesis, notification, engagement announcement and
+academic catalog reads. The academic slice covers semester/course list and
+detail routes only. These candidates use JDBC against legacy schemas when their
+feature flags are explicitly enabled under the `persistence` profile; they do
+not add DDL, write data, or own public traffic.
+
 ## Implemented slice
 
 - Registration rounds with explicit lifecycle transitions.

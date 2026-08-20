@@ -10,6 +10,12 @@
 
 CampusCore is a production-like university operations platform built as a release-verified microservices portfolio. It combines a Next.js frontend, a NestJS service mesh, a single public `nginx` edge, bilingual product UX, sandbox-ready student payments, and an operator monitoring stack designed for realistic local and Kubernetes handoff workflows.
 
+> **Backend consolidation note:** the active Java migration target is now a
+> single Spring Boot modular monolith at `java-services/restful-api`; the root
+> Java reactor builds only that application. The published `v1.4.1` runtime
+> topology below remains the legacy/canonical route owner until the Java API
+> passes PostgreSQL parity, canary and rollback gates.
+
 - Public site: [https://tienson.io.vn](https://tienson.io.vn)
 - Latest release: [`v1.4.1`](./docs/releases/v1.4.1.md)
 - English docs: [README.en.md](./README.en.md)

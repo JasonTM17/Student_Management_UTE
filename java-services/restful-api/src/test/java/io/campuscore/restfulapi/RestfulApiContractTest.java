@@ -71,6 +71,17 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void academicReadBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/semesters").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/courses").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void thesisRoundReadBoundaryIsDisabledByDefault() throws Exception {
         mvc.perform(get("/api/v1/thesis/rounds").with(jwt()))
                 .andExpect(status().isNotFound())

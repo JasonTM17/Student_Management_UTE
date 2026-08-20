@@ -189,6 +189,19 @@ the retirement gates pass.
   the one supported modular-monolith build target while preserving legacy Java
   services as direct-build rollback references. It makes no route, writer,
   database, image, or client change.
+- Phase 13 backend-first auth and academic read foundation:
+  source candidate/HOLD; see `phase-13-auth-academic-foundation.md`. It adds a
+  server-side access-token issuer for the future Java auth owner plus
+  feature-default-off Java read-only list/detail candidates for semesters and
+  courses through the legacy academic schema. Legacy auth/academic services
+  remain public route owners and canonical writers; PostgreSQL parity, route
+  canary, rollback and frontend convergence remain open.
+- Phase 13 backend-first auth and academic read foundation: in progress; see
+  `phase-13-auth-academic-foundation.md`. It adds a Java access-token issuer
+  compatible with the existing resource-server claim contract and a
+  disabled-by-default academic catalog read candidate. It does not move login,
+  refresh, revocation, public routes, enrollment/grade writes, PostgreSQL
+  parity, canary, rollback or client cutover.
 
 ## Backend foundation gate before Stitch implementation
 
