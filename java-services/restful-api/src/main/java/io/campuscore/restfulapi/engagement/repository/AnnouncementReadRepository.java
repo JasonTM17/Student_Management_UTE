@@ -10,7 +10,7 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Types;
 import java.time.Instant;
-import java.time.OffsetDateTime;
+import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
@@ -117,8 +117,8 @@ public class AnnouncementReadRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue(
                         "now",
-                        OffsetDateTime.ofInstant(visibility.now(), ZoneOffset.UTC),
-                        Types.TIMESTAMP_WITH_TIMEZONE);
+                        LocalDateTime.ofInstant(visibility.now(), ZoneOffset.UTC),
+                        Types.TIMESTAMP);
 
         List<String> audience = new ArrayList<>();
         audience.add("\"isGlobal\" = TRUE");
@@ -227,8 +227,8 @@ public class AnnouncementReadRepository {
     }
 
     private static Instant instant(ResultSet resultSet, String column) throws SQLException {
-        OffsetDateTime value = resultSet.getObject(column, OffsetDateTime.class);
-        return value == null ? null : value.toInstant();
+        LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
+        return value == null ? null : value.toInstant(ZoneOffset.UTC);
     }
 
     private static boolean present(String value) {

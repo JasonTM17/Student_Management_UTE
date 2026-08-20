@@ -6,7 +6,6 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.sql.PreparedStatement;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.util.List;
@@ -26,7 +25,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
-@TestPropertySource(properties = "migration.engagement-read.enabled=true")
+@TestPropertySource(properties = {
+        "migration.engagement-read.enabled=true",
+        "spring.flyway.enabled=false",
+        "spring.jpa.hibernate.ddl-auto=none"
+})
 class AnnouncementReadPersistenceTest {
 
     private static final Instant PAST = Instant.parse("2020-01-01T00:00:00Z");
@@ -50,8 +53,8 @@ class AnnouncementReadPersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "isGlobal" BOOLEAN NOT NULL,
-                    "publishAt" TIMESTAMP WITH TIME ZONE,
-                    "expiresAt" TIMESTAMP WITH TIME ZONE,
+                    "publishAt" TIMESTAMP,
+                    "expiresAt" TIMESTAMP,
                     "publishedBy" VARCHAR(120),
                     "semesterId" VARCHAR(120),
                     "semesterName" VARCHAR(200),
@@ -61,8 +64,8 @@ class AnnouncementReadPersistenceTest {
                     "courseName" VARCHAR(200),
                     "lecturerId" VARCHAR(120),
                     "lecturerDisplayName" VARCHAR(200),
-                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
-                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
         jdbc.update("DELETE FROM \"engagement\".\"Announcement\"");
@@ -82,6 +85,7 @@ class AnnouncementReadPersistenceTest {
         mvc.perform(get("/api/v1/announcements/my")
                         .with(jwt().jwt(token -> token
                                 .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
                                 .claim("roles", List.of("STUDENT"))
                                 .claim("studentId", "student-profile")
                                 .claim("student", Map.of("year", 2)))))
@@ -96,14 +100,12 @@ class AnnouncementReadPersistenceTest {
         mvc.perform(get("/api/v1/announcements/my")
                         .with(jwt().jwt(token -> token
                                 .subject("student-without-profile")
+                                .claim("email", "student2@campuscore.edu")
                                 .claim("roles", List.of("STUDENT"))
                                 .claim("studentId", "")
                                 .claim("student", Map.of("year", 2)))))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.data.length()").value(3))
-                .andExpect(jsonPath("$.data[0].id").value("wrong-year"))
-                .andExpect(jsonPath("$.data[1].id").value("role-year"))
-                .andExpect(jsonPath("$.data[2].id").value("global"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -117,6 +119,7 @@ class AnnouncementReadPersistenceTest {
         mvc.perform(get("/api/v1/announcements/my")
                         .with(jwt().jwt(token -> token
                                 .subject("lecturer-user")
+                                .claim("email", "lecturer@campuscore.edu")
                                 .claim("roles", List.of("LECTURER"))
                                 .claim("lecturerId", "lecturer-1"))))
                 .andExpect(status().isOk())
@@ -124,6 +127,14 @@ class AnnouncementReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].id").value("mine"))
                 .andExpect(jsonPath("$.data[0].lecturer.id").value("lecturer-1"))
                 .andExpect(jsonPath("$.data[1].id").value("general"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("lecturer-without-profile")
+                                .claim("email", "lecturer2@campuscore.edu")
+                                .claim("roles", List.of("LECTURER")))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
     }
 
     @Test
@@ -140,7 +151,10 @@ class AnnouncementReadPersistenceTest {
                         .queryParam("sectionId", "section-1")
                         .queryParam("priority", "HIGH")
                         .with(jwt()
-                                .jwt(token -> token.subject("admin-user").claim("roles", List.of("ADMIN")))
+                                .jwt(token -> token
+                                        .subject("admin-user")
+                                        .claim("email", "admin@campuscore.edu")
+                                        .claim("roles", List.of("ADMIN")))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
@@ -157,7 +171,10 @@ class AnnouncementReadPersistenceTest {
 
         mvc.perform(get("/api/v1/announcements")
                         .with(jwt()
-                                .jwt(token -> token.subject("student-user").claim("roles", List.of("STUDENT")))
+                                .jwt(token -> token
+                                        .subject("student-user")
+                                        .claim("email", "student@campuscore.edu")
+                                        .claim("roles", List.of("STUDENT")))
                                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -172,7 +189,9 @@ class AnnouncementReadPersistenceTest {
         mvc.perform(get("/api/v1/announcements/my")
                         .queryParam("page", "2")
                         .queryParam("limit", "2")
-                        .with(jwt().jwt(token -> token.subject("user"))))
+                        .with(jwt().jwt(token -> token
+                                .subject("user")
+                                .claim("email", "user@campuscore.edu"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].id").value("oldest"))
@@ -181,17 +200,62 @@ class AnnouncementReadPersistenceTest {
 
         mvc.perform(get("/api/v1/announcements/my")
                         .queryParam("limit", "201")
-                        .with(jwt().jwt(token -> token.subject("user"))))
+                        .with(jwt().jwt(token -> token
+                                .subject("user")
+                                .claim("email", "user@campuscore.edu"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/announcements")
                         .queryParam("priority", "CRITICAL")
                         .with(jwt()
-                                .jwt(token -> token.subject("admin-user").claim("roles", List.of("ADMIN")))
+                                .jwt(token -> token
+                                        .subject("admin-user")
+                                        .claim("email", "admin@campuscore.edu")
+                                        .claim("roles", List.of("ADMIN")))
                                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .queryParam("unknown", "value")
+                        .with(jwt().jwt(token -> token
+                                .subject("user")
+                                .claim("email", "user@campuscore.edu"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .queryParam("page", "1", "2")
+                        .with(jwt().jwt(token -> token
+                                .subject("user")
+                                .claim("email", "user@campuscore.edu"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void emptyAdminFiltersAreIgnoredAndIdentityClaimsAreRequired() throws Exception {
+        insert(fixture("first", true, new String[0], new Integer[0], "2026-08-20T10:00:00Z"));
+        insert(fixture("second", true, new String[0], new Integer[0], "2026-08-20T11:00:00Z"));
+
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("semesterId", "")
+                        .queryParam("sectionId", "")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("admin-user")
+                                        .claim("email", "admin@campuscore.edu")
+                                        .claim("roles", List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token.subject("missing-email"))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
     @Test
@@ -265,9 +329,12 @@ class AnnouncementReadPersistenceTest {
     private static void timestamp(PreparedStatement statement, int index, Instant value)
             throws java.sql.SQLException {
         if (value == null) {
-            statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
+            statement.setNull(index, Types.TIMESTAMP);
         } else {
-            statement.setTimestamp(index, Timestamp.from(value));
+            statement.setObject(
+                    index,
+                    java.time.LocalDateTime.ofInstant(value, java.time.ZoneOffset.UTC),
+                    Types.TIMESTAMP);
         }
     }
 

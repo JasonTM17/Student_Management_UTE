@@ -9,6 +9,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
+import org.springframework.security.core.AuthenticationException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
@@ -19,6 +20,18 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    @ExceptionHandler(AuthenticationException.class)
+    ResponseEntity<ApiError> unauthenticated(
+            AuthenticationException exception,
+            HttpServletRequest request) {
+        return error(
+                HttpStatus.UNAUTHORIZED,
+                "UNAUTHENTICATED",
+                "Authentication is required",
+                request,
+                Map.of());
+    }
 
     @ExceptionHandler(AccessDeniedException.class)
     ResponseEntity<ApiError> accessDenied(
