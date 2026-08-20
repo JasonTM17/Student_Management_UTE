@@ -23,6 +23,21 @@ public final class AnalyticsReadDtos {
             long totalClassrooms) {
     }
 
+    public record SectionOccupancyBucket(
+            String sectionId,
+            String sectionNumber,
+            String courseCode,
+            String courseName,
+            String courseNameEn,
+            String courseNameVi,
+            String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
+            int capacity,
+            long enrolledCount,
+            int occupancyRate) {
+    }
+
     public record EnrollmentBySemesterBucket(
             String semesterId,
             String semesterName,
