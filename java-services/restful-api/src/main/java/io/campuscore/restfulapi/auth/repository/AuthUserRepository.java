@@ -168,6 +168,45 @@ public class AuthUserRepository {
                 new MapSqlParameterSource("userId", userId));
     }
 
+    public void updateProfile(
+            String userId,
+            String firstName,
+            String lastName,
+            String phone,
+            Instant dateOfBirth,
+            String address) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE
+                        + " SET \"firstName\" = :firstName,"
+                        + " \"lastName\" = :lastName,"
+                        + " \"phone\" = :phone,"
+                        + " \"dateOfBirth\" = :dateOfBirth,"
+                        + " \"address\" = :address,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("firstName", firstName)
+                        .addValue("lastName", lastName)
+                        .addValue("phone", phone)
+                        .addValue("dateOfBirth", localDateTime(dateOfBirth))
+                        .addValue("address", address));
+    }
+
+    public void changePassword(String userId, String passwordHash, Instant passwordChangedAt) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE
+                        + " SET \"password\" = :password,"
+                        + " \"passwordChangedAt\" = :passwordChangedAt,"
+                        + " \"refreshToken\" = NULL,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("password", passwordHash)
+                        .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
+    }
+
     private List<String> findRoles(String userId) {
         return jdbc.queryForList(
                 "SELECT r.\"name\""

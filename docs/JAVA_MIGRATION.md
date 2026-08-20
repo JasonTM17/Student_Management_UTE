@@ -75,10 +75,11 @@ migrated legacy `auth` schema, emits and clears the shared `cc_access_token`,
 `cc_refresh_token` and `cc_csrf` browser cookies, returns body tokens for mobile
 clients, records failed login attempts, locks after the fifth failed attempt,
 stores only hashed refresh sessions, returns the current authenticated user at
-`/api/v1/auth/me`, rotates refresh tokens, and clears sessions on logout. It is
-not a full auth cutover: profile writes, password flows, audit publishing,
-PostgreSQL parity, route canary and rollback evidence remain required before
-public ownership can move.
+`/api/v1/auth/me`, updates current-user profile fields, rotates refresh tokens,
+changes passwords while revoking stored refresh sessions, and clears sessions
+on logout. It is not a full auth cutover: registration, forgot/reset password,
+email verification, audit publishing, PostgreSQL parity, route canary and
+rollback evidence remain required before public ownership can move.
 
 ## Implemented slice
 

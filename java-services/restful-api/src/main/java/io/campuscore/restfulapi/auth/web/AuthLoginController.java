@@ -3,10 +3,13 @@ package io.campuscore.restfulapi.auth.web;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService.LoginResult;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
+import io.campuscore.restfulapi.auth.web.AuthDtos.ChangePasswordRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LogoutRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.MessageResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.RefreshRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
@@ -17,11 +20,12 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Disabled-by-default Java login endpoint for the monolith migration. */
+/** Disabled-by-default Java auth session endpoints for the monolith migration. */
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
@@ -78,6 +82,21 @@ public class AuthLoginController {
     @GetMapping("me")
     public AuthUserResponse me(@AuthenticationPrincipal Jwt jwt) {
         return auth.me(jwt.getSubject());
+    }
+
+    @PutMapping("profile")
+    public AuthUserResponse updateProfile(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestBody(required = false) UpdateProfileRequest request) {
+        return auth.updateProfile(jwt.getSubject(), request);
+    }
+
+    @PostMapping("change-password")
+    public MessageResponse changePassword(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody ChangePasswordRequest request) {
+        auth.changePassword(jwt.getSubject(), request.oldPassword(), request.newPassword());
+        return new MessageResponse("Password changed successfully");
     }
 
     @PostMapping("logout")

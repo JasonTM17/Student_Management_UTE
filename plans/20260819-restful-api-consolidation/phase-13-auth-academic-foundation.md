@@ -13,13 +13,16 @@ web/mobile authenticated parity wave:
 - feature-gated login, current-user read, refresh rotation and logout-clearing
   endpoints that preserve the shared web cookie/CSRF contract and the mobile
   body-token contract without taking public route ownership;
+- feature-gated profile update and password change endpoints for the current
+  authenticated user, preserving web CSRF protection and revoking refresh
+  sessions after a password change;
 - a feature-gated, read-only academic catalog candidate for semesters and
   courses.
 
-This is not an auth cutover, profile-write implementation, password
-reset/change implementation, audit publisher, public route switch,
-enrollment/grade migration, PostgreSQL parity claim, canary, rollback,
-frontend change or mobile runtime claim.
+This is not an auth cutover, registration implementation, password reset/email
+implementation, audit publisher, public route switch, enrollment/grade
+migration, PostgreSQL parity claim, canary, rollback, frontend change or mobile
+runtime claim.
 
 ## Scope and authority
 
@@ -37,6 +40,9 @@ In scope:
   the shared web cookies without moving public ownership;
 - expose Java `/api/v1/auth/me` only under the same auth flag, resolving the
   current user by JWT subject from the migrated legacy `auth` schema;
+- expose Java profile update and password change only under the same auth flag,
+  preserving the shared cookie/CSRF mutation contract and revoking refresh
+  sessions after a successful password change;
 - expose academic catalog reads only when both the `persistence` profile and
   `migration.academic-read.enabled=true` are active;
 - use JDBC `SELECT` queries only against the legacy Prisma academic schema;
@@ -46,8 +52,9 @@ In scope:
 
 Non-goals:
 
-- no profile write, password reset/change, audit publisher, public route
-  ownership move or production revocation parity claim in this phase;
+- no registration, forgot/reset password flow, email verification, audit
+  publisher, public route ownership move or production revocation parity claim
+  in this phase;
 - no schema DDL, Flyway migration, enrollment, timetable, class, grade or
   academic write path;
 - no client rewiring and no claim that Stitch authenticated E2E is now complete.
@@ -70,6 +77,13 @@ Non-goals:
   browser cookies; logout still requires an authenticated access token.
 - `/api/v1/auth/me` returns the same FE-facing user shape for bearer and cookie
   access sessions while inactive or missing users fail closed.
+- `/api/v1/auth/profile` preserves existing values when fields are omitted,
+  persists legacy `auth.User` profile fields, and requires the browser CSRF
+  double-submit contract for cookie-backed mutation.
+- `/api/v1/auth/change-password` rejects anonymous and wrong-password attempts,
+  updates the BCrypt password hash, sets `passwordChangedAt`, clears the legacy
+  user refresh token, revokes stored refresh sessions, and allows subsequent
+  login only with the new password.
 - Academic read routes remain disabled by default in the shell contract.
 - Legacy-schema migration safety covers academic read and auth login modes so
   Hibernate DDL and Flyway are not accidentally used as a migration authority
