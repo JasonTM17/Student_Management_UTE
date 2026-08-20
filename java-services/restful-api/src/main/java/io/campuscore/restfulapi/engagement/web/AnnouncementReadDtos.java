@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.engagement.web;
 
+import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.List;
 
@@ -17,7 +18,9 @@ public final class AnnouncementReadDtos {
             List<String> targetRoles,
             List<Integer> targetYears,
             boolean isGlobal,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant publishAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant expiresAt,
             String publishedBy,
             String semesterId,
@@ -28,7 +31,9 @@ public final class AnnouncementReadDtos {
             String courseName,
             String lecturerId,
             String lecturerDisplayName,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant updatedAt,
             SemesterSummary semester,
             SectionSummary section,
