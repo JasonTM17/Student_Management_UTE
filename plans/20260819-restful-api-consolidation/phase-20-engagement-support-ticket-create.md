@@ -53,18 +53,12 @@ assignment owner, event publisher, route owner, and rollback target.
   ```powershell
   $env:JAVA_HOME='<java-home>'
   $env:Path="$env:JAVA_HOME\bin;$env:Path"
-  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<workspace>\.tmp'
-  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<d-drive-temp>'
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWriteServiceTest,io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
   ```
 
-- Full Java reactor gate also passed locally on the same host/JDK:
-
-  ```powershell
-  $env:JAVA_HOME='<java-home>'
-  $env:Path="$env:JAVA_HOME\bin;$env:Path"
-  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=<workspace>\.tmp'
-  mvn -q -f java-services/pom.xml test
-  ```
+- Full Java reactor gate was not rerun after the numbering guard change; it is
+  not current evidence for this exact head.
 
 - `node scripts/check-doc-hygiene.mjs`: PASS.
 - `node scripts/check-architecture.mjs`: PASS.
