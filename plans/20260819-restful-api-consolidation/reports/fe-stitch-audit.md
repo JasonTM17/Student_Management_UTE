@@ -25,9 +25,20 @@ than reference-diff evidence and several current routes/states are not covered.
 - Fresh browser smoke on 2026-08-20: the locally running public landing page
   rendered at 1440px, 390px, and 768px with zero measured horizontal overflow;
   the page console returned no errors. This is a limited runtime observation:
-  the `campuscore-frontend:local` image has no source-revision label, so it is
-  not accepted as exact-current-source, authenticated, or Stitch pixel-diff
-  evidence.
+  the prior `campuscore-frontend:local` image has no source-revision label, so
+  it is not accepted as exact-current-source, authenticated, or Stitch
+  pixel-diff evidence.
+- A source-current Next development server was separately checked on
+  `127.0.0.1:3011` on 2026-08-20. The public landing page returned HTTP 200 at
+  1440px, 390px and 768px; measured document widths (1425, 375 and 753px)
+  remained within their viewports, and the browser recorded zero console errors.
+  The server was started with `npm run dev -- -p 3011` from exact source commit
+  `95b4a181e7ebcae51b8b60a334f208bbb7027147`; tracked files were clean before
+  the audit, apart from the preserved untracked `.agents` file. The observation
+  used the Codex in-app browser and did not create a screenshot artifact or
+  pixel hash. This confirms only the public landing's responsive source
+  behavior. It does not cover signed-in routes, API/network success, reference
+  pixel comparison, or a production build/image.
 - The native scaffold now defines 23 unique registry-to-component bindings
   under `mobile/`; 13 direct mobile Stitch references are checked against the
   shared metadata ledger. The read-only audit snapshot reported zero native
