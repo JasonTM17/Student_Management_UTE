@@ -38,6 +38,17 @@ public final class AnalyticsReadDtos {
             int occupancyRate) {
     }
 
+    public record TopCourseBucket(
+            String courseId,
+            String courseCode,
+            String courseName,
+            String courseNameEn,
+            String courseNameVi,
+            int credits,
+            long sectionCount,
+            long totalEnrollments) {
+    }
+
     public record EnrollmentBySemesterBucket(
             String semesterId,
             String semesterName,

@@ -405,6 +405,15 @@ the retirement gates pass.
   20 and rounded occupancy percentage. PostgreSQL read parity, cockpit
   composition, canary routing, rollback and public analytics route handoff
   remain open.
+- Phase 39 backend-first analytics top courses foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-39-analytics-top-courses.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/top-courses` for `ADMIN`/`SUPER_ADMIN`, preserving
+  the legacy course response shape, section count, `CONFIRMED`/`PENDING`
+  enrollment totals, descending total-enrollment sort and default/custom limit
+  behavior. PostgreSQL read parity, cockpit composition, canary routing,
+  rollback and public analytics route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

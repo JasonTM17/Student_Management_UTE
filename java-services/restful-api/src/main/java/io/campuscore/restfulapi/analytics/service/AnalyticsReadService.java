@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
 import java.math.BigDecimal;
 import java.util.List;
 import java.util.Map;
@@ -107,6 +108,11 @@ public class AnalyticsReadService {
     @Transactional(readOnly = true)
     public List<SectionOccupancyBucket> sectionOccupancy() {
         return analytics.sectionOccupancy();
+    }
+
+    @Transactional(readOnly = true)
+    public List<TopCourseBucket> topCourses(int limit) {
+        return analytics.topCourses(Math.max(limit, 0));
     }
 
     @Transactional(readOnly = true)
