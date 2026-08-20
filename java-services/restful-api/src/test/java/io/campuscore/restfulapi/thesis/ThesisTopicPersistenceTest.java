@@ -89,6 +89,26 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
+    void registrationRoundsUseTheGatedSingleAppReadContract() throws Exception {
+        UUID earlier = UUID.randomUUID();
+        UUID later = UUID.randomUUID();
+        insertRound(earlier, "Earlier round", Instant.parse("2026-01-01T00:00:00Z"), "DRAFT");
+        insertRound(later, "Open round", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+
+        mvc.perform(get("/api/v1/thesis/rounds").with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(later.toString()))
+                .andExpect(jsonPath("$[0].status").value("REGISTRATION_OPEN"));
+
+        mvc.perform(get("/api/v1/thesis/rounds")
+                        .queryParam("status", "DRAFT")
+                        .with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(earlier.toString()))
+                .andExpect(jsonPath("$[0].name").value("Earlier round"));
+    }
+
+    @Test
     void thesisReadPathRejectsAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/thesis/topics")
                         .queryParam("roundId", UUID.randomUUID().toString()))
@@ -119,18 +139,21 @@ class ThesisTopicPersistenceTest {
 
     private UUID insertRound() {
         UUID roundId = UUID.randomUUID();
-        Instant start = Instant.parse("2026-01-01T00:00:00Z");
-        Instant end = Instant.parse("2026-02-01T00:00:00Z");
+        insertRound(roundId, "2026 Capstone", Instant.parse("2026-01-01T00:00:00Z"), "DRAFT");
+        return roundId;
+    }
+
+    private void insertRound(UUID roundId, String name, Instant start, String status) {
+        Instant end = start.plusSeconds(31L * 24 * 60 * 60);
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, registration_start, registration_end, status) "
                         + "VALUES (?, ?, ?, ?, ?, ?)",
                 roundId,
-                "2026 Capstone",
+                name,
                 "CAPSTONE",
                 Timestamp.from(start),
                 Timestamp.from(end),
-                "OPEN");
-        return roundId;
+                status);
     }
 }

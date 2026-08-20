@@ -157,6 +157,10 @@ the retirement gates pass.
   `phase-05-notification-read-contract.md` and
   `reports/notification-read-candidate.md`. The feature-flagged Java read
   adapter exists, but no public route or writer ownership has moved.
+- Phase 06 thesis registration-round read: source candidate; see
+  `phase-06-thesis-round-read.md`. Compile passed, while Spring test execution
+  is `BLOCKED_CAPABILITY` by the current Windows commit-memory limit; no route
+  or writer ownership has moved.
 
 # Acceptance and verification
 
