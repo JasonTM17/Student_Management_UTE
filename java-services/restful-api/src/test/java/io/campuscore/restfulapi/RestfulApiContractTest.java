@@ -64,6 +64,13 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void engagementReadBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/announcements/my").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void thesisRoundReadBoundaryIsDisabledByDefault() throws Exception {
         mvc.perform(get("/api/v1/thesis/rounds").with(jwt()))
                 .andExpect(status().isNotFound())

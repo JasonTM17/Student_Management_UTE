@@ -10,6 +10,8 @@ migration:
     enabled: true
   notifications-read:
     enabled: false
+  engagement-read:
+    enabled: false
 
 spring:
   datasource:
