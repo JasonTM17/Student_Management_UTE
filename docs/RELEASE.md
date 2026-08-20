@@ -16,6 +16,7 @@ A release tag is valid only when `quality-gate` succeeds on that exact SHA.
 
 Current required lanes:
 
+- `java-restful-api-quality`
 - `core-quality`
 - `core-integration`
 - `auth-quality`
@@ -41,16 +42,19 @@ Current required lanes:
 - `security-scan`
 - `quality-gate`
 
-## Java strangler migration lane
+## Java modular-monolith migration lane
 
-The Java services are migration candidates, not additional public release
-images yet. `java-services/thesis-service` is the first pilot boundary and
-remains behind the existing Node canonical owner until every gate below passes
-on the exact candidate SHA.
+`java-services/restful-api` is the only canonical Java build target, not an
+additional public release image yet. Retained Java sibling services, including
+the historical thesis pilot, are shadow/rollback sources and are never selected
+by the default reactor. Node remains the route and writer owner until every
+gate below passes on the exact candidate SHA.
 
 Required before a Java boundary can enter a public release:
 
-- `mvn -f java-services/pom.xml verify` passes with the supported JDK.
+- `mvn -f java-services/pom.xml verify` passes with the supported JDK and only
+  selects `restful-api`; direct shadow-child verification is recorded separately
+  when a rollback rehearsal depends on it.
 - The service is exercised in the production-shaped Compose/Kubernetes path,
   including readiness, metrics, logs, traces, and gateway routing.
 - Differential contract tests compare Node and Java status, body, headers,
@@ -62,10 +66,10 @@ Required before a Java boundary can enter a public release:
 - Advisor and Kongming review the same exact snapshot; Wukong independently
   falsifies the cutover and rollback claims.
 
-Until then, do not add the Java image to the nine-image public release list or
-describe the repository as fully Java-converted. The current status and
+Until then, do not add the Java monolith image to the nine-image public release
+list or describe the repository as fully Java-converted. The current status and
 remaining blockers are tracked in
-`plans/20260819-java-thesis-strangler-migration/plan.md`.
+`plans/20260819-restful-api-consolidation/plan.md`.
 
 ## Public images
 

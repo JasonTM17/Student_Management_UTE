@@ -15,8 +15,8 @@
     <artifactId>campuscore-java-services</artifactId>
     <version>0.1.0-SNAPSHOT</version>
     <packaging>pom</packaging>
-    <name>CampusCore Java services</name>
-    <description>Spring Boot services introduced through the CampusCore strangler migration</description>
+    <name>CampusCore Java modular monolith</name>
+    <description>Canonical Spring Boot modular-monolith build for the CampusCore course migration</description>
 
     <properties>
         <java.version>21</java.version>
@@ -25,9 +25,6 @@
     </properties>
 
     <modules>
-        <module>auth-service</module>
-        <module>engagement-service</module>
-        <module>notification-service</module>
-        <module>thesis-service</module>
+        <module>restful-api</module>
     </modules>
 </project>

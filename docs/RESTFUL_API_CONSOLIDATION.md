@@ -7,6 +7,11 @@ Java Spring Boot RESTful API duy nhất. Ứng dụng này là modular monolith:
 được chia package theo domain để dễ duy trì, nhưng không vận hành thành nhiều
 backend container.
 
+Từ wave backend-first, `java-services/pom.xml` là canonical Maven reactor và
+chỉ build `java-services/restful-api`. Các Java service sibling cũ vẫn giữ làm
+nguồn shadow/rollback, nhưng chỉ được build trực tiếp theo child `pom.xml`; chúng
+không phải module canonical, image release, hay route owner mới.
+
 ## Mô hình đích
 
 - `restful-api`: một JAR/container Java 21 duy nhất, chứa auth, academic,

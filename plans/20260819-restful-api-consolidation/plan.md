@@ -150,9 +150,11 @@ the retirement gates pass.
 - Phase 03 persistence/migration seam: bounded candidate committed at `0064df8`;
   see `phase-03-persistence-thesis-read.md`. It has no public route or writer
   handoff yet, and PostgreSQL/rollback/review gates remain open.
-- Phase 04 Stitch web/mobile client track: in progress; see
-  `phase-04-stitch-web-mobile.md` and `reports/fe-stitch-audit.md`. It has no
-  browser rerun, Expo/device proof, or Java client cutover.
+- Phase 04 Stitch web/mobile client track: deferred by the backend-first
+  sequencing decision; see `phase-04-stitch-web-mobile.md` and
+  `reports/fe-stitch-audit.md`. Its existing source evidence is preserved, but
+  no additional web/mobile implementation is authorized until the backend
+  foundation gate below has passed.
 - Phase 05 notification read contract: source-level candidate/HOLD; see
   `phase-05-notification-read-contract.md` and
   `reports/notification-read-candidate.md`. The feature-flagged Java read
@@ -182,6 +184,60 @@ the retirement gates pass.
   `phase-11-engagement-postgres-differential-rehearsal.md`. It adds the physical
   Prisma schema/type, audience-array, signed-auth, error-divergence and private
   rollback corpus missing from the thesis-only Phase 09 rehearsal.
+- Phase 12 canonical monolith build boundary: in progress; see
+  `phase-12-backend-first-monolith-boundary.md`. It makes the Java reactor name
+  the one supported modular-monolith build target while preserving legacy Java
+  services as direct-build rollback references. It makes no route, writer,
+  database, image, or client change.
+
+## Backend foundation gate before Stitch implementation
+
+The next Stitch web/mobile implementation wave is blocked until all of the
+following are observed on one exact source HEAD:
+
+1. the canonical Java build executes only `java-services/restful-api` as the
+   modular-monolith target;
+2. the security/error/correlation shell and its negative tests remain green;
+3. one low-risk, read-only domain is exercised against an approved disposable
+   PostgreSQL restore with a read-only role, Flyway/DDL disabled, and a recorded
+   legacy-to-Java-to-legacy rollback rehearsal;
+4. fresh exact-head Advisor, Kongming, reviewer, and bounded Wukong gates have
+   no unresolved high/critical counterexample for that backend scope.
+
+Until then, the existing 22+ web/mobile screen material is design/source
+evidence only. It is not a reason to expand the client or point either client
+at an incomplete Java API.
+
+## Continuation evidence — 2026-08-20, `ba90cf6`
+
+The current exact checkout remains on
+`ba90cf61e89ac48110a7be680b443513909dd771` and the branch is still ahead of
+`origin/feature/java-thesis-platform` by 16 commits. The working tree has only
+preserved untracked AgentKit/Codex configuration files plus
+`.agents/skills/ak-use-mcp/scripts/package-lock.json`; none of those were used
+as implementation evidence.
+
+Observed low-disk-safe gates:
+
+- `npm test --prefix mobile`: PASS, 5/5 dependency-free screen-atlas tests. This
+  re-confirms the native registry above the 20-screen requirement, Stitch token
+  anchors, preview/live API separation, role navigation, and non-impersonating
+  preview sign-in. It is not Expo typecheck, emulator, device, or live API proof.
+- `npm test --prefix frontend`: PASS, 28/28 frontend smoke tests. This is source
+  and structural coverage only; it is not a fresh authenticated browser matrix,
+  Stitch pixel/reference diff, or production build evidence.
+- `mvn -q -f java-services/restful-api/pom.xml test`: PASS with Maven 3.9.12
+  and Java 24.0.2. Surefire recorded 45/45 tests passing across engagement,
+  notification, thesis, security, migration safety, CSRF and REST contract
+  tests. This updates the older resource-limit note for the current host, but it
+  still does not prove PostgreSQL parity, route canary, runtime smoke, rollback,
+  or public cutover.
+
+Disk observation during the same continuation: C: had about 3.40 GB free and D:
+about 39.38 GB free. The exact stale rehearsal snapshot targets under
+`D:\Student_Management-recovery\phase11-engagement-a854f90` were verified, but
+the environment rejected the bounded `Remove-Item` cleanup, so cleanup remains
+`BLOCKED_CAPABILITY` rather than silently worked around.
 
 # Acceptance and verification
 
