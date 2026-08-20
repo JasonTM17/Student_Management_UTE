@@ -44,11 +44,28 @@ class AnalyticsReadPersistenceTest {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"public\"");
         createCountTable("Student");
         createCountTable("Lecturer");
-        createCountTable("Course");
-        createCountTable("Section");
         createCountTable("Department");
         createCountTable("Faculty");
         createCountTable("Classroom");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Course" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "code" VARCHAR(80),
+                    "name" VARCHAR(200),
+                    "nameEn" VARCHAR(200),
+                    "nameVi" VARCHAR(200)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Section" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "sectionNumber" VARCHAR(80),
+                    "courseId" VARCHAR(120),
+                    "semesterId" VARCHAR(120),
+                    "capacity" INTEGER,
+                    "enrolledCount" INTEGER
+                )
+                """);
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."AcademicYear" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -68,6 +85,7 @@ class AnalyticsReadPersistenceTest {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Enrollment" (
                     "id" VARCHAR(120) PRIMARY KEY,
+                    "sectionId" VARCHAR(120),
                     "semesterId" VARCHAR(120),
                     "status" VARCHAR(40),
                     "letterGrade" VARCHAR(10)
@@ -194,6 +212,44 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void sectionOccupancyPreservesLegacyOrderCountFallbackAndShape() throws Exception {
+        insertAcademicYear("academic-year-2026", 2026);
+        insertSemester(
+                "semester-fall-2026",
+                "Fall 2026",
+                "Fall 2026",
+                "Hoc ky Thu 2026",
+                "academic-year-2026",
+                BASE_TIME);
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web");
+        insertCourse("course-java", "JAVA201", "Java Backend", "Java Backend", "Java Backend");
+        insertSection("section-web-a", "A", "course-web", "semester-fall-2026", 10, 9);
+        insertSection("section-java-b", "B", "course-java", "semester-fall-2026", 6, 3);
+        insertEnrollmentInSection("enrollment-web-confirmed", "semester-fall-2026", "section-web-a", "CONFIRMED");
+        insertEnrollmentInSection("enrollment-web-pending", "semester-fall-2026", "section-web-a", "PENDING");
+        insertEnrollmentInSection("enrollment-web-completed", "semester-fall-2026", "section-web-a", "COMPLETED");
+
+        mvc.perform(get("/api/v1/analytics/section-occupancy").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].sectionId").value("section-web-a"))
+                .andExpect(jsonPath("$[0].sectionNumber").value("A"))
+                .andExpect(jsonPath("$[0].courseCode").value("WEB101"))
+                .andExpect(jsonPath("$[0].courseName").value("Web Programming"))
+                .andExpect(jsonPath("$[0].courseNameEn").value("Web Programming"))
+                .andExpect(jsonPath("$[0].courseNameVi").value("Lap trinh Web"))
+                .andExpect(jsonPath("$[0].semesterName").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameEn").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameVi").value("Hoc ky Thu 2026"))
+                .andExpect(jsonPath("$[0].capacity").value(10))
+                .andExpect(jsonPath("$[0].enrolledCount").value(2))
+                .andExpect(jsonPath("$[0].occupancyRate").value(20))
+                .andExpect(jsonPath("$[1].sectionId").value("section-java-b"))
+                .andExpect(jsonPath("$[1].enrolledCount").value(3))
+                .andExpect(jsonPath("$[1].occupancyRate").value(50));
+    }
+
+    @Test
     void financeSummaryPreservesLegacyAggregatesAndFinanceOfficerAccess() throws Exception {
         insertInvoice("invoice-pending", "PENDING", BigDecimal.valueOf(1000));
         insertInvoice("invoice-overdue", "OVERDUE", BigDecimal.valueOf(700));
@@ -307,6 +363,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/section-occupancy").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/grade-distribution").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -323,6 +383,12 @@ class AnalyticsReadPersistenceTest {
 
         mvc.perform(get("/api/v1/analytics/enrollments-by-semester")
                         .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/section-occupancy")
+                        .queryParam("semesterId", "semester-1")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -379,6 +445,36 @@ class AnalyticsReadPersistenceTest {
                 localDateTime(startDate));
     }
 
+    private void insertCourse(String id, String code, String name, String nameEn, String nameVi) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Course\""
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\") VALUES (?, ?, ?, ?, ?)",
+                id,
+                code,
+                name,
+                nameEn,
+                nameVi);
+    }
+
+    private void insertSection(
+            String id,
+            String sectionNumber,
+            String courseId,
+            String semesterId,
+            int capacity,
+            int enrolledCount) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"capacity\", \"enrolledCount\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                sectionNumber,
+                courseId,
+                semesterId,
+                capacity,
+                enrolledCount);
+    }
+
     private void insertInvoice(String id, String status, BigDecimal total) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Invoice\""
@@ -392,8 +488,9 @@ class AnalyticsReadPersistenceTest {
     private void insertEnrollment(String id, String status, String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
                 id,
+                null,
                 null,
                 status,
                 letterGrade);
@@ -402,8 +499,20 @@ class AnalyticsReadPersistenceTest {
     private void insertEnrollmentInSemester(String id, String semesterId, String status) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
                 id,
+                null,
+                semesterId,
+                status,
+                null);
+    }
+
+    private void insertEnrollmentInSection(String id, String semesterId, String sectionId, String status) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Enrollment\""
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
+                id,
+                sectionId,
                 semesterId,
                 status,
                 null);

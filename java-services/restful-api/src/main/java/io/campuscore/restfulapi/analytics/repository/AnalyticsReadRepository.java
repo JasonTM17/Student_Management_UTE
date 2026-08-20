@@ -1,11 +1,12 @@
 package io.campuscore.restfulapi.analytics.repository;
 
-import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationTypeBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -136,6 +137,25 @@ public class AnalyticsReadRepository {
                         resultSet.getLong("enrollmentCount")));
     }
 
+    public List<SectionOccupancyBucket> sectionOccupancy() {
+        return jdbc.query(
+                "SELECT s.\"id\" AS \"sectionId\", s.\"sectionNumber\", c.\"code\" AS \"courseCode\","
+                        + " c.\"name\" AS \"courseName\", c.\"nameEn\" AS \"courseNameEn\","
+                        + " c.\"nameVi\" AS \"courseNameVi\", sm.\"name\" AS \"semesterName\","
+                        + " sm.\"nameEn\" AS \"semesterNameEn\", sm.\"nameVi\" AS \"semesterNameVi\","
+                        + " s.\"capacity\", s.\"enrolledCount\", COUNT(e.\"id\") AS \"countedEnrollments\""
+                        + " FROM " + table("\"Section\"") + " s"
+                        + " JOIN " + table("\"Course\"") + " c ON c.\"id\" = s.\"courseId\""
+                        + " JOIN " + table("\"Semester\"") + " sm ON sm.\"id\" = s.\"semesterId\""
+                        + " LEFT JOIN " + table("\"Enrollment\"") + " e ON e.\"sectionId\" = s.\"id\""
+                        + " AND e.\"status\" IN ('CONFIRMED', 'PENDING')"
+                        + " GROUP BY s.\"id\", s.\"sectionNumber\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\","
+                        + " sm.\"name\", sm.\"nameEn\", sm.\"nameVi\", s.\"capacity\", s.\"enrolledCount\""
+                        + " ORDER BY s.\"enrolledCount\" DESC"
+                        + " LIMIT 20",
+                (resultSet, ignored) -> sectionOccupancyBucket(resultSet));
+    }
+
     public Map<String, Long> completedLetterGradeCounts() {
         Map<String, Long> counts = new LinkedHashMap<>();
         jdbc.query(
@@ -200,6 +220,29 @@ public class AnalyticsReadRepository {
     private static BigDecimal amount(ResultSet resultSet, String column) throws SQLException {
         BigDecimal value = resultSet.getBigDecimal(column);
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static SectionOccupancyBucket sectionOccupancyBucket(ResultSet resultSet) throws SQLException {
+        int capacity = resultSet.getInt("capacity");
+        long countedEnrollments = resultSet.getLong("countedEnrollments");
+        long storedEnrollments = resultSet.getLong("enrolledCount");
+        long enrolledCount = countedEnrollments > 0 ? countedEnrollments : storedEnrollments;
+        int occupancyRate = capacity > 0
+                ? Math.toIntExact(Math.round((enrolledCount * 100.0d) / capacity))
+                : 0;
+        return new SectionOccupancyBucket(
+                resultSet.getString("sectionId"),
+                resultSet.getString("sectionNumber"),
+                resultSet.getString("courseCode"),
+                resultSet.getString("courseName"),
+                resultSet.getString("courseNameEn"),
+                resultSet.getString("courseNameVi"),
+                resultSet.getString("semesterName"),
+                resultSet.getString("semesterNameEn"),
+                resultSet.getString("semesterNameVi"),
+                capacity,
+                enrolledCount,
+                occupancyRate);
     }
 
     private static java.time.Instant instant(ResultSet resultSet, String column) throws SQLException {

@@ -100,10 +100,10 @@ detail routes only. The finance slice covers student invoice list/detail plus
 admin invoice/payment list/detail routes only, with checkout, provider
 callbacks/webhooks, exports and writes still owned by the legacy finance
 service. The analytics slice covers dashboard overview counts,
-enrollments-by-semester aggregate, finance-summary aggregate,
-notification-summary delivery aggregates and grade-distribution buckets, with
-trends, cockpit composition, lecturer analytics, attendance and metrics still
-owned by the legacy analytics service.
+enrollments-by-semester aggregate, section-occupancy buckets, finance-summary
+aggregate, notification-summary delivery aggregates and grade-distribution
+buckets, with trends, cockpit composition, lecturer analytics, attendance and
+metrics still owned by the legacy analytics service.
 The academic enrollment slice covers current-student enrollment list, student
 grade/transcript reads, admin enrollment list/detail, and lecturer/admin grade
 item/student-grade read aggregation, with enroll/drop, waitlist, grade

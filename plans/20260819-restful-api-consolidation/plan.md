@@ -394,6 +394,17 @@ the retirement gates pass.
   response shape from the analytics service's legacy Prisma schema.
   PostgreSQL read parity, cockpit composition, canary routing, rollback and
   public analytics route handoff remain open.
+- Phase 38 backend-first analytics section occupancy foundation:
+  source/H2 verified candidate/HOLD; see
+  `phase-38-analytics-section-occupancy.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/section-occupancy` for `ADMIN`/`SUPER_ADMIN`,
+  preserving the legacy section/course/semester response shape,
+  `CONFIRMED`/`PENDING` occupancy count, `Section.enrolledCount` fallback when
+  no counted enrollments exist, `Section.enrolledCount` descending order, limit
+  20 and rounded occupancy percentage. PostgreSQL read parity, cockpit
+  composition, canary routing, rollback and public analytics route handoff
+  remain open.
 
 ## Backend foundation gate before Stitch implementation
 
