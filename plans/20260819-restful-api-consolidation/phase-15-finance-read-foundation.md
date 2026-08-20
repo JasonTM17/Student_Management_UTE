@@ -64,8 +64,9 @@ bounded Maven heap and test temp files redirected to a D-drive temporary
 directory outside the repository:
 
 ```powershell
-mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest' '-DforkCount=0' test
-mvn -q '-Dtest=MigrationSafetyConfigTest,RestfulApiContractTest' '-DforkCount=0' test
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest,MigrationSafetyConfigTest,RestfulApiContractTest' '-DforkCount=0' test
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=AcademicReadPersistenceTest,PeopleReadPersistenceTest,NotificationReadPersistenceTest' '-DforkCount=0' test
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=AuthLoginPersistenceTest' '-DforkCount=0' test
 git diff --check
 node scripts/check-doc-hygiene.mjs
 node scripts/check-architecture.mjs
@@ -73,30 +74,16 @@ node scripts/check-thesis-contract.mjs
 rg -n "(?i)(password|secret|token|api[_-]?key|private[_-]?key|BEGIN RSA|BEGIN OPENSSH|credential)" <scoped finance/config/doc paths>
 ```
 
-The first attempt exposed stale/incomplete test classpath output for
-`ContractController$PingRequest` when invoked from the repository root with
-multiple test patterns; rerunning from the module after class output existed
-passed. The focused finance gate passed after test authorities were made
-explicit for method-security role checks.
+The finance/default-off focused gate, existing read-candidate chunks,
+auth-session chunk and repository hygiene gates passed locally. The scoped
+secret scan only matched existing placeholder/test configuration names and
+documentation words; no new credential value was introduced by this phase.
 
-Repository hygiene gates passed locally. The scoped secret scan only matched
-existing placeholder/test configuration names and documentation words; no new
-credential value was introduced by this phase.
-
-Root reactor was attempted twice:
-
-- `mvn -q -f java-services/pom.xml '-DforkCount=0' test` reached existing
-  Spring tests, then the JVM exited on native-memory allocation failure and
-  wrote `hs_err_pid43208.log` plus `replay_pid43208.log`;
-- `mvn -q -f java-services/pom.xml '-DforkCount=1' '-DreuseForks=false' ... test`
-  progressed through multiple forked test classes, then failed because Windows
-  reported the paging file was too small for another Java fork.
-
-Both crash artifacts from the first attempt were removed from the repository
-root after verification. No new crash artifact remained after the second
-attempt. Therefore the root reactor gate is `BLOCKED_CAPABILITY` on current
-Windows native memory/pagefile capacity, not a source-level assertion failure
-observed in this finance slice.
+The full root reactor remains `BLOCKED_CAPABILITY` on the current Windows
+native memory/pagefile capacity after recent exact-worktree attempts exited
+inside the JVM with native allocation errors. Crash/replay artifacts from those
+attempts were removed from the repository root after verification. No source
+assertion failure was observed in this finance slice.
 
 PostgreSQL restore parity, runtime smoke, route canary, event/payment
 reconciliation, rollback and independent final review remain open until the
