@@ -2,14 +2,61 @@ import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import { Button, Card, Field, ScreenShell, UiText } from '../../components/Ui';
-import { apiClient } from '../../api/client';
+import { ApiClientError, apiClient, campusApi } from '../../api/client';
 import { tokens } from '../../design/tokens';
+import type { UserRole } from '../../navigation/routes';
 import type { MobileScreenProps } from '../../navigation/types';
+
+function resolveRole(roles: readonly string[] | undefined): UserRole {
+  const normalizedRoles = new Set((roles ?? []).map((role) => role.toUpperCase()));
+  if (normalizedRoles.has('ADMIN')) {
+    return 'admin';
+  }
+  if (normalizedRoles.has('LECTURER') || normalizedRoles.has('FACULTY') || normalizedRoles.has('TEACHER')) {
+    return 'lecturer';
+  }
+  return 'student';
+}
 
 export function SignInScreen({ navigation }: MobileScreenProps) {
   const [email, setEmail] = useState('student@campuscore.local');
   const [password, setPassword] = useState('');
+  const [error, setError] = useState<string | null>(null);
+  const [isSubmitting, setIsSubmitting] = useState(false);
   const isPreview = apiClient.mode === 'preview';
+  const canSubmit = isPreview || (email.trim().length > 0 && password.length > 0);
+
+  const handleSubmit = async () => {
+    setError(null);
+    if (isPreview) {
+      navigation.enterPreview();
+      return;
+    }
+
+    if (!email.trim() || !password) {
+      setError('Enter your university email and password to continue.');
+      return;
+    }
+
+    setIsSubmitting(true);
+    try {
+      const response = await campusApi.login(email.trim(), password);
+      if (!response.accessToken) {
+        throw new Error('The Java auth response did not include an access token.');
+      }
+      apiClient.setAccessToken(response.accessToken);
+      navigation.completeSignIn(resolveRole(response.user?.roles));
+    } catch (signInError) {
+      apiClient.clearAccessToken();
+      setError(
+        signInError instanceof ApiClientError
+          ? signInError.message
+          : 'Live sign in could not be completed against the Java auth contract.',
+      );
+    } finally {
+      setIsSubmitting(false);
+    }
+  };
 
   return (
     <ScreenShell
@@ -54,20 +101,22 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
           value={password}
         />
         <Button
-          disabled={!isPreview}
-          label={isPreview ? 'Explore preview' : 'Live sign in unavailable'}
-          onPress={() => {
-            if (isPreview) {
-              navigation.enterPreview();
-            }
-          }}
+          disabled={!canSubmit}
+          label={isPreview ? 'Explore preview' : 'Sign in'}
+          loading={isSubmitting}
+          onPress={handleSubmit}
           style={styles.submit}
         />
         <Button label="Forgot password?" onPress={() => undefined} variant="text" />
+        {error ? (
+          <UiText variant="bodySmall" tone="error" style={styles.errorText}>
+            {error}
+          </UiText>
+        ) : null}
         <UiText variant="bodySmall" tone="muted" style={styles.previewNotice}>
           {isPreview
             ? 'Preview data is local. No account is authenticated until the Java auth contract is implemented and verified.'
-            : 'Live sign in stays blocked because the Java auth contract is not implemented in this candidate.'}
+            : 'Live mode sends credentials to the Java auth candidate and enters the app only after a bearer token is returned.'}
         </UiText>
       </Card>
 
@@ -90,6 +139,7 @@ const styles = StyleSheet.create({
   formCard: { padding: tokens.spacing.lg },
   formIntro: { marginBottom: tokens.spacing.lg, marginTop: tokens.spacing.xs },
   submit: { marginTop: tokens.spacing.sm },
+  errorText: { marginTop: tokens.spacing.sm, textAlign: 'center' },
   previewNotice: { marginTop: tokens.spacing.md, textAlign: 'center' },
   footerNote: { alignItems: 'center', paddingHorizontal: tokens.spacing.md, paddingTop: tokens.spacing.lg },
   centerText: { textAlign: 'center' },

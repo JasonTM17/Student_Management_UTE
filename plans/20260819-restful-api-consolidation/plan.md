@@ -272,8 +272,9 @@ Observed low-disk-safe gates:
 
 - `npm test --prefix mobile`: PASS, 5/5 dependency-free screen-atlas tests. This
   re-confirms the native registry above the 20-screen requirement, Stitch token
-  anchors, preview/live API separation, role navigation, and non-impersonating
-  preview sign-in. It is not Expo typecheck, emulator, device, or live API proof.
+  anchors, preview/live API separation, role navigation, non-impersonating
+  preview sign-in, explicit live Java auth handoff, and assistant locale payload
+  parity. It is not Expo typecheck, emulator, device, or live API proof.
 - `npm test --prefix frontend`: PASS, 28/28 frontend smoke tests. This is source
   and structural coverage only; it is not a fresh authenticated browser matrix,
   Stitch pixel/reference diff, or production build evidence.

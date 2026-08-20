@@ -54,7 +54,7 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | Web P0 repair | `PASS` source-level | Metric wrapping, assistant offset/z-index, exact background, 1280px cap, and tablet bottom-nav boundary are covered by a new smoke assertion. Rendered proof remains open. |
 | Public landing browser smoke | `PASS` limited runtime | The running local frontend image showed no horizontal overflow at 1440px, 390px, or 768px and no public-page console errors. The image lacks a source-revision label; it is not exact-current-source, authenticated, full-route, or reference-diff evidence. |
 | Web smoke/typecheck/lint | `PASS` | 28 smoke tests, Next route type generation/TypeScript, and ESLint zero-warning gate pass on the current web tree. |
-| Native route/role/reference regression | `PASS` source-level | Five dependency-free tests prove 23 unique registry-to-component bindings, 13 direct mobile Stitch references backed by the 22-screen metadata ledger, role-specific bottom navigation, unauthorized-route fallback, and transparent preview sign-in. The navigator distinguishes `signedOut`, `preview`, and `authenticated` state; only preview role switching is allowed. |
+| Native route/role/reference regression | `PASS` source-level | Five dependency-free tests prove 23 unique registry-to-component bindings, 13 direct mobile Stitch references backed by the 22-screen metadata ledger, role-specific bottom navigation, unauthorized-route fallback, transparent preview sign-in, explicit live Java auth handoff, and assistant locale payload parity. The navigator distinguishes `signedOut`, `preview`, and `authenticated` state; only preview role switching is allowed. |
 | Native mobile source transpile | `PASS` | TypeScript syntax transpile passed for all 14 mobile `.ts/.tsx` files. This is not dependency-aware typecheck. |
 | Native API preview guard | `PASS` source-level | The client defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls require explicit `EXPO_PUBLIC_API_MODE=live`. |
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
@@ -70,6 +70,17 @@ These checks keep the Stitch web/mobile source contract warm at the current
 checkout. They do not replace the open browser visual rerun, authenticated E2E,
 Expo dependency-aware typecheck, emulator/device smoke, or Java API cutover
 evidence required by this phase.
+
+### Fresh bounded checks — 2026-08-20, mobile auth seam
+
+- `npm test --prefix mobile`: PASS, 5/5 dependency-free atlas/API/navigation
+  tests. The mobile auth source seam keeps preview local, calls Java
+  `/auth/login` only in explicit live mode, stores the returned bearer token in
+  memory, and enters `authenticated` only after a token-bearing response.
+
+This is source-level client evidence only. It is not Expo typecheck, emulator,
+device, live Java API, authenticated E2E, gateway canary, or production cutover
+evidence.
 
 ## Affected components and ownership
 

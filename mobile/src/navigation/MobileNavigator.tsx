@@ -47,6 +47,15 @@ export function MobileNavigator() {
       setRoute(roleHome[role]);
       setMenuOpen(false);
     },
+    completeSignIn(nextRole) {
+      if (route !== 'auth.signIn' || apiClient.mode !== 'live') {
+        return;
+      }
+      setSessionKind('authenticated');
+      setRole(nextRole);
+      setRoute(roleHome[nextRole]);
+      setMenuOpen(false);
+    },
     goBack() {
       setRoute(hasActiveSession ? roleHome[role] : 'auth.signIn');
       setMenuOpen(false);

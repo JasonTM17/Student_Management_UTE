@@ -75,7 +75,11 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /type SessionKind = 'signedOut' \| 'preview' \| 'authenticated'/);
   assert.match(navigator, /const isAuthenticated = sessionKind === 'authenticated'/);
   assert.match(navigator, /if \(route !== 'auth\.signIn' \|\| apiClient\.mode !== 'preview'\)/);
+  assert.match(navigator, /completeSignIn\(nextRole\) \{/);
+  assert.match(navigator, /if \(route !== 'auth\.signIn' \|\| apiClient\.mode !== 'live'\)/);
+  assert.match(navigator, /setSessionKind\('authenticated'\)/);
   assert.match(navigationTypes, /enterPreview\(\): void/);
+  assert.match(navigationTypes, /completeSignIn\(role: UserRole\): void/);
 });
 
 test('Stitch mobile references stay traceable and preview sign-in does not impersonate live authentication', () => {
@@ -100,9 +104,13 @@ test('Stitch mobile references stay traceable and preview sign-in does not imper
   assert.match(routes, /'thesis\.evaluation': \[[\s\S]*?3073bce589eb4d4e97ef9775e921a506/);
   assert.match(routes, /'admin\.lecturers': \[[\s\S]*?36c60dec6ed9458a80bc5b1cfe6f82a5/);
   assert.match(signIn, /const isPreview = apiClient\.mode === 'preview'/);
-  assert.match(signIn, /label=\{isPreview \? 'Explore preview' : 'Live sign in unavailable'\}/);
+  assert.match(signIn, /label=\{isPreview \? 'Explore preview' : 'Sign in'\}/);
   assert.match(signIn, /navigation\.enterPreview\(\)/);
+  assert.match(signIn, /campusApi\.login\(email\.trim\(\), password\)/);
+  assert.match(signIn, /apiClient\.setAccessToken\(response\.accessToken\)/);
+  assert.match(signIn, /navigation\.completeSignIn\(resolveRole\(response\.user\?\.roles\)\)/);
   assert.doesNotMatch(signIn, /navigation\.navigate\('dashboard\.student'\)/);
   assert.match(signIn, /No account is authenticated until the Java auth contract is implemented and verified/);
+  assert.match(signIn, /enters the app only after a bearer token is returned/);
   assert.match(readme, /role-specific bottom bar/);
 });
