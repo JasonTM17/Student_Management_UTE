@@ -75,12 +75,16 @@ than reference-diff evidence and several current routes/states are not covered.
 - Exact-source browser/Playwright visual rerun remains `NOT_RUN`; the public
   landing-page-only browser smoke does not cover authenticated routes or a
   Stitch reference diff.
-- Capture all 38 route families at desktop, 390px, and 768–1023px widths,
-  including both locales and the ten missing routes.
+- The visual QA harness has been tightened to capture the ten previously
+  missing route families at desktop, 390px, and 768px tablet widths, including
+  sign-out and discovered topic/grading detail routes. A fresh browser capture
+  is still `NOT_RUN`, so this is verifier-source progress rather than visual
+  acceptance.
 - Add normalized/reference-size Stitch diff or an explicitly reviewed visual
   comparison; the current matrix only checks structure and viewport metrics.
 - Gate console/network errors instead of recording 401/400 responses as a
-  passing visual run.
+  passing visual run. The harness now fails noisy captures; the rerun must
+  prove the current app is clean.
 - Exercise loading, empty, error, permission, long-text, keyboard, and
   accessibility states.
 - Install mobile dependencies in a bounded environment, run Expo typecheck,

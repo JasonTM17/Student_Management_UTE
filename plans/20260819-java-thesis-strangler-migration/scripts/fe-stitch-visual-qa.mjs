@@ -37,6 +37,13 @@ const viewports = [
     isMobile: true,
     hasTouch: true,
   },
+  {
+    name: 'tablet',
+    width: 768,
+    height: 1024,
+    isMobile: false,
+    hasTouch: true,
+  },
 ];
 
 const routes = [
@@ -54,17 +61,43 @@ const routes = [
   { role: 'student', path: '/dashboard/announcements', label: 'Announcements' },
   { role: 'student', path: '/dashboard/notifications', label: 'Notifications' },
   { role: 'student', path: '/dashboard/profile', label: 'Profile' },
+  { role: 'student', path: '/dashboard/sign-out', label: 'Sign out' },
   { role: 'student', path: '/dashboard/thesis', label: 'Thesis home' },
   { role: 'student', path: '/dashboard/thesis/topics', label: 'Thesis topics' },
+  {
+    role: 'student',
+    path: '/dashboard/thesis/topics/[id]',
+    label: 'Thesis topic detail',
+    discoverFrom: {
+      path: '/dashboard/thesis/topics',
+      hrefIncludes: '/dashboard/thesis/topics/',
+    },
+  },
   { role: 'student', path: '/dashboard/thesis/progress', label: 'Thesis progress' },
   { role: 'student', path: '/dashboard/thesis/evaluation', label: 'Thesis evaluation' },
   { role: 'lecturer', path: '/dashboard/lecturer', label: 'Lecturer dashboard' },
   { role: 'lecturer', path: '/dashboard/lecturer/schedule', label: 'Lecturer schedule' },
   { role: 'lecturer', path: '/dashboard/lecturer/announcements', label: 'Lecturer announcements' },
   { role: 'lecturer', path: '/dashboard/lecturer/grades', label: 'Lecturer grades' },
+  {
+    role: 'lecturer',
+    path: '/dashboard/lecturer/grades/[id]',
+    label: 'Lecturer grade detail',
+    discoverFrom: {
+      path: '/dashboard/lecturer/grades',
+      hrefIncludes: '/dashboard/lecturer/grades/',
+    },
+  },
   { role: 'admin', path: '/admin', label: 'Admin dashboard' },
   { role: 'admin', path: '/admin/users', label: 'Admin users' },
   { role: 'admin', path: '/admin/courses', label: 'Admin courses' },
+  { role: 'admin', path: '/admin/academic-years', label: 'Admin academic years' },
+  { role: 'admin', path: '/admin/classrooms', label: 'Admin classrooms' },
+  { role: 'admin', path: '/admin/departments', label: 'Admin departments' },
+  { role: 'admin', path: '/admin/enrollments', label: 'Admin enrollments' },
+  { role: 'admin', path: '/admin/lecturers', label: 'Admin lecturers' },
+  { role: 'admin', path: '/admin/sections', label: 'Admin sections' },
+  { role: 'admin', path: '/admin/semesters', label: 'Admin semesters' },
   { role: 'admin', path: '/admin/announcements', label: 'Admin announcements' },
   { role: 'admin', path: '/admin/invoices', label: 'Admin invoices' },
   { role: 'admin', path: '/admin/analytics', label: 'Admin analytics' },
@@ -216,6 +249,29 @@ async function evaluatePage(page) {
   });
 }
 
+async function resolveRoutePath(page, route) {
+  if (!route.discoverFrom) {
+    return route.path;
+  }
+
+  await page.goto(route.discoverFrom.path, {
+    waitUntil: 'domcontentloaded',
+    timeout: 30_000,
+  });
+  await page.waitForLoadState('networkidle', { timeout: 2_500 }).catch(() => {});
+
+  const locator = page.locator(`a[href*="${route.discoverFrom.hrefIncludes}"]`).first();
+  const href = await locator.getAttribute('href', { timeout: 10_000 });
+  if (!href) {
+    throw new Error(
+      `Could not discover ${route.path} from ${route.discoverFrom.path} using ${route.discoverFrom.hrefIncludes}`,
+    );
+  }
+
+  const resolved = new URL(href, baseURL);
+  return `${resolved.pathname}${resolved.search}`;
+}
+
 async function captureRoute(browser, viewport, sessions, route) {
   const context = await browser.newContext({
     baseURL,
@@ -253,9 +309,11 @@ async function captureRoute(browser, viewport, sessions, route) {
   let navigationError = null;
   let screenshotError = null;
   let screenshotOk = false;
+  let resolvedPath = route.path;
 
   try {
-    const response = await page.goto(route.path, {
+    resolvedPath = await resolveRoutePath(page, route);
+    const response = await page.goto(resolvedPath, {
       waitUntil: 'domcontentloaded',
       timeout: 30_000,
     });
@@ -294,7 +352,9 @@ async function captureRoute(browser, viewport, sessions, route) {
     usesStitchFont: /Be Vietnam Pro/i.test(metrics.fontFamily),
     noHorizontalOverflow: metrics.overflowX <= 8,
     mobileBottomNavOk: !expectsMobileBottomNav || metrics.mobileBottomNavVisible,
+    noConsoleErrors: consoleErrors.length === 0,
     noPageErrors: pageErrors.length === 0,
+    noFailedRequests: failedRequests.length === 0,
     screenshotOk,
   };
   const ok = Object.values(checks).every(Boolean);
@@ -307,6 +367,7 @@ async function captureRoute(browser, viewport, sessions, route) {
     viewportSize: `${viewport.width}x${viewport.height}`,
     responseStatus,
     finalUrl,
+    resolvedPath,
     screenshotPath,
     metrics,
     checks,
@@ -324,6 +385,8 @@ function summarize(results) {
   const failed = results.filter((result) => !result.ok);
   const overflow = results.filter((result) => result.metrics.overflowX > 8);
   const missingMobileNav = results.filter((result) => result.checks.mobileBottomNavOk === false);
+  const consoleErrorRoutes = results.filter((result) => result.checks.noConsoleErrors === false);
+  const failedRequestRoutes = results.filter((result) => result.checks.noFailedRequests === false);
 
   return {
     baseURL,
@@ -336,6 +399,8 @@ function summarize(results) {
     failedCount: failed.length,
     overflowCount: overflow.length,
     missingMobileNavCount: missingMobileNav.length,
+    consoleErrorCount: consoleErrorRoutes.length,
+    failedRequestCount: failedRequestRoutes.length,
   };
 }
 
@@ -348,6 +413,7 @@ function markdownReport(summary, results) {
         result.viewport,
         result.role,
         result.path,
+        result.resolvedPath,
         result.responseStatus ?? 'n/a',
         result.metrics.overflowX,
         result.metrics.mobileBottomNavVisible ? 'yes' : 'no',
@@ -382,11 +448,13 @@ API URL: \`${summary.apiBaseURL}\`
 - Failed captures: ${summary.failedCount}
 - Horizontal overflow findings: ${summary.overflowCount}
 - Missing expected mobile bottom navigation: ${summary.missingMobileNavCount}
+- Console-error route captures: ${summary.consoleErrorCount}
+- Failed-request route captures: ${summary.failedRequestCount}
 
 ## Route matrix
 
-Status | Viewport | Role | Route | HTTP | Overflow X | Mobile bottom nav | Screenshot
---- | --- | --- | --- | ---: | ---: | --- | ---
+Status | Viewport | Role | Route | Resolved route | HTTP | Overflow X | Mobile bottom nav | Screenshot
+--- | --- | --- | --- | --- | ---: | ---: | --- | ---
 ${rows}
 
 ## Findings
