@@ -1,13 +1,18 @@
 package io.campuscore.restfulapi.notification.service;
 
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository;
+import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.CreateNotificationCommand;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.PatchValue;
 import io.campuscore.restfulapi.notification.repository.NotificationWriteRepository.UpdateNotificationCommand;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
+import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.CreateNotificationRequest;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.DeleteNotificationResponse;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.MarkAllReadResponse;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;
+import java.time.Clock;
+import java.time.Instant;
 import java.util.Set;
+import java.util.UUID;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -24,6 +29,7 @@ public class NotificationWriteService {
     private static final Set<String> TYPES = Set.of("INFO", "WARNING", "ERROR", "SUCCESS");
 
     private final NotificationWriteRepository notifications;
+    private final Clock clock = Clock.systemUTC();
 
     public NotificationWriteService(NotificationWriteRepository notifications) {
         this.notifications = notifications;
@@ -47,6 +53,23 @@ public class NotificationWriteService {
     public MarkAllReadResponse markAllRead(String userId) {
         requireSubject(userId);
         return new MarkAllReadResponse(notifications.markAllRead(userId));
+    }
+
+    @Transactional
+    public NotificationResponse create(CreateNotificationRequest request) {
+        String type = requireText(request.type(), "type");
+        if (!TYPES.contains(type)) {
+            throw new IllegalArgumentException("type must be INFO, WARNING, ERROR, or SUCCESS");
+        }
+        Instant now = Instant.now(clock);
+        return notifications.create(new CreateNotificationCommand(
+                UUID.randomUUID().toString(),
+                requireText(request.userId(), "userId"),
+                requireText(request.title(), "title"),
+                requireText(request.message(), "message"),
+                type,
+                request.link(),
+                now));
     }
 
     @Transactional

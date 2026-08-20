@@ -77,7 +77,12 @@ notification admin deletion slice adds feature-default-off
 and pre-delete not-found behavior. The notification admin update slice adds
 feature-default-off `PUT /api/v1/notifications/{id}` for admins with partial
 legacy field updates, enum validation, optional `link` clearing and the shared
-notification response shape; admin create still remains legacy-owned. The
+notification response shape. The notification admin create slice adds
+feature-default-off `POST /api/v1/notifications` for admins with legacy fields,
+`201 Created`, default unread/read-at-null persistence and the shared
+notification response shape. Realtime delivery, event publication, PostgreSQL
+write parity, canary routing, rollback and public notification writer ownership
+still remain with the legacy notification service until proven. The
 announcement create slice adds a separate
 feature-default-off `POST /api/v1/announcements` candidate for admins with
 legacy defaults, publisher ownership from the JWT subject and the shared

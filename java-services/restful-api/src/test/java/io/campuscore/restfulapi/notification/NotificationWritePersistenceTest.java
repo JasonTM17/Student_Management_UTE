@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -116,6 +117,92 @@ class NotificationWritePersistenceTest {
 
         assertThat(unreadCount(STUDENT)).isZero();
         assertThat(unreadCount(OTHER_USER)).isEqualTo(1);
+    }
+
+    @Test
+    void adminCreatePreservesLegacyDefaultsAndResponseShape() throws Exception {
+        mvc.perform(post("/api/v1/notifications")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": "student-user-1",
+                                  "title": "Payment posted",
+                                  "message": "Your tuition payment was received.",
+                                  "type": "SUCCESS",
+                                  "link": "/finance/invoices/invoice-1"
+                                }
+                                """))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.id").exists())
+                .andExpect(jsonPath("$.userId").value(STUDENT))
+                .andExpect(jsonPath("$.title").value("Payment posted"))
+                .andExpect(jsonPath("$.message").value("Your tuition payment was received."))
+                .andExpect(jsonPath("$.type").value("SUCCESS"))
+                .andExpect(jsonPath("$.link").value("/finance/invoices/invoice-1"))
+                .andExpect(jsonPath("$.isRead").value(false))
+                .andExpect(jsonPath("$.readAt").doesNotExist())
+                .andExpect(jsonPath("$.createdAt").exists())
+                .andExpect(jsonPath("$.updatedAt").exists());
+
+        assertThat(totalRows()).isEqualTo(1);
+        assertThat(unreadCount(STUDENT)).isEqualTo(1);
+    }
+
+    @Test
+    void adminCreateFailsClosedForInvalidBodyAndStudentRole() throws Exception {
+        mvc.perform(post("/api/v1/notifications")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": "student-user-1",
+                                  "title": "Payment posted",
+                                  "message": "Your tuition payment was received.",
+                                  "type": "ALERT"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(post("/api/v1/notifications")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": "student-user-1",
+                                  "message": "Missing title",
+                                  "type": "INFO"
+                                }
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(post("/api/v1/notifications")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"unexpected\":\"value\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(post("/api/v1/notifications")
+                        .with(jwt().jwt(token -> token
+                                .subject(STUDENT)
+                                .claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "userId": "student-user-1",
+                                  "title": "Student create",
+                                  "message": "Forbidden",
+                                  "type": "INFO"
+                                }
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        assertThat(totalRows()).isZero();
     }
 
     @Test
@@ -276,6 +363,13 @@ class NotificationWritePersistenceTest {
                 "SELECT COUNT(*) FROM notifications.notification WHERE user_id = ? AND is_read = FALSE",
                 Integer.class,
                 userId);
+        return count == null ? 0 : count;
+    }
+
+    private int totalRows() {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification",
+                Integer.class);
         return count == null ? 0 : count;
     }
 

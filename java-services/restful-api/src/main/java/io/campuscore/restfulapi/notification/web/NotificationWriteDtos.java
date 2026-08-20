@@ -10,7 +10,7 @@ import java.util.Set;
 /** Disabled-by-default notification write DTOs for the strangler candidate. */
 public final class NotificationWriteDtos {
 
-    private static final Set<String> UPDATE_FIELDS = Set.of(
+    private static final Set<String> WRITE_FIELDS = Set.of(
             "userId",
             "title",
             "message",
@@ -30,7 +30,7 @@ public final class NotificationWriteDtos {
 
         public static UpdateNotificationRequest from(JsonNode body) {
             ObjectNode object = objectBody(body);
-            Set<String> presentFields = presentAllowedFields(object);
+            Set<String> presentFields = presentAllowedFields(object, WRITE_FIELDS);
             return new UpdateNotificationRequest(
                     Collections.unmodifiableSet(presentFields),
                     stringValue(object, "userId", false),
@@ -42,6 +42,29 @@ public final class NotificationWriteDtos {
 
         public boolean has(String field) {
             return presentFields.contains(field);
+        }
+    }
+
+    public record CreateNotificationRequest(
+            String userId,
+            String title,
+            String message,
+            String type,
+            String link) {
+
+        public static CreateNotificationRequest from(JsonNode body) {
+            ObjectNode object = objectBody(body);
+            Set<String> presentFields = presentAllowedFields(object, WRITE_FIELDS);
+            requirePresent(presentFields, "userId");
+            requirePresent(presentFields, "title");
+            requirePresent(presentFields, "message");
+            requirePresent(presentFields, "type");
+            return new CreateNotificationRequest(
+                    stringValue(object, "userId", false),
+                    stringValue(object, "title", false),
+                    stringValue(object, "message", false),
+                    stringValue(object, "type", false),
+                    stringValue(object, "link", true));
         }
     }
 
@@ -61,17 +84,23 @@ public final class NotificationWriteDtos {
         return object;
     }
 
-    private static Set<String> presentAllowedFields(ObjectNode body) {
+    private static Set<String> presentAllowedFields(ObjectNode body, Set<String> allowedFields) {
         Set<String> present = new LinkedHashSet<>();
         Iterator<String> fieldNames = body.fieldNames();
         while (fieldNames.hasNext()) {
             String field = fieldNames.next();
-            if (!UPDATE_FIELDS.contains(field)) {
+            if (!allowedFields.contains(field)) {
                 throw new IllegalArgumentException("Unexpected body property: " + field);
             }
             present.add(field);
         }
         return present;
+    }
+
+    private static void requirePresent(Set<String> presentFields, String field) {
+        if (!presentFields.contains(field)) {
+            throw new IllegalArgumentException(field + " is required");
+        }
     }
 
     private static String stringValue(ObjectNode body, String field, boolean allowNull) {
