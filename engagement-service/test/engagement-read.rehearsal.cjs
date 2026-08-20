@@ -191,7 +191,8 @@ function rebuildJavaArtifact(repoRoot, runRoot, sourceHead, javaExecutable) {
     'mvn.cmd',
   );
   const moduleRoot = path.resolve(repoRoot, 'java-services/restful-api');
-  const mavenCommand = `"${mavenExecutable}" -o -DskipTests clean package`;
+  const mavenCommand =
+    `call "${mavenExecutable}" -o -DskipTests clean package`;
   const buildOutput = execFileSync(
     process.env.ComSpec || 'C:\\Windows\\System32\\cmd.exe',
     ['/d', '/s', '/c', mavenCommand],
