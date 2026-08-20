@@ -59,7 +59,17 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /mode: ApiMode/);
   assert.match(client, /setSessionTokens\(accessToken: string \| undefined, refreshToken: string \| undefined\): void/);
   assert.match(client, /getRefreshToken\(\): string \| undefined/);
-  assert.match(client, /apiRoutes\.auth\.refresh, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
+  assert.match(client, /function shouldRefreshAfterUnauthorized\(path: string, status: number\)/);
+  assert.match(client, /!normalizedPath\.startsWith\('\/auth\/login'\)/);
+  assert.match(client, /!normalizedPath\.startsWith\('\/auth\/refresh'\)/);
+  assert.match(client, /!normalizedPath\.startsWith\('\/auth\/logout'\)/);
+  assert.match(client, /async function refreshMobileSession\(requestId: string\)/);
+  assert.match(client, /'X-Request-Id': `\$\{requestId\}-refresh`/);
+  assert.match(client, /'The Java auth refresh response did not include rotated tokens'/);
+  assert.match(client, /shouldRefreshAfterUnauthorized\(path, response\.status\) && refreshToken/);
+  assert.match(client, /headers\.set\('Authorization', `Bearer \$\{accessToken\}`\)/);
+  assert.match(client, /apiRoutes\.auth\.refresh,[\s\S]*?\{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
+  assert.match(client, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
   assert.match(client, /apiRoutes\.auth\.logout, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /export type AssistantLocale = 'en' \| 'vi'/);
   assert.match(client, /assistantChat: \(message: string, locale: AssistantLocale = 'en'\)/);
