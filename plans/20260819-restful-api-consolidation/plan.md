@@ -221,6 +221,16 @@ the retirement gates pass.
   dashboard aggregate shapes and role boundaries. Trends, cockpit composition,
   lecturer analytics, attendance, metrics/events, PostgreSQL parity, route
   canary, rollback and frontend convergence remain open.
+- Phase 17 backend-first academic enrollment read foundation:
+  source candidate/HOLD; see `phase-17-academic-enrollment-read-foundation.md`.
+  It adds feature-default-off Java current-student enrollment, grade and
+  transcript reads, admin enrollment list/detail reads, and selected lecturer/
+  admin grade item and student-grade reads against the migrated legacy
+  `academic` schema. It preserves the selected enrollment envelope, nested
+  section/course/semester/lecturer hydration, student self-scope boundary,
+  weighted grade totals and transcript GPA summary. Enroll/drop, waitlist,
+  grade writes/publishing, timetable, export, events, PostgreSQL parity, route
+  canary, rollback and frontend convergence remain open.
 
 ## Backend foundation gate before Stitch implementation
 

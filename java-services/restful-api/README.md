@@ -23,6 +23,13 @@ shell, not a domain-parity or cutover claim.
 - a disabled-by-default, read-only academic catalog candidate behind
   `ACADEMIC_READ_ENABLED=true` in the `persistence` profile; it reads semesters
   and courses only, with no enrollment, grade, timetable or write ownership.
+- a disabled-by-default, read-only academic enrollment candidate behind
+  `ACADEMIC_ENROLLMENT_READ_ENABLED=true` in the `persistence` profile; it
+  reads the current student's enrollment list, grade and transcript views plus
+  admin enrollment list/detail and lecturer/admin grade item/student-grade
+  views from the migrated legacy `academic` schema. It does not own enroll/drop,
+  waitlist, grade editing/publishing, timetable, CSV export, public routing or
+  full academic cutover.
 - a disabled-by-default auth session candidate behind `AUTH_LOGIN_ENABLED=true`
   in the `persistence` profile; it verifies BCrypt passwords against the
   legacy `auth` schema, issues and refreshes shared web cookies plus body
@@ -69,7 +76,10 @@ payment provider or LLM provider is cut over; the finance read candidate uses
 checkout, provider callback/webhook, export or write ownership. The analytics
 read candidate uses `ANALYTICS_READ_ENABLED=true` for overview and
 finance-summary reads only and does not move cockpit/trend/attendance/lecturer
-analytics ownership. Those
+analytics ownership. The academic enrollment read candidate uses
+`ACADEMIC_ENROLLMENT_READ_ENABLED=true` for selected enrollment, grade and
+transcript reads only and does not move enroll/drop, waitlist, grade write/
+publish, timetable or export ownership. Those
 dependencies enter through later migration phases with one canonical writer and
 explicit rollback evidence.
 

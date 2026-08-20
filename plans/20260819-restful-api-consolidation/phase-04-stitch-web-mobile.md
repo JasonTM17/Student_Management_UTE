@@ -58,7 +58,7 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | Native mobile source transpile | `PASS` | TypeScript syntax transpile passed for all 14 mobile `.ts/.tsx` files. This is not dependency-aware typecheck. |
 | Native API preview guard | `PASS` source-level | The client defaults to `preview` and fails closed with `MOBILE_API_PREVIEW`; live calls require explicit `EXPO_PUBLIC_API_MODE=live`. |
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
-| Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target has shell probes plus conditional thesis-topic read only; auth, academic, finance, notification, analytics, complete thesis, and chatbot routes are not yet implemented. |
+| Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target now has shell probes plus feature-gated auth/session, notification/engagement, academic catalog, people, finance, analytics and selected academic enrollment/grade/transcript read candidates. Complete academic writes, grade publishing, chatbot parity, PostgreSQL parity, route canary and rollback evidence are still not implemented. |
 
 ### Fresh bounded checks — 2026-08-20, `ba90cf6`
 
