@@ -206,6 +206,14 @@ the retirement gates pass.
   user/academic snapshots. People writes, enrollment history, events,
   PostgreSQL parity, route canary, rollback and frontend convergence remain
   open.
+- Phase 15 backend-first finance read foundation:
+  source candidate/HOLD; see `phase-15-finance-read-foundation.md`. It adds
+  feature-default-off Java invoice and payment read paths against the migrated
+  legacy `finance` schema, preserving admin list/detail envelopes, student
+  self-invoice isolation, invoice item/payment hydration and payment invoice
+  joins. Finance writes, checkout/payment provider orchestration, exports,
+  PostgreSQL parity, route canary, rollback and frontend convergence remain
+  open.
 
 ## Backend foundation gate before Stitch implementation
 

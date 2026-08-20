@@ -46,6 +46,8 @@ migration:
     enabled: ${ACADEMIC_READ_ENABLED:false}
   people-read:
     enabled: ${PEOPLE_READ_ENABLED:false}
+  finance-read:
+    enabled: ${FINANCE_READ_ENABLED:false}
   auth-login:
     enabled: ${AUTH_LOGIN_ENABLED:false}
 

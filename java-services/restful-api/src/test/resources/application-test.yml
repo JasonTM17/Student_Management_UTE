@@ -17,6 +17,8 @@ migration:
     enabled: false
   people-read:
     enabled: false
+  finance-read:
+    enabled: false
   auth-login:
     enabled: false
 
