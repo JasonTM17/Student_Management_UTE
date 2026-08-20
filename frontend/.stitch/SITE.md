@@ -32,10 +32,13 @@ the web at a 390px viewport; compare native mobile against the mobile atlas.
   current frontend source.
 - Existing visual QA artifact: 28 web routes × 2 viewports = 56/56 captures,
   0 overflow findings, and 0 missing mobile navigation findings.
-- Direct Stitch atlas inventory is current, but a fresh in-app browser visual
-  rerun is `NOT_RUN` because the browser runtime failed to initialize. Do not
-  upgrade the visual claim until that runtime or an equivalent Playwright
-  capture is available.
+- A fresh in-app browser check on 2026-08-20 observed the public landing page
+  at 1440px, 390px, and 768px with no measured horizontal overflow and no
+  console errors. The running `campuscore-frontend:local` image has no
+  source-revision label, so this is limited runtime evidence for that image,
+  not an exact-HEAD Stitch reference diff or authenticated-route proof.
+- Do not upgrade the visual claim until an exact-source browser/Playwright
+  capture covers the route/state matrix against the Stitch references.
 - Native mobile dependencies are intentionally not installed while C: is low;
   device/emulator, Expo, and mobile API runtime evidence remain `NOT_RUN`.
 
