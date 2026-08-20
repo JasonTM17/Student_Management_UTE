@@ -40,6 +40,8 @@ class ThesisTopicPersistenceTest {
 
     @BeforeEach
     void cleanDatabase() {
+        jdbc.update("DELETE FROM thesis.thesis_group_member");
+        jdbc.update("DELETE FROM thesis.thesis_group");
         topics.deleteAll();
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
     }
@@ -109,6 +111,31 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
+    void groupsPreserveSortMemberOrderNullableFieldsAndNotFoundSemantics() throws Exception {
+        UUID roundId = insertRound();
+        UUID olderGroup = insertGroup(roundId, Instant.parse("2026-01-02T00:00:00Z"), UUID.randomUUID(), "topic", "REJECTED", "REJECTED", "Needs revision");
+        UUID newerGroup = insertGroup(roundId, Instant.parse("2026-01-03T00:00:00Z"), UUID.randomUUID(), null, "DRAFT", "PENDING", null);
+        UUID firstMember = UUID.randomUUID();
+        UUID secondMember = UUID.randomUUID();
+        insertMember(newerGroup, roundId, secondMember, 2);
+        insertMember(newerGroup, roundId, firstMember, 1);
+
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value(newerGroup.toString()))
+                .andExpect(jsonPath("$[0].topicId").doesNotExist())
+                .andExpect(jsonPath("$[0].rejectionReason").doesNotExist())
+                .andExpect(jsonPath("$[0].memberStudentIds[0]").value(firstMember.toString()))
+                .andExpect(jsonPath("$[0].memberStudentIds[1]").value(secondMember.toString()))
+                .andExpect(jsonPath("$[1].id").value(olderGroup.toString()));
+
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
+                .andExpect(status().isNotFound());
+        mvc.perform(get("/api/v1/thesis/groups/{id}", UUID.randomUUID()).with(jwt()))
+                .andExpect(status().isNotFound());
+    }
+
+    @Test
     void thesisReadPathRejectsAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/thesis/topics")
                         .queryParam("roundId", UUID.randomUUID().toString()))
@@ -155,5 +182,15 @@ class ThesisTopicPersistenceTest {
                 Timestamp.from(start),
                 Timestamp.from(end),
                 status);
+    }
+
+    private UUID insertGroup(UUID roundId, Instant createdAt, UUID leaderId, String topicId, String status, String approvalStatus, String rejectionReason) {
+        UUID groupId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status, rejection_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", groupId, roundId, leaderId, "topic".equals(topicId) ? UUID.randomUUID() : null, status, approvalStatus, rejectionReason, Timestamp.from(createdAt));
+        return groupId;
+    }
+
+    private void insertMember(UUID groupId, UUID roundId, UUID studentId, int memberOrder) {
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), groupId, roundId, studentId, memberOrder, memberOrder == 1);
     }
 }
