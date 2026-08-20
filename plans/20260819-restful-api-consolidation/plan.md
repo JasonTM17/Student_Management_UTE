@@ -240,6 +240,14 @@ the retirement gates pass.
   tools, or move public chatbot traffic. Provider mode, prompt governance,
   moderation, telemetry, rate limiting, PostgreSQL parity, route canary,
   rollback and frontend convergence remain open.
+- Phase 19 backend-first engagement support-ticket read foundation:
+  source candidate/HOLD; see `phase-19-engagement-support-ticket-read.md`. It
+  adds feature-default-off Java support-ticket list/detail reads for the current
+  user and admins against the migrated legacy `engagement` schema. It preserves
+  the selected support-ticket envelope, user isolation, admin filters, response
+  hydration and nested user display fallback. Ticket creation, assignment,
+  response mutation, status updates, deletion, PostgreSQL parity, route canary,
+  rollback and frontend convergence remain open.
 
 ## Backend foundation gate before Stitch implementation
 
