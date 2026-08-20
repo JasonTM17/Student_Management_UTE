@@ -23,6 +23,7 @@ server:
 security:
   jwt:
     secret: ${JWT_SECRET:}
+    access-token-ttl-seconds: ${JWT_ACCESS_TOKEN_TTL_SECONDS:900}
   access-token-cookie: ${ACCESS_TOKEN_COOKIE:cc_access_token}
   refresh-token-cookie: ${REFRESH_TOKEN_COOKIE:cc_refresh_token}
   csrf-cookie: ${CSRF_COOKIE:cc_csrf}
@@ -38,6 +39,8 @@ migration:
     enabled: ${NOTIFICATIONS_READ_ENABLED:false}
   engagement-read:
     enabled: ${ENGAGEMENT_READ_ENABLED:false}
+  academic-read:
+    enabled: ${ACADEMIC_READ_ENABLED:false}
 
 management:
   endpoints:

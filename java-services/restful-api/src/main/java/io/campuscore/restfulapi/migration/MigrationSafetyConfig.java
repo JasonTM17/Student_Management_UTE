@@ -13,8 +13,9 @@ import org.springframework.context.annotation.Profile;
 public class MigrationSafetyConfig {
 
     /**
-     * A read-only domain role must not need visibility into the thesis schema
-     * merely because thesis JPA entities share this deployable.
+     * A read-only domain role must not need visibility into the thesis schema,
+     * nor be able to mutate a legacy schema, merely because JPA entities share
+     * this deployable.
      */
     @Bean
     @Conditional(ReadOnlyMigrationCandidateCondition.class)

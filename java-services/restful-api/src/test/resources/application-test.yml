@@ -12,6 +12,8 @@ migration:
     enabled: false
   engagement-read:
     enabled: false
+  academic-read:
+    enabled: false
 
 spring:
   datasource:

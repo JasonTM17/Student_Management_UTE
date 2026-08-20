@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.security;
 
+import com.nimbusds.jose.jwk.source.ImmutableSecret;
 import io.campuscore.restfulapi.web.ApiErrorWriter;
 import java.nio.charset.StandardCharsets;
 import java.util.ArrayList;
@@ -19,7 +20,9 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jose.jws.MacAlgorithm;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
+import org.springframework.security.oauth2.jwt.JwtEncoder;
 import org.springframework.security.oauth2.jwt.NimbusJwtDecoder;
+import org.springframework.security.oauth2.jwt.NimbusJwtEncoder;
 import org.springframework.security.oauth2.server.resource.authentication.JwtAuthenticationConverter;
 import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
@@ -32,14 +35,22 @@ public class SecurityConfig {
 
     @Bean
     JwtDecoder jwtDecoder(@Value("${security.jwt.secret}") String secret) {
-        if (secret == null || secret.length() < 32) {
-            throw new IllegalStateException("JWT_SECRET must contain at least 32 characters");
-        }
-
-        SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
+        SecretKeySpec key = jwtSecretKey(secret);
         return NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+    }
+
+    @Bean
+    JwtEncoder jwtEncoder(@Value("${security.jwt.secret}") String secret) {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey(secret)));
+    }
+
+    private static SecretKeySpec jwtSecretKey(String secret) {
+        if (secret == null || secret.length() < 32) {
+            throw new IllegalStateException("JWT_SECRET must contain at least 32 characters");
+        }
+        return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
     @Bean
