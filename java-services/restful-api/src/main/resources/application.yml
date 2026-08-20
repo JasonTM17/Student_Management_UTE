@@ -36,6 +36,8 @@ migration:
     enabled: ${THESIS_READ_ENABLED:false}
   notifications-read:
     enabled: ${NOTIFICATIONS_READ_ENABLED:false}
+  engagement-read:
+    enabled: ${ENGAGEMENT_READ_ENABLED:false}
 
 management:
   endpoints:

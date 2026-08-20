@@ -172,6 +172,12 @@ the retirement gates pass.
   on an isolated disposable restore; see
   `phase-09-postgres-differential-rehearsal.md`. The active shared CampusCore
   PostgreSQL container is not an authorized rehearsal target.
+- Phase 10 engagement announcement read: source candidate/HOLD; see
+  `phase-10-engagement-announcement-read.md`. The feature-default-off Java
+  adapter preserves the current Nest list and personalized-read contract using
+  JDBC `SELECT` only. The complete 40-test monolith H2/Spring suite passed
+  locally, but PostgreSQL parity, route canary, writer ownership and rollback
+  remain open.
 
 # Acceptance and verification
 
