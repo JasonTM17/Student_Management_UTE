@@ -252,7 +252,7 @@ public class AcademicEnrollmentReadRepository {
                 + " student_user.\"lastName\" AS student_last_name, section.\"sectionNumber\", course.\"code\","
                 + " course.\"name\" AS course_name, course.\"nameEn\" AS course_name_en, course.\"nameVi\" AS course_name_vi,"
                 + " semester.\"name\" AS semester_name, semester.\"nameEn\" AS semester_name_en,"
-                + " semester.\"nameVi\" AS semester_name_vi, grade.\"id\" AS grade_id, grade.\"gradeItemId\","
+                + " semester.\"nameVi\" AS semester_name_vi, grade.\"id\" AS grade_id, item.\"id\" AS \"gradeItemId\","
                 + " grade.\"score\", item.\"name\" AS grade_item_name, item.\"type\" AS grade_item_type,"
                 + " item.\"maxScore\", item.\"weight\" FROM " + ENROLLMENT + " e"
                 + " JOIN " + STUDENT + " student ON student.\"id\" = e.\"studentId\""
@@ -261,7 +261,8 @@ public class AcademicEnrollmentReadRepository {
                 + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                 + " JOIN " + SEMESTER + " semester ON semester.\"id\" = e.\"semesterId\""
                 + " LEFT JOIN " + STUDENT_GRADE + " grade ON grade.\"enrollmentId\" = e.\"id\""
-                + " LEFT JOIN " + GRADE_ITEM + " item ON item.\"id\" = grade.\"gradeItemId\"";
+                + " LEFT JOIN " + GRADE_ITEM + " item ON item.\"id\" = grade.\"gradeItemId\""
+                + " AND item.\"sectionId\" = e.\"sectionId\"";
     }
 
     private static EnrollmentRow mapEnrollment(ResultSet rs, int ignored) throws SQLException {
