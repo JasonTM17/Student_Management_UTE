@@ -55,7 +55,8 @@ mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.eng
 
 Surefire recorded:
 
-- `SupportTicketWritePersistenceTest`: 15/15 passed.
+- `SupportTicketWritePersistenceTest`: 17/17 passed, including blank-string
+  response/update parity regressions added after the reviewer finding.
 - `SupportTicketWriteServiceTest`: 1/1 passed.
 - `SupportTicketReadPersistenceTest`: 4/4 passed.
 - `RestfulApiContractTest`: 21/21 passed.
@@ -67,7 +68,7 @@ The root Java reactor also passed locally with the same D-drive temp posture:
 mvn -q -f java-services/pom.xml test
 ```
 
-Surefire recorded 108 tests, 0 failures, 0 errors and 0 skipped across 18
+Surefire recorded 113 tests, 0 failures, 0 errors and 0 skipped across 19
 report files.
 
 ## Remaining gates
