@@ -43,8 +43,7 @@ public class AnnouncementReadController {
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
-        requireLegacyIdentity(jwt);
-        List<String> roles = values(jwt, "roles");
+        List<String> roles = requireLegacyIdentity(jwt);
         String studentId = stringClaim(jwt, "studentId");
         Integer studentYear = studentYear(jwt);
         String lecturerId = stringClaim(jwt, "lecturerId");
@@ -90,13 +89,14 @@ public class AnnouncementReadController {
         }
     }
 
-    private static void requireLegacyIdentity(Jwt jwt) {
+    private static List<String> requireLegacyIdentity(Jwt jwt) {
         String subject = stringClaim(jwt, "sub");
         if (subject == null
                 || subject.isBlank()
                 || stringClaim(jwt, "email") == null) {
             throw new BadCredentialsException("Invalid JWT claims");
         }
+        return values(jwt, "roles");
     }
 
     private static void requireProfileClaims(
@@ -117,13 +117,23 @@ public class AnnouncementReadController {
     }
 
     private static List<String> values(Jwt jwt, String claimName) {
-        if (jwt == null || !(jwt.getClaims().get(claimName) instanceof Collection<?> values)) {
+        if (jwt == null) {
             return List.of();
         }
+        Object claim = jwt.getClaims().get(claimName);
+        if (claim == null) {
+            return List.of();
+        }
+        if (!(claim instanceof Collection<?> values)) {
+            throw new BadCredentialsException("Invalid " + claimName + " claim");
+        }
         return values.stream()
-                .filter(String.class::isInstance)
-                .map(String.class::cast)
-                .filter(value -> !value.isBlank())
+                .map(value -> {
+                    if (!(value instanceof String text) || text.isBlank()) {
+                        throw new BadCredentialsException("Invalid " + claimName + " claim");
+                    }
+                    return text;
+                })
                 .toList();
     }
 

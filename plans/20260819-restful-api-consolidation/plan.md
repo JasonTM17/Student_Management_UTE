@@ -175,7 +175,7 @@ the retirement gates pass.
 - Phase 10 engagement announcement read: source candidate/HOLD; see
   `phase-10-engagement-announcement-read.md`. The feature-default-off Java
   adapter preserves the current Nest list and personalized-read contract using
-  JDBC `SELECT` only. The repaired 43-test monolith H2/Spring suite passed
+  JDBC `SELECT` only. The repaired 45-test monolith H2/Spring suite passed
   locally, but PostgreSQL parity, route canary, writer ownership and rollback
   remain open.
 - Phase 11 engagement PostgreSQL differential rehearsal: planned/HOLD; see

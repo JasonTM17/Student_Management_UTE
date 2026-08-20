@@ -326,6 +326,14 @@ class AnnouncementReadPersistenceTest {
                                 .claim("email", "boolean-sub@campuscore.edu"))))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("mixed-roles")
+                                .claim("email", "mixed-roles@campuscore.edu")
+                                .claim("roles", List.of("STUDENT", 42)))))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
     @Test

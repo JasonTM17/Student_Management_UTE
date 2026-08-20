@@ -9,6 +9,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity;
 import org.springframework.security.config.annotation.web.builders.HttpSecurity;
 import org.springframework.security.config.annotation.web.configurers.AbstractHttpConfigurer;
@@ -99,7 +100,7 @@ public class SecurityConfig {
         return converter;
     }
 
-    private static Collection<GrantedAuthority> authoritiesFromClaims(Jwt jwt) {
+    static Collection<GrantedAuthority> authoritiesFromClaims(Jwt jwt) {
         List<GrantedAuthority> authorities = new ArrayList<>();
         addAuthorities(authorities, jwt.getClaims().get("roles"), "ROLE_");
         addAuthorities(authorities, jwt.getClaims().get("permissions"), "PERM_");
@@ -107,12 +108,17 @@ public class SecurityConfig {
     }
 
     private static void addAuthorities(List<GrantedAuthority> authorities, Object claim, String prefix) {
-        if (claim instanceof Collection<?> values) {
-            for (Object value : values) {
-                if (value != null && !value.toString().isBlank()) {
-                    authorities.add(new SimpleGrantedAuthority(prefix + value));
-                }
+        if (claim == null) {
+            return;
+        }
+        if (!(claim instanceof Collection<?> values)) {
+            throw new BadCredentialsException("Invalid authority claim");
+        }
+        for (Object value : values) {
+            if (!(value instanceof String text) || text.isBlank()) {
+                throw new BadCredentialsException("Invalid authority claim");
             }
+            authorities.add(new SimpleGrantedAuthority(prefix + text));
         }
     }
 }

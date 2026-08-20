@@ -70,9 +70,9 @@ route owner, canonical writer, RabbitMQ event publisher, and rollback target.
   ```
 
 - The pre-review snapshot reported 40 passing tests. After the adversarial
-  repairs, the complete suite reported 43 tests with zero failures, errors, or
+  repairs, the complete suite reported 45 tests with zero failures, errors, or
   skips: 6 engagement, 2 migration-safety, 4 notification, 14 shell contract,
-  5 CSRF, and 12 thesis tests.
+  5 CSRF, 2 authority-conversion, and 12 thesis tests.
 - Source scanning found no JDBC mutation or DDL statement in the production
   engagement package. `git diff --check` passed; line-ending notices are Git's
   existing Windows LF-to-CRLF normalization warning, not whitespace errors.
@@ -117,6 +117,13 @@ strict identity handling because Spring's `Jwt.getSubject()` can coerce a raw
 non-string `sub`. The controller now reads the raw `sub` through the strict
 string-claim path, and numeric/boolean `sub` regressions require HTTP 401. This
 change again invalidates every prior exact-head verdict.
+
+The following checkpoint `f9a9ea8` received Advisor source-gate `ACCEPT` and
+Kongming source-gate `PASS`, but degraded Wukong `FALSIFIED` mixed role claims:
+the controller discarded non-string list members, while the shared authority
+converter stringified them. Both boundaries now reject scalar, mixed, blank or
+non-string role/permission values. Controller and converter regressions cover
+the abuse case. These edits again require fresh exact-head review.
 
 All three independent reviews must be repeated on the repaired exact commit;
 the original verdicts cannot approve a changed snapshot.
