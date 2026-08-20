@@ -44,7 +44,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
       if (!response.accessToken) {
         throw new Error('The Java auth response did not include an access token.');
       }
-      apiClient.setAccessToken(response.accessToken);
+      apiClient.setSessionTokens(response.accessToken, response.refreshToken);
       navigation.completeSignIn(resolveRole(response.user?.roles));
     } catch (signInError) {
       apiClient.clearAccessToken();

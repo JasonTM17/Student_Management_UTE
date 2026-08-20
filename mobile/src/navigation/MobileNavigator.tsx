@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 
-import { apiClient } from '../api/client';
+import { apiClient, campusApi } from '../api/client';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MenuPanel } from '../components/MenuPanel';
 import { tokens } from '../design/tokens';
@@ -61,7 +61,11 @@ export function MobileNavigator() {
       setMenuOpen(false);
     },
     signOut() {
-      apiClient.clearAccessToken();
+      if (apiClient.mode === 'live') {
+        void campusApi.logout().catch(() => undefined).finally(() => apiClient.clearAccessToken());
+      } else {
+        apiClient.clearAccessToken();
+      }
       setSessionKind('signedOut');
       setRole('student');
       setRoute('auth.signIn');

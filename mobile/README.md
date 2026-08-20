@@ -49,10 +49,13 @@ The app uses one base URL for all requests and does not embed credentials. The
 local preview entry point is deliberately labeled as a preview; it does not
 represent a successful Java authentication. When live mode is selected, sign
 in calls `/auth/login`, stores the returned bearer access token in the in-memory
-API client, and enters the role-specific home screen only after the Java auth
-candidate returns a token. The navigator keeps `signedOut`, `preview`, and
-`authenticated` as distinct session states; role switching is available only
-inside the explicit preview state and is never an authorization substitute.
+API client together with the body refresh token, and enters the role-specific
+home screen only after the Java auth candidate returns a token. Refresh and
+logout requests send the in-memory refresh token in the request body, matching
+the Java mobile-token contract. The navigator keeps `signedOut`, `preview`,
+and `authenticated` as distinct session states; role switching is available
+only inside the explicit preview state and is never an authorization
+substitute.
 
 ## API seam
 
