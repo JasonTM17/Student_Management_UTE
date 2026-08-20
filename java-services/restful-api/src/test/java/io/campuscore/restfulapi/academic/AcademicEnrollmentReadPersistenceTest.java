@@ -109,6 +109,73 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     @Test
+    void studentGradeTranscriptAndAdminGradeDetailReadsAreCovered() throws Exception {
+        mvc.perform(get("/api/v1/enrollments/my/grades").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value("enrollment-1"))
+                .andExpect(jsonPath("$[0].courseCode").value("CS101"))
+                .andExpect(jsonPath("$[0].finalGrade").value(88.5))
+                .andExpect(jsonPath("$[0].letterGrade").value("A"));
+
+        mvc.perform(get("/api/v1/enrollments/my/transcript").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.summary.cumulativeGpa").value(4.0))
+                .andExpect(jsonPath("$.summary.totalCreditsEarned").value(4))
+                .andExpect(jsonPath("$.semesters[0].records[0].id").value("enrollment-1"));
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"))
+                .andExpect(jsonPath("$.grades.length()").value(2))
+                .andExpect(jsonPath("$.calculatedTotal").value(86.0))
+                .andExpect(jsonPath("$.totalWeight").value(100.0));
+    }
+
+    @Test
+    void lecturerGradeReadsAreScopedToOwnedSectionsAndRequireLecturerClaim() throws Exception {
+        mvc.perform(get("/api/v1/grades/items/lecturer/my").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].section.id").value("section-1"));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
+
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].grades.length()").value(2))
+                .andExpect(jsonPath("$[0].calculatedTotal").value(86.0))
+                .andExpect(jsonPath("$[0].totalWeight").value(100.0));
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"));
+
+        mvc.perform(get("/api/v1/grades/items/section/section-1").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/grades/items/lecturer/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("lecturer-user-1")
+                                .claim("roles", List.of("LECTURER")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+    }
+
+    @Test
     void enrollmentReadBoundaryFailsClosedForAnonymousRolesMissingClaimsAndBadQueries() throws Exception {
         mvc.perform(get("/api/v1/enrollments/my"))
                 .andExpect(status().isUnauthorized())
@@ -155,11 +222,11 @@ class AcademicEnrollmentReadPersistenceTest {
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
-    private static RequestPostProcessor lecturerJwt() {
+    private static RequestPostProcessor lecturerJwt(String lecturerId) {
         return jwt().jwt(token -> token
                         .subject("lecturer-user-1")
                         .claim("roles", List.of("LECTURER"))
-                        .claim("lecturerId", "lecturer-1"))
+                        .claim("lecturerId", lecturerId))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
     }
 

@@ -64,7 +64,9 @@ Non-goals:
   cumulative GPA, earned credits and attempted credits.
 - Lecturer grade reads require a `lecturerId` claim and preserve grade item,
   student-grade, calculated weighted total and total-weight fields for the
-  selected read-only routes.
+  selected read-only routes. Section-level grade reads must scope lecturer
+  callers to sections they own; admin/super-admin callers may read the selected
+  section without a lecturer ownership filter.
 - Role/query boundaries reject anonymous access, student access to admin list,
   missing student/lecturer claims, invalid page sizes and unexpected query
   parameters.
@@ -92,6 +94,13 @@ student grade/transcript, lecturer grade item/student-grade aggregation,
 default-off route behavior and role/query negative cases. The source mutation
 grep returned no runtime academic enrollment package matches, supporting the
 SELECT-only claim for this slice.
+
+Continuation repair evidence: the Java controller now passes JWT roles and
+`lecturerId` into the section/enrollment grade read service methods, and the
+repository has explicit lecturer-owned filters for section and enrollment grade
+reads. The H2 persistence test records 6/6 passing tests, including lecturer
+other-section denial as empty list or `404`, missing lecturer claim as `403`,
+and weighted-total calculation that ignores unscored rows.
 
 Root reactor remains subject to the current Windows native-memory/pagefile
 capacity limitation observed in earlier phases; do not claim a root-reactor
