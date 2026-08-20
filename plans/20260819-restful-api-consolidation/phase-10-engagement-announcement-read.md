@@ -70,8 +70,8 @@ route owner, canonical writer, RabbitMQ event publisher, and rollback target.
   ```
 
 - The pre-review snapshot reported 40 passing tests. After the adversarial
-  repairs, the complete suite reported 42 tests with zero failures, errors, or
-  skips: 6 engagement, 1 migration-safety, 4 notification, 14 shell contract,
+  repairs, the complete suite reported 43 tests with zero failures, errors, or
+  skips: 6 engagement, 2 migration-safety, 4 notification, 14 shell contract,
   5 CSRF, and 12 thesis tests.
 - Source scanning found no JDBC mutation or DDL statement in the production
   engagement package. `git diff --check` passed; line-ending notices are Git's
@@ -93,8 +93,23 @@ as stale-gate findings, not approvals:
   The JDBC adapter and H2 fixture now use UTC `LocalDateTime` plus SQL
   `TIMESTAMP`, rather than claiming an unverified timestamptz mapping;
 - enabling the engagement read flag installs a Flyway strategy that throws
-  before migration. The candidate test context explicitly sets Flyway off;
+  before migration and a Hibernate customizer that disables schema management,
+  so an engagement-only role does not need thesis-schema visibility. The
+  candidate test context explicitly sets Flyway off but no longer overrides
+  `ddl-auto`, exercising the customizer during Spring startup;
 - Phase 11 now owns an engagement-specific PostgreSQL differential corpus.
+- a blank `priority=` remains invalid like the Nest DTO, while blank semester
+  and section filters remain optional; malformed non-string profile/identity
+  claims and fractional or overflowing student years now fail closed, with
+  regression requests covering each counterexample.
+
+The repaired checkpoint `23055a5` then received an Advisor source-gate
+`ACCEPT`, Kongming source-gate `PASS`, and degraded Wukong `FALSIFIED`.
+Advisor identified the engagement-only database role could still be forced to
+validate thesis JPA entities at startup; Wukong identified the blank-priority
+and malformed-claim cases above. Those verdicts became stale as soon as these
+repairs changed the snapshot. The final exact commit therefore requires a new
+three-review gate; none of the earlier verdicts is carried forward.
 
 All three independent reviews must be repeated on the repaired exact commit;
 the original verdicts cannot approve a changed snapshot.

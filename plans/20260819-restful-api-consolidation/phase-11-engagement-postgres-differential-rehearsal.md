@@ -17,6 +17,9 @@ events, or modify the active CampusCore stack.
   disabled. Java starts with `ENGAGEMENT_READ_ENABLED=true` and
   `FLYWAY_ENABLED=false` using a role limited to `CONNECT`, schema `USAGE`, and
   table `SELECT`; deny ownership, TEMP, CREATE, DML and superuser capability.
+- With the engagement flag on, Java must show that its Flyway rejection strategy
+  is installed and Hibernate schema management resolves to `none`; the role must
+  not require thesis-schema visibility merely to start the shared deployable.
 
 ## Physical schema gate
 
@@ -54,6 +57,7 @@ data, meta, nulls, arrays, timestamps, ordering and relevant headers for:
 - successful isolated restore and physical schema/type report;
 - read-only privilege proof plus database audit showing no DML/DDL/TEMP;
 - Flyway strategy/default evidence and `FLYWAY_ENABLED=false` startup evidence;
+- effective Hibernate `hbm2ddl.auto=none` and no thesis-schema privilege proof;
 - redacted signed-auth request corpus and explained differential report;
 - bounded latency/query-plan evidence for audience arrays and pagination;
 - private legacy → Java → legacy route rehearsal with unchanged legacy writer;
