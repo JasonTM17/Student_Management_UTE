@@ -161,6 +161,9 @@ the retirement gates pass.
   `phase-06-thesis-round-read.md`. Compile passed, while Spring test execution
   is `BLOCKED_CAPABILITY` by the current Windows commit-memory limit; no route
   or writer ownership has moved.
+- Phase 07 thesis group read: source candidate; see
+  `phase-07-thesis-group-read.md`. It is JDBC-only and compile-verified; the
+  same host resource limit blocks Spring persistence verification.
 
 # Acceptance and verification
 

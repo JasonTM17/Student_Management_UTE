@@ -33,3 +33,27 @@ CREATE TABLE thesis.thesis_topic (
 
 CREATE INDEX thesis_topic_round_idx
     ON thesis.thesis_topic (round_id, status);
+
+CREATE TABLE thesis.thesis_group (
+    id UUID PRIMARY KEY,
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
+    leader_student_id UUID NOT NULL,
+    topic_id UUID,
+    status VARCHAR(32) NOT NULL,
+    approval_status VARCHAR(32) NOT NULL,
+    rejection_reason VARCHAR(500),
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+);
+
+CREATE INDEX thesis_group_round_idx ON thesis.thesis_group (round_id, created_at);
+
+CREATE TABLE thesis.thesis_group_member (
+    id UUID PRIMARY KEY,
+    group_id UUID NOT NULL REFERENCES thesis.thesis_group (id) ON DELETE CASCADE,
+    round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
+    student_id UUID NOT NULL,
+    member_order INTEGER NOT NULL,
+    is_leader BOOLEAN NOT NULL DEFAULT FALSE,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT thesis_group_member_unique UNIQUE (group_id, student_id)
+);
