@@ -2,10 +2,15 @@ package io.campuscore.restfulapi.migration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
 import java.util.HashMap;
 import java.util.Map;
 import org.junit.jupiter.api.Test;
+import org.springframework.context.annotation.ConditionContext;
+import org.springframework.mock.env.MockEnvironment;
 
 class MigrationSafetyConfigTest {
 
@@ -27,5 +32,15 @@ class MigrationSafetyConfigTest {
         config.disableHibernateSchemaManagementForReadOnlyCandidates().customize(properties);
 
         assertEquals("none", properties.get("hibernate.hbm2ddl.auto"));
+    }
+
+    @Test
+    void supportTicketWriteCandidateAlsoActivatesMigrationSafetyCondition() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("migration.engagement-write.enabled", "true");
+        ConditionContext context = mock(ConditionContext.class);
+        when(context.getEnvironment()).thenReturn(environment);
+
+        assertTrue(new ReadOnlyMigrationCandidateCondition().matches(context, null));
     }
 }

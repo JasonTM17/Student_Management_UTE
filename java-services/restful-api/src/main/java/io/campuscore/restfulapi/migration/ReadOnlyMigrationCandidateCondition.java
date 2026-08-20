@@ -9,6 +9,7 @@ final class ReadOnlyMigrationCandidateCondition implements Condition {
     @Override
     public boolean matches(ConditionContext context, AnnotatedTypeMetadata metadata) {
         return enabled(context, "migration.engagement-read.enabled")
+                || enabled(context, "migration.engagement-write.enabled")
                 || enabled(context, "migration.notifications-read.enabled")
                 || enabled(context, "migration.academic-read.enabled")
                 || enabled(context, "migration.academic-enrollment-read.enabled")
