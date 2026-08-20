@@ -40,6 +40,8 @@ migration:
     enabled: ${THESIS_READ_ENABLED:false}
   notifications-read:
     enabled: ${NOTIFICATIONS_READ_ENABLED:false}
+  notifications-write:
+    enabled: ${NOTIFICATIONS_WRITE_ENABLED:false}
   engagement-read:
     enabled: ${ENGAGEMENT_READ_ENABLED:false}
   engagement-write:

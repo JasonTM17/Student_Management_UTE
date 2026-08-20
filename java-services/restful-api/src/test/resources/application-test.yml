@@ -11,6 +11,8 @@ migration:
     enabled: true
   notifications-read:
     enabled: false
+  notifications-write:
+    enabled: false
   engagement-read:
     enabled: false
   academic-read:
