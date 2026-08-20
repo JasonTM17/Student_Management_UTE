@@ -93,6 +93,10 @@ class AnnouncementReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].id").value("role-year"))
                 .andExpect(jsonPath("$.data[0].targetRoles[0]").value("STUDENT"))
                 .andExpect(jsonPath("$.data[0].targetYears[0]").value(2))
+                .andExpect(jsonPath("$.data[0].publishAt").value("2020-01-01T00:00:00.000Z"))
+                .andExpect(jsonPath("$.data[0].expiresAt").value("2100-01-01T00:00:00.000Z"))
+                .andExpect(jsonPath("$.data[0].createdAt").value("2026-08-20T10:00:00.000Z"))
+                .andExpect(jsonPath("$.data[0].updatedAt").value("2026-08-20T10:00:00.000Z"))
                 .andExpect(jsonPath("$.data[1].id").value("global"))
                 .andExpect(jsonPath("$.meta.total").value(2));
 
