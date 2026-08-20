@@ -1,10 +1,10 @@
 package io.campuscore.restfulapi.engagement.web;
 
+import com.fasterxml.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.engagement.service.AnnouncementWriteService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnouncementRequest;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
-import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -38,16 +38,16 @@ public class AnnouncementWriteController {
     @ResponseStatus(HttpStatus.CREATED)
     public AnnouncementResponse create(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody CreateAnnouncementRequest request) {
-        return announcements.create(subject(jwt), request);
+            @RequestBody JsonNode request) {
+        return announcements.create(subject(jwt), CreateAnnouncementRequest.from(request));
     }
 
     @PutMapping("{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public AnnouncementResponse update(
             @PathVariable String id,
-            @Valid @RequestBody UpdateAnnouncementRequest request) {
-        return announcements.update(id, request);
+            @RequestBody JsonNode request) {
+        return announcements.update(id, UpdateAnnouncementRequest.from(request));
     }
 
     private static String subject(Jwt jwt) {

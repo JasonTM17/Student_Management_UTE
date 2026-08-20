@@ -154,7 +154,14 @@ class AnnouncementWritePersistenceTest {
                         .contentType("application/json")
                         .content("{\"content\":\"Missing title\"}"))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(post("/api/v1/announcements")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Nope\",\"content\":\"Nope\",\"unexpected\":true}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(post("/api/v1/announcements")
                         .with(adminJwt("admin-1"))
@@ -263,6 +270,46 @@ class AnnouncementWritePersistenceTest {
     }
 
     @Test
+    void adminClearsAnnouncementNullableFieldsWithExplicitNulls() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "publishAt": null,
+                                  "expiresAt": null,
+                                  "semesterId": null,
+                                  "sectionId": null,
+                                  "lecturerId": null
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("existing-announcement"))
+                .andExpect(jsonPath("$.publishAt").doesNotExist())
+                .andExpect(jsonPath("$.expiresAt").doesNotExist())
+                .andExpect(jsonPath("$.semesterId").doesNotExist())
+                .andExpect(jsonPath("$.semester").doesNotExist())
+                .andExpect(jsonPath("$.sectionId").doesNotExist())
+                .andExpect(jsonPath("$.section").doesNotExist())
+                .andExpect(jsonPath("$.lecturer").doesNotExist());
+
+        Integer cleared = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement'"
+                        + " AND \"publishAt\" IS NULL AND \"expiresAt\" IS NULL"
+                        + " AND \"semesterId\" IS NULL AND \"semesterName\" IS NULL"
+                        + " AND \"sectionId\" IS NULL AND \"sectionNumber\" IS NULL"
+                        + " AND \"courseCode\" IS NULL AND \"courseName\" IS NULL"
+                        + " AND \"lecturerId\" IS NULL AND \"lecturerDisplayName\" IS NULL"
+                        + " AND \"updatedAt\" > ?",
+                Integer.class,
+                localDateTime(BASE_TIME));
+        org.junit.jupiter.api.Assertions.assertEquals(1, cleared);
+    }
+
+    @Test
     void updateBoundaryFailsClosedForStudentMissingAnnouncementAndInvalidValues() throws Exception {
         seedAnnouncement();
 
@@ -288,6 +335,13 @@ class AnnouncementWritePersistenceTest {
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
                         .content("{\"priority\":\"CRITICAL\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"unexpected\":true}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
