@@ -297,6 +297,20 @@ class AnnouncementWritePersistenceTest {
                         .content("{\"targetYears\":[0]}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"targetRoles\":[7]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"targetYears\":[1.9]}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     private static org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt(String subject) {
