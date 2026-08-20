@@ -71,25 +71,35 @@ inspection are not substitutes for PostgreSQL parity or rollback proof.
 Verdict: **bounded runtime PASS; production cutover HOLD**.
 
 The exact provenance-bound probe checkpoint was
-`4c0e79b7448235d581469d995652c42a28ed0466`. The Java timestamp source commit
+`70eaaf260f462928b696395816beba39b8918995`. The Java timestamp source commit
 was `b6c6e0d863642a6cdbdb89e2e87dd2fbec8d4d57` and no Java production source
-changed between those identities. The rebuilt Spring Boot artifact was
-deterministic across the pre-commit and exact-head package runs:
+changed between those identities. The owned probe ran offline Maven
+`clean package` from that tracked-clean HEAD with the selected Java runtime,
+then hashed the resulting Spring Boot artifact before launching it. This binds
+the observed run to one exact clean build; it is not a reproducible-build claim:
 
 - JAR SHA-256:
-  `1866AA8719B67A218D77C11CA1FE0A6087C0C9451A9EE099F6C64F73BD929BE8`;
+  `9A33174446FC1F71982ADE7825CF6E1786BF8FB32389A23D2C35A0871B79B855`;
 - Java reference artifact SHA-256:
-  `C35AB883F93A0F62A6D446F99692F86CE048604F21782F616A9847922E631A69`;
+  `C1AAF8084CBF25F0E909DD1096624886E1A95C4E34060035C615EB4B6152799D`;
 - sequential differential report SHA-256:
-  `B6A7654FC17A2D7BB284400793B92F7CFB2E02F19FB29FA5E62591BC000FF1DE`;
+  `E6F3F463C2DC4F97D29123B808AF051B95C903F9E81AD3E0B3BAD6E65F1911CC`;
+- Maven clean-build log SHA-256:
+  `AF64D41141B08E7674D24E6FFD9045696C0BF6C8D39E98D8604C9F13C55DDFCC`;
+- selected Maven launcher SHA-256:
+  `5F9B8EAC523030CD9818DAA0EB337635E06137D0DA95A66A0A5425D668050E12`;
+- selected Java executable SHA-256:
+  `94DC54724B34717DAD127855DC8228AF8BC2E021C19B233FFF0DF4525F7698B3`;
+- owned Java log SHA-256:
+  `2FDB65AE07F0117C5529F2B2E156E63418F6B5B2E2B94419DC1BC48820A5B545`;
 - legacy Nest `dist/src/main.js` SHA-256:
   `DD5B004DC457BA61235704FB4633638907675F1940F747E109EDBB3BF988BD43`.
 
 The response artifacts are outside Git in the D-hosted Phase 11 recovery root.
 They contain response data and source/artifact identities, but no bearer or
-cookie token values. The capture derives the Git HEAD and artifact hashes from
-the checkout and files it actually observes; it rejects a tracked-dirty
-checkout instead of accepting caller-supplied identity strings.
+cookie token values. The probe derives the Git HEAD and hashes from the checkout,
+build tools and files it actually observes; it rejects a tracked-dirty checkout
+instead of accepting caller-supplied identity strings.
 
 ### Isolated database and startup evidence
 
@@ -120,10 +130,13 @@ checkout instead of accepting caller-supplied identity strings.
 ### Differential result
 
 The reusable probe is
-`engagement-service/test/engagement-read.rehearsal.cjs`. It captures Java
-responses with a lightweight process, stops Java, then starts the in-process
-Nest application and compares against the immutable reference. This sequential
-shape was selected because the C drive had only about 0.3 GiB free and a prior
+`engagement-service/test/engagement-read.rehearsal.cjs`. In one process it runs
+an offline clean Maven build, spawns Java with a fixed structured `-jar` argv,
+requires the loopback listener PID to equal that owned child PID, captures Java
+responses in memory, verifies that the JAR hash did not change, stops Java, and
+only then starts the in-process Nest application for comparison. It writes the
+reference artifact after capture for audit, but never reads an external
+reference for comparison. This sequential shape was selected because a prior
 Jest/ts-jest attempt exhausted its bounded Node heap before running tests; that
 attempt remains `NOT_RUN`, not a functional failure.
 
@@ -135,11 +148,12 @@ target with the `engagement` schema; a D-hosted Phase 11 run root; and a live
 match that root. Reference and report paths must be descendants of the same
 root. The probe deletes the absent RabbitMQ environment key before Nest config
 loads, so an `.env` file or inherited broker URL cannot activate queue setup.
-Java capture additionally requires the exact loopback URL
+Owned Java execution additionally requires the exact loopback URL
 `http://127.0.0.1:56410/`, rejects credentials/query/fragment and redirects,
-and binds the listener PID command line to the exact D-hosted JAR whose hash it
-records. The report then verifies the immutable Java reference hash, actual
-clean source HEAD, JAR path/hash/PID and actual legacy entry-artifact hash.
+rejects the retired split capture mode and any caller-provided reference, and
+binds the listener PID to the child process it spawned from the freshly built
+D-hosted JAR. The report records the Java reference hash, actual clean source
+HEAD, build/JAR/tool/log hashes, owned PID and actual legacy entry-artifact hash.
 
 Thirteen signed/negative cases produced equal HTTP status and normalized
 content type. Status, successful response body and normalized content type are
@@ -169,8 +183,11 @@ decision and is not represented as full parity.
 - negative preflight cases for a substring-smuggled active database URL,
   inherited RabbitMQ URL, C-hosted run root and a userinfo-smuggled Java URL:
   all rejected before app import or network use.
-- exact-head Java capture: 13/13 cases PASS with the listener bound to PID
-  `15988` and the JAR/hash shown above; Java was stopped before legacy startup.
+- external reference comparison and the retired split capture mode: both
+  rejected before build or network use.
+- exact-head owned Java capture: 13/13 cases PASS with the listener bound to the
+  spawned PID `42080` and the clean-built JAR/hash shown above; Java was stopped
+  before legacy startup and port `56410` was closed after the run.
 - sequential differential: 13/13 status/content-type assertions PASS and 7/7
   successful full-body assertions PASS; the six intentional error-envelope
   differences remained visible as `errorBodyParity=false`.
