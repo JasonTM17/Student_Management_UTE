@@ -44,17 +44,30 @@ assignment owner, event publisher, route owner, and rollback target.
 ## Verification observed
 
 - Current exact-head focused gate passed locally on Windows with Java 24, using
-  a workspace-local temporary directory outside the low-space system drive:
+  Maven heap and temp settings that kept test artifacts off the low-space
+  system drive:
 
   ```powershell
-  $env:TEMP='<workspace>\.tmp'
-  $env:TMP='<workspace>\.tmp'
-  $env:MAVEN_OPTS='-Xmx768m -XX:MaxMetaspaceSize=256m'
-  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.SupportTicketWritePersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test
+  $env:JAVA_HOME='C:\Program Files\Java\jdk-24'
+  $env:Path="$env:JAVA_HOME\bin;$env:Path"
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp'
+  mvn -q -pl restful-api '-Dtest=SupportTicketWritePersistenceTest,SupportTicketReadPersistenceTest,RestfulApiContractTest,MigrationSafetyConfigTest' test
+  ```
+
+- Full Java reactor gate also passed locally on the same host/JDK:
+
+  ```powershell
+  $env:JAVA_HOME='C:\Program Files\Java\jdk-24'
+  $env:Path="$env:JAVA_HOME\bin;$env:Path"
+  $env:MAVEN_OPTS='-Xmx384m -XX:MaxMetaspaceSize=192m -XX:ReservedCodeCacheSize=64m -Djava.io.tmpdir=D:\Student_Management-recovery\java-test-temp'
+  mvn -q -f java-services/pom.xml test
   ```
 
 - `node scripts/check-doc-hygiene.mjs`: PASS.
 - `node scripts/check-architecture.mjs`: PASS.
+- `node scripts/check-thesis-contract.mjs`: PASS as a static source contract
+  gate; runtime response, auth, mutation, data, image provenance, and rollback
+  parity remain separate gates.
 - Runtime engagement write/DDL scan found only the intended support-ticket
   `INSERT`; no `UPDATE`, `DELETE`, `CREATE`, `ALTER`, `DROP`, `TRUNCATE` or
   `MERGE` statement was present in the engagement runtime package.
