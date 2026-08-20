@@ -7,6 +7,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -41,28 +42,36 @@ public class AcademicEnrollmentReadRepository {
     }
 
     public List<EnrollmentRow> findStudentEnrollments(String studentId, String semesterId) {
-        return jdbc.query(enrollmentSelect()
-                        + " WHERE e.\"studentId\" = :studentId"
-                        + " AND (:semesterId IS NULL OR e.\"semesterId\" = :semesterId)"
-                        + " ORDER BY e.\"enrolledAt\" DESC",
-                new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId),
+        MapSqlParameterSource parameters = new MapSqlParameterSource("studentId", studentId);
+        StringBuilder sql = new StringBuilder(enrollmentSelect()).append(" WHERE e.\"studentId\" = :studentId");
+        if (semesterId != null) {
+            sql.append(" AND e.\"semesterId\" = :semesterId");
+            parameters.addValue("semesterId", semesterId);
+        }
+        sql.append(" ORDER BY e.\"enrolledAt\" DESC");
+        return jdbc.query(sql.toString(),
+                parameters,
                 AcademicEnrollmentReadRepository::mapEnrollment);
     }
 
     public List<EnrollmentRow> findEnrollments(long offset, int limit, String status, String semesterId, String studentId, String courseId, String sectionId) {
-        return jdbc.query(enrollmentSelect() + enrollmentWhere()
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId);
+        return jdbc.query(enrollmentSelect() + where
                         + " ORDER BY e.\"enrolledAt\" DESC LIMIT :limit OFFSET :offset",
-                enrollmentParameters(status, semesterId, studentId, courseId, sectionId)
+                parameters
                         .addValue("offset", offset)
                         .addValue("limit", limit),
                 AcademicEnrollmentReadRepository::mapEnrollment);
     }
 
     public long countEnrollments(String status, String semesterId, String studentId, String courseId, String sectionId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        String where = enrollmentWhere(parameters, status, semesterId, studentId, courseId, sectionId);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + ENROLLMENT + " e JOIN " + SECTION
-                        + " section ON section.\"id\" = e.\"sectionId\"" + enrollmentWhere(),
-                enrollmentParameters(status, semesterId, studentId, courseId, sectionId),
+                        + " section ON section.\"id\" = e.\"sectionId\"" + where,
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -100,10 +109,10 @@ public class AcademicEnrollmentReadRepository {
                         + " FROM " + ENROLLMENT + " e" + commonJoins()
                         + " LEFT JOIN " + ACADEMIC_YEAR + " ay ON ay.\"id\" = semester.\"academicYearId\""
                         + " WHERE e.\"studentId\" = :studentId"
-                        + " AND (:semesterId IS NULL OR e.\"semesterId\" = :semesterId)"
+                        + (semesterId == null ? "" : " AND e.\"semesterId\" = :semesterId")
                         + " AND (e.\"status\" = 'COMPLETED' OR e.\"gradeStatus\" IN ('PUBLISHED', 'APPEALED'))"
                         + " ORDER BY ay.\"year\" DESC, semester.\"startDate\" DESC, course.\"code\" ASC",
-                new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId),
+                optionalParameter(new MapSqlParameterSource("studentId", studentId), "semesterId", semesterId),
                 AcademicEnrollmentReadRepository::mapGradeSummary);
     }
 
@@ -121,12 +130,26 @@ public class AcademicEnrollmentReadRepository {
                 AcademicEnrollmentReadRepository::mapGradeItem);
     }
 
+    public List<GradeItemRow> findGradeItemsBySectionAndLecturer(String sectionId, String lecturerId) {
+        return jdbc.query(gradeItemSelect()
+                        + " WHERE item.\"sectionId\" = :sectionId AND section.\"lecturerId\" = :lecturerId"
+                        + " ORDER BY item.\"createdAt\" DESC",
+                new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                AcademicEnrollmentReadRepository::mapGradeItem);
+    }
+
     public List<StudentGradeRow> findStudentGradesByLecturer(String lecturerId, String sectionId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("lecturerId", lecturerId);
+        String sectionFilter = "";
+        if (sectionId != null) {
+            sectionFilter = " AND e.\"sectionId\" = :sectionId";
+            parameters.addValue("sectionId", sectionId);
+        }
         return jdbc.query(studentGradeSelect()
                         + " WHERE section.\"lecturerId\" = :lecturerId"
-                        + " AND (:sectionId IS NULL OR e.\"sectionId\" = :sectionId)"
+                        + sectionFilter
                         + " ORDER BY section.\"sectionNumber\", student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\"",
-                new MapSqlParameterSource().addValue("lecturerId", lecturerId).addValue("sectionId", sectionId),
+                parameters,
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
 
@@ -138,10 +161,26 @@ public class AcademicEnrollmentReadRepository {
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
 
+    public List<StudentGradeRow> findStudentGradesBySectionAndLecturer(String sectionId, String lecturerId) {
+        return jdbc.query(studentGradeSelect()
+                        + " WHERE e.\"sectionId\" = :sectionId AND section.\"lecturerId\" = :lecturerId"
+                        + " ORDER BY student_user.\"lastName\", student_user.\"firstName\", item.\"createdAt\"",
+                new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                AcademicEnrollmentReadRepository::mapStudentGrade);
+    }
+
     public List<StudentGradeRow> findStudentGradesByEnrollment(String enrollmentId) {
         return jdbc.query(studentGradeSelect()
                         + " WHERE e.\"id\" = :enrollmentId ORDER BY item.\"createdAt\"",
                 new MapSqlParameterSource("enrollmentId", enrollmentId),
+                AcademicEnrollmentReadRepository::mapStudentGrade);
+    }
+
+    public List<StudentGradeRow> findStudentGradesByEnrollmentAndLecturer(String enrollmentId, String lecturerId) {
+        return jdbc.query(studentGradeSelect()
+                        + " WHERE e.\"id\" = :enrollmentId AND section.\"lecturerId\" = :lecturerId"
+                        + " ORDER BY item.\"createdAt\"",
+                new MapSqlParameterSource().addValue("enrollmentId", enrollmentId).addValue("lecturerId", lecturerId),
                 AcademicEnrollmentReadRepository::mapStudentGrade);
     }
 
@@ -170,21 +209,28 @@ public class AcademicEnrollmentReadRepository {
                 + " LEFT JOIN " + USER + " lecturer_user ON lecturer_user.\"id\" = lecturer.\"userId\"";
     }
 
-    private static String enrollmentWhere() {
-        return " WHERE (:status IS NULL OR e.\"status\" = :status)"
-                + " AND (:semesterId IS NULL OR e.\"semesterId\" = :semesterId)"
-                + " AND (:studentId IS NULL OR e.\"studentId\" = :studentId)"
-                + " AND (:courseId IS NULL OR section.\"courseId\" = :courseId)"
-                + " AND (:sectionId IS NULL OR e.\"sectionId\" = :sectionId)";
+    private static String enrollmentWhere(MapSqlParameterSource parameters, String status, String semesterId, String studentId, String courseId, String sectionId) {
+        List<String> filters = new ArrayList<>();
+        addFilter(filters, parameters, "status", status, "e.\"status\" = :status");
+        addFilter(filters, parameters, "semesterId", semesterId, "e.\"semesterId\" = :semesterId");
+        addFilter(filters, parameters, "studentId", studentId, "e.\"studentId\" = :studentId");
+        addFilter(filters, parameters, "courseId", courseId, "section.\"courseId\" = :courseId");
+        addFilter(filters, parameters, "sectionId", sectionId, "e.\"sectionId\" = :sectionId");
+        return filters.isEmpty() ? "" : " WHERE " + String.join(" AND ", filters);
     }
 
-    private static MapSqlParameterSource enrollmentParameters(String status, String semesterId, String studentId, String courseId, String sectionId) {
-        return new MapSqlParameterSource()
-                .addValue("status", status)
-                .addValue("semesterId", semesterId)
-                .addValue("studentId", studentId)
-                .addValue("courseId", courseId)
-                .addValue("sectionId", sectionId);
+    private static void addFilter(List<String> filters, MapSqlParameterSource parameters, String name, String value, String sql) {
+        if (value != null) {
+            filters.add(sql);
+            parameters.addValue(name, value);
+        }
+    }
+
+    private static MapSqlParameterSource optionalParameter(MapSqlParameterSource parameters, String name, String value) {
+        if (value != null) {
+            parameters.addValue(name, value);
+        }
+        return parameters;
     }
 
     private static String gradeItemSelect() {

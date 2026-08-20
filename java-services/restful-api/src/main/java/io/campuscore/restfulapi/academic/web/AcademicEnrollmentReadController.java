@@ -96,8 +96,10 @@ public class AcademicEnrollmentReadController {
 
     @GetMapping("grades/items/section/{sectionId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
-    public List<GradeItemResponse> getGradeItemsBySection(@PathVariable String sectionId) {
-        return academic.findGradeItemsBySection(sectionId);
+    public List<GradeItemResponse> getGradeItemsBySection(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String sectionId) {
+        return academic.findGradeItemsBySection(sectionId, jwt.getClaimAsStringList("roles"), jwt.getClaimAsString("lecturerId"));
     }
 
     @GetMapping("grades/items/lecturer/my")
@@ -108,8 +110,10 @@ public class AcademicEnrollmentReadController {
 
     @GetMapping("grades/student-grades/section/{sectionId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
-    public List<StudentGradeSectionRow> getStudentGradesBySection(@PathVariable String sectionId) {
-        return academic.findStudentGradesBySection(sectionId);
+    public List<StudentGradeSectionRow> getStudentGradesBySection(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String sectionId) {
+        return academic.findStudentGradesBySection(sectionId, jwt.getClaimAsStringList("roles"), jwt.getClaimAsString("lecturerId"));
     }
 
     @GetMapping("grades/student-grades/lecturer/my")
@@ -124,8 +128,10 @@ public class AcademicEnrollmentReadController {
 
     @GetMapping("grades/student-grades/enrollment/{enrollmentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
-    public StudentGradesByEnrollmentResponse getStudentGradesByEnrollment(@PathVariable String enrollmentId) {
-        return academic.findStudentGradesByEnrollment(enrollmentId);
+    public StudentGradesByEnrollmentResponse getStudentGradesByEnrollment(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String enrollmentId) {
+        return academic.findStudentGradesByEnrollment(enrollmentId, jwt.getClaimAsStringList("roles"), jwt.getClaimAsString("lecturerId"));
     }
 
     private static void requireAllowedQuery(

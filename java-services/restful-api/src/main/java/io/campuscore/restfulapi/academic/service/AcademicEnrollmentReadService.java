@@ -177,8 +177,14 @@ public class AcademicEnrollmentReadService {
     }
 
     @Transactional(readOnly = true)
-    public List<GradeItemResponse> findGradeItemsBySection(String sectionId) {
-        return academic.findGradeItemsBySection(normalizeRequired("sectionId", sectionId)).stream()
+    public List<GradeItemResponse> findGradeItemsBySection(String sectionId, List<String> roles, String lecturerId) {
+        String normalizedSectionId = normalizeRequired("sectionId", sectionId);
+        List<GradeItemRow> rows = isAdmin(roles)
+                ? academic.findGradeItemsBySection(normalizedSectionId)
+                : academic.findGradeItemsBySectionAndLecturer(
+                        normalizedSectionId,
+                        requireProfileId("lecturerId", lecturerId));
+        return rows.stream()
                 .map(AcademicEnrollmentReadService::gradeItem)
                 .toList();
     }
@@ -191,8 +197,14 @@ public class AcademicEnrollmentReadService {
     }
 
     @Transactional(readOnly = true)
-    public List<StudentGradeSectionRow> findStudentGradesBySection(String sectionId) {
-        return studentGradeRows(academic.findStudentGradesBySection(normalizeRequired("sectionId", sectionId)));
+    public List<StudentGradeSectionRow> findStudentGradesBySection(String sectionId, List<String> roles, String lecturerId) {
+        String normalizedSectionId = normalizeRequired("sectionId", sectionId);
+        List<StudentGradeRow> rows = isAdmin(roles)
+                ? academic.findStudentGradesBySection(normalizedSectionId)
+                : academic.findStudentGradesBySectionAndLecturer(
+                        normalizedSectionId,
+                        requireProfileId("lecturerId", lecturerId));
+        return studentGradeRows(rows);
     }
 
     @Transactional(readOnly = true)
@@ -203,9 +215,14 @@ public class AcademicEnrollmentReadService {
     }
 
     @Transactional(readOnly = true)
-    public StudentGradesByEnrollmentResponse findStudentGradesByEnrollment(String enrollmentId) {
+    public StudentGradesByEnrollmentResponse findStudentGradesByEnrollment(String enrollmentId, List<String> roles, String lecturerId) {
+        String normalizedEnrollmentId = normalizeRequired("enrollmentId", enrollmentId);
         List<StudentGradeSectionRow> rows = studentGradeRows(
-                academic.findStudentGradesByEnrollment(normalizeRequired("enrollmentId", enrollmentId)));
+                isAdmin(roles)
+                        ? academic.findStudentGradesByEnrollment(normalizedEnrollmentId)
+                        : academic.findStudentGradesByEnrollmentAndLecturer(
+                                normalizedEnrollmentId,
+                                requireProfileId("lecturerId", lecturerId)));
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found");
         }
@@ -353,20 +370,28 @@ public class AcademicEnrollmentReadService {
             return null;
         }
         BigDecimal total = BigDecimal.ZERO;
+        boolean hasContribution = false;
         for (StudentGradeLine grade : grades) {
-            if (grade.score() != null && grade.maxScore() != null && grade.weight() != null
-                    && grade.maxScore().compareTo(BigDecimal.ZERO) > 0) {
+            if (isScored(grade)) {
+                hasContribution = true;
                 total = total.add(grade.score().divide(grade.maxScore(), 8, RoundingMode.HALF_UP).multiply(grade.weight()));
             }
         }
-        return total.setScale(2, RoundingMode.HALF_UP);
+        return hasContribution ? total.setScale(2, RoundingMode.HALF_UP) : null;
     }
 
     private static BigDecimal totalWeight(List<StudentGradeLine> grades) {
         return grades.stream()
+                .filter(AcademicEnrollmentReadService::isScored)
                 .map(StudentGradeLine::weight)
-                .filter(java.util.Objects::nonNull)
                 .reduce(BigDecimal.ZERO, BigDecimal::add);
+    }
+
+    private static boolean isScored(StudentGradeLine grade) {
+        return grade.score() != null
+                && grade.maxScore() != null
+                && grade.weight() != null
+                && grade.maxScore().compareTo(BigDecimal.ZERO) > 0;
     }
 
     private static String requireProfileId(String name, String value) {
@@ -397,6 +422,10 @@ public class AcademicEnrollmentReadService {
             throw new IllegalArgumentException(name + " is too long");
         }
         return trimmed;
+    }
+
+    private static boolean isAdmin(List<String> roles) {
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
     private static void requirePage(int page, int limit) {
