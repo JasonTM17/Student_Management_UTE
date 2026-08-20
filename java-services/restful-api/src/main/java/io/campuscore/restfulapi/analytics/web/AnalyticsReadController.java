@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import java.util.List;
 import java.util.Map;
@@ -45,6 +46,14 @@ public class AnalyticsReadController {
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of());
         return analytics.financeSummary();
+    }
+
+    @GetMapping("notification-summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public NotificationSummaryResponse notificationSummary(
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.notificationSummary();
     }
 
     private static void requireAllowedQuery(

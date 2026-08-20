@@ -239,6 +239,10 @@ class RestfulApiContractTest {
         mvc.perform(get("/api/v1/analytics/finance-summary").with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/analytics/notification-summary").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

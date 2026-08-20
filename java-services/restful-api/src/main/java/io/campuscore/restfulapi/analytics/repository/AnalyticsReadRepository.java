@@ -1,11 +1,15 @@
 package io.campuscore.restfulapi.analytics.repository;
 
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationTypeBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.LocalDateTime;
+import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -108,6 +112,42 @@ public class AnalyticsReadRepository {
                         amount(resultSet, "amount")));
     }
 
+    public long countNotifications() {
+        return count("\"Notification\"");
+    }
+
+    public long countUnreadNotifications() {
+        Long count = jdbc.getJdbcTemplate().queryForObject(
+                "SELECT COUNT(*) FROM " + table("\"Notification\"") + " WHERE \"isRead\" = FALSE",
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public List<NotificationTypeBucket> notificationTypeBuckets() {
+        return jdbc.query(
+                "SELECT \"type\", COUNT(\"id\") AS \"count\""
+                        + " FROM " + table("\"Notification\"")
+                        + " GROUP BY \"type\" ORDER BY \"type\" ASC",
+                (resultSet, ignored) -> new NotificationTypeBucket(
+                        resultSet.getString("type"),
+                        resultSet.getLong("count")));
+    }
+
+    public List<RecentAttentionNotification> recentAttentionNotifications() {
+        return jdbc.query(
+                "SELECT \"id\", \"title\", \"message\", \"type\", \"createdAt\""
+                        + " FROM " + table("\"Notification\"")
+                        + " WHERE \"type\" IN ('ERROR', 'WARNING')"
+                        + " ORDER BY \"createdAt\" DESC"
+                        + " LIMIT 5",
+                (resultSet, ignored) -> new RecentAttentionNotification(
+                        resultSet.getString("id"),
+                        resultSet.getString("title"),
+                        resultSet.getString("message"),
+                        resultSet.getString("type"),
+                        instant(resultSet, "createdAt")));
+    }
+
     private long count(String tableName) {
         Long count = jdbc.getJdbcTemplate().queryForObject(
                 "SELECT COUNT(*) FROM " + table(tableName),
@@ -122,5 +162,10 @@ public class AnalyticsReadRepository {
     private static BigDecimal amount(ResultSet resultSet, String column) throws SQLException {
         BigDecimal value = resultSet.getBigDecimal(column);
         return value == null ? BigDecimal.ZERO : value;
+    }
+
+    private static java.time.Instant instant(ResultSet resultSet, String column) throws SQLException {
+        LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
+        return value == null ? null : value.toInstant(ZoneOffset.UTC);
     }
 }
