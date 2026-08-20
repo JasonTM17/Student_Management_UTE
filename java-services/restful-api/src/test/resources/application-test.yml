@@ -1,6 +1,7 @@
 security:
   jwt:
     secret: test-only-restful-api-secret-with-at-least-32-characters
+    refresh-secret: test-only-refresh-secret-with-at-least-32-characters
 
 health:
   readiness-key: test-health-key
@@ -13,6 +14,8 @@ migration:
   engagement-read:
     enabled: false
   academic-read:
+    enabled: false
+  auth-login:
     enabled: false
 
 spring:

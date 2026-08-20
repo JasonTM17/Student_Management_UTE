@@ -7,15 +7,15 @@ import org.springframework.context.annotation.Conditional;
 import org.springframework.context.annotation.Configuration;
 import org.springframework.context.annotation.Profile;
 
-/** Fail-closed migration controls for read-only strangler candidates. */
+/** Fail-closed migration controls for legacy-schema strangler candidates. */
 @Configuration(proxyBeanMethods = false)
 @Profile("persistence")
 public class MigrationSafetyConfig {
 
     /**
-     * A read-only domain role must not need visibility into the thesis schema,
-     * nor be able to mutate a legacy schema, merely because JPA entities share
-     * this deployable.
+     * A legacy-schema candidate must not need visibility into the thesis
+     * schema, nor allow Hibernate to mutate a schema, merely because JPA
+     * entities share this deployable.
      */
     @Bean
     @Conditional(ReadOnlyMigrationCandidateCondition.class)
@@ -25,15 +25,16 @@ public class MigrationSafetyConfig {
 
     /**
      * Spring Boot invokes this strategy instead of {@code flyway.migrate()}.
-     * Therefore an operator cannot accidentally combine a read-only candidate
-     * flag with Flyway and mutate a legacy/shared schema during startup.
+     * Therefore an operator cannot accidentally combine a legacy-schema
+     * candidate flag with Flyway and mutate a legacy/shared schema during
+     * startup.
      */
     @Bean
     @Conditional(ReadOnlyMigrationCandidateCondition.class)
     FlywayMigrationStrategy rejectFlywayForReadOnlyCandidates() {
         return flyway -> {
             throw new IllegalStateException(
-                    "Flyway must be disabled while a read-only migration candidate is enabled");
+                    "Flyway must be disabled while a legacy-schema migration candidate is enabled");
         };
     }
 }
