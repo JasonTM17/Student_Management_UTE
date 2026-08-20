@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBuc
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -154,6 +155,31 @@ public class AnalyticsReadRepository {
                         + " ORDER BY s.\"enrolledCount\" DESC"
                         + " LIMIT 20",
                 (resultSet, ignored) -> sectionOccupancyBucket(resultSet));
+    }
+
+    public List<TopCourseBucket> topCourses(int limit) {
+        return jdbc.query(
+                "SELECT c.\"id\" AS \"courseId\", c.\"code\" AS \"courseCode\","
+                        + " c.\"name\" AS \"courseName\", c.\"nameEn\" AS \"courseNameEn\","
+                        + " c.\"nameVi\" AS \"courseNameVi\", c.\"credits\","
+                        + " COUNT(DISTINCT s.\"id\") AS \"sectionCount\", COUNT(e.\"id\") AS \"totalEnrollments\""
+                        + " FROM " + table("\"Course\"") + " c"
+                        + " LEFT JOIN " + table("\"Section\"") + " s ON s.\"courseId\" = c.\"id\""
+                        + " LEFT JOIN " + table("\"Enrollment\"") + " e ON e.\"sectionId\" = s.\"id\""
+                        + " AND e.\"status\" IN ('CONFIRMED', 'PENDING')"
+                        + " GROUP BY c.\"id\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\", c.\"credits\""
+                        + " ORDER BY \"totalEnrollments\" DESC"
+                        + " LIMIT :limit",
+                Map.of("limit", limit),
+                (resultSet, ignored) -> new TopCourseBucket(
+                        resultSet.getString("courseId"),
+                        resultSet.getString("courseCode"),
+                        resultSet.getString("courseName"),
+                        resultSet.getString("courseNameEn"),
+                        resultSet.getString("courseNameVi"),
+                        resultSet.getInt("credits"),
+                        resultSet.getLong("sectionCount"),
+                        resultSet.getLong("totalEnrollments")));
     }
 
     public Map<String, Long> completedLetterGradeCounts() {

@@ -53,7 +53,8 @@ class AnalyticsReadPersistenceTest {
                     "code" VARCHAR(80),
                     "name" VARCHAR(200),
                     "nameEn" VARCHAR(200),
-                    "nameVi" VARCHAR(200)
+                    "nameVi" VARCHAR(200),
+                    "credits" INTEGER
                 )
                 """);
         jdbc.execute("""
@@ -221,8 +222,8 @@ class AnalyticsReadPersistenceTest {
                 "Hoc ky Thu 2026",
                 "academic-year-2026",
                 BASE_TIME);
-        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web");
-        insertCourse("course-java", "JAVA201", "Java Backend", "Java Backend", "Java Backend");
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web", 3);
+        insertCourse("course-java", "JAVA201", "Java Backend", "Java Backend", "Java Backend", 4);
         insertSection("section-web-a", "A", "course-web", "semester-fall-2026", 10, 9);
         insertSection("section-java-b", "B", "course-java", "semester-fall-2026", 6, 3);
         insertEnrollmentInSection("enrollment-web-confirmed", "semester-fall-2026", "section-web-a", "CONFIRMED");
@@ -247,6 +248,46 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$[1].sectionId").value("section-java-b"))
                 .andExpect(jsonPath("$[1].enrolledCount").value(3))
                 .andExpect(jsonPath("$[1].occupancyRate").value(50));
+    }
+
+    @Test
+    void topCoursesPreservesLegacySortLimitAndConfirmedPendingCounts() throws Exception {
+        insertAcademicYear("academic-year-2026", 2026);
+        insertSemester(
+                "semester-fall-2026",
+                "Fall 2026",
+                "Fall 2026",
+                "Hoc ky Thu 2026",
+                "academic-year-2026",
+                BASE_TIME);
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web", 3);
+        insertCourse("course-java", "JAVA201", "Java Backend", "Java Backend", "Java Backend", 4);
+        insertCourse("course-db", "DB301", "Databases", "Databases", "Co so du lieu", 3);
+        insertSection("section-web-a", "A", "course-web", "semester-fall-2026", 30, 0);
+        insertSection("section-web-b", "B", "course-web", "semester-fall-2026", 30, 0);
+        insertSection("section-java-a", "A", "course-java", "semester-fall-2026", 20, 0);
+        insertEnrollmentInSection("enrollment-web-confirmed", "semester-fall-2026", "section-web-a", "CONFIRMED");
+        insertEnrollmentInSection("enrollment-web-pending", "semester-fall-2026", "section-web-a", "PENDING");
+        insertEnrollmentInSection("enrollment-web-confirmed-2", "semester-fall-2026", "section-web-b", "CONFIRMED");
+        insertEnrollmentInSection("enrollment-web-completed", "semester-fall-2026", "section-web-b", "COMPLETED");
+        insertEnrollmentInSection("enrollment-java-pending", "semester-fall-2026", "section-java-a", "PENDING");
+
+        mvc.perform(get("/api/v1/analytics/top-courses")
+                        .queryParam("limit", "2")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].courseId").value("course-web"))
+                .andExpect(jsonPath("$[0].courseCode").value("WEB101"))
+                .andExpect(jsonPath("$[0].courseName").value("Web Programming"))
+                .andExpect(jsonPath("$[0].courseNameEn").value("Web Programming"))
+                .andExpect(jsonPath("$[0].courseNameVi").value("Lap trinh Web"))
+                .andExpect(jsonPath("$[0].credits").value(3))
+                .andExpect(jsonPath("$[0].sectionCount").value(2))
+                .andExpect(jsonPath("$[0].totalEnrollments").value(3))
+                .andExpect(jsonPath("$[1].courseId").value("course-java"))
+                .andExpect(jsonPath("$[1].sectionCount").value(1))
+                .andExpect(jsonPath("$[1].totalEnrollments").value(1));
     }
 
     @Test
@@ -367,6 +408,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/top-courses").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/grade-distribution").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -389,6 +434,13 @@ class AnalyticsReadPersistenceTest {
 
         mvc.perform(get("/api/v1/analytics/section-occupancy")
                         .queryParam("semesterId", "semester-1")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/top-courses")
+                        .queryParam("limit", "2")
+                        .queryParam("limit", "3")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -445,15 +497,17 @@ class AnalyticsReadPersistenceTest {
                 localDateTime(startDate));
     }
 
-    private void insertCourse(String id, String code, String name, String nameEn, String nameVi) {
+    private void insertCourse(String id, String code, String name, String nameEn, String nameVi, int credits) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Course\""
-                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\") VALUES (?, ?, ?, ?, ?)",
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"credits\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
                 id,
                 code,
                 name,
                 nameEn,
-                nameVi);
+                nameVi,
+                credits);
     }
 
     private void insertSection(
