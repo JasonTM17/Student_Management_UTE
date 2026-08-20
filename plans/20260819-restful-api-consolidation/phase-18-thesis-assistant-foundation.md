@@ -73,6 +73,9 @@ fallback shape remains compatible with web/mobile callers.
    prompts, or write database state.
 6. The mobile API seam sends `{ message, locale }` and expects
    `{ answer, model, degraded }`, matching the web client and Java controller.
+7. The mobile assistant screen keeps preview responses local, calls the Java
+   assistant route only in explicit live mode after bearer sign-in, and surfaces
+   the `degraded` fallback label when the Java local assistant responds.
 
 ## Verification commands
 
@@ -87,6 +90,13 @@ node scripts/check-thesis-contract.mjs
 npm test --prefix mobile
 git diff --check
 ```
+
+Continuation source evidence: the mobile assistant screen now calls
+`campusApi.assistantChat(trimmedMessage, 'en')` only when
+`EXPO_PUBLIC_API_MODE=live`; preview mode appends a local preview response and
+does not perform a network request. This remains source-level evidence only and
+does not prove Expo runtime, device behavior, live Java API availability,
+provider-backed chatbot mode, authenticated E2E, route canary or rollback.
 
 ## Risks and rollback
 
