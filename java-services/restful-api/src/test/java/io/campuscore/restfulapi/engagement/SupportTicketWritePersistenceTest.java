@@ -239,6 +239,23 @@ class SupportTicketWritePersistenceTest {
     }
 
     @Test
+    void respondAllowsBlankMessageLikeLegacyValidation() throws Exception {
+        mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
+                        .with(adminJwt("admin-3", "admin3@campuscore.edu", "Admin", "Three"))
+                        .contentType("application/json")
+                        .content("{\"message\":\"\"}"))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.message").value(""));
+
+        Integer blankResponses = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"TicketResponse\""
+                        + " WHERE \"ticketId\" = 'existing-ticket' AND \"userId\" = 'admin-3'"
+                        + " AND \"message\" = ''",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, blankResponses);
+    }
+
+    @Test
     void adminUpdatesTicketFieldsAndResolvedTimestamp() throws Exception {
         seedResponse("response-1", "existing-ticket", "agent-1", "agent@campuscore.edu", "Agent One");
 
@@ -289,6 +306,39 @@ class SupportTicketWritePersistenceTest {
                 .andExpect(jsonPath("$.status").value("CLOSED"))
                 .andExpect(jsonPath("$.resolvedAt").exists())
                 .andExpect(jsonPath("$.closedAt").exists());
+    }
+
+    @Test
+    void adminUpdatesBlankTextFieldsAndRejectsBlankEnumsLikeLegacyValidation() throws Exception {
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"subject\":\"\",\"description\":\"\",\"category\":\"\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.subject").value(""))
+                .andExpect(jsonPath("$.description").value(""))
+                .andExpect(jsonPath("$.category").value(""));
+
+        Integer blankTextRows = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"SupportTicket\""
+                        + " WHERE \"id\" = 'existing-ticket' AND \"subject\" = ''"
+                        + " AND \"description\" = '' AND \"category\" = ''",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, blankTextRows);
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"priority\":\"\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     @Test

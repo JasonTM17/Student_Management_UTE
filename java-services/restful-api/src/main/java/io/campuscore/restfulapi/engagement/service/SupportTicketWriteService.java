@@ -80,7 +80,7 @@ public class SupportTicketWriteService {
                 requireText(user.id(), "user id"),
                 requireText(user.email(), "email"),
                 user.displayName(),
-                requireText(request.message(), "message"),
+                requirePresent(request.message(), "message"),
                 Boolean.TRUE.equals(request.isInternal()),
                 Instant.now(clock)));
         if ("OPEN".equals(status)) {
@@ -94,8 +94,8 @@ public class SupportTicketWriteService {
         String id = requireText(ticketId, "ticket id");
         tickets.findTicketStatus(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
-        String priority = optional(request.priority());
-        String status = optional(request.status());
+        String priority = request.priority();
+        String status = request.status();
         if (priority != null && !PRIORITIES.contains(priority)) {
             throw new IllegalArgumentException("priority must be LOW, MEDIUM, HIGH, or CRITICAL");
         }
@@ -104,9 +104,9 @@ public class SupportTicketWriteService {
         }
         tickets.update(new SupportTicketWriteRepository.UpdateTicketCommand(
                 id,
-                optional(request.subject()),
-                optional(request.description()),
-                optional(request.category()),
+                request.subject(),
+                request.description(),
+                request.category(),
                 priority,
                 status,
                 Instant.now(clock)));
@@ -143,8 +143,11 @@ public class SupportTicketWriteService {
         return value;
     }
 
-    private static String optional(String value) {
-        return value == null || value.isBlank() ? null : value;
+    private static String requirePresent(String value, String name) {
+        if (value == null) {
+            throw new IllegalArgumentException(name + " is required");
+        }
+        return value;
     }
 
     public record CurrentTicketUser(String id, String email, String displayName) {
