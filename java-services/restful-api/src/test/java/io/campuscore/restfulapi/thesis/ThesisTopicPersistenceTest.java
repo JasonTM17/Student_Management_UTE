@@ -185,6 +185,15 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
+    void councilsAllowAnExistingRoundWithoutCouncils() throws Exception {
+        UUID roundId = insertRound();
+
+        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()).with(jwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+    }
+
+    @Test
     void thesisReadPathRejectsAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/thesis/topics")
                         .queryParam("roundId", UUID.randomUUID().toString()))
