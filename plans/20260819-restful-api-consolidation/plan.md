@@ -231,6 +231,15 @@ the retirement gates pass.
   weighted grade totals and transcript GPA summary. Enroll/drop, waitlist,
   grade writes/publishing, timetable, export, events, PostgreSQL parity, route
   canary, rollback and frontend convergence remain open.
+- Phase 18 backend-first thesis assistant/chatbotAI contract foundation:
+  source candidate/HOLD; see `phase-18-thesis-assistant-foundation.md`. It adds
+  a feature-default-off Java `/api/v1/thesis/assistant/chat` endpoint with the
+  response shape already expected by the web and mobile clients. The current
+  implementation is a deterministic local fallback (`degraded=true`) only; it
+  does not call an LLM provider, persist prompts, use a vector store, expose
+  tools, or move public chatbot traffic. Provider mode, prompt governance,
+  moderation, telemetry, rate limiting, PostgreSQL parity, route canary,
+  rollback and frontend convergence remain open.
 
 ## Backend foundation gate before Stitch implementation
 

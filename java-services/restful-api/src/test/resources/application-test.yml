@@ -23,6 +23,8 @@ migration:
     enabled: false
   analytics-read:
     enabled: false
+  thesis-assistant:
+    enabled: false
   auth-login:
     enabled: false
 

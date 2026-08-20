@@ -55,6 +55,12 @@ shell, not a domain-parity or cutover claim.
   `public` schema. It does not own enrollment trends, section occupancy,
   grade distribution, cockpit composition, lecturer analytics, attendance,
   metrics export, public routing or full analytics cutover.
+- a disabled-by-default thesis assistant/chatbotAI contract candidate behind
+  `THESIS_ASSISTANT_ENABLED=true`; it preserves the web/mobile
+  `/api/v1/thesis/assistant/chat` response shape with a deterministic local
+  fallback model and `degraded=true`. It does not call an LLM provider, persist
+  prompts, use a vector database, expose mutation tools, own rate limiting or
+  move public chatbot traffic.
 
 The default profile intentionally excludes database auto-configuration, so the
 shell can be tested without a running service dependency. The `persistence`
@@ -79,7 +85,11 @@ finance-summary reads only and does not move cockpit/trend/attendance/lecturer
 analytics ownership. The academic enrollment read candidate uses
 `ACADEMIC_ENROLLMENT_READ_ENABLED=true` for selected enrollment, grade and
 transcript reads only and does not move enroll/drop, waitlist, grade write/
-publish, timetable or export ownership. Those
+publish, timetable or export ownership. The thesis assistant contract candidate
+uses `THESIS_ASSISTANT_ENABLED=true` for a local, deterministic fallback
+response only, so provider-backed LLM mode, prompt governance, moderation,
+telemetry, rate limiting, canary and rollback evidence remain later-phase gates.
+Those
 dependencies enter through later migration phases with one canonical writer and
 explicit rollback evidence.
 

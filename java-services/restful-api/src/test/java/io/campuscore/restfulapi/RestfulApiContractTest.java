@@ -201,6 +201,16 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void thesisAssistantBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(post("/api/v1/thesis/assistant/chat")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"message\":\"How do I choose a topic?\",\"locale\":\"en\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void identityClaimsAreAvailableToEveryFutureModule() throws Exception {
         mvc.perform(get("/api/v1/me").with(jwt().jwt(token -> token
                         .subject("user-123")
