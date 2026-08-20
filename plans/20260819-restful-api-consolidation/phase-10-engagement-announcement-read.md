@@ -100,8 +100,8 @@ as stale-gate findings, not approvals:
 - Phase 11 now owns an engagement-specific PostgreSQL differential corpus.
 - a blank `priority=` remains invalid like the Nest DTO, while blank semester
   and section filters remain optional; malformed non-string profile/identity
-  claims and fractional or overflowing student years now fail closed, with
-  regression requests covering each counterexample.
+  claims, including raw non-string `sub`, and fractional or overflowing student
+  years now fail closed, with regression requests covering each counterexample.
 
 The repaired checkpoint `23055a5` then received an Advisor source-gate
 `ACCEPT`, Kongming source-gate `PASS`, and degraded Wukong `FALSIFIED`.
@@ -110,6 +110,13 @@ validate thesis JPA entities at startup; Wukong identified the blank-priority
 and malformed-claim cases above. Those verdicts became stale as soon as these
 repairs changed the snapshot. The final exact commit therefore requires a new
 three-review gate; none of the earlier verdicts is carried forward.
+
+The next checkpoint `72d8d6f` received Advisor source-gate `ACCEPT` and a
+corrected Kongming source-gate `PASS`, but degraded Wukong still `FALSIFIED`
+strict identity handling because Spring's `Jwt.getSubject()` can coerce a raw
+non-string `sub`. The controller now reads the raw `sub` through the strict
+string-claim path, and numeric/boolean `sub` regressions require HTTP 401. This
+change again invalidates every prior exact-head verdict.
 
 All three independent reviews must be repeated on the repaired exact commit;
 the original verdicts cannot approve a changed snapshot.

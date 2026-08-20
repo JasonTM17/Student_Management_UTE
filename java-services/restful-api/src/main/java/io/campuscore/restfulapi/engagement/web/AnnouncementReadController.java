@@ -91,9 +91,9 @@ public class AnnouncementReadController {
     }
 
     private static void requireLegacyIdentity(Jwt jwt) {
-        if (jwt == null
-                || jwt.getSubject() == null
-                || jwt.getSubject().isBlank()
+        String subject = stringClaim(jwt, "sub");
+        if (subject == null
+                || subject.isBlank()
                 || stringClaim(jwt, "email") == null) {
             throw new BadCredentialsException("Invalid JWT claims");
         }
