@@ -77,7 +77,8 @@ item/student-grade read aggregation, with enroll/drop, waitlist, grade
 editing/publishing, timetable, CSV export and writes still owned by the legacy
 academic service. The support-ticket read slice covers current-user and admin
 list/detail reads with response hydration. The support-ticket create slice adds
-a separate feature-default-off `POST /api/v1/support-tickets` candidate, while
+a separate feature-default-off `POST /api/v1/support-tickets` candidate with
+legacy-shaped `TKT-xxxxx` numbering and a bounded unique-collision retry, while
 assignment, response mutation, status updates, deletion, event/notification
 parity, PostgreSQL write rehearsal, route canary and rollback remain owned by
 the legacy engagement service until proven. The thesis assistant/chatbotAI slice

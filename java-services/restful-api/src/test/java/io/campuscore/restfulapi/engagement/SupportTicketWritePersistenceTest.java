@@ -56,7 +56,8 @@ class SupportTicketWritePersistenceTest {
                     "resolvedAt" TIMESTAMP,
                     "closedAt" TIMESTAMP,
                     "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL
+                    "updatedAt" TIMESTAMP NOT NULL,
+                    CONSTRAINT "uk_support_ticket_number" UNIQUE ("ticketNumber")
                 )
                 """);
         jdbc.update("DELETE FROM \"engagement\".\"SupportTicket\"");
@@ -133,6 +134,19 @@ class SupportTicketWritePersistenceTest {
     }
 
     @Test
+    void createTicketUsesMaxLegacyTicketNumberInsteadOfRowCount() throws Exception {
+        jdbc.update("DELETE FROM \"engagement\".\"SupportTicket\" WHERE \"ticketNumber\" = 'TKT-00001'");
+        seedTicket("ticket-two", "TKT-00002");
+
+        mvc.perform(post("/api/v1/support-tickets")
+                        .with(userJwt("user-3", "student3@campuscore.edu", "Student", "Three"))
+                        .contentType("application/json")
+                        .content(validBody()))
+                .andExpect(status().isCreated())
+                .andExpect(jsonPath("$.ticketNumber").value("TKT-00003"));
+    }
+
+    @Test
     void createBoundaryFailsClosedForAnonymousInvalidClaimsAndBadRequests() throws Exception {
         mvc.perform(post("/api/v1/support-tickets")
                         .contentType("application/json")
@@ -199,6 +213,31 @@ class SupportTicketWritePersistenceTest {
                   "category": "TECHNICAL"
                 }
                 """;
+    }
+
+    private void seedTicket(String id, String ticketNumber) {
+        jdbc.update(
+                "INSERT INTO \"engagement\".\"SupportTicket\""
+                        + " (\"id\", \"ticketNumber\", \"userId\", \"userEmail\", \"userDisplayName\","
+                        + " \"subject\", \"description\", \"category\", \"priority\", \"status\","
+                        + " \"assignedTo\", \"assignedToDisplayName\", \"resolvedAt\", \"closedAt\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                ticketNumber,
+                "existing-user",
+                "existing@campuscore.edu",
+                "Existing User",
+                "Existing",
+                "Existing ticket",
+                "GENERAL",
+                "LOW",
+                "OPEN",
+                null,
+                null,
+                null,
+                null,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
     }
 
     private static java.time.LocalDateTime localDateTime(Instant value) {

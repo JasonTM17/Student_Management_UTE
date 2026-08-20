@@ -6,7 +6,6 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
-import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -32,9 +31,17 @@ public class SupportTicketWriteRepository {
         this.jdbc = jdbc;
     }
 
-    public long countTickets() {
-        Long count = jdbc.queryForObject("SELECT COUNT(*) FROM " + TICKET, new MapSqlParameterSource(), Long.class);
-        return Objects.requireNonNullElse(count, 0L);
+    public long nextTicketSequence() {
+        return jdbc.query(
+                        "SELECT \"ticketNumber\" FROM " + TICKET + " WHERE \"ticketNumber\" LIKE 'TKT-%'",
+                        new MapSqlParameterSource(),
+                        (resultSet, rowNumber) -> resultSet.getString("ticketNumber"))
+                .stream()
+                .map(SupportTicketWriteRepository::parseTicketSequence)
+                .filter(sequence -> sequence > 0)
+                .mapToLong(Long::longValue)
+                .max()
+                .orElse(0L) + 1;
     }
 
     public SupportTicketResponse create(CreateTicketCommand command) {
@@ -82,6 +89,17 @@ public class SupportTicketWriteRepository {
 
     private static String displayName(String displayName, String email) {
         return displayName == null || displayName.isBlank() ? email : displayName;
+    }
+
+    private static long parseTicketSequence(String ticketNumber) {
+        if (ticketNumber == null || !ticketNumber.startsWith("TKT-")) {
+            return 0;
+        }
+        try {
+            return Long.parseLong(ticketNumber.substring(4));
+        } catch (NumberFormatException exception) {
+            return 0;
+        }
     }
 
     public record CreateTicketCommand(
