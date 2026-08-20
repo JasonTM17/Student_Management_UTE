@@ -278,9 +278,12 @@ Observed low-disk-safe gates:
   in-memory access/refresh token handling plus one-shot refresh retry for the
   Java mobile auth contract. It is not Expo typecheck, emulator, device, secure
   storage, or live API proof.
-- `npm test --prefix frontend`: PASS, 28/28 frontend smoke tests. This is source
-  and structural coverage only; it is not a fresh authenticated browser matrix,
-  Stitch pixel/reference diff, or production build evidence.
+- `npm test --prefix frontend`: PASS, 29/29 frontend smoke tests. This is source
+  and structural coverage only; the added FE Stitch guard proves the visual QA
+  harness now covers the ten audit-missing route families, 768px tablet width,
+  discovered detail routes, and console/network failure checks. It is not a
+  fresh authenticated browser matrix, Stitch pixel/reference diff, or production
+  build evidence.
 - `mvn -q -f java-services/restful-api/pom.xml test`: PASS with Maven 3.9.12
   and Java 24.0.2. Surefire recorded 45/45 tests passing across engagement,
   notification, thesis, security, migration safety, CSRF and REST contract

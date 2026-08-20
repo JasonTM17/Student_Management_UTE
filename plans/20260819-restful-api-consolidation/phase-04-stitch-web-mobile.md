@@ -50,6 +50,7 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | --- | --- | --- |
 | Stitch MCP project inventory | `PASS` | Fresh 2026-08-19 read: 23 records, 9 desktop, 13 mobile, 1 supplementary image; 22 screen records have HTML and screenshot references. The local metadata ledger records the 22 named screens. |
 | Existing web visual QA | `PASS` | 28 logical routes × 2 viewports = 56/56 captures, 0 measured overflow, 0 missing mobile-nav findings. It does not cover all current routes, tablet, full-page states, or reference pixel diff. |
+| Visual QA harness hardening | `PASS` | The Playwright capture script now covers the ten audit-missing route families, adds a 768px tablet viewport, resolves detail routes from live list links, and fails noisy console/network captures. This is source/harness evidence only until the browser capture is rerun. |
 | Independent Stitch/FE audit | `HOLD` | Found metric wrapping, assistant occlusion, missing current-route captures, token/breakpoint drift, and un-gated console errors. Browser rerun was `NOT_RUN`. |
 | Web P0 repair | `PASS` source-level | Metric wrapping, assistant offset/z-index, exact background, 1280px cap, and tablet bottom-nav boundary are covered by a new smoke assertion. Rendered proof remains open. |
 | Public landing browser smoke | `PASS` limited runtime | The running local frontend image showed no horizontal overflow at 1440px, 390px, or 768px and no public-page console errors. The image lacks a source-revision label; it is not exact-current-source, authenticated, full-route, or reference-diff evidence. |
@@ -60,9 +61,9 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 | Expo/device runtime | `NOT_RUN` | `mobile/node_modules` is intentionally absent; no emulator/device or live API run. |
 | Java API contract audit | `HOLD` | See `reports/frontend-java-api-audit.md`; Java target now has shell probes plus feature-gated auth/session, notification/engagement, academic catalog, people, finance, analytics, selected academic enrollment/grade/transcript reads, and a local thesis assistant contract fallback candidate. Complete academic writes, grade publishing, provider-backed chatbot parity, PostgreSQL parity, route canary and rollback evidence are still not implemented. |
 
-### Fresh bounded checks — 2026-08-20, `ba90cf6`
+### Fresh bounded checks — 2026-08-20 continuations
 
-- `npm test --prefix frontend`: PASS, 28/28 smoke tests.
+- `npm test --prefix frontend`: PASS, 29/29 smoke tests.
 - `npm test --prefix mobile`: PASS, 5/5 dependency-free atlas/API/navigation
   tests.
 
@@ -91,6 +92,13 @@ evidence required by this phase.
 - `npm test --prefix mobile`: PASS, 6/6 dependency-free atlas/API/navigation
   tests after adding a one-shot live refresh retry for non-auth `401`
   responses. Login, refresh and logout routes are excluded from retry loops.
+
+- `node --check plans/20260819-java-thesis-strangler-migration/scripts/fe-stitch-visual-qa.mjs`
+  and `npm test --prefix frontend`: PASS after tightening the FE Stitch visual
+  QA harness to cover the ten audit-missing route families, include desktop,
+  390px mobile and 768px tablet captures, resolve topic/grading detail routes
+  from live links, and fail console/network noise. Browser capture rerun remains
+  `NOT_RUN`.
 
 This is source-level client evidence only. It is not Expo typecheck, emulator,
 device, live Java API, authenticated E2E, gateway canary, or production cutover

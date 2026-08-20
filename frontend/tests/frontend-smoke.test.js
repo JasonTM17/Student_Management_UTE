@@ -656,6 +656,34 @@ test('frontend config exposes local edge rewrites and SEO runtime files', () => 
   assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'manifest.ts')));
 });
 
+test('FE Stitch visual QA matrix covers audit-missing routes and fails noisy captures', () => {
+  const source = read('../plans/20260819-java-thesis-strangler-migration/scripts/fe-stitch-visual-qa.mjs');
+
+  for (const route of [
+    '/admin/academic-years',
+    '/admin/classrooms',
+    '/admin/departments',
+    '/admin/enrollments',
+    '/admin/lecturers',
+    '/admin/sections',
+    '/admin/semesters',
+    '/dashboard/sign-out',
+    '/dashboard/thesis/topics/[id]',
+    '/dashboard/lecturer/grades/[id]',
+  ]) {
+    const escapedRoute = route.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    assert.match(source, new RegExp(`path: '${escapedRoute}'`));
+  }
+
+  assert.match(source, /name: 'tablet'[\s\S]*?width: 768[\s\S]*?height: 1024/);
+  assert.match(source, /discoverFrom:[\s\S]*?hrefIncludes: '\/dashboard\/thesis\/topics\/'/);
+  assert.match(source, /discoverFrom:[\s\S]*?hrefIncludes: '\/dashboard\/lecturer\/grades\/'/);
+  assert.match(source, /noConsoleErrors: consoleErrors\.length === 0/);
+  assert.match(source, /noFailedRequests: failedRequests\.length === 0/);
+  assert.match(source, /Console-error route captures/);
+  assert.match(source, /Failed-request route captures/);
+});
+
 test('locale middleware, dictionaries, and shell toggles stay aligned', () => {
   const middlewareSource = readFirstExisting([
     'src/proxy.ts',
