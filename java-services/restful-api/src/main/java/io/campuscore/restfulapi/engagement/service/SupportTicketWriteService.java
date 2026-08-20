@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTick
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.UpdateSupportTicketRequest;
 import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
@@ -27,6 +28,7 @@ public class SupportTicketWriteService {
 
     private static final int MAX_TICKET_NUMBER_ATTEMPTS = 5;
     private static final Set<String> PRIORITIES = Set.of("LOW", "MEDIUM", "HIGH", "CRITICAL");
+    private static final Set<String> STATUSES = Set.of("OPEN", "IN_PROGRESS", "RESOLVED", "CLOSED");
 
     private final SupportTicketWriteRepository tickets;
     private final Clock clock = Clock.systemUTC();
@@ -85,11 +87,40 @@ public class SupportTicketWriteService {
         return response;
     }
 
+    @Transactional
+    public SupportTicketResponse update(String ticketId, UpdateSupportTicketRequest request) {
+        String id = requireText(ticketId, "ticket id");
+        tickets.findTicketStatus(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+        String priority = optional(request.priority());
+        String status = optional(request.status());
+        if (priority != null && !PRIORITIES.contains(priority)) {
+            throw new IllegalArgumentException("priority must be LOW, MEDIUM, HIGH, or CRITICAL");
+        }
+        if (status != null && !STATUSES.contains(status)) {
+            throw new IllegalArgumentException("status must be OPEN, IN_PROGRESS, RESOLVED, or CLOSED");
+        }
+        tickets.update(new SupportTicketWriteRepository.UpdateTicketCommand(
+                id,
+                optional(request.subject()),
+                optional(request.description()),
+                optional(request.category()),
+                priority,
+                status,
+                Instant.now(clock)));
+        return tickets.findTicket(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Support ticket not found"));
+    }
+
     private static String requireText(String value, String name) {
         if (value == null || value.isBlank()) {
             throw new IllegalArgumentException(name + " is required");
         }
         return value;
+    }
+
+    private static String optional(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     public record CurrentTicketUser(String id, String email, String displayName) {

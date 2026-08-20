@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.SupportTick
 import io.campuscore.restfulapi.engagement.web.SupportTicketReadDtos.TicketResponse;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateTicketResponseRequest;
 import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.CreateSupportTicketRequest;
+import io.campuscore.restfulapi.engagement.web.SupportTicketWriteDtos.UpdateSupportTicketRequest;
 import jakarta.validation.Valid;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
@@ -16,6 +17,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
+import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
@@ -50,6 +52,14 @@ public class SupportTicketWriteController {
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody CreateTicketResponseRequest request) {
         return tickets.respond(id, user(jwt), request);
+    }
+
+    @PutMapping("{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public SupportTicketResponse update(
+            @PathVariable String id,
+            @Valid @RequestBody UpdateSupportTicketRequest request) {
+        return tickets.update(id, request);
     }
 
     private static CurrentTicketUser user(Jwt jwt) {

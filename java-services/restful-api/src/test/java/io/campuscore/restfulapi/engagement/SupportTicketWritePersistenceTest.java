@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -160,6 +161,24 @@ class SupportTicketWritePersistenceTest {
     }
 
     @Test
+    void createTicketRejectsExhaustedLegacyTicketNumberRange() throws Exception {
+        jdbc.update("DELETE FROM \"engagement\".\"SupportTicket\"");
+        seedTicket("ticket-max", "TKT-9223372036854775807");
+
+        mvc.perform(post("/api/v1/support-tickets")
+                        .with(userJwt("user-4", "student4@campuscore.edu", "Student", "Four"))
+                        .contentType("application/json")
+                        .content(validBody()))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        Integer malformedNumbers = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"SupportTicket\" WHERE \"ticketNumber\" LIKE 'TKT--%'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, malformedNumbers);
+    }
+
+    @Test
     void adminRespondsToOpenTicketAndMovesItInProgress() throws Exception {
         mvc.perform(post("/api/v1/support-tickets/existing-ticket/respond")
                         .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
@@ -212,6 +231,59 @@ class SupportTicketWritePersistenceTest {
                 "SELECT \"status\" FROM \"engagement\".\"SupportTicket\" WHERE \"id\" = 'existing-ticket'",
                 String.class);
         org.junit.jupiter.api.Assertions.assertEquals("CLOSED", status);
+    }
+
+    @Test
+    void adminUpdatesTicketFieldsAndResolvedTimestamp() throws Exception {
+        seedResponse("response-1", "existing-ticket", "agent-1", "agent@campuscore.edu", "Agent One");
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("""
+                                {
+                                  "subject": "Updated subject",
+                                  "description": "Updated description",
+                                  "category": "ACADEMIC",
+                                  "priority": "HIGH",
+                                  "status": "RESOLVED"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("existing-ticket"))
+                .andExpect(jsonPath("$.subject").value("Updated subject"))
+                .andExpect(jsonPath("$.description").value("Updated description"))
+                .andExpect(jsonPath("$.category").value("ACADEMIC"))
+                .andExpect(jsonPath("$.priority").value("HIGH"))
+                .andExpect(jsonPath("$.status").value("RESOLVED"))
+                .andExpect(jsonPath("$.resolvedAt").exists())
+                .andExpect(jsonPath("$.closedAt").doesNotExist())
+                .andExpect(jsonPath("$.responses.length()").value(1))
+                .andExpect(jsonPath("$.responses[0].user.displayName").value("Agent One"));
+
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"SupportTicket\""
+                        + " WHERE \"id\" = 'existing-ticket' AND \"status\" = 'RESOLVED'"
+                        + " AND \"resolvedAt\" IS NOT NULL",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, count);
+    }
+
+    @Test
+    void adminClosesTicketWithoutClearingResolvedTimestamp() throws Exception {
+        jdbc.update(
+                "UPDATE \"engagement\".\"SupportTicket\""
+                        + " SET \"status\" = 'RESOLVED', \"resolvedAt\" = ? WHERE \"id\" = 'existing-ticket'",
+                localDateTime(BASE_TIME.plusSeconds(60)));
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("CLOSED"))
+                .andExpect(jsonPath("$.resolvedAt").exists())
+                .andExpect(jsonPath("$.closedAt").exists());
     }
 
     @Test
@@ -288,6 +360,37 @@ class SupportTicketWritePersistenceTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
+    @Test
+    void updateBoundaryFailsClosedForStudentMissingTicketInvalidStatusAndPriority() throws Exception {
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(userJwt("user-1", "student@campuscore.edu", "Student", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"RESOLVED\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(put("/api/v1/support-tickets/missing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"RESOLVED\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"status\":\"ARCHIVED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/support-tickets/existing-ticket")
+                        .with(adminJwt("admin-1", "admin@campuscore.edu", "Admin", "One"))
+                        .contentType("application/json")
+                        .content("{\"priority\":\"URGENT\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
     private static RequestPostProcessor userJwt(
             String subject,
             String email,
@@ -359,6 +462,22 @@ class SupportTicketWritePersistenceTest {
                 null,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
+    }
+
+    private void seedResponse(String id, String ticketId, String userId, String email, String displayName) {
+        jdbc.update(
+                "INSERT INTO \"engagement\".\"TicketResponse\""
+                        + " (\"id\", \"ticketId\", \"userId\", \"userEmail\", \"userDisplayName\","
+                        + " \"message\", \"isInternal\", \"createdAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                ticketId,
+                userId,
+                email,
+                displayName,
+                "Existing response",
+                false,
+                localDateTime(BASE_TIME.plusSeconds(30)));
     }
 
     private static java.time.LocalDateTime localDateTime(Instant value) {
