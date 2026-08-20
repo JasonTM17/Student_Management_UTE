@@ -6,6 +6,7 @@ import java.sql.SQLException;
 import java.sql.Timestamp;
 import java.util.List;
 import java.util.Objects;
+import java.util.Optional;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
@@ -54,6 +55,21 @@ public class NotificationReadRepository {
                 ROW_MAPPER);
     }
 
+    public List<NotificationResponse> findAll(
+            long offset,
+            int limit,
+            String userId) {
+        String sql = "SELECT " + SELECT_COLUMNS
+                + " FROM notifications.notification"
+                + adminWhereClause(userId)
+                + " ORDER BY created_at DESC"
+                + " LIMIT :limit OFFSET :offset";
+        return jdbc.query(
+                sql,
+                adminParameters(offset, limit, userId),
+                ROW_MAPPER);
+    }
+
     public long countMy(String userId, Boolean isRead) {
         String sql = "SELECT COUNT(*) FROM notifications.notification"
                 + whereClause(isRead);
@@ -62,6 +78,25 @@ public class NotificationReadRepository {
                 parameters(userId, 0, 0, isRead),
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public long countAll(String userId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM notifications.notification" + adminWhereClause(userId),
+                adminParameters(0, 0, userId),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<NotificationResponse> findById(String id) {
+        return jdbc.query(
+                        "SELECT " + SELECT_COLUMNS
+                                + " FROM notifications.notification"
+                                + " WHERE id = :id",
+                        new MapSqlParameterSource("id", id),
+                        ROW_MAPPER)
+                .stream()
+                .findFirst();
     }
 
     public long countUnread(String userId) {
@@ -88,10 +123,31 @@ public class NotificationReadRepository {
         return parameters;
     }
 
+    private MapSqlParameterSource adminParameters(
+            long offset,
+            int limit,
+            String userId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("offset", offset)
+                .addValue("limit", limit);
+        if (hasText(userId)) {
+            parameters.addValue("userId", userId);
+        }
+        return parameters;
+    }
+
     private String whereClause(Boolean isRead) {
         return isRead == null
                 ? " WHERE user_id = :userId"
                 : " WHERE user_id = :userId AND is_read = :isRead";
+    }
+
+    private String adminWhereClause(String userId) {
+        return hasText(userId) ? " WHERE user_id = :userId" : "";
+    }
+
+    private static boolean hasText(String value) {
+        return value != null && !value.isBlank();
     }
 
     private static NotificationResponse mapRow(ResultSet resultSet, int rowNumber)

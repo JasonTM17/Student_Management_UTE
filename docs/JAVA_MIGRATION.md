@@ -63,7 +63,10 @@ candidates for thesis, notification, engagement announcement,
 engagement support-ticket, academic catalog, people student/lecturer profile,
 finance, analytics and academic enrollment boundaries. Read candidates use JDBC
 against legacy schemas under the `persistence` profile and do not add DDL,
-write data or own public traffic. The notification self-service write slice adds
+write data or own public traffic. The notification read slice covers
+current-user list/unread-count plus admin list/detail reads, preserving the
+legacy notification envelopes, pagination, optional admin `userId` filter and
+admin-only detail access. The notification self-service write slice adds
 separate feature-default-off `PATCH /api/v1/notifications/my/{id}/read`,
 `PATCH /api/v1/notifications/my/read-all` and
 `DELETE /api/v1/notifications/my/{id}` candidates for the authenticated user,

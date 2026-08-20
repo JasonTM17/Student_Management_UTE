@@ -2,19 +2,22 @@ package io.campuscore.restfulapi.notification.web;
 
 import io.campuscore.restfulapi.notification.service.NotificationReadService;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationListResponse;
+import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCountResponse;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-flagged, read-only notification boundary. Legacy mutation and
- * realtime routes remain owned by the notification service.
+ * Feature-flagged, read-only notification boundary. Legacy mutation, realtime
+ * delivery and public ownership remain owned by the notification service.
  */
 @RestController
 @Profile("persistence")
@@ -40,6 +43,21 @@ public class NotificationReadController {
     @GetMapping("my/unread-count")
     public UnreadCountResponse getMyUnreadCount(@AuthenticationPrincipal Jwt jwt) {
         return notifications.getUnreadCount(subject(jwt));
+    }
+
+    @GetMapping
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public NotificationListResponse findAll(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam(required = false) String userId) {
+        return notifications.findAll(page, limit, userId);
+    }
+
+    @GetMapping("{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public NotificationResponse findOne(@PathVariable String id) {
+        return notifications.findOne(id);
     }
 
     private String subject(Jwt jwt) {
