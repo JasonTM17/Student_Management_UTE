@@ -522,6 +522,17 @@ the retirement gates pass.
   grade editing/publishing, PostgreSQL read parity, live timetable/grading route
   wiring, canary routing, rollback and public academic route handoff remain
   open.
+- Phase 51 backend-first academic catalog read extension: source/H2 verified
+  candidate/HOLD; see `phase-51-academic-catalog-read.md`. It extends the
+  existing feature-default-off Java academic catalog candidate with
+  `GET /api/v1/academic-years`, `GET /api/v1/academic-years/{id}`,
+  `GET /api/v1/classrooms` and `GET /api/v1/classrooms/{id}` reads against the
+  migrated legacy `academic` schema, preserving selected list/detail envelopes,
+  academic-year semester hydration, classroom detail section summaries,
+  query/page/default-off failures and auth boundary behavior. Academic-year and
+  classroom writes, classroom equipment-array parity, PostgreSQL read parity,
+  live admin/catalog route wiring, canary routing, rollback and public academic
+  route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
