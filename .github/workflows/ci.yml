@@ -1586,6 +1586,19 @@ jobs:
             analytics-service/package-lock.json
             frontend/package-lock.json
 
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '21'
+          cache: maven
+          cache-dependency-path: |
+            java-services/pom.xml
+            java-services/restful-api/pom.xml
+
+      - name: Package Java modular monolith
+        run: mvn -q -f java-services/pom.xml -DskipTests package
+
       - name: Prepare scan directory
         run: mkdir -p security-results
 
@@ -1639,6 +1652,36 @@ jobs:
       - name: Install analytics service dependencies
         working-directory: analytics-service
         run: npm ci
+
+      - name: Java monolith filesystem scan
+        id: trivy-java-fs
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: fs
+          scan-ref: java-services/restful-api
+          format: sarif
+          output: security-results/trivy-java-fs.sarif
+          severity: HIGH,CRITICAL
+          exit-code: '1'
+          limit-severities-for-sarif: true
+
+      - name: Build Java monolith image for scan
+        run: docker build -f java-services/restful-api/Dockerfile -t campuscore-restful-api:security java-services/restful-api
+
+      - name: Java monolith image scan
+        id: trivy-java-image
+        continue-on-error: true
+        uses: aquasecurity/trivy-action@v0.35.0
+        with:
+          scan-type: image
+          image-ref: campuscore-restful-api:security
+          format: sarif
+          output: security-results/trivy-java-image.sarif
+          severity: HIGH,CRITICAL
+          ignore-unfixed: true
+          exit-code: '1'
+          limit-severities-for-sarif: true
 
       - name: Platform auth npm audit
         id: platform-auth-npm-audit
@@ -2073,18 +2116,31 @@ jobs:
       - name: Enforce scan gate
         if: always()
         run: |
+          is_tag_release=false
+          if [ "${GITHUB_REF_TYPE}" = "tag" ] && [[ "${GITHUB_REF_NAME}" == v* ]]; then
+            is_tag_release=true
+          fi
+
           if [ "${{ steps.gitleaks.outcome }}" != "success" ] || \
              [ "${{ steps.platform-auth-npm-audit.outcome }}" != "success" ] || \
+             [ "${{ steps.trivy-platform-auth-fs.outcome }}" != "success" ] || \
+             [ "${{ steps.trivy-java-fs.outcome }}" != "success" ] || \
+             [ "${{ steps.trivy-java-image.outcome }}" != "success" ] || \
+             [ "${{ steps.frontend-npm-audit.outcome }}" != "success" ] || \
+             [ "${{ steps.trivy-frontend-image.outcome }}" != "success" ]; then
+            echo "Active-stack security scan failed. Review gitleaks, platform-auth, Java monolith, and frontend reports."
+            exit 1
+          fi
+
+          if [ "$is_tag_release" = "true" ] && (
              [ "${{ steps.backend-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.auth-npm-audit.outcome }}" != "success" ] || \
-             [ "${{ steps.frontend-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.notification-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.finance-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.academic-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.engagement-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.people-npm-audit.outcome }}" != "success" ] || \
              [ "${{ steps.analytics-npm-audit.outcome }}" != "success" ] || \
-             [ "${{ steps.trivy-platform-auth-fs.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-fs.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-auth-fs.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-academic-fs.outcome }}" != "success" ] || \
@@ -2093,16 +2149,16 @@ jobs:
              [ "${{ steps.trivy-analytics-fs.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-backend-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-auth-image.outcome }}" != "success" ] || \
-             [ "${{ steps.trivy-frontend-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-notification-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-finance-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-academic-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-engagement-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-people-image.outcome }}" != "success" ] || \
              [ "${{ steps.trivy-analytics-image.outcome }}" != "success" ]; then
-            echo "Security scan failed. Review npm audit, gitleaks, and Trivy reports."
+            echo "Release-tag security scan failed. Review legacy service reports before publish."
             exit 1
           fi
+          echo "Security scan passed for active Java monolith, platform auth, frontend, and advisory legacy reports."
 
   dependency-review:
     name: dependency-review
@@ -2126,7 +2182,8 @@ jobs:
             echo "## Dependency review"
             echo ""
             echo "Dependency Review compares dependency changes on pull requests only."
-            echo "For push and semver tag runs, npm audit and Trivy coverage are enforced by the security-scan lane."
+            echo "For push runs, the active Java monolith, platform-auth, and frontend scans are enforced; legacy microservice scans remain advisory until release tags."
+            echo "For semver tag runs, legacy npm audit and Trivy coverage are enforced by the security-scan lane before publish."
           } >> "$GITHUB_STEP_SUMMARY"
 
   quality-gate:
