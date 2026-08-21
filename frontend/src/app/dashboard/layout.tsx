@@ -139,6 +139,14 @@ export default function DashboardLayout({
         title: messages.thesis.evaluationTitle,
         description: messages.thesis.evaluationDescription,
       },
+      '/dashboard/thesis/councils': {
+        title: messages.thesis.councils.title,
+        description: messages.thesis.councils.description,
+      },
+      '/dashboard/thesis/reviews': {
+        title: messages.thesis.review.title,
+        description: messages.thesis.review.description,
+      },
       '/dashboard/invoices': {
         title: messages.dashboardShell.menu.invoices,
         description: messages.dashboardShell.routeDescriptions.invoices,

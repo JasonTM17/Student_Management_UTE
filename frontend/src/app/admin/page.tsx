@@ -247,33 +247,40 @@ export default function AdminDashboardPage() {
             contentClassName="space-y-0"
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {menuItems.map((item, index) => (
-                <LocalizedLink
-                  key={item.href}
-                  href={item.href}
-                  className="group rounded-lg border border-border/70 bg-card px-5 py-5 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  <div className="flex h-full flex-col gap-4">
-                    <div
-                      className={`flex h-11 w-11 items-center justify-center rounded-lg ${item.tone}`}
-                    >
-                      <item.icon className="h-5 w-5" />
+              {menuItems.map((item, index) => {
+                const localizedItem = messages.admin.menuItems[index] ?? [
+                  item.label,
+                  item.description,
+                ];
+
+                return (
+                  <LocalizedLink
+                    key={item.href}
+                    href={item.href}
+                    className="group rounded-lg border border-border/70 bg-card px-5 py-5 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    <div className="flex h-full flex-col gap-4">
+                      <div
+                        className={`flex h-11 w-11 items-center justify-center rounded-lg ${item.tone}`}
+                      >
+                        <item.icon className="h-5 w-5" />
+                      </div>
+                      <div className="space-y-3">
+                        <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
+                          {localizedItem[0]}
+                        </h3>
+                        <p className="text-sm leading-6 text-muted-foreground">
+                          {localizedItem[1]}
+                        </p>
+                      </div>
+                      <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary">
+                        <span>{messages.common.actions.openWorkspace}</span>
+                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
+                      </div>
                     </div>
-                    <div className="space-y-3">
-                      <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
-                        {messages.admin.menuItems[index][0]}
-                      </h3>
-                      <p className="text-sm leading-6 text-muted-foreground">
-                        {messages.admin.menuItems[index][1]}
-                      </p>
-                    </div>
-                    <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary">
-                      <span>{messages.common.actions.openWorkspace}</span>
-                      <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                    </div>
-                  </div>
-                </LocalizedLink>
-              ))}
+                  </LocalizedLink>
+                );
+              })}
             </div>
           </AdminTableCard>
         </div>
