@@ -168,6 +168,36 @@ public final class AnalyticsReadDtos {
             long pendingInvoiceCount) {
     }
 
+    public record AttendanceAnalyticsResponse(
+            long totalRecords,
+            long present,
+            long absent,
+            long late,
+            long excused,
+            int attendanceRate) {
+    }
+
+    public record LecturerAnalyticsResponse(
+            long totalSections,
+            long totalStudents,
+            long sectionsWithGrades) {
+    }
+
+    public record LecturerSectionAnalyticsBucket(
+            String sectionId,
+            String sectionNumber,
+            String courseCode,
+            String courseName,
+            String courseNameEn,
+            String courseNameVi,
+            String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
+            int capacity,
+            long enrolledCount,
+            int occupancyRate) {
+    }
+
     public record InvoiceStatusBucket(
             String status,
             long count,

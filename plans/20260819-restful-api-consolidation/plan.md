@@ -218,9 +218,10 @@ the retirement gates pass.
   source candidate/HOLD; see `phase-16-analytics-read-foundation.md`. It adds
   feature-default-off Java analytics overview and finance-summary reads against
   the analytics service's legacy Prisma `public` schema, preserving selected
-  dashboard aggregate shapes and role boundaries. Cockpit composition,
-  lecturer analytics, attendance, metrics/events, PostgreSQL parity, route
-  canary, rollback and frontend convergence remain open.
+  dashboard aggregate shapes and role boundaries. Lecturer analytics,
+  metrics/events, PostgreSQL parity, route canary, rollback and frontend
+  convergence were still open at that phase; later analytics waves below add
+  more source candidates without changing the public cutover HOLD.
 - Phase 17 backend-first academic enrollment read foundation:
   source candidate/HOLD; see `phase-17-academic-enrollment-read-foundation.md`.
   It adds feature-default-off Java current-student enrollment, grade and
@@ -459,6 +460,30 @@ the retirement gates pass.
   `semesterId` filter, invoice totals/counts and completed-payment revenue
   calculation. PostgreSQL read parity, live finance/admin route wiring, canary
   routing, rollback and public analytics route handoff remain open.
+- Phase 45 backend-first analytics attendance foundation: source candidate/HOLD;
+  see `phase-45-analytics-attendance.md`. It extends the feature-default-off
+  Java analytics read candidate with `GET /api/v1/analytics/attendance` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy optional `semesterId` section
+  filter, status totals and rounded attendance-rate formula. PostgreSQL read
+  parity, live admin route wiring, canary routing, rollback and public analytics
+  route handoff remain open.
+- Phase 46 backend-first analytics lecturer foundation: source candidate/HOLD;
+  see `phase-46-analytics-lecturer.md`. It extends the feature-default-off Java
+  analytics read candidate with `GET /api/v1/analytics/lecturer/my` and
+  `GET /api/v1/analytics/lecturer/sections` for `LECTURER`, preserving the
+  legacy `lecturerId` claim scope, confirmed/pending student counts, published
+  grade counts, bilingual course/semester section buckets and occupancy
+  formula. PostgreSQL read parity, live lecturer route wiring, canary routing,
+  rollback and public analytics route handoff remain open.
+- Phase 47 backend-first academic schedule read foundation: source
+  candidate/HOLD; see `phase-47-academic-schedule-read.md`. It adds
+  feature-default-off Java `GET /api/v1/schedules` and
+  `GET /api/v1/schedules/{id}` reads against the migrated legacy `academic`
+  schema, preserving the selected list envelope, day/start ordering, direct
+  section/classroom hydration and migration-safety default-off boundary.
+  Schedule writes, lecturer timetable shortcuts, PostgreSQL read parity, live
+  timetable wiring, canary routing, rollback and public academic route handoff
+  remain open.
 
 ## Backend foundation gate before Stitch implementation
 

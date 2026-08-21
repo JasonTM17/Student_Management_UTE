@@ -1,11 +1,14 @@
 package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.AttendanceAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.LecturerAnalyticsResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.LecturerSectionAnalyticsBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OperatorSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
@@ -20,6 +23,8 @@ import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -27,9 +32,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-gated analytics reads. Attendance, lecturer dashboards, metrics
- * export and event consumers remain in the legacy analytics-service for this
- * wave.
+ * Feature-gated analytics reads. Metrics export and event consumers remain in
+ * the legacy analytics-service for this wave.
  */
 @RestController
 @Profile("persistence")
@@ -65,6 +69,33 @@ public class AnalyticsReadController {
             @RequestParam(name = "semesterId", required = false) String semesterId) {
         requireAllowedQuery(queryParameters, Set.of("semesterId"));
         return analytics.revenueAnalytics(semesterId);
+    }
+
+    @GetMapping("attendance")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public AttendanceAnalyticsResponse attendance(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @RequestParam(name = "semesterId", required = false) String semesterId) {
+        requireAllowedQuery(queryParameters, Set.of("semesterId"));
+        return analytics.attendanceAnalytics(semesterId);
+    }
+
+    @GetMapping("lecturer/my")
+    @PreAuthorize("hasRole('LECTURER')")
+    public LecturerAnalyticsResponse lecturerMy(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @AuthenticationPrincipal Jwt jwt) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.lecturerAnalytics(stringClaim(jwt, "lecturerId"));
+    }
+
+    @GetMapping("lecturer/sections")
+    @PreAuthorize("hasRole('LECTURER')")
+    public List<LecturerSectionAnalyticsBucket> lecturerSections(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @AuthenticationPrincipal Jwt jwt) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.lecturerSectionAnalytics(stringClaim(jwt, "lecturerId"));
     }
 
     @GetMapping("enrollments-by-semester")
@@ -171,5 +202,13 @@ public class AnalyticsReadController {
         } catch (NumberFormatException ignored) {
             return 12;
         }
+    }
+
+    private static String stringClaim(Jwt jwt, String claimName) {
+        if (jwt == null) {
+            return null;
+        }
+        Object value = jwt.getClaims().get(claimName);
+        return value instanceof String text && !text.isBlank() ? text : null;
     }
 }

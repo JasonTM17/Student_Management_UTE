@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.analytics.service;
 
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository.EnrollmentTrendActivity;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.AttendanceAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.DashboardLink;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
@@ -10,6 +11,8 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryRe
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.LecturerAnalyticsResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.LecturerSectionAnalyticsBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OperatorSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
@@ -32,8 +35,10 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.web.server.ResponseStatusException;
 
 /** Read-only application service for the initial analytics dashboard slice. */
 @Service
@@ -129,6 +134,21 @@ public class AnalyticsReadService {
     @Transactional(readOnly = true)
     public RevenueAnalyticsResponse revenueAnalytics(String semesterId) {
         return analytics.revenueAnalytics(normalizeOptional(semesterId));
+    }
+
+    @Transactional(readOnly = true)
+    public AttendanceAnalyticsResponse attendanceAnalytics(String semesterId) {
+        return analytics.attendanceAnalytics(normalizeOptional(semesterId));
+    }
+
+    @Transactional(readOnly = true)
+    public LecturerAnalyticsResponse lecturerAnalytics(String lecturerId) {
+        return analytics.lecturerAnalytics(requireProfileId("lecturerId", lecturerId));
+    }
+
+    @Transactional(readOnly = true)
+    public List<LecturerSectionAnalyticsBucket> lecturerSectionAnalytics(String lecturerId) {
+        return analytics.lecturerSectionAnalytics(requireProfileId("lecturerId", lecturerId));
     }
 
     @Transactional(readOnly = true)
@@ -298,6 +318,14 @@ public class AnalyticsReadService {
 
     private static String normalizeOptional(String value) {
         return value == null || value.isEmpty() ? null : value;
+    }
+
+    private static String requireProfileId(String name, String value) {
+        String normalized = normalizeOptional(value);
+        if (normalized == null) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, name + " profile claim is required");
+        }
+        return normalized;
     }
 
     private static final class MutableTrendBucket {

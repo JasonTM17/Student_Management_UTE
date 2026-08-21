@@ -50,6 +50,8 @@ migration:
     enabled: ${ACADEMIC_READ_ENABLED:false}
   academic-enrollment-read:
     enabled: ${ACADEMIC_ENROLLMENT_READ_ENABLED:false}
+  academic-schedule-read:
+    enabled: ${ACADEMIC_SCHEDULE_READ_ENABLED:false}
   people-read:
     enabled: ${PEOPLE_READ_ENABLED:false}
   finance-read:
