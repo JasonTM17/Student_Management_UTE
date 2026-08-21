@@ -29,7 +29,8 @@ Out of scope:
 
 ## Evidence
 
-Observed on exact head `b67aa85f16bb73a5d18d00b35bef070bc61ada32`:
+Observed on exact head `9b5ee317f3daa88ce6d379a6d3097b860e0a7aee` after
+normalizing volatile Prisma invocation preambles in the harness:
 
 ```powershell
 node --check scripts/run-finance-differential-rehearsal.mjs
@@ -56,9 +57,12 @@ Result: `PASS_WITH_LIMITATIONS`.
   `0dd68b6caccdf8ae4246e84bb169dfc7fd0029cbd71dec8ada3da8916f58d53d`.
 - The proxy route-switch sequence also rolled back cleanly:
   `legacy-before` and `legacy-after` shared stage hash
-  `ee349b886ea1cf6de05e84fbe2785e3e5e7d8f3c46630f5d2a278aec6278c8b5`;
+  `19aae5d3114ca5be0ecb061977bf07a8d35cec75adbe08bf739f069b702c8a64`;
   `java-candidate` produced the expected distinct stage hash
   `e22651f9f3a410bb8d0b1145915d4c69f747f229dd92e7e541f52eb02ead2dd5`.
+- The harness now hashes the semantic Prisma error cause only, so the
+  documented `finance.PaymentStatus` limitation remains stable across the
+  legacy-before/after proxy probes.
 - `git diff --check` passed with only the usual Windows LF-to-CRLF warning on
   the script file.
 - The live Node and Java processes were stopped after capture.
