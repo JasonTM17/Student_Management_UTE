@@ -487,10 +487,19 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Current canonical Surefire summary from
   `java-services/restful-api/target/surefire-reports`: 26 reports / 176 tests /
   0 failures / 0 errors / 1 skipped.
+- Focused PostgreSQL rehearsal PASS on 2026-08-21 against disposable
+  PostgreSQL 18.4 target `127.0.0.1:56454`, database
+  `campuscore_academic_enrollment_20260821_183305`, `currentSchema=academic`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest' '-DforkCount=0' test`.
+  Surefire summary:
+  8 tests / 0 failures / 0 errors / 0 skipped. This is a focused fixture-based
+  PostgreSQL syntax/type rehearsal for the academic enrollment/admin shortcut
+  test suite, not a restored legacy dataset differential.
 - Production controller SQL-write grep PASS and touched-file `git diff --check`
   PASS with only Git Windows LF-to-CRLF working-copy warnings.
-- Limitation: source/H2 evidence only until PostgreSQL read parity, route
-  canary and rollback rehearsal are observed.
+- Limitation: the enrollment admin shortcut now has a focused PostgreSQL
+  rehearsal, but restored legacy-data parity, route canary and rollback
+  rehearsal are still open.
 
 ## Deferred findings
 

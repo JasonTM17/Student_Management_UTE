@@ -567,10 +567,11 @@ the retirement gates pass.
   `GET /api/v1/enrollments/student/{studentId}`, preserving the selected
   legacy admin/super-admin role boundary, list response shape, optional
   `semesterId` filter, `enrolledAt DESC` ordering, default-off route absence
-  and negative authorization/query behavior. Enrollment create/drop/update/
-  delete ownership, CSV export parity, PostgreSQL read parity, live route
-  wiring, canary routing, rollback and public academic route handoff remain
-  open.
+  and negative authorization/query behavior. A focused PostgreSQL rehearsal on
+  the admin student-enrollment shortcut has since passed against a disposable
+  target, but enrollment create/drop/update/delete ownership, CSV export
+  parity, restored PostgreSQL read parity, live route wiring, canary routing,
+  rollback and public academic route handoff remain open.
 - Phase 55 academic internal-context bridge: complete at
   `d92ce53e884adcd83b5dd479aebeb584d9a83946`; see
   `phase-55-academic-internal-context-bridge.md`. It adds internal-only
