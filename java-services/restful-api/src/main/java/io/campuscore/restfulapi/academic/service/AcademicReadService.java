@@ -8,6 +8,9 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
@@ -122,6 +125,21 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
+    public CurriculumListResponse findCurricula(int page, int limit) {
+        requirePage(page, limit);
+        long total = academic.countCurricula();
+        List<CurriculumResponse> curricula = academic.findCurricula(offset(page, limit), limit);
+        return new CurriculumListResponse(hydrateCurricula(curricula, false), meta(total, page, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public CurriculumResponse findCurriculum(String id) {
+        CurriculumResponse curriculum = academic.findCurriculumById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curriculum not found"));
+        return hydrateCurricula(List.of(curriculum), true).getFirst();
+    }
+
+    @Transactional(readOnly = true)
     public ClassroomListResponse findClassrooms(int page, int limit) {
         requirePage(page, limit);
         long total = academic.countClassrooms();
@@ -210,6 +228,40 @@ public class AcademicReadService {
                         department.faculty(),
                         lecturersByDepartment.getOrDefault(department.id(), List.of())))
                 .map(AcademicCatalogLocalizer::hydrateDepartmentResponse)
+                .toList();
+    }
+
+    private List<CurriculumResponse> hydrateCurricula(List<CurriculumResponse> curricula, boolean includeCourses) {
+        Map<String, List<CurriculumCourseSummary>> coursesByCurriculum;
+        if (includeCourses) {
+            List<String> ids = curricula.stream().map(CurriculumResponse::id).toList();
+            coursesByCurriculum = academic
+                    .findCurriculumCoursesByCurriculumIds(ids)
+                    .stream()
+                    .collect(Collectors.groupingBy(CurriculumCourseSummary::curriculumId));
+        } else {
+            coursesByCurriculum = Map.of();
+        }
+        return curricula.stream()
+                .map(curriculum -> new CurriculumResponse(
+                        curriculum.id(),
+                        curriculum.name(),
+                        curriculum.nameEn(),
+                        curriculum.nameVi(),
+                        curriculum.code(),
+                        curriculum.departmentId(),
+                        curriculum.academicYearId(),
+                        curriculum.semesterId(),
+                        curriculum.totalCredits(),
+                        curriculum.description(),
+                        curriculum.descriptionEn(),
+                        curriculum.descriptionVi(),
+                        curriculum.isActive(),
+                        curriculum.createdAt(),
+                        curriculum.updatedAt(),
+                        curriculum.department(),
+                        coursesByCurriculum.getOrDefault(curriculum.id(), List.of())))
+                .map(AcademicCatalogLocalizer::hydrateCurriculum)
                 .toList();
     }
 

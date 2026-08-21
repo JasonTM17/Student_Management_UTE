@@ -7,6 +7,8 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomListRespo
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListResponse;
@@ -112,6 +114,20 @@ public class AcademicReadController {
     @GetMapping("courses/{id}")
     public CourseResponse getCourse(@PathVariable String id) {
         return academic.findCourse(id);
+    }
+
+    @GetMapping("curricula")
+    public CurriculumListResponse getCurricula(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return academic.findCurricula(page, limit);
+    }
+
+    @GetMapping("curricula/{id}")
+    public CurriculumResponse getCurriculum(@PathVariable String id) {
+        return academic.findCurriculum(id);
     }
 
     @GetMapping("classrooms")

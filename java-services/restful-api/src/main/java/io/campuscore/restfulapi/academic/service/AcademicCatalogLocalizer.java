@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
@@ -68,6 +69,23 @@ final class AcademicCatalogLocalizer {
                     "Faculty of Business Administration",
                     "Khoa Quản trị kinh doanh"));
 
+    private static final Map<String, LocalizedDefaults> CURRICULUM_DEFAULTS = Map.of(
+            "CS2025", new LocalizedDefaults(
+                    "Computer Science 2025",
+                    "Chương trình Khoa học máy tính 2025",
+                    "Computer Science curriculum for the 2025 intake",
+                    "Chương trình Khoa học máy tính cho khóa tuyển sinh 2025"),
+            "CS2026", new LocalizedDefaults(
+                    "Computer Science 2026",
+                    "Chương trình Khoa học máy tính 2026",
+                    "Computer Science curriculum for the 2026 intake",
+                    "Chương trình Khoa học máy tính cho khóa tuyển sinh 2026"),
+            "SE2025", new LocalizedDefaults(
+                    "Software Engineering 2025",
+                    "Chương trình Kỹ thuật phần mềm 2025",
+                    "Software Engineering curriculum for the 2025 intake",
+                    "Chương trình Kỹ thuật phần mềm cho khóa tuyển sinh 2025"));
+
     private AcademicCatalogLocalizer() {
     }
 
@@ -113,6 +131,31 @@ final class AcademicCatalogLocalizer {
                 course.createdAt(),
                 course.updatedAt(),
                 department);
+    }
+
+    static CurriculumResponse hydrateCurriculum(CurriculumResponse curriculum) {
+        LocalizedDefaults defaults = CURRICULUM_DEFAULTS.getOrDefault(
+                upper(curriculum.code()),
+                LocalizedDefaults.EMPTY);
+        DepartmentSummary department = hydrateDepartment(curriculum.department());
+        return new CurriculumResponse(
+                curriculum.id(),
+                curriculum.name(),
+                pick(curriculum.nameEn(), curriculum.name(), defaults.nameEn()),
+                pick(curriculum.nameVi(), defaults.nameVi()),
+                curriculum.code(),
+                curriculum.departmentId(),
+                curriculum.academicYearId(),
+                curriculum.semesterId(),
+                curriculum.totalCredits(),
+                curriculum.description(),
+                pick(curriculum.descriptionEn(), curriculum.description(), defaults.descriptionEn()),
+                pick(curriculum.descriptionVi(), defaults.descriptionVi()),
+                curriculum.isActive(),
+                curriculum.createdAt(),
+                curriculum.updatedAt(),
+                department,
+                curriculum.courses());
     }
 
     static FacultyResponse hydrateFaculty(FacultyResponse faculty) {
