@@ -1,9 +1,9 @@
-FROM eclipse-temurin:21-jre
+FROM eclipse-temurin:21-jre-alpine
 
 WORKDIR /app
 
-RUN groupadd --system --gid 10001 campuscore \
-    && useradd --system --uid 10001 --gid 10001 campuscore
+RUN addgroup -S -g 10001 campuscore \
+    && adduser -S -u 10001 -G campuscore campuscore
 
 COPY target/campuscore-restful-api-*.jar app.jar
 
