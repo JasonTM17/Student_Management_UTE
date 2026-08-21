@@ -20,6 +20,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
+import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
@@ -27,6 +28,14 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
+@TestPropertySource(properties = {
+        "migration.thesis-read.enabled=true",
+        "spring.datasource.url=jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.username=sa",
+        "spring.datasource.password=",
+        "spring.flyway.enabled=true",
+        "spring.flyway.locations=classpath:db/migration-h2"
+})
 class ThesisTopicPersistenceTest {
 
     @Autowired
@@ -133,9 +142,13 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$[1].id").value(olderGroup.toString()));
 
         mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
         mvc.perform(get("/api/v1/thesis/groups/{id}", UUID.randomUUID()).with(jwt()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.message").value("Thesis group not found"));
     }
 
     @Test
@@ -147,7 +160,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$").isEmpty());
         mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", "not-a-uuid").with(jwt()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+                .andExpect(jsonPath("$.statusCode").value(400))
+                .andExpect(jsonPath("$.message").value("Invalid request parameter"));
         mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
@@ -176,10 +190,13 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$[2].room").doesNotExist());
 
         mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
-                .andExpect(status().isNotFound());
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
         mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", "not-a-uuid").with(jwt()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+                .andExpect(jsonPath("$.statusCode").value(400))
+                .andExpect(jsonPath("$.message").value("Invalid request parameter"));
         mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
@@ -208,7 +225,8 @@ class ThesisTopicPersistenceTest {
                         .queryParam("roundId", UUID.randomUUID().toString())
                         .with(jwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
     }
 
     @ParameterizedTest(name = "{0} can read an existing round")

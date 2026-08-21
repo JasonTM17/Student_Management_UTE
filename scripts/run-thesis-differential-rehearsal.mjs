@@ -90,6 +90,16 @@ function compareResponses(item, legacy, java) {
       java,
     };
   }
+  const timestampFailure = validateErrorTimestamps(legacy, java);
+  if (timestampFailure) {
+    return {
+      name: item.name,
+      result: 'FAIL',
+      reason: timestampFailure,
+      legacy,
+      java,
+    };
+  }
   if (legacy.contentType !== java.contentType) {
     return {
       name: item.name,
@@ -99,8 +109,8 @@ function compareResponses(item, legacy, java) {
       java,
     };
   }
-  const legacyHash = hashStable(legacy.body);
-  const javaHash = hashStable(java.body);
+  const legacyHash = hashStable(normalizeComparableBody(legacy));
+  const javaHash = hashStable(normalizeComparableBody(java));
   if (legacyHash !== javaHash) {
     return {
       name: item.name,
@@ -117,6 +127,46 @@ function compareResponses(item, legacy, java) {
     contentType: legacy.contentType,
     bodyHash: legacyHash,
   };
+}
+
+function validateErrorTimestamps(legacy, java) {
+  for (const [label, response] of [['legacy', legacy], ['java', java]]) {
+    if (!isLegacyErrorEnvelope(response)) {
+      continue;
+    }
+    if (!isUtcTimestamp(response.body.timestamp)) {
+      return `${label} error timestamp is not a valid ISO-8601 UTC timestamp`;
+    }
+  }
+  return null;
+}
+
+function normalizeComparableBody(response) {
+  if (!isLegacyErrorEnvelope(response)) {
+    return response.body;
+  }
+  return {
+    ...response.body,
+    timestamp: '__utc_error_timestamp__',
+  };
+}
+
+function isLegacyErrorEnvelope(response) {
+  const body = response.body;
+  return response.status >= 400
+    && body !== null
+    && typeof body === 'object'
+    && !Array.isArray(body)
+    && Object.hasOwn(body, 'statusCode')
+    && Object.hasOwn(body, 'message')
+    && Object.hasOwn(body, 'path')
+    && Object.hasOwn(body, 'timestamp');
+}
+
+function isUtcTimestamp(value) {
+  return typeof value === 'string'
+    && value.endsWith('Z')
+    && !Number.isNaN(Date.parse(value));
 }
 
 async function requestJson(baseUrl, item, token) {
