@@ -3,22 +3,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this handoff update:
+- Current branch snapshot before this docs update:
   `feature/java-thesis-platform` at
   `7b4634c5e9245b8e37d16a88b60ab43f0c8cfd1d`
-  (`docs(plan): record finance postgres repair`), matching `origin/main`,
-  `origin/feature/java-thesis-platform` and `origin/HEAD`.
-- Repo state before this handoff update: finance source and Phase 58 docs are
-  committed and pushed; tracked dirty file is this ledger note only. The
-  user-owned untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
-- Branch integration result: the user requested `main` as the main branch for
-  faster progress. The verified feature tip was fast-forward pushed to `main`
-  with `git push origin feature/java-thesis-platform:main`; GitHub reports
-  default branch `main`; local `origin/HEAD` and local branch `main` were
-  fast-forwarded to `origin/main`.
-- Disk snapshot before this handoff update: C: ~13.64 GiB free, D: ~35.31 GiB
-  free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56447`
-  and `56448` were stopped by exact data directory; no broad deletion was run.
+  (`docs(plan): record finance postgres repair`), with local HEAD ahead of
+  `origin/feature/java-thesis-platform` by the finance source repair and that
+  finance docs record.
+- Repo state before this docs update: tracked tree is clean; the user-owned
+  untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
+- Branch integration ruling: keep using `feature/java-thesis-platform` as the
+  integration branch for this turn; do not fast-forward or push `main` unless
+  the user explicitly changes the target.
+- Disk snapshot before this docs update: C: ~13.64 GiB free, D: ~35.31 GiB
+  free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56452`
+  and `56453` were stopped by exact data directory; no broad deletion was run.
 
 ## Completed evidence carried forward
 
@@ -29,11 +27,10 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 - Finance PostgreSQL optional-filter repair is committed at
   `3327f8318bc9aa775a4e48185b8f74b54ab3215a`, documented in
-  `phase-58-finance-postgres-parity-repair.md`, and included on pushed
-  `main`.
-- Current step after this handoff: continue the accepted backend-first parity
-  plan from the next bounded slice. Route ownership, writer ownership, FE
-  traffic and production cutover remain on HOLD.
+  `phase-58-finance-postgres-parity-repair.md`.
+- Current step after this docs update: continue the accepted backend-first
+  parity plan from the next bounded slice. Route ownership, writer ownership,
+  FE traffic and production cutover remain on HOLD.
 
 ## Phase 48 evidence
 
@@ -98,6 +95,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Added H2 persistence/default-off tests for curriculum list envelope/order/hydration, list path without curriculum-course hydration, curriculum detail courses, missing detail and default-off route absence.
 - Focused gate PASS: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`.
 - Full Java reactor PASS: `mvn -q -f java-services/pom.xml test`; surefire summary from `java-services/restful-api/target/surefire-reports`: 25 reports / 174 tests / 0 failures / 0 errors / 0 skipped.
+- Focused PostgreSQL rehearsal PASS on 2026-08-21 against disposable PostgreSQL 18.4 target `127.0.0.1:56452`, database `campuscore_academic_read_20260821_182123`, `currentSchema=academic`: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest' '-DforkCount=0' test`. Surefire summary: 8 tests / 0 failures / 0 errors / 0 skipped. This is a focused fixture-based PostgreSQL syntax/type rehearsal for the academic catalog/curriculum test suite, not a restored legacy dataset differential.
 - Production academic catalog candidate SQL-write grep PASS: no SQL write/DDL markers in the changed production academic read repository, service, controller or localizer.
 - `git diff --check` PASS with only Git Windows CRLF working-copy warnings.
 - High-confidence staged secret marker scan PASS. The broad staged scan matched JWT test `token` terminology, so it was recorded as a false positive without printing matched content.

@@ -30,8 +30,8 @@ legacy-compatible curriculum list and detail reads inside the single
 
 The slice keeps JDBC `SELECT` ownership only. Curriculum create, update,
 delete, student/curriculum writer ownership, course writes, richer course-object
-joins inside curriculum-course rows, public route ownership, PostgreSQL parity,
-canary and rollback remain open.
+joins inside curriculum-course rows, public route ownership, restored
+PostgreSQL read parity, canary and rollback remain open.
 
 ## Verification
 
@@ -41,6 +41,14 @@ canary and rollback remain open.
   `mvn -q -f java-services/pom.xml test`
 - Surefire summary from `java-services/restful-api/target/surefire-reports`:
   25 reports / 174 tests / 0 failures / 0 errors / 0 skipped.
+- Focused PostgreSQL rehearsal PASS on 2026-08-21 against a disposable
+  PostgreSQL 18.4 target on `127.0.0.1:56452`, database
+  `campuscore_academic_read_20260821_182123`, `currentSchema=academic`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest' '-DforkCount=0' test`.
+  Surefire summary:
+  8 tests / 0 failures / 0 errors / 0 skipped. This is a focused fixture-based
+  PostgreSQL syntax/type rehearsal for the academic catalog/curriculum test
+  suite, not a restored legacy dataset differential.
 - Production academic catalog SQL-write grep PASS: no `INSERT`, `UPDATE`,
   `DELETE`, `MERGE`, `ALTER`, `DROP`, `CREATE` or `TRUNCATE` markers in the
   changed production academic read repository/service/controller/localizer.
@@ -52,7 +60,7 @@ canary and rollback remain open.
 
 ## Open gates
 
-- PostgreSQL read parity against an approved disposable restore.
+- Restored PostgreSQL read parity against an approved legacy-data snapshot.
 - Live route canary and rollback rehearsal.
 - Curriculum-course response parity if the legacy API later requires nested
   course objects rather than only `CurriculumCourse` rows.
