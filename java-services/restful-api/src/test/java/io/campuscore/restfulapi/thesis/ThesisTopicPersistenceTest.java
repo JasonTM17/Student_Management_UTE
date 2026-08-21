@@ -115,7 +115,8 @@ class ThesisTopicPersistenceTest {
     @Test
     void groupsPreserveSortMemberOrderNullableFieldsAndNotFoundSemantics() throws Exception {
         UUID roundId = insertRound();
-        UUID olderGroup = insertGroup(roundId, Instant.parse("2026-01-02T00:00:00Z"), UUID.randomUUID(), "topic", "REJECTED", "REJECTED", "Needs revision");
+        UUID topicId = insertTopic(roundId);
+        UUID olderGroup = insertGroup(roundId, Instant.parse("2026-01-02T00:00:00Z"), UUID.randomUUID(), topicId, "REJECTED", "REJECTED", "Needs revision");
         UUID newerGroup = insertGroup(roundId, Instant.parse("2026-01-03T00:00:00Z"), UUID.randomUUID(), null, "DRAFT", "PENDING", null);
         UUID firstMember = UUID.randomUUID();
         UUID secondMember = UUID.randomUUID();
@@ -242,9 +243,26 @@ class ThesisTopicPersistenceTest {
                 status);
     }
 
-    private UUID insertGroup(UUID roundId, Instant createdAt, UUID leaderId, String topicId, String status, String approvalStatus, String rejectionReason) {
+    private UUID insertTopic(UUID roundId) {
+        UUID topicId = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic "
+                        + "(id, round_id, department_id, title, description, max_groups, status, created_by) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                topicId,
+                roundId,
+                UUID.randomUUID(),
+                "Topic",
+                "Topic description",
+                1,
+                "DRAFT",
+                UUID.randomUUID());
+        return topicId;
+    }
+
+    private UUID insertGroup(UUID roundId, Instant createdAt, UUID leaderId, UUID topicId, String status, String approvalStatus, String rejectionReason) {
         UUID groupId = UUID.randomUUID();
-        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status, rejection_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", groupId, roundId, leaderId, "topic".equals(topicId) ? UUID.randomUUID() : null, status, approvalStatus, rejectionReason, Timestamp.from(createdAt));
+        jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status, rejection_reason, created_at) VALUES (?, ?, ?, ?, ?, ?, ?, ?)", groupId, roundId, leaderId, topicId, status, approvalStatus, rejectionReason, Timestamp.from(createdAt));
         return groupId;
     }
 
