@@ -3,8 +3,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `67927c79cd3a0832c87936969dede21a00a0e1c6`, exactly matching `origin/feature/java-thesis-platform` after the Phase 53 source/docs and capability-preflight records on 2026-08-21.
-- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
+- Current branch snapshot: `feature/java-thesis-platform` at `99da4c0055264a6f880b29e78e153a8dcc875393`, exactly matching `origin/feature/java-thesis-platform` after the mobile fix commit and prior docs records on 2026-08-21.
+- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/`, `.tmp/` and `mobile/package-lock.json`; preserve them and do not stage them.
 - Disk snapshot before implementation: C: ~15.76 GiB free, D: ~38.92 GiB free.
 
 ## Completed evidence carried forward
