@@ -56,6 +56,7 @@ public final class FinanceReadDtos {
             Instant createdAt,
             @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant updatedAt,
+            List<PaymentCore> payments,
             BigDecimal paidAmount,
             BigDecimal balance,
             StudentSnapshot student,
@@ -69,6 +70,25 @@ public final class FinanceReadDtos {
             int quantity,
             BigDecimal unitPrice,
             BigDecimal total) {
+    }
+
+    public record PaymentCore(
+            String id,
+            String paymentNumber,
+            String invoiceId,
+            String studentId,
+            BigDecimal amount,
+            String method,
+            String status,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant paidAt,
+            String transactionId,
+            String paymentIntentId,
+            String notes,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt) {
     }
 
     public record PaymentResponse(
@@ -95,13 +115,48 @@ public final class FinanceReadDtos {
             String id,
             String invoiceNumber,
             String studentId,
+            String studentUserId,
             String studentDisplayName,
             String studentEmail,
             String studentCode,
             String semesterId,
             String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
             String status,
-            BigDecimal total) {
+            BigDecimal subtotal,
+            BigDecimal discount,
+            BigDecimal total,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant dueDate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant paidAt,
+            String notes,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt) {
+    }
+
+    public record StudentInvoiceListItem(
+            String id,
+            String invoiceNumber,
+            String semesterName,
+            String semesterNameEn,
+            String semesterNameVi,
+            String semesterId,
+            String status,
+            BigDecimal subtotal,
+            BigDecimal discount,
+            BigDecimal total,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant dueDate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant paidAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            BigDecimal paidAmount,
+            BigDecimal balance) {
     }
 
     public record InvoiceDetail(
@@ -134,7 +189,7 @@ public final class FinanceReadDtos {
             StudentSnapshot student,
             SemesterSnapshot semester,
             List<InvoiceItemResponse> items,
-            List<PaymentResponse> payments) {
+            List<PaymentCore> payments) {
     }
 
     public record InvoiceListResponse(List<InvoiceListItem> data, PageMeta meta) {

@@ -6,9 +6,11 @@ import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceDetail;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceListItem;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceListResponse;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PageMeta;
+import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PaymentCore;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PaymentListResponse;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PaymentResponse;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.SemesterSnapshot;
+import io.campuscore.restfulapi.finance.web.FinanceReadDtos.StudentInvoiceListItem;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.StudentSnapshot;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.UserSnapshot;
 import java.math.BigDecimal;
@@ -76,12 +78,12 @@ public class FinanceReadService {
     }
 
     @Transactional(readOnly = true)
-    public List<InvoiceListItem> findStudentInvoices(String studentId, String semesterId) {
+    public List<StudentInvoiceListItem> findStudentInvoices(String studentId, String semesterId) {
         String normalizedStudentId = requireStudentId(studentId);
         String normalizedSemesterId = normalizeOptional("semesterId", semesterId);
         return finance.findStudentInvoices(normalizedStudentId, normalizedSemesterId)
                 .stream()
-                .map(this::toInvoiceListItem)
+                .map(this::toStudentInvoiceListItem)
                 .toList();
     }
 
@@ -147,7 +149,7 @@ public class FinanceReadService {
                 base.student(),
                 base.semester(),
                 finance.findInvoiceItems(invoice.id()),
-                finance.findInvoicePayments(invoice.id()));
+                base.payments());
     }
 
     private InvoiceListItem toInvoiceListItem(InvoiceRecord invoice) {
@@ -175,10 +177,57 @@ public class FinanceReadService {
                 invoice.notes(),
                 invoice.createdAt(),
                 invoice.updatedAt(),
+                paymentCoreList(invoice.id()),
                 paidAmount,
                 total.subtract(paidAmount).max(BigDecimal.ZERO),
                 student(invoice),
                 semester(invoice));
+    }
+
+    private StudentInvoiceListItem toStudentInvoiceListItem(InvoiceRecord invoice) {
+        BigDecimal paidAmount = amount(invoice.paidAmount());
+        BigDecimal total = amount(invoice.total());
+        String status = displayStatus(invoice, paidAmount, total);
+        return new StudentInvoiceListItem(
+                invoice.id(),
+                invoice.invoiceNumber(),
+                invoice.semesterName(),
+                semesterNameEn(invoice),
+                invoice.semesterNameVi(),
+                invoice.semesterId(),
+                status,
+                amount(invoice.subtotal()),
+                amount(invoice.discount()),
+                total,
+                invoice.dueDate(),
+                displayPaidAt(invoice, status),
+                invoice.createdAt(),
+                paidAmount,
+                total.subtract(paidAmount).max(BigDecimal.ZERO));
+    }
+
+    private List<PaymentCore> paymentCoreList(String invoiceId) {
+        return finance.findInvoicePayments(invoiceId)
+                .stream()
+                .map(FinanceReadService::toPaymentCore)
+                .toList();
+    }
+
+    private static PaymentCore toPaymentCore(PaymentResponse payment) {
+        return new PaymentCore(
+                payment.id(),
+                payment.paymentNumber(),
+                payment.invoiceId(),
+                payment.studentId(),
+                payment.amount(),
+                payment.method(),
+                payment.status(),
+                payment.paidAt(),
+                payment.transactionId(),
+                payment.paymentIntentId(),
+                payment.notes(),
+                payment.createdAt(),
+                payment.updatedAt());
     }
 
     private String displayStatus(InvoiceRecord invoice, BigDecimal paidAmount, BigDecimal total) {

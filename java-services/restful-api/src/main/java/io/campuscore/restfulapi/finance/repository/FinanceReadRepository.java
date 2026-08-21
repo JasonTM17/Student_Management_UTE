@@ -165,12 +165,23 @@ public class FinanceReadRepository {
                 + " payment.\"notes\", payment.\"createdAt\", payment.\"updatedAt\","
                 + " invoice.\"id\" AS \"invoice_id\", invoice.\"invoiceNumber\" AS \"invoice_invoiceNumber\","
                 + " invoice.\"studentId\" AS \"invoice_studentId\","
+                + " invoice.\"studentUserId\" AS \"invoice_studentUserId\","
                 + " invoice.\"studentDisplayName\" AS \"invoice_studentDisplayName\","
                 + " invoice.\"studentEmail\" AS \"invoice_studentEmail\","
                 + " invoice.\"studentCode\" AS \"invoice_studentCode\","
                 + " invoice.\"semesterId\" AS \"invoice_semesterId\","
                 + " invoice.\"semesterName\" AS \"invoice_semesterName\","
-                + " invoice.\"status\" AS \"invoice_status\", invoice.\"total\" AS \"invoice_total\""
+                + " invoice.\"semesterNameEn\" AS \"invoice_semesterNameEn\","
+                + " invoice.\"semesterNameVi\" AS \"invoice_semesterNameVi\","
+                + " invoice.\"status\" AS \"invoice_status\","
+                + " invoice.\"subtotal\" AS \"invoice_subtotal\","
+                + " invoice.\"discount\" AS \"invoice_discount\","
+                + " invoice.\"total\" AS \"invoice_total\","
+                + " invoice.\"dueDate\" AS \"invoice_dueDate\","
+                + " invoice.\"paidAt\" AS \"invoice_paidAt\","
+                + " invoice.\"notes\" AS \"invoice_notes\","
+                + " invoice.\"createdAt\" AS \"invoice_createdAt\","
+                + " invoice.\"updatedAt\" AS \"invoice_updatedAt\""
                 + " FROM " + PAYMENT_TABLE + " payment"
                 + " JOIN " + INVOICE_TABLE + " invoice ON invoice.\"id\" = payment.\"invoiceId\"";
     }
@@ -267,13 +278,23 @@ public class FinanceReadRepository {
                 resultSet.getString("invoice_id"),
                 resultSet.getString("invoice_invoiceNumber"),
                 resultSet.getString("invoice_studentId"),
+                resultSet.getString("invoice_studentUserId"),
                 resultSet.getString("invoice_studentDisplayName"),
                 resultSet.getString("invoice_studentEmail"),
                 resultSet.getString("invoice_studentCode"),
                 resultSet.getString("invoice_semesterId"),
                 resultSet.getString("invoice_semesterName"),
+                resultSet.getString("invoice_semesterNameEn"),
+                resultSet.getString("invoice_semesterNameVi"),
                 resultSet.getString("invoice_status"),
-                resultSet.getBigDecimal("invoice_total"));
+                resultSet.getBigDecimal("invoice_subtotal"),
+                resultSet.getBigDecimal("invoice_discount"),
+                resultSet.getBigDecimal("invoice_total"),
+                instant(resultSet.getTimestamp("invoice_dueDate")),
+                instant(resultSet.getTimestamp("invoice_paidAt")),
+                resultSet.getString("invoice_notes"),
+                instant(resultSet.getTimestamp("invoice_createdAt")),
+                instant(resultSet.getTimestamp("invoice_updatedAt")));
         return new PaymentResponse(
                 resultSet.getString("id"),
                 resultSet.getString("paymentNumber"),

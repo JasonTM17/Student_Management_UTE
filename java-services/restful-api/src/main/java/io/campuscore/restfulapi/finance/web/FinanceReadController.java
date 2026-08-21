@@ -2,10 +2,10 @@ package io.campuscore.restfulapi.finance.web;
 
 import io.campuscore.restfulapi.finance.service.FinanceReadService;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceDetail;
-import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceListItem;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.InvoiceListResponse;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PaymentListResponse;
 import io.campuscore.restfulapi.finance.web.FinanceReadDtos.PaymentResponse;
+import io.campuscore.restfulapi.finance.web.FinanceReadDtos.StudentInvoiceListItem;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -40,7 +40,7 @@ public class FinanceReadController {
 
     @GetMapping("my/invoices")
     @PreAuthorize("hasRole('STUDENT')")
-    public List<InvoiceListItem> getMyInvoices(
+    public List<StudentInvoiceListItem> getMyInvoices(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String semesterId,
             @RequestParam MultiValueMap<String, String> queryParameters) {
