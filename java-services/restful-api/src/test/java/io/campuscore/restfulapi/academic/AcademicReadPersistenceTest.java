@@ -101,6 +101,35 @@ class AcademicReadPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Section\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Classroom\"");
+        jdbc.execute("""
+                CREATE TABLE "academic"."Classroom" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "building" VARCHAR(120) NOT NULL,
+                    "roomNumber" VARCHAR(120) NOT NULL,
+                    "capacity" INTEGER NOT NULL DEFAULT 0,
+                    "type" VARCHAR(80) NOT NULL DEFAULT 'CLASSROOM',
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00'
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE "academic"."Section" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "sectionNumber" VARCHAR(40) NOT NULL,
+                    "courseId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "lecturerId" VARCHAR(120),
+                    "classroomId" VARCHAR(120),
+                    "capacity" INTEGER NOT NULL,
+                    "enrolledCount" INTEGER NOT NULL,
+                    "status" VARCHAR(40) NOT NULL
+                )
+                """);
+        jdbc.update("DELETE FROM \"academic\".\"Section\"");
+        jdbc.update("DELETE FROM \"academic\".\"Classroom\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Semester\"");
         jdbc.update("DELETE FROM \"academic\".\"Department\"");
@@ -136,6 +165,35 @@ class AcademicReadPersistenceTest {
     }
 
     @Test
+    void academicYearsPreserveLegacyListEnvelopeOrderingAndSemesters() throws Exception {
+        insertAcademicYear("ay-2025", 2025, false);
+        insertAcademicYear("ay-2026", 2026, true);
+        insertSemester("spring-2026", "Spring", null, null, "SPRING", "ay-2026", "2026-01-01T00:00:00Z");
+        insertSemester("fall-2026", "Fall", null, null, "FALL", "ay-2026", "2026-09-01T00:00:00Z");
+        insertSemester("fall-2025", "Fall", null, null, "FALL", "ay-2025", "2025-09-01T00:00:00Z");
+
+        mvc.perform(get("/api/v1/academic-years")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "1")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("ay-2026"))
+                .andExpect(jsonPath("$.data[0].isCurrent").value(true))
+                .andExpect(jsonPath("$.data[0].semesters.length()").value(2))
+                .andExpect(jsonPath("$.data[0].semesters[0].id").value("fall-2026"))
+                .andExpect(jsonPath("$.data[0].semesters[1].id").value("spring-2026"))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/academic-years/ay-2025")
+                        .with(jwt().jwt(token -> token.subject("lecturer-user"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.year").value(2025))
+                .andExpect(jsonPath("$.semesters[0].id").value("fall-2025"));
+    }
+
+    @Test
     void coursesPreserveLegacyListEnvelopeDepartmentAndHydration() throws Exception {
         insertAcademicYear("ay-2026", 2026, true);
         insertSemester("fall-2026", "Fall", null, null, "FALL", "ay-2026", "2026-09-01T00:00:00Z");
@@ -168,6 +226,40 @@ class AcademicReadPersistenceTest {
     }
 
     @Test
+    void classroomsPreserveLegacyListEnvelopeOrderingAndDetailSections() throws Exception {
+        insertAcademicYear("ay-2026", 2026, true);
+        insertSemester("fall-2026", "Fall", null, null, "FALL", "ay-2026", "2026-09-01T00:00:00Z");
+        insertClassroom("classroom-b202", "B", "202", 60, "LECTURE_HALL");
+        insertClassroom("classroom-a101", "A", "101", 40, "LAB");
+        insertClassroomSection("section-2", "B", "course-1", "fall-2026", "lecturer-1", "classroom-a101", 40, 35);
+        insertClassroomSection("section-1", "A", "course-1", "fall-2026", "lecturer-1", "classroom-a101", 40, 20);
+
+        mvc.perform(get("/api/v1/classrooms")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "20")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("classroom-a101"))
+                .andExpect(jsonPath("$.data[0].building").value("A"))
+                .andExpect(jsonPath("$.data[0].roomNumber").value("101"))
+                .andExpect(jsonPath("$.data[0].capacity").value(40))
+                .andExpect(jsonPath("$.data[0].type").value("LAB"))
+                .andExpect(jsonPath("$.data[0].sections.length()").value(0))
+                .andExpect(jsonPath("$.data[1].id").value("classroom-b202"))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/classrooms/classroom-a101")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.isActive").value(true))
+                .andExpect(jsonPath("$.sections.length()").value(2))
+                .andExpect(jsonPath("$.sections[0].sectionNumber").value("A"))
+                .andExpect(jsonPath("$.sections[1].sectionNumber").value("B"))
+                .andExpect(jsonPath("$.sections[1].enrolledCount").value(35));
+    }
+
+    @Test
     void readBoundaryFailsClosedForAnonymousInvalidPagesAndUnexpectedQuery() throws Exception {
         mvc.perform(get("/api/v1/semesters"))
                 .andExpect(status().isUnauthorized())
@@ -195,17 +287,34 @@ class AcademicReadPersistenceTest {
                         .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/academic-years/missing")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/classrooms/missing")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/classrooms")
+                        .queryParam("building", "A")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
     private void insertAcademicYear(String id, int year, boolean current) {
+        Instant start = Instant.parse(year + "-01-01T00:00:00Z");
         jdbc.update(
                 "INSERT INTO \"academic\".\"AcademicYear\""
                         + " (\"id\", \"year\", \"startDate\", \"endDate\", \"isCurrent\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 year,
-                localDateTime(BASE_TIME),
-                localDateTime(BASE_TIME.plusSeconds(31_536_000)),
+                localDateTime(start),
+                localDateTime(start.plusSeconds(31_536_000)),
                 current,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
@@ -303,6 +412,47 @@ class AcademicReadPersistenceTest {
                 true,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
+    }
+
+    private void insertClassroom(String id, String building, String roomNumber, int capacity, String type) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Classroom\""
+                        + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\", \"isActive\","
+                        + " \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                building,
+                roomNumber,
+                capacity,
+                type,
+                true,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
+    }
+
+    private void insertClassroomSection(
+            String id,
+            String sectionNumber,
+            String courseId,
+            String semesterId,
+            String lecturerId,
+            String classroomId,
+            int capacity,
+            int enrolledCount) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\","
+                        + " \"classroomId\", \"capacity\", \"enrolledCount\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                sectionNumber,
+                courseId,
+                semesterId,
+                lecturerId,
+                classroomId,
+                capacity,
+                enrolledCount,
+                "OPEN");
     }
 
     private static void timestamp(PreparedStatement statement, int index, Instant value)

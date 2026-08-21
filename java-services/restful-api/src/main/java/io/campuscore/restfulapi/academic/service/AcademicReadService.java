@@ -1,12 +1,20 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.repository.AcademicReadRepository;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.PageMeta;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.util.List;
+import java.util.Map;
+import java.util.stream.Collectors;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -46,6 +54,21 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
+    public AcademicYearListResponse findAcademicYears(int page, int limit) {
+        requirePage(page, limit);
+        long total = academic.countAcademicYears();
+        List<AcademicYearResponse> years = academic.findAcademicYears(offset(page, limit), limit);
+        return new AcademicYearListResponse(hydrateAcademicYears(years), meta(total, page, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public AcademicYearResponse findAcademicYear(String id) {
+        AcademicYearResponse year = academic.findAcademicYearById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Academic year not found"));
+        return hydrateAcademicYears(List.of(year)).getFirst();
+    }
+
+    @Transactional(readOnly = true)
     public CourseListResponse findCourses(int page, int limit) {
         requirePage(page, limit);
         long total = academic.countCourses();
@@ -60,6 +83,60 @@ public class AcademicReadService {
         return academic.findCourseById(id)
                 .map(AcademicCatalogLocalizer::hydrateCourse)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Course not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public ClassroomListResponse findClassrooms(int page, int limit) {
+        requirePage(page, limit);
+        long total = academic.countClassrooms();
+        List<ClassroomResponse> data = academic.findClassrooms(offset(page, limit), limit);
+        return new ClassroomListResponse(data, meta(total, page, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public ClassroomResponse findClassroom(String id) {
+        ClassroomResponse classroom = academic.findClassroomById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Classroom not found"));
+        return hydrateClassrooms(List.of(classroom)).getFirst();
+    }
+
+    private List<AcademicYearResponse> hydrateAcademicYears(List<AcademicYearResponse> years) {
+        List<String> ids = years.stream().map(AcademicYearResponse::id).toList();
+        Map<String, List<SemesterCatalogSummary>> semestersByYear = academic
+                .findSemesterCatalogSummariesByAcademicYearIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(SemesterCatalogSummary::academicYearId));
+        return years.stream()
+                .map(year -> new AcademicYearResponse(
+                        year.id(),
+                        year.year(),
+                        year.startDate(),
+                        year.endDate(),
+                        year.isCurrent(),
+                        year.createdAt(),
+                        year.updatedAt(),
+                        semestersByYear.getOrDefault(year.id(), List.of())))
+                .toList();
+    }
+
+    private List<ClassroomResponse> hydrateClassrooms(List<ClassroomResponse> classrooms) {
+        List<String> ids = classrooms.stream().map(ClassroomResponse::id).toList();
+        Map<String, List<ClassroomSectionSummary>> sectionsByClassroom = academic
+                .findClassroomSectionsByClassroomIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(ClassroomSectionSummary::classroomId));
+        return classrooms.stream()
+                .map(classroom -> new ClassroomResponse(
+                        classroom.id(),
+                        classroom.building(),
+                        classroom.roomNumber(),
+                        classroom.capacity(),
+                        classroom.type(),
+                        classroom.isActive(),
+                        classroom.createdAt(),
+                        classroom.updatedAt(),
+                        sectionsByClassroom.getOrDefault(classroom.id(), List.of())))
+                .toList();
     }
 
     private static PageMeta meta(long total, int page, int limit) {

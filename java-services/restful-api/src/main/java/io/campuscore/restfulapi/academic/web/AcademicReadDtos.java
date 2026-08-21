@@ -64,6 +64,39 @@ public final class AcademicReadDtos {
             AcademicYearSummary academicYear) {
     }
 
+    public record SemesterCatalogSummary(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String type,
+            String academicYearId,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant startDate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant endDate,
+            String status,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt) {
+    }
+
+    public record AcademicYearResponse(
+            String id,
+            int year,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant startDate,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant endDate,
+            boolean isCurrent,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            List<SemesterCatalogSummary> semesters) {
+    }
+
     public record CourseResponse(
             String id,
             String code,
@@ -84,12 +117,44 @@ public final class AcademicReadDtos {
             DepartmentSummary department) {
     }
 
+    public record ClassroomSectionSummary(
+            String id,
+            String sectionNumber,
+            String courseId,
+            String semesterId,
+            String lecturerId,
+            String classroomId,
+            int capacity,
+            int enrolledCount,
+            String status) {
+    }
+
+    public record ClassroomResponse(
+            String id,
+            String building,
+            String roomNumber,
+            int capacity,
+            String type,
+            boolean isActive,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            List<ClassroomSectionSummary> sections) {
+    }
+
     public record PageMeta(long total, int page, int limit, int totalPages) {
+    }
+
+    public record AcademicYearListResponse(List<AcademicYearResponse> data, PageMeta meta) {
     }
 
     public record SemesterListResponse(List<SemesterResponse> data, PageMeta meta) {
     }
 
     public record CourseListResponse(List<CourseResponse> data, PageMeta meta) {
+    }
+
+    public record ClassroomListResponse(List<ClassroomResponse> data, PageMeta meta) {
     }
 }

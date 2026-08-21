@@ -1,8 +1,12 @@
 package io.campuscore.restfulapi.academic.repository;
 
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -50,8 +54,16 @@ public class AcademicReadRepository {
 
     private static final RowMapper<SemesterResponse> SEMESTER_ROW_MAPPER =
             AcademicReadRepository::mapSemester;
+    private static final RowMapper<SemesterCatalogSummary> SEMESTER_CATALOG_ROW_MAPPER =
+            AcademicReadRepository::mapSemesterCatalogSummary;
+    private static final RowMapper<AcademicYearResponse> ACADEMIC_YEAR_ROW_MAPPER =
+            AcademicReadRepository::mapAcademicYear;
     private static final RowMapper<CourseResponse> COURSE_ROW_MAPPER =
             AcademicReadRepository::mapCourse;
+    private static final RowMapper<ClassroomResponse> CLASSROOM_ROW_MAPPER =
+            AcademicReadRepository::mapClassroom;
+    private static final RowMapper<ClassroomSectionSummary> CLASSROOM_SECTION_ROW_MAPPER =
+            AcademicReadRepository::mapClassroomSection;
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -98,6 +110,48 @@ public class AcademicReadRepository {
         return matches.stream().findFirst();
     }
 
+    public List<AcademicYearResponse> findAcademicYears(long offset, int limit) {
+        return jdbc.query(
+                "SELECT " + ACADEMIC_YEAR_COLUMNS
+                        + " FROM \"academic\".\"AcademicYear\" ay"
+                        + " ORDER BY ay.\"startDate\" DESC LIMIT :limit OFFSET :offset",
+                pageParameters(offset, limit),
+                ACADEMIC_YEAR_ROW_MAPPER);
+    }
+
+    public long countAcademicYears() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"AcademicYear\"",
+                new MapSqlParameterSource(),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<AcademicYearResponse> findAcademicYearById(String id) {
+        List<AcademicYearResponse> matches = jdbc.query(
+                "SELECT " + ACADEMIC_YEAR_COLUMNS
+                        + " FROM \"academic\".\"AcademicYear\" ay"
+                        + " WHERE ay.\"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                ACADEMIC_YEAR_ROW_MAPPER);
+        return matches.stream().findFirst();
+    }
+
+    public List<SemesterCatalogSummary> findSemesterCatalogSummariesByAcademicYearIds(List<String> academicYearIds) {
+        if (academicYearIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT s.\"id\", s.\"name\", s.\"nameEn\", s.\"nameVi\", s.\"type\","
+                        + " s.\"academicYearId\", s.\"startDate\", s.\"endDate\","
+                        + " s.\"status\", s.\"createdAt\", s.\"updatedAt\""
+                        + " FROM \"academic\".\"Semester\" s"
+                        + " WHERE s.\"academicYearId\" IN (:academicYearIds)"
+                        + " ORDER BY s.\"startDate\" DESC, s.\"id\" ASC",
+                new MapSqlParameterSource("academicYearIds", academicYearIds),
+                SEMESTER_CATALOG_ROW_MAPPER);
+    }
+
     public List<CourseResponse> findCourses(long offset, int limit) {
         return jdbc.query(
                 "SELECT c.\"id\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\","
@@ -131,6 +185,50 @@ public class AcademicReadRepository {
                 new MapSqlParameterSource("id", id),
                 COURSE_ROW_MAPPER);
         return matches.stream().findFirst();
+    }
+
+    public List<ClassroomResponse> findClassrooms(long offset, int limit) {
+        return jdbc.query(
+                "SELECT cl.\"id\", cl.\"building\", cl.\"roomNumber\", cl.\"capacity\","
+                        + " cl.\"type\", cl.\"isActive\", cl.\"createdAt\", cl.\"updatedAt\""
+                        + " FROM \"academic\".\"Classroom\" cl"
+                        + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC LIMIT :limit OFFSET :offset",
+                pageParameters(offset, limit),
+                CLASSROOM_ROW_MAPPER);
+    }
+
+    public long countClassrooms() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Classroom\"",
+                new MapSqlParameterSource(),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<ClassroomResponse> findClassroomById(String id) {
+        List<ClassroomResponse> matches = jdbc.query(
+                "SELECT cl.\"id\", cl.\"building\", cl.\"roomNumber\", cl.\"capacity\","
+                        + " cl.\"type\", cl.\"isActive\", cl.\"createdAt\", cl.\"updatedAt\""
+                        + " FROM \"academic\".\"Classroom\" cl"
+                        + " WHERE cl.\"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                CLASSROOM_ROW_MAPPER);
+        return matches.stream().findFirst();
+    }
+
+    public List<ClassroomSectionSummary> findClassroomSectionsByClassroomIds(List<String> classroomIds) {
+        if (classroomIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT section.\"id\", section.\"sectionNumber\", section.\"courseId\","
+                        + " section.\"semesterId\", section.\"lecturerId\", section.\"classroomId\","
+                        + " section.\"capacity\", section.\"enrolledCount\", section.\"status\""
+                        + " FROM \"academic\".\"Section\" section"
+                        + " WHERE section.\"classroomId\" IN (:classroomIds)"
+                        + " ORDER BY section.\"sectionNumber\" ASC, section.\"id\" ASC",
+                new MapSqlParameterSource("classroomIds", classroomIds),
+                CLASSROOM_SECTION_ROW_MAPPER);
     }
 
     private static MapSqlParameterSource pageParameters(long offset, int limit) {
@@ -168,6 +266,35 @@ public class AcademicReadRepository {
                 academicYear);
     }
 
+    private static SemesterCatalogSummary mapSemesterCatalogSummary(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new SemesterCatalogSummary(
+                resultSet.getString("id"),
+                resultSet.getString("name"),
+                resultSet.getString("nameEn"),
+                resultSet.getString("nameVi"),
+                resultSet.getString("type"),
+                resultSet.getString("academicYearId"),
+                instant(resultSet.getTimestamp("startDate")),
+                instant(resultSet.getTimestamp("endDate")),
+                resultSet.getString("status"),
+                instant(resultSet.getTimestamp("createdAt")),
+                instant(resultSet.getTimestamp("updatedAt")));
+    }
+
+    private static AcademicYearResponse mapAcademicYear(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new AcademicYearResponse(
+                resultSet.getString("ay_id"),
+                resultSet.getInt("ay_year"),
+                instant(resultSet.getTimestamp("ay_start_date")),
+                instant(resultSet.getTimestamp("ay_end_date")),
+                resultSet.getBoolean("ay_is_current"),
+                instant(resultSet.getTimestamp("ay_created_at")),
+                instant(resultSet.getTimestamp("ay_updated_at")),
+                List.of());
+    }
+
     private static CourseResponse mapCourse(ResultSet resultSet, int ignored)
             throws SQLException {
         DepartmentSummary department = new DepartmentSummary(
@@ -197,6 +324,34 @@ public class AcademicReadRepository {
                 instant(resultSet.getTimestamp("createdAt")),
                 instant(resultSet.getTimestamp("updatedAt")),
                 department);
+    }
+
+    private static ClassroomResponse mapClassroom(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new ClassroomResponse(
+                resultSet.getString("id"),
+                resultSet.getString("building"),
+                resultSet.getString("roomNumber"),
+                resultSet.getInt("capacity"),
+                resultSet.getString("type"),
+                resultSet.getBoolean("isActive"),
+                instant(resultSet.getTimestamp("createdAt")),
+                instant(resultSet.getTimestamp("updatedAt")),
+                List.of());
+    }
+
+    private static ClassroomSectionSummary mapClassroomSection(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new ClassroomSectionSummary(
+                resultSet.getString("id"),
+                resultSet.getString("sectionNumber"),
+                resultSet.getString("courseId"),
+                resultSet.getString("semesterId"),
+                resultSet.getString("lecturerId"),
+                resultSet.getString("classroomId"),
+                resultSet.getInt("capacity"),
+                resultSet.getInt("enrolledCount"),
+                resultSet.getString("status"));
     }
 
     private static Instant instant(Timestamp timestamp) {
