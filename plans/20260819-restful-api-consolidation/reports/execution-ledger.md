@@ -286,3 +286,34 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   web/mobile remains a required later phase with Stitch, responsive, auth/runtime
   and functional proof. Preserve untracked `.agents/`, `.codex/` and `.tmp/`
   unless the user explicitly authorizes a safe cleanup target.
+
+## Thesis differential repair and rehearsal — 2026-08-21
+
+- Repaired `ThesisCompatibilityExceptionHandler` and the thesis persistence
+  assertions so unknown-round and malformed-UUID reads use the legacy
+  `{statusCode,message,timestamp,path}` envelope. The production handler is
+  scoped to the thesis read controllers; shared API error handling and public
+  route ownership were not changed.
+- The first live rerun exposed a nondeterministic harness issue: the legacy and
+  Java error envelopes had identical stable fields but request-time timestamps.
+  The comparator was repaired to validate ISO-8601 UTC timestamps and normalize
+  only that volatile error field before hashing. Business/data timestamps remain
+  strict.
+- Focused regression PASS on a new writable database in the isolated
+  `56433` PostgreSQL cluster: `ThesisTopicPersistenceTest`, 12/12, 0 failures,
+  0 errors. The restored `55432` database was intentionally not used for this
+  mutating test because its read-only role correctly rejects cleanup writes.
+- Harness syntax/self-test PASS. Live private thesis differential PASS: 8/8
+  corpus comparisons, and legacy → Java → legacy route sequence preserved the
+  legacy rounds body hash
+  `b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194`.
+- Read-only audit PASS on `campuscore_ro_reader`: transaction read-only on,
+  `statement_timeout=5s`, thesis `USAGE` and `SELECT` granted, `INSERT` and
+  database `CREATE` denied. Both Java runtimes and disposable PostgreSQL
+  servers were stopped after the rehearsal.
+- Full evidence is in
+  `plans/20260819-restful-api-consolidation/reports/thesis-differential-20260821.md`.
+- This does not clear the larger backend foundation gate: authenticated
+  client parity, full domain differential coverage, canary, writer handoff,
+  rollback observation, and fresh exact-head Advisor/Kongming/Wukong review
+  remain open.
