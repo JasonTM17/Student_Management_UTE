@@ -95,10 +95,30 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Legacy-compatible scope for Phase 52 includes selected faculty/department read routes only. `POST /faculties`, `PUT /faculties/:id`, `DELETE /faculties/:id`, `POST /departments`, `PUT /departments/:id`, `DELETE /departments/:id` and curricula routes are explicitly non-goals until a later scoped parity slice.
 - Legacy-compatible scope for Phase 53 includes selected curriculum read routes only. `POST /curricula`, `PUT /curricula/:id`, `DELETE /curricula/:id`, student/curriculum writer ownership and richer nested course-object joins are explicitly non-goals until a later scoped parity slice or PostgreSQL parity gate.
 
+## Backend foundation capability preflight — 2026-08-21
+
+- Exact source snapshot: `ead8266c2ea2a2332add4fbe7b2ffc8cb299eaaf`, matching
+  `origin/feature/java-thesis-platform` before this docs-only record.
+- `psql`, `pg_dump`, `pg_restore` and `postgres` 18.0.4 are installed, but the
+  Docker daemon is unavailable on the read-only probe (`dockerDesktopLinuxEngine`
+  named pipe missing).
+- No approved disposable PostgreSQL restore/fixture, isolated target identity or
+  rehearsal credentials were present in the known D: paths or environment. The
+  active CampusCore stack was not contacted or mutated.
+- Verdict: `BLOCKED_CAPABILITY` for the PostgreSQL restore/differential/rollback
+  gate. This does not change the Java source candidate, public route ownership or
+  cutover posture.
+
 ## Deferred findings
 
 - PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
 
 ## Next resume point
 
-- Resume with the backend foundation gate: PostgreSQL restore parity/canary preparation or the next low-risk academic/admin read before FE Stitch runtime parity. FE web/mobile remains a required later phase with Stitch, responsive, auth/runtime and functional proof. Preserve untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a safe cleanup target.
+- Resume when an approved disposable PostgreSQL target, scrubbed backup/fixture
+  and rehearsal authority are supplied; then run the Phase 09/11-style
+  read-only differential and rollback rehearsal at a fresh exact HEAD. Until
+  that capability exists, do not point FE traffic or public routes at Java. FE
+  web/mobile remains a required later phase with Stitch, responsive, auth/runtime
+  and functional proof. Preserve untracked `.agents/`, `.codex/` and `.tmp/`
+  unless the user explicitly authorizes a safe cleanup target.
