@@ -103,6 +103,21 @@ public final class AnalyticsReadDtos {
             long enrollmentCount) {
     }
 
+    public record EnrollmentTrendBucket(
+            String month,
+            int year,
+            int monthNumber,
+            Instant startDate,
+            Instant endDate,
+            String labelEn,
+            String labelVi,
+            long enrolled,
+            long dropped,
+            long completed,
+            long net,
+            long totalActivity) {
+    }
+
     public record FinanceSummaryResponse(
             FinanceTotals totals,
             List<InvoiceStatusBucket> invoiceStatus,

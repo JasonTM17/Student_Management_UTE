@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
@@ -23,8 +24,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-gated analytics reads. Trends, attendance, lecturer dashboards,
- * cockpit composition, metrics export and event consumers remain in the legacy
+ * Feature-gated analytics reads. Attendance, lecturer dashboards, cockpit
+ * composition, metrics export and event consumers remain in the legacy
  * analytics-service for this wave.
  */
 @RestController
@@ -60,6 +61,15 @@ public class AnalyticsReadController {
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of());
         return analytics.enrollmentsBySemester();
+    }
+
+    @GetMapping("enrollment-trends")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public List<EnrollmentTrendBucket> enrollmentTrends(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @RequestParam(name = "months", required = false) String months) {
+        requireAllowedQuery(queryParameters, Set.of("months"));
+        return analytics.enrollmentTrends(parseTrendMonths(months));
     }
 
     @GetMapping("section-occupancy")
@@ -118,6 +128,21 @@ public class AnalyticsReadController {
             if (!allowed.contains(entry.getKey()) || entry.getValue().size() != 1) {
                 throw new IllegalArgumentException("Unexpected or repeated query parameter: " + entry.getKey());
             }
+        }
+    }
+
+    private static int parseTrendMonths(String value) {
+        if (value == null || value.isBlank()) {
+            return 12;
+        }
+        try {
+            double parsed = Double.parseDouble(value);
+            if (!Double.isFinite(parsed)) {
+                return 12;
+            }
+            return (int) parsed;
+        } catch (NumberFormatException ignored) {
+            return 12;
         }
     }
 }
