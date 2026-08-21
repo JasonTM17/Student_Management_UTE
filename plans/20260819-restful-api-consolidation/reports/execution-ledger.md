@@ -5,23 +5,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 - Current remote integration snapshot:
   `origin/feature/java-thesis-platform` at
-  `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`
-  (`docs(plan): record academic context hardening`), with source hardening in
-  `97a9b7e12d70aeb6a55959ea66b593515ede778f`.
-- Backend worktree used for this checkpoint:
-  `C:\Users\Admin\.codex\worktrees\b516\Student_Management`, branch
-  `fix/academic-context-security`, clean at `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`.
+  `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`
+  (`fix(frontend): tighten Stitch responsive surfaces`), with source hardening
+  in `97a9b7e12d70aeb6a55959ea66b593515ede778f`.
+- Backend provenance worktree used for this checkpoint:
+  `D:\Student_Management-recovery\backend-provenance-4b5e771`, detached at
+  `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`, clean.
 - Main workspace `D:\Student_Management` remains intentionally untouched for
   integration because it is behind the remote by two commits and contains
   preserved user-owned dirty FE/edge artifacts. Do not reset, clean, rebase or
   stage those files without a fresh exact-scope decision.
-- Current backend gate evidence on the hardening source: focused Phase 55
-  Maven gate PASS with 54 tests / 0 failures / 0 errors / 0 skipped,
+- Current backend gate evidence on the current tip: `mvn -q -f java-services/pom.xml test`
+  PASS with 27 reports / 178 tests / 0 failures / 0 errors / 1 skipped,
   `git diff --check` PASS, and scoped high-confidence secret scan PASS.
-- Full Java reactor after the Phase 55 hardening follow-up is `NOT_RUN` because
-  C: free space is low. Treat earlier full reactor runs as historical evidence
-  only, not as proof of this exact docs/head checkpoint.
-- Disk snapshot after the push: C: ~2.63 GiB free, D: ~34.51 GiB free. No
+- The earlier Phase 55 hardening focused gate remains historical evidence only.
+- Disk snapshot after the refresh: C: ~2.63 GiB free, D: ~34.51 GiB free. No
   manual Codex/IDE/user-data cleanup was performed.
 
 ## Completed evidence carried forward
