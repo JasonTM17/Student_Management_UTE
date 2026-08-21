@@ -263,10 +263,15 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   and negative student-role/unexpected-query behavior.
 - Focused gate PASS:
   `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`.
+- Full canonical Java monolith gate PASS:
+  `mvn -q -f java-services/pom.xml clean test`.
+- Current canonical Surefire summary from
+  `java-services/restful-api/target/surefire-reports`: 26 reports / 176 tests /
+  0 failures / 0 errors / 1 skipped.
 - Production controller SQL-write grep PASS and touched-file `git diff --check`
   PASS with only Git Windows LF-to-CRLF working-copy warnings.
-- Limitation: H2/source evidence only until full canonical monolith rerun,
-  PostgreSQL read parity, route canary and rollback rehearsal are observed.
+- Limitation: source/H2 evidence only until PostgreSQL read parity, route
+  canary and rollback rehearsal are observed.
 
 ## Deferred findings
 

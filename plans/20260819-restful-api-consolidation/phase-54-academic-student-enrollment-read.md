@@ -30,6 +30,11 @@ route ownership, PostgreSQL parity, canary or rollback.
 
 - Focused gate PASS:
   `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
+- Full canonical Java monolith gate PASS:
+  `mvn -q -f java-services/pom.xml clean test`
+- Surefire summary from `java-services/restful-api/target/surefire-reports`:
+  26 reports / 176 tests / 0 failures / 0 errors / 1 skipped. The skipped test
+  is the opt-in restore smoke when `THESIS_RESTORE_SMOKE` is not set.
 - Production controller SQL-write grep PASS: no `INSERT`, `UPDATE`, `DELETE`,
   `MERGE`, `ALTER`, `DROP`, `CREATE` or `TRUNCATE` markers in the changed
   production controller.
@@ -38,7 +43,6 @@ route ownership, PostgreSQL parity, canary or rollback.
 
 ## Open gates
 
-- Full canonical Java monolith test after docs update.
 - PostgreSQL read parity against an approved disposable restore.
 - Live route canary and rollback rehearsal.
 - CSV export parity for `GET /api/v1/enrollments/export/csv`.
