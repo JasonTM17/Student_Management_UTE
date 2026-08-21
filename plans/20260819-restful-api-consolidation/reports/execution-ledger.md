@@ -4,16 +4,24 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Current execution state
 
 - Current branch snapshot before this docs update:
-  `feature/java-thesis-platform` at
-  `7b4634c5e9245b8e37d16a88b60ab43f0c8cfd1d`
-  (`docs(plan): record finance postgres repair`), with local HEAD ahead of
-  `origin/feature/java-thesis-platform` by the finance source repair and that
-  finance docs record.
+  `main` at `3e1bfbbae19fedab6229e18200ed0389c147f613`
+  (`fix(frontend): refresh sharp security baseline`), with `origin/main`
+  matching and `feature/java-thesis-platform` still carrying the separate
+  docs-only phase-54 update.
 - Repo state before this docs update: tracked tree is clean; the user-owned
   untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
-- Branch integration ruling: keep using `feature/java-thesis-platform` as the
-  integration branch for this turn; do not fast-forward or push `main` unless
-  the user explicitly changes the target.
+- Source gates refreshed on this exact head: `npm test --prefix frontend`
+  29/29, `npm run typecheck --prefix frontend`, `npm run lint --prefix
+  frontend`, `npm test --prefix mobile` 6/6, and
+  `mvn -q -f java-services/pom.xml test` 26 reports / 177 tests / 0 failures /
+  0 errors / 1 skipped.
+- Runtime browser gate assessment: Docker daemon is unreachable
+  (`dockerDesktopLinuxEngine` pipe missing) and `kubectl` has no current
+  context, so exact-source browser/Playwright visual capture remains blocked
+  until a local edge/runtime is restored.
+- Branch integration ruling: continue using `main` as the integration branch
+  for this turn; do not fast-forward or push any other branch unless the user
+  explicitly changes the target.
 - Disk snapshot before this docs update: C: ~13.64 GiB free, D: ~35.31 GiB
   free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56452`
   and `56453` were stopped by exact data directory; no broad deletion was run.
@@ -25,12 +33,10 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Finance PostgreSQL optional-filter repair is committed at
-  `3327f8318bc9aa775a4e48185b8f74b54ab3215a`, documented in
-  `phase-58-finance-postgres-parity-repair.md`.
-- Current step after this docs update: continue the accepted backend-first
-  parity plan from the next bounded slice. Route ownership, writer ownership,
-  FE traffic and production cutover remain on HOLD.
+- Current step after this docs update: record the refreshed exact-head source
+  checkpoint, preserve the runtime blocker evidence, and keep the active plan
+  intact until a local edge/runtime is available again. Route ownership,
+  writer ownership, FE traffic and production cutover remain on HOLD.
 
 ## Phase 48 evidence
 
@@ -626,3 +632,22 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   to an exact source identity. The current correction supplies that identity;
   refresh Advisor/Kongming/Wukong after this report commit. `SOURCE_PUSH` and
   `CUTOVER` remain `HOLD`.
+
+## Current feature-branch backend gate refresh — 2026-08-21
+
+- Verified exact head: `4a5b1026d15b246db1e36d6a7260106620fcd2fb`
+  (`docs(plan): record phase 54 postgres rehearsal`) on
+  `origin/feature/java-thesis-platform`.
+- Canonical Java reactor refresh:
+  `mvn -q -f java-services/pom.xml clean test`
+  `PASS`, with surefire totals from `java-services/restful-api/target/surefire-reports`:
+  177 tests / 0 failures / 0 errors / 1 skipped.
+- Rollback harness refresh:
+  `node scripts/run-thesis-differential-rehearsal.mjs --self-test`
+  `PASS`, with the legacy/java/legacy route sequence and normalization checks
+  still green on the current source tree.
+- Read-only review refresh on the same exact head:
+  Kongming `HOLD`, Wukong `NOT_FALSIFIED`.
+- Gate conclusion: backend foundation remains `HOLD` because the fresh
+  review still lacks a route-switch/cutover-quality exact-head pass that would
+  unlock client staging; FE Stitch remains deferred until that gate moves.
