@@ -32,33 +32,54 @@ Out of scope:
 
 ## Evidence
 
-Observed on local `main` at
-`ec1b2fed6d471716d35403b74158d513768b0d92` before commit:
+Observed on local `main` at source commit
+`b567a02f8c152b909470c96ea638a129c4f23c1c`:
 
 ```powershell
+node --check scripts/run-finance-differential-rehearsal.mjs
 node scripts/run-finance-differential-rehearsal.mjs --self-test
 ```
 
-Result: PASS for 11 finance read comparisons plus the legacy-before,
-java-candidate and legacy-after route sequence. This is a harness self-test
-with local in-process servers, not restored legacy runtime evidence.
+Result: PASS. The harness self-test covers 11 finance comparisons plus the
+legacy-before → java-candidate → legacy-after route sequence.
+
+Restored PostgreSQL live rehearsal on `127.0.0.1:56460` using the disposable
+finance snapshot `campuscore_finance_read_20260821_182354`:
 
 ```powershell
-mvn -q -f java-services/pom.xml clean test
+node scripts/run-finance-differential-rehearsal.mjs
 ```
 
-Result: PASS. Canonical RESTful API Surefire summary:
+Result: `PASS_WITH_LIMITATIONS`.
+
+- 10 comparable finance checks passed.
+- `GET /api/v1/finance/payments?status=COMPLETED` is a known restored-legacy
+  limitation: the Node legacy service returns 500 on this restored varchar
+  schema because the Prisma `finance.PaymentStatus` enum is absent.
+- The legacy-before / java-candidate / legacy-after route sequence hash stayed
+  stable.
+
+Focused Java verification:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test
+mvn -q -f java-services/pom.xml test
+```
+
+Result: PASS.
+Canonical RESTful API Surefire summary:
 26 reports / 177 tests / 0 failures / 0 errors / 1 skipped.
 
 Additional hygiene:
 
-- `git diff --check` for the changed Finance files and the rehearsal harness:
-  PASS, with only Windows LF-to-CRLF working-copy warnings.
+- `git diff --check` for the touched finance source and harness: PASS, with
+  only Windows LF-to-CRLF working-copy warnings.
 - High-confidence sensitive-value scan found only JWT/token variable names in
   the harness and test code; no hardcoded credential value was observed.
 
 ## Remaining holds
 
-This phase is still source/harness evidence. The backend foundation gate remains
-HOLD until a restored PostgreSQL read-only target, live legacy-versus-Java
-differential, route rollback observation and fresh exact-head review gates pass.
+This phase now has live restored-PostgreSQL evidence, but the backend foundation
+gate still remains HOLD until the known legacy schema limitation is resolved or
+accounted for, route rollback observation is expanded, and fresh exact-head
+review gates pass.
