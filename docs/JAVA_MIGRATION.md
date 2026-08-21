@@ -109,10 +109,13 @@ attendance analytics, plus lecturer self-summary and lecturer section
 analytics, with metrics still owned by the legacy analytics service.
 The academic enrollment slice covers current-student enrollment list, student
 grade/transcript reads, admin enrollment list/detail, and lecturer/admin grade
-item/student-grade read aggregation, with enroll/drop, waitlist, grade
-editing/publishing, timetable, CSV export and writes still owned by the legacy
-academic service. The support-ticket read slice covers current-user and admin
-list/detail reads with response hydration. The support-ticket create slice adds
+item/student-grade read aggregation. The academic schedule slice covers
+feature-default-off schedule list/detail reads with direct section/classroom
+hydration, while enroll/drop, waitlist, grade editing/publishing, schedule
+writes, lecturer timetable shortcuts, CSV export and other writes still remain
+owned by the legacy academic service. The support-ticket read slice covers
+current-user and admin list/detail reads with response hydration. The
+support-ticket create slice adds
 a separate feature-default-off `POST /api/v1/support-tickets` candidate with
 legacy-shaped `TKT-xxxxx` numbering and a bounded unique-collision retry. The
 support-ticket response slice adds feature-default-off
