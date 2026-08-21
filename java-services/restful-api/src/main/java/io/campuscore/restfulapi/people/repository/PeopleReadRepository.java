@@ -45,25 +45,27 @@ public class PeopleReadRepository {
     }
 
     public List<StudentResponse> findStudents(long offset, int limit, String status) {
-        MapSqlParameterSource parameters = pageParameters(offset, limit)
-                .addValue("status", status);
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
+        String where = studentStatusFilter(parameters, status);
         return jdbc.query(
                 "SELECT \"id\", \"userId\", \"email\", \"firstName\", \"lastName\","
                         + " \"studentId\", \"curriculumId\", \"curriculumCode\", \"curriculumName\","
                         + " \"departmentId\", \"departmentCode\", \"departmentName\", \"year\","
                         + " \"status\", \"admissionDate\", \"createdAt\", \"updatedAt\""
                         + " FROM " + STUDENT_TABLE
-                        + " WHERE (:status IS NULL OR \"status\" = :status)"
+                        + where
                         + " ORDER BY \"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 parameters,
                 STUDENT_MAPPER);
     }
 
     public long countStudents(String status) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        String where = studentStatusFilter(parameters, status);
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + STUDENT_TABLE
-                        + " WHERE (:status IS NULL OR \"status\" = :status)",
-                new MapSqlParameterSource("status", status),
+                        + where,
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -116,6 +118,14 @@ public class PeopleReadRepository {
         return new MapSqlParameterSource()
                 .addValue("offset", offset)
                 .addValue("limit", limit);
+    }
+
+    private static String studentStatusFilter(MapSqlParameterSource parameters, String status) {
+        if (status == null) {
+            return "";
+        }
+        parameters.addValue("status", status);
+        return " WHERE \"status\" = :status";
     }
 
     private static StudentResponse mapStudent(ResultSet resultSet, int ignored)
