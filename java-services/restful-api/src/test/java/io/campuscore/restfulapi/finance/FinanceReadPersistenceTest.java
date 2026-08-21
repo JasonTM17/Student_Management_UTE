@@ -116,6 +116,8 @@ class FinanceReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].student.user.email").value("student-2@campuscore.edu"))
                 .andExpect(jsonPath("$.data[0].semester.nameEn").value("Fall 2026"))
                 .andExpect(jsonPath("$.data[0].paidAmount").value(0))
+                .andExpect(jsonPath("$.data[0].payments.length()").value(1))
+                .andExpect(jsonPath("$.data[0].payments[0].paymentNumber").value("PAY-002"))
                 .andExpect(jsonPath("$.meta.total").value(2))
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
 
@@ -136,7 +138,8 @@ class FinanceReadPersistenceTest {
                 .andExpect(jsonPath("$.items.length()").value(1))
                 .andExpect(jsonPath("$.items[0].description").value("Tuition"))
                 .andExpect(jsonPath("$.payments.length()").value(1))
-                .andExpect(jsonPath("$.payments[0].paymentNumber").value("PAY-001"));
+                .andExpect(jsonPath("$.payments[0].paymentNumber").value("PAY-001"))
+                .andExpect(jsonPath("$.payments[0].invoice").doesNotExist());
     }
 
     @Test
@@ -148,7 +151,9 @@ class FinanceReadPersistenceTest {
                         .with(studentJwt("student-1")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(1))
-                .andExpect(jsonPath("$[0].id").value("invoice-own"));
+                .andExpect(jsonPath("$[0].id").value("invoice-own"))
+                .andExpect(jsonPath("$[0].studentId").doesNotExist())
+                .andExpect(jsonPath("$[0].updatedAt").doesNotExist());
 
         mvc.perform(get("/api/v1/finance/my/invoices/invoice-other")
                         .with(studentJwt("student-1")))
@@ -191,6 +196,7 @@ class FinanceReadPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.paymentNumber").value("PAY-NEW"))
+                .andExpect(jsonPath("$.invoice.studentUserId").value("user-student-1"))
                 .andExpect(jsonPath("$.invoice.studentEmail").value("student-1@campuscore.edu"));
     }
 

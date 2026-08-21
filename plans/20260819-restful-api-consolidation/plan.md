@@ -596,6 +596,12 @@ the retirement gates pass.
   payment optional-filter reads so the existing feature-default-off read slice
   works on PostgreSQL when filters are absent, without adding routes, writes,
   checkout ownership or public traffic handoff.
+- Phase 59 finance envelope differential preparation: source candidate; see
+  `phase-59-finance-envelope-differential.md`. It tightens the Java finance
+  student invoice and payment invoice envelope for safer legacy comparison and
+  adds a self-testable finance differential rehearsal harness. It is not
+  restored legacy-data parity, route canary, rollback, checkout ownership or
+  public traffic handoff evidence.
 
 ## Backend foundation gate before Stitch implementation
 
