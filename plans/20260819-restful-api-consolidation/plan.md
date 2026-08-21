@@ -510,6 +510,18 @@ the retirement gates pass.
   Attendance mark/update/delete mutations, PostgreSQL read parity, live
   attendance route wiring, canary routing, rollback and public academic route
   handoff remain open.
+- Phase 50 backend-first academic section read foundation: source/H2 verified
+  candidate/HOLD; see `phase-50-academic-section-read.md`. It adds
+  feature-default-off Java `GET /api/v1/sections`,
+  `GET /api/v1/sections/my/schedule`, `GET /api/v1/sections/my/grading`,
+  `GET /api/v1/sections/{id}` and `GET /api/v1/sections/{id}/grades` reads
+  against the migrated legacy `academic` schema, preserving selected section
+  list/detail hydration, lecturer timetable shortcut shape, lecturer grading
+  counts, section grade enrollment rows, role/claim/query failures and the
+  migration-safety default-off boundary. Section create/update/delete,
+  grade editing/publishing, PostgreSQL read parity, live timetable/grading route
+  wiring, canary routing, rollback and public academic route handoff remain
+  open.
 
 ## Backend foundation gate before Stitch implementation
 

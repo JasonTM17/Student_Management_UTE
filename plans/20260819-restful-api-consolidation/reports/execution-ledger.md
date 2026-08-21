@@ -3,9 +3,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `fdd2601`, matching `origin/feature/java-thesis-platform`, on 2026-08-21 before Phase 49.
+- Current branch snapshot: `feature/java-thesis-platform` at `38a4f71`, ahead of `origin/feature/java-thesis-platform`, on 2026-08-21 after the Phase 50 source commit and before the docs checkpoint commit/push.
 - Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
-- Disk snapshot before implementation: C: ~16.95 GiB free, D: ~39.20 GiB free.
+- Disk snapshot before implementation: C: ~17.39 GiB free, D: ~39.12 GiB free.
 
 ## Completed evidence carried forward
 
@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 49 candidate: add a feature-default-off Java RESTful monolith read slice for academic attendance routes.
-- Exit criterion: Java exposes only read attendance routes under `/api/v1/attendance` when `migration.academic-attendance-read.enabled=true`, preserves selected legacy read shapes, filters, formulas and role/claim boundaries, leaves attendance mark/update/delete ownership with legacy Nest, adds focused persistence/default-off tests, updates plan/docs, and passes focused/full Java gates.
+- Phase 50 candidate: add a feature-default-off Java RESTful monolith read slice for academic section routes.
+- Exit criterion: Java exposes only selected read section routes under `/api/v1/sections` when `migration.academic-section-read.enabled=true`, preserves selected legacy section list/detail, lecturer timetable, lecturer grading and section grade shapes, leaves section and grade mutations with legacy Nest, adds focused persistence/default-off tests, updates plan/docs, and passes focused/full Java gates.
 
 ## Phase 48 evidence
 
@@ -34,13 +34,25 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Focused gate PASS after one fixture/oracle repair: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicAttendanceReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
 - Full Java reactor PASS: `mvn -q -f java-services/pom.xml test`; surefire summary 24 reports / 162 tests / 0 failures / 0 errors / 0 skipped.
 - Production attendance candidate SQL-write grep PASS and `git diff --check` PASS with only Git line-ending warnings.
-- Source commit/push complete: `e61dbd3 feat(java): add academic attendance reads` pushed to `origin/feature/java-thesis-platform` on 2026-08-21; post-push local and remote branch tips matched `e61dbd3827d9e0a2eec90e36b8675e016b2c2ac6`.
+- Source commit/push complete: `e61dbd3 feat(java): add academic attendance reads` and `4ca7a4b docs(plan): record attendance read checkpoint` pushed to `origin/feature/java-thesis-platform` on 2026-08-21; post-push local and remote branch tips matched `4ca7a4bbeb95136d9fa41df252ce45ff96dc2d5d`.
+
+## Phase 50 evidence
+
+- Implemented feature-default-off Java `GET /api/v1/sections`, `GET /api/v1/sections/my/schedule`, `GET /api/v1/sections/my/grading`, `GET /api/v1/sections/{id}` and `GET /api/v1/sections/{id}/grades` read routes.
+- Added `migration.academic-section-read.enabled` / `ACADEMIC_SECTION_READ_ENABLED:false` and read-only migration safety condition coverage.
+- Added H2 persistence tests for section list envelope/filter/order/hydration, lecturer semester schedule scope and active-enrollment count, lecturer grading counts/publishability formula, detail/not-found, section grade rows, role/claim/query failures, and default-off route absence.
+- Focused gate PASS: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicSectionReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
+- Full Java monolith gate PASS after cleaning stale reports outside the canonical monolith target: `mvn -q -f java-services/pom.xml clean test`; `java-services/restful-api/target` surefire summary 25 reports / 169 tests / 0 failures / 0 errors / 0 skipped.
+- Production section candidate SQL-write grep PASS: no SQL write/DDL markers in the new section read repository, service or controller.
+- Source commit complete locally: `38a4f71 feat(java): add academic section reads`.
+- Incidental in-scope NOW defect fixed in the same source commit: attendance read date filters and H2 fixtures now bind UTC timestamps so the selected legacy date filter behavior remains stable under the local Asia/Bangkok test runtime.
 
 ## Execution rulings
 
 - User-provided turn instructions add plan-lock discipline and restrict unnecessary thread/subagent spawning. This small read-only backend slice stays controller-owned; Advisor/Kongming/Wukong remain deferred to exact-head cutover/high-risk gates.
 - Legacy-compatible scope for this slice includes `GET /waitlist`, `GET /waitlist/my`, `GET /waitlist/section/:sectionId`, and `GET /waitlist/:id`. `POST /waitlist/:id/promote` and `DELETE /waitlist/:id` are explicitly non-goals.
 - Legacy-compatible scope for Phase 49 includes attendance read routes only. `POST /attendance`, `POST /attendance/bulk`, `POST /attendance/section/:sectionId/mark`, `PUT /attendance/:id` and `DELETE /attendance/:id` are explicitly non-goals.
+- Legacy-compatible scope for Phase 50 includes selected section read routes only. `POST /sections`, `PUT /sections/:id`, `DELETE /sections/:id`, `PUT /sections/:id/grades` and `POST /sections/:id/grades/publish` are explicitly non-goals.
 
 ## Deferred findings
 
@@ -48,4 +60,4 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Next resume point
 
-- Continue the backend foundation gate with the next missing low-risk academic read or PostgreSQL restore parity/canary preparation before FE Stitch runtime parity. Preserve untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a safe cleanup target.
+- Commit/push the Phase 50 docs checkpoint, then continue the backend foundation gate with PostgreSQL restore parity/canary preparation or the next missing low-risk academic read before FE Stitch runtime parity. Preserve untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a safe cleanup target.
