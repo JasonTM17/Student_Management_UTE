@@ -203,6 +203,18 @@ class RestfulApiContractTest {
         mvc.perform(get("/api/v1/classrooms").with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/internal/academic-context/curricula/curriculum-cs").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/internal/academic-context/departments/department-cs").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
     }
 
     @Test

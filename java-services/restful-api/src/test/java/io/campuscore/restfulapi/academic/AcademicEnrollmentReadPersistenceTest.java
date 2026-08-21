@@ -27,11 +27,15 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "migration.academic-enrollment-read.enabled=true",
+        "migration.academic-read.enabled=true",
+        "migration.academic-context.enabled=true",
+        "INTERNAL_SERVICE_TOKEN=academic-internal-token-12345",
         "spring.flyway.enabled=false"
 })
 class AcademicEnrollmentReadPersistenceTest {
 
     private static final Instant BASE_TIME = Instant.parse("2026-08-20T00:00:00Z");
+    private static final String SERVICE_TOKEN = "academic-internal-token-12345";
 
     @Autowired
     private JdbcTemplate jdbc;
@@ -107,6 +111,21 @@ class AcademicEnrollmentReadPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
+    void internalAcademicContextStudentEnrollmentsRequireServiceToken() throws Exception {
+        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
+        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments")
+                        .header("X-Service-Token", SERVICE_TOKEN))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value("enrollment-2"))
+                .andExpect(jsonPath("$[0].section.course.code").value("SE401"))
+                .andExpect(jsonPath("$[1].id").value("enrollment-1"));
     }
 
     @Test
