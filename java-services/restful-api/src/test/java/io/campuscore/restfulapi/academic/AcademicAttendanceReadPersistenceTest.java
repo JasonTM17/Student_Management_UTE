@@ -304,7 +304,8 @@ class AcademicAttendanceReadPersistenceTest {
                 "INSERT INTO \"academic\".\"Student\""
                         + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\", \"admissionDate\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, userId, studentNumber, "curriculum-1", 3, "ACTIVE", BASE_TIME, BASE_TIME, BASE_TIME);
+                id, userId, studentNumber, "curriculum-1", 3, "ACTIVE",
+                utcTimestamp(BASE_TIME), utcTimestamp(BASE_TIME), utcTimestamp(BASE_TIME));
     }
 
     private void insertCourse(String id, String code, String name, String nameEn, String nameVi) {
@@ -313,7 +314,8 @@ class AcademicAttendanceReadPersistenceTest {
                         + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\","
                         + " \"credits\", \"departmentId\", \"semesterId\", \"isActive\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, code, name, nameEn, nameVi, null, null, null, 4, "department-1", "semester-1", true, BASE_TIME, BASE_TIME);
+                id, code, name, nameEn, nameVi, null, null, null, 4, "department-1", "semester-1", true,
+                utcTimestamp(BASE_TIME), utcTimestamp(BASE_TIME));
     }
 
     private void insertSection(String id, String sectionNumber, String courseId, String semesterId, String lecturerId) {

@@ -5,6 +5,7 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
@@ -294,10 +295,12 @@ class AcademicWaitlistReadPersistenceTest {
                         + " \"registrationStart\", \"registrationEnd\", \"addDropStart\", \"addDropEnd\", \"status\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 "semester-1", "Fall 2026", "Fall 2026", "Học kỳ Thu 2026", "FALL", "year-1",
-                BASE_TIME, BASE_TIME.plusSeconds(90L * 24 * 60 * 60),
-                BASE_TIME.minusSeconds(7L * 24 * 60 * 60), BASE_TIME.plusSeconds(7L * 24 * 60 * 60),
-                BASE_TIME.minusSeconds(24 * 60 * 60), BASE_TIME.plusSeconds(14L * 24 * 60 * 60),
-                "REGISTRATION_OPEN", BASE_TIME, BASE_TIME);
+                timestamp(BASE_TIME), timestamp(BASE_TIME.plusSeconds(90L * 24 * 60 * 60)),
+                timestamp(BASE_TIME.minusSeconds(7L * 24 * 60 * 60)),
+                timestamp(BASE_TIME.plusSeconds(7L * 24 * 60 * 60)),
+                timestamp(BASE_TIME.minusSeconds(24 * 60 * 60)),
+                timestamp(BASE_TIME.plusSeconds(14L * 24 * 60 * 60)),
+                "REGISTRATION_OPEN", timestamp(BASE_TIME), timestamp(BASE_TIME));
         insertCourse("course-1", "CS101", "Intro to Programming", "Intro to Programming", "Nhập môn lập trình");
         insertCourse("course-2", "SE401", "Web Development", "Web Development", "Lập trình web");
         insertClassroom("room-1", "A", "A101");
@@ -323,7 +326,8 @@ class AcademicWaitlistReadPersistenceTest {
                 "INSERT INTO \"academic\".\"Student\""
                         + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\", \"admissionDate\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, userId, studentNumber, "curriculum-1", 3, "ACTIVE", BASE_TIME, BASE_TIME, BASE_TIME);
+                id, userId, studentNumber, "curriculum-1", 3, "ACTIVE",
+                timestamp(BASE_TIME), timestamp(BASE_TIME), timestamp(BASE_TIME));
     }
 
     private void insertCourse(String id, String code, String name, String nameEn, String nameVi) {
@@ -332,7 +336,8 @@ class AcademicWaitlistReadPersistenceTest {
                         + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\","
                         + " \"credits\", \"departmentId\", \"semesterId\", \"isActive\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id, code, name, nameEn, nameVi, null, null, null, 4, "department-1", "semester-1", true, BASE_TIME, BASE_TIME);
+                id, code, name, nameEn, nameVi, null, null, null, 4, "department-1", "semester-1", true,
+                timestamp(BASE_TIME), timestamp(BASE_TIME));
     }
 
     private void insertClassroom(String id, String building, String roomNumber) {
@@ -380,6 +385,10 @@ class AcademicWaitlistReadPersistenceTest {
                 "INSERT INTO \"academic\".\"Waitlist\""
                         + " (\"id\", \"studentId\", \"sectionId\", \"position\", \"status\", \"addedAt\", \"convertedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                id, studentId, sectionId, position, status, addedAt, null);
+                id, studentId, sectionId, position, status, timestamp(addedAt), null);
+    }
+
+    private static Timestamp timestamp(Instant instant) {
+        return Timestamp.from(instant);
     }
 }
