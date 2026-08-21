@@ -8,15 +8,18 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.sql.PreparedStatement;
 import java.sql.Types;
 import java.time.Instant;
+import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -39,6 +42,11 @@ class AcademicReadPersistenceTest {
     @BeforeEach
     void prepareReadOnlyFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Section\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Lecturer\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Course\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Department\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Faculty\"");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."AcademicYear" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -51,7 +59,7 @@ class AcademicReadPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "academic"."Department" (
+                CREATE TABLE "academic"."Faculty" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(200) NOT NULL,
                     "nameEn" VARCHAR(200),
@@ -60,8 +68,33 @@ class AcademicReadPersistenceTest {
                     "description" VARCHAR(1000),
                     "descriptionEn" VARCHAR(1000),
                     "descriptionVi" VARCHAR(1000),
+                    "dean" VARCHAR(200),
+                    "phone" VARCHAR(80),
+                    "email" VARCHAR(200),
+                    "building" VARCHAR(120),
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE "academic"."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(200) NOT NULL,
+                    "nameEn" VARCHAR(200),
+                    "nameVi" VARCHAR(200),
+                    "code" VARCHAR(40) NOT NULL,
+                    "description" VARCHAR(1000),
+                    "descriptionEn" VARCHAR(1000),
+                    "descriptionVi" VARCHAR(1000),
+                    "chair" VARCHAR(200),
+                    "phone" VARCHAR(80),
+                    "email" VARCHAR(200),
+                    "building" VARCHAR(120),
                     "facultyId" VARCHAR(120) NOT NULL,
-                    "isActive" BOOLEAN NOT NULL
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
                 )
                 """);
         jdbc.execute("""
@@ -101,6 +134,21 @@ class AcademicReadPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE "academic"."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "employeeId" VARCHAR(80) NOT NULL,
+                    "title" VARCHAR(120),
+                    "specialization" VARCHAR(200),
+                    "office" VARCHAR(120),
+                    "phone" VARCHAR(80),
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Section\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Classroom\"");
         jdbc.execute("""
@@ -131,8 +179,10 @@ class AcademicReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Classroom\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
+        jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Semester\"");
         jdbc.update("DELETE FROM \"academic\".\"Department\"");
+        jdbc.update("DELETE FROM \"academic\".\"Faculty\"");
         jdbc.update("DELETE FROM \"academic\".\"AcademicYear\"");
     }
 
@@ -191,6 +241,126 @@ class AcademicReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.year").value(2025))
                 .andExpect(jsonPath("$.semesters[0].id").value("fall-2025"));
+    }
+
+    @Test
+    void facultiesPreserveLegacyAdminListEnvelopeHydrationAndDetailDepartments() throws Exception {
+        insertFaculty("faculty-cs", "Computer Science", null, null, "FCS", null, null, null);
+        insertFaculty("faculty-business", "Business", null, null, "FBA", null, null, null);
+        insertDepartment(
+                "department-se",
+                "Software Engineering",
+                null,
+                null,
+                "SE",
+                null,
+                null,
+                null,
+                "faculty-cs",
+                "Dr. SE");
+        insertDepartment(
+                "department-ce",
+                "Computer Engineering",
+                null,
+                null,
+                "CE",
+                null,
+                null,
+                null,
+                "faculty-cs",
+                "Dr. CE");
+
+        mvc.perform(get("/api/v1/faculties")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "1")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("faculty-business"))
+                .andExpect(jsonPath("$.data[0].nameEn").value("Business"))
+                .andExpect(jsonPath("$.data[0].nameVi").value("Khoa Quản trị kinh doanh"))
+                .andExpect(jsonPath("$.data[0].descriptionEn").value("Faculty of Business Administration"))
+                .andExpect(jsonPath("$.data[0].departments.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/faculties")
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/faculties/faculty-cs")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("faculty-cs"))
+                .andExpect(jsonPath("$.nameEn").value("Computer Science"))
+                .andExpect(jsonPath("$.descriptionVi").value("Khoa Khoa học máy tính và công nghệ thông tin"))
+                .andExpect(jsonPath("$.departments.length()").value(2))
+                .andExpect(jsonPath("$.departments[0].id").value("department-ce"))
+                .andExpect(jsonPath("$.departments[0].nameVi").value("Kỹ thuật máy tính"))
+                .andExpect(jsonPath("$.departments[1].id").value("department-se"))
+                .andExpect(jsonPath("$.departments[1].nameVi").value("Kỹ thuật phần mềm"));
+    }
+
+    @Test
+    void departmentsPreserveLegacyAdminListEnvelopeFacultyAndDetailLecturers() throws Exception {
+        insertFaculty("faculty-cs", "Computer Science", null, null, "FCS", null, null, null);
+        insertFaculty("faculty-business", "Business", null, null, "FBA", null, null, null);
+        insertDepartment(
+                "department-se",
+                "Software Engineering",
+                null,
+                null,
+                "SE",
+                null,
+                null,
+                null,
+                "faculty-cs",
+                "Dr. SE");
+        insertDepartment(
+                "department-ba",
+                "Business Administration",
+                null,
+                null,
+                "BA",
+                null,
+                null,
+                null,
+                "faculty-business",
+                "Dr. BA");
+        insertLecturer("lecturer-2", "user-2", "department-se", "EMP-02", "Senior Lecturer");
+        insertLecturer("lecturer-1", "user-1", "department-se", "EMP-01", "Lecturer");
+
+        mvc.perform(get("/api/v1/departments")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "20")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("department-ba"))
+                .andExpect(jsonPath("$.data[0].nameVi").value("Quản trị kinh doanh"))
+                .andExpect(jsonPath("$.data[0].faculty.code").value("FBA"))
+                .andExpect(jsonPath("$.data[0].faculty.nameEn").value("Business"))
+                .andExpect(jsonPath("$.data[0].faculty.descriptionEn").value("Faculty of Business Administration"))
+                .andExpect(jsonPath("$.data[1].id").value("department-se"))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/departments")
+                        .with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/departments/department-se")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("department-se"))
+                .andExpect(jsonPath("$.nameEn").value("Software Engineering"))
+                .andExpect(jsonPath("$.nameVi").value("Kỹ thuật phần mềm"))
+                .andExpect(jsonPath("$.faculty.nameVi").value("Khoa Khoa học máy tính"))
+                .andExpect(jsonPath("$.lecturers.length()").value(2))
+                .andExpect(jsonPath("$.lecturers[0].id").value("lecturer-1"))
+                .andExpect(jsonPath("$.lecturers[0].employeeId").value("EMP-01"))
+                .andExpect(jsonPath("$.lecturers[1].id").value("lecturer-2"));
     }
 
     @Test
@@ -298,9 +468,25 @@ class AcademicReadPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
 
+        mvc.perform(get("/api/v1/faculties/missing")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/departments/missing")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
         mvc.perform(get("/api/v1/classrooms")
                         .queryParam("building", "A")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/faculties")
+                        .queryParam("status", "ACTIVE")
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
@@ -357,7 +543,7 @@ class AcademicReadPersistenceTest {
         });
     }
 
-    private void insertDepartment(
+    private void insertFaculty(
             String id,
             String name,
             String nameEn,
@@ -367,10 +553,11 @@ class AcademicReadPersistenceTest {
             String descriptionEn,
             String descriptionVi) {
         jdbc.update(
-                "INSERT INTO \"academic\".\"Department\""
+                "INSERT INTO \"academic\".\"Faculty\""
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\","
-                        + " \"descriptionEn\", \"descriptionVi\", \"facultyId\", \"isActive\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                        + " \"descriptionEn\", \"descriptionVi\", \"dean\", \"phone\", \"email\","
+                        + " \"building\", \"createdAt\", \"updatedAt\", \"isActive\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
                 id,
                 name,
                 nameEn,
@@ -379,7 +566,59 @@ class AcademicReadPersistenceTest {
                 description,
                 descriptionEn,
                 descriptionVi,
-                "faculty-1",
+                null,
+                null,
+                null,
+                null,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME),
+                true);
+    }
+
+    private void insertDepartment(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi) {
+        insertDepartment(id, name, nameEn, nameVi, code, description, descriptionEn, descriptionVi, "faculty-1", null);
+    }
+
+    private void insertDepartment(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            String facultyId,
+            String chair) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Department\""
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\","
+                        + " \"descriptionEn\", \"descriptionVi\", \"chair\", \"phone\", \"email\","
+                        + " \"building\", \"facultyId\", \"createdAt\", \"updatedAt\", \"isActive\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                name,
+                nameEn,
+                nameVi,
+                code,
+                description,
+                descriptionEn,
+                descriptionVi,
+                chair,
+                null,
+                null,
+                null,
+                facultyId,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME),
                 true);
     }
 
@@ -412,6 +651,25 @@ class AcademicReadPersistenceTest {
                 true,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
+    }
+
+    private void insertLecturer(String id, String userId, String departmentId, String employeeId, String title) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Lecturer\""
+                        + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"title\","
+                        + " \"specialization\", \"office\", \"phone\", \"createdAt\", \"updatedAt\", \"isActive\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                userId,
+                departmentId,
+                employeeId,
+                title,
+                "Software systems",
+                "A-101",
+                "0123456789",
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME),
+                true);
     }
 
     private void insertClassroom(String id, String building, String roomNumber, int capacity, String type) {
@@ -453,6 +711,20 @@ class AcademicReadPersistenceTest {
                 capacity,
                 enrolledCount,
                 "OPEN");
+    }
+
+    private static RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                .subject("admin-user")
+                .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private static RequestPostProcessor studentJwt() {
+        return jwt().jwt(token -> token
+                .subject("student-user")
+                .claim("roles", List.of("STUDENT")))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 
     private static void timestamp(PreparedStatement statement, int index, Instant value)
