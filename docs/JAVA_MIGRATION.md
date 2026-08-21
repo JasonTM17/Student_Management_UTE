@@ -98,9 +98,14 @@ and no Java RabbitMQ/event publication. The academic catalog slice covers
 semester/course list and detail routes plus academic-year list/detail with
 nested semesters, classroom list/detail with classroom detail section
 summaries, faculty list/detail with nested department summaries, and department
-list/detail with nested faculty and lecturer summaries. Curricula parity,
-classroom equipment-array parity and all academic catalog writes remain
-legacy-owned until PostgreSQL parity, canary and rollback evidence exist.
+list/detail with nested faculty and lecturer summaries, plus curriculum
+list/detail with department hydration and detail-only curriculum-course mapping
+rows. Richer curriculum course-object joins, classroom equipment-array parity
+and all academic catalog writes remain legacy-owned until PostgreSQL parity,
+canary and rollback evidence exist. The Phase 53 source checkpoint is
+`27d34f736da87f439a7ac600f839a0819402d109` on
+`feature/java-thesis-platform`; this is a local candidate, not public route
+ownership or Java cutover evidence.
 The people slice covers student/lecturer list and
 detail routes only. The finance slice covers student invoice list/detail plus
 admin invoice/payment list/detail routes only, with checkout, provider
