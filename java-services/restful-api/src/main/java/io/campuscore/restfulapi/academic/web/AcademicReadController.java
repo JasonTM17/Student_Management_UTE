@@ -1,6 +1,10 @@
 package io.campuscore.restfulapi.academic.web;
 
 import io.campuscore.restfulapi.academic.service.AcademicReadService;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
@@ -47,6 +51,20 @@ public class AcademicReadController {
         return academic.findSemester(id);
     }
 
+    @GetMapping("academic-years")
+    public AcademicYearListResponse getAcademicYears(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return academic.findAcademicYears(page, limit);
+    }
+
+    @GetMapping("academic-years/{id}")
+    public AcademicYearResponse getAcademicYear(@PathVariable String id) {
+        return academic.findAcademicYear(id);
+    }
+
     @GetMapping("courses")
     public CourseListResponse getCourses(
             @RequestParam(defaultValue = "1") int page,
@@ -59,6 +77,20 @@ public class AcademicReadController {
     @GetMapping("courses/{id}")
     public CourseResponse getCourse(@PathVariable String id) {
         return academic.findCourse(id);
+    }
+
+    @GetMapping("classrooms")
+    public ClassroomListResponse getClassrooms(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return academic.findClassrooms(page, limit);
+    }
+
+    @GetMapping("classrooms/{id}")
+    public ClassroomResponse getClassroom(@PathVariable String id) {
+        return academic.findClassroom(id);
     }
 
     private static void requireAllowedQuery(
