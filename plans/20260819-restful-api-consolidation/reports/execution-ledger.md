@@ -3,8 +3,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `99da4c0055264a6f880b29e78e153a8dcc875393`, exactly matching `origin/feature/java-thesis-platform` after the mobile fix commit and prior docs records on 2026-08-21.
-- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/`, `.tmp/` and `mobile/package-lock.json`; preserve them and do not stage them.
+- Current branch snapshot: `feature/java-thesis-platform` at `10cffd8191d408bbb788d0b351d06dd5cc76a529`, exactly matching `origin/feature/java-thesis-platform` after the disposable PostgreSQL rehearsal evidence and prior docs records on 2026-08-21.
+- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
 - Disk snapshot before implementation: C: ~15.76 GiB free, D: ~38.92 GiB free.
 
 ## Completed evidence carried forward
@@ -97,17 +97,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Backend foundation capability preflight — 2026-08-21
 
-- Exact source snapshot: `67927c79cd3a0832c87936969dede21a00a0e1c6`, matching
+- Exact source snapshot at preflight start: `67927c79cd3a0832c87936969dede21a00a0e1c6`, matching
   `origin/feature/java-thesis-platform` before this docs-only record.
 - `psql`, `pg_dump`, `pg_restore` and `postgres` 18.0.4 are installed, but the
   Docker daemon is unavailable on the read-only probe (`dockerDesktopLinuxEngine`
   named pipe missing).
-- No approved disposable PostgreSQL restore/fixture, isolated target identity or
-  rehearsal credentials were present in the known D: paths or environment. The
-  active CampusCore stack was not contacted or mutated.
-- Verdict: `BLOCKED_CAPABILITY` for the PostgreSQL restore/differential/rollback
-  gate. This does not change the Java source candidate, public route ownership or
-  cutover posture.
+- At preflight start, no approved disposable PostgreSQL restore/fixture,
+  isolated target identity or rehearsal credentials were present in the known D:
+  paths or environment. The active CampusCore stack was not contacted or
+  mutated.
+- Later in the same turn, a disposable PostgreSQL cluster was created under
+  `.tmp/pg-phase53/cluster` and verified on loopback port `56433`.
+- Verdict: the original `BLOCKED_CAPABILITY` preflight was only a transient
+  start-state; the disposable target requirement is now satisfied for a
+  read-only rehearsal, but the full PostgreSQL differential/rollback gate is
+  still incomplete.
 
 ## Independent Wukong gate — 2026-08-21
 
@@ -125,6 +129,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Handoff: keep the backend foundation gate `BLOCKED_CAPABILITY` until those
   artifacts and authority are supplied, then create a fresh academic
   curriculum differential plus rollback rehearsal and fresh independent review.
+
+## Backend foundation disposable PostgreSQL rehearsal — 2026-08-21
+
+- Disposable target: `.tmp/pg-phase53/cluster` on `127.0.0.1:56433`, started
+  with `initdb` and `pg_ctl`, isolated from the active CampusCore stack.
+- Verified against that target:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest' '-DforkCount=0' test`
+  with `SPRING_DATASOURCE_URL=jdbc:postgresql://127.0.0.1:56433/campuscore?currentSchema=academic`
+  and `SPRING_DATASOURCE_USERNAME=postgres`.
+- Verified against that target:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
+  with the same disposable PostgreSQL URL override.
+- Limitation: this proves a real PostgreSQL read rehearsal for the academic
+  curricula candidate, but not the full legacy-to-Java differential or rollback
+  rehearsal yet.
 
 ## Deferred findings
 
