@@ -25,10 +25,15 @@ disposable database and is not a source or shared-stack change.
 
 ## Source and runtime boundary
 
-- Source basis before this checkpoint: `8574f3c07d90c10d2dba0e1c0c132233418ea08b`.
-- Intended checkpoint files: the thesis compatibility advice, its persistence
-  regression assertions, this differential harness repair, and this report.
-- Unrelated dirty and untracked files were not staged or changed.
+- Historical source basis before the compatibility repair:
+  `8574f3c07d90c10d2dba0e1c0c132233418ea08b`.
+- Exact source used for the follow-up verification:
+  `683829a661f517c7469a4ee7cc85a22aeaeb2a08`, tree
+  `4c1386178142b6cba4eb6085659e4f9d29bd72cb`, with differential harness blob
+  `b4e1205fa9448865612a8066c84279aff5d7714d`.
+- The exact-head worktree had no tracked/index changes; unrelated untracked
+  AgentKit/Codex/runtime directories were preserved and excluded from source
+  evidence.
 - Legacy private runtime: `java-services/thesis-service`, `127.0.0.1:54111`.
 - Java candidate private runtime: `java-services/restful-api`,
   `127.0.0.1:54112`, `persistence` profile, `THESIS_READ_ENABLED=true`.
@@ -65,11 +70,18 @@ disposable database and is not a source or shared-stack change.
 2. Harness syntax and deterministic self-test:
    `node --check scripts/run-thesis-differential-rehearsal.mjs` and
    `node scripts/run-thesis-differential-rehearsal.mjs --self-test`: `PASS`.
-3. Live private differential:
+3. Live private differential from the exact source above:
+   execution `e18d7d91-fc49-4c22-90f4-1ef0f80f1f7e`, generated at
+   `2026-08-21T07:33:24.840Z`, command
    `node scripts/run-thesis-differential-rehearsal.mjs`: `PASS`, all 8/8
    corpus cases matched on HTTP status, normalized content type and stable
    normalized body hash. The cases cover rounds, filtered rounds, topics,
-   groups, group detail, councils, unknown round and malformed UUID.
+   groups, group detail, councils, unknown round and malformed UUID. The
+   captured result had status/content type/body hashes:
+
+   ```json
+   {"rounds all":[200,"application/json","b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194"],"rounds by status":[200,"application/json","b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194"],"published topics":[200,"application/json","112ba6939e6be23addc1dcd9b99b9b311aee335be93b8029aa8e0060e49e85d6"],"groups by round":[200,"application/json","33021a5bf1a08a8ed1e4df64b7844a5476b43e5643c716b9b06f7b25fe984ab1"],"group detail":[200,"application/json","ccd65fbd213d182e4cfb2825a850e15619951290152751ce23129afbea2fdabf"],"councils by round":[200,"application/json","d865d130a12df66d03aec62399bb8d3805badfeb9b0f69226fc0ab781cc4314e"],"unknown round topics":[404,"application/json","db243a515505b3cf2635aca83cdbf813e4c9aa8a34befec3599a20dbc384e7f0"],"malformed round groups":[400,"application/json","ba175016bd4e9d670d9fc3267d819050ed3f2015d08f551e37e3897c892fb9ce"]}
+   ```
 4. Route sequence `legacy-before -> java-candidate -> legacy-after`: `PASS`;
    all three probes returned status `200` and body hash
    `b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194`.
@@ -99,10 +111,11 @@ other body field remain strict comparisons.
 
 ## Current gate
 
-`REPAIR_VERIFIED_PENDING_REVIEW`: the follow-up probes pass, but this working
-tree has not yet been committed and the Advisor/Kongming/Wukong exact-head
-review must be rerun against the new commit. Keep source push and cutover on
-`HOLD` until that review and the wider Phase 09 gates complete.
+`PROVENANCE_REPAIR_PENDING_REVIEW`: the exact-head runtime rerun is now bound
+to commit/tree/script-blob identity, but the report/ledger correction is still
+uncommitted and the independent review must be refreshed after that documentation
+checkpoint. Keep source push and cutover on `HOLD` until the refreshed review
+and the wider Phase 09 gates complete.
 
 ## Remaining gates
 
