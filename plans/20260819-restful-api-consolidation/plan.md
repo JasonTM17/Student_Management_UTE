@@ -612,6 +612,14 @@ the retirement gates pass.
   PostgreSQL restore and the same documented restored-legacy payment-status
   limitation. This adds proxy rollback evidence, but it still does not grant
   public finance route ownership, checkout ownership, or FE/mobile wiring.
+- Phase 61 auth login PostgreSQL focused rehearsal: source/PostgreSQL focused
+  verified candidate/HOLD; see
+  `phase-61-auth-login-postgres-focused-rehearsal.md`. It exercises the
+  feature-gated auth login/session persistence test suite against a disposable
+  PostgreSQL target on exact head, validating login, refresh, profile,
+  password-change and logout behavior on real PostgreSQL syntax/types. Legacy
+  auth-service remains the public route owner; route canary, rollback and
+  public auth handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
