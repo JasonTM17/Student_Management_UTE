@@ -681,3 +681,33 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Next safe resume point: keep moving backend parity slices only after the
   limitation is addressed or explicitly accepted; do not claim FE/runtime or
   production cutover readiness yet.
+
+## Finance edge route-switch rollback rehearsal — 2026-08-21
+
+- Source commit:
+  `b67aa85f16bb73a5d18d00b35bef070bc61ada32`
+  (`test(finance): add edge route-switch rehearsal`).
+- Harness proof:
+  `node --check scripts/run-finance-differential-rehearsal.mjs`,
+  `node scripts/run-finance-differential-rehearsal.mjs --self-test`, and
+  `node scripts/run-finance-differential-rehearsal.mjs --edge-route-switch`
+  all PASS/PASS_WITH_LIMITATIONS on the current exact head.
+- Live bases:
+  legacy `http://127.0.0.1:54121/`, Java `http://127.0.0.1:54122/`, restored
+  PostgreSQL `campuscore_finance_read_20260821_182354` on `127.0.0.1:56460`.
+- Result: 11/11 direct comparisons PASS with one documented restored-legacy
+  limitation on `GET /api/v1/finance/payments?status=COMPLETED`.
+- Route evidence:
+  proxy route sequence stayed hash-stable across
+  `legacy-before → java-candidate → legacy-after` with body hash
+  `0dd68b6caccdf8ae4246e84bb169dfc7fd0029cbd71dec8ada3da8916f58d53d`.
+- Route-switch evidence:
+  `legacy-before` and `legacy-after` shared stage hash
+  `ee349b886ea1cf6de05e84fbe2785e3e5e7d8f3c46630f5d2a278aec6278c8b5`;
+  `java-candidate` produced the expected distinct stage hash
+  `e22651f9f3a410bb8d0b1145915d4c69f747f229dd92e7e541f52eb02ead2dd5`.
+- Cleanup: the rehearsal Node and Java processes were stopped after capture;
+  the disposable PostgreSQL listener remained available for later reuse.
+- Next resume point: refresh the exact-head Advisor/Kongming/Wukong gate on
+  this new snapshot, then continue only with the next bounded backend slice or
+  FE work once the gate allows it.
