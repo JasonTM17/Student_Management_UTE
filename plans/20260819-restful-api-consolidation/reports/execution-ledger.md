@@ -34,6 +34,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Focused gate PASS after one fixture/oracle repair: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicAttendanceReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
 - Full Java reactor PASS: `mvn -q -f java-services/pom.xml test`; surefire summary 24 reports / 162 tests / 0 failures / 0 errors / 0 skipped.
 - Production attendance candidate SQL-write grep PASS and `git diff --check` PASS with only Git line-ending warnings.
+- Source commit/push complete: `e61dbd3 feat(java): add academic attendance reads` pushed to `origin/feature/java-thesis-platform` on 2026-08-21; post-push local and remote branch tips matched `e61dbd3827d9e0a2eec90e36b8675e016b2c2ac6`.
 
 ## Execution rulings
 
@@ -47,4 +48,4 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Next resume point
 
-- Commit and push Phase 49 if final staging and sensitive-material scan pass. Then continue the backend foundation gate with the next missing low-risk academic read or PostgreSQL restore parity/canary preparation before FE Stitch runtime parity.
+- Continue the backend foundation gate with the next missing low-risk academic read or PostgreSQL restore parity/canary preparation before FE Stitch runtime parity. Preserve untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a safe cleanup target.

@@ -73,6 +73,8 @@ code. Test fixtures may write to H2.
 - Surefire summary after full Java reactor: 24 reports / 162 tests / 0 failures / 0 errors / 0 skipped.
 - Production attendance candidate SQL-write grep — PASS, no matches.
 - `git diff --check` — PASS; only Git line-ending warnings for existing Java files.
+- Source commit: `e61dbd3 feat(java): add academic attendance reads`, pushed to
+  `origin/feature/java-thesis-platform` on 2026-08-21.
 
 ## HOLD gates
 
