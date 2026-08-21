@@ -580,6 +580,12 @@ the retirement gates pass.
   academic enrollment/grade read foundation against a disposable PostgreSQL
   target on the exact HEAD carrying the academic internal-context bridge and
   records parity evidence without widening route ownership.
+- Phase 57 people read PostgreSQL parity repair: source repair committed at
+  `feb6213e20fb14c67f2345007ed9485c0571777d`; see
+  `phase-57-people-postgres-parity-repair.md`. It fixes the people student
+  status filter so the existing read-only people slice works on PostgreSQL when
+  the optional `status` filter is absent, without adding routes, writes or
+  route ownership.
 
 ## Backend foundation gate before Stitch implementation
 
