@@ -516,9 +516,23 @@ function normalizeErrorResponse(response) {
       : '';
   return {
     status: response.status,
-    message,
+    message: normalizeErrorMessage(message),
     path: typeof body.path === 'string' ? body.path : '',
   };
+}
+
+function normalizeErrorMessage(message) {
+  if (!message) {
+    return '';
+  }
+
+  const marker = 'Error occurred during query execution:';
+  const markerIndex = message.indexOf(marker);
+  if (markerIndex >= 0) {
+    return message.slice(markerIndex).trim();
+  }
+
+  return message;
 }
 
 function stableRouteSwitchHash(item, response) {

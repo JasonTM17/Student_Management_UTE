@@ -1,6 +1,8 @@
 # Finance edge route-switch rollback rehearsal — 2026-08-21
 
-- Exact head: `b67aa85f16bb73a5d18d00b35bef070bc61ada32`
+- Exact head: `9b5ee317f3daa88ce6d379a6d3097b860e0a7aee`
+  after normalizing volatile Prisma invocation preambles in the harness.
+- Harness source commit: `b67aa85f16bb73a5d18d00b35bef070bc61ada32`
   (`test(finance): add edge route-switch rehearsal`).
 - Harness syntax/self-test:
   `node --check scripts/run-finance-differential-rehearsal.mjs` and
@@ -18,11 +20,11 @@
   - One limitation remains on
     `GET /api/v1/finance/payments?status=COMPLETED`, because the restored Node
     snapshot lacks the Prisma `finance.PaymentStatus` enum.
-  - The stable proxy route sequence hash was
-    `0dd68b6caccdf8ae4246e84bb169dfc7fd0029cbd71dec8ada3da8916f58d53d`.
-  - The proxy route-switch stage hashes were:
-    - `legacy-before`: `ee349b886ea1cf6de05e84fbe2785e3e5e7d8f3c46630f5d2a278aec6278c8b5`
-    - `java-candidate`: `e22651f9f3a410bb8d0b1145915d4c69f747f229dd92e7e541f52eb02ead2dd5`
-    - `legacy-after`: `ee349b886ea1cf6de05e84fbe2785e3e5e7d8f3c46630f5d2a278aec6278c8b5`
+- The stable proxy route sequence hash was
+  `0dd68b6caccdf8ae4246e84bb169dfc7fd0029cbd71dec8ada3da8916f58d53d`.
+- The proxy route-switch stage hashes were:
+  - `legacy-before`: `19aae5d3114ca5be0ecb061977bf07a8d35cec75adbe08bf739f069b702c8a64`
+  - `java-candidate`: `e22651f9f3a410bb8d0b1145915d4c69f747f229dd92e7e541f52eb02ead2dd5`
+  - `legacy-after`: `19aae5d3114ca5be0ecb061977bf07a8d35cec75adbe08bf739f069b702c8a64`
 - `git diff --check` passed; only Windows LF-to-CRLF warnings were reported.
 - Live Node and Java rehearsal processes were stopped after capture.
