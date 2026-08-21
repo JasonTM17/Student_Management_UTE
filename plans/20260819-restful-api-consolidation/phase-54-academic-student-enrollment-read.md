@@ -35,6 +35,14 @@ route ownership, PostgreSQL parity, canary or rollback.
 - Surefire summary from `java-services/restful-api/target/surefire-reports`:
   26 reports / 176 tests / 0 failures / 0 errors / 1 skipped. The skipped test
   is the opt-in restore smoke when `THESIS_RESTORE_SMOKE` is not set.
+- Later focused PostgreSQL rehearsal PASS on 2026-08-21 against disposable
+  PostgreSQL 18.4 target `127.0.0.1:56454`, database
+  `campuscore_academic_enrollment_20260821_183305`, `currentSchema=academic`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest' '-DforkCount=0' test`.
+  Surefire summary:
+  8 tests / 0 failures / 0 errors / 0 skipped. This is a focused fixture-based
+  PostgreSQL syntax/type rehearsal for the academic enrollment/admin shortcut
+  test suite, not a restored legacy dataset differential.
 - Production controller SQL-write grep PASS: no `INSERT`, `UPDATE`, `DELETE`,
   `MERGE`, `ALTER`, `DROP`, `CREATE` or `TRUNCATE` markers in the changed
   production controller.
@@ -43,7 +51,7 @@ route ownership, PostgreSQL parity, canary or rollback.
 
 ## Open gates
 
-- PostgreSQL read parity against an approved disposable restore.
+- Restored PostgreSQL read parity against an approved legacy-data snapshot.
 - Live route canary and rollback rehearsal.
 - CSV export parity for `GET /api/v1/enrollments/export/csv`.
 - Enrollment create/drop/update/delete ownership.
