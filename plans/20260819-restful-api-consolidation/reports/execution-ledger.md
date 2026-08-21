@@ -715,3 +715,22 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Next resume point: keep moving to the next bounded backend slice only after
   the current finance hold is documented in the phase/report files and the
   updated exact-head review wave is recorded.
+
+## Auth login PostgreSQL focused rehearsal — 2026-08-21
+
+- Working-tree exact head during the run:
+  `e43ecf86f433afb0f409c0bd9f33d7c844ac1a9a`
+  (`test(finance): normalize route-switch error hashing`), with unrelated FE
+  screenshot churn still preserved outside this checkpoint.
+- Disposable target: reused `.tmp/pg-phase53/cluster` on `127.0.0.1:56470`,
+  database `postgres`, `currentSchema=auth`, user `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.auth.AuthLoginPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `9 tests / 0 failures / 0 errors / 0 skipped`.
+- Behavior covered: login, refresh rotation, `/api/v1/auth/me`, profile
+  update, password change, logout and lockout behavior on real PostgreSQL
+  syntax/types.
+- Limitation: this is a focused PostgreSQL parity rehearsal for the auth login
+  session slice, not a public auth route handoff, canary, rollback or mobile
+  runtime proof.
