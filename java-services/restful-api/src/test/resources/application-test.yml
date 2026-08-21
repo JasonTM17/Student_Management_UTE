@@ -19,6 +19,8 @@ migration:
     enabled: false
   academic-enrollment-read:
     enabled: false
+  academic-schedule-read:
+    enabled: false
   people-read:
     enabled: false
   finance-read:

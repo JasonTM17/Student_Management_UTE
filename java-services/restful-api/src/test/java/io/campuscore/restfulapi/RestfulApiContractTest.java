@@ -205,6 +205,17 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void academicScheduleReadBoundaryIsDisabledByDefault() throws Exception {
+        mvc.perform(get("/api/v1/schedules").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/schedules/schedule-1").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+    }
+
+    @Test
     void peopleReadBoundaryIsDisabledByDefault() throws Exception {
         mvc.perform(get("/api/v1/students").with(jwt()))
                 .andExpect(status().isNotFound())
@@ -241,6 +252,18 @@ class RestfulApiContractTest {
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
         mvc.perform(get("/api/v1/analytics/revenue").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/analytics/attendance").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/my").with(jwt()))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/sections").with(jwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("NOT_FOUND"));
 
