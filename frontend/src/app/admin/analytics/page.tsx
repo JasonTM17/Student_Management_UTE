@@ -341,8 +341,8 @@ export default function AdminAnalyticsPage() {
               description={cockpitCopy.panels.enrollmentFlow.description}
               className="h-full min-w-0"
             >
-              <div className="min-w-0 max-w-full overflow-x-auto pb-2">
-                <div className="flex min-h-[300px] w-max min-w-full items-end gap-3">
+              <div className="min-w-0 max-w-full overflow-x-auto pb-2 md:overflow-x-visible">
+                <div className="flex min-h-[300px] w-max min-w-full items-end gap-3 md:grid md:w-full md:grid-cols-12 md:gap-2">
                   {cockpit.enrollmentTrends.map((trend) => {
                     const total =
                       trend.totalActivity ??
@@ -363,21 +363,21 @@ export default function AdminAnalyticsPage() {
                     return (
                       <div
                         key={trend.month}
-                        className="flex w-[78px] shrink-0 flex-col items-center gap-3"
+                        className="flex w-[78px] shrink-0 flex-col items-center gap-3 md:w-auto md:min-w-0"
                       >
-                        <div className="flex h-[230px] w-full items-end justify-center gap-1 rounded-lg border border-border/70 bg-secondary/20 px-2 py-2">
+                        <div className="flex h-[230px] w-full items-end justify-center gap-1 rounded-lg border border-border/70 bg-secondary/20 px-2 py-2 md:gap-0 md:px-1">
                           <div
-                            className="w-3 rounded-t bg-sky-500"
+                            className="w-3 rounded-t bg-sky-500 md:w-2"
                             title={`${messages.adminAnalytics.tableHeaders.grades.enrolled}: ${trend.enrolled}`}
                             style={{ height: enrolledHeight }}
                           />
                           <div
-                            className="w-3 rounded-t bg-emerald-500"
+                            className="w-3 rounded-t bg-emerald-500 md:w-2"
                             title={`${messages.adminAnalytics.tableHeaders.grades.completed}: ${trend.completed}`}
                             style={{ height: completedHeight }}
                           />
                           <div
-                            className="w-3 rounded-t bg-red-500"
+                            className="w-3 rounded-t bg-red-500 md:w-2"
                             title={`${messages.adminAnalytics.tableHeaders.grades.dropped}: ${trend.dropped}`}
                             style={{ height: droppedHeight }}
                           />
