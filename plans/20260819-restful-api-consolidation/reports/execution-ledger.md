@@ -214,6 +214,41 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   `thesis-service` target directories are not part of the current parent
   reactor and are not counted as Java monolith evidence.
 
+## Thesis differential harness checkpoint — 2026-08-21
+
+- Source snapshot before this checkpoint:
+  `e41019d52f0e90c84e7d44dfec8a0772a3c49386`
+  (`docs(plan): record canonical monolith gate`).
+- Added `scripts/run-thesis-differential-rehearsal.mjs`, a dependency-free
+  harness for the Phase 09 thesis read corpus. It compares private legacy and
+  Java base URLs for status, normalized content type and stable JSON body hash,
+  then probes a bounded legacy -> Java -> legacy route sequence without touching
+  nginx or public frontend traffic.
+- Harness self-test PASS:
+  `node scripts/run-thesis-differential-rehearsal.mjs --self-test`.
+- Live private rehearsal executed against the restored read-only PostgreSQL
+  snapshot on `127.0.0.1:55432`:
+  - legacy/pilot endpoint: `java-services/thesis-service` on
+    `http://127.0.0.1:54111`
+  - monolith candidate: `java-services/restful-api` on
+    `http://127.0.0.1:54112` with `SPRING_PROFILES_ACTIVE=persistence`,
+    `THESIS_READ_ENABLED=true` and `FLYWAY_ENABLED=false`
+  - both used `SPRING_DATASOURCE_USERNAME=campuscore_ro_reader`
+- Result: `FAIL`, with 6/8 corpus checks passing and 2/8 failing:
+  - `unknown round topics`: status/content type matched, but the legacy
+    endpoint returned `{statusCode,message,timestamp,path}` while the monolith
+    returned the shared `{code,message,path,requestId,timestamp,fields}` error
+    envelope.
+  - `malformed round groups`: status/content type matched, but the same legacy
+    versus monolith error-envelope shape difference remained.
+- Route sequence evidence: `legacy-before`, `java-candidate`, and
+  `legacy-after` all returned 200 with the same body hash for
+  `GET /api/v1/thesis/rounds`.
+- Ruling: this is useful differential evidence and a reusable gate, but it is
+  not a pass. Do not weaken the oracle or claim backend foundation completion;
+  decide whether the monolith should preserve the legacy thesis error envelope
+  or record this as an intentional contract change before any cutover.
+
 ## Deferred findings
 
 - PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
