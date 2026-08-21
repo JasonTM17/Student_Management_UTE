@@ -557,6 +557,17 @@ the retirement gates pass.
   student/curriculum writer ownership, richer course-object joins, PostgreSQL
   read parity, live admin/catalog route wiring, canary routing, rollback and
   public academic route handoff remain open.
+- Phase 54 backend-first academic admin student enrollment read extension:
+  source/H2 focused verified candidate/HOLD; see
+  `phase-54-academic-student-enrollment-read.md`. It extends the existing
+  feature-default-off Java academic enrollment read candidate with
+  `GET /api/v1/enrollments/student/{studentId}`, preserving the selected
+  legacy admin/super-admin role boundary, list response shape, optional
+  `semesterId` filter, `enrolledAt DESC` ordering, default-off route absence
+  and negative authorization/query behavior. Enrollment create/drop/update/
+  delete ownership, CSV export parity, PostgreSQL read parity, live route
+  wiring, canary routing, rollback and public academic route handoff remain
+  open.
 
 ## Backend foundation gate before Stitch implementation
 
