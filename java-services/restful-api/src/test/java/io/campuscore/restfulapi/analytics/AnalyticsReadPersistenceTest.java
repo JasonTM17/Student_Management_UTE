@@ -70,6 +70,7 @@ class AnalyticsReadPersistenceTest {
                     "sectionNumber" VARCHAR(80),
                     "courseId" VARCHAR(120),
                     "semesterId" VARCHAR(120),
+                    "lecturerId" VARCHAR(120),
                     "capacity" INTEGER,
                     "enrolledCount" INTEGER
                 )
@@ -98,7 +99,8 @@ class AnalyticsReadPersistenceTest {
                     "semesterId" VARCHAR(120),
                     "status" VARCHAR(40),
                     "enrolledAt" TIMESTAMP,
-                    "letterGrade" VARCHAR(10)
+                    "letterGrade" VARCHAR(10),
+                    "gradeStatus" VARCHAR(40)
                 )
                 """);
         jdbc.execute("""
@@ -640,6 +642,63 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void lecturerAnalyticsPreservesLegacyClaimScopeCountsAndSectionBuckets() throws Exception {
+        insertAcademicYear("academic-year-2026", 2026);
+        insertSemester(
+                "semester-fall",
+                "Fall 2026",
+                "Fall 2026",
+                "Hoc ky Thu 2026",
+                "academic-year-2026",
+                BASE_TIME);
+        insertCourse("course-java", "JAVA101", "Java Programming", "Java Programming", "Lap trinh Java", 3);
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web", 4);
+        insertSectionWithLecturer("section-java", "01", "course-java", "semester-fall", "lecturer-1", 4, 0);
+        insertSectionWithLecturer("section-web", "02", "course-web", "semester-fall", "lecturer-1", 5, 3);
+        insertSectionWithLecturer("section-other", "03", "course-web", "semester-fall", "lecturer-2", 10, 10);
+        insertEnrollmentInSectionWithGradeStatus(
+                "enrollment-java-confirmed", "semester-fall", "section-java", "CONFIRMED", "PUBLISHED");
+        insertEnrollmentInSectionWithGradeStatus(
+                "enrollment-java-pending", "semester-fall", "section-java", "PENDING", "DRAFT");
+        insertEnrollmentInSectionWithGradeStatus(
+                "enrollment-java-completed", "semester-fall", "section-java", "COMPLETED", "PUBLISHED");
+        insertEnrollmentInSectionWithGradeStatus(
+                "enrollment-web-dropped", "semester-fall", "section-web", "DROPPED", "PUBLISHED");
+        insertEnrollmentInSectionWithGradeStatus(
+                "enrollment-other-confirmed", "semester-fall", "section-other", "CONFIRMED", "PUBLISHED");
+
+        mvc.perform(get("/api/v1/analytics/lecturer/my").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalSections").value(2))
+                .andExpect(jsonPath("$.totalStudents").value(2))
+                .andExpect(jsonPath("$.sectionsWithGrades").value(3));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/sections").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].sectionId").value("section-java"))
+                .andExpect(jsonPath("$[0].sectionNumber").value("01"))
+                .andExpect(jsonPath("$[0].courseCode").value("JAVA101"))
+                .andExpect(jsonPath("$[0].courseName").value("Java Programming"))
+                .andExpect(jsonPath("$[0].courseNameEn").value("Java Programming"))
+                .andExpect(jsonPath("$[0].courseNameVi").value("Lap trinh Java"))
+                .andExpect(jsonPath("$[0].semesterName").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameEn").value("Fall 2026"))
+                .andExpect(jsonPath("$[0].semesterNameVi").value("Hoc ky Thu 2026"))
+                .andExpect(jsonPath("$[0].capacity").value(4))
+                .andExpect(jsonPath("$[0].enrolledCount").value(2))
+                .andExpect(jsonPath("$[0].occupancyRate").value(50))
+                .andExpect(jsonPath("$[1].sectionId").value("section-web"))
+                .andExpect(jsonPath("$[1].enrolledCount").value(3))
+                .andExpect(jsonPath("$[1].occupancyRate").value(60));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/sections").with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].sectionId").value("section-other"));
+    }
+
+    @Test
     void gradeDistributionPreservesLegacyBucketsAndPercentagesForAdmins() throws Exception {
         insertEnrollment("enrollment-a-1", "COMPLETED", "A");
         insertEnrollment("enrollment-a-2", "COMPLETED", "A");
@@ -735,6 +794,22 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/lecturer/my").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/sections").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("lecturer-user")
+                                .claim("roles", List.of("LECTURER")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
         mvc.perform(get("/api/v1/analytics/enrollments-by-semester").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -810,6 +885,18 @@ class AnalyticsReadPersistenceTest {
         mvc.perform(get("/api/v1/analytics/attendance")
                         .queryParam("months", "12")
                         .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/my")
+                        .queryParam("months", "12")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/lecturer/sections")
+                        .queryParam("semesterId", "semester-1")
+                        .with(lecturerJwt("lecturer-1")))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
@@ -958,14 +1045,27 @@ class AnalyticsReadPersistenceTest {
             String semesterId,
             int capacity,
             int enrolledCount) {
+        insertSectionWithLecturer(id, sectionNumber, courseId, semesterId, null, capacity, enrolledCount);
+    }
+
+    private void insertSectionWithLecturer(
+            String id,
+            String sectionNumber,
+            String courseId,
+            String semesterId,
+            String lecturerId,
+            int capacity,
+            int enrolledCount) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Section\""
-                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"capacity\", \"enrolledCount\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\","
+                        + " \"capacity\", \"enrolledCount\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 sectionNumber,
                 courseId,
                 semesterId,
+                lecturerId,
                 capacity,
                 enrolledCount);
     }
@@ -994,52 +1094,80 @@ class AnalyticsReadPersistenceTest {
     private void insertEnrollment(String id, String status, String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\","
+                        + " \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 null,
                 null,
                 status,
                 localDateTime(BASE_TIME),
-                letterGrade);
+                letterGrade,
+                null);
     }
 
     private void insertEnrollmentInSemester(String id, String semesterId, String status) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\","
+                        + " \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 null,
                 semesterId,
                 status,
                 localDateTime(BASE_TIME),
+                null,
                 null);
     }
 
     private void insertEnrollmentInSection(String id, String semesterId, String sectionId, String status) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\","
+                        + " \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 sectionId,
                 semesterId,
                 status,
                 localDateTime(BASE_TIME),
+                null,
                 null);
+    }
+
+    private void insertEnrollmentInSectionWithGradeStatus(
+            String id,
+            String semesterId,
+            String sectionId,
+            String status,
+            String gradeStatus) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Enrollment\""
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\","
+                        + " \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id,
+                sectionId,
+                semesterId,
+                status,
+                localDateTime(BASE_TIME),
+                null,
+                gradeStatus);
     }
 
     private void insertEnrollmentAt(String id, String status, Instant enrolledAt) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\","
+                        + " \"gradeStatus\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
                 id,
                 null,
                 null,
                 status,
                 localDateTime(enrolledAt),
+                null,
                 null);
     }
 
@@ -1130,6 +1258,14 @@ class AnalyticsReadPersistenceTest {
                 .subject("student-user")
                 .claim("roles", List.of("STUDENT")))
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private static RequestPostProcessor lecturerJwt(String lecturerId) {
+        return jwt().jwt(token -> token
+                .subject("lecturer-user")
+                .claim("roles", List.of("LECTURER"))
+                .claim("lecturerId", lecturerId))
+                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
     }
 
     private static LocalDateTime localDateTime(Instant value) {

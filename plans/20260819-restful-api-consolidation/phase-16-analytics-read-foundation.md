@@ -16,6 +16,13 @@ lecturer analytics port, metrics/export port, event consumer move, PostgreSQL
 parity claim, gateway canary, rollback proof, frontend change or mobile runtime
 claim.
 
+Later source candidates added selected analytics routes after this foundation.
+See Phase 35 and Phase 37 through Phase 46 for the incremental notification,
+enrollment, occupancy, registration-pressure, top-course, student-statistics,
+operator/cockpit, revenue, attendance and lecturer read candidates. This Phase
+16 file remains the original foundation boundary, not the current full
+analytics inventory.
+
 ## Scope and authority
 
 In scope:
