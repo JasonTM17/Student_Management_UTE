@@ -24,6 +24,7 @@ if (selfTest) {
   await withSelfTestServers(async ({ legacyBaseUrl, javaBaseUrl }) => {
     await runDifferential({ legacyBaseUrl, javaBaseUrl, token: 'self-test-token' });
   });
+  runTimestampNormalizationSelfTest();
 } else {
   const legacyBaseUrl = requiredEnv('THESIS_DIFF_LEGACY_BASE_URL');
   const javaBaseUrl = requiredEnv('THESIS_DIFF_JAVA_BASE_URL');
@@ -164,9 +165,76 @@ function isLegacyErrorEnvelope(response) {
 }
 
 function isUtcTimestamp(value) {
-  return typeof value === 'string'
-    && value.endsWith('Z')
-    && !Number.isNaN(Date.parse(value));
+  const match = typeof value === 'string'
+    ? /^(\d{4})-(\d{2})-(\d{2})T(\d{2}):(\d{2}):(\d{2})(?:\.(\d{1,9}))?Z$/.exec(value)
+    : null;
+  if (!match) {
+    return false;
+  }
+  const year = Number(match[1]);
+  const month = Number(match[2]);
+  const day = Number(match[3]);
+  const hour = Number(match[4]);
+  const minute = Number(match[5]);
+  const second = Number(match[6]);
+  const daysInMonth = [
+    31,
+    (year % 4 === 0 && (year % 100 !== 0 || year % 400 === 0)) ? 29 : 28,
+    31,
+    30,
+    31,
+    30,
+    31,
+    31,
+    30,
+    31,
+    30,
+    31,
+  ];
+  return month >= 1
+    && month <= 12
+    && day >= 1
+    && day <= daysInMonth[month - 1]
+    && hour >= 0
+    && hour <= 23
+    && minute >= 0
+    && minute <= 59
+    && second >= 0
+    && second <= 59;
+}
+
+function runTimestampNormalizationSelfTest() {
+  const legacy = errorResponse('2026-02-28T10:20:30.123456Z');
+  const java = errorResponse('2026-02-28T10:20:30.987654321Z');
+  if (validateErrorTimestamps(legacy, java) !== null) {
+    throw new Error('self-test expected valid UTC error timestamps to be accepted');
+  }
+  if (hashStable(normalizeComparableBody(legacy)) !== hashStable(normalizeComparableBody(java))) {
+    throw new Error('self-test expected valid volatile error timestamps to normalize equally');
+  }
+
+  const invalid = errorResponse('2026-02-30T10:20:30Z');
+  if (!validateErrorTimestamps(invalid, java)) {
+    throw new Error('self-test expected an impossible calendar date to be rejected');
+  }
+
+  const businessLegacy = { status: 200, body: { timestamp: '2026-02-30T10:20:30Z' } };
+  const businessJava = { status: 200, body: { timestamp: '2026-03-02T10:20:30Z' } };
+  if (hashStable(normalizeComparableBody(businessLegacy)) === hashStable(normalizeComparableBody(businessJava))) {
+    throw new Error('self-test expected non-error business timestamps to remain strict');
+  }
+}
+
+function errorResponse(timestamp) {
+  return {
+    status: 404,
+    body: {
+      statusCode: 404,
+      message: 'Thesis registration round not found',
+      timestamp,
+      path: '/api/v1/thesis/topics',
+    },
+  };
 }
 
 async function requestJson(baseUrl, item, token) {
@@ -291,12 +359,20 @@ function selfTestPayload(url) {
   }
   if (url.pathname === '/api/v1/thesis/topics') {
     if (url.searchParams.get('roundId') === '00000000-0000-0000-0000-000000000000') {
-      return { status: 404, body: { code: 'HTTP_404' } };
+      return errorResponse(new Date().toISOString());
     }
     return { status: 200, body: [{ id: TOPIC_ID, roundId: ROUND_ID, title: 'RO Topic', status: 'PUBLISHED' }] };
   }
   if (url.pathname === '/api/v1/thesis/groups' && url.searchParams.get('roundId') === 'not-a-uuid') {
-    return { status: 400, body: { code: 'INVALID_REQUEST' } };
+    return {
+      status: 400,
+      body: {
+        statusCode: 400,
+        message: 'Invalid request parameter',
+        timestamp: new Date().toISOString(),
+        path: '/api/v1/thesis/groups',
+      },
+    };
   }
   if (url.pathname === '/api/v1/thesis/groups') {
     return { status: 200, body: [{ id: GROUP_ID, roundId: ROUND_ID, memberStudentIds: [] }] };
