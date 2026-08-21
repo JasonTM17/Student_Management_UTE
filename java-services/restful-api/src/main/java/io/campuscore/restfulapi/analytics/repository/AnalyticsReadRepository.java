@@ -7,6 +7,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBuc
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RecentAttentionNotification;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureSection;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RevenueAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentYearBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
@@ -23,14 +24,15 @@ import java.util.Map;
 import java.util.Objects;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /**
  * Read adapter for the analytics service's Prisma public schema.
  *
- * <p>This candidate intentionally issues SELECT statements only. Revenue,
- * attendance, lecturer analytics, observability metrics and event consumers
+ * <p>This candidate intentionally issues SELECT statements only. Attendance,
+ * lecturer analytics, observability metrics and event consumers
  * remain owned by the legacy analytics-service until a separate parity/cutover
  * gate proves them.</p>
  */
@@ -137,6 +139,33 @@ public class AnalyticsReadRepository {
                         resultSet.getString("status"),
                         resultSet.getLong("count"),
                         amount(resultSet, "amount")));
+    }
+
+    public RevenueAnalyticsResponse revenueAnalytics(String semesterId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("semesterId", semesterId);
+        String invoiceFilter = semesterId == null ? "" : " WHERE \"semesterId\" = :semesterId";
+        RevenueInvoiceAggregate invoices = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(\"total\"), 0) AS \"totalInvoiced\","
+                        + " COUNT(\"id\") AS \"invoiceCount\","
+                        + " COALESCE(SUM(CASE WHEN \"status\" = 'PAID' THEN 1 ELSE 0 END), 0) AS \"paidInvoiceCount\","
+                        + " COALESCE(SUM(CASE WHEN \"status\" <> 'PAID' THEN 1 ELSE 0 END), 0) AS \"pendingInvoiceCount\""
+                        + " FROM " + table("\"Invoice\"")
+                        + invoiceFilter,
+                parameters,
+                (resultSet, ignored) -> new RevenueInvoiceAggregate(
+                        amount(resultSet, "totalInvoiced"),
+                        resultSet.getLong("invoiceCount"),
+                        resultSet.getLong("paidInvoiceCount"),
+                        resultSet.getLong("pendingInvoiceCount")));
+        BigDecimal paid = completedPaymentTotal(semesterId);
+        BigDecimal invoiced = invoices == null ? BigDecimal.ZERO : invoices.totalInvoiced();
+        return new RevenueAnalyticsResponse(
+                invoiced,
+                paid,
+                invoiced.subtract(paid),
+                invoices == null ? 0L : invoices.invoiceCount(),
+                invoices == null ? 0L : invoices.paidInvoiceCount(),
+                invoices == null ? 0L : invoices.pendingInvoiceCount());
     }
 
     public List<EnrollmentBySemesterBucket> enrollmentsBySemester() {
@@ -372,7 +401,32 @@ public class AnalyticsReadRepository {
         return value == null ? null : value.toInstant(ZoneOffset.UTC);
     }
 
+    private BigDecimal completedPaymentTotal(String semesterId) {
+        if (semesterId == null) {
+            BigDecimal value = jdbc.getJdbcTemplate().queryForObject(
+                    "SELECT COALESCE(SUM(\"amount\"), 0) FROM " + table("\"Payment\"")
+                            + " WHERE \"status\" = 'COMPLETED'",
+                    BigDecimal.class);
+            return value == null ? BigDecimal.ZERO : value;
+        }
+        BigDecimal value = jdbc.queryForObject(
+                "SELECT COALESCE(SUM(p.\"amount\"), 0)"
+                        + " FROM " + table("\"Payment\"") + " p"
+                        + " JOIN " + table("\"Invoice\"") + " i ON i.\"id\" = p.\"invoiceId\""
+                        + " WHERE p.\"status\" = 'COMPLETED' AND i.\"semesterId\" = :semesterId",
+                new MapSqlParameterSource("semesterId", semesterId),
+                BigDecimal.class);
+        return value == null ? BigDecimal.ZERO : value;
+    }
+
     private record GradeCount(String grade, long count) {
+    }
+
+    private record RevenueInvoiceAggregate(
+            BigDecimal totalInvoiced,
+            long invoiceCount,
+            long paidInvoiceCount,
+            long pendingInvoiceCount) {
     }
 
     public record EnrollmentTrendActivity(Instant enrolledAt, String status) {

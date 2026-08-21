@@ -159,6 +159,15 @@ public final class AnalyticsReadDtos {
             long failedPayments) {
     }
 
+    public record RevenueAnalyticsResponse(
+            BigDecimal totalInvoiced,
+            BigDecimal totalPaid,
+            BigDecimal pending,
+            long invoiceCount,
+            long paidInvoiceCount,
+            long pendingInvoiceCount) {
+    }
+
     public record InvoiceStatusBucket(
             String status,
             long count,
