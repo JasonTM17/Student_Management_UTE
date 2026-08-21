@@ -1,11 +1,11 @@
-FROM eclipse-temurin:21-jre-alpine
+FROM eclipse-temurin:21-jre-jammy
 
 WORKDIR /app
 
-RUN addgroup -S -g 10001 campuscore \
-    && adduser -S -u 10001 -G campuscore campuscore
+RUN groupadd --system --gid 10001 campuscore \
+    && useradd --system --uid 10001 --gid 10001 --create-home --home-dir /home/campuscore --shell /usr/sbin/nologin campuscore
 
-COPY target/campuscore-restful-api-*.jar app.jar
+COPY --chown=campuscore:campuscore target/campuscore-restful-api-*.jar app.jar
 
 USER 10001:10001
 EXPOSE 4010
