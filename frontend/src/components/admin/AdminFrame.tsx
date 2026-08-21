@@ -51,17 +51,17 @@ export function AdminFrame({
     {
       href: '/admin/users',
       icon: Users,
-      label: messages.admin.menuItems[0]?.[0] ?? 'Users',
+      label: messages.admin.menuItems[1]?.[0] ?? 'Users',
     },
     {
       href: '/admin/courses',
       icon: BookOpen,
-      label: messages.admin.menuItems[2]?.[0] ?? 'Courses',
+      label: messages.admin.menuItems[3]?.[0] ?? 'Courses',
     },
     {
       href: '/admin/analytics',
       icon: BarChart3,
-      label: messages.admin.menuItems[8]?.[0] ?? 'Analytics',
+      label: messages.admin.menuItems[9]?.[0] ?? 'Analytics',
     },
   ];
 
