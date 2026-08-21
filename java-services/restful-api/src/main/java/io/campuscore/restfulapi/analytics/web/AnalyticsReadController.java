@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.AttendanceAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
@@ -27,9 +28,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-gated analytics reads. Attendance, lecturer dashboards, metrics
- * export and event consumers remain in the legacy analytics-service for this
- * wave.
+ * Feature-gated analytics reads. Lecturer dashboards, metrics export and event
+ * consumers remain in the legacy analytics-service for this wave.
  */
 @RestController
 @Profile("persistence")
@@ -65,6 +65,15 @@ public class AnalyticsReadController {
             @RequestParam(name = "semesterId", required = false) String semesterId) {
         requireAllowedQuery(queryParameters, Set.of("semesterId"));
         return analytics.revenueAnalytics(semesterId);
+    }
+
+    @GetMapping("attendance")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public AttendanceAnalyticsResponse attendance(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @RequestParam(name = "semesterId", required = false) String semesterId) {
+        requireAllowedQuery(queryParameters, Set.of("semesterId"));
+        return analytics.attendanceAnalytics(semesterId);
     }
 
     @GetMapping("enrollments-by-semester")

@@ -218,9 +218,9 @@ the retirement gates pass.
   source candidate/HOLD; see `phase-16-analytics-read-foundation.md`. It adds
   feature-default-off Java analytics overview and finance-summary reads against
   the analytics service's legacy Prisma `public` schema, preserving selected
-  dashboard aggregate shapes and role boundaries. Cockpit composition,
-  lecturer analytics, attendance, metrics/events, PostgreSQL parity, route
-  canary, rollback and frontend convergence remain open.
+  dashboard aggregate shapes and role boundaries. Lecturer analytics,
+  metrics/events, PostgreSQL parity, route canary, rollback and frontend
+  convergence remain open.
 - Phase 17 backend-first academic enrollment read foundation:
   source candidate/HOLD; see `phase-17-academic-enrollment-read-foundation.md`.
   It adds feature-default-off Java current-student enrollment, grade and
@@ -459,6 +459,13 @@ the retirement gates pass.
   `semesterId` filter, invoice totals/counts and completed-payment revenue
   calculation. PostgreSQL read parity, live finance/admin route wiring, canary
   routing, rollback and public analytics route handoff remain open.
+- Phase 45 backend-first analytics attendance foundation: source candidate/HOLD;
+  see `phase-45-analytics-attendance.md`. It extends the feature-default-off
+  Java analytics read candidate with `GET /api/v1/analytics/attendance` for
+  `ADMIN`/`SUPER_ADMIN`, preserving the legacy optional `semesterId` section
+  filter, status totals and rounded attendance-rate formula. PostgreSQL read
+  parity, live admin route wiring, canary routing, rollback and public analytics
+  route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

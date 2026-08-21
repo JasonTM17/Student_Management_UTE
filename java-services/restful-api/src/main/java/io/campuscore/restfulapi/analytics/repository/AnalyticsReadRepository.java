@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.analytics.repository;
 
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.AttendanceAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationTypeBucket;
@@ -31,10 +32,9 @@ import org.springframework.stereotype.Repository;
 /**
  * Read adapter for the analytics service's Prisma public schema.
  *
- * <p>This candidate intentionally issues SELECT statements only. Attendance,
- * lecturer analytics, observability metrics and event consumers
- * remain owned by the legacy analytics-service until a separate parity/cutover
- * gate proves them.</p>
+ * <p>This candidate intentionally issues SELECT statements only. Lecturer
+ * analytics, observability metrics and event consumers remain owned by the
+ * legacy analytics-service until a separate parity/cutover gate proves them.</p>
  */
 @Repository
 @Profile("persistence")
@@ -166,6 +166,43 @@ public class AnalyticsReadRepository {
                 invoices == null ? 0L : invoices.invoiceCount(),
                 invoices == null ? 0L : invoices.paidInvoiceCount(),
                 invoices == null ? 0L : invoices.pendingInvoiceCount());
+    }
+
+    public AttendanceAnalyticsResponse attendanceAnalytics(String semesterId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource("semesterId", semesterId);
+        String sectionJoin = semesterId == null
+                ? ""
+                : " JOIN " + table("\"Section\"") + " s ON s.\"id\" = a.\"sectionId\""
+                        + " AND s.\"semesterId\" = :semesterId";
+        AttendanceAggregate aggregate = jdbc.queryForObject(
+                "SELECT COUNT(a.\"id\") AS \"totalRecords\","
+                        + " COALESCE(SUM(CASE WHEN a.\"status\" = 'PRESENT' THEN 1 ELSE 0 END), 0) AS \"present\","
+                        + " COALESCE(SUM(CASE WHEN a.\"status\" = 'ABSENT' THEN 1 ELSE 0 END), 0) AS \"absent\","
+                        + " COALESCE(SUM(CASE WHEN a.\"status\" = 'LATE' THEN 1 ELSE 0 END), 0) AS \"late\","
+                        + " COALESCE(SUM(CASE WHEN a.\"status\" = 'EXCUSED' THEN 1 ELSE 0 END), 0) AS \"excused\""
+                        + " FROM " + table("\"Attendance\"") + " a"
+                        + sectionJoin,
+                parameters,
+                (resultSet, ignored) -> new AttendanceAggregate(
+                        resultSet.getLong("totalRecords"),
+                        resultSet.getLong("present"),
+                        resultSet.getLong("absent"),
+                        resultSet.getLong("late"),
+                        resultSet.getLong("excused")));
+        if (aggregate == null) {
+            return new AttendanceAnalyticsResponse(0, 0, 0, 0, 0, 0);
+        }
+        int attendanceRate = aggregate.totalRecords() > 0
+                ? Math.toIntExact(Math.round(((aggregate.present() + aggregate.late()) * 100.0d)
+                        / aggregate.totalRecords()))
+                : 0;
+        return new AttendanceAnalyticsResponse(
+                aggregate.totalRecords(),
+                aggregate.present(),
+                aggregate.absent(),
+                aggregate.late(),
+                aggregate.excused(),
+                attendanceRate);
     }
 
     public List<EnrollmentBySemesterBucket> enrollmentsBySemester() {
@@ -427,6 +464,14 @@ public class AnalyticsReadRepository {
             long invoiceCount,
             long paidInvoiceCount,
             long pendingInvoiceCount) {
+    }
+
+    private record AttendanceAggregate(
+            long totalRecords,
+            long present,
+            long absent,
+            long late,
+            long excused) {
     }
 
     public record EnrollmentTrendActivity(Instant enrolledAt, String status) {

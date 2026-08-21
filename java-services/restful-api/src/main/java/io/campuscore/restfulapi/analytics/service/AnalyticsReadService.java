@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.analytics.service;
 
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository.EnrollmentTrendActivity;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.AttendanceAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.DashboardLink;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
@@ -129,6 +130,11 @@ public class AnalyticsReadService {
     @Transactional(readOnly = true)
     public RevenueAnalyticsResponse revenueAnalytics(String semesterId) {
         return analytics.revenueAnalytics(normalizeOptional(semesterId));
+    }
+
+    @Transactional(readOnly = true)
+    public AttendanceAnalyticsResponse attendanceAnalytics(String semesterId) {
+        return analytics.attendanceAnalytics(normalizeOptional(semesterId));
     }
 
     @Transactional(readOnly = true)
