@@ -555,10 +555,11 @@ the retirement gates pass.
   migrated legacy `academic` schema, preserving selected authenticated list and
   detail boundaries, list envelopes, department hydration, detail-only
   `CurriculumCourse` mapping hydration, localization defaults, default-off
-  route absence and negative query behavior. Curriculum writes,
-  student/curriculum writer ownership, richer course-object joins, PostgreSQL
-  read parity, live admin/catalog route wiring, canary routing, rollback and
-  public academic route handoff remain open.
+  route absence and negative query behavior. A focused PostgreSQL rehearsal on
+  the curriculum read suite has since passed against a disposable target, but
+  curriculum writes, student/curriculum writer ownership, richer course-object
+  joins, restored PostgreSQL read parity, live admin/catalog route wiring,
+  canary routing, rollback and public academic route handoff remain open.
 - Phase 54 backend-first academic admin student enrollment read extension:
   source/H2 focused verified candidate/HOLD; see
   `phase-54-academic-student-enrollment-read.md`. It extends the existing
