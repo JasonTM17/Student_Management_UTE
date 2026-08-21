@@ -223,7 +223,10 @@ the retirement gates pass.
   dashboard aggregate shapes and role boundaries. Lecturer analytics,
   metrics/events, PostgreSQL parity, route canary, rollback and frontend
   convergence were still open at that phase; later analytics waves below add
-  more source candidates without changing the public cutover HOLD.
+  more source candidates without changing the public cutover HOLD. A focused
+  PostgreSQL rehearsal has now been refreshed on exact head
+  `2a56a2dd85c218ed7e355ac57c23a196b91d5127`; route canary and rollback
+  remain open.
 - Phase 17 backend-first academic enrollment read foundation:
   source candidate/HOLD; see `phase-17-academic-enrollment-read-foundation.md`.
   It adds feature-default-off Java current-student enrollment, grade and
