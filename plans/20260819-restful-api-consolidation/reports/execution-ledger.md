@@ -3,9 +3,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this docs update: `feature/java-thesis-platform` at `27eb9a58ddf6f1c9be1610afa89c38376553f85e` (`fix(ci): exclude agent docs from gitleaks scan`); local HEAD matches `origin/feature/java-thesis-platform`.
-- Repo state before this docs update: tracked dirty `java-services/restful-api/src/main/java/io/campuscore/restfulapi/finance/repository/FinanceReadRepository.java` is intentionally preserved per user instruction; only user-owned untracked `.agents/`, `.codex/` and `.tmp/` also remain and must stay unstaged.
-- Disk snapshot before this docs update: C: ~16.10 GiB free, D: ~36.62 GiB free.
+- Current branch snapshot before this docs update: `feature/java-thesis-platform`
+  at `3327f8318bc9aa775a4e48185b8f74b54ab3215a`
+  (`fix(java): support finance postgres optional filters`); local branch is
+  ahead of `origin/feature/java-thesis-platform` by the source repair commit
+  plus this documentation record until pushed.
+- Repo state before this docs update: the finance source repair is committed;
+  tracked dirty files are this plan/ledger documentation update only. The
+  user-owned untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
+- Branch integration ruling: the user requested `main` as the main branch for
+  faster progress. After this docs record, fast-forward `main` to the verified
+  branch tip and push `main` instead of continuing to treat the feature branch
+  as the primary integration target.
+- Disk snapshot before this docs update: C: ~16.40 GiB free, D: ~35.93 GiB
+  free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56447`
+  and `56448` were stopped by exact data directory; no broad deletion was run.
 
 ## Completed evidence carried forward
 
@@ -14,8 +26,12 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Finance PostgreSQL parity repair is verified in the working tree, but the repaired production file remains intentionally dirty and uncommitted per user instruction.
-- Exit criterion: this ledger records the exact finance repair evidence, the preserved dirty file stays unstaged, and the next backend slice remains identified without claiming finance cutover or public route ownership.
+- Finance PostgreSQL optional-filter repair is committed at
+  `3327f8318bc9aa775a4e48185b8f74b54ab3215a` and documented in
+  `phase-58-finance-postgres-parity-repair.md`.
+- Exit criterion for this slice: record the exact finance repair evidence,
+  push the verified branch state to `main`, and keep route ownership, writer
+  ownership, FE traffic and production cutover on HOLD.
 
 ## Phase 48 evidence
 
@@ -289,29 +305,32 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Finance PostgreSQL parity repair checkpoint — 2026-08-21
 
-- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
-  plus the local modification in
-  `java-services/restful-api/src/main/java/io/campuscore/restfulapi/finance/repository/FinanceReadRepository.java`.
-  The user explicitly asked to preserve that dirty file, so it remains
-  unstaged and uncommitted.
+- Source repair commit:
+  `3327f8318bc9aa775a4e48185b8f74b54ab3215a`
+  (`fix(java): support finance postgres optional filters`).
 - Confirmed root cause: the finance invoice/payment reads used nullable
   optional filters in the same `(:param IS NULL OR ...)` shape that PostgreSQL
   rejects when the filter is absent, while H2 stayed permissive.
 - Repair: finance read repository now emits dynamic `WHERE` clauses only when
   filters exist, matching the existing repository pattern used by other read
   slices, while keeping the public API, envelopes and role boundaries
-  unchanged.
+  unchanged. The regression test now also covers admin payment list reads with
+  no optional filter.
 - H2 focused regression PASS:
-  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest' '-DforkCount=0' test`
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
 - PostgreSQL focused rehearsal PASS against the disposable target on
-  `127.0.0.1:56437` with `currentSchema=finance`:
+  `127.0.0.1:56448` with `currentSchema=finance` and
+  `server_encoding=UTF8`:
   `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest' '-DforkCount=0' test`
 - Full canonical Java monolith gate PASS after the repair:
   `mvn -q -f java-services/pom.xml clean test`; canonical surefire summary
-  `177 tests / 0 failures / 0 errors / 1 skipped`.
-- Open hold: commit/push is deferred only because the user asked to keep the
-  finance file dirty for now; no finance route-canary or production-cutover
-  claim is being made.
+  `26 reports / 177 tests / 0 failures / 0 errors / 1 skipped`.
+- Hygiene PASS: touched-file `git diff --check` passed with only Windows
+  LF-to-CRLF warnings, production finance repository SQL-write marker scan had
+  no matches, and staged sensitive-value diff scan passed before commit.
+- Open HOLD: no finance route canary, public writer ownership, restored
+  legacy-data parity, payment reconciliation, rollback observation or
+  production-cutover claim is being made.
 
 ## Analytics PostgreSQL focused rehearsal — 2026-08-21
 
@@ -475,21 +494,24 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Deferred findings
 
-- PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
-- Finance PostgreSQL parity is now verified in the working tree, but the
-  repaired source file stays intentionally uncommitted until the user allows
-  staging that exact path.
+- PostgreSQL restored-data parity, route canary, rollback rehearsal, live FE
+  authenticated parity, mobile runtime parity, and Stitch live visual audit
+  remain open gates before any cutover or production-ready claim.
+- Finance PostgreSQL optional-filter syntax parity is committed, but finance
+  route ownership, writes, checkout/payment provider orchestration,
+  reconciliation and rollback remain open.
 
 ## Next resume point
 
-- Next safe backend slice: continue PostgreSQL parity hardening for another
-  existing read candidate, or wait for the user to authorize staging the
-  preserved finance file if the goal is to commit/push that verified repair.
-  Until backend foundation/canary/rollback/review gates pass, do not point FE
-  traffic or public routes at Java. FE web/mobile remains a required later
-  phase with Stitch, responsive, auth/runtime and functional proof. Preserve
-  untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly
-  authorizes a safe cleanup target.
+- Next safe step in this run: commit this documentation record, push the branch
+  state, fast-forward `main` to the verified tip and push `main` so `main`
+  becomes the primary integration branch. After that, continue backend parity
+  hardening or the next accepted plan slice. Until backend
+  foundation/canary/rollback/review gates pass, do not point FE traffic or
+  public routes at Java. FE web/mobile remains a required later phase with
+  Stitch, responsive, auth/runtime and functional proof. Preserve untracked
+  `.agents/`, `.codex/` and `.tmp` unless the user explicitly authorizes a safe
+  cleanup target.
 
 ## Thesis differential repair and rehearsal — 2026-08-21
 
