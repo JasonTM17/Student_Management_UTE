@@ -3,7 +3,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `0b63b302d6976718c69f8ebde83f7a2ecaad6a68`, exactly matching `origin/feature/java-thesis-platform` after the Phase 53 source/docs checkpoint push on 2026-08-21.
+- Current branch snapshot: `feature/java-thesis-platform` at `2977a4f50ebb0d8b8544bb220e673f61fc467081`, exactly matching `origin/feature/java-thesis-platform` after the Phase 53 source/docs and capability-preflight records on 2026-08-21.
 - Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
 - Disk snapshot before implementation: C: ~15.76 GiB free, D: ~38.92 GiB free.
 
@@ -108,6 +108,23 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Verdict: `BLOCKED_CAPABILITY` for the PostgreSQL restore/differential/rollback
   gate. This does not change the Java source candidate, public route ownership or
   cutover posture.
+
+## Independent Wukong gate — 2026-08-21
+
+- Verdict: `FALSIFIED` for reusing the prior Phase 11 engagement rehearsal as
+  current exact-head parity evidence or as a substitute for the academic
+  curriculum gate.
+- The prior probe identities (`f4188d7...` / Java source `b6c6e0d...`) differ
+  from current HEAD, and the rehearsal blob has drifted (`229 added / 105
+  deleted` between the recorded probe and current source).
+- The current rehearsal corpus targets announcements and has no curriculum
+  cases; Phase 53 curriculum PostgreSQL parity and exact-head review remain
+  open. Phase 11's no-go still requires an approved D: disposable target,
+  scrubbed backup or deterministic fixture with checksum, read-only role and
+  migrations/DDL/seed disabled.
+- Handoff: keep the backend foundation gate `BLOCKED_CAPABILITY` until those
+  artifacts and authority are supplied, then create a fresh academic
+  curriculum differential plus rollback rehearsal and fresh independent review.
 
 ## Deferred findings
 
