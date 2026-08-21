@@ -128,6 +128,17 @@ class AnalyticsReadPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "public"."Attendance" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120),
+                    "sectionId" VARCHAR(120),
+                    "date" TIMESTAMP,
+                    "status" VARCHAR(40) NOT NULL,
+                    "notes" VARCHAR(500),
+                    "createdAt" TIMESTAMP
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Notification" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
@@ -143,6 +154,7 @@ class AnalyticsReadPersistenceTest {
 
         for (String table : List.of(
                 "Notification",
+                "Attendance",
                 "Payment",
                 "Invoice",
                 "Waitlist",
@@ -597,6 +609,37 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void attendanceAnalyticsPreservesLegacySemesterFilterAndRateFormula() throws Exception {
+        insertSection("section-fall", "A", "course-web", "semester-fall", 40, 0);
+        insertSection("section-spring", "B", "course-web", "semester-spring", 40, 0);
+        insertAttendance("attendance-fall-present", "section-fall", "PRESENT");
+        insertAttendance("attendance-fall-late", "section-fall", "LATE");
+        insertAttendance("attendance-fall-absent", "section-fall", "ABSENT");
+        insertAttendance("attendance-fall-excused", "section-fall", "EXCUSED");
+        insertAttendance("attendance-spring-present", "section-spring", "PRESENT");
+
+        mvc.perform(get("/api/v1/analytics/attendance")
+                        .queryParam("semesterId", "semester-fall")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRecords").value(4))
+                .andExpect(jsonPath("$.present").value(1))
+                .andExpect(jsonPath("$.absent").value(1))
+                .andExpect(jsonPath("$.late").value(1))
+                .andExpect(jsonPath("$.excused").value(1))
+                .andExpect(jsonPath("$.attendanceRate").value(50));
+
+        mvc.perform(get("/api/v1/analytics/attendance").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalRecords").value(5))
+                .andExpect(jsonPath("$.present").value(2))
+                .andExpect(jsonPath("$.absent").value(1))
+                .andExpect(jsonPath("$.late").value(1))
+                .andExpect(jsonPath("$.excused").value(1))
+                .andExpect(jsonPath("$.attendanceRate").value(60));
+    }
+
+    @Test
     void gradeDistributionPreservesLegacyBucketsAndPercentagesForAdmins() throws Exception {
         insertEnrollment("enrollment-a-1", "COMPLETED", "A");
         insertEnrollment("enrollment-a-2", "COMPLETED", "A");
@@ -688,6 +731,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/attendance").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/enrollments-by-semester").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -748,6 +795,19 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/analytics/revenue")
+                        .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/attendance")
+                        .queryParam("semesterId", "semester-fall")
+                        .queryParam("semesterId", "semester-spring")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/attendance")
                         .queryParam("months", "12")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
@@ -1012,6 +1072,20 @@ class AnalyticsReadPersistenceTest {
                 method,
                 status,
                 amount,
+                localDateTime(BASE_TIME));
+    }
+
+    private void insertAttendance(String id, String sectionId, String status) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Attendance\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"date\", \"status\", \"notes\", \"createdAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?)",
+                id,
+                "student-user",
+                sectionId,
+                localDateTime(BASE_TIME),
+                status,
+                null,
                 localDateTime(BASE_TIME));
     }
 

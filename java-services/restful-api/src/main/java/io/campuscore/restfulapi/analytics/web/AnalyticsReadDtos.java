@@ -168,6 +168,15 @@ public final class AnalyticsReadDtos {
             long pendingInvoiceCount) {
     }
 
+    public record AttendanceAnalyticsResponse(
+            long totalRecords,
+            long present,
+            long absent,
+            long late,
+            long excused,
+            int attendanceRate) {
+    }
+
     public record InvoiceStatusBucket(
             String status,
             long count,
