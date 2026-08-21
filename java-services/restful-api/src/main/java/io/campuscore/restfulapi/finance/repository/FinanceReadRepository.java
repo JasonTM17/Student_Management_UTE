@@ -9,6 +9,7 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
@@ -47,29 +48,21 @@ public class FinanceReadRepository {
             String status,
             String semesterId,
             String studentId) {
+        SqlWhere where = invoiceWhere(status, semesterId, studentId);
+        where.parameters().addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(
                 invoiceSelect()
-                        + " WHERE (:status IS NULL OR invoice.\"status\" = :status)"
-                        + " AND (:semesterId IS NULL OR invoice.\"semesterId\" = :semesterId)"
-                        + " AND (:studentId IS NULL OR invoice.\"studentId\" = :studentId)"
+                        + where.sql()
                         + " ORDER BY invoice.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit)
-                        .addValue("status", status)
-                        .addValue("semesterId", semesterId)
-                        .addValue("studentId", studentId),
+                where.parameters(),
                 FinanceReadRepository::mapInvoice);
     }
 
     public long countInvoices(String status, String semesterId, String studentId) {
+        SqlWhere where = invoiceWhere(status, semesterId, studentId);
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + INVOICE_TABLE + " invoice"
-                        + " WHERE (:status IS NULL OR invoice.\"status\" = :status)"
-                        + " AND (:semesterId IS NULL OR invoice.\"semesterId\" = :semesterId)"
-                        + " AND (:studentId IS NULL OR invoice.\"studentId\" = :studentId)",
-                new MapSqlParameterSource()
-                        .addValue("status", status)
-                        .addValue("semesterId", semesterId)
-                        .addValue("studentId", studentId),
+                "SELECT COUNT(*) FROM " + INVOICE_TABLE + " invoice" + where.sql(),
+                where.parameters(),
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -82,14 +75,12 @@ public class FinanceReadRepository {
     }
 
     public List<InvoiceRecord> findStudentInvoices(String studentId, String semesterId) {
+        SqlWhere where = studentInvoiceWhere(studentId, semesterId);
         return jdbc.query(
                 invoiceSelect()
-                        + " WHERE invoice.\"studentId\" = :studentId"
-                        + " AND (:semesterId IS NULL OR invoice.\"semesterId\" = :semesterId)"
+                        + where.sql()
                         + " ORDER BY invoice.\"createdAt\" DESC",
-                new MapSqlParameterSource()
-                        .addValue("studentId", studentId)
-                        .addValue("semesterId", semesterId),
+                where.parameters(),
                 FinanceReadRepository::mapInvoice);
     }
 
@@ -126,29 +117,21 @@ public class FinanceReadRepository {
             String status,
             String invoiceId,
             String studentId) {
+        SqlWhere where = paymentWhere(status, invoiceId, studentId);
+        where.parameters().addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(
                 paymentSelect()
-                        + " WHERE (:status IS NULL OR payment.\"status\" = :status)"
-                        + " AND (:invoiceId IS NULL OR payment.\"invoiceId\" = :invoiceId)"
-                        + " AND (:studentId IS NULL OR payment.\"studentId\" = :studentId)"
+                        + where.sql()
                         + " ORDER BY payment.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit)
-                        .addValue("status", status)
-                        .addValue("invoiceId", invoiceId)
-                        .addValue("studentId", studentId),
+                where.parameters(),
                 FinanceReadRepository::mapPayment);
     }
 
     public long countPayments(String status, String invoiceId, String studentId) {
+        SqlWhere where = paymentWhere(status, invoiceId, studentId);
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + PAYMENT_TABLE + " payment"
-                        + " WHERE (:status IS NULL OR payment.\"status\" = :status)"
-                        + " AND (:invoiceId IS NULL OR payment.\"invoiceId\" = :invoiceId)"
-                        + " AND (:studentId IS NULL OR payment.\"studentId\" = :studentId)",
-                new MapSqlParameterSource()
-                        .addValue("status", status)
-                        .addValue("invoiceId", invoiceId)
-                        .addValue("studentId", studentId),
+                "SELECT COUNT(*) FROM " + PAYMENT_TABLE + " payment" + where.sql(),
+                where.parameters(),
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -192,10 +175,56 @@ public class FinanceReadRepository {
                 + " JOIN " + INVOICE_TABLE + " invoice ON invoice.\"id\" = payment.\"invoiceId\"";
     }
 
-    private static MapSqlParameterSource pageParameters(long offset, int limit) {
-        return new MapSqlParameterSource()
-                .addValue("offset", offset)
-                .addValue("limit", limit);
+    private static SqlWhere invoiceWhere(String status, String semesterId, String studentId) {
+        List<String> conditions = new ArrayList<>();
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        addEquals(conditions, parameters, "invoice", "status", status);
+        addEquals(conditions, parameters, "invoice", "semesterId", semesterId);
+        addEquals(conditions, parameters, "invoice", "studentId", studentId);
+        return new SqlWhere(where(conditions), parameters);
+    }
+
+    private static SqlWhere studentInvoiceWhere(String studentId, String semesterId) {
+        List<String> conditions = new ArrayList<>();
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        addRequired(conditions, parameters, "invoice", "studentId", studentId);
+        addEquals(conditions, parameters, "invoice", "semesterId", semesterId);
+        return new SqlWhere(where(conditions), parameters);
+    }
+
+    private static SqlWhere paymentWhere(String status, String invoiceId, String studentId) {
+        List<String> conditions = new ArrayList<>();
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
+        addEquals(conditions, parameters, "payment", "status", status);
+        addEquals(conditions, parameters, "payment", "invoiceId", invoiceId);
+        addEquals(conditions, parameters, "payment", "studentId", studentId);
+        return new SqlWhere(where(conditions), parameters);
+    }
+
+    private static void addRequired(
+            List<String> conditions,
+            MapSqlParameterSource parameters,
+            String alias,
+            String column,
+            String value) {
+        conditions.add(alias + ".\"" + column + "\" = :" + column);
+        parameters.addValue(column, value);
+    }
+
+    private static void addEquals(
+            List<String> conditions,
+            MapSqlParameterSource parameters,
+            String alias,
+            String column,
+            String value) {
+        if (value != null) {
+            conditions.add(alias + ".\"" + column + "\" = :" + column);
+            parameters.addValue(column, value);
+        }
+    }
+
+    private static String where(List<String> conditions) {
+        return conditions.isEmpty() ? "" : " WHERE " + String.join(" AND ", conditions);
     }
 
     private static InvoiceRecord mapInvoice(ResultSet resultSet, int ignored) throws SQLException {
@@ -300,5 +329,8 @@ public class FinanceReadRepository {
             Instant createdAt,
             Instant updatedAt,
             java.math.BigDecimal paidAmount) {
+    }
+
+    private record SqlWhere(String sql, MapSqlParameterSource parameters) {
     }
 }
