@@ -390,3 +390,31 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - This repair is ready for a new exact-head review wave. Actual route-switch
   rollback, wider corpus (anonymous/unknown IDs/empty lists/headers/latency),
   full client parity, and FE/mobile gates remain outside this checkpoint.
+
+## Exact-head provenance repair run — 2026-08-21
+
+- Review target before this documentation correction:
+  `683829a661f517c7469a4ee7cc85a22aeaeb2a08`, tree
+  `4c1386178142b6cba4eb6085659e4f9d29bd72cb`, differential harness blob
+  `b4e1205fa9448865612a8066c84279aff5d7714d`.
+- Exact-head runtime verification execution:
+  `e18d7d91-fc49-4c22-90f4-1ef0f80f1f7e`, generated at
+  `2026-08-21T07:33:24.840Z`. The two freshly packaged Java runtimes used the
+  restored `campuscore_ro` PostgreSQL snapshot on `127.0.0.1:55432` through
+  `campuscore_ro_reader`; `FLYWAY_ENABLED=false`, private ports `54111` and
+  `54112`, and no shared CampusCore stack or public traffic.
+- `node --check scripts/run-thesis-differential-rehearsal.mjs` and the full
+  `--self-test` passed. The live differential returned `PASS`, 8/8 comparisons,
+  with route sequence `legacy-before -> java-candidate -> legacy-after` all
+  `200` and the unchanged rounds body hash
+  `b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194`.
+- The captured live result included the exact eight comparison hashes recorded
+  in `reports/thesis-differential-20260821.md`; all runtimes and both isolated
+  PostgreSQL servers were stopped after collection.
+- Exact-head review results on that source snapshot: Advisor
+  `ACCEPT_CHECKPOINT` and Kongming `PASS_CHECKPOINT` for the bounded thesis-read
+  scope; Wukong `INCONCLUSIVE` on the comparator itself but `BLOCK` on the
+  historical report provenance because the earlier live result was not bound
+  to an exact source identity. The current correction supplies that identity;
+  refresh Advisor/Kongming/Wukong after this report commit. `SOURCE_PUSH` and
+  `CUTOVER` remain `HOLD`.
