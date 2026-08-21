@@ -841,9 +841,30 @@ test('Stitch workspace guardrails keep long values and assistant clear of mobile
 
   assert.match(metricSource, /break-normal/);
   assert.match(studentDashboardSource, /valueClassName="text-xl sm:text-2xl"/);
-  assert.match(assistantSource, /bottom-\[5\.75rem\].*z-50/);
+  assert.match(studentDashboardSource, /md:grid-cols-2 2xl:grid-cols-4/);
+  assert.match(assistantSource, /bottom-\[calc\(5\.75rem\+env\(safe-area-inset-bottom\)\)\].*z-50/);
+  assert.match(assistantSource, /hidden md:inline/);
   assert.match(shellSource, /backdrop-blur md:hidden/);
   assert.match(globalsSource, /--background: 240 100% 98\.8%/);
+});
+
+test('Stitch thesis catalog preserves a live detail link for every topic', () => {
+  const catalogSource = read('src/components/dashboard/thesis/ThesisTopicCatalogPage.tsx');
+
+  assert.match(
+    catalogSource,
+    /href=\{`\/dashboard\/thesis\/topics\/\$\{topic\.id\}\?roundId=\$\{workspace\.selectedRoundId\}`\}/,
+  );
+});
+
+test('Stitch tablet analytics keeps the enrollment chart fluid', () => {
+  const analyticsSource = read('src/app/admin/analytics/page.tsx');
+
+  assert.match(analyticsSource, /overflow-x-auto pb-2 md:overflow-x-visible/);
+  assert.match(analyticsSource, /md:grid md:w-full md:grid-cols-12 md:gap-2/);
+  assert.match(analyticsSource, /w-\[78px\] shrink-0[\s\S]*md:w-auto md:min-w-0/);
+  assert.match(analyticsSource, /gap-1[\s\S]*md:gap-0 md:px-1/);
+  assert.match(analyticsSource, /w-3 rounded-t bg-sky-500 md:w-2/);
 });
 
 test('key frontend surfaces label icon-only buttons', () => {

@@ -49,17 +49,17 @@ export function AssistantPanel() {
   };
 
   return (
-    <div className="fixed bottom-[5.75rem] right-4 z-50 w-[min(24rem,calc(100vw-2rem))] md:bottom-6 sm:right-6">
+    <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-3 z-50 w-[min(24rem,calc(100vw-1.5rem))] md:bottom-6 md:right-6 md:w-[min(24rem,calc(100vw-3rem))]">
       {!open ? (
         <Button
           type="button"
           size="lg"
-          className="ml-auto flex rounded-full border border-white/15 bg-[hsl(var(--foreground))] px-5 text-[hsl(var(--background))] shadow-2xl hover:bg-[hsl(var(--foreground))/0.9]"
+          className="ml-auto flex h-12 w-12 justify-center rounded-full border border-white/15 bg-[hsl(var(--foreground))] px-0 text-[hsl(var(--background))] shadow-2xl hover:bg-[hsl(var(--foreground))/0.9] md:h-10 md:w-auto md:justify-start md:px-5"
           onClick={() => setOpen(true)}
           aria-label={messages.assistant.open}
         >
-          <MessageCircle className="mr-2 h-5 w-5" />
-          {messages.assistant.label}
+          <MessageCircle className="mr-0 h-5 w-5 md:mr-2" />
+          <span className="hidden md:inline">{messages.assistant.label}</span>
         </Button>
       ) : (
         <section
