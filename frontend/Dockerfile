@@ -27,6 +27,8 @@ ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
 ENV NEXT_TELEMETRY_DISABLED=1
 
+RUN apk upgrade --no-cache libcrypto3 libssl3
+
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S nodejs -u 1001
 
