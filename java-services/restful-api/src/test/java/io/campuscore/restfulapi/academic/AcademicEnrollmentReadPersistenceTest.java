@@ -93,6 +93,23 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     @Test
+    void adminStudentEnrollmentReadPreservesLegacyListAndSemesterFilter() throws Exception {
+        mvc.perform(get("/api/v1/enrollments/student/student-1").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].id").value("enrollment-2"))
+                .andExpect(jsonPath("$[0].studentId").value("student-1"))
+                .andExpect(jsonPath("$[0].section.course.code").value("SE401"))
+                .andExpect(jsonPath("$[1].id").value("enrollment-1"));
+
+        mvc.perform(get("/api/v1/enrollments/student/student-1")
+                        .queryParam("semesterId", "semester-missing")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(0));
+    }
+
+    @Test
     void detailReadAllowsAdminsAndCurrentStudentButHidesOtherStudentRecords() throws Exception {
         mvc.perform(get("/api/v1/enrollments/enrollment-3").with(adminJwt()))
                 .andExpect(status().isOk())
@@ -192,6 +209,11 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/enrollments/student/student-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/enrollments/my")
                         .with(jwt().jwt(token -> token
                                 .subject("student-user-1")
@@ -210,6 +232,12 @@ class AcademicEnrollmentReadPersistenceTest {
                         .queryParam("semesterId", "semester-1")
                         .queryParam("unexpected", "value")
                         .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/enrollments/student/student-1")
+                        .queryParam("unexpected", "value")
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }

@@ -69,6 +69,16 @@ public class AcademicEnrollmentReadController {
         return academic.findStudentTranscript(jwt.getClaimAsString("studentId"));
     }
 
+    @GetMapping("enrollments/student/{studentId}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public List<EnrollmentResponse> getStudentEnrollments(
+            @PathVariable String studentId,
+            @RequestParam(required = false) String semesterId,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("semesterId"));
+        return academic.findStudentEnrollments(studentId, semesterId);
+    }
+
     @GetMapping("enrollments")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public EnrollmentListResponse getEnrollments(
