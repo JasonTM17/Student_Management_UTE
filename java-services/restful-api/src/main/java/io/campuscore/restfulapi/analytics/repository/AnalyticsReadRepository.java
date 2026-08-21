@@ -29,10 +29,10 @@ import org.springframework.stereotype.Repository;
 /**
  * Read adapter for the analytics service's Prisma public schema.
  *
- * <p>This candidate intentionally issues SELECT statements only. Attendance,
- * lecturer analytics, cockpit composition, observability metrics and event
- * consumers remain owned by the legacy analytics-service until a separate
- * parity/cutover gate proves them.</p>
+ * <p>This candidate intentionally issues SELECT statements only. Revenue,
+ * attendance, lecturer analytics, observability metrics and event consumers
+ * remain owned by the legacy analytics-service until a separate parity/cutover
+ * gate proves them.</p>
  */
 @Repository
 @Profile("persistence")

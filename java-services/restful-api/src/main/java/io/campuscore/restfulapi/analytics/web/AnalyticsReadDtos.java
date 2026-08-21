@@ -118,6 +118,31 @@ public final class AnalyticsReadDtos {
             long totalActivity) {
     }
 
+    public record OperatorSummaryResponse(
+            Instant generatedAt,
+            long serviceCount,
+            long dependencyDown,
+            long highLatency,
+            List<DashboardLink> dashboards) {
+    }
+
+    public record DashboardLink(
+            String label,
+            String url) {
+    }
+
+    public record CockpitResponse(
+            Instant generatedAt,
+            OverviewResponse overview,
+            List<EnrollmentTrendBucket> enrollmentTrends,
+            List<SectionOccupancyBucket> sectionOccupancy,
+            List<GradeDistributionBucket> gradeDistribution,
+            FinanceSummaryResponse finance,
+            NotificationSummaryResponse notifications,
+            RegistrationPressureResponse registrationPressure,
+            OperatorSummaryResponse operator) {
+    }
+
     public record FinanceSummaryResponse(
             FinanceTotals totals,
             List<InvoiceStatusBucket> invoiceStatus,
@@ -179,4 +204,5 @@ public final class AnalyticsReadDtos {
             String type,
             Instant createdAt) {
     }
+
 }

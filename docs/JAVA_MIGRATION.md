@@ -103,9 +103,10 @@ service. The analytics slice covers dashboard overview counts,
 enrollments-by-semester aggregate, section-occupancy buckets, finance-summary
 aggregate, notification-summary delivery aggregates, top-courses ranking and
 student-statistics aggregates, registration-pressure capacity/waitlist
-summary, enrollment-trends monthly activity buckets, plus grade-distribution
-buckets, with cockpit composition, lecturer analytics, attendance and metrics
-still owned by the legacy analytics service.
+summary, enrollment-trends monthly activity buckets, grade-distribution
+buckets, operator-summary posture and cockpit composition, with revenue,
+lecturer analytics, attendance and metrics still owned by the legacy analytics
+service.
 The academic enrollment slice covers current-student enrollment list, student
 grade/transcript reads, admin enrollment list/detail, and lecturer/admin grade
 item/student-grade read aggregation, with enroll/drop, waitlist, grade
