@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 55 academic internal-context bridge code commit is complete at `d92ce53e884adcd83b5dd479aebeb584d9a83946`; docs/ledger update and push are next.
-- Exit criterion: Phase 55 report, plan ledger, execution ledger and migration doc name the exact source commit, gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
+- Phase 56 academic enrollment PostgreSQL parity rehearsal is complete at `683829a661f517c7469a4ee7cc85a22aeaeb2a08`; docs/ledger update and push are next.
+- Exit criterion: Phase 56 report, plan ledger, execution ledger and migration doc name the exact source commit, gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
 
 ## Phase 48 evidence
 
@@ -238,6 +238,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Source commit complete locally:
   `d92ce53e884adcd83b5dd479aebeb584d9a83946` (`feat(java): add academic
   internal context reads`).
+
+## Phase 56 evidence
+
+- Rehearsed the existing academic enrollment/grade read foundation against the
+  disposable PostgreSQL target on `127.0.0.1:56433` with
+  `currentSchema=academic` at exact HEAD `683829a661f517c7469a4ee7cc85a22aeaeb2a08`.
+- Focused PostgreSQL rehearsal PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary from
+  `java-services/restful-api/target/surefire-reports/TEST-io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest.xml`:
+  8 tests / 0 failures / 0 errors / 0 skipped.
+- This adds real PostgreSQL parity evidence for the academic enrollment/grade
+  read foundation but does not on its own clear the broader backend foundation
+  gate, route canary, rollback observation or independent review.
 
 ## Thesis differential harness checkpoint — 2026-08-21
 
