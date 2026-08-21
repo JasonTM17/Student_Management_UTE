@@ -597,6 +597,23 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void revenueAnalyticsPreservesLegacyWhitespaceSemesterFilter() throws Exception {
+        insertInvoice("invoice-fall-paid", "semester-fall", "PAID", BigDecimal.valueOf(500));
+        insertPayment("payment-fall-completed", "invoice-fall-paid", "CARD", "COMPLETED", BigDecimal.valueOf(450));
+
+        mvc.perform(get("/api/v1/analytics/revenue")
+                        .queryParam("semesterId", " ")
+                        .with(financeOfficerJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalInvoiced").value(0.00))
+                .andExpect(jsonPath("$.totalPaid").value(0.00))
+                .andExpect(jsonPath("$.pending").value(0.00))
+                .andExpect(jsonPath("$.invoiceCount").value(0))
+                .andExpect(jsonPath("$.paidInvoiceCount").value(0))
+                .andExpect(jsonPath("$.pendingInvoiceCount").value(0));
+    }
+
+    @Test
     void gradeDistributionPreservesLegacyBucketsAndPercentagesForAdmins() throws Exception {
         insertEnrollment("enrollment-a-1", "COMPLETED", "A");
         insertEnrollment("enrollment-a-2", "COMPLETED", "A");

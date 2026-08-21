@@ -42,24 +42,27 @@ surfaces.
 - Feature-on H2 tests cover:
   - finance-officer access;
   - optional `semesterId` filtering;
+  - legacy whitespace `semesterId` filter behavior;
   - all-semester aggregate behavior;
   - invoice and completed-payment arithmetic;
   - student access denied;
   - repeated and unexpected query parameter rejection.
-- The monolith shell contract covers feature-default-off behavior for the route.
+- A persistence-profile default-off test covers the route with
+  `migration.analytics-read.enabled=false`, so the 404 proof is not merely a
+  missing-profile proof.
 
 ## Verification observed
 
-- Focused analytics/default-off H2 gate passed on 2026-08-21 with Java 24.0.2
+- Focused analytics/default-off H2 gate passed on 2026-08-21 with Java 26.0.1
   and temporary files redirected outside C: through `java.io.tmpdir`:
-  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
-- Observed focused result from Surefire XML: 39 tests, 0 failures, 0 errors,
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest,io.campuscore.restfulapi.analytics.AnalyticsReadDisabledPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
+- Observed focused result from Surefire XML: 41 tests, 0 failures, 0 errors,
   0 skipped.
-- Full Java reactor gate passed on 2026-08-21 with Java 24.0.2 and temporary
+- Full Java reactor gate passed on 2026-08-21 with Java 26.0.1 and temporary
   files redirected outside C: through `java.io.tmpdir`:
   `mvn -q -f java-services/pom.xml test`.
-- Observed current reactor result from Surefire XML: 141 tests, 0 failures,
-  0 errors, 0 skipped across 20 reports in the configured
+- Observed current reactor result from Surefire XML: 143 tests, 0 failures,
+  0 errors, 0 skipped across 21 reports in the configured
   `java-services/pom.xml` module set.
 
 ## Remaining gates
