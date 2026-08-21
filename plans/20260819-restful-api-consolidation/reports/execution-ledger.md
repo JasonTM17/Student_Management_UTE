@@ -242,14 +242,23 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Implemented internal-only Java academic context reads for curricula,
   departments and student enrollments under
   `migration.academic-context.enabled=true`, with `X-Service-Token`
-  compatibility enforcement and the default internal token
-  `academic-internal-token-12345`.
-- Permitted `/api/v1/internal/**` at the Spring Security layer so the
-  controllers can own the 403 contract for missing or invalid internal tokens.
+  compatibility enforcement through `internal.service-token`, sourced from
+  `INTERNAL_SERVICE_TOKEN`, with no built-in fallback token.
+- Permitted only the three owned academic-context `GET` routes at the Spring
+  Security layer so unowned internal paths still require authentication.
 - Pinned the thesis persistence test to H2 so it no longer drifts with external
   datasource overrides during the monolith reactor.
 - Focused gate PASS:
   `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
+- Security hardening follow-up source commit:
+  `97a9b7e12d70aeb6a55959ea66b593515ede778f` (`fix(java): harden academic
+  context internals`).
+- Security hardening focused gate PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicContextSecurityTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest' '-DforkCount=0' test`
+- Surefire summary for the hardening focused gate: 54 tests / 0 failures / 0
+  errors / 0 skipped across `AcademicContextSecurityTest`,
+  `RestfulApiContractTest`, `AcademicReadPersistenceTest`,
+  `AcademicEnrollmentReadPersistenceTest` and `ThesisTopicPersistenceTest`.
 - Full canonical Java monolith gate PASS:
   `mvn -q -f java-services/pom.xml clean test`
 - Production SQL-write grep PASS for the changed security and academic-context
@@ -261,6 +270,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Source commit complete locally:
   `d92ce53e884adcd83b5dd479aebeb584d9a83946` (`feat(java): add academic
   internal context reads`).
+- Full Java reactor after the security hardening follow-up is `NOT_RUN` because
+  C: free space was low and the checkpoint only changed a small Phase 55 safety
+  defect; public traffic handoff remains on HOLD.
 
 ## Phase 56 evidence
 

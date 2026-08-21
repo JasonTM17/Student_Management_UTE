@@ -10,6 +10,8 @@ academic route surface.
 ## Exact source checkpoint
 
 - Source commit: `d92ce53e884adcd83b5dd479aebeb584d9a83946`
+- Security hardening follow-up:
+  `97a9b7e12d70aeb6a55959ea66b593515ede778f`
 - Parent baseline: `255a25a8b91e3ea5410e257e205fd530538fe4ac`
 - Branch: `feature/java-thesis-platform`
 - Feature gate: `migration.academic-context.enabled=true`
@@ -22,12 +24,12 @@ academic route surface.
 
 The internal bridge:
 
-- is guarded by `X-Service-Token` and `INTERNAL_SERVICE_TOKEN`
-  (default `academic-internal-token-12345`);
+- is guarded by `X-Service-Token` and `internal.service-token`, sourced from
+  `INTERNAL_SERVICE_TOKEN`, with no built-in fallback token;
 - returns `403` for missing or invalid service tokens;
 - uses the existing academic read services and does not add a new writer;
-- permits `/api/v1/internal/**` at the Spring Security layer so the controller
-  can own the compatibility `403` response shape;
+- permits only the three owned academic-context `GET` routes at the Spring
+  Security layer so unowned internal paths still require authentication;
 - keeps the public academic curriculum, enrollment and thesis route surface
   unchanged.
 
@@ -35,10 +37,15 @@ The internal bridge:
 
 - Focused gate PASS:
   `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
-- Full canonical Java monolith gate PASS:
+- Security hardening focused gate PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicContextSecurityTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest' '-DforkCount=0' test`
+- Initial full canonical Java monolith gate PASS:
   `mvn -q -f java-services/pom.xml clean test`
 - Surefire summary from `java-services/restful-api/target/surefire-reports`:
   26 reports / 177 tests / 0 failures / 0 errors / 1 skipped.
+- Full Java reactor after the hardening follow-up is `NOT_RUN`; C: free space
+  was low during this checkpoint, so the hardening proof is limited to the
+  focused backend regression and related Phase 55 contracts above.
 - Production SQL-write grep PASS for the changed production security and
   academic-context files.
 - High-confidence secret-marker scan PASS for the changed production and test
