@@ -533,6 +533,19 @@ the retirement gates pass.
   classroom writes, classroom equipment-array parity, PostgreSQL read parity,
   live admin/catalog route wiring, canary routing, rollback and public academic
   route handoff remain open.
+- Phase 52 backend-first academic faculty/department read extension:
+  source/H2 verified candidate/HOLD; see
+  `phase-52-academic-faculty-department-read.md`. It extends the existing
+  feature-default-off Java academic catalog candidate with
+  `GET /api/v1/faculties`, `GET /api/v1/faculties/{id}`,
+  `GET /api/v1/departments` and `GET /api/v1/departments/{id}` reads against
+  the migrated legacy `academic` schema, preserving selected admin-only list
+  boundaries, authenticated detail reads, list envelopes, faculty department
+  hydration, department faculty/lecturer hydration, localization defaults,
+  default-off route absence and negative authorization/query behavior.
+  Faculty/department writes, curricula parity, PostgreSQL read parity, live
+  admin/catalog route wiring, canary routing, rollback and public academic
+  route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
