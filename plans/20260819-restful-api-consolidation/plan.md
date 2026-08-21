@@ -632,7 +632,9 @@ The next Stitch web/mobile implementation wave is blocked until all of the
 following are observed on one exact source HEAD:
 
 1. the canonical Java build executes only `java-services/restful-api` as the
-   modular-monolith target;
+   modular-monolith target; on the current checkout `4b5e771`,
+   `mvn -q -f java-services/pom.xml test` passes for the monolith reactor with
+   27 reports / 178 tests / 0 failures / 0 errors / 1 skipped;
 2. the security/error/correlation shell and its negative tests remain green;
 3. one low-risk, read-only domain is exercised against an approved disposable
    PostgreSQL restore with a read-only role, Flyway/DDL disabled, and a recorded
