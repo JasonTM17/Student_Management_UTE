@@ -9,7 +9,7 @@ import {
   Star,
   Users,
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -32,6 +32,10 @@ interface ReviewDraft {
 
 export default function ThesisReviewsPage() {
   const { user, isLecturer, isAdmin } = useAuth();
+  const { isLoading: authLoading, hasAccess } = useRequireAuth([
+    'LECTURER',
+    'ADMIN',
+  ]);
   const { messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
@@ -126,7 +130,7 @@ export default function ThesisReviewsPage() {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || !hasAccess || isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
