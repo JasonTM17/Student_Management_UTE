@@ -3,9 +3,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this docs update: `feature/java-thesis-platform` at source repair commit `feb6213e20fb14c67f2345007ed9485c0571777d`, one local commit ahead of `origin/feature/java-thesis-platform`.
-- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
-- Disk snapshot before implementation: C: ~16.30 GiB free, D: ~36.74 GiB free.
+- Current branch snapshot before this docs update: `feature/java-thesis-platform` at `27eb9a58ddf6f1c9be1610afa89c38376553f85e` (`fix(ci): exclude agent docs from gitleaks scan`); local HEAD matches `origin/feature/java-thesis-platform`.
+- Repo state before this docs update: tracked dirty `java-services/restful-api/src/main/java/io/campuscore/restfulapi/finance/repository/FinanceReadRepository.java` is intentionally preserved per user instruction; only user-owned untracked `.agents/`, `.codex/` and `.tmp/` also remain and must stay unstaged.
+- Disk snapshot before this docs update: C: ~16.10 GiB free, D: ~36.62 GiB free.
 
 ## Completed evidence carried forward
 
@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 57 people read PostgreSQL parity repair is source-committed at `feb6213e20fb14c67f2345007ed9485c0571777d`; docs/ledger update, exact-head verification and push are next.
-- Exit criterion: Phase 57 report, plan ledger and execution ledger name the exact source repair, H2/PostgreSQL gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
+- Finance PostgreSQL parity repair is verified in the working tree, but the repaired production file remains intentionally dirty and uncommitted per user instruction.
+- Exit criterion: this ledger records the exact finance repair evidence, the preserved dirty file stays unstaged, and the next backend slice remains identified without claiming finance cutover or public route ownership.
 
 ## Phase 48 evidence
 
@@ -287,6 +287,133 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   ownership, restore parity, route canary, rollback observation, independent
   exact-head review and FE/mobile live wiring remain open.
 
+## Finance PostgreSQL parity repair checkpoint — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus the local modification in
+  `java-services/restful-api/src/main/java/io/campuscore/restfulapi/finance/repository/FinanceReadRepository.java`.
+  The user explicitly asked to preserve that dirty file, so it remains
+  unstaged and uncommitted.
+- Confirmed root cause: the finance invoice/payment reads used nullable
+  optional filters in the same `(:param IS NULL OR ...)` shape that PostgreSQL
+  rejects when the filter is absent, while H2 stayed permissive.
+- Repair: finance read repository now emits dynamic `WHERE` clauses only when
+  filters exist, matching the existing repository pattern used by other read
+  slices, while keeping the public API, envelopes and role boundaries
+  unchanged.
+- H2 focused regression PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest' '-DforkCount=0' test`
+- PostgreSQL focused rehearsal PASS against the disposable target on
+  `127.0.0.1:56437` with `currentSchema=finance`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest' '-DforkCount=0' test`
+- Full canonical Java monolith gate PASS after the repair:
+  `mvn -q -f java-services/pom.xml clean test`; canonical surefire summary
+  `177 tests / 0 failures / 0 errors / 1 skipped`.
+- Open hold: commit/push is deferred only because the user asked to keep the
+  finance file dirty for now; no finance route-canary or production-cutover
+  claim is being made.
+
+## Analytics PostgreSQL focused rehearsal — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus local finance/docs modifications. No analytics source files were
+  changed in this checkpoint.
+- Disposable target: `.tmp/pg-phase53/cluster` on `127.0.0.1:56438`, started
+  and stopped with `pg_ctl`; database `campuscore`, `currentSchema=public`,
+  user `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `17 tests / 0 failures / 0 errors / 0 skipped`.
+- Limitation: this proves the selected analytics read tests run against real
+  PostgreSQL 18.4 syntax/types, but it is not a restored legacy dataset,
+  legacy-versus-Java differential, route canary, rollback observation or
+  public traffic handoff.
+
+## Notification read PostgreSQL focused rehearsal — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus local finance/docs modifications. No notification source files were
+  changed in this checkpoint.
+- Disposable target: `.tmp/pg-phase53/cluster` on `127.0.0.1:56439`, started
+  and stopped with `pg_ctl`; database `campuscore`,
+  `currentSchema=notifications`, user `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.notification.NotificationReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `6 tests / 0 failures / 0 errors / 0 skipped`.
+- Limitation: this proves the selected notification read tests run against real
+  PostgreSQL 18.4 syntax/types, but it is not a restored legacy notification
+  dataset, read-only role permission proof, Node-versus-Java differential,
+  route canary, rollback observation or public traffic handoff.
+
+## Engagement read PostgreSQL focused rehearsal — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus local finance/docs modifications. No engagement source files were
+  changed in this checkpoint.
+- Disposable target: `.tmp/pg-phase53/cluster` on `127.0.0.1:56440`, started
+  and stopped with `pg_ctl`; database `campuscore`,
+  `currentSchema=engagement`, user `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `AnnouncementReadPersistenceTest`: 6 tests / 0 failures / 0 errors /
+  0 skipped; `SupportTicketReadPersistenceTest`: 4 tests / 0 failures /
+  0 errors / 0 skipped.
+- Limitation: this proves the selected engagement read tests run against real
+  PostgreSQL 18.4 syntax/types, but it is not the Phase 11 private
+  legacy-versus-Java differential, restored read-only corpus, route canary,
+  rollback observation or public traffic handoff.
+
+## Academic schedule PostgreSQL focused rehearsal — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus local finance/docs modifications. No academic schedule source files were
+  changed in this checkpoint.
+- An initial command attempt failed before exercising the app because the
+  PowerShell JDBC URL string interpolated the database/query string
+  incorrectly and PostgreSQL looked for database `=academic`; rerun used
+  `${db}` to pin the URL.
+- Disposable target for the passing run: `.tmp/pg-phase53/cluster` on
+  `127.0.0.1:56442`, started and stopped with `pg_ctl`; fresh database
+  `campuscore_academic_schedule_56442`, `currentSchema=academic`, user
+  `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicScheduleReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `3 tests / 0 failures / 0 errors / 0 skipped`.
+- Limitation: this proves the selected academic schedule read tests run against
+  real PostgreSQL 18.4 syntax/types, but it is not a restored legacy academic
+  dataset, route canary, rollback observation or public traffic handoff.
+
+## Academic waitlist PostgreSQL fixture repair and focused rehearsal — 2026-08-21
+
+- Working-tree source snapshot: `27eb9a58ddf6f1c9be1610afa89c38376553f85e`
+  plus local finance/docs modifications and the waitlist test-fixture repair.
+- Failing PostgreSQL reproduction: the first real PostgreSQL run of
+  `AcademicWaitlistReadPersistenceTest` reached PostgreSQL 18.4 and failed
+  before production reads because the test fixture bound `java.time.Instant`
+  values directly into timestamp columns; pgjdbc reported it could not infer
+  the SQL type for `java.time.Instant`.
+- Repair: `AcademicWaitlistReadPersistenceTest` now converts timestamp fixture
+  values with `Timestamp.from(...)`. Production waitlist code and public API
+  behavior were not changed.
+- H2 focused regression PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicWaitlistReadPersistenceTest' '-DforkCount=0' test`
+- PostgreSQL focused rehearsal PASS against the disposable target on
+  `127.0.0.1:56444`, fresh database `campuscore_academic_waitlist_56444`,
+  `currentSchema=academic`, user `postgres`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicWaitlistReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `4 tests / 0 failures / 0 errors / 0 skipped`.
+- Full canonical Java monolith gate PASS after the waitlist fixture repair:
+  `mvn -q -f java-services/pom.xml clean test`; canonical surefire summary
+  `26 reports / 177 tests / 0 failures / 0 errors / 1 skipped`.
+- Limitation: this proves the selected academic waitlist read tests run against
+  real PostgreSQL 18.4 syntax/types, but it is not a restored legacy academic
+  dataset, route canary, rollback observation or public traffic handoff.
+
 ## Thesis differential harness checkpoint — 2026-08-21
 
 - Source snapshot before this checkpoint:
@@ -349,20 +476,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Deferred findings
 
 - PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
-- Deferred PostgreSQL parity risk: `FinanceReadRepository` still uses nullable
-  optional filters of the `(:param IS NULL OR ...)` shape and should be
-  repaired or explicitly rehearsed before a finance PostgreSQL parity claim.
+- Finance PostgreSQL parity is now verified in the working tree, but the
+  repaired source file stays intentionally uncommitted until the user allows
+  staging that exact path.
 
 ## Next resume point
 
-- Next safe backend slice: either continue PostgreSQL parity hardening for
-  another existing read candidate, or repair/rehearse the known finance
-  nullable-filter risk before claiming finance PostgreSQL parity. Until
-  backend foundation/canary/rollback/review gates pass, do not point FE traffic
-  or public routes at Java. FE web/mobile remains a required later phase with
-  Stitch, responsive, auth/runtime and functional proof. Preserve untracked
-  `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a
-  safe cleanup target.
+- Next safe backend slice: continue PostgreSQL parity hardening for another
+  existing read candidate, or wait for the user to authorize staging the
+  preserved finance file if the goal is to commit/push that verified repair.
+  Until backend foundation/canary/rollback/review gates pass, do not point FE
+  traffic or public routes at Java. FE web/mobile remains a required later
+  phase with Stitch, responsive, auth/runtime and functional proof. Preserve
+  untracked `.agents/`, `.codex/` and `.tmp/` unless the user explicitly
+  authorizes a safe cleanup target.
 
 ## Thesis differential repair and rehearsal — 2026-08-21
 

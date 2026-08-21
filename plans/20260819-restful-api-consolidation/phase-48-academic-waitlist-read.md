@@ -62,10 +62,26 @@ code. Test fixtures may write to H2.
 - Surefire summary after full Java reactor: 23 reports / 156 tests / 0 failures / 0 errors / 0 skipped.
 - Production waitlist candidate SQL-write grep — PASS, no matches.
 - `git diff --check` — PASS; only Git line-ending warnings for existing Java files.
+- Later PostgreSQL-focused rehearsal first exposed a test-fixture binding
+  problem, not a production read failure: pgjdbc could not infer the SQL type
+  for direct `java.time.Instant` values inserted into timestamp fixture
+  columns. The fixture now converts timestamp values with `Timestamp.from(...)`.
+- H2 focused regression after the fixture repair:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicWaitlistReadPersistenceTest' '-DforkCount=0' test`
+  — PASS.
+- PostgreSQL focused rehearsal after the fixture repair against the disposable
+  local cluster on `127.0.0.1:56444`, fresh database
+  `campuscore_academic_waitlist_56444`, `currentSchema=academic`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicWaitlistReadPersistenceTest' '-DforkCount=0' test`
+  — PASS; 4 tests / 0 failures / 0 errors / 0 skipped.
+- Full canonical Java monolith gate after the fixture repair:
+  `mvn -q -f java-services/pom.xml clean test` — PASS; 26 reports /
+  177 tests / 0 failures / 0 errors / 1 skipped.
 
 ## HOLD gates
 
-- PostgreSQL read parity is not run.
+- PostgreSQL focused read compatibility is observed for the selected waitlist
+  tests, but restored legacy dataset parity is not run.
 - Gateway canary and rollback are not run.
 - Authenticated FE/mobile runtime parity is not run.
 - Advisor/Kongming/Wukong exact-head release review is not run for this slice.

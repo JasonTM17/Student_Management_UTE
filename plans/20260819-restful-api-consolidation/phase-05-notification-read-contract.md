@@ -88,6 +88,19 @@ material, but it is not proof for the monolith: it currently has separate
 application configuration and its list implementation must be checked for
 `isRead` and response-shape parity before any code is reused.
 
+Later focused PostgreSQL compatibility evidence was observed against the
+disposable local cluster on `127.0.0.1:56439` with
+`currentSchema=notifications`:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.notification.NotificationReadPersistenceTest' '-DforkCount=0' test
+```
+
+Surefire summary: 6 tests / 0 failures / 0 errors / 0 skipped. This closes the
+H2-only syntax/type uncertainty for the selected notification read tests, but
+does not close the restored legacy dataset, read-only role, Node-versus-Java
+differential, route canary, rollback or public traffic handoff gates.
+
 ## Proposed implementation boundary
 
 1. Add a disabled-by-default property such as

@@ -73,5 +73,18 @@ hygiene, architecture, whitespace and source mutation scans passed. The source
 mutation grep returned no runtime academic schedule package matches, supporting
 the SELECT-only claim for this slice.
 
+Focused PostgreSQL compatibility evidence was later observed against the
+disposable local cluster on `127.0.0.1:56442` with a fresh database
+`campuscore_academic_schedule_56442` and `currentSchema=academic`:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicScheduleReadPersistenceTest' '-DforkCount=0' test
+```
+
+Surefire summary: 3 tests / 0 failures / 0 errors / 0 skipped. This proves the
+selected academic schedule read tests run against real PostgreSQL syntax/types,
+but it is not a restored legacy academic dataset, route canary, rollback
+observation or public traffic handoff.
+
 PostgreSQL restore parity, runtime smoke, route canary, schedule write parity,
 rollback and independent final review remain open.

@@ -85,9 +85,19 @@ RabbitMQ event publisher, and rollback target.
 - Static engagement scan found no runtime JDBC mutation/DDL statement and no
   optional-null SQL pattern.
 
-This evidence is H2/Spring source evidence only. PostgreSQL differential reads,
-route canary, live runtime smoke, writer handoff, rollback, and independent
-exact-head review remain `NOT_RUN`.
+This evidence started as H2/Spring source evidence only. Later focused
+PostgreSQL compatibility evidence was observed against the disposable local
+cluster on `127.0.0.1:56440` with `currentSchema=engagement`:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest' '-DforkCount=0' test
+```
+
+Surefire summary for this phase's support-ticket class:
+4 tests / 0 failures / 0 errors / 0 skipped. This proves the selected
+support-ticket read tests run against real PostgreSQL syntax/types, but it is
+not the Phase 11 private differential, restored read-only corpus, route canary,
+rollback observation or public traffic handoff.
 
 ## Remaining gates
 
