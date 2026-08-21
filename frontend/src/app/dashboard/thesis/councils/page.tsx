@@ -8,7 +8,7 @@ import {
   Plus,
   UserCog,
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -25,6 +25,10 @@ import {
 
 export default function ThesisCouncilsPage() {
   const { isLecturer, isAdmin } = useAuth();
+  const { isLoading: authLoading, hasAccess } = useRequireAuth([
+    'LECTURER',
+    'ADMIN',
+  ]);
   const { formatDateTime, messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
@@ -121,7 +125,7 @@ export default function ThesisCouncilsPage() {
     }
   };
 
-  if (isLoading) {
+  if (authLoading || !hasAccess || isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
