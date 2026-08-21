@@ -943,12 +943,16 @@ async function waitForResponse(
 ) {
   const timeoutMs = options.timeoutMs ?? 120_000;
   const intervalMs = options.intervalMs ?? 1_000;
+  const requestTimeoutMs = options.requestTimeoutMs ?? Math.min(15_000, timeoutMs);
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
 
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: { Connection: 'close' },
+        signal: AbortSignal.timeout(requestTimeoutMs)
+      });
 
       if (predicate(null, response)) {
         return;
@@ -1057,4 +1061,13 @@ function delay(ms) {
   return new Promise((resolve) => setTimeout(resolve, ms));
 }
 
-await main();
+const keepAlive = setInterval(() => {}, 1_000);
+
+main()
+  .catch((error) => {
+    console.error(error);
+    process.exitCode = 1;
+  })
+  .finally(() => {
+    clearInterval(keepAlive);
+  });
