@@ -734,3 +734,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Limitation: this is a focused PostgreSQL parity rehearsal for the auth login
   session slice, not a public auth route handoff, canary, rollback or mobile
   runtime proof.
+
+## Analytics PostgreSQL focused rehearsal refresh — 2026-08-21
+
+- Current exact head: `2a56a2dd85c218ed7e355ac57c23a196b91d5127`
+  (`docs(plan): record auth postgres rehearsal`), with the analytics refresh
+  aligned to the post-auth docs-only branch tip.
+- Disposable target reused: `.tmp/pg-phase53/cluster` on `127.0.0.1:56471`,
+  database `postgres`, `currentSchema=public`, user `postgres`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary:
+  `17 tests / 0 failures / 0 errors / 0 skipped`.
+- Behavior covered: overview, finance summary, revenue, attendance, lecturer,
+  enrollment trends, operator summary, cockpit, section occupancy,
+  registration pressure, top courses, student statistics, grade distribution
+  and notification summary on real PostgreSQL syntax/types.
+- Limitation: focused PostgreSQL parity only; no restored legacy dataset,
+  route canary, rollback or public traffic handoff proof.

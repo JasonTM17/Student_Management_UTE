@@ -102,3 +102,19 @@ handoff.
 
 PostgreSQL restore parity, runtime smoke, route canary, full analytics parity,
 rollback and independent final review remain open.
+
+## Exact-head refresh — 2026-08-21
+
+The same analytics read suite was refreshed on the current exact head
+`2a56a2dd85c218ed7e355ac57c23a196b91d5127` against the reusable disposable
+cluster on `127.0.0.1:56471` with `currentSchema=public`:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest' '-DforkCount=0' test
+```
+
+Surefire summary: `17 tests / 0 failures / 0 errors / 0 skipped`.
+
+This refresh keeps the analytics focused PostgreSQL evidence aligned with the
+current branch head, but it still does not prove restored legacy parity, route
+canary, rollback or public handoff.
