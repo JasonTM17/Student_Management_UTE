@@ -317,7 +317,7 @@ public class AnalyticsReadService {
     }
 
     private static String normalizeOptional(String value) {
-        return value == null || value.isBlank() ? null : value;
+        return value == null || value.isEmpty() ? null : value;
     }
 
     private static String requireProfileId(String name, String value) {
