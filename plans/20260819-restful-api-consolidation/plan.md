@@ -484,6 +484,18 @@ the retirement gates pass.
   Schedule writes, lecturer timetable shortcuts, PostgreSQL read parity, live
   timetable wiring, canary routing, rollback and public academic route handoff
   remain open.
+- Phase 48 backend-first academic waitlist read foundation: source/H2
+  verified candidate/HOLD; see `phase-48-academic-waitlist-read.md`. It adds
+  feature-default-off Java `GET /api/v1/waitlist`,
+  `GET /api/v1/waitlist/my`, `GET /api/v1/waitlist/section/{sectionId}` and
+  `GET /api/v1/waitlist/{id}` reads against the migrated legacy `academic`
+  schema, preserving the selected list envelope, current-student active
+  waitlist scope, section active filter, position/added-at ordering, role
+  boundaries and migration-safety default-off boundary. Focused tests and the
+  full Java reactor passed on H2 with 23 reports / 156 tests / 0 failures /
+  0 errors / 0 skipped. Waitlist promotion, waitlist removal, enroll/drop
+  mutations, PostgreSQL read parity, live registration route wiring, canary
+  routing, rollback and public academic route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
