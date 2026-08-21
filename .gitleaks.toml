@@ -7,4 +7,8 @@ useDefault = true
 description = "Ignore AgentKit skill reference documentation examples"
 paths = [
   '''^\.agents/skills/''',
+  '''^\.claude/skills/''',
+  '''^\.codex/skills/''',
+  '''^\.cursor/skills/''',
+  '''^engineer/skills/''',
 ]
