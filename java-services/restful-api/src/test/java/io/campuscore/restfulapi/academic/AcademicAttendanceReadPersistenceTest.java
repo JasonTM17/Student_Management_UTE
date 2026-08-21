@@ -5,7 +5,9 @@ import static org.springframework.test.web.servlet.request.MockMvcRequestBuilder
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.ZoneOffset;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -98,7 +100,7 @@ class AcademicAttendanceReadPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(4))
-                .andExpect(jsonPath("$.data[0].date").value("2026-08-21T07:00:00.000Z"));
+                .andExpect(jsonPath("$.data[0].date").value("2026-08-21T00:00:00.000Z"));
     }
 
     @Test
@@ -333,6 +335,10 @@ class AcademicAttendanceReadPersistenceTest {
                 "INSERT INTO \"academic\".\"Attendance\""
                         + " (\"id\", \"studentId\", \"sectionId\", \"date\", \"status\", \"notes\", \"createdAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?)",
-                id, studentId, sectionId, date, status, notes, BASE_TIME);
+                id, studentId, sectionId, utcTimestamp(date), status, notes, utcTimestamp(BASE_TIME));
+    }
+
+    private static Timestamp utcTimestamp(Instant instant) {
+        return Timestamp.valueOf(instant.atOffset(ZoneOffset.UTC).toLocalDateTime());
     }
 }
