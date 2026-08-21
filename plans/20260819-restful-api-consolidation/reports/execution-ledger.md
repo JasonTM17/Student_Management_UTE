@@ -652,3 +652,32 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Gate conclusion: backend foundation remains `HOLD` because the fresh
   review still lacks a route-switch/cutover-quality exact-head pass that would
   unlock client staging; FE Stitch remains deferred until that gate moves.
+
+## Finance envelope differential rehearsal — 2026-08-21
+
+- Exact head during the run: `b567a02f8c152b909470c96ea638a129c4f23c1c`.
+- Harness syntax/self-test:
+  `node --check scripts/run-finance-differential-rehearsal.mjs` and
+  `node scripts/run-finance-differential-rehearsal.mjs --self-test`
+  both `PASS`.
+- Live restored-PostgreSQL rehearsal against disposable snapshot
+  `campuscore_finance_read_20260821_182354` on `127.0.0.1:56460`:
+  `node scripts/run-finance-differential-rehearsal.mjs`
+  returned `PASS_WITH_LIMITATIONS`.
+- Comparable live checks: 10/10 PASS; the only limitation is the restored
+  legacy `GET /api/v1/finance/payments?status=COMPLETED` route, which returns
+  500 because the Prisma `finance.PaymentStatus` enum is absent from this
+  varchar-only snapshot.
+- Route rollback observation stayed stable:
+  legacy-before → java-candidate → legacy-after hash
+  `0dd68b6caccdf8ae4246e84bb169dfc7fd0029cbd71dec8ada3da8916f58d53d`.
+- Focused Java gate:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.finance.FinanceReadPersistenceTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
+  PASS.
+- Full reactor gate:
+  `mvn -q -f java-services/pom.xml test`
+  PASS; canonical RESTful API Surefire summary 26 reports / 177 tests / 0
+  failures / 0 errors / 1 skipped.
+- Next safe resume point: keep moving backend parity slices only after the
+  limitation is addressed or explicitly accepted; do not claim FE/runtime or
+  production cutover readiness yet.
