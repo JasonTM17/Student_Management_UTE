@@ -3,29 +3,26 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this docs update:
-  `main` / `feature/java-thesis-platform` at
-  `dc56651447372188695cc64f652c496a9aad4c49`
-  (`docs(plan): record current-head checkpoint and runtime blocker`), with
-  `origin/main` still behind and the branch pair now sharing the same exact
-  docs-only checkpoint.
-- Repo state before this docs update: tracked tree is clean; the user-owned
-  untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
-- Source gates refreshed on this exact head: `npm test --prefix frontend`
-  29/29, `npm run typecheck --prefix frontend`, `npm run lint --prefix
-  frontend`, `npm test --prefix mobile` 6/6, and
-  `mvn -q -f java-services/pom.xml test` 26 reports / 177 tests / 0 failures /
-  0 errors / 1 skipped.
-- Runtime browser gate assessment: Docker daemon is unreachable
-  (`dockerDesktopLinuxEngine` pipe missing) and `kubectl` has no current
-  context, so exact-source browser/Playwright visual capture remains blocked
-  until a local edge/runtime is restored.
-- Branch integration ruling: continue using `main` as the integration branch
-  for this turn; do not fast-forward or push any other branch unless the user
-  explicitly changes the target.
-- Disk snapshot before this docs update: C: ~13.64 GiB free, D: ~35.31 GiB
-  free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56452`
-  and `56453` were stopped by exact data directory; no broad deletion was run.
+- Current remote integration snapshot:
+  `origin/feature/java-thesis-platform` at
+  `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`
+  (`docs(plan): record academic context hardening`), with source hardening in
+  `97a9b7e12d70aeb6a55959ea66b593515ede778f`.
+- Backend worktree used for this checkpoint:
+  `C:\Users\Admin\.codex\worktrees\b516\Student_Management`, branch
+  `fix/academic-context-security`, clean at `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`.
+- Main workspace `D:\Student_Management` remains intentionally untouched for
+  integration because it is behind the remote by two commits and contains
+  preserved user-owned dirty FE/edge artifacts. Do not reset, clean, rebase or
+  stage those files without a fresh exact-scope decision.
+- Current backend gate evidence on the hardening source: focused Phase 55
+  Maven gate PASS with 54 tests / 0 failures / 0 errors / 0 skipped,
+  `git diff --check` PASS, and scoped high-confidence secret scan PASS.
+- Full Java reactor after the Phase 55 hardening follow-up is `NOT_RUN` because
+  C: free space is low. Treat earlier full reactor runs as historical evidence
+  only, not as proof of this exact docs/head checkpoint.
+- Disk snapshot after the push: C: ~2.63 GiB free, D: ~34.51 GiB free. No
+  manual Codex/IDE/user-data cleanup was performed.
 
 ## Completed evidence carried forward
 
@@ -34,10 +31,10 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Current step after this docs update: keep the refreshed exact-head source
-  checkpoint, preserve the runtime blocker evidence, and keep the active plan
-  intact until a local edge/runtime is available again. Route ownership,
-  writer ownership, FE traffic and production cutover remain on HOLD.
+- Current step after the Phase 55 hardening checkpoint: continue with the next
+  bounded backend parity/rehearsal slice from `origin/feature/java-thesis-platform`
+  while keeping public route ownership, writer ownership, FE traffic and
+  production cutover on HOLD.
 
 ## Phase 48 evidence
 

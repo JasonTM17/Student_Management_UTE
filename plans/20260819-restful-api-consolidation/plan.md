@@ -575,12 +575,14 @@ the retirement gates pass.
   target, but enrollment create/drop/update/delete ownership, CSV export
   parity, restored PostgreSQL read parity, live route wiring, canary routing,
   rollback and public academic route handoff remain open.
-- Phase 55 academic internal-context bridge: complete at
-  `d92ce53e884adcd83b5dd479aebeb584d9a83946`; see
+- Phase 55 academic internal-context bridge: original source complete at
+  `d92ce53e884adcd83b5dd479aebeb584d9a83946`, with security hardening follow-up
+  at `97a9b7e12d70aeb6a55959ea66b593515ede778f`; see
   `phase-55-academic-internal-context-bridge.md`. It adds internal-only
   academic context lookups for curricula, departments and student enrollments
-  behind `X-Service-Token`, keeps the public academic route surface unchanged
-  and does not move public route ownership or Java cutover.
+  behind `X-Service-Token` and a configured `INTERNAL_SERVICE_TOKEN`, keeps the
+  public academic route surface unchanged and does not move public route
+  ownership or Java cutover.
 - Phase 56 academic enrollment PostgreSQL parity rehearsal: source/parity
   verified at `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`; see
   `phase-56-academic-enrollment-postgres-parity.md`. It exercises the existing
