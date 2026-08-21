@@ -194,12 +194,19 @@ async function waitForResponse(
 ) {
   const timeoutMs = options.timeoutMs ?? 180_000;
   const intervalMs = options.intervalMs ?? 2_000;
+  const requestTimeoutMs = options.requestTimeoutMs ?? Math.min(15_000, timeoutMs);
   const deadline = Date.now() + timeoutMs;
   let lastError = null;
 
   while (Date.now() < deadline) {
     try {
-      const response = await fetch(url);
+      const response = await fetch(url, {
+        headers: {
+          Connection: 'close',
+          ...(options.headers ?? {}),
+        },
+        signal: AbortSignal.timeout(requestTimeoutMs),
+      });
       const payload = options.parseJson === false ? null : await response.json();
 
       if (predicate(payload, response)) {
@@ -220,7 +227,10 @@ async function waitForResponse(
 }
 
 async function getJson(url) {
-  const response = await fetch(url);
+  const response = await fetch(url, {
+    headers: { Connection: 'close' },
+    signal: AbortSignal.timeout(15_000),
+  });
   if (!response.ok) {
     throw new Error(`Failed to fetch ${url}: ${response.status}`);
   }
@@ -304,6 +314,7 @@ async function getInternalReadiness(serviceName, port) {
     `
       fetch('http://127.0.0.1:${port}/api/v1/health/readiness', {
         headers: { 'X-Health-Key': ${JSON.stringify(readinessKey)} },
+        signal: AbortSignal.timeout(15_000),
       })
         .then(async (response) => {
           const body = await response.text();

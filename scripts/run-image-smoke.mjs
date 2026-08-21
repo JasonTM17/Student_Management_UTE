@@ -566,6 +566,7 @@ async function getInternalReadiness(serviceName, port) {
       `
         fetch('http://127.0.0.1:${port}/api/v1/health/readiness', {
           headers: { 'X-Health-Key': ${JSON.stringify(readinessKey)} },
+          signal: AbortSignal.timeout(15_000),
         })
           .then(async (response) => {
             const body = await response.text();
