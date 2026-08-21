@@ -1,5 +1,22 @@
 # Architecture review gate — one RESTful API direction
 
+## Current exact-head refresh — `dc56651447372188695cc64f652c496a9aad4c49`
+
+- Branch: `feature/java-thesis-platform`
+- Review mode: read-only, current-state refresh
+- Scope: whether the backend foundation is ready to unlock staged FE Stitch work
+- Status: `HOLD`
+
+| Reviewer | Verdict | Meaning |
+| --- | --- | --- |
+| Advisor | `HOLD` | Fresh exact-head read confirms backend foundation still lacks rollback/cutover-quality proof. |
+| Kongming | `HOLD` | Fresh read-only review says backend foundation still lacks exact-head rollback/cutover-quality proof. |
+| Wukong | `NOT_FALSIFIED` | No concrete counterexample overturns the HOLD; fresh review still lacks route-switch/cutover proof. |
+
+The current exact head stays behind the backend foundation gate. This refresh
+records the exact-head evidence boundary so later client staging can compare
+against a non-stale snapshot.
+
 ## Review ledger snapshot
 
 - Reviewed exact head: `7f389f2deaaba53ad5f7368b9136f48cab41685a`

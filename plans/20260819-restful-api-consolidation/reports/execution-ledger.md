@@ -4,10 +4,11 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Current execution state
 
 - Current branch snapshot before this docs update:
-  `main` at `3e1bfbbae19fedab6229e18200ed0389c147f613`
-  (`fix(frontend): refresh sharp security baseline`), with `origin/main`
-  matching and `feature/java-thesis-platform` still carrying the separate
-  docs-only phase-54 update.
+  `main` / `feature/java-thesis-platform` at
+  `dc56651447372188695cc64f652c496a9aad4c49`
+  (`docs(plan): record current-head checkpoint and runtime blocker`), with
+  `origin/main` still behind and the branch pair now sharing the same exact
+  docs-only checkpoint.
 - Repo state before this docs update: tracked tree is clean; the user-owned
   untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
 - Source gates refreshed on this exact head: `npm test --prefix frontend`
@@ -33,7 +34,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Current step after this docs update: record the refreshed exact-head source
+- Current step after this docs update: keep the refreshed exact-head source
   checkpoint, preserve the runtime blocker evidence, and keep the active plan
   intact until a local edge/runtime is available again. Route ownership,
   writer ownership, FE traffic and production cutover remain on HOLD.

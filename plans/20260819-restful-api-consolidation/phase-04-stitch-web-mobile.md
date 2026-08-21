@@ -5,8 +5,10 @@
 **Deferred / HOLD by backend-first sequencing.** The web P0 layout repairs and
 native mobile scaffold are preserved, but no further Stitch web/mobile
 implementation will be performed until the backend foundation gate in
-`plan.md` passes. No fresh browser capture, Expo typecheck with installed
-dependencies, emulator, or device run has been observed.
+`plan.md` passes. Current backend exact-head evidence remains HOLD at
+`dc56651447372188695cc64f652c496a9aad4c49`, so this phase stays staged only.
+No fresh browser capture, Expo typecheck with installed dependencies,
+emulator, or device run has been observed.
 
 ## Outcome and success signal
 
@@ -130,6 +132,23 @@ evidence.
    missing from the prior matrix and both locales.
 7. Obtain exact-head Advisor/Kongming/Wukong review after the final client and
    backend commits; stale pre-commit reviews do not count.
+
+## Staged FE execution order after backend readiness
+
+When the backend foundation gate turns green on a fresh exact head, execute the
+client wave in this order:
+
+1. refresh the web route matrix and the browser capture harness against the
+   same exact head as the backend review;
+2. rerun `npm test`, `npm run typecheck`, `npm run lint`, and `git diff --check`
+   for the web tree;
+3. install mobile dependencies in a bounded environment, then run the mobile
+   source checks and dependency-aware typecheck;
+4. provision the Expo/emulator/device smoke for the agreed student, thesis,
+   notification, assistant, lecturer, and admin flows;
+5. only after the above pass, wire the clients to the one-API target and
+   refresh the exact-head Advisor/Kongming/Wukong review for the client cutover
+   snapshot.
 
 ## Acceptance and exact verification
 
