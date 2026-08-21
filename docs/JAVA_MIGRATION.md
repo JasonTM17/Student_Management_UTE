@@ -61,8 +61,8 @@ remain required while the old services are still canonical.
 The `java-services/restful-api` monolith now contains disabled-by-default
 candidates for thesis, notification, engagement announcement,
 engagement support-ticket, academic catalog, people student/lecturer profile,
-finance, analytics, academic enrollment, academic schedule, academic waitlist
-and academic attendance boundaries. Read candidates use JDBC against legacy
+finance, analytics, academic enrollment, academic schedule, academic waitlist,
+academic attendance, and academic section boundaries. Read candidates use JDBC against legacy
 schemas under the `persistence` profile and do not add DDL, write data or own
 public traffic. The notification read slice covers
 current-user list/unread-count plus admin list/detail reads, preserving the
@@ -119,9 +119,13 @@ selected legacy shapes. The academic attendance slice covers feature-default-off
 attendance list/detail, current-student list and summary, lecturer-owned list,
 section list and section summary reads with the selected legacy date filters,
 role/claim boundaries and attendance-rate formulas, while attendance
-mark/update/delete, enroll/drop, waitlist promotion/removal, grade
-editing/publishing, schedule writes, lecturer timetable shortcuts, CSV export
-and other writes still remain owned by the legacy academic service. The
+mark/update/delete. The academic section slice covers feature-default-off
+section list/detail, lecturer timetable shortcut, lecturer grading summary and
+section grade read rows with nested course, department, semester, lecturer,
+classroom and schedule hydration, while section create/update/delete,
+enroll/drop, waitlist promotion/removal, grade editing/publishing, schedule
+writes, CSV export and other writes still remain owned by the legacy academic
+service. The
 support-ticket read slice covers
 current-user and admin list/detail reads with response hydration. The
 support-ticket create slice adds
