@@ -575,7 +575,7 @@ the retirement gates pass.
   behind `X-Service-Token`, keeps the public academic route surface unchanged
   and does not move public route ownership or Java cutover.
 - Phase 56 academic enrollment PostgreSQL parity rehearsal: source/parity
-  verified at `683829a661f517c7469a4ee7cc85a22aeaeb2a08`; see
+  verified at `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`; see
   `phase-56-academic-enrollment-postgres-parity.md`. It exercises the existing
   academic enrollment/grade read foundation against a disposable PostgreSQL
   target on the exact HEAD carrying the academic internal-context bridge and

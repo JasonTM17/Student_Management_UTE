@@ -7,8 +7,8 @@ real disposable PostgreSQL rehearsal on the exact current Java monolith HEAD.
 
 ## Exact source checkpoint
 
-- Source commit: `683829a661f517c7469a4ee7cc85a22aeaeb2a08`
-- Parent baseline: `8bedb8b9a8f2b4c9e6ce0f6f2fa0d2b3dfb1f9d3`
+- Source commit: `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`
+- Parent baseline: `683829a661f517c7469a4ee7cc85a22aeaeb2a08`
 - Branch: `feature/java-thesis-platform`
 
 ## Rehearsed scope
@@ -31,6 +31,9 @@ the exact HEAD already carrying the academic internal-context bridge.
 - Surefire summary from
   `java-services/restful-api/target/surefire-reports/TEST-io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest.xml`:
   8 tests / 0 failures / 0 errors / 0 skipped
+
+- Exact-head rerun PASS on the docs-only branch tip:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest' '-DforkCount=0' test`
 
 ## Open gates
 
