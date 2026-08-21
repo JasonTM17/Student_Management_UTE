@@ -207,12 +207,14 @@ the retirement gates pass.
   PostgreSQL parity, route canary, rollback and frontend convergence remain
   open.
 - Phase 15 backend-first finance read foundation:
-  source candidate/HOLD; see `phase-15-finance-read-foundation.md`. It adds
+  source/PostgreSQL-syntax verified candidate/HOLD; see
+  `phase-15-finance-read-foundation.md`. It adds
   feature-default-off Java invoice and payment read paths against the migrated
   legacy `finance` schema, preserving admin list/detail envelopes, student
   self-invoice isolation, invoice item/payment hydration and payment invoice
-  joins. Finance writes, checkout/payment provider orchestration, exports,
-  PostgreSQL parity, route canary, rollback and frontend convergence remain
+  joins. Phase 58 repaired the nullable optional filters for PostgreSQL syntax.
+  Finance writes, checkout/payment provider orchestration, exports, restored
+  legacy-data parity, route canary, rollback and frontend convergence remain
   open.
 - Phase 16 backend-first analytics read foundation:
   source candidate/HOLD; see `phase-16-analytics-read-foundation.md`. It adds
@@ -586,6 +588,12 @@ the retirement gates pass.
   status filter so the existing read-only people slice works on PostgreSQL when
   the optional `status` filter is absent, without adding routes, writes or
   route ownership.
+- Phase 58 finance read PostgreSQL parity repair: source repair committed at
+  `3327f8318bc9aa775a4e48185b8f74b54ab3215a`; see
+  `phase-58-finance-postgres-parity-repair.md`. It fixes finance invoice and
+  payment optional-filter reads so the existing feature-default-off read slice
+  works on PostgreSQL when filters are absent, without adding routes, writes,
+  checkout ownership or public traffic handoff.
 
 ## Backend foundation gate before Stitch implementation
 

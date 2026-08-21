@@ -90,3 +90,11 @@ finance read repository; runtime smoke, route canary, event/payment
 reconciliation, rollback and independent final review remain open until the
 final verification pass records them. The repaired finance file is intentionally
 left dirty for now per user instruction and is not staged or committed yet.
+
+## Superseded update
+
+Phase 58 supersedes the dirty-file note above: the PostgreSQL optional-filter
+repair is now committed at `3327f8318bc9aa775a4e48185b8f74b54ab3215a`, and the
+current full Java reactor gate passes for the canonical RESTful API module. See
+`phase-58-finance-postgres-parity-repair.md` for exact commands and remaining
+holds.
