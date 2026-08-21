@@ -605,6 +605,13 @@ the retirement gates pass.
   on the Node status-filter route, so it is still not restored legacy-data
   parity, route canary, rollback, checkout ownership or public traffic handoff
   evidence.
+- Phase 60 finance edge route-switch rollback rehearsal: source/live-proxy
+  candidate/HOLD; see `phase-60-finance-edge-route-switch-rollback.md`. It
+  runs the finance read corpus through a local proxy that switches legacy →
+  Java → legacy under one stable client URL, using the same disposable
+  PostgreSQL restore and the same documented restored-legacy payment-status
+  limitation. This adds proxy rollback evidence, but it still does not grant
+  public finance route ownership, checkout ownership, or FE/mobile wiring.
 
 ## Backend foundation gate before Stitch implementation
 
