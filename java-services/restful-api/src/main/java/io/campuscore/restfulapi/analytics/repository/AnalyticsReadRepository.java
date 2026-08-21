@@ -14,6 +14,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.WaitlistStatusBu
 import java.math.BigDecimal;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.LinkedHashMap;
@@ -28,10 +29,10 @@ import org.springframework.stereotype.Repository;
 /**
  * Read adapter for the analytics service's Prisma public schema.
  *
- * <p>This candidate intentionally issues SELECT statements only. Trends,
- * attendance, lecturer analytics, cockpit composition, observability metrics
- * and event consumers remain owned by the legacy analytics-service until a
- * separate parity/cutover gate proves them.</p>
+ * <p>This candidate intentionally issues SELECT statements only. Attendance,
+ * lecturer analytics, cockpit composition, observability metrics and event
+ * consumers remain owned by the legacy analytics-service until a separate
+ * parity/cutover gate proves them.</p>
  */
 @Repository
 @Profile("persistence")
@@ -157,6 +158,17 @@ public class AnalyticsReadRepository {
                         resultSet.getString("semesterNameVi"),
                         resultSet.getInt("academicYear"),
                         resultSet.getLong("enrollmentCount")));
+    }
+
+    public List<EnrollmentTrendActivity> enrollmentTrendActivities(Instant oldestBucket) {
+        return jdbc.query(
+                "SELECT \"enrolledAt\", \"status\""
+                        + " FROM " + table("\"Enrollment\"")
+                        + " WHERE \"enrolledAt\" >= :oldestBucket",
+                Map.of("oldestBucket", LocalDateTime.ofInstant(oldestBucket, ZoneOffset.UTC)),
+                (resultSet, ignored) -> new EnrollmentTrendActivity(
+                        instant(resultSet, "enrolledAt"),
+                        resultSet.getString("status")));
     }
 
     public List<SectionOccupancyBucket> sectionOccupancy() {
@@ -361,5 +373,8 @@ public class AnalyticsReadRepository {
     }
 
     private record GradeCount(String grade, long count) {
+    }
+
+    public record EnrollmentTrendActivity(Instant enrolledAt, String status) {
     }
 }

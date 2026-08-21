@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.time.YearMonth;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -96,6 +97,7 @@ class AnalyticsReadPersistenceTest {
                     "sectionId" VARCHAR(120),
                     "semesterId" VARCHAR(120),
                     "status" VARCHAR(40),
+                    "enrolledAt" TIMESTAMP,
                     "letterGrade" VARCHAR(10)
                 )
                 """);
@@ -337,6 +339,60 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void enrollmentTrendsPreservesLegacyMonthlyBucketsLabelsClampAndCounts() throws Exception {
+        YearMonth currentMonth = YearMonth.now(ZoneOffset.UTC);
+        YearMonth middleMonth = currentMonth.minusMonths(1);
+        YearMonth oldestMonth = currentMonth.minusMonths(2);
+        YearMonth outsideWindow = currentMonth.minusMonths(3);
+
+        insertEnrollmentAt("enrollment-old-confirmed", "CONFIRMED", firstDay(outsideWindow));
+        insertEnrollmentAt("enrollment-oldest-confirmed", "CONFIRMED", firstDay(oldestMonth).plusSeconds(60));
+        insertEnrollmentAt("enrollment-oldest-completed", "COMPLETED", firstDay(oldestMonth).plusSeconds(120));
+        insertEnrollmentAt("enrollment-middle-dropped", "DROPPED", firstDay(middleMonth).plusSeconds(60));
+        insertEnrollmentAt("enrollment-middle-cancelled", "CANCELLED", firstDay(middleMonth).plusSeconds(120));
+        insertEnrollmentAt("enrollment-current-confirmed", "CONFIRMED", firstDay(currentMonth).plusSeconds(60));
+        insertEnrollmentAt("enrollment-current-pending", "PENDING", firstDay(currentMonth).plusSeconds(120));
+        insertEnrollmentAt("enrollment-current-completed", "COMPLETED", firstDay(currentMonth).plusSeconds(180));
+        insertEnrollmentAt("enrollment-current-dropped", "DROPPED", firstDay(currentMonth).plusSeconds(240));
+
+        mvc.perform(get("/api/v1/analytics/enrollment-trends")
+                        .queryParam("months", "3.8")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                .andExpect(jsonPath("$[0].month").value(monthKey(oldestMonth)))
+                .andExpect(jsonPath("$[0].year").value(oldestMonth.getYear()))
+                .andExpect(jsonPath("$[0].monthNumber").value(oldestMonth.getMonthValue()))
+                .andExpect(jsonPath("$[0].startDate").value(firstDay(oldestMonth).toString()))
+                .andExpect(jsonPath("$[0].endDate").value(lastMillisecond(oldestMonth).toString()))
+                .andExpect(jsonPath("$[0].labelEn").value(labelEn(oldestMonth)))
+                .andExpect(jsonPath("$[0].labelVi").value(labelVi(oldestMonth)))
+                .andExpect(jsonPath("$[0].enrolled").value(1))
+                .andExpect(jsonPath("$[0].dropped").value(0))
+                .andExpect(jsonPath("$[0].completed").value(1))
+                .andExpect(jsonPath("$[0].net").value(2))
+                .andExpect(jsonPath("$[0].totalActivity").value(2))
+                .andExpect(jsonPath("$[1].month").value(monthKey(middleMonth)))
+                .andExpect(jsonPath("$[1].enrolled").value(0))
+                .andExpect(jsonPath("$[1].dropped").value(1))
+                .andExpect(jsonPath("$[1].completed").value(0))
+                .andExpect(jsonPath("$[1].net").value(-1))
+                .andExpect(jsonPath("$[1].totalActivity").value(1))
+                .andExpect(jsonPath("$[2].month").value(monthKey(currentMonth)))
+                .andExpect(jsonPath("$[2].enrolled").value(2))
+                .andExpect(jsonPath("$[2].dropped").value(1))
+                .andExpect(jsonPath("$[2].completed").value(1))
+                .andExpect(jsonPath("$[2].net").value(2))
+                .andExpect(jsonPath("$[2].totalActivity").value(4));
+
+        mvc.perform(get("/api/v1/analytics/enrollment-trends")
+                        .queryParam("months", "abc")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(12));
+    }
+
+    @Test
     void topCoursesPreservesLegacySortLimitAndConfirmedPendingCounts() throws Exception {
         insertAcademicYear("academic-year-2026", 2026);
         insertSemester(
@@ -524,6 +580,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/enrollment-trends").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/top-courses").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -560,6 +620,13 @@ class AnalyticsReadPersistenceTest {
 
         mvc.perform(get("/api/v1/analytics/registration-pressure")
                         .queryParam("semesterId", "semester-1")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/enrollment-trends")
+                        .queryParam("months", "3")
+                        .queryParam("months", "4")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
@@ -703,33 +770,52 @@ class AnalyticsReadPersistenceTest {
     private void insertEnrollment(String id, String status, String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
                 id,
                 null,
                 null,
                 status,
+                localDateTime(BASE_TIME),
                 letterGrade);
     }
 
     private void insertEnrollmentInSemester(String id, String semesterId, String status) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
                 id,
                 null,
                 semesterId,
                 status,
+                localDateTime(BASE_TIME),
                 null);
     }
 
     private void insertEnrollmentInSection(String id, String semesterId, String sectionId, String status) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
-                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"letterGrade\") VALUES (?, ?, ?, ?, ?)",
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
                 id,
                 sectionId,
                 semesterId,
                 status,
+                localDateTime(BASE_TIME),
+                null);
+    }
+
+    private void insertEnrollmentAt(String id, String status, Instant enrolledAt) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Enrollment\""
+                        + " (\"id\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"letterGrade\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                null,
+                null,
+                status,
+                localDateTime(enrolledAt),
                 null);
     }
 
@@ -797,5 +883,28 @@ class AnalyticsReadPersistenceTest {
 
     private static LocalDateTime localDateTime(Instant value) {
         return LocalDateTime.ofInstant(value, ZoneOffset.UTC);
+    }
+
+    private static Instant firstDay(YearMonth month) {
+        return month.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+    }
+
+    private static Instant lastMillisecond(YearMonth month) {
+        return firstDay(month.plusMonths(1)).minusMillis(1);
+    }
+
+    private static String monthKey(YearMonth month) {
+        return "%d-%02d".formatted(month.getYear(), month.getMonthValue());
+    }
+
+    private static String labelEn(YearMonth month) {
+        return month.getMonth().name().substring(0, 1)
+                + month.getMonth().name().substring(1, 3).toLowerCase()
+                + " "
+                + month.getYear();
+    }
+
+    private static String labelVi(YearMonth month) {
+        return "tháng " + month.getMonthValue() + " năm " + month.getYear();
     }
 }

@@ -1,7 +1,9 @@
 package io.campuscore.restfulapi.analytics.service;
 
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
+import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository.EnrollmentTrendActivity;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
@@ -17,6 +19,11 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentStatistic
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.WaitlistStatusBucket;
 import java.math.BigDecimal;
+import java.time.Clock;
+import java.time.Instant;
+import java.time.YearMonth;
+import java.time.ZoneOffset;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
@@ -30,6 +37,8 @@ import org.springframework.transaction.annotation.Transactional;
 @ConditionalOnProperty(prefix = "migration.analytics-read", name = "enabled", havingValue = "true")
 public class AnalyticsReadService {
 
+    private static final int DEFAULT_TREND_MONTHS = 12;
+    private static final int MAX_TREND_MONTHS = 24;
     private static final int NEAR_CAPACITY_THRESHOLD = 80;
 
     private static final List<String> LETTER_GRADES = List.of(
@@ -47,9 +56,11 @@ public class AnalyticsReadService {
             "F");
 
     private final AnalyticsReadRepository analytics;
+    private final Clock clock;
 
     public AnalyticsReadService(AnalyticsReadRepository analytics) {
         this.analytics = analytics;
+        this.clock = Clock.systemUTC();
     }
 
     @Transactional(readOnly = true)
@@ -109,6 +120,42 @@ public class AnalyticsReadService {
     @Transactional(readOnly = true)
     public List<EnrollmentBySemesterBucket> enrollmentsBySemester() {
         return analytics.enrollmentsBySemester();
+    }
+
+    @Transactional(readOnly = true)
+    public List<EnrollmentTrendBucket> enrollmentTrends(int months) {
+        int bucketCount = Math.min(Math.max(months, 1), MAX_TREND_MONTHS);
+        YearMonth currentBucket = YearMonth.now(clock);
+        YearMonth oldestBucket = currentBucket.minusMonths(bucketCount - 1L);
+        Instant oldestInstant = oldestBucket.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+
+        Map<String, MutableTrendBucket> buckets = new LinkedHashMap<>();
+        for (int index = 0; index < bucketCount; index++) {
+            YearMonth bucket = oldestBucket.plusMonths(index);
+            buckets.put(monthKey(bucket), MutableTrendBucket.from(bucket));
+        }
+
+        for (EnrollmentTrendActivity activity : analytics.enrollmentTrendActivities(oldestInstant)) {
+            if (activity.enrolledAt() == null) {
+                continue;
+            }
+            YearMonth bucket = YearMonth.from(activity.enrolledAt().atZone(ZoneOffset.UTC));
+            MutableTrendBucket trendBucket = buckets.get(monthKey(bucket));
+            if (trendBucket == null) {
+                continue;
+            }
+            if ("CONFIRMED".equals(activity.status()) || "PENDING".equals(activity.status())) {
+                trendBucket.enrolled++;
+            } else if ("DROPPED".equals(activity.status())) {
+                trendBucket.dropped++;
+            } else if ("COMPLETED".equals(activity.status())) {
+                trendBucket.completed++;
+            }
+        }
+
+        return buckets.values().stream()
+                .map(MutableTrendBucket::toResponse)
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -194,5 +241,85 @@ public class AnalyticsReadService {
     private static GradeDistributionBucket bucket(String grade, long count, long total) {
         int percentage = total > 0 ? (int) Math.round((count / (double) total) * 100) : 0;
         return new GradeDistributionBucket(grade, count, percentage);
+    }
+
+    private static String monthKey(YearMonth bucket) {
+        return "%d-%02d".formatted(bucket.getYear(), bucket.getMonthValue());
+    }
+
+    private static String labelEn(YearMonth bucket) {
+        return bucket.getMonth().name().substring(0, 1)
+                + bucket.getMonth().name().substring(1, 3).toLowerCase()
+                + " "
+                + bucket.getYear();
+    }
+
+    private static String labelVi(YearMonth bucket) {
+        return "tháng " + bucket.getMonthValue() + " năm " + bucket.getYear();
+    }
+
+    private static final class MutableTrendBucket {
+        private final String month;
+        private final int year;
+        private final int monthNumber;
+        private final Instant startDate;
+        private final Instant endDate;
+        private final String labelEn;
+        private final String labelVi;
+        private long enrolled;
+        private long dropped;
+        private long completed;
+
+        private MutableTrendBucket(
+                String month,
+                int year,
+                int monthNumber,
+                Instant startDate,
+                Instant endDate,
+                String labelEn,
+                String labelVi) {
+            this.month = month;
+            this.year = year;
+            this.monthNumber = monthNumber;
+            this.startDate = startDate;
+            this.endDate = endDate;
+            this.labelEn = labelEn;
+            this.labelVi = labelVi;
+        }
+
+        private static MutableTrendBucket from(YearMonth bucket) {
+            Instant startDate = bucket.atDay(1).atStartOfDay().toInstant(ZoneOffset.UTC);
+            Instant endDate = bucket.plusMonths(1)
+                    .atDay(1)
+                    .atStartOfDay()
+                    .toInstant(ZoneOffset.UTC)
+                    .minusMillis(1);
+            return new MutableTrendBucket(
+                    monthKey(bucket),
+                    bucket.getYear(),
+                    bucket.getMonthValue(),
+                    startDate,
+                    endDate,
+                    labelEn(bucket),
+                    labelVi(bucket));
+        }
+
+        private EnrollmentTrendBucket toResponse() {
+            long net = enrolled + completed - dropped;
+            long totalActivity = enrolled + completed + dropped;
+            return new EnrollmentTrendBucket(
+                    month,
+                    year,
+                    monthNumber,
+                    startDate,
+                    endDate,
+                    labelEn,
+                    labelVi,
+                    enrolled,
+                    dropped,
+                    completed,
+                    net,
+                    totalActivity);
+        }
     }
 }
