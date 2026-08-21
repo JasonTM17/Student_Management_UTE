@@ -249,6 +249,25 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   decide whether the monolith should preserve the legacy thesis error envelope
   or record this as an intentional contract change before any cutover.
 
+## Phase 54 academic admin student enrollment read — 2026-08-21
+
+- Source commit:
+  `99c9c1d6e5dbb2a22169ddd684dcd22cfb7d23fe`
+  (`feat(java): add admin student enrollment reads`).
+- Implemented feature-default-off Java
+  `GET /api/v1/enrollments/student/{studentId}` under the existing
+  `migration.academic-enrollment-read.enabled` gate.
+- Preserved the selected legacy admin/super-admin role boundary, the list
+  response shape already used by student self-enrollment reads, optional
+  `semesterId` filtering, `enrolledAt DESC` ordering, default-off route absence
+  and negative student-role/unexpected-query behavior.
+- Focused gate PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`.
+- Production controller SQL-write grep PASS and touched-file `git diff --check`
+  PASS with only Git Windows LF-to-CRLF working-copy warnings.
+- Limitation: H2/source evidence only until full canonical monolith rerun,
+  PostgreSQL read parity, route canary and rollback rehearsal are observed.
+
 ## Deferred findings
 
 - PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
