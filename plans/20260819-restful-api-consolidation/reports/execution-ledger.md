@@ -147,8 +147,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Backend foundation thesis FK rehearsal — 2026-08-21
 
-- Local head: `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`
-  (`fix(java): seed thesis topic before FK rehearsal`).
+- Local head: `2c8cb4a7ee21ab78729f006ee18292c6efea96ed`
+  (`test(java): add thesis restore read-only smoke`).
 - Disposable target reused: `.tmp/pg-phase53/cluster` on `127.0.0.1:56433`,
   with `currentSchema=thesis` and the exact `postgres` role.
 - Verified:
@@ -157,6 +157,29 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   thesis topic/group/council read contract.
 - Limitation: this is a live PostgreSQL rehearsal for the thesis persistence
   slice, not the final route-canary/rollback gate.
+
+## Backend foundation thesis restore smoke — 2026-08-21
+
+- Local head: `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`
+  (`fix(java): seed thesis topic before FK rehearsal`).
+- Disposable snapshot artifacts:
+  - backup: `D:\Student_Management-recovery\pg-thesis-20260821\thesis-schema.dump`
+  - checksum: `SHA256 5D7CF84815D85A9CAC7130426D5FFC87D215121EEE53943A24E7E4CD84B9FEB3`
+  - restored database: `campuscore_ro` on `127.0.0.1:55432`
+- Read-only role audit:
+  - role: `campuscore_ro_reader`
+  - `current_setting('default_transaction_read_only') = on`
+  - `statement_timeout = 5s`
+  - write attempt `INSERT INTO thesis.thesis_topic ...` failed with
+    `cannot execute INSERT in a read-only transaction`
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.thesis.ThesisReadOnlyRestoreSmokeTest' '-DforkCount=0' test`
+  with `THESIS_RESTORE_SMOKE=true`, `THESIS_READ_ENABLED=true`,
+  `FLYWAY_ENABLED=false`, valid JWT secrets, and the restored PostgreSQL
+  target. The smoke read `/api/v1/thesis/topics`, `/api/v1/thesis/groups` and
+  `/api/v1/thesis/councils` successfully against the restored snapshot.
+- Limitation: this proves the disposable restore/read-only smoke for the thesis
+  candidate, not the legacy-versus-Java differential or rollback rehearsal.
 
 ## Deferred findings
 
