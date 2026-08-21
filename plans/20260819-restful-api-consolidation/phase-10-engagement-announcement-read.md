@@ -78,6 +78,19 @@ route owner, canonical writer, RabbitMQ event publisher, and rollback target.
   existing Windows LF-to-CRLF normalization warning, not whitespace errors.
 - This evidence is H2/Spring source evidence only. No shared CampusCore database
   or running engagement container was queried or changed.
+- Later focused PostgreSQL compatibility evidence was observed against the
+  disposable local cluster on `127.0.0.1:56440` with
+  `currentSchema=engagement`:
+
+  ```powershell
+  mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.engagement.AnnouncementReadPersistenceTest,io.campuscore.restfulapi.engagement.SupportTicketReadPersistenceTest' '-DforkCount=0' test
+  ```
+
+  Surefire summary for this phase's announcement class:
+  6 tests / 0 failures / 0 errors / 0 skipped. This proves the selected
+  announcement read tests run against real PostgreSQL syntax/types, but it is
+  not the Phase 11 private differential, restored read-only corpus, route
+  canary, rollback observation or public traffic handoff.
 
 ## Adversarial review remediation
 

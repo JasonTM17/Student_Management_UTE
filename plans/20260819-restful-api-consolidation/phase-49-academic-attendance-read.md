@@ -69,8 +69,10 @@ code. Test fixtures may write to H2.
 ## Observed evidence
 
 - `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicAttendanceReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test` — PASS on 2026-08-21 after one fixture/oracle repair for H2 timestamp serialization and student self-scope fixture data.
-- `mvn -q -f java-services/pom.xml test` — PASS on 2026-08-21.
-- Surefire summary after full Java reactor: 24 reports / 162 tests / 0 failures / 0 errors / 0 skipped.
+- Later PostgreSQL-focused rehearsal against a disposable local cluster on `127.0.0.1:56446` with fresh database `campuscore_academic_attendance_56446` and `currentSchema=academic`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicAttendanceReadPersistenceTest' '-DforkCount=0' test` — PASS after the fixture repair; 4 tests / 0 failures / 0 errors / 0 skipped.
+- `mvn -q -f java-services/pom.xml clean test` — PASS on 2026-08-21 after the attendance fixture repair.
+- Surefire summary after full Java reactor: 26 reports / 177 tests / 0 failures / 0 errors / 1 skipped.
 - Production attendance candidate SQL-write grep — PASS, no matches.
 - `git diff --check` — PASS; only Git line-ending warnings for existing Java files.
 - Source commit: `e61dbd3 feat(java): add academic attendance reads`, pushed to
@@ -78,7 +80,7 @@ code. Test fixtures may write to H2.
 
 ## HOLD gates
 
-- PostgreSQL read parity is not run.
+- PostgreSQL focused read compatibility is observed for the selected attendance tests, but restored legacy dataset parity is not run.
 - Gateway canary and rollback are not run.
 - Authenticated FE/mobile runtime parity is not run.
 - Advisor/Kongming/Wukong exact-head release review is not run for this slice.

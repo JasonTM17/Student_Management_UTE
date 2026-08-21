@@ -85,6 +85,8 @@ inside the JVM with native allocation errors. Crash/replay artifacts from those
 attempts were removed from the repository root after verification. No source
 assertion failure was observed in this finance slice.
 
-PostgreSQL restore parity, runtime smoke, route canary, event/payment
+PostgreSQL restore parity was verified in the working-tree repair on the
+finance read repository; runtime smoke, route canary, event/payment
 reconciliation, rollback and independent final review remain open until the
-final verification pass records them.
+final verification pass records them. The repaired finance file is intentionally
+left dirty for now per user instruction and is not staged or committed yet.

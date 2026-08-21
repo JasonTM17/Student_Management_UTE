@@ -88,5 +88,17 @@ Root reactor remains subject to the current Windows native-memory/pagefile
 capacity limitation observed in Phase 15; do not claim a root-reactor pass until
 it is actually observed.
 
+Focused PostgreSQL compatibility rehearsal was later observed against the
+disposable local cluster on `127.0.0.1:56438` with `currentSchema=public`:
+
+```powershell
+mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.analytics.AnalyticsReadPersistenceTest' '-DforkCount=0' test
+```
+
+Surefire summary: 17 tests / 0 failures / 0 errors / 0 skipped. This proves the
+selected analytics read tests run against real PostgreSQL syntax/types, not a
+restored legacy dataset, route canary, rollback observation or public traffic
+handoff.
+
 PostgreSQL restore parity, runtime smoke, route canary, full analytics parity,
 rollback and independent final review remain open.
