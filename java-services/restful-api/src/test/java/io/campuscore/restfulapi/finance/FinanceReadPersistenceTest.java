@@ -180,6 +180,13 @@ class FinanceReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].invoice.invoiceNumber").value("INV-PAID"))
                 .andExpect(jsonPath("$.meta.total").value(1));
 
+        mvc.perform(get("/api/v1/finance/payments")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("payment-new"))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
         mvc.perform(get("/api/v1/finance/payments/payment-new")
                         .with(adminJwt()))
                 .andExpect(status().isOk())
