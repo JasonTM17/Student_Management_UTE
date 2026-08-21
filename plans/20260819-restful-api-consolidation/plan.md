@@ -475,6 +475,15 @@ the retirement gates pass.
   grade counts, bilingual course/semester section buckets and occupancy
   formula. PostgreSQL read parity, live lecturer route wiring, canary routing,
   rollback and public analytics route handoff remain open.
+- Phase 47 backend-first academic schedule read foundation: source
+  candidate/HOLD; see `phase-47-academic-schedule-read.md`. It adds
+  feature-default-off Java `GET /api/v1/schedules` and
+  `GET /api/v1/schedules/{id}` reads against the migrated legacy `academic`
+  schema, preserving the selected list envelope, day/start ordering, direct
+  section/classroom hydration and migration-safety default-off boundary.
+  Schedule writes, lecturer timetable shortcuts, PostgreSQL read parity, live
+  timetable wiring, canary routing, rollback and public academic route handoff
+  remain open.
 
 ## Backend foundation gate before Stitch implementation
 
