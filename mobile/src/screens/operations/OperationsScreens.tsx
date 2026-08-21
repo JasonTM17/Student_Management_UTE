@@ -243,6 +243,7 @@ const styles = StyleSheet.create({
   scheduleHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   topicCopy: { flex: 1, paddingRight: tokens.spacing.sm },
   gradingHero: { padding: tokens.spacing.lg },
+  courseHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   secondaryButton: { marginTop: tokens.spacing.sm },
   attendanceSummary: { padding: tokens.spacing.md },
 });
