@@ -48,6 +48,8 @@ migration:
     enabled: ${ENGAGEMENT_WRITE_ENABLED:false}
   academic-read:
     enabled: ${ACADEMIC_READ_ENABLED:false}
+  academic-context:
+    enabled: ${ACADEMIC_CONTEXT_ENABLED:false}
   academic-enrollment-read:
     enabled: ${ACADEMIC_ENROLLMENT_READ_ENABLED:false}
   academic-schedule-read:
@@ -68,6 +70,9 @@ migration:
     enabled: ${THESIS_ASSISTANT_ENABLED:false}
   auth-login:
     enabled: ${AUTH_LOGIN_ENABLED:false}
+
+internal:
+  service-token: ${INTERNAL_SERVICE_TOKEN:}
 
 management:
   endpoints:

@@ -120,6 +120,11 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("HTTP_403"));
 
         mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments")
+                        .header("X-Service-Token", "wrong-token"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
+        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments")
                         .header("X-Service-Token", SERVICE_TOKEN))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(2))
