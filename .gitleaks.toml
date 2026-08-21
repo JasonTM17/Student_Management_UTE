@@ -1,0 +1,10 @@
+title = "Student Management Gitleaks configuration"
+
+[extend]
+useDefault = true
+
+[[allowlists]]
+description = "Ignore AgentKit skill reference documentation examples"
+paths = [
+  '''^\.agents/skills/''',
+]
