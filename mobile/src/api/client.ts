@@ -250,11 +250,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       return body as TResponse;
     },
 
-    get<TResponse>(path, init) {
+    get<TResponse>(path: string, init: RequestInit = {}) {
       return client.request<TResponse>(path, { ...init, method: 'GET' });
     },
 
-    post<TResponse>(path, body, init) {
+    post<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'POST',
@@ -262,7 +262,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    put<TResponse>(path, body, init) {
+    put<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PUT',
@@ -270,7 +270,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    patch<TResponse>(path, body, init) {
+    patch<TResponse>(path: string, body: unknown = undefined, init: RequestInit = {}) {
       return client.request<TResponse>(path, {
         ...init,
         method: 'PATCH',
@@ -278,7 +278,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       });
     },
 
-    delete<TResponse>(path, init) {
+    delete<TResponse>(path: string, init: RequestInit = {}) {
       return client.request<TResponse>(path, { ...init, method: 'DELETE' });
     },
   };
