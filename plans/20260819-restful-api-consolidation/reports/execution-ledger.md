@@ -3,9 +3,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`, aligned with `origin/feature/java-thesis-platform` after the academic enrollment PostgreSQL parity rehearsal docs on 2026-08-21.
+- Current branch snapshot before this docs update: `feature/java-thesis-platform` at source repair commit `feb6213e20fb14c67f2345007ed9485c0571777d`, one local commit ahead of `origin/feature/java-thesis-platform`.
 - Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
-- Disk snapshot before implementation: C: ~16.55 GiB free, D: ~36.88 GiB free.
+- Disk snapshot before implementation: C: ~16.30 GiB free, D: ~36.74 GiB free.
 
 ## Completed evidence carried forward
 
@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 56 academic enrollment PostgreSQL parity rehearsal exact-head rerun is complete at `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`; docs/ledger update and push are next.
-- Exit criterion: Phase 56 report, plan ledger, execution ledger and migration doc name the exact source commit, gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
+- Phase 57 people read PostgreSQL parity repair is source-committed at `feb6213e20fb14c67f2345007ed9485c0571777d`; docs/ledger update, exact-head verification and push are next.
+- Exit criterion: Phase 57 report, plan ledger and execution ledger name the exact source repair, H2/PostgreSQL gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
 
 ## Phase 48 evidence
 
@@ -255,6 +255,38 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   read foundation but does not on its own clear the broader backend foundation
   gate, route canary, rollback observation or independent review.
 
+## Phase 57 evidence
+
+- Source repair commit:
+  `feb6213e20fb14c67f2345007ed9485c0571777d` (`fix(java): support people
+  postgres status reads`).
+- Confirmed root cause: PostgreSQL rejected the previous nullable optional
+  student-status predicate when `status` was absent, producing a
+  `BadSqlGrammarException` and 500 for `GET /api/v1/students`. H2 did not
+  expose this incompatibility.
+- Repaired `PeopleReadRepository` so the `status` `WHERE` clause is emitted
+  only when a filter value exists. The repair keeps the people read API,
+  response shape, feature flag, route ownership and writer boundaries unchanged.
+- H2 focused regression PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.people.PeopleReadPersistenceTest' '-DforkCount=0' test`
+- PostgreSQL focused rehearsal PASS against the disposable PostgreSQL 18.4
+  target on `127.0.0.1:56434` with `currentSchema=people`:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.people.PeopleReadPersistenceTest' '-DforkCount=0' test`
+- Surefire summary from
+  `java-services/restful-api/target/surefire-reports/TEST-io.campuscore.restfulapi.people.PeopleReadPersistenceTest.xml`:
+  3 tests / 0 failures / 0 errors / 0 skipped.
+- Disposable cluster note: the older `56433` listener stopped answering
+  `pg_isready`; it was stopped through `pg_ctl` against the exact
+  `.tmp/pg-phase53/cluster` data directory, restarted on `127.0.0.1:56434`,
+  used for the people read rehearsal, then stopped again.
+- Production SQL-write grep PASS for the repaired people repository.
+- Staged secret marker scan PASS for the repaired people repository.
+- `git diff --check` PASS on the repaired repository with only Git Windows
+  LF-to-CRLF working-copy warnings.
+- Open HOLD boundaries: public people route ownership, people writer
+  ownership, restore parity, route canary, rollback observation, independent
+  exact-head review and FE/mobile live wiring remain open.
+
 ## Thesis differential harness checkpoint — 2026-08-21
 
 - Source snapshot before this checkpoint:
@@ -317,16 +349,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Deferred findings
 
 - PostgreSQL restore parity, route canary, rollback rehearsal, live FE authenticated parity, mobile runtime parity, and Stitch live visual audit remain open gates before any cutover or production-ready claim.
+- Deferred PostgreSQL parity risk: `FinanceReadRepository` still uses nullable
+  optional filters of the `(:param IS NULL OR ...)` shape and should be
+  repaired or explicitly rehearsed before a finance PostgreSQL parity claim.
 
 ## Next resume point
 
-- Resume when an approved disposable PostgreSQL target, scrubbed backup/fixture
-  and rehearsal authority are supplied; then run the Phase 09/11-style
-  read-only differential and rollback rehearsal at a fresh exact HEAD. Until
-  that capability exists, do not point FE traffic or public routes at Java. FE
-  web/mobile remains a required later phase with Stitch, responsive, auth/runtime
-  and functional proof. Preserve untracked `.agents/`, `.codex/` and `.tmp/`
-  unless the user explicitly authorizes a safe cleanup target.
+- Next safe backend slice: either continue PostgreSQL parity hardening for
+  another existing read candidate, or repair/rehearse the known finance
+  nullable-filter risk before claiming finance PostgreSQL parity. Until
+  backend foundation/canary/rollback/review gates pass, do not point FE traffic
+  or public routes at Java. FE web/mobile remains a required later phase with
+  Stitch, responsive, auth/runtime and functional proof. Preserve untracked
+  `.agents/`, `.codex/` and `.tmp/` unless the user explicitly authorizes a
+  safe cleanup target.
 
 ## Thesis differential repair and rehearsal — 2026-08-21
 
