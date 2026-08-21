@@ -363,6 +363,7 @@ export const en = {
     managementConsoleDescription:
       'Jump straight into the workspace that needs attention. Each area keeps the same admin shell, confirmation flow, and route grammar.',
     menuItems: [
+      ['Thesis management', 'Create registration rounds, manage lifecycle, and monitor councils.'],
       ['User management', 'Review campus accounts, statuses, and role assignments.'],
       ['Lecturers', 'Manage lecturer records and academic ownership data.'],
       ['Courses', 'Maintain catalog structure, codes, and course metadata.'],
@@ -1446,6 +1447,7 @@ export const vi: I18nMessages = {
     managementConsoleDescription:
       'Đi thẳng vào khu cần xử lý. Mỗi khu vẫn dùng cùng admin shell, confirmation flow và route grammar.',
     menuItems: [
+      ['Quản lý luận văn', 'Tạo đợt đăng ký, quản lý vòng đời và theo dõi hội đồng.'],
       ['Quản lý người dùng', 'Xem tài khoản campus, trạng thái và phân quyền.'],
       ['Giảng viên', 'Quản lý hồ sơ giảng viên và dữ liệu sở hữu học vụ.'],
       ['Môn học', 'Duy trì danh mục, mã môn và metadata môn học.'],
