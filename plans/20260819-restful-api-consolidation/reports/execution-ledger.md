@@ -160,8 +160,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Backend foundation thesis restore smoke — 2026-08-21
 
-- Local head: `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`
-  (`fix(java): seed thesis topic before FK rehearsal`).
+- Local source head: `fcfe324151bba30879bdc3893a0b19a207218be3`
+  (`test(java): add thesis restore read-only smoke`).
 - Disposable snapshot artifacts:
   - backup: `D:\Student_Management-recovery\pg-thesis-20260821\thesis-schema.dump`
   - checksum: `SHA256 5D7CF84815D85A9CAC7130426D5FFC87D215121EEE53943A24E7E4CD84B9FEB3`
@@ -180,6 +180,22 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   `/api/v1/thesis/councils` successfully against the restored snapshot.
 - Limitation: this proves the disposable restore/read-only smoke for the thesis
   candidate, not the legacy-versus-Java differential or rollback rehearsal.
+
+## Backend foundation exact-head review attempt — 2026-08-21
+
+- Reviewed source snapshot: `fcfe324151bba30879bdc3893a0b19a207218be3`
+  (`test(java): add thesis restore read-only smoke`).
+- Advisor verdict: `insufficient`. The restore smoke is useful evidence, but it
+  does not satisfy the backend foundation gate because the Phase 09/11-style
+  legacy-versus-Java differential, route rollback rehearsal and full fresh
+  review gate are still open.
+- Kongming verdict: `NOT_RUN`; the bounded sidecar timed out before returning a
+  verdict.
+- Wukong verdict: `NOT_RUN`; the sidecar failed before review because the
+  runtime could not refresh/connect to its model/transport endpoint.
+- Ruling: FE Stitch implementation remains gated off by the backend foundation
+  criteria. Continue with the smallest read-only differential/rollback slice
+  rather than expanding public route ownership or client traffic.
 
 ## Deferred findings
 
