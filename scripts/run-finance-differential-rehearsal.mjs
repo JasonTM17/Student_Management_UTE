@@ -157,14 +157,16 @@ const corpus = [
 ];
 
 const selfTest = process.argv.includes('--self-test');
+const edgeRouteSwitch = process.argv.includes('--edge-route-switch');
 
 if (selfTest) {
   await withSelfTestServers(async ({ legacyBaseUrl, javaBaseUrl }) => {
-    await runDifferential({
+    await executeRehearsal({
       legacyBaseUrl,
       javaBaseUrl,
       adminToken: 'self-test-admin',
       studentToken: 'self-test-student',
+      edgeRouteSwitch,
     });
   });
 } else {
@@ -185,15 +187,45 @@ if (selfTest) {
     studentId: 'student-1',
   });
 
-  await runDifferential({
+  await executeRehearsal({
+    legacyBaseUrl,
+    javaBaseUrl,
+    adminToken,
+    studentToken,
+    edgeRouteSwitch,
+  });
+}
+
+async function executeRehearsal({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken, edgeRouteSwitch }) {
+  if (edgeRouteSwitch) {
+    await runEdgeRouteSwitch({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken });
+    return;
+  }
+
+  await runDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken });
+}
+
+async function runDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken }) {
+  const { report, failures } = await evaluateDifferential({
     legacyBaseUrl,
     javaBaseUrl,
     adminToken,
     studentToken,
   });
+
+  if (failures.length > 0) {
+    console.error(JSON.stringify({ result: 'FAIL', failures, report }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
+  console.log(JSON.stringify({
+    result: report.limitations.length > 0 ? 'PASS_WITH_LIMITATIONS' : 'PASS',
+    report,
+  }, null, 2));
 }
 
-async function runDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken }) {
+async function evaluateDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken }) {
   const report = {
     generatedAt: new Date().toISOString(),
     corpus: corpus.map(({ name, method, path, auth, legacyRestoredSchemaLimitation }) => ({
@@ -212,12 +244,14 @@ async function runDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, student
     limitations: [],
   };
   const failures = [];
+  const baselines = new Map();
 
   for (const item of corpus) {
     const legacy = await requestJson(legacyBaseUrl, item, { adminToken, studentToken });
     const java = await requestJson(javaBaseUrl, item, { adminToken, studentToken });
     const comparison = compareResponses(item, legacy, java);
     report.comparisons.push(comparison);
+    baselines.set(item.name, { legacy, java });
     if (comparison.limitation) {
       report.limitations.push({
         name: item.name,
@@ -248,6 +282,95 @@ async function runDifferential({ legacyBaseUrl, javaBaseUrl, adminToken, student
   const finalLegacyHash = report.routeSequence[2].bodyHash;
   if (firstLegacyHash !== finalLegacyHash) {
     failures.push('legacy rollback sequence changed the legacy response hash');
+  }
+
+  return { report, failures, baselines };
+}
+
+async function runEdgeRouteSwitch({ legacyBaseUrl, javaBaseUrl, adminToken, studentToken }) {
+  const { report, failures, baselines } = await evaluateDifferential({
+    legacyBaseUrl,
+    javaBaseUrl,
+    adminToken,
+    studentToken,
+  });
+
+  if (failures.length > 0) {
+    console.error(JSON.stringify({ result: 'FAIL', failures, report }, null, 2));
+    process.exitCode = 1;
+    return;
+  }
+
+  await withRouteSwitchProxy({ legacyBaseUrl, javaBaseUrl }, async ({ proxyBaseUrl, setOwner }) => {
+    report.edgeProxy = redactUrl(proxyBaseUrl);
+    report.routeSwitchSequence = [];
+
+    const stages = [
+      { owner: 'legacy-before', upstream: 'legacy' },
+      { owner: 'java-candidate', upstream: 'java' },
+      { owner: 'legacy-after', upstream: 'legacy' },
+    ];
+
+    for (const stage of stages) {
+      setOwner(stage.upstream);
+      const stageResponses = [];
+
+      for (const item of corpus) {
+        const observed = await requestJson(
+          proxyBaseUrl,
+          item,
+          { adminToken, studentToken },
+        );
+        const expected = baselines.get(item.name)?.[stage.upstream];
+        if (!expected) {
+          failures.push(`missing baseline for ${item.name} during ${stage.owner}`);
+          continue;
+        }
+
+        const comparison = compareResponses(item, expected, observed);
+        if (comparison.limitation) {
+          report.limitations.push({
+            name: `${stage.owner}:${item.name}`,
+            limitation: comparison.limitation,
+          });
+        }
+        if (comparison.result !== 'PASS') {
+          failures.push(`${stage.owner}:${item.name}: ${comparison.reason}`);
+        }
+
+        stageResponses.push({
+          name: item.name,
+          status: observed.status,
+          contentType: observed.contentType,
+          bodyHash: stableRouteSwitchHash(item, observed),
+          upstreamOwner:
+            observed.headers['x-rehearsal-owner'] ??
+            observed.headers['x-route-switch-owner'] ??
+            stage.upstream,
+        });
+      }
+
+      report.routeSwitchSequence.push({
+        owner: stage.owner,
+        upstream: stage.upstream,
+        stageHash: hashStable(
+          stageResponses.map(({ name, status, contentType, bodyHash }) => ({
+            name,
+            status,
+            contentType,
+            bodyHash,
+          })),
+        ),
+        sampleOwner: stageResponses[0]?.upstreamOwner ?? stage.upstream,
+        sampleHash: stageResponses[0]?.bodyHash ?? null,
+      });
+    }
+  });
+
+  const firstStageHash = report.routeSwitchSequence[0]?.stageHash;
+  const finalStageHash = report.routeSwitchSequence[2]?.stageHash;
+  if (!firstStageHash || !finalStageHash || firstStageHash !== finalStageHash) {
+    failures.push('finance proxy rollback sequence changed the route-switch body hash');
   }
 
   if (failures.length > 0) {
@@ -396,6 +519,13 @@ function normalizeErrorResponse(response) {
     message,
     path: typeof body.path === 'string' ? body.path : '',
   };
+}
+
+function stableRouteSwitchHash(item, response) {
+  if (response.status >= 400) {
+    return hashStable(normalizeErrorResponse(response));
+  }
+  return hashStable(normalizeComparableBody(item, response));
 }
 
 function normalizeInvoiceListItem(item) {
@@ -571,6 +701,7 @@ function requestJson(baseUrl, item, tokens) {
       status: response.status,
       contentType: normalizeContentType(response.headers.get('content-type')),
       body: parseBody(text),
+      headers: Object.fromEntries(response.headers.entries()),
     };
   });
 }
@@ -664,6 +795,80 @@ async function withSelfTestServers(callback) {
   }
 }
 
+async function withRouteSwitchProxy({ legacyBaseUrl, javaBaseUrl }, callback) {
+  let currentOwner = 'legacy';
+  const proxy = http.createServer(async (request, response) => {
+    try {
+      const owner = currentOwner;
+      const targetBaseUrl = owner === 'java' ? javaBaseUrl : legacyBaseUrl;
+      const method = request.method ?? 'GET';
+      const targetUrl = new URL(request.url ?? '/', ensureTrailingSlash(targetBaseUrl));
+      const headers = { ...request.headers };
+      delete headers.host;
+      delete headers.connection;
+      delete headers['content-length'];
+
+      let body;
+      if (!['GET', 'HEAD'].includes(method.toUpperCase())) {
+        body = await readRequestBody(request);
+      }
+
+      const upstream = await fetch(
+        targetUrl,
+        body
+          ? {
+              method,
+              headers,
+              body,
+              duplex: 'half',
+              redirect: 'manual',
+            }
+          : {
+              method,
+              headers,
+              redirect: 'manual',
+            },
+      );
+
+      const outgoingHeaders = Object.fromEntries(upstream.headers.entries());
+      delete outgoingHeaders['transfer-encoding'];
+      delete outgoingHeaders['content-encoding'];
+      delete outgoingHeaders['content-length'];
+      for (const [name, value] of Object.entries(outgoingHeaders)) {
+        response.setHeader(name, value);
+      }
+      response.setHeader('x-rehearsal-owner', owner);
+      response.setHeader('x-route-switch-owner', owner);
+      response.statusCode = upstream.status;
+      response.end(Buffer.from(await upstream.arrayBuffer()));
+    } catch (error) {
+      response.statusCode = 502;
+      response.setHeader('content-type', 'application/json');
+      response.end(JSON.stringify({
+        code: 'PROXY_ERROR',
+        message: error instanceof Error ? error.message : String(error),
+        path: request.url ?? '/',
+      }));
+    }
+  });
+
+  try {
+    proxy.listen(0, '127.0.0.1');
+    await once(proxy, 'listening');
+    await callback({
+      proxyBaseUrl: `http://127.0.0.1:${proxy.address().port}`,
+      setOwner(owner) {
+        if (owner !== 'legacy' && owner !== 'java') {
+          throw new Error(`Unsupported route owner: ${owner}`);
+        }
+        currentOwner = owner;
+      },
+    });
+  } finally {
+    await closeServer(proxy);
+  }
+}
+
 function createSelfTestServer(label) {
   return http.createServer((request, response) => {
     const url = new URL(request.url, `http://${request.headers.host}`);
@@ -673,6 +878,14 @@ function createSelfTestServer(label) {
     response.statusCode = payload.status;
     response.end(JSON.stringify(payload.body));
   });
+}
+
+async function readRequestBody(request) {
+  const chunks = [];
+  for await (const chunk of request) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
 }
 
 function selfTestPayload(label, url) {
