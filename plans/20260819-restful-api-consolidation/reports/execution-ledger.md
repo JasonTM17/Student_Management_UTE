@@ -3,7 +3,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `10cffd8191d408bbb788d0b351d06dd5cc76a529`, exactly matching `origin/feature/java-thesis-platform` after the disposable PostgreSQL rehearsal evidence and prior docs records on 2026-08-21.
+- Current branch snapshot: `feature/java-thesis-platform` at `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`, ahead of `origin/feature/java-thesis-platform` by one commit after the thesis FK rehearsal fix and disposable PostgreSQL evidence on 2026-08-21.
 - Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
 - Disk snapshot before implementation: C: ~15.76 GiB free, D: ~38.92 GiB free.
 
@@ -144,6 +144,19 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Limitation: this proves a real PostgreSQL read rehearsal for the academic
   curricula candidate, but not the full legacy-to-Java differential or rollback
   rehearsal yet.
+
+## Backend foundation thesis FK rehearsal — 2026-08-21
+
+- Local head: `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`
+  (`fix(java): seed thesis topic before FK rehearsal`).
+- Disposable target reused: `.tmp/pg-phase53/cluster` on `127.0.0.1:56433`,
+  with `currentSchema=thesis` and the exact `postgres` role.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest' '-DforkCount=0' test`
+  on PostgreSQL 18.4, including Flyway creation of the thesis schema and the
+  thesis topic/group/council read contract.
+- Limitation: this is a live PostgreSQL rehearsal for the thesis persistence
+  slice, not the final route-canary/rollback gate.
 
 ## Deferred findings
 
