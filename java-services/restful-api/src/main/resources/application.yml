@@ -56,6 +56,8 @@ migration:
     enabled: ${ACADEMIC_WAITLIST_READ_ENABLED:false}
   academic-attendance-read:
     enabled: ${ACADEMIC_ATTENDANCE_READ_ENABLED:false}
+  academic-section-read:
+    enabled: ${ACADEMIC_SECTION_READ_ENABLED:false}
   people-read:
     enabled: ${PEOPLE_READ_ENABLED:false}
   finance-read:

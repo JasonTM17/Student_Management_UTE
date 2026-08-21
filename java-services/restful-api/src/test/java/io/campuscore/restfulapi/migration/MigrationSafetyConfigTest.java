@@ -83,4 +83,14 @@ class MigrationSafetyConfigTest {
 
         assertTrue(new ReadOnlyMigrationCandidateCondition().matches(context, null));
     }
+
+    @Test
+    void academicSectionReadCandidateAlsoActivatesMigrationSafetyCondition() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("migration.academic-section-read.enabled", "true");
+        ConditionContext context = mock(ConditionContext.class);
+        when(context.getEnvironment()).thenReturn(environment);
+
+        assertTrue(new ReadOnlyMigrationCandidateCondition().matches(context, null));
+    }
 }

@@ -99,7 +99,7 @@ public class AcademicAttendanceReadRepository {
             where.append(" AND a.\"sectionId\" = :sectionId");
         }
         if (date != null) {
-            parameters.addValue("date", date);
+            parameters.addValue("date", utcTimestamp(date));
             where.append(" AND a.\"date\" = :date");
         }
         return jdbc.query(attendanceSelect() + where
@@ -112,7 +112,7 @@ public class AcademicAttendanceReadRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource("sectionId", sectionId);
         String dateFilter = "";
         if (date != null) {
-            parameters.addValue("date", date);
+            parameters.addValue("date", utcTimestamp(date));
             dateFilter = " AND a.\"date\" = :date";
         }
         return jdbc.query(attendanceSelect()
@@ -152,7 +152,7 @@ public class AcademicAttendanceReadRepository {
         appendFilter(where, "a.\"sectionId\" = :sectionId", "sectionId", sectionId, parameters);
         appendFilter(where, "a.\"studentId\" = :studentId", "studentId", studentId, parameters);
         if (date != null) {
-            appendFilter(where, "a.\"date\" = :date", "date", date, parameters);
+            appendFilter(where, "a.\"date\" = :date", "date", utcTimestamp(date), parameters);
         }
         return where.toString();
     }
@@ -237,6 +237,10 @@ public class AcademicAttendanceReadRepository {
             return null;
         }
         return timestamp.toLocalDateTime().toInstant(ZoneOffset.UTC);
+    }
+
+    private static Timestamp utcTimestamp(Instant instant) {
+        return Timestamp.valueOf(instant.atOffset(ZoneOffset.UTC).toLocalDateTime());
     }
 
     public record AttendanceRow(

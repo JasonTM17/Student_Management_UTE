@@ -25,6 +25,8 @@ migration:
     enabled: false
   academic-attendance-read:
     enabled: false
+  academic-section-read:
+    enabled: false
   people-read:
     enabled: false
   finance-read:
