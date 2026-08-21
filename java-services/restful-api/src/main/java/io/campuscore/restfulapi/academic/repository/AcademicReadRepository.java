@@ -5,6 +5,8 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearRespon
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
@@ -82,6 +84,21 @@ public class AcademicReadRepository {
             d."isActive" AS department_is_active
             """;
 
+    private static final String CURRICULUM_COLUMNS = """
+            cur."id" AS curriculum_id, cur."name" AS curriculum_name,
+            cur."nameEn" AS curriculum_name_en, cur."nameVi" AS curriculum_name_vi,
+            cur."code" AS curriculum_code, cur."departmentId" AS curriculum_department_id,
+            cur."academicYearId" AS curriculum_academic_year_id,
+            cur."semesterId" AS curriculum_semester_id,
+            cur."totalCredits" AS curriculum_total_credits,
+            cur."description" AS curriculum_description,
+            cur."descriptionEn" AS curriculum_description_en,
+            cur."descriptionVi" AS curriculum_description_vi,
+            cur."isActive" AS curriculum_is_active,
+            cur."createdAt" AS curriculum_created_at,
+            cur."updatedAt" AS curriculum_updated_at
+            """;
+
     private static final RowMapper<SemesterResponse> SEMESTER_ROW_MAPPER =
             AcademicReadRepository::mapSemester;
     private static final RowMapper<FacultyResponse> FACULTY_ROW_MAPPER =
@@ -98,6 +115,10 @@ public class AcademicReadRepository {
             AcademicReadRepository::mapAcademicYear;
     private static final RowMapper<CourseResponse> COURSE_ROW_MAPPER =
             AcademicReadRepository::mapCourse;
+    private static final RowMapper<CurriculumResponse> CURRICULUM_ROW_MAPPER =
+            AcademicReadRepository::mapCurriculum;
+    private static final RowMapper<CurriculumCourseSummary> CURRICULUM_COURSE_ROW_MAPPER =
+            AcademicReadRepository::mapCurriculumCourse;
     private static final RowMapper<ClassroomResponse> CLASSROOM_ROW_MAPPER =
             AcademicReadRepository::mapClassroom;
     private static final RowMapper<ClassroomSectionSummary> CLASSROOM_SECTION_ROW_MAPPER =
@@ -307,6 +328,50 @@ public class AcademicReadRepository {
                 new MapSqlParameterSource("id", id),
                 COURSE_ROW_MAPPER);
         return matches.stream().findFirst();
+    }
+
+    public List<CurriculumResponse> findCurricula(long offset, int limit) {
+        return jdbc.query(
+                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_COLUMNS
+                        + " FROM \"academic\".\"Curriculum\" cur"
+                        + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = cur.\"departmentId\""
+                        + " ORDER BY cur.\"name\" ASC, cur.\"id\" ASC LIMIT :limit OFFSET :offset",
+                pageParameters(offset, limit),
+                CURRICULUM_ROW_MAPPER);
+    }
+
+    public long countCurricula() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Curriculum\"",
+                new MapSqlParameterSource(),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<CurriculumResponse> findCurriculumById(String id) {
+        List<CurriculumResponse> matches = jdbc.query(
+                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_COLUMNS
+                        + " FROM \"academic\".\"Curriculum\" cur"
+                        + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = cur.\"departmentId\""
+                        + " WHERE cur.\"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                CURRICULUM_ROW_MAPPER);
+        return matches.stream().findFirst();
+    }
+
+    public List<CurriculumCourseSummary> findCurriculumCoursesByCurriculumIds(List<String> curriculumIds) {
+        if (curriculumIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT cc.\"id\" AS cc_id, cc.\"curriculumId\" AS cc_curriculum_id,"
+                        + " cc.\"courseId\" AS cc_course_id, cc.\"year\" AS cc_year,"
+                        + " cc.\"semester\" AS cc_semester, cc.\"isMandatory\" AS cc_is_mandatory"
+                        + " FROM \"academic\".\"CurriculumCourse\" cc"
+                        + " WHERE cc.\"curriculumId\" IN (:curriculumIds)"
+                        + " ORDER BY cc.\"year\" ASC, cc.\"semester\" ASC, cc.\"courseId\" ASC, cc.\"id\" ASC",
+                new MapSqlParameterSource("curriculumIds", curriculumIds),
+                CURRICULUM_COURSE_ROW_MAPPER);
     }
 
     public List<ClassroomResponse> findClassrooms(long offset, int limit) {
@@ -549,6 +614,50 @@ public class AcademicReadRepository {
                 instant(resultSet.getTimestamp("createdAt")),
                 instant(resultSet.getTimestamp("updatedAt")),
                 department);
+    }
+
+    private static CurriculumResponse mapCurriculum(ResultSet resultSet, int ignored)
+            throws SQLException {
+        DepartmentSummary department = new DepartmentSummary(
+                resultSet.getString("department_id"),
+                resultSet.getString("department_name"),
+                resultSet.getString("department_name_en"),
+                resultSet.getString("department_name_vi"),
+                resultSet.getString("department_code"),
+                resultSet.getString("department_description"),
+                resultSet.getString("department_description_en"),
+                resultSet.getString("department_description_vi"),
+                resultSet.getString("department_faculty_id"),
+                resultSet.getBoolean("department_is_active"));
+        return new CurriculumResponse(
+                resultSet.getString("curriculum_id"),
+                resultSet.getString("curriculum_name"),
+                resultSet.getString("curriculum_name_en"),
+                resultSet.getString("curriculum_name_vi"),
+                resultSet.getString("curriculum_code"),
+                resultSet.getString("curriculum_department_id"),
+                resultSet.getString("curriculum_academic_year_id"),
+                resultSet.getString("curriculum_semester_id"),
+                resultSet.getInt("curriculum_total_credits"),
+                resultSet.getString("curriculum_description"),
+                resultSet.getString("curriculum_description_en"),
+                resultSet.getString("curriculum_description_vi"),
+                resultSet.getBoolean("curriculum_is_active"),
+                instant(resultSet.getTimestamp("curriculum_created_at")),
+                instant(resultSet.getTimestamp("curriculum_updated_at")),
+                department,
+                List.of());
+    }
+
+    private static CurriculumCourseSummary mapCurriculumCourse(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new CurriculumCourseSummary(
+                resultSet.getString("cc_id"),
+                resultSet.getString("cc_curriculum_id"),
+                resultSet.getString("cc_course_id"),
+                resultSet.getInt("cc_year"),
+                resultSet.getInt("cc_semester"),
+                resultSet.getBoolean("cc_is_mandatory"));
     }
 
     private static ClassroomResponse mapClassroom(ResultSet resultSet, int ignored)

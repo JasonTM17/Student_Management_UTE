@@ -44,6 +44,8 @@ class AcademicReadPersistenceTest {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Section\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Lecturer\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"CurriculumCourse\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Curriculum\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Course\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Department\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Faculty\"");
@@ -135,6 +137,35 @@ class AcademicReadPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE "academic"."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "name" VARCHAR(200) NOT NULL,
+                    "nameEn" VARCHAR(200),
+                    "nameVi" VARCHAR(200),
+                    "code" VARCHAR(40) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "academicYearId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120),
+                    "totalCredits" INTEGER NOT NULL,
+                    "description" VARCHAR(1000),
+                    "descriptionEn" VARCHAR(1000),
+                    "descriptionVi" VARCHAR(1000),
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00',
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT TIMESTAMP '2026-08-20 00:00:00'
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE "academic"."CurriculumCourse" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120) NOT NULL,
+                    "courseId" VARCHAR(120) NOT NULL,
+                    "year" INTEGER NOT NULL,
+                    "semester" INTEGER NOT NULL,
+                    "isMandatory" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE "academic"."Lecturer" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
@@ -178,6 +209,8 @@ class AcademicReadPersistenceTest {
                 """);
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Classroom\"");
+        jdbc.update("DELETE FROM \"academic\".\"CurriculumCourse\"");
+        jdbc.update("DELETE FROM \"academic\".\"Curriculum\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Semester\"");
@@ -396,6 +429,70 @@ class AcademicReadPersistenceTest {
     }
 
     @Test
+    void curriculaPreserveLegacyListEnvelopeDepartmentAndDetailCourses() throws Exception {
+        insertAcademicYear("ay-2026", 2026, true);
+        insertSemester("fall-2026", "Fall", null, null, "FALL", "ay-2026", "2026-09-01T00:00:00Z");
+        insertFaculty("faculty-cs", "Computer Science", null, null, "FCS", null, null, null);
+        insertDepartment(
+                "department-cs",
+                "Computer Science",
+                null,
+                null,
+                "CSE",
+                null,
+                null,
+                null,
+                "faculty-cs",
+                "Dr. CS");
+        insertDepartment(
+                "department-se",
+                "Software Engineering",
+                null,
+                null,
+                "SE",
+                null,
+                null,
+                null,
+                "faculty-cs",
+                "Dr. SE");
+        insertCourse("cs101", "CS101", "Intro", null, null, "department-cs", "fall-2026", 4);
+        insertCourse("se401", "SE401", "Web Development", null, null, "department-se", "fall-2026", 3);
+        insertCurriculum("curriculum-se", "Software Engineering 2025", null, null, "SE2025", "department-se", "ay-2026", null, 152);
+        insertCurriculum("curriculum-cs", "Computer Science 2026", null, null, "CS2026", "department-cs", "ay-2026", "fall-2026", 150);
+        insertCurriculumCourse("curriculum-course-2", "curriculum-cs", "se401", 2, 1, false);
+        insertCurriculumCourse("curriculum-course-1", "curriculum-cs", "cs101", 1, 1, true);
+
+        mvc.perform(get("/api/v1/curricula")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "1")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("curriculum-cs"))
+                .andExpect(jsonPath("$.data[0].nameEn").value("Computer Science 2026"))
+                .andExpect(jsonPath("$.data[0].nameVi").value("Chương trình Khoa học máy tính 2026"))
+                .andExpect(jsonPath("$.data[0].descriptionVi").value("Chương trình Khoa học máy tính cho khóa tuyển sinh 2026"))
+                .andExpect(jsonPath("$.data[0].department.code").value("CSE"))
+                .andExpect(jsonPath("$.data[0].department.nameVi").value("Khoa học máy tính"))
+                .andExpect(jsonPath("$.data[0].courses.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/curricula/curriculum-cs")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("curriculum-cs"))
+                .andExpect(jsonPath("$.semesterId").value("fall-2026"))
+                .andExpect(jsonPath("$.totalCredits").value(150))
+                .andExpect(jsonPath("$.courses.length()").value(2))
+                .andExpect(jsonPath("$.courses[0].id").value("curriculum-course-1"))
+                .andExpect(jsonPath("$.courses[0].courseId").value("cs101"))
+                .andExpect(jsonPath("$.courses[0].isMandatory").value(true))
+                .andExpect(jsonPath("$.courses[1].id").value("curriculum-course-2"))
+                .andExpect(jsonPath("$.courses[1].isMandatory").value(false));
+    }
+
+    @Test
     void classroomsPreserveLegacyListEnvelopeOrderingAndDetailSections() throws Exception {
         insertAcademicYear("ay-2026", 2026, true);
         insertSemester("fall-2026", "Fall", null, null, "FALL", "ay-2026", "2026-09-01T00:00:00Z");
@@ -478,6 +575,11 @@ class AcademicReadPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
 
+        mvc.perform(get("/api/v1/curricula/missing")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
         mvc.perform(get("/api/v1/classrooms")
                         .queryParam("building", "A")
                         .with(jwt().jwt(token -> token.subject("student-user"))))
@@ -486,7 +588,13 @@ class AcademicReadPersistenceTest {
 
         mvc.perform(get("/api/v1/faculties")
                         .queryParam("status", "ACTIVE")
-                        .with(adminJwt()))
+                .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/curricula")
+                        .queryParam("status", "ACTIVE")
+                        .with(jwt().jwt(token -> token.subject("student-user"))))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
@@ -651,6 +759,58 @@ class AcademicReadPersistenceTest {
                 true,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
+    }
+
+    private void insertCurriculum(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String departmentId,
+            String academicYearId,
+            String semesterId,
+            int totalCredits) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Curriculum\""
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"departmentId\","
+                        + " \"academicYearId\", \"semesterId\", \"totalCredits\", \"description\","
+                        + " \"descriptionEn\", \"descriptionVi\", \"isActive\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id,
+                name,
+                nameEn,
+                nameVi,
+                code,
+                departmentId,
+                academicYearId,
+                semesterId,
+                totalCredits,
+                "Description " + code,
+                null,
+                null,
+                true,
+                localDateTime(BASE_TIME),
+                localDateTime(BASE_TIME));
+    }
+
+    private void insertCurriculumCourse(
+            String id,
+            String curriculumId,
+            String courseId,
+            int year,
+            int semester,
+            boolean mandatory) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CurriculumCourse\""
+                        + " (\"id\", \"curriculumId\", \"courseId\", \"year\", \"semester\", \"isMandatory\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                curriculumId,
+                courseId,
+                year,
+                semester,
+                mandatory);
     }
 
     private void insertLecturer(String id, String userId, String departmentId, String employeeId, String title) {

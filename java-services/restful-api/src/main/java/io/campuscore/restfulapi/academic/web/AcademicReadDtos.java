@@ -218,6 +218,37 @@ public final class AcademicReadDtos {
             DepartmentSummary department) {
     }
 
+    public record CurriculumCourseSummary(
+            String id,
+            String curriculumId,
+            String courseId,
+            int year,
+            int semester,
+            boolean isMandatory) {
+    }
+
+    public record CurriculumResponse(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String departmentId,
+            String academicYearId,
+            String semesterId,
+            int totalCredits,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            boolean isActive,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            DepartmentSummary department,
+            List<CurriculumCourseSummary> courses) {
+    }
+
     public record ClassroomSectionSummary(
             String id,
             String sectionNumber,
@@ -260,6 +291,9 @@ public final class AcademicReadDtos {
     }
 
     public record CourseListResponse(List<CourseResponse> data, PageMeta meta) {
+    }
+
+    public record CurriculumListResponse(List<CurriculumResponse> data, PageMeta meta) {
     }
 
     public record ClassroomListResponse(List<ClassroomResponse> data, PageMeta meta) {
