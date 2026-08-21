@@ -3,9 +3,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` at `a3f6351ced2ffd5849ae29f6613635ffbddd51a6`, ahead of `origin/feature/java-thesis-platform` by one commit after the thesis FK rehearsal fix and disposable PostgreSQL evidence on 2026-08-21.
+- Current branch snapshot: `feature/java-thesis-platform` at `d92ce53e884adcd83b5dd479aebeb584d9a83946`, ahead of `origin/feature/java-thesis-platform` by two commits after the thesis differential repair baseline and the academic internal-context bridge on 2026-08-21.
 - Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
-- Disk snapshot before implementation: C: ~15.76 GiB free, D: ~38.92 GiB free.
+- Disk snapshot before implementation: C: ~16.55 GiB free, D: ~36.88 GiB free.
 
 ## Completed evidence carried forward
 
@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 53 checkpoint push completed: source/docs provenance, gates and open HOLD boundaries are recorded and the branch tip matches origin.
-- Exit criterion: Phase 53 report, plan ledger, execution ledger and migration doc name the exact source commit, gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
+- Phase 55 academic internal-context bridge code commit is complete at `d92ce53e884adcd83b5dd479aebeb584d9a83946`; docs/ledger update and push are next.
+- Exit criterion: Phase 55 report, plan ledger, execution ledger and migration doc name the exact source commit, gates, open HOLD boundaries and next safe action without claiming public route ownership or Java cutover.
 
 ## Phase 48 evidence
 
@@ -200,19 +200,44 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Current canonical Java monolith gate — 2026-08-21
 
 - Verified checkout before this ledger update:
-  `7e6dfdeab411470c5d8bc7bf2201610f7ca2837b`
-  (`docs(plan): record thesis restore review gate`).
+  `d92ce53e884adcd83b5dd479aebeb584d9a83946`
+  (`feat(java): add academic internal context reads`).
 - Canonical parent module check: `java-services/pom.xml` lists only
   `<module>restful-api</module>` for the modular-monolith reactor.
 - Verified:
   `mvn -q -f java-services/pom.xml clean test` exited 0.
 - Canonical Surefire summary from
-  `java-services/restful-api/target/surefire-reports`: 26 reports / 175 tests /
+  `java-services/restful-api/target/surefire-reports`: 26 reports / 177 tests /
   0 failures / 0 errors / 1 skipped. The skipped test is the opt-in
   `ThesisReadOnlyRestoreSmokeTest` when `THESIS_RESTORE_SMOKE` is not set.
 - Limitation: stale XML reports under legacy `auth-service` and
   `thesis-service` target directories are not part of the current parent
   reactor and are not counted as Java monolith evidence.
+
+## Phase 55 evidence
+
+- Implemented internal-only Java academic context reads for curricula,
+  departments and student enrollments under
+  `migration.academic-context.enabled=true`, with `X-Service-Token`
+  compatibility enforcement and the default internal token
+  `academic-internal-token-12345`.
+- Permitted `/api/v1/internal/**` at the Spring Security layer so the
+  controllers can own the 403 contract for missing or invalid internal tokens.
+- Pinned the thesis persistence test to H2 so it no longer drifts with external
+  datasource overrides during the monolith reactor.
+- Focused gate PASS:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicReadPersistenceTest,io.campuscore.restfulapi.academic.AcademicEnrollmentReadPersistenceTest,io.campuscore.restfulapi.thesis.ThesisTopicPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest' '-DforkCount=0' test`
+- Full canonical Java monolith gate PASS:
+  `mvn -q -f java-services/pom.xml clean test`
+- Production SQL-write grep PASS for the changed security and academic-context
+  production files.
+- High-confidence secret-marker scan PASS for the changed production and test
+  files.
+- `git diff --check` PASS with only Git Windows LF-to-CRLF working-copy
+  warnings on touched files.
+- Source commit complete locally:
+  `d92ce53e884adcd83b5dd479aebeb584d9a83946` (`feat(java): add academic
+  internal context reads`).
 
 ## Thesis differential harness checkpoint — 2026-08-21
 
@@ -317,3 +342,51 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   client parity, full domain differential coverage, canary, writer handoff,
   rollback observation, and fresh exact-head Advisor/Kongming/Wukong review
   remain open.
+
+## Exact-head independent review — commit 255a25a — 2026-08-21
+
+- Advisor: `ACCEPT_CHECKPOINT` only for the bounded private thesis-read
+  rehearsal; FE convergence, full backend convergence and route cutover remain
+  blocked. Advisor also flagged that the general ledger snapshot identity was
+  stale and needed correction.
+- Kongming: `PASS_CHECKPOINT`, with `SOURCE_PUSH: HOLD` and `CUTOVER: HOLD`.
+  The sequence in the harness is a base-URL probe, not an actual edge route
+  switch/abort/recovery rehearsal. The 8-case corpus and privilege summary are
+  narrower than the Phase 09 contract, and the deterministic self-test did not
+  exercise timestamp normalization.
+- Wukong: `FALSIFIED`, gate `REPAIR_THEN_RETEST`, high confidence/E3. Minimal
+  counterexample: `2026-02-30T00:00:00Z` passed the previous
+  `endsWith('Z') && !Number.isNaN(Date.parse(value))` predicate and was
+  normalized out of the comparable body. This violates the invariant that a
+  timestamp must be validated before normalization.
+- Immediate repair authorized inside this phase: replace the permissive parser
+  with strict UTC ISO/calendar validation; add deterministic positive,
+  impossible-date, and non-error-business-timestamp self-tests; rerun the
+  focused persistence test, harness self-test, live differential and a fresh
+  exact-head independent review. Full corpus/privilege audit and actual route
+  switch remain later gates.
+
+## Review-repair verification — 2026-08-21
+
+- Strict timestamp repair verified with `node --check` and
+  `node scripts/run-thesis-differential-rehearsal.mjs --self-test`: `PASS`.
+  The self-test covers different valid UTC timestamps, rejects the impossible
+  calendar date `2026-02-30T10:20:30Z`, and keeps non-error business timestamp
+  differences strict.
+- Focused `ThesisTopicPersistenceTest`: `PASS`, 12/12, 0 failures, 0 errors.
+  The run resolves H2 through `application-test.yml`; it is recorded as
+  H2/Spring regression evidence, not PostgreSQL proof.
+- Fresh live private differential against the restored PostgreSQL snapshot:
+  `PASS`, 8/8, with legacy → Java → legacy body hash unchanged at
+  `b24dc28a551161788e2502437643dfb8324b710ee0ad6c8b270e162c0c4e4194`.
+- The initial full privilege audit exposed `database_temp=true`. On the
+  disposable restore only, the `campuscore` database owner revoked
+  `TEMPORARY` from `PUBLIC`; the follow-up reader audit shows
+  `database_temp=false`, `default_transaction_read_only=on`, 5s statement and
+  1s lock timeouts, no superuser/CREATEDB/CREATEROLE, thesis `USAGE=true`,
+  schema `CREATE=false`, database `CREATE=false`, and all 10 thesis tables
+  `SELECT=true` with `INSERT/UPDATE/DELETE=false`. Runtime targets were stopped
+  after the audit.
+- This repair is ready for a new exact-head review wave. Actual route-switch
+  rollback, wider corpus (anonymous/unknown IDs/empty lists/headers/latency),
+  full client parity, and FE/mobile gates remain outside this checkpoint.

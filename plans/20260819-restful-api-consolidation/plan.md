@@ -568,6 +568,12 @@ the retirement gates pass.
   delete ownership, CSV export parity, PostgreSQL read parity, live route
   wiring, canary routing, rollback and public academic route handoff remain
   open.
+- Phase 55 academic internal-context bridge: complete at
+  `d92ce53e884adcd83b5dd479aebeb584d9a83946`; see
+  `phase-55-academic-internal-context-bridge.md`. It adds internal-only
+  academic context lookups for curricula, departments and student enrollments
+  behind `X-Service-Token`, keeps the public academic route surface unchanged
+  and does not move public route ownership or Java cutover.
 
 ## Backend foundation gate before Stitch implementation
 
