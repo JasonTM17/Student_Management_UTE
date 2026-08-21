@@ -3,9 +3,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot: `feature/java-thesis-platform` fast-forwarded to `57cde78` from `origin/feature/java-thesis-platform` on 2026-08-21 before this slice.
-- Repo state before implementation: only user-owned untracked `.agents/` and `.codex/`; preserve both and do not stage them.
-- Disk snapshot before implementation: C: ~16.96 GiB free, D: ~39.20 GiB free.
+- Current branch snapshot: `feature/java-thesis-platform` at `fdd2601`, matching `origin/feature/java-thesis-platform`, on 2026-08-21 before Phase 49.
+- Repo state before implementation: only user-owned untracked `.agents/`, `.codex/` and `.tmp/`; preserve them and do not stage them.
+- Disk snapshot before implementation: C: ~16.95 GiB free, D: ~39.20 GiB free.
 
 ## Completed evidence carried forward
 
@@ -14,8 +14,8 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Phase 48 candidate: add a feature-default-off Java RESTful monolith read slice for academic waitlist routes.
-- Exit criterion: Java exposes only read waitlist routes under `/api/v1/waitlist` when `migration.academic-waitlist-read.enabled=true`, preserves legacy read shape and role boundaries for selected routes, leaves promote/delete/mutation ownership with legacy Nest, adds focused persistence/default-off tests, updates plan/docs, and passes focused gates.
+- Phase 49 candidate: add a feature-default-off Java RESTful monolith read slice for academic attendance routes.
+- Exit criterion: Java exposes only read attendance routes under `/api/v1/attendance` when `migration.academic-attendance-read.enabled=true`, preserves selected legacy read shapes, filters, formulas and role/claim boundaries, leaves attendance mark/update/delete ownership with legacy Nest, adds focused persistence/default-off tests, updates plan/docs, and passes focused/full Java gates.
 
 ## Phase 48 evidence
 
@@ -26,10 +26,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Full Java reactor PASS: `mvn -q -f java-services/pom.xml test`; surefire summary 23 reports / 156 tests / 0 failures / 0 errors / 0 skipped.
 - Production waitlist SQL-write grep PASS and `git diff --check` PASS with only Git line-ending warnings.
 
+## Phase 49 evidence
+
+- Implemented feature-default-off Java `GET /api/v1/attendance`, `GET /api/v1/attendance/my`, `GET /api/v1/attendance/my/summary`, `GET /api/v1/attendance/lecturer/my`, `GET /api/v1/attendance/section/{sectionId}`, `GET /api/v1/attendance/section/{sectionId}/summary` and `GET /api/v1/attendance/{id}` read routes.
+- Added `migration.academic-attendance-read.enabled` / `ACADEMIC_ATTENDANCE_READ_ENABLED:false` and read-only migration safety condition coverage.
+- Added H2 persistence tests for student self filters, student summary formula, admin envelope/date filter/order, lecturer-owned section scope, section ordering/summary formula, detail/not-found, role/claim/query failures, and default-off route absence.
+- Focused gate PASS after one fixture/oracle repair: `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.academic.AcademicAttendanceReadPersistenceTest,io.campuscore.restfulapi.RestfulApiContractTest,io.campuscore.restfulapi.migration.MigrationSafetyConfigTest' '-DforkCount=0' test`.
+- Full Java reactor PASS: `mvn -q -f java-services/pom.xml test`; surefire summary 24 reports / 162 tests / 0 failures / 0 errors / 0 skipped.
+- Production attendance candidate SQL-write grep PASS and `git diff --check` PASS with only Git line-ending warnings.
+
 ## Execution rulings
 
 - User-provided turn instructions add plan-lock discipline and restrict unnecessary thread/subagent spawning. This small read-only backend slice stays controller-owned; Advisor/Kongming/Wukong remain deferred to exact-head cutover/high-risk gates.
 - Legacy-compatible scope for this slice includes `GET /waitlist`, `GET /waitlist/my`, `GET /waitlist/section/:sectionId`, and `GET /waitlist/:id`. `POST /waitlist/:id/promote` and `DELETE /waitlist/:id` are explicitly non-goals.
+- Legacy-compatible scope for Phase 49 includes attendance read routes only. `POST /attendance`, `POST /attendance/bulk`, `POST /attendance/section/:sectionId/mark`, `PUT /attendance/:id` and `DELETE /attendance/:id` are explicitly non-goals.
 
 ## Deferred findings
 
@@ -37,4 +47,4 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Next resume point
 
-- Commit and push Phase 48 if final git hygiene and sensitive-material scan pass. Then continue the backend foundation gate with the next missing low-risk academic read or PostgreSQL restore parity/canary preparation before FE Stitch runtime parity.
+- Commit and push Phase 49 if final staging and sensitive-material scan pass. Then continue the backend foundation gate with the next missing low-risk academic read or PostgreSQL restore parity/canary preparation before FE Stitch runtime parity.

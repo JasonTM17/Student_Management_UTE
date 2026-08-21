@@ -23,6 +23,8 @@ migration:
     enabled: false
   academic-waitlist-read:
     enabled: false
+  academic-attendance-read:
+    enabled: false
   people-read:
     enabled: false
   finance-read:

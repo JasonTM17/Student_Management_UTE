@@ -496,6 +496,20 @@ the retirement gates pass.
   0 errors / 0 skipped. Waitlist promotion, waitlist removal, enroll/drop
   mutations, PostgreSQL read parity, live registration route wiring, canary
   routing, rollback and public academic route handoff remain open.
+- Phase 49 backend-first academic attendance read foundation: source/focused
+  H2 verified candidate/HOLD; see `phase-49-academic-attendance-read.md`. It
+  adds feature-default-off Java `GET /api/v1/attendance`,
+  `GET /api/v1/attendance/my`, `GET /api/v1/attendance/my/summary`,
+  `GET /api/v1/attendance/lecturer/my`,
+  `GET /api/v1/attendance/section/{sectionId}`,
+  `GET /api/v1/attendance/section/{sectionId}/summary` and
+  `GET /api/v1/attendance/{id}` reads against the migrated legacy `academic`
+  schema, preserving the selected list envelope, student self filters,
+  student/section summary formulas, lecturer-owned section scope, date filters,
+  role/claim/query failures and migration-safety default-off boundary.
+  Attendance mark/update/delete mutations, PostgreSQL read parity, live
+  attendance route wiring, canary routing, rollback and public academic route
+  handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 
