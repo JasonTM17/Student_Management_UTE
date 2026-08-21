@@ -7,6 +7,10 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomListRespo
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.util.List;
@@ -14,6 +18,7 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -49,6 +54,36 @@ public class AcademicReadController {
     @GetMapping("semesters/{id}")
     public SemesterResponse getSemester(@PathVariable String id) {
         return academic.findSemester(id);
+    }
+
+    @GetMapping("faculties")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public FacultyListResponse getFaculties(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return academic.findFaculties(page, limit);
+    }
+
+    @GetMapping("faculties/{id}")
+    public FacultyResponse getFaculty(@PathVariable String id) {
+        return academic.findFaculty(id);
+    }
+
+    @GetMapping("departments")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public DepartmentListResponse getDepartments(
+            @RequestParam(defaultValue = "1") int page,
+            @RequestParam(defaultValue = "20") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return academic.findDepartments(page, limit);
+    }
+
+    @GetMapping("departments/{id}")
+    public DepartmentResponse getDepartment(@PathVariable String id) {
+        return academic.findDepartment(id);
     }
 
     @GetMapping("academic-years")

@@ -37,6 +37,107 @@ public final class AcademicReadDtos {
             boolean isActive) {
     }
 
+    public record FacultySummary(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            String dean,
+            String phone,
+            String email,
+            String building,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            boolean isActive) {
+    }
+
+    public record FacultyDepartmentSummary(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            String chair,
+            String phone,
+            String email,
+            String building,
+            String facultyId,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            boolean isActive) {
+    }
+
+    public record FacultyResponse(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            String dean,
+            String phone,
+            String email,
+            String building,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            boolean isActive,
+            List<FacultyDepartmentSummary> departments) {
+    }
+
+    public record DepartmentLecturerSummary(
+            String id,
+            String userId,
+            String departmentId,
+            String employeeId,
+            String title,
+            String specialization,
+            String office,
+            String phone,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            boolean isActive) {
+    }
+
+    public record DepartmentResponse(
+            String id,
+            String name,
+            String nameEn,
+            String nameVi,
+            String code,
+            String description,
+            String descriptionEn,
+            String descriptionVi,
+            String chair,
+            String phone,
+            String email,
+            String building,
+            String facultyId,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            boolean isActive,
+            FacultySummary faculty,
+            List<DepartmentLecturerSummary> lecturers) {
+    }
+
     public record SemesterResponse(
             String id,
             String name,
@@ -144,6 +245,12 @@ public final class AcademicReadDtos {
     }
 
     public record PageMeta(long total, int page, int limit, int totalPages) {
+    }
+
+    public record FacultyListResponse(List<FacultyResponse> data, PageMeta meta) {
+    }
+
+    public record DepartmentListResponse(List<DepartmentResponse> data, PageMeta meta) {
     }
 
     public record AcademicYearListResponse(List<AcademicYearResponse> data, PageMeta meta) {

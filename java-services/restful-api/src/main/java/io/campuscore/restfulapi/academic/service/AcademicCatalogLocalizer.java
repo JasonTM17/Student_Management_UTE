@@ -1,7 +1,11 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultySummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.util.Map;
 
@@ -30,7 +34,39 @@ final class AcademicCatalogLocalizer {
                     "Software Engineering",
                     "Kỹ thuật phần mềm",
                     "Department of Software Engineering",
-                    "Bộ môn Kỹ thuật phần mềm"));
+                    "Bộ môn Kỹ thuật phần mềm"),
+            "CE", new LocalizedDefaults(
+                    "Computer Engineering",
+                    "Kỹ thuật máy tính",
+                    "Department of Computer Engineering",
+                    "Bộ môn Kỹ thuật máy tính"),
+            "BA", new LocalizedDefaults(
+                    "Business Administration",
+                    "Quản trị kinh doanh",
+                    "Department of Business Administration",
+                    "Bộ môn Quản trị kinh doanh"));
+
+    private static final Map<String, LocalizedDefaults> FACULTY_DEFAULTS = Map.of(
+            "FCS", new LocalizedDefaults(
+                    "Faculty of Computer Science",
+                    "Khoa Khoa học máy tính",
+                    "Faculty of Computer Science and Information Technology",
+                    "Khoa Khoa học máy tính và công nghệ thông tin"),
+            "ENG", new LocalizedDefaults(
+                    "Faculty of Engineering",
+                    "Khoa Kỹ thuật",
+                    "Faculty of Engineering",
+                    "Khoa Kỹ thuật"),
+            "FE", new LocalizedDefaults(
+                    "Faculty of Engineering",
+                    "Khoa Kỹ thuật",
+                    "Faculty of Engineering",
+                    "Khoa Kỹ thuật"),
+            "FBA", new LocalizedDefaults(
+                    "Faculty of Business Administration",
+                    "Khoa Quản trị kinh doanh",
+                    "Faculty of Business Administration",
+                    "Khoa Quản trị kinh doanh"));
 
     private AcademicCatalogLocalizer() {
     }
@@ -79,6 +115,56 @@ final class AcademicCatalogLocalizer {
                 department);
     }
 
+    static FacultyResponse hydrateFaculty(FacultyResponse faculty) {
+        LocalizedDefaults defaults = FACULTY_DEFAULTS.getOrDefault(
+                upper(faculty.code()),
+                LocalizedDefaults.EMPTY);
+        return new FacultyResponse(
+                faculty.id(),
+                faculty.name(),
+                pick(faculty.nameEn(), faculty.name(), defaults.nameEn()),
+                pick(faculty.nameVi(), defaults.nameVi()),
+                faculty.code(),
+                faculty.description(),
+                pick(faculty.descriptionEn(), faculty.description(), defaults.descriptionEn()),
+                pick(faculty.descriptionVi(), defaults.descriptionVi()),
+                faculty.dean(),
+                faculty.phone(),
+                faculty.email(),
+                faculty.building(),
+                faculty.createdAt(),
+                faculty.updatedAt(),
+                faculty.isActive(),
+                faculty.departments().stream()
+                        .map(AcademicCatalogLocalizer::hydrateFacultyDepartment)
+                        .toList());
+    }
+
+    static DepartmentResponse hydrateDepartmentResponse(DepartmentResponse department) {
+        LocalizedDefaults defaults = DEPARTMENT_DEFAULTS.getOrDefault(
+                upper(department.code()),
+                LocalizedDefaults.EMPTY);
+        return new DepartmentResponse(
+                department.id(),
+                department.name(),
+                pick(department.nameEn(), department.name(), defaults.nameEn()),
+                pick(department.nameVi(), defaults.nameVi()),
+                department.code(),
+                department.description(),
+                pick(department.descriptionEn(), department.description(), defaults.descriptionEn()),
+                pick(department.descriptionVi(), defaults.descriptionVi()),
+                department.chair(),
+                department.phone(),
+                department.email(),
+                department.building(),
+                department.facultyId(),
+                department.createdAt(),
+                department.updatedAt(),
+                department.isActive(),
+                hydrateFacultySummary(department.faculty()),
+                department.lecturers());
+    }
+
     private static DepartmentSummary hydrateDepartment(DepartmentSummary department) {
         LocalizedDefaults defaults = DEPARTMENT_DEFAULTS.getOrDefault(
                 upper(department.code()),
@@ -93,6 +179,51 @@ final class AcademicCatalogLocalizer {
                 pick(department.descriptionEn(), department.description(), defaults.descriptionEn()),
                 pick(department.descriptionVi(), defaults.descriptionVi()),
                 department.facultyId(),
+                department.isActive());
+    }
+
+    private static FacultySummary hydrateFacultySummary(FacultySummary faculty) {
+        LocalizedDefaults defaults = FACULTY_DEFAULTS.getOrDefault(
+                upper(faculty.code()),
+                LocalizedDefaults.EMPTY);
+        return new FacultySummary(
+                faculty.id(),
+                faculty.name(),
+                pick(faculty.nameEn(), faculty.name(), defaults.nameEn()),
+                pick(faculty.nameVi(), defaults.nameVi()),
+                faculty.code(),
+                faculty.description(),
+                pick(faculty.descriptionEn(), faculty.description(), defaults.descriptionEn()),
+                pick(faculty.descriptionVi(), defaults.descriptionVi()),
+                faculty.dean(),
+                faculty.phone(),
+                faculty.email(),
+                faculty.building(),
+                faculty.createdAt(),
+                faculty.updatedAt(),
+                faculty.isActive());
+    }
+
+    private static FacultyDepartmentSummary hydrateFacultyDepartment(FacultyDepartmentSummary department) {
+        LocalizedDefaults defaults = DEPARTMENT_DEFAULTS.getOrDefault(
+                upper(department.code()),
+                LocalizedDefaults.EMPTY);
+        return new FacultyDepartmentSummary(
+                department.id(),
+                department.name(),
+                pick(department.nameEn(), department.name(), defaults.nameEn()),
+                pick(department.nameVi(), defaults.nameVi()),
+                department.code(),
+                department.description(),
+                pick(department.descriptionEn(), department.description(), defaults.descriptionEn()),
+                pick(department.descriptionVi(), defaults.descriptionVi()),
+                department.chair(),
+                department.phone(),
+                department.email(),
+                department.building(),
+                department.facultyId(),
+                department.createdAt(),
+                department.updatedAt(),
                 department.isActive());
     }
 

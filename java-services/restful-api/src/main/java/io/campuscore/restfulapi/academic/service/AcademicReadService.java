@@ -8,6 +8,12 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.PageMeta;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
@@ -51,6 +57,36 @@ public class AcademicReadService {
         return academic.findSemesterById(id)
                 .map(AcademicCatalogLocalizer::hydrateSemester)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Semester not found"));
+    }
+
+    @Transactional(readOnly = true)
+    public FacultyListResponse findFaculties(int page, int limit) {
+        requirePage(page, limit);
+        long total = academic.countFaculties();
+        List<FacultyResponse> faculties = academic.findFaculties(offset(page, limit), limit);
+        return new FacultyListResponse(hydrateFaculties(faculties), meta(total, page, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public FacultyResponse findFaculty(String id) {
+        FacultyResponse faculty = academic.findFacultyById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Faculty not found"));
+        return hydrateFaculties(List.of(faculty)).getFirst();
+    }
+
+    @Transactional(readOnly = true)
+    public DepartmentListResponse findDepartments(int page, int limit) {
+        requirePage(page, limit);
+        long total = academic.countDepartments();
+        List<DepartmentResponse> departments = academic.findDepartments(offset(page, limit), limit);
+        return new DepartmentListResponse(hydrateDepartments(departments), meta(total, page, limit));
+    }
+
+    @Transactional(readOnly = true)
+    public DepartmentResponse findDepartment(String id) {
+        DepartmentResponse department = academic.findDepartmentById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Department not found"));
+        return hydrateDepartments(List.of(department)).getFirst();
     }
 
     @Transactional(readOnly = true)
@@ -116,6 +152,64 @@ public class AcademicReadService {
                         year.createdAt(),
                         year.updatedAt(),
                         semestersByYear.getOrDefault(year.id(), List.of())))
+                .toList();
+    }
+
+    private List<FacultyResponse> hydrateFaculties(List<FacultyResponse> faculties) {
+        List<String> ids = faculties.stream().map(FacultyResponse::id).toList();
+        Map<String, List<FacultyDepartmentSummary>> departmentsByFaculty = academic
+                .findFacultyDepartmentsByFacultyIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(FacultyDepartmentSummary::facultyId));
+        return faculties.stream()
+                .map(faculty -> new FacultyResponse(
+                        faculty.id(),
+                        faculty.name(),
+                        faculty.nameEn(),
+                        faculty.nameVi(),
+                        faculty.code(),
+                        faculty.description(),
+                        faculty.descriptionEn(),
+                        faculty.descriptionVi(),
+                        faculty.dean(),
+                        faculty.phone(),
+                        faculty.email(),
+                        faculty.building(),
+                        faculty.createdAt(),
+                        faculty.updatedAt(),
+                        faculty.isActive(),
+                        departmentsByFaculty.getOrDefault(faculty.id(), List.of())))
+                .map(AcademicCatalogLocalizer::hydrateFaculty)
+                .toList();
+    }
+
+    private List<DepartmentResponse> hydrateDepartments(List<DepartmentResponse> departments) {
+        List<String> ids = departments.stream().map(DepartmentResponse::id).toList();
+        Map<String, List<DepartmentLecturerSummary>> lecturersByDepartment = academic
+                .findDepartmentLecturersByDepartmentIds(ids)
+                .stream()
+                .collect(Collectors.groupingBy(DepartmentLecturerSummary::departmentId));
+        return departments.stream()
+                .map(department -> new DepartmentResponse(
+                        department.id(),
+                        department.name(),
+                        department.nameEn(),
+                        department.nameVi(),
+                        department.code(),
+                        department.description(),
+                        department.descriptionEn(),
+                        department.descriptionVi(),
+                        department.chair(),
+                        department.phone(),
+                        department.email(),
+                        department.building(),
+                        department.facultyId(),
+                        department.createdAt(),
+                        department.updatedAt(),
+                        department.isActive(),
+                        department.faculty(),
+                        lecturersByDepartment.getOrDefault(department.id(), List.of())))
+                .map(AcademicCatalogLocalizer::hydrateDepartmentResponse)
                 .toList();
     }
 

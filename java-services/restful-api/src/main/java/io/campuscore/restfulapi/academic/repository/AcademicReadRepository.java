@@ -5,7 +5,12 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearRespon
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyDepartmentSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultySummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.sql.ResultSet;
@@ -52,8 +57,41 @@ public class AcademicReadRepository {
             d."isActive" AS department_is_active
             """;
 
+    private static final String FACULTY_COLUMNS = """
+            f."id" AS faculty_id, f."name" AS faculty_name,
+            f."nameEn" AS faculty_name_en, f."nameVi" AS faculty_name_vi,
+            f."code" AS faculty_code, f."description" AS faculty_description,
+            f."descriptionEn" AS faculty_description_en,
+            f."descriptionVi" AS faculty_description_vi,
+            f."dean" AS faculty_dean, f."phone" AS faculty_phone,
+            f."email" AS faculty_email, f."building" AS faculty_building,
+            f."createdAt" AS faculty_created_at, f."updatedAt" AS faculty_updated_at,
+            f."isActive" AS faculty_is_active
+            """;
+
+    private static final String DEPARTMENT_RESPONSE_COLUMNS = """
+            d."id" AS department_id, d."name" AS department_name,
+            d."nameEn" AS department_name_en, d."nameVi" AS department_name_vi,
+            d."code" AS department_code, d."description" AS department_description,
+            d."descriptionEn" AS department_description_en,
+            d."descriptionVi" AS department_description_vi,
+            d."chair" AS department_chair, d."phone" AS department_phone,
+            d."email" AS department_email, d."building" AS department_building,
+            d."facultyId" AS department_faculty_id,
+            d."createdAt" AS department_created_at, d."updatedAt" AS department_updated_at,
+            d."isActive" AS department_is_active
+            """;
+
     private static final RowMapper<SemesterResponse> SEMESTER_ROW_MAPPER =
             AcademicReadRepository::mapSemester;
+    private static final RowMapper<FacultyResponse> FACULTY_ROW_MAPPER =
+            AcademicReadRepository::mapFaculty;
+    private static final RowMapper<FacultyDepartmentSummary> FACULTY_DEPARTMENT_ROW_MAPPER =
+            AcademicReadRepository::mapFacultyDepartment;
+    private static final RowMapper<DepartmentResponse> DEPARTMENT_RESPONSE_ROW_MAPPER =
+            AcademicReadRepository::mapDepartmentResponse;
+    private static final RowMapper<DepartmentLecturerSummary> DEPARTMENT_LECTURER_ROW_MAPPER =
+            AcademicReadRepository::mapDepartmentLecturer;
     private static final RowMapper<SemesterCatalogSummary> SEMESTER_CATALOG_ROW_MAPPER =
             AcademicReadRepository::mapSemesterCatalogSummary;
     private static final RowMapper<AcademicYearResponse> ACADEMIC_YEAR_ROW_MAPPER =
@@ -69,6 +107,90 @@ public class AcademicReadRepository {
 
     public AcademicReadRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+    }
+
+    public List<FacultyResponse> findFaculties(long offset, int limit) {
+        return jdbc.query(
+                "SELECT " + FACULTY_COLUMNS
+                        + " FROM \"academic\".\"Faculty\" f"
+                        + " ORDER BY f.\"name\" ASC, f.\"id\" ASC LIMIT :limit OFFSET :offset",
+                pageParameters(offset, limit),
+                FACULTY_ROW_MAPPER);
+    }
+
+    public long countFaculties() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Faculty\"",
+                new MapSqlParameterSource(),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<FacultyResponse> findFacultyById(String id) {
+        List<FacultyResponse> matches = jdbc.query(
+                "SELECT " + FACULTY_COLUMNS
+                        + " FROM \"academic\".\"Faculty\" f"
+                        + " WHERE f.\"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                FACULTY_ROW_MAPPER);
+        return matches.stream().findFirst();
+    }
+
+    public List<FacultyDepartmentSummary> findFacultyDepartmentsByFacultyIds(List<String> facultyIds) {
+        if (facultyIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT " + DEPARTMENT_RESPONSE_COLUMNS
+                        + " FROM \"academic\".\"Department\" d"
+                        + " WHERE d.\"facultyId\" IN (:facultyIds)"
+                        + " ORDER BY d.\"name\" ASC, d.\"id\" ASC",
+                new MapSqlParameterSource("facultyIds", facultyIds),
+                FACULTY_DEPARTMENT_ROW_MAPPER);
+    }
+
+    public List<DepartmentResponse> findDepartments(long offset, int limit) {
+        return jdbc.query(
+                "SELECT " + DEPARTMENT_RESPONSE_COLUMNS + ", " + FACULTY_COLUMNS
+                        + " FROM \"academic\".\"Department\" d"
+                        + " INNER JOIN \"academic\".\"Faculty\" f ON f.\"id\" = d.\"facultyId\""
+                        + " ORDER BY d.\"name\" ASC, d.\"id\" ASC LIMIT :limit OFFSET :offset",
+                pageParameters(offset, limit),
+                DEPARTMENT_RESPONSE_ROW_MAPPER);
+    }
+
+    public long countDepartments() {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Department\"",
+                new MapSqlParameterSource(),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    public Optional<DepartmentResponse> findDepartmentById(String id) {
+        List<DepartmentResponse> matches = jdbc.query(
+                "SELECT " + DEPARTMENT_RESPONSE_COLUMNS + ", " + FACULTY_COLUMNS
+                        + " FROM \"academic\".\"Department\" d"
+                        + " INNER JOIN \"academic\".\"Faculty\" f ON f.\"id\" = d.\"facultyId\""
+                        + " WHERE d.\"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                DEPARTMENT_RESPONSE_ROW_MAPPER);
+        return matches.stream().findFirst();
+    }
+
+    public List<DepartmentLecturerSummary> findDepartmentLecturersByDepartmentIds(List<String> departmentIds) {
+        if (departmentIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT l.\"id\", l.\"userId\", l.\"departmentId\", l.\"employeeId\","
+                        + " l.\"title\", l.\"specialization\", l.\"office\", l.\"phone\","
+                        + " l.\"createdAt\", l.\"updatedAt\", l.\"isActive\""
+                        + " FROM \"academic\".\"Lecturer\" l"
+                        + " WHERE l.\"departmentId\" IN (:departmentIds)"
+                        + " ORDER BY l.\"employeeId\" ASC, l.\"id\" ASC",
+                new MapSqlParameterSource("departmentIds", departmentIds),
+                DEPARTMENT_LECTURER_ROW_MAPPER);
     }
 
     public List<SemesterResponse> findSemesters(long offset, int limit) {
@@ -235,6 +357,109 @@ public class AcademicReadRepository {
         return new MapSqlParameterSource()
                 .addValue("offset", offset)
                 .addValue("limit", limit);
+    }
+
+    private static FacultyResponse mapFaculty(ResultSet resultSet, int ignored)
+            throws SQLException {
+        FacultySummary faculty = mapFacultySummary(resultSet);
+        return new FacultyResponse(
+                faculty.id(),
+                faculty.name(),
+                faculty.nameEn(),
+                faculty.nameVi(),
+                faculty.code(),
+                faculty.description(),
+                faculty.descriptionEn(),
+                faculty.descriptionVi(),
+                faculty.dean(),
+                faculty.phone(),
+                faculty.email(),
+                faculty.building(),
+                faculty.createdAt(),
+                faculty.updatedAt(),
+                faculty.isActive(),
+                List.of());
+    }
+
+    private static FacultyDepartmentSummary mapFacultyDepartment(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new FacultyDepartmentSummary(
+                resultSet.getString("department_id"),
+                resultSet.getString("department_name"),
+                resultSet.getString("department_name_en"),
+                resultSet.getString("department_name_vi"),
+                resultSet.getString("department_code"),
+                resultSet.getString("department_description"),
+                resultSet.getString("department_description_en"),
+                resultSet.getString("department_description_vi"),
+                resultSet.getString("department_chair"),
+                resultSet.getString("department_phone"),
+                resultSet.getString("department_email"),
+                resultSet.getString("department_building"),
+                resultSet.getString("department_faculty_id"),
+                instant(resultSet.getTimestamp("department_created_at")),
+                instant(resultSet.getTimestamp("department_updated_at")),
+                resultSet.getBoolean("department_is_active"));
+    }
+
+    private static DepartmentResponse mapDepartmentResponse(ResultSet resultSet, int ignored)
+            throws SQLException {
+        FacultySummary faculty = mapFacultySummary(resultSet);
+        return new DepartmentResponse(
+                resultSet.getString("department_id"),
+                resultSet.getString("department_name"),
+                resultSet.getString("department_name_en"),
+                resultSet.getString("department_name_vi"),
+                resultSet.getString("department_code"),
+                resultSet.getString("department_description"),
+                resultSet.getString("department_description_en"),
+                resultSet.getString("department_description_vi"),
+                resultSet.getString("department_chair"),
+                resultSet.getString("department_phone"),
+                resultSet.getString("department_email"),
+                resultSet.getString("department_building"),
+                resultSet.getString("department_faculty_id"),
+                instant(resultSet.getTimestamp("department_created_at")),
+                instant(resultSet.getTimestamp("department_updated_at")),
+                resultSet.getBoolean("department_is_active"),
+                faculty,
+                List.of());
+    }
+
+    private static FacultySummary mapFacultySummary(ResultSet resultSet)
+            throws SQLException {
+        return new FacultySummary(
+                resultSet.getString("faculty_id"),
+                resultSet.getString("faculty_name"),
+                resultSet.getString("faculty_name_en"),
+                resultSet.getString("faculty_name_vi"),
+                resultSet.getString("faculty_code"),
+                resultSet.getString("faculty_description"),
+                resultSet.getString("faculty_description_en"),
+                resultSet.getString("faculty_description_vi"),
+                resultSet.getString("faculty_dean"),
+                resultSet.getString("faculty_phone"),
+                resultSet.getString("faculty_email"),
+                resultSet.getString("faculty_building"),
+                instant(resultSet.getTimestamp("faculty_created_at")),
+                instant(resultSet.getTimestamp("faculty_updated_at")),
+                resultSet.getBoolean("faculty_is_active"));
+    }
+
+    private static DepartmentLecturerSummary mapDepartmentLecturer(ResultSet resultSet, int ignored)
+            throws SQLException {
+        return new DepartmentLecturerSummary(
+                resultSet.getString("id"),
+                resultSet.getString("userId"),
+                resultSet.getString("departmentId"),
+                resultSet.getString("employeeId"),
+                resultSet.getString("title"),
+                resultSet.getString("specialization"),
+                resultSet.getString("office"),
+                resultSet.getString("phone"),
+                instant(resultSet.getTimestamp("createdAt")),
+                instant(resultSet.getTimestamp("updatedAt")),
+                resultSet.getBoolean("isActive"));
     }
 
     private static SemesterResponse mapSemester(ResultSet resultSet, int ignored)
