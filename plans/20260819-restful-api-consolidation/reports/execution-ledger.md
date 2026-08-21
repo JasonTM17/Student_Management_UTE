@@ -147,7 +147,7 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Backend foundation thesis FK rehearsal — 2026-08-21
 
-- Local head: `2c8cb4a7ee21ab78729f006ee18292c6efea96ed`
+- Local source head: `fcfe324151bba30879bdc3893a0b19a207218be3`
   (`test(java): add thesis restore read-only smoke`).
 - Disposable target reused: `.tmp/pg-phase53/cluster` on `127.0.0.1:56433`,
   with `currentSchema=thesis` and the exact `postgres` role.
@@ -196,6 +196,23 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Ruling: FE Stitch implementation remains gated off by the backend foundation
   criteria. Continue with the smallest read-only differential/rollback slice
   rather than expanding public route ownership or client traffic.
+
+## Current canonical Java monolith gate — 2026-08-21
+
+- Verified checkout before this ledger update:
+  `7e6dfdeab411470c5d8bc7bf2201610f7ca2837b`
+  (`docs(plan): record thesis restore review gate`).
+- Canonical parent module check: `java-services/pom.xml` lists only
+  `<module>restful-api</module>` for the modular-monolith reactor.
+- Verified:
+  `mvn -q -f java-services/pom.xml clean test` exited 0.
+- Canonical Surefire summary from
+  `java-services/restful-api/target/surefire-reports`: 26 reports / 175 tests /
+  0 failures / 0 errors / 1 skipped. The skipped test is the opt-in
+  `ThesisReadOnlyRestoreSmokeTest` when `THESIS_RESTORE_SMOKE` is not set.
+- Limitation: stale XML reports under legacy `auth-service` and
+  `thesis-service` target directories are not part of the current parent
+  reactor and are not counted as Java monolith evidence.
 
 ## Deferred findings
 
