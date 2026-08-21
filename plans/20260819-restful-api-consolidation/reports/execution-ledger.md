@@ -3,19 +3,20 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this docs update: `feature/java-thesis-platform`
-  at `3327f8318bc9aa775a4e48185b8f74b54ab3215a`
-  (`fix(java): support finance postgres optional filters`); local branch is
-  ahead of `origin/feature/java-thesis-platform` by the source repair commit
-  plus this documentation record until pushed.
-- Repo state before this docs update: the finance source repair is committed;
-  tracked dirty files are this plan/ledger documentation update only. The
+- Current branch snapshot before this handoff update:
+  `feature/java-thesis-platform` at
+  `7b4634c5e9245b8e37d16a88b60ab43f0c8cfd1d`
+  (`docs(plan): record finance postgres repair`), matching `origin/main`,
+  `origin/feature/java-thesis-platform` and `origin/HEAD`.
+- Repo state before this handoff update: finance source and Phase 58 docs are
+  committed and pushed; tracked dirty file is this ledger note only. The
   user-owned untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
-- Branch integration ruling: the user requested `main` as the main branch for
-  faster progress. After this docs record, fast-forward `main` to the verified
-  branch tip and push `main` instead of continuing to treat the feature branch
-  as the primary integration target.
-- Disk snapshot before this docs update: C: ~16.40 GiB free, D: ~35.93 GiB
+- Branch integration result: the user requested `main` as the main branch for
+  faster progress. The verified feature tip was fast-forward pushed to `main`
+  with `git push origin feature/java-thesis-platform:main`; GitHub reports
+  default branch `main`; local `origin/HEAD` and local branch `main` were
+  fast-forwarded to `origin/main`.
+- Disk snapshot before this handoff update: C: ~13.64 GiB free, D: ~35.31 GiB
   free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56447`
   and `56448` were stopped by exact data directory; no broad deletion was run.
 
@@ -27,11 +28,12 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 ## Current step
 
 - Finance PostgreSQL optional-filter repair is committed at
-  `3327f8318bc9aa775a4e48185b8f74b54ab3215a` and documented in
-  `phase-58-finance-postgres-parity-repair.md`.
-- Exit criterion for this slice: record the exact finance repair evidence,
-  push the verified branch state to `main`, and keep route ownership, writer
-  ownership, FE traffic and production cutover on HOLD.
+  `3327f8318bc9aa775a4e48185b8f74b54ab3215a`, documented in
+  `phase-58-finance-postgres-parity-repair.md`, and included on pushed
+  `main`.
+- Current step after this handoff: continue the accepted backend-first parity
+  plan from the next bounded slice. Route ownership, writer ownership, FE
+  traffic and production cutover remain on HOLD.
 
 ## Phase 48 evidence
 
@@ -503,15 +505,13 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Next resume point
 
-- Next safe step in this run: commit this documentation record, push the branch
-  state, fast-forward `main` to the verified tip and push `main` so `main`
-  becomes the primary integration branch. After that, continue backend parity
-  hardening or the next accepted plan slice. Until backend
-  foundation/canary/rollback/review gates pass, do not point FE traffic or
-  public routes at Java. FE web/mobile remains a required later phase with
-  Stitch, responsive, auth/runtime and functional proof. Preserve untracked
-  `.agents/`, `.codex/` and `.tmp` unless the user explicitly authorizes a safe
-  cleanup target.
+- Main-branch integration for the finance repair is complete. Next safe work is
+  the next bounded backend parity slice or the accepted FE Stitch phase once
+  the backend foundation/canary/rollback/review gates allow client wiring.
+  Until then, do not point FE traffic or public routes at Java. FE web/mobile
+  remains a required later phase with Stitch, responsive, auth/runtime and
+  functional proof. Preserve untracked `.agents/`, `.codex/` and `.tmp` unless
+  the user explicitly authorizes a safe cleanup target.
 
 ## Thesis differential repair and rehearsal — 2026-08-21
 
