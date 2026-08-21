@@ -452,6 +452,13 @@ the retirement gates pass.
   over the already-ported analytics read aggregates. PostgreSQL read parity,
   live cockpit UI wiring, canary routing, rollback and public analytics route
   handoff remain open.
+- Phase 44 backend-first analytics revenue foundation: source candidate/HOLD;
+  see `phase-44-analytics-revenue.md`. It extends the feature-default-off Java
+  analytics read candidate with `GET /api/v1/analytics/revenue` for
+  `ADMIN`/`SUPER_ADMIN`/`FINANCE_OFFICER`, preserving the legacy optional
+  `semesterId` filter, invoice totals/counts and completed-payment revenue
+  calculation. PostgreSQL read parity, live finance/admin route wiring, canary
+  routing, rollback and public analytics route handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

@@ -111,6 +111,7 @@ class AnalyticsReadPersistenceTest {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Invoice" (
                     "id" VARCHAR(120) PRIMARY KEY,
+                    "semesterId" VARCHAR(120),
                     "status" VARCHAR(40) NOT NULL,
                     "total" DECIMAL(10, 2) NOT NULL,
                     "createdAt" TIMESTAMP NOT NULL
@@ -119,6 +120,7 @@ class AnalyticsReadPersistenceTest {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "public"."Payment" (
                     "id" VARCHAR(120) PRIMARY KEY,
+                    "invoiceId" VARCHAR(120),
                     "method" VARCHAR(80) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
                     "amount" DECIMAL(10, 2) NOT NULL,
@@ -565,6 +567,36 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void revenueAnalyticsPreservesLegacySemesterFilterAndFinanceOfficerAccess() throws Exception {
+        insertInvoice("invoice-fall-paid", "semester-fall", "PAID", BigDecimal.valueOf(500));
+        insertInvoice("invoice-fall-pending", "semester-fall", "PENDING", BigDecimal.valueOf(300));
+        insertInvoice("invoice-spring-paid", "semester-spring", "PAID", BigDecimal.valueOf(700));
+        insertPayment("payment-fall-completed", "invoice-fall-paid", "CARD", "COMPLETED", BigDecimal.valueOf(450));
+        insertPayment("payment-fall-pending", "invoice-fall-pending", "CARD", "PENDING", BigDecimal.valueOf(200));
+        insertPayment("payment-spring-completed", "invoice-spring-paid", "CASH", "COMPLETED", BigDecimal.valueOf(700));
+
+        mvc.perform(get("/api/v1/analytics/revenue")
+                        .queryParam("semesterId", "semester-fall")
+                        .with(financeOfficerJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalInvoiced").value(800.00))
+                .andExpect(jsonPath("$.totalPaid").value(450.00))
+                .andExpect(jsonPath("$.pending").value(350.00))
+                .andExpect(jsonPath("$.invoiceCount").value(2))
+                .andExpect(jsonPath("$.paidInvoiceCount").value(1))
+                .andExpect(jsonPath("$.pendingInvoiceCount").value(1));
+
+        mvc.perform(get("/api/v1/analytics/revenue").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.totalInvoiced").value(1500.00))
+                .andExpect(jsonPath("$.totalPaid").value(1150.00))
+                .andExpect(jsonPath("$.pending").value(350.00))
+                .andExpect(jsonPath("$.invoiceCount").value(3))
+                .andExpect(jsonPath("$.paidInvoiceCount").value(2))
+                .andExpect(jsonPath("$.pendingInvoiceCount").value(1));
+    }
+
+    @Test
     void gradeDistributionPreservesLegacyBucketsAndPercentagesForAdmins() throws Exception {
         insertEnrollment("enrollment-a-1", "COMPLETED", "A");
         insertEnrollment("enrollment-a-2", "COMPLETED", "A");
@@ -652,6 +684,10 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/revenue").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/enrollments-by-semester").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -699,6 +735,19 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/analytics/enrollments-by-semester")
+                        .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/revenue")
+                        .queryParam("semesterId", "semester-fall")
+                        .queryParam("semesterId", "semester-spring")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/revenue")
                         .queryParam("months", "12")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
@@ -871,6 +920,17 @@ class AnalyticsReadPersistenceTest {
                 localDateTime(BASE_TIME));
     }
 
+    private void insertInvoice(String id, String semesterId, String status, BigDecimal total) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Invoice\""
+                        + " (\"id\", \"semesterId\", \"status\", \"total\", \"createdAt\") VALUES (?, ?, ?, ?, ?)",
+                id,
+                semesterId,
+                status,
+                total,
+                localDateTime(BASE_TIME));
+    }
+
     private void insertEnrollment(String id, String status, String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"public\".\"Enrollment\""
@@ -936,6 +996,19 @@ class AnalyticsReadPersistenceTest {
                 "INSERT INTO \"public\".\"Payment\""
                         + " (\"id\", \"method\", \"status\", \"amount\", \"createdAt\") VALUES (?, ?, ?, ?, ?)",
                 id,
+                method,
+                status,
+                amount,
+                localDateTime(BASE_TIME));
+    }
+
+    private void insertPayment(String id, String invoiceId, String method, String status, BigDecimal amount) {
+        jdbc.update(
+                "INSERT INTO \"public\".\"Payment\""
+                        + " (\"id\", \"invoiceId\", \"method\", \"status\", \"amount\", \"createdAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                invoiceId,
                 method,
                 status,
                 amount,

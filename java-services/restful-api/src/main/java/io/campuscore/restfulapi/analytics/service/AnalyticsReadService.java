@@ -17,6 +17,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBuc
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureSection;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RevenueAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentStatisticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
@@ -123,6 +124,11 @@ public class AnalyticsReadService {
                 invoiceStatus,
                 paymentStatus,
                 providerFunnel);
+    }
+
+    @Transactional(readOnly = true)
+    public RevenueAnalyticsResponse revenueAnalytics(String semesterId) {
+        return analytics.revenueAnalytics(normalizeOptional(semesterId));
     }
 
     @Transactional(readOnly = true)
@@ -288,6 +294,10 @@ public class AnalyticsReadService {
 
     private static String labelVi(YearMonth bucket) {
         return "tháng " + bucket.getMonthValue() + " năm " + bucket.getYear();
+    }
+
+    private static String normalizeOptional(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static final class MutableTrendBucket {

@@ -10,6 +10,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSumm
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OperatorSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RevenueAnalyticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.StudentStatisticsResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.TopCourseBucket;
@@ -26,9 +27,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-gated analytics reads. Revenue, attendance, lecturer dashboards,
- * metrics export and event consumers remain in the legacy
- * analytics-service for this wave.
+ * Feature-gated analytics reads. Attendance, lecturer dashboards, metrics
+ * export and event consumers remain in the legacy analytics-service for this
+ * wave.
  */
 @RestController
 @Profile("persistence")
@@ -55,6 +56,15 @@ public class AnalyticsReadController {
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of());
         return analytics.financeSummary();
+    }
+
+    @GetMapping("revenue")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'FINANCE_OFFICER')")
+    public RevenueAnalyticsResponse revenue(
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            @RequestParam(name = "semesterId", required = false) String semesterId) {
+        requireAllowedQuery(queryParameters, Set.of("semesterId"));
+        return analytics.revenueAnalytics(semesterId);
     }
 
     @GetMapping("enrollments-by-semester")
