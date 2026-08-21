@@ -4,6 +4,7 @@ import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import java.util.List;
 import org.springframework.beans.factory.annotation.Value;
+import org.springframework.boot.autoconfigure.condition.ConditionalOnBean;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -18,6 +19,7 @@ import org.springframework.web.server.ResponseStatusException;
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "migration.academic-context", name = "enabled", havingValue = "true")
+@ConditionalOnBean(AcademicEnrollmentReadService.class)
 @RequestMapping("/api/v1/internal/academic-context")
 public class AcademicContextEnrollmentController {
 
@@ -30,7 +32,7 @@ public class AcademicContextEnrollmentController {
 
     public AcademicContextEnrollmentController(
             AcademicEnrollmentReadService enrollments,
-            @Value("${INTERNAL_SERVICE_TOKEN:academic-internal-token-12345}") String internalServiceToken) {
+            @Value("${internal.service-token:}") String internalServiceToken) {
         this.enrollments = enrollments;
         this.internalServiceToken = internalServiceToken;
     }

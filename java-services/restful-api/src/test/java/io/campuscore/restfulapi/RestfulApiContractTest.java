@@ -50,6 +50,10 @@ class RestfulApiContractTest {
         mvc.perform(get("/api/v1/me"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
+
+        mvc.perform(get("/api/v1/internal/unowned"))
+                .andExpect(status().isUnauthorized())
+                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
 
     @Test

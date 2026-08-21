@@ -55,11 +55,6 @@ public class ThesisCompatibilityExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, exception.getMessage(), request);
     }
 
-    @ExceptionHandler(Exception.class)
-    ResponseEntity<ApiError> unexpected(Exception exception, HttpServletRequest request) {
-        return error(HttpStatus.INTERNAL_SERVER_ERROR, "Unexpected server error", request);
-    }
-
     private ResponseEntity<ApiError> error(HttpStatus status, String message, HttpServletRequest request) {
         return ResponseEntity.status(status).body(new ApiError(
                 status.value(),
