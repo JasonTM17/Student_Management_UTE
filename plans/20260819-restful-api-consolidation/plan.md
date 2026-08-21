@@ -442,6 +442,16 @@ the retirement gates pass.
   bucket ordering, EN/VI labels, enrolled/dropped/completed counts, net and
   total activity shape. PostgreSQL read parity, cockpit composition, canary
   routing, rollback and public analytics route handoff remain open.
+- Phase 43 backend-first analytics cockpit and operator-summary foundation:
+  source candidate/HOLD; see
+  `phase-43-analytics-cockpit-operator-summary.md`.
+  It extends the feature-default-off Java analytics read candidate with
+  `GET /api/v1/analytics/operator-summary` and
+  `GET /api/v1/analytics/cockpit` for `ADMIN`/`SUPER_ADMIN`, preserving the
+  legacy local-operator dashboard-link posture and cockpit composition shape
+  over the already-ported analytics read aggregates. PostgreSQL read parity,
+  live cockpit UI wiring, canary routing, rollback and public analytics route
+  handoff remain open.
 
 ## Backend foundation gate before Stitch implementation
 

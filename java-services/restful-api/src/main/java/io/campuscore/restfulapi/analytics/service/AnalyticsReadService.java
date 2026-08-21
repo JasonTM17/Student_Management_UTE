@@ -2,6 +2,8 @@ package io.campuscore.restfulapi.analytics.service;
 
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository;
 import io.campuscore.restfulapi.analytics.repository.AnalyticsReadRepository.EnrollmentTrendActivity;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.DashboardLink;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
@@ -9,6 +11,7 @@ import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceTotals;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.InvoiceStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OperatorSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.PaymentStatusBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.ProviderFunnelBucket;
@@ -40,6 +43,11 @@ public class AnalyticsReadService {
     private static final int DEFAULT_TREND_MONTHS = 12;
     private static final int MAX_TREND_MONTHS = 24;
     private static final int NEAR_CAPACITY_THRESHOLD = 80;
+    private static final List<DashboardLink> OPERATOR_DASHBOARDS = List.of(
+            new DashboardLink("Grafana", "http://127.0.0.1:3002"),
+            new DashboardLink("Prometheus", "http://127.0.0.1:9090"),
+            new DashboardLink("Loki", "http://127.0.0.1:3100"),
+            new DashboardLink("Tempo", "http://127.0.0.1:3200"));
 
     private static final List<String> LETTER_GRADES = List.of(
             "A",
@@ -156,6 +164,30 @@ public class AnalyticsReadService {
         return buckets.values().stream()
                 .map(MutableTrendBucket::toResponse)
                 .toList();
+    }
+
+    @Transactional(readOnly = true)
+    public OperatorSummaryResponse operatorSummary() {
+        return new OperatorSummaryResponse(
+                Instant.now(clock),
+                8,
+                0,
+                0,
+                OPERATOR_DASHBOARDS);
+    }
+
+    @Transactional(readOnly = true)
+    public CockpitResponse cockpit() {
+        return new CockpitResponse(
+                Instant.now(clock),
+                overview(),
+                enrollmentTrends(DEFAULT_TREND_MONTHS),
+                sectionOccupancy(),
+                gradeDistribution(),
+                financeSummary(),
+                notificationSummary(),
+                registrationPressure(),
+                operatorSummary());
     }
 
     @Transactional(readOnly = true)

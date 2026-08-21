@@ -393,6 +393,90 @@ class AnalyticsReadPersistenceTest {
     }
 
     @Test
+    void operatorSummaryPreservesLegacyDashboardLinksAndHealthShape() throws Exception {
+        mvc.perform(get("/api/v1/analytics/operator-summary").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.generatedAt").exists())
+                .andExpect(jsonPath("$.serviceCount").value(8))
+                .andExpect(jsonPath("$.dependencyDown").value(0))
+                .andExpect(jsonPath("$.highLatency").value(0))
+                .andExpect(jsonPath("$.dashboards.length()").value(4))
+                .andExpect(jsonPath("$.dashboards[0].label").value("Grafana"))
+                .andExpect(jsonPath("$.dashboards[0].url").value("http://127.0.0.1:3002"))
+                .andExpect(jsonPath("$.dashboards[1].label").value("Prometheus"))
+                .andExpect(jsonPath("$.dashboards[1].url").value("http://127.0.0.1:9090"))
+                .andExpect(jsonPath("$.dashboards[2].label").value("Loki"))
+                .andExpect(jsonPath("$.dashboards[2].url").value("http://127.0.0.1:3100"))
+                .andExpect(jsonPath("$.dashboards[3].label").value("Tempo"))
+                .andExpect(jsonPath("$.dashboards[3].url").value("http://127.0.0.1:3200"));
+    }
+
+    @Test
+    void cockpitComposesLegacyAdminAnalyticsPayload() throws Exception {
+        YearMonth currentMonth = YearMonth.now(ZoneOffset.UTC);
+        insertStudent("student-active", "ACTIVE", 1);
+        insertRows("Lecturer", 1);
+        insertRows("Department", 1);
+        insertRows("Faculty", 1);
+        insertRows("Classroom", 1);
+        insertAcademicYear("academic-year-2026", 2026);
+        insertSemesterWithStatus(
+                "semester-registration",
+                "Registration 2026",
+                "Registration 2026",
+                "Dang ky 2026",
+                "academic-year-2026",
+                "REGISTRATION_OPEN",
+                firstDay(currentMonth));
+        insertCourse("course-web", "WEB101", "Web Programming", "Web Programming", "Lap trinh Web", 3);
+        insertSection("section-web-a", "A", "course-web", "semester-registration", 2, 0);
+        insertEnrollmentInSection("enrollment-confirmed", "semester-registration", "section-web-a", "CONFIRMED");
+        insertEnrollment("enrollment-completed-a", "COMPLETED", "A");
+        insertWaitlist("waitlist-active", "section-web-a", "ACTIVE");
+        insertInvoice("invoice-pending", "PENDING", BigDecimal.valueOf(100));
+        insertPayment("payment-completed", "CARD", "COMPLETED", BigDecimal.valueOf(40));
+        insertNotification(
+                "notification-warning",
+                "WARNING",
+                false,
+                BASE_TIME,
+                "Capacity warning",
+                "A section is near capacity.");
+
+        mvc.perform(get("/api/v1/analytics/cockpit").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.generatedAt").exists())
+                .andExpect(jsonPath("$.overview.totalStudents").value(1))
+                .andExpect(jsonPath("$.overview.totalLecturers").value(1))
+                .andExpect(jsonPath("$.overview.totalCourses").value(1))
+                .andExpect(jsonPath("$.overview.totalSections").value(1))
+                .andExpect(jsonPath("$.overview.totalEnrollments").value(2))
+                .andExpect(jsonPath("$.enrollmentTrends.length()").value(12))
+                .andExpect(jsonPath("$.enrollmentTrends[11].month").value(monthKey(currentMonth)))
+                .andExpect(jsonPath("$.enrollmentTrends[11].enrolled").value(1))
+                .andExpect(jsonPath("$.enrollmentTrends[11].completed").value(1))
+                .andExpect(jsonPath("$.enrollmentTrends[11].totalActivity").value(2))
+                .andExpect(jsonPath("$.sectionOccupancy.length()").value(1))
+                .andExpect(jsonPath("$.sectionOccupancy[0].sectionId").value("section-web-a"))
+                .andExpect(jsonPath("$.sectionOccupancy[0].occupancyRate").value(50))
+                .andExpect(jsonPath("$.gradeDistribution.length()").value(12))
+                .andExpect(jsonPath("$.gradeDistribution[0].grade").value("A"))
+                .andExpect(jsonPath("$.gradeDistribution[0].count").value(1))
+                .andExpect(jsonPath("$.gradeDistribution[0].percentage").value(100))
+                .andExpect(jsonPath("$.finance.totals.totalInvoiced").value(100.00))
+                .andExpect(jsonPath("$.finance.totals.paidAmount").value(40.00))
+                .andExpect(jsonPath("$.finance.totals.outstandingAmount").value(60.00))
+                .andExpect(jsonPath("$.notifications.total").value(1))
+                .andExpect(jsonPath("$.notifications.unread").value(1))
+                .andExpect(jsonPath("$.notifications.recentAttention[0].id").value("notification-warning"))
+                .andExpect(jsonPath("$.registrationPressure.activeSemesters").value(1))
+                .andExpect(jsonPath("$.registrationPressure.totalSections").value(1))
+                .andExpect(jsonPath("$.registrationPressure.waitlistActive").value(1))
+                .andExpect(jsonPath("$.operator.serviceCount").value(8))
+                .andExpect(jsonPath("$.operator.dashboards.length()").value(4));
+    }
+
+    @Test
     void topCoursesPreservesLegacySortLimitAndConfirmedPendingCounts() throws Exception {
         insertAcademicYear("academic-year-2026", 2026);
         insertSemester(
@@ -584,6 +668,14 @@ class AnalyticsReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
 
+        mvc.perform(get("/api/v1/analytics/operator-summary").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/analytics/cockpit").with(studentJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
         mvc.perform(get("/api/v1/analytics/top-courses").with(studentJwt()))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
@@ -627,6 +719,18 @@ class AnalyticsReadPersistenceTest {
         mvc.perform(get("/api/v1/analytics/enrollment-trends")
                         .queryParam("months", "3")
                         .queryParam("months", "4")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/operator-summary")
+                        .queryParam("months", "12")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/analytics/cockpit")
+                        .queryParam("months", "12")
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));

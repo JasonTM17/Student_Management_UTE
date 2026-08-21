@@ -1,11 +1,13 @@
 package io.campuscore.restfulapi.analytics.web;
 
 import io.campuscore.restfulapi.analytics.service.AnalyticsReadService;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.CockpitResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentBySemesterBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.EnrollmentTrendBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.FinanceSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.GradeDistributionBucket;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.NotificationSummaryResponse;
+import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OperatorSummaryResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.OverviewResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.RegistrationPressureResponse;
 import io.campuscore.restfulapi.analytics.web.AnalyticsReadDtos.SectionOccupancyBucket;
@@ -24,8 +26,8 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 /**
- * Feature-gated analytics reads. Attendance, lecturer dashboards, cockpit
- * composition, metrics export and event consumers remain in the legacy
+ * Feature-gated analytics reads. Revenue, attendance, lecturer dashboards,
+ * metrics export and event consumers remain in the legacy
  * analytics-service for this wave.
  */
 @RestController
@@ -70,6 +72,21 @@ public class AnalyticsReadController {
             @RequestParam(name = "months", required = false) String months) {
         requireAllowedQuery(queryParameters, Set.of("months"));
         return analytics.enrollmentTrends(parseTrendMonths(months));
+    }
+
+    @GetMapping("operator-summary")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public OperatorSummaryResponse operatorSummary(
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.operatorSummary();
+    }
+
+    @GetMapping("cockpit")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public CockpitResponse cockpit(@RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of());
+        return analytics.cockpit();
     }
 
     @GetMapping("section-occupancy")
