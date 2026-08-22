@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.academic.web;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 
@@ -245,7 +246,8 @@ public final class AcademicReadDtos {
             Instant createdAt,
             @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant updatedAt,
-            DepartmentSummary department,
+            FacultyDepartmentSummary department,
+            @JsonInclude(JsonInclude.Include.NON_NULL)
             List<CurriculumCourseSummary> courses) {
     }
 

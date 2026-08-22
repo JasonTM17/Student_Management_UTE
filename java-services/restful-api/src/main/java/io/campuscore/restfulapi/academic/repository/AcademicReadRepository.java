@@ -332,7 +332,7 @@ public class AcademicReadRepository {
 
     public List<CurriculumResponse> findCurricula(long offset, int limit) {
         return jdbc.query(
-                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_COLUMNS
+                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_RESPONSE_COLUMNS
                         + " FROM \"academic\".\"Curriculum\" cur"
                         + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = cur.\"departmentId\""
                         + " ORDER BY cur.\"name\" ASC, cur.\"id\" ASC LIMIT :limit OFFSET :offset",
@@ -350,7 +350,7 @@ public class AcademicReadRepository {
 
     public Optional<CurriculumResponse> findCurriculumById(String id) {
         List<CurriculumResponse> matches = jdbc.query(
-                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_COLUMNS
+                "SELECT " + CURRICULUM_COLUMNS + ", " + DEPARTMENT_RESPONSE_COLUMNS
                         + " FROM \"academic\".\"Curriculum\" cur"
                         + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = cur.\"departmentId\""
                         + " WHERE cur.\"id\" = :id",
@@ -368,8 +368,7 @@ public class AcademicReadRepository {
                         + " cc.\"courseId\" AS cc_course_id, cc.\"year\" AS cc_year,"
                         + " cc.\"semester\" AS cc_semester, cc.\"isMandatory\" AS cc_is_mandatory"
                         + " FROM \"academic\".\"CurriculumCourse\" cc"
-                        + " WHERE cc.\"curriculumId\" IN (:curriculumIds)"
-                        + " ORDER BY cc.\"year\" ASC, cc.\"semester\" ASC, cc.\"courseId\" ASC, cc.\"id\" ASC",
+                        + " WHERE cc.\"curriculumId\" IN (:curriculumIds)",
                 new MapSqlParameterSource("curriculumIds", curriculumIds),
                 CURRICULUM_COURSE_ROW_MAPPER);
     }
@@ -618,7 +617,7 @@ public class AcademicReadRepository {
 
     private static CurriculumResponse mapCurriculum(ResultSet resultSet, int ignored)
             throws SQLException {
-        DepartmentSummary department = new DepartmentSummary(
+        FacultyDepartmentSummary department = new FacultyDepartmentSummary(
                 resultSet.getString("department_id"),
                 resultSet.getString("department_name"),
                 resultSet.getString("department_name_en"),
@@ -627,7 +626,13 @@ public class AcademicReadRepository {
                 resultSet.getString("department_description"),
                 resultSet.getString("department_description_en"),
                 resultSet.getString("department_description_vi"),
+                resultSet.getString("department_chair"),
+                resultSet.getString("department_phone"),
+                resultSet.getString("department_email"),
+                resultSet.getString("department_building"),
                 resultSet.getString("department_faculty_id"),
+                instant(resultSet.getTimestamp("department_created_at")),
+                instant(resultSet.getTimestamp("department_updated_at")),
                 resultSet.getBoolean("department_is_active"));
         return new CurriculumResponse(
                 resultSet.getString("curriculum_id"),
