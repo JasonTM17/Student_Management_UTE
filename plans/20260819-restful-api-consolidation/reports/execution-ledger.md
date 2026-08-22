@@ -21,6 +21,11 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Current exact-head review refresh on `92da1dfc5c3b28847e3dae7911b1331dc783c022`:
   Advisor `HOLD`, Kongming `HOLD`, reviewer `HOLD`, Wukong `FALSIFIED` for the
   claim that the old pack was already fresh exact-head evidence.
+- Phase 62 academic curriculum differential harness is now present on the same
+  backend tip as an uncommitted working change; it has syntax/self-test PASS,
+  and the live restored curricula rehearsal now also PASSes against the seeded
+  PostgreSQL restore at `127.0.0.1:56452` using legacy `127.0.0.1:4003` and
+  Java `127.0.0.1:4010`.
 - The earlier Phase 55 hardening focused gate remains historical evidence only.
 - Disk snapshot after the refresh: C: ~2.63 GiB free, D: ~34.51 GiB free. No
   manual Codex/IDE/user-data cleanup was performed.
@@ -32,10 +37,11 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current step
 
-- Current step after the Phase 55 hardening checkpoint: continue with the next
-  bounded backend parity/rehearsal slice from `origin/feature/java-thesis-platform`
-  while keeping public route ownership, writer ownership, FE traffic and
-  production cutover on HOLD.
+- Current step after the Phase 62 live rehearsal: commit the exact source/docs
+  state for the curriculum differential checkpoint, push it safely, and then
+  continue with the next bounded backend parity/rehearsal slice from
+  `origin/feature/java-thesis-platform` while keeping public route ownership,
+  writer ownership, FE traffic and production cutover on HOLD.
 
 ## Phase 48 evidence
 

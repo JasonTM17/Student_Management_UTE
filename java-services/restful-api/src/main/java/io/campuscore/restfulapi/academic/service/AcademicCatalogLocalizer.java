@@ -137,7 +137,7 @@ final class AcademicCatalogLocalizer {
         LocalizedDefaults defaults = CURRICULUM_DEFAULTS.getOrDefault(
                 upper(curriculum.code()),
                 LocalizedDefaults.EMPTY);
-        DepartmentSummary department = hydrateDepartment(curriculum.department());
+        FacultyDepartmentSummary department = hydrateFacultyDepartment(curriculum.department());
         return new CurriculumResponse(
                 curriculum.id(),
                 curriculum.name(),

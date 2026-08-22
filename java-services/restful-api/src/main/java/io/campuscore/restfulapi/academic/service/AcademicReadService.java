@@ -260,7 +260,7 @@ public class AcademicReadService {
                         curriculum.createdAt(),
                         curriculum.updatedAt(),
                         curriculum.department(),
-                        coursesByCurriculum.getOrDefault(curriculum.id(), List.of())))
+                        includeCourses ? coursesByCurriculum.getOrDefault(curriculum.id(), List.of()) : null))
                 .map(AcademicCatalogLocalizer::hydrateCurriculum)
                 .toList();
     }

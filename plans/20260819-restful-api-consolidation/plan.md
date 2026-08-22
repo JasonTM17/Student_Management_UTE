@@ -625,6 +625,13 @@ the retirement gates pass.
   password-change and logout behavior on real PostgreSQL syntax/types. Legacy
   auth-service remains the public route owner; route canary, rollback and
   public auth handoff remain open.
+- Phase 62 academic curriculum differential and rollback harness: source
+  harness verified candidate/HOLD; see
+  `phase-62-academic-curriculum-differential-rollback.md`. It adds a dedicated
+  legacy → Java → legacy rehearsal for `GET /api/v1/curricula` and
+  `GET /api/v1/curricula/{id}` with list no-hydration and detail hydration
+  checks. The harness self-test passes, and the live restored PostgreSQL
+  curricula rehearsal now passes as well on the seeded disposable restore.
 
 ## Backend foundation gate before Stitch implementation
 
