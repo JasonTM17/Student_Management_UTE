@@ -26,6 +26,21 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Disk snapshot before this docs update: C: ~13.64 GiB free, D: ~35.31 GiB
   free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56452`
   and `56453` were stopped by exact data directory; no broad deletion was run.
+- Fresh exact-head refresh on the current remote tip
+  `6bd4bd59bedbe0df6923d4fb2d7063a986ad7c69` in
+  `D:\Student_Management-recovery\backend-provenance-4b5e771`:
+  - harness syntax: `node --check scripts/run-academic-curriculum-differential-rehearsal.mjs` PASS
+  - harness self-test: `node scripts/run-academic-curriculum-differential-rehearsal.mjs --self-test` PASS
+  - harness edge-route-switch self-test: `node scripts/run-academic-curriculum-differential-rehearsal.mjs --self-test --edge-route-switch` PASS
+  - live differential against restored academic snapshot on `127.0.0.1:56452`
+    with temporary legacy academic-service on `127.0.0.1:54003` and Java
+    candidate on `127.0.0.1:4010`: PASS
+  - live edge-route-switch rollback on the same snapshot/ports: PASS
+  - live DB user observed via `pg_stat_activity`: `postgres` on database
+    `postgres`, schema `academic`
+- The earlier Phase 55 hardening focused gate remains historical evidence only.
+- Disk snapshot after the refresh: C: ~2.63 GiB free, D: ~34.51 GiB free. No
+  manual Codex/IDE/user-data cleanup was performed.
 
 ## Completed evidence carried forward
 
@@ -38,6 +53,11 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   checkpoint, preserve the runtime blocker evidence, and keep the active plan
   intact until a local edge/runtime is available again. Route ownership,
   writer ownership, FE traffic and production cutover remain on HOLD.
+- Current step after the Phase 62 live rehearsal: commit the exact source/docs
+  state for the curriculum differential checkpoint, push it safely, and then
+  continue with the next bounded backend parity/rehearsal slice from
+  `origin/feature/java-thesis-platform` while keeping public route ownership,
+  writer ownership, FE traffic and production cutover on HOLD.
 
 ## Phase 48 evidence
 

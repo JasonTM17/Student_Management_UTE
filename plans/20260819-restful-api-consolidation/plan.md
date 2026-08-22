@@ -605,6 +605,28 @@ the retirement gates pass.
   on the Node status-filter route, so it is still not restored legacy-data
   parity, route canary, rollback, checkout ownership or public traffic handoff
   evidence.
+- Phase 60 finance edge route-switch rollback rehearsal: source/live-proxy
+  candidate/HOLD; see `phase-60-finance-edge-route-switch-rollback.md`. It
+  runs the finance read corpus through a local proxy that switches legacy →
+  Java → legacy under one stable client URL, using the same disposable
+  PostgreSQL restore and the same documented restored-legacy payment-status
+  limitation. This adds proxy rollback evidence, but it still does not grant
+  public finance route ownership, checkout ownership, or FE/mobile wiring.
+- Phase 61 auth login PostgreSQL focused rehearsal: source/PostgreSQL focused
+  verified candidate/HOLD; see
+  `phase-61-auth-login-postgres-focused-rehearsal.md`. It exercises the
+  feature-gated auth login/session persistence test suite against a disposable
+  PostgreSQL target on exact head, validating login, refresh, profile,
+  password-change and logout behavior on real PostgreSQL syntax/types. Legacy
+  auth-service remains the public route owner; route canary, rollback and
+  public auth handoff remain open.
+- Phase 62 academic curriculum differential and rollback harness: source
+  harness verified candidate/HOLD; see
+  `phase-62-academic-curriculum-differential-rollback.md`. It adds a dedicated
+  legacy → Java → legacy rehearsal for `GET /api/v1/curricula` and
+  `GET /api/v1/curricula/{id}` with list no-hydration and detail hydration
+  checks. The harness self-test passes, and the live restored PostgreSQL
+  curricula rehearsal now passes as well on the seeded disposable restore.
 
 ## Backend foundation gate before Stitch implementation
 
