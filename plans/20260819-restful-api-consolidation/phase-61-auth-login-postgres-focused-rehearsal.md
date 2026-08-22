@@ -53,3 +53,17 @@ Result: PASS.
 This adds focused PostgreSQL evidence for the auth login/session slice, but it
 still does not clear public auth route ownership, auth canary routing,
 rollback, or wider client convergence.
+
+## Source checkpoint refresh — 2026-08-22
+
+- Source commit: `4838c323cc99755f15f2242597077c83a571a6da`
+- `mvn -q -f java-services/pom.xml test`
+  - result: PASS
+  - Surefire summary: 27 reports / 178 tests / 0 failures / 0 errors / 1
+    skipped
+- `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.auth.AuthLoginPersistenceTest' '-DforkCount=0' test`
+  - disposable PostgreSQL target `127.0.0.1:56473`
+  - result: PASS
+  - Surefire summary: 9 tests / 0 failures / 0 errors / 0 skipped
+- This confirms the auth login/session rehearsal still holds on the refreshed
+  source checkpoint while preserving the 2026-08-21 exact-head evidence above.
