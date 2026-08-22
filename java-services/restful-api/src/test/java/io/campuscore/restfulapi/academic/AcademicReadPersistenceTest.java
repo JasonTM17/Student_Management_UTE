@@ -478,7 +478,7 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].descriptionVi").value("Chương trình Khoa học máy tính cho khóa tuyển sinh 2026"))
                 .andExpect(jsonPath("$.data[0].department.code").value("CSE"))
                 .andExpect(jsonPath("$.data[0].department.nameVi").value("Khoa học máy tính"))
-                .andExpect(jsonPath("$.data[0].courses.length()").value(0))
+                .andExpect(jsonPath("$.data[0].courses").doesNotExist())
                 .andExpect(jsonPath("$.meta.total").value(2))
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
 
@@ -489,11 +489,11 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.semesterId").value("fall-2026"))
                 .andExpect(jsonPath("$.totalCredits").value(150))
                 .andExpect(jsonPath("$.courses.length()").value(2))
-                .andExpect(jsonPath("$.courses[0].id").value("curriculum-course-1"))
-                .andExpect(jsonPath("$.courses[0].courseId").value("cs101"))
-                .andExpect(jsonPath("$.courses[0].isMandatory").value(true))
-                .andExpect(jsonPath("$.courses[1].id").value("curriculum-course-2"))
-                .andExpect(jsonPath("$.courses[1].isMandatory").value(false));
+                .andExpect(jsonPath("$.courses[0].id").value("curriculum-course-2"))
+                .andExpect(jsonPath("$.courses[0].courseId").value("se401"))
+                .andExpect(jsonPath("$.courses[0].isMandatory").value(false))
+                .andExpect(jsonPath("$.courses[1].id").value("curriculum-course-1"))
+                .andExpect(jsonPath("$.courses[1].isMandatory").value(true));
 
         mvc.perform(get("/api/v1/internal/academic-context/curricula/curriculum-cs"))
                 .andExpect(status().isForbidden())
