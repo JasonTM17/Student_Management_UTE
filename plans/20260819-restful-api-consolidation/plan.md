@@ -752,3 +752,18 @@ until rollback has been exercised and evidence is stored under this plan.
 
 Until these decisions are resolved with evidence, the public migration gate is
 `HOLD` and the legacy topology remains preserved.
+
+## Current exact-head refresh — 2026-08-22
+
+- Current exact head: `92da1dfc5c3b28847e3dae7911b1331dc783c022`
+  (`docs(plan): record auth checkpoint at current tip`).
+- Backend provenance worktree for this refresh:
+  `D:\Student_Management-recovery\backend-provenance-4b5e771`, detached and
+  clean at the same exact head.
+- This is a docs-only tip on the same source checkpoint. The auth PostgreSQL
+  rehearsal and canonical Java reactor evidence still describe the same source
+  tree; only the review/ledger binding needed rebase to the current SHA.
+- Exact-head review refresh on this tip: Advisor `HOLD`, Kongming `HOLD`,
+  reviewer `HOLD`, Wukong `FALSIFIED` for the claim that the old pack was
+  already fresh exact-head evidence.
+- Source push, public cutover and FE wiring remain `HOLD`.
