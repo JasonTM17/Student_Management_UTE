@@ -5,12 +5,12 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 - Current remote integration snapshot:
   `origin/feature/java-thesis-platform` at
-  `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`
-  (`fix(frontend): tighten Stitch responsive surfaces`), with source hardening
-  in `97a9b7e12d70aeb6a55959ea66b593515ede778f`.
+  `92da1dfc5c3b28847e3dae7911b1331dc783c022`
+  (`docs(plan): record auth checkpoint at current tip`), with the current
+  backend source checkpoint preserved in `4838c323cc99755f15f2242597077c83a571a6da`.
 - Backend provenance worktree used for this checkpoint:
   `D:\Student_Management-recovery\backend-provenance-4b5e771`, detached at
-  `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`, clean.
+  `92da1dfc5c3b28847e3dae7911b1331dc783c022`, clean.
 - Main workspace `D:\Student_Management` remains intentionally untouched for
   integration because it is behind the remote by two commits and contains
   preserved user-owned dirty FE/edge artifacts. Do not reset, clean, rebase or
@@ -18,6 +18,9 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 - Current backend gate evidence on the current tip: `mvn -q -f java-services/pom.xml test`
   PASS with 27 reports / 178 tests / 0 failures / 0 errors / 1 skipped,
   `git diff --check` PASS, and scoped high-confidence secret scan PASS.
+- Current exact-head review refresh on `92da1dfc5c3b28847e3dae7911b1331dc783c022`:
+  Advisor `HOLD`, Kongming `HOLD`, reviewer `HOLD`, Wukong `FALSIFIED` for the
+  claim that the old pack was already fresh exact-head evidence.
 - The earlier Phase 55 hardening focused gate remains historical evidence only.
 - Disk snapshot after the refresh: C: ~2.63 GiB free, D: ~34.51 GiB free. No
   manual Codex/IDE/user-data cleanup was performed.

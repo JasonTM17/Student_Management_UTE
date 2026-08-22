@@ -1,23 +1,24 @@
 # Architecture review gate — one RESTful API direction
 
-## Current exact-head refresh — `2996395326c11b6dfbdba57e33926e9bcf98dc85`
+## Current exact-head refresh — `92da1dfc5c3b28847e3dae7911b1331dc783c022`
 
 - Branch: `feature/java-thesis-platform`
 - Review mode: read-only, current-state refresh
-- Scope: whether the backend foundation is ready to unlock staged FE Stitch work
+- Scope: whether the backend foundation review pack is bound to the current
+  exact head and safe to continue backend parity work
 - Status: `HOLD`
 
 | Reviewer | Verdict | Meaning |
 | --- | --- | --- |
-| Advisor | `HOLD` | Fresh exact-head read confirms backend foundation still lacks rollback/cutover-quality proof. |
-| Kongming | `HOLD` | Fresh read-only review says backend foundation still lacks exact-head rollback/cutover-quality proof. |
-| Wukong | `FALSIFIED` | The claim that current evidence is sufficient to mark backend foundation ready and begin Stitch FE is false. |
+| Advisor | `HOLD` | Review-only gate refresh is the next safe move; backend parity can continue later, but source push/cutover/FE wiring remain HOLD. |
+| Kongming | `HOLD` | Backend parity may continue, but source push/cutover/FE wiring remain HOLD until exact-head rollback/cutover proof exists. |
+| Reviewer | `HOLD` | The previous pack was stale; this refresh now binds the current tip, but it is still only HOLD, not approval. |
+| Wukong | `FALSIFIED` | The claim that the old pack was already fresh exact-head evidence is false. |
 
 The current exact head stays behind the backend foundation gate. This refresh
 records the exact-head evidence boundary so later client staging can compare
-against a non-stale snapshot. The reviewer pass for this snapshot was
-`NOT_RUN` because the working tree still carries preserved dirty FE/edge/runtime
-candidate paths, so this is not a frozen acceptance head.
+against a non-stale snapshot. The pack is still HOLD, but it now tracks the
+current tip instead of an older SHA.
 
 ## Review ledger snapshot
 

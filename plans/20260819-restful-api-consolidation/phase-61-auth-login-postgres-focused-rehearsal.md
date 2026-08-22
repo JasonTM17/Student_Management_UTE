@@ -67,3 +67,12 @@ rollback, or wider client convergence.
   - Surefire summary: 9 tests / 0 failures / 0 errors / 0 skipped
 - This confirms the auth login/session rehearsal still holds on the refreshed
   source checkpoint while preserving the 2026-08-21 exact-head evidence above.
+
+## Exact-head continuity note — 2026-08-22
+
+- Current branch tip: `92da1dfc5c3b28847e3dae7911b1331dc783c022`
+  (`docs(plan): record auth checkpoint at current tip`).
+- This tip is docs-only on the same source checkpoint, so the auth rehearsal
+  evidence above remains the relevant source behavior record.
+- The exact-head review pack and execution ledger were rebound to the current
+  tip so the backend continuation path is not tied to stale SHAs.
