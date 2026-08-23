@@ -1,10 +1,9 @@
 'use client';
 
 import { Check, Clock3, FileText, UsersRound } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -66,9 +65,9 @@ export default function ThesisProgressPage() {
         title={messages.thesis.progressTitle}
         description={messages.thesis.progressDescription}
         actions={
-          <LocalizedLink href="/dashboard/thesis">
-            <Button variant="outline">{messages.thesis.backToWorkspace}</Button>
-          </LocalizedLink>
+          <LinkButton href="/dashboard/thesis" variant="outline">
+            {messages.thesis.backToWorkspace}
+          </LinkButton>
         }
       />
 
@@ -150,9 +149,9 @@ export default function ThesisProgressPage() {
                 </p>
               </div>
             </div>
-            <LocalizedLink href="/dashboard/thesis">
-              <Button variant="outline">{messages.thesis.backToWorkspace}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/thesis" variant="outline">
+              {messages.thesis.backToWorkspace}
+            </LinkButton>
           </CardContent>
         </Card>
       )}

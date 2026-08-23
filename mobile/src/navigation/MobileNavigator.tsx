@@ -22,12 +22,13 @@ export function MobileNavigator() {
   const [role, setRole] = useState<UserRole>('student');
   const [sessionKind, setSessionKind] = useState<SessionKind>('signedOut');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedThesisTopicId, setSelectedThesisTopicId] = useState<string | null>(null);
   const isPreviewSession = sessionKind === 'preview';
   const isAuthenticated = sessionKind === 'authenticated';
   const hasActiveSession = isPreviewSession || isAuthenticated;
 
   const navigation: MobileNavigation = {
-    navigate(nextRoute) {
+    navigate(nextRoute, options) {
       if (!hasActiveSession) {
         return;
       }
@@ -35,6 +36,9 @@ export function MobileNavigator() {
         setRoute(roleHome[role]);
         setMenuOpen(false);
         return;
+      }
+      if (options?.thesisTopicId) {
+        setSelectedThesisTopicId(options.thesisTopicId);
       }
       setRoute(nextRoute);
       setMenuOpen(false);
@@ -44,6 +48,7 @@ export function MobileNavigator() {
         return;
       }
       setSessionKind('preview');
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[role]);
       setMenuOpen(false);
     },
@@ -53,6 +58,7 @@ export function MobileNavigator() {
       }
       setSessionKind('authenticated');
       setRole(nextRole);
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[nextRole]);
       setMenuOpen(false);
     },
@@ -68,6 +74,7 @@ export function MobileNavigator() {
       }
       setSessionKind('signedOut');
       setRole('student');
+      setSelectedThesisTopicId(null);
       setRoute('auth.signIn');
       setMenuOpen(false);
     },
@@ -76,6 +83,7 @@ export function MobileNavigator() {
         return;
       }
       setRole(nextRole);
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[nextRole]);
       setMenuOpen(false);
     },
@@ -91,7 +99,11 @@ export function MobileNavigator() {
           importantForAccessibility={menuOpen ? 'no-hide-descendants' : 'auto'}
           style={styles.content}
         >
-          <ScreenComponent navigation={navigation} role={role} />
+          <ScreenComponent
+            navigation={navigation}
+            role={role}
+            selectedThesisTopicId={selectedThesisTopicId}
+          />
           {hasActiveSession ? (
             <BottomNavigation
               activeRoute={route}

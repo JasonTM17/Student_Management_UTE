@@ -26,11 +26,11 @@ const adminMetrics = [
 
 export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
   return (
-    <ScreenShell title="Admin dashboard" eyebrow="Operations · Admin" subtitle="A focused view of campus continuity signals.">
+    <ScreenShell title="Admin dashboard" eyebrow="Admin workspace" subtitle="A focused view of campus academic activity.">
       <Card tone="primary" style={styles.hero}>
         <UiText variant="meta" tone="primary">TODAY · 24 AUGUST 2026</UiText>
         <UiText variant="headlineSmall" style={styles.heroTitle}>Keep the campus moving.</UiText>
-        <UiText variant="bodySmall" tone="muted">Review registration pressure and people operations from one mobile surface.</UiText>
+        <UiText variant="bodySmall" tone="muted">Review registration demand and people records from one mobile surface.</UiText>
       </Card>
       <ScreenSpacer />
       <View style={styles.metricGrid}>
@@ -45,7 +45,7 @@ export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
         ))}
       </View>
       <ScreenSpacer />
-      <SectionHeading title="Operational shortcuts" />
+      <SectionHeading title="Admin shortcuts" />
       <Card>
         <ListRow leading="S" title="Manage students" subtitle="Search and review student records" onPress={() => navigation.navigate('admin.students')} trailing={<UiText variant="bodyMedium" tone="muted">›</UiText>} />
         <Divider />
@@ -59,7 +59,7 @@ export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
 
 export function AdminStudentsScreen({ navigation }: MobileScreenProps) {
   return (
-    <ScreenShell title="Manage students" eyebrow="Admin workspace" subtitle="A mobile-friendly record list for common operations.">
+    <ScreenShell title="Manage students" eyebrow="Admin workspace" subtitle="A mobile-friendly list for common student record tasks.">
       <Card tone="low" style={styles.summaryCard}>
         <UiText variant="label">12,418 active students</UiText>
         <UiText variant="bodySmall" tone="muted">Updated 10 minutes ago · data comes from the Java API seam when connected.</UiText>
@@ -110,7 +110,7 @@ export function AdminLecturersScreen({ navigation }: MobileScreenProps) {
 
 export function LecturerDashboardScreen({ navigation, role }: MobileScreenProps) {
   return (
-    <ScreenShell title="Lecturer dashboard" eyebrow={`Operations · ${role}`} subtitle="Your teaching day, kept readable.">
+    <ScreenShell title="Lecturer dashboard" eyebrow={`${role} workspace`} subtitle="Your teaching day, kept readable.">
       <Card tone="primary" style={styles.hero}>
         <UiText variant="meta" tone="primary">TUESDAY · 19 AUGUST 2026</UiText>
         <UiText variant="headlineSmall" style={styles.heroTitle}>Two classes need you today.</UiText>

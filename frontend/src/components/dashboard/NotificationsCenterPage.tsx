@@ -8,7 +8,7 @@ import {
   Inbox,
   RefreshCw,
 } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
@@ -247,11 +247,9 @@ export default function NotificationsCenterPage() {
             title={filter === 'unread' ? copy.noUnread : copy.noAll}
             description={filter === 'unread' ? copy.noUnread : copy.empty}
             action={
-              <Button asChild variant="outline">
-                <LocalizedLink href="/dashboard">
-                  {messages.common.actions.openDashboard}
-                </LocalizedLink>
-              </Button>
+              <LinkButton href="/dashboard" variant="outline">
+                {messages.common.actions.openDashboard}
+              </LinkButton>
             }
           />
         ) : (

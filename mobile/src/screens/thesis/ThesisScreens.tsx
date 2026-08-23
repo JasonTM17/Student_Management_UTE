@@ -166,7 +166,11 @@ export function ThesisTopicsScreen({ navigation }: MobileScreenProps) {
                 </View>
                 <Badge label={topic.status} tone={statusTone(topic.status)} />
               </View>
-              <Button label="View topic" onPress={() => navigation.navigate('thesis.detail')} variant="text" />
+              <Button
+                label="View topic"
+                onPress={() => navigation.navigate('thesis.detail', { thesisTopicId: topic.id })}
+                variant="text"
+              />
             </Card>
           ))}
           {workspace.topics.length === 0 ? (
@@ -178,9 +182,9 @@ export function ThesisTopicsScreen({ navigation }: MobileScreenProps) {
   );
 }
 
-export function ThesisDetailScreen({ navigation }: MobileScreenProps) {
+export function ThesisDetailScreen({ navigation, selectedThesisTopicId }: MobileScreenProps) {
   const workspace = useThesisWorkspace();
-  const topic = workspace.topics[0];
+  const topic = workspace.topics.find((item) => item.id === selectedThesisTopicId);
 
   return (
     <ScreenShell title="Topic detail" eyebrow={topic?.departmentId ?? 'Thesis core'} subtitle={topic?.title ?? 'Published topic'}>
@@ -201,7 +205,10 @@ export function ThesisDetailScreen({ navigation }: MobileScreenProps) {
             <UiText variant="meta" tone="muted">Maximum {topic.maxGroups} groups</UiText>
           </Card>
           <ScreenSpacer />
-          <Button label="Register this topic" onPress={() => navigation.navigate('thesis.registration')} />
+          <Button
+            label="Register this topic"
+            onPress={() => navigation.navigate('thesis.registration', { thesisTopicId: topic.id })}
+          />
         </>
       ) : !workspace.loading && !workspace.error ? (
         <Card tone="low"><UiText variant="bodySmall" tone="muted">Select a published topic when one becomes available.</UiText></Card>
@@ -210,12 +217,14 @@ export function ThesisDetailScreen({ navigation }: MobileScreenProps) {
   );
 }
 
-export function ThesisRegistrationScreen({ navigation }: MobileScreenProps) {
+export function ThesisRegistrationScreen({ navigation, selectedThesisTopicId }: MobileScreenProps) {
   const workspace = useThesisWorkspace();
   const [working, setWorking] = useState(false);
   const [notice, setNotice] = useState<string | null>(null);
-  const topic = workspace.topics[0];
   const group = workspace.groups[0];
+  const topic = workspace.topics.find(
+    (item) => item.id === (selectedThesisTopicId ?? group?.topicId),
+  );
   const canRegister = Boolean(workspace.round && topic && workspace.round.status === 'REGISTRATION_OPEN');
 
   const register = async () => {

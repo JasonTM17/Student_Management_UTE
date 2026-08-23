@@ -97,6 +97,8 @@ jobs:
           assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
           ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "ANSWERED" and data["degraded"] is False and len(data["citations"]) > 0'
           docker compose stop postgres
+          readiness_code="$(curl --max-time 8 --silent --output /dev/null --write-out '%{http_code}' -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness)"
+          test "$readiness_code" = "503"
           outage="$(curl --max-time 8 --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
           OUTAGE="$outage" python3 -c 'import json, os; data=json.loads(os.environ["OUTAGE"]); assert data["reasonCode"] == "KNOWLEDGE_UNAVAILABLE" and data["degraded"] is True and data["citations"] == []'
           docker compose start postgres

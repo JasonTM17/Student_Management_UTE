@@ -1,0 +1,110 @@
+const test = require('node:test');
+const assert = require('node:assert/strict');
+const fs = require('node:fs');
+const path = require('node:path');
+
+const root = path.resolve(__dirname, '..');
+
+function read(relativePath) {
+  return fs.readFileSync(path.join(root, relativePath), 'utf8');
+}
+
+function walk(relativeDirectory) {
+  const directory = path.join(root, relativeDirectory);
+  return fs.readdirSync(directory, { withFileTypes: true }).flatMap((entry) => {
+    const relativePath = path.join(relativeDirectory, entry.name);
+    if (entry.isDirectory()) return walk(relativePath);
+    return /\.(tsx?|jsx?)$/.test(entry.name) ? [relativePath] : [];
+  });
+}
+
+test('localized CTA links render one anchor with shared button styling', () => {
+  const source = walk('src').map(read).join('\n');
+  const linkButton = read('src/components/ui/link-button.tsx');
+
+  assert.doesNotMatch(source, /<LocalizedLink\b[^>]*>\s*<Button\b/);
+  assert.doesNotMatch(source, /<Button\b[^>]*>\s*<LocalizedLink\b/);
+  assert.match(linkButton, /<LocalizedLink[\s\S]*buttonVariants\(\{ size, variant \}\)/);
+  assert.doesNotMatch(linkButton, /role=["']button["']/);
+});
+
+test('reference loaders use Java API maxima and expose failed lookups', () => {
+  const limits = read('src/lib/reference-data.ts');
+  const pages = [
+    'src/app/admin/semesters/page.tsx',
+    'src/app/admin/sections/page.tsx',
+    'src/app/admin/courses/page.tsx',
+    'src/app/admin/lecturers/page.tsx',
+    'src/app/admin/enrollments/page.tsx',
+  ].map(read);
+  const source = pages.join('\n');
+
+  assert.match(limits, /ACADEMIC_REFERENCE_LIMIT = 200/);
+  assert.match(limits, /PEOPLE_REFERENCE_LIMIT = 100/);
+  assert.doesNotMatch(source, /limit:\s*1000/);
+  assert.match(source, /lecturersApi\.getAll\(\{ limit: PEOPLE_REFERENCE_LIMIT \}\)/);
+  for (const page of pages) assert.match(page, /setReferenceError\(/);
+  assert.match(pages[1], /Promise\.allSettled/);
+  assert.match(pages[4], /setSectionReferenceError\(/);
+});
+
+test('admin thesis and home routing distinguish role state explicitly', () => {
+  const thesis = read('src/app/admin/thesis/page.tsx');
+  const home = read('src/app/page.tsx');
+
+  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login"/);
+  assert.match(thesis, /if \(!canAccess\) \{[\s\S]*?<ForbiddenState/);
+  assert.ok(thesis.indexOf('if (!canAccess)') < thesis.indexOf('if (isLoading && rounds.length === 0)'));
+  assert.match(home, /const workspaceHref = isAdmin \|\| isSuperAdmin/);
+  assert.match(home, /isLecturer[\s\S]*?'\/dashboard\/lecturer'/);
+  assert.doesNotMatch(home, /href=\{user \? '\/admin' : '\/login'\}/);
+});
+
+test('course-demo copy excludes retired finance and monitoring language', () => {
+  const copy = [
+    'src/i18n/messages.ts',
+    'src/app/admin/departments/page.tsx',
+    'src/app/admin/semesters/page.tsx',
+    'src/app/dashboard/lecturer/schedule/page.tsx',
+    'src/app/opengraph-image.tsx',
+    'public/screenshots/home-en.svg',
+    'public/screenshots/home-vi.svg',
+  ].map(read).join('\n');
+
+  assert.doesNotMatch(
+    copy,
+    /\b(?:finance|financial|billing|invoice|payment|reporting|operational)\b|tài chính|hóa đơn|thanh toán|báo cáo|vận hành/i,
+  );
+});
+
+test('npm test includes smoke, portal, and Phase 6 source regressions', () => {
+  const packageJson = JSON.parse(read('package.json'));
+
+  assert.match(packageJson.scripts.test, /frontend-smoke\.test\.js/);
+  assert.match(packageJson.scripts.test, /portal-shell\.test\.js/);
+  assert.match(packageJson.scripts.test, /phase-six-repair\.test\.js/);
+  assert.doesNotMatch(packageJson.scripts.test, /viewport/);
+});
+
+test('the authenticated portal assistant is a complete bottom-right RAG surface', () => {
+  const layout = read('src/app/dashboard/layout.tsx');
+  const assistant = read('src/components/assistant/AssistantPanel.tsx');
+  const messages = read('src/i18n/messages.ts');
+
+  assert.match(layout, /<AssistantPanel \/>/);
+  assert.match(assistant, /fixed bottom-\[/);
+  assert.match(assistant, /right-4/);
+  assert.match(assistant, /role="dialog"/);
+  assert.match(assistant, /role="log"/);
+  assert.match(assistant, /aria-live="polite"/);
+  assert.match(assistant, /event\.key !== 'Escape'/);
+  assert.match(assistant, /launcherRef\.current\?\.focus\(\)/);
+  assert.match(assistant, /thesisApi\.chat\(message, locale\)/);
+  assert.match(assistant, /citation\.title/);
+  assert.match(assistant, /citation\.source/);
+  assert.match(assistant, /citation\.excerpt/);
+  assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
+  assert.match(assistant, /messages\.assistant\.noMatch/);
+  assert.match(messages, /Hỏi về đăng ký, đề tài, nhóm hoặc tiến độ/);
+  assert.doesNotMatch(messages, /nhóm hoặc phản biện|groups, or reviews/i);
+});

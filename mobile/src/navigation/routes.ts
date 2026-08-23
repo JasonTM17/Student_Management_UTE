@@ -32,7 +32,7 @@ export type ScreenFamily =
   | 'student'
   | 'thesis'
   | 'assistant'
-  | 'operations';
+  | 'staff';
 
 export interface ScreenDefinition {
   name: ScreenName;
@@ -73,20 +73,20 @@ export const screenRegistry: readonly ScreenDefinition[] = [
   { name: 'thesis.registration', title: 'Thesis registration', family: 'thesis', roles: studentRoles, icon: 'account-group-outline' },
   { name: 'thesis.progress', title: 'Thesis progress', family: 'thesis', roles: studentRoles, icon: 'chart-timeline-variant' },
   { name: 'assistant.chat', title: 'Academic assistant', family: 'assistant', roles: allRoles, icon: 'robot-outline' },
-  { name: 'admin.dashboard', title: 'Admin dashboard', family: 'operations', roles: adminRoles, icon: 'shield-account-outline' },
-  { name: 'admin.students', title: 'Manage students', family: 'operations', roles: adminRoles, icon: 'school-outline' },
-  { name: 'admin.lecturers', title: 'Manage lecturers', family: 'operations', roles: adminRoles, icon: 'account-tie-outline' },
-  { name: 'lecturer.dashboard', title: 'Lecturer dashboard', family: 'operations', roles: lecturerRoles, icon: 'view-dashboard-outline' },
-  { name: 'lecturer.schedule', title: 'Teaching schedule', family: 'operations', roles: lecturerRoles, icon: 'calendar-account-outline' },
-  { name: 'lecturer.grading', title: 'Gradebook', family: 'operations', roles: lecturerRoles, icon: 'notebook-edit-outline' },
-  { name: 'lecturer.attendance', title: 'Class attendance', family: 'operations', roles: lecturerRoles, icon: 'account-check-outline' },
+  { name: 'admin.dashboard', title: 'Admin dashboard', family: 'staff', roles: adminRoles, icon: 'shield-account-outline' },
+  { name: 'admin.students', title: 'Manage students', family: 'staff', roles: adminRoles, icon: 'school-outline' },
+  { name: 'admin.lecturers', title: 'Manage lecturers', family: 'staff', roles: adminRoles, icon: 'account-tie-outline' },
+  { name: 'lecturer.dashboard', title: 'Lecturer dashboard', family: 'staff', roles: lecturerRoles, icon: 'view-dashboard-outline' },
+  { name: 'lecturer.schedule', title: 'Teaching schedule', family: 'staff', roles: lecturerRoles, icon: 'calendar-account-outline' },
+  { name: 'lecturer.grading', title: 'Gradebook', family: 'staff', roles: lecturerRoles, icon: 'notebook-edit-outline' },
+  { name: 'lecturer.attendance', title: 'Class attendance', family: 'staff', roles: lecturerRoles, icon: 'account-check-outline' },
 ];
 
 const bottomNavigationByRole: Readonly<Record<UserRole, readonly BottomNavigationItem[]>> = {
   student: [
     { route: 'dashboard.student', label: 'Home', icon: 'home-variant' },
     { route: 'schedule', label: 'Schedule', icon: 'calendar-week' },
-    { route: 'courses', label: 'Courses', icon: 'book-open-page-variant' },
+    { route: 'registration', label: 'Register', icon: 'book-plus-outline' },
     { route: 'notifications', label: 'Alerts', icon: 'bell-outline' },
   ],
   lecturer: [
@@ -148,8 +148,8 @@ export const menuSections = [
     families: ['student', 'thesis', 'assistant'] as const,
   },
   {
-    title: 'Operations',
-    families: ['operations'] as const,
+    title: 'Staff',
+    families: ['staff'] as const,
   },
 ] as const;
 

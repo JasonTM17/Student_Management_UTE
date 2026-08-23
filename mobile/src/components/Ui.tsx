@@ -75,7 +75,7 @@ export function ScreenShell({
                 {eyebrow.toUpperCase()}
               </UiText>
             ) : null}
-            <UiText variant="headlineLarge">{title}</UiText>
+            <UiText accessibilityRole="header" variant="headlineLarge">{title}</UiText>
             {subtitle ? (
               <UiText variant="bodySmall" tone="muted" style={styles.subtitle}>
                 {subtitle}
@@ -125,7 +125,7 @@ export function Button({
     <Pressable
       accessibilityRole="button"
       accessibilityLabel={accessibilityLabel ?? label}
-      accessibilityState={{ disabled: isDisabled }}
+      accessibilityState={{ busy: loading, disabled: isDisabled }}
       disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -227,7 +227,7 @@ export interface SectionHeadingProps {
 export function SectionHeading({ title, actionLabel, onAction }: SectionHeadingProps) {
   return (
     <View style={styles.sectionHeading}>
-      <UiText variant="headlineSmall">{title}</UiText>
+      <UiText accessibilityRole="header" variant="headlineSmall">{title}</UiText>
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} variant="text" />
       ) : null}
@@ -254,8 +254,18 @@ export function ListRow({
   onPress,
   unread = false,
 }: ListRowProps) {
+  const accessibilityLabel = [
+    unread ? 'Unread' : null,
+    title,
+    subtitle,
+    meta,
+  ].filter(Boolean).join('. ');
   const content = (
-    <View style={styles.listRow}>
+    <View
+      accessible={!onPress}
+      accessibilityLabel={!onPress ? accessibilityLabel : undefined}
+      style={styles.listRow}
+    >
       {leading ? (
         <View style={[styles.leading, unread ? styles.leadingUnread : undefined]}>
           <UiText variant="label" tone={unread ? 'primary' : 'muted'}>
@@ -264,9 +274,16 @@ export function ListRow({
         </View>
       ) : null}
       <View style={styles.listCopy}>
-        <UiText variant="bodyMedium" style={unread ? styles.unreadTitle : undefined}>
-          {title}
-        </UiText>
+        <View style={styles.listTitleRow}>
+          <UiText variant="bodyMedium" style={unread ? styles.unreadTitle : styles.listTitle}>
+            {title}
+          </UiText>
+          {unread ? (
+            <UiText variant="meta" tone="primary" style={styles.unreadLabel}>
+              Unread
+            </UiText>
+          ) : null}
+        </View>
         {subtitle ? (
           <UiText variant="bodySmall" tone="muted" numberOfLines={2}>
             {subtitle}
@@ -288,6 +305,7 @@ export function ListRow({
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [pressed ? styles.rowPressed : undefined]}
@@ -307,7 +325,13 @@ export function ProgressBar({ value, label, tone = 'primary' }: ProgressBarProps
   const boundedValue = Math.max(0, Math.min(100, value));
 
   return (
-    <View style={styles.progressGroup}>
+    <View
+      accessible
+      accessibilityLabel={label ?? 'Progress'}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(boundedValue) }}
+      style={styles.progressGroup}
+    >
       {label ? (
         <View style={styles.progressHeader}>
           <UiText variant="bodySmall" tone="muted">
@@ -464,8 +488,11 @@ const styles = StyleSheet.create({
   leading: { alignItems: 'center', backgroundColor: tokens.colors.surfaceLow, borderRadius: tokens.radii.control, height: 36, justifyContent: 'center', marginRight: tokens.spacing.sm, width: 36 },
   leadingUnread: { backgroundColor: tokens.colors.primaryFixed },
   listCopy: { flex: 1, paddingRight: tokens.spacing.sm },
+  listTitle: { flex: 1 },
+  listTitleRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.xs },
   listMeta: { marginLeft: tokens.spacing.sm },
   unreadTitle: { color: tokens.colors.primary, fontWeight: '600' },
+  unreadLabel: { backgroundColor: tokens.colors.primaryFixed, borderRadius: tokens.radii.pill, paddingHorizontal: tokens.spacing.xs, paddingVertical: 2 },
   rowPressed: { backgroundColor: tokens.colors.surfaceLow, borderRadius: tokens.radii.control },
   progressGroup: { marginTop: tokens.spacing.sm },
   progressHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.xs },

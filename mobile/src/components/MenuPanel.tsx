@@ -30,7 +30,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
             <UiText variant="meta" tone="primary">
               CAMPUSCORE
             </UiText>
-            <UiText variant="headlineSmall">Complete menu</UiText>
+            <UiText accessibilityRole="header" variant="headlineSmall">Complete menu</UiText>
           </View>
           <Button label="Close" onPress={onClose} variant="text" />
         </View>
@@ -66,7 +66,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
 
             return (
               <View key={section.title} style={styles.section}>
-                <UiText variant="label" tone="muted" style={styles.sectionTitle}>
+                <UiText accessibilityRole="header" variant="label" tone="muted" style={styles.sectionTitle}>
                   {section.title}
                 </UiText>
                 {screens.map((screen) => {
@@ -75,6 +75,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
                   return (
                     <Pressable
                       key={screen.name}
+                      accessibilityLabel={screen.title}
                       accessibilityRole="button"
                       accessibilityState={{ selected: active }}
                       onPress={() => onNavigate(screen.name)}
@@ -98,8 +99,8 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
             );
           })}
           <UiText variant="bodySmall" tone="muted" style={styles.menuNote}>
-            {getScreenDefinition(activeRoute)?.family === 'operations'
-              ? 'Operations screens are available only in explicit preview mode.'
+            {getScreenDefinition(activeRoute)?.family === 'staff'
+              ? 'Staff screens are available only in explicit preview mode.'
               : 'Choose a screen to continue your academic workflow.'}
           </UiText>
         </ScrollView>

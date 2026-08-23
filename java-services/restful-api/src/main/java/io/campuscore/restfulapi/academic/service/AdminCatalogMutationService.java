@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.web.DomainException;
-import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -24,6 +24,7 @@ public class AdminCatalogMutationService {
     private static final String COURSE = "\"academic\".\"Course\"";
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SECTION = "\"academic\".\"Section\"";
+    private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -50,8 +51,8 @@ public class AdminCatalogMutationService {
         jdbc.update(
                 "INSERT INTO " + ACADEMIC_YEAR
                         + " (\"id\", \"year\", \"startDate\", \"endDate\", \"isCurrent\")"
-                        + " VALUES (:id, :year, CAST(:startDate AS TIMESTAMPTZ),"
-                        + " CAST(:endDate AS TIMESTAMPTZ), :isCurrent)",
+                        + " VALUES (:id, :year, CAST(:startDate AS TIMESTAMP WITH TIME ZONE),"
+                        + " CAST(:endDate AS TIMESTAMP WITH TIME ZONE), :isCurrent)",
                 new MapSqlParameterSource()
                         .addValue("id", id)
                         .addValue("year", number(input, "year", java.time.Year.now().getValue()))
@@ -97,8 +98,8 @@ public class AdminCatalogMutationService {
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"type\", \"academicYearId\","
                         + " \"startDate\", \"endDate\", \"registrationStart\", \"registrationEnd\", \"status\")"
                         + " VALUES (:id, :name, :nameEn, :nameVi, :type, :academicYearId,"
-                        + " COALESCE(CAST(:startDate AS TIMESTAMPTZ), CURRENT_TIMESTAMP),"
-                        + " COALESCE(CAST(:endDate AS TIMESTAMPTZ), CURRENT_TIMESTAMP + INTERVAL '5 months'),"
+                        + " COALESCE(CAST(:startDate AS TIMESTAMP WITH TIME ZONE), CURRENT_TIMESTAMP),"
+                        + " COALESCE(CAST(:endDate AS TIMESTAMP WITH TIME ZONE), CURRENT_TIMESTAMP + INTERVAL '5 months'),"
                         + " :registrationStart, :registrationEnd, :status)",
                 params(input, id)
                         .addValue("type", text(input, "type", "FIRST"))
@@ -126,6 +127,9 @@ public class AdminCatalogMutationService {
                         .addValue("classroomId", input.get("classroomId"))
                         .addValue("capacity", number(input, "capacity", 30))
                         .addValue("status", text(input, "status", "OPEN")));
+        if (input.containsKey("schedules")) {
+            replaceSectionSchedules(id, input.get("schedules"));
+        }
         return get(SECTION, id);
     }
 
@@ -134,6 +138,7 @@ public class AdminCatalogMutationService {
         Map<String, String> columns = allowedColumns(table);
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
+        boolean replacesSchedules = SECTION.equals(table) && input.containsKey("schedules");
         boolean first = true;
         for (Map.Entry<String, String> entry : columns.entrySet()) {
             if (!input.containsKey(entry.getKey())) {
@@ -145,19 +150,26 @@ public class AdminCatalogMutationService {
             first = false;
             sql.append(entry.getValue()).append(" = ");
             if (isTimestampField(table, entry.getKey())) {
-                sql.append("CAST(:").append(entry.getKey()).append(" AS TIMESTAMPTZ)");
+                sql.append("CAST(:").append(entry.getKey()).append(" AS TIMESTAMP WITH TIME ZONE)");
             } else {
                 sql.append(':').append(entry.getKey());
             }
             parameters.addValue(entry.getKey(), input.get(entry.getKey()));
         }
         if (first) {
-            throw new IllegalArgumentException("At least one editable field is required");
+            if (!replacesSchedules) {
+                throw new IllegalArgumentException("At least one editable field is required");
+            }
+            requireExists(table, id);
+        } else {
+            sql.append(", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id");
+            int updated = jdbc.update(sql.toString(), parameters);
+            if (updated == 0) {
+                throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+            }
         }
-        sql.append(", \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id");
-        int updated = jdbc.update(sql.toString(), parameters);
-        if (updated == 0) {
-            throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+        if (replacesSchedules) {
+            replaceSectionSchedules(id, input.get("schedules"));
         }
         return get(table, id);
     }
@@ -195,11 +207,14 @@ public class AdminCatalogMutationService {
             columns.put("type", "\"type\""); columns.put("isActive", "\"isActive\"");
         } else if (SEMESTER.equals(table)) {
             columns.put("name", "\"name\""); columns.put("nameEn", "\"nameEn\""); columns.put("nameVi", "\"nameVi\"");
+            columns.put("type", "\"type\""); columns.put("academicYearId", "\"academicYearId\"");
+            columns.put("startDate", "\"startDate\""); columns.put("endDate", "\"endDate\"");
             columns.put("status", "\"status\""); columns.put("registrationStart", "\"registrationStart\"");
             columns.put("registrationEnd", "\"registrationEnd\""); columns.put("addDropStart", "\"addDropStart\"");
             columns.put("addDropEnd", "\"addDropEnd\"");
         } else if (SECTION.equals(table)) {
-            columns.put("sectionNumber", "\"sectionNumber\""); columns.put("lecturerId", "\"lecturerId\"");
+            columns.put("sectionNumber", "\"sectionNumber\""); columns.put("courseId", "\"courseId\"");
+            columns.put("semesterId", "\"semesterId\""); columns.put("lecturerId", "\"lecturerId\"");
             columns.put("classroomId", "\"classroomId\""); columns.put("capacity", "\"capacity\""); columns.put("status", "\"status\"");
         } else {
             throw new IllegalArgumentException("Unsupported catalog resource");
@@ -211,10 +226,68 @@ public class AdminCatalogMutationService {
         if (ACADEMIC_YEAR.equals(table)) {
             return "startDate".equals(field) || "endDate".equals(field);
         }
-        return SEMESTER.equals(table) && ("registrationStart".equals(field)
+        return SEMESTER.equals(table) && ("startDate".equals(field)
+                || "endDate".equals(field)
+                || "registrationStart".equals(field)
                 || "registrationEnd".equals(field)
                 || "addDropStart".equals(field)
                 || "addDropEnd".equals(field));
+    }
+
+    private void replaceSectionSchedules(String sectionId, Object value) {
+        if (!(value instanceof List<?> schedules)) {
+            throw new IllegalArgumentException("schedules must be an array");
+        }
+        jdbc.update(
+                "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                new MapSqlParameterSource("sectionId", sectionId));
+        for (Object item : schedules) {
+            if (!(item instanceof Map<?, ?> schedule)) {
+                throw new IllegalArgumentException("Each schedule must be an object");
+            }
+            jdbc.update(
+                    "INSERT INTO " + SECTION_SCHEDULE
+                            + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
+                            + " VALUES (:id, :sectionId, :classroomId, :dayOfWeek, :startTime, :endTime)",
+                    new MapSqlParameterSource()
+                            .addValue("id", optionalScheduleText(schedule, "id", UUID.randomUUID().toString()))
+                            .addValue("sectionId", sectionId)
+                            .addValue("classroomId", requiredScheduleText(schedule, "classroomId"))
+                            .addValue("dayOfWeek", requiredScheduleNumber(schedule, "dayOfWeek"))
+                            .addValue("startTime", requiredScheduleText(schedule, "startTime"))
+                            .addValue("endTime", requiredScheduleText(schedule, "endTime")));
+        }
+    }
+
+    private void requireExists(String table, String id) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+    }
+
+    private static String requiredScheduleText(Map<?, ?> schedule, String name) {
+        String value = optionalScheduleText(schedule, name, null);
+        if (value == null) {
+            throw new IllegalArgumentException(name + " is required for each schedule");
+        }
+        return value;
+    }
+
+    private static String optionalScheduleText(Map<?, ?> schedule, String name, String fallback) {
+        Object value = schedule.get(name);
+        return value == null || value.toString().isBlank() ? fallback : value.toString().trim();
+    }
+
+    private static int requiredScheduleNumber(Map<?, ?> schedule, String name) {
+        Object value = schedule.get(name);
+        if (value == null || value.toString().isBlank()) {
+            throw new IllegalArgumentException(name + " is required for each schedule");
+        }
+        return value instanceof Number number ? number.intValue() : Integer.parseInt(value.toString());
     }
 
     private static MapSqlParameterSource params(Map<String, Object> input, String id) {

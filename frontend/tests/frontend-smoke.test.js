@@ -87,7 +87,8 @@ test('assistant UI exposes provenance and degraded state', () => {
   assert.match(assistantApi, /citations/);
   assert.match(assistantApi, /reasonCode/);
   assert.match(assistantSource, /citation\.title/);
-  assert.match(assistantSource, /DEGRADED/);
+  assert.match(assistantSource, /KNOWLEDGE_UNAVAILABLE/);
+  assert.match(assistantSource, /messages\.assistant\.degraded/);
 });
 
 test('frontend source contains no removed route or runtime reference', () => {

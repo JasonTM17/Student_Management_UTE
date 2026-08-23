@@ -52,7 +52,13 @@ public class AdminUserMutationService {
                 "SELECT COUNT(*) FROM " + USER + " u WHERE (:status IS NULL OR u.\"status\" = :status)"
                         + " AND (:search IS NULL OR LOWER(u.\"email\") LIKE :search OR LOWER(u.\"firstName\") LIKE :search OR LOWER(u.\"lastName\") LIKE :search)",
                 params, Long.class);
-        return Map.of("data", data, "meta", Map.of("total", total == null ? 0 : total, "page", page, "limit", limit));
+        long totalItems = total == null ? 0 : total;
+        int totalPages = (int) ((totalItems + limit - 1) / limit);
+        return Map.of("data", data, "meta", Map.of(
+                "total", totalItems,
+                "page", page,
+                "limit", limit,
+                "totalPages", totalPages));
     }
 
     @Transactional
@@ -88,7 +94,7 @@ public class AdminUserMutationService {
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
         if (input.get("role") != null) {
             String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
-            assignRole(id, role);
+            replaceSystemRole(id, role);
             ensureProfile(id, role, input);
         }
         return find(id);
@@ -109,9 +115,34 @@ public class AdminUserMutationService {
     }
 
     private void assignRole(String userId, String roleName) {
-        String roleId = jdbc.queryForObject("SELECT \"id\" FROM " + ROLE + " WHERE \"name\" = :name", new MapSqlParameterSource("name", roleName.toUpperCase()), String.class);
-        if (roleId == null) throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
+        String roleId = roleId(roleName);
         jdbc.update("INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\") SELECT :id, :userId, :roleId WHERE NOT EXISTS (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)", new MapSqlParameterSource().addValue("id", UUID.randomUUID().toString()).addValue("userId", userId).addValue("roleId", roleId));
+    }
+
+    private void replaceSystemRole(String userId, String roleName) {
+        String roleId = roleId(roleName);
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("roleId", roleId);
+        jdbc.update(
+                "DELETE FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" IN"
+                        + " (SELECT \"id\" FROM " + ROLE + " WHERE \"isSystem\" = TRUE AND \"id\" <> :roleId)",
+                params);
+        jdbc.update(
+                "INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\")"
+                        + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
+                        + " (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
+                params.addValue("id", UUID.randomUUID().toString()));
+    }
+
+    private String roleId(String roleName) {
+        return jdbc.queryForList(
+                        "SELECT \"id\" FROM " + ROLE + " WHERE \"name\" = :name",
+                        new MapSqlParameterSource("name", roleName.toUpperCase(java.util.Locale.ROOT)),
+                        String.class)
+                .stream()
+                .findFirst()
+                .orElseThrow(() -> problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found"));
     }
 
     private void ensureProfile(String userId, String roleName, Map<String, Object> input) {

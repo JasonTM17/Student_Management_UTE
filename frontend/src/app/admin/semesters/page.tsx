@@ -29,6 +29,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
+import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
 interface Semester {
   id: string;
@@ -56,6 +57,7 @@ export default function AdminSemestersPage() {
   const [academicYears, setAcademicYears] = useState<AcademicYearOption[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -89,13 +91,18 @@ export default function AdminSemestersPage() {
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
   const fetchAcademicYears = useCallback(async () => {
+    setReferenceError('');
     try {
-      const response = await academicYearsApi.getAll({ limit: 1000 });
+      const response = await academicYearsApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT });
       setAcademicYears(response.data || []);
     } catch {
-      // The table can still render without dropdown helpers.
+      setReferenceError(
+        locale === 'vi'
+          ? 'Hiện chưa thể tải dữ liệu năm học cho biểu mẫu.'
+          : 'Academic-year options could not be loaded.',
+      );
     }
-  }, []);
+  }, [locale]);
 
   const fetchSemesters = useCallback(async () => {
     setIsLoading(true);
@@ -149,7 +156,7 @@ export default function AdminSemestersPage() {
           loading: 'Đang tải học kỳ',
           title: 'Học kỳ',
           description:
-            'Giữ timeline học thuật rõ ràng để đăng ký, section và tài chính cùng bám vào cùng một mốc vận hành.',
+            'Giữ timeline học thuật rõ ràng để đăng ký, section và lịch học cùng bám một mốc.',
           create: 'Tạo học kỳ',
           searchLabel: 'Tìm học kỳ',
           searchPlaceholder: 'Tìm theo học kỳ, loại hoặc năm',
@@ -160,7 +167,7 @@ export default function AdminSemestersPage() {
           unavailableTitle: 'Học kỳ chưa sẵn sàng',
           emptyTitle: 'Không có học kỳ phù hợp',
           emptyDescription:
-            'Hãy tạo học kỳ để section, hóa đơn, đăng ký và báo cáo có cùng một timeline rõ ràng.',
+            'Hãy tạo học kỳ để section, đăng ký, lịch học và điểm có cùng một timeline rõ ràng.',
           tableTitle: 'Bản ghi học kỳ',
           headers: {
             name: 'Tên học kỳ',
@@ -211,7 +218,7 @@ export default function AdminSemestersPage() {
           unavailableTitle: 'Semesters unavailable',
           emptyTitle: 'No matching semesters',
           emptyDescription:
-            'Create a semester to anchor sections, registration timing, and academic reporting.',
+            'Create a semester to anchor sections, registration timing, schedules, and grades.',
           tableTitle: 'Semester records',
           headers: {
             name: 'Name',
@@ -410,6 +417,14 @@ export default function AdminSemestersPage() {
               />
             </form>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchAcademicYears()}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

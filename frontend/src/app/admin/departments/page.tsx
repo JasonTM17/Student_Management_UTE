@@ -121,7 +121,7 @@ export default function AdminDepartmentsPage() {
           loading: 'Đang tải khoa',
           title: 'Khoa',
           description:
-            'Giữ cấu trúc học thuật rõ ràng để môn học, giảng viên và báo cáo luôn bám cùng một ownership.',
+            'Giữ cấu trúc học thuật rõ ràng để môn học, giảng viên và chương trình cùng bám một ownership.',
           create: 'Tạo khoa',
           searchLabel: 'Tìm khoa',
           searchPlaceholder: 'Tìm theo tên hoặc mã khoa',
@@ -168,7 +168,7 @@ export default function AdminDepartmentsPage() {
           loading: 'Loading departments',
           title: 'Departments',
           description:
-            'Keep the academic structure readable for courses, lecturers, and downstream reporting.',
+            'Keep the academic structure readable for courses, lecturers, and curriculum ownership.',
           create: 'Create department',
           searchLabel: 'Search departments',
           searchPlaceholder: 'Search by name or code',

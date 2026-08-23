@@ -33,6 +33,7 @@ import {
   getLocalizedDescription,
   getLocalizedName,
 } from '@/lib/academic-content';
+import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
 interface Course {
   id: string;
@@ -64,6 +65,7 @@ export default function AdminCoursesPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [page, setPage] = useState(1);
@@ -99,13 +101,18 @@ export default function AdminCoursesPage() {
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
   const fetchDepartments = useCallback(async () => {
+    setReferenceError('');
     try {
-      const response = await departmentsApi.getAll({ limit: 1000 });
+      const response = await departmentsApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT });
       setDepartments(response.data || []);
     } catch {
-      // Filter options are optional in this view.
+      setReferenceError(
+        locale === 'vi'
+          ? 'Hiện chưa thể tải dữ liệu khoa cho bộ lọc và biểu mẫu.'
+          : 'Department options could not be loaded.',
+      );
     }
-  }, []);
+  }, [locale]);
 
   const fetchCourses = useCallback(async () => {
     setIsLoading(true);
@@ -419,6 +426,14 @@ export default function AdminCoursesPage() {
               />
             </form>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchDepartments()}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

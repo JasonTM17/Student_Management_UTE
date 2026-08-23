@@ -6,8 +6,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
 import { GradingSection, Semester } from '@/types/api';
-import { LocalizedLink } from '@/components/LocalizedLink';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import {
@@ -216,11 +215,9 @@ export default function LecturerGradesPage() {
                       >
                         {section.canPublish ? messages.lecturerGrades.labels.readyStatus : section.gradeStatus}
                       </span>
-                      <Button asChild>
-                        <LocalizedLink href={`/dashboard/lecturer/grades/${section.id}`}>
-                          {section.gradedCount > 0 ? messages.lecturerGrades.labels.manageGrades : messages.lecturerGrades.labels.enterGrades}
-                        </LocalizedLink>
-                      </Button>
+                      <LinkButton href={`/dashboard/lecturer/grades/${section.id}`}>
+                        {section.gradedCount > 0 ? messages.lecturerGrades.labels.manageGrades : messages.lecturerGrades.labels.enterGrades}
+                      </LinkButton>
                     </div>
                   </div>
                 </div>

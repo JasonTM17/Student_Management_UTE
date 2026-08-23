@@ -9,7 +9,7 @@ import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { LocalizedLink } from '@/components/LocalizedLink';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
 
@@ -195,17 +195,13 @@ export default function AdminDashboardPage() {
       description={messages.admin.description}
       actions={
         <>
-          <Button asChild variant="outline">
-            <LocalizedLink href="/admin/users">
-              <UserPlus className="mr-2 h-4 w-4" />
-              {messages.common.actions.addUser}
-            </LocalizedLink>
-          </Button>
-          <Button asChild>
-            <LocalizedLink href="/admin/courses">
-              {messages.dashboardShell.menu.myCourses}
-            </LocalizedLink>
-          </Button>
+          <LinkButton href="/admin/users" variant="outline">
+            <UserPlus className="mr-2 h-4 w-4" />
+            {messages.common.actions.addUser}
+          </LinkButton>
+          <LinkButton href="/admin/courses">
+            {messages.dashboardShell.menu.myCourses}
+          </LinkButton>
         </>
       }
     >
