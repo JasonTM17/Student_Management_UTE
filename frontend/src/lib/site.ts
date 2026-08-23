@@ -1,4 +1,4 @@
-const DEFAULT_SITE_URL = 'https://tienson.io.vn';
+const DEFAULT_SITE_URL = 'http://localhost:3000';
 
 function normalizeUrl(value: string) {
   return value.replace(/\/$/, '');
