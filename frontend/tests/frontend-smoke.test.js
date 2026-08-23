@@ -72,6 +72,15 @@ test('the Java API proxy preserves query parameters and encodes path segments', 
   );
 });
 
+test('site metadata defaults to the local course demo and contains no retired domain', () => {
+  const siteSource = read('src/lib/site.ts');
+  const envExample = read('.env.example');
+
+  assert.match(siteSource, /http:\/\/localhost:3000/);
+  assert.match(envExample, /NEXT_PUBLIC_SITE_URL=http:\/\/localhost:3000/);
+  assert.doesNotMatch(`${siteSource}\n${envExample}`, /tienson\.io\.vn/i);
+});
+
 test('assistant UI exposes provenance and degraded state', () => {
   const assistantSource = read('src/components/assistant/AssistantPanel.tsx');
   const assistantApi = read('src/lib/thesis-api.ts');
