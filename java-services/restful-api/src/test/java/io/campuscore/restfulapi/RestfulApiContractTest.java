@@ -14,7 +14,7 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
+@ActiveProfiles({"test", "persistence"})
 class RestfulApiContractTest {
 
     @Autowired
@@ -35,7 +35,8 @@ class RestfulApiContractTest {
 
         mvc.perform(get("/api/v1/health/readiness").header("X-Health-Key", "test-health-key"))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("ready"));
+                .andExpect(jsonPath("$.status").value("ready"))
+                .andExpect(jsonPath("$.dependencies[0]").value("postgresql"));
     }
 
     @Test

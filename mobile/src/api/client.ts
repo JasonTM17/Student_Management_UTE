@@ -1,3 +1,5 @@
+import { Platform } from 'react-native';
+
 export type JsonObject = Record<string, unknown>;
 export type AssistantLocale = 'en' | 'vi';
 
@@ -159,7 +161,9 @@ export class ApiClientError extends Error {
   }
 }
 
-export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:4010/api/v1';
+export const DEFAULT_API_BASE_URL = Platform.OS === 'android'
+  ? 'http://10.0.2.2:4010/api/v1'
+  : 'http://127.0.0.1:4010/api/v1';
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_URL;
 const configuredApiMode: ApiMode = process.env.EXPO_PUBLIC_API_MODE === 'preview' ? 'preview' : 'live';

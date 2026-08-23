@@ -17,9 +17,21 @@ Run the stack with:
 
 ```powershell
 docker compose up -d --build postgres restful-api
-curl http://127.0.0.1:4010/api/v1/health/liveness
-curl http://127.0.0.1:4010/v3/api-docs
+curl.exe http://127.0.0.1:4010/api/v1/health/liveness
+curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
+curl.exe http://127.0.0.1:4010/v3/api-docs
 ```
 
+Local seed accounts:
+
+| Role | Email | Password |
+| --- | --- | --- |
+| Student | `student@campuscore.edu` | `password123` |
+| Lecturer | `lecturer@campuscore.edu` | `password123` |
+| Admin | `admin@campuscore.edu` | `admin123` |
+
+These credentials are only for the local course database.
+
 See [ARCHITECTURE.md](docs/ARCHITECTURE.md), [RELEASE.md](docs/RELEASE.md),
-and the active plan for the complete course acceptance gates.
+and [RESTFUL_API_CONSOLIDATION.md](docs/RESTFUL_API_CONSOLIDATION.md) for the
+complete course acceptance gates.

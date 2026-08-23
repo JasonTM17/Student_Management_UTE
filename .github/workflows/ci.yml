@@ -75,9 +75,29 @@ jobs:
         run: npm run typecheck
 
   compose:
-    name: Minimal Compose contract
+    name: PostgreSQL and Compose runtime
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
       - name: Validate Compose
         run: docker compose config
+      - name: Build and start fresh course stack
+        run: docker compose up -d --build --wait
+      - name: Verify Flyway, health, OpenAPI, login and RAG
+        shell: bash
+        run: |
+          version="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc 'SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1')"
+          test "$version" = "9"
+          curl --fail --silent --show-error http://127.0.0.1:4010/api/v1/health/liveness
+          curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
+          curl --fail --silent --show-error http://127.0.0.1:4010/v3/api-docs > openapi.json
+          login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"student@campuscore.edu","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
+          token="$(LOGIN="$login" python3 -c 'import json, os; print(json.loads(os.environ["LOGIN"])["accessToken"])')"
+          assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
+          ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "ANSWERED" and data["degraded"] is False and len(data["citations"]) > 0'
+      - name: Show runtime logs after failure
+        if: failure()
+        run: docker compose logs --no-color
+      - name: Stop course stack
+        if: always()
+        run: docker compose down
