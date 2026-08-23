@@ -152,11 +152,17 @@ export default function DashboardLayout({
   const sidebarRef = useRef<HTMLElement>(null);
   const sidebarCloseRef = useRef<HTMLButtonElement>(null);
   const openSidebarButtonRef = useRef<HTMLButtonElement>(null);
+  const studentRailRef = useRef<HTMLElement>(null);
+  const studentRailTriggerRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const previousPathnameRef = useRef(pathname);
   const menuLabels = messages.dashboardShell.menu;
   const menuSectionLabels = messages.dashboardShell.menuSections;
   const showStudentRail = !isAdmin && !isLecturer;
+  const closeStudentRail = () => {
+    setStudentRailOpen(false);
+    window.requestAnimationFrame(() => studentRailTriggerRef.current?.focus());
+  };
   const menuSections = isAdmin
     ? []
     : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
@@ -284,6 +290,55 @@ export default function DashboardLayout({
   }, [isDesktopSidebar, sidebarOpen]);
 
   useEffect(() => {
+    if (!studentRailOpen || isDesktopSidebar) {
+      return;
+    }
+
+    const focusableSelector = [
+      'a[href]',
+      'button:not([disabled])',
+      'input:not([disabled])',
+      'select:not([disabled])',
+      'textarea:not([disabled])',
+      '[tabindex]:not([tabindex="-1"])',
+    ].join(',');
+    const frame = window.requestAnimationFrame(() => {
+      studentRailRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
+    });
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab' || !studentRailRef.current) {
+        return;
+      }
+
+      const focusable = Array.from(
+        studentRailRef.current.querySelectorAll<HTMLElement>(focusableSelector),
+      );
+      if (focusable.length === 0) {
+        event.preventDefault();
+        studentRailRef.current.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement;
+      if (event.shiftKey && (active === first || !studentRailRef.current.contains(active))) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && (active === last || !studentRailRef.current.contains(active))) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleTab);
+    };
+  }, [isDesktopSidebar, studentRailOpen]);
+
+  useEffect(() => {
     const drawerOpen = sidebarOpen || studentRailOpen;
     const previousOverflow = document.body.style.overflow;
 
@@ -302,6 +357,7 @@ export default function DashboardLayout({
         setNotificationsOpen(false);
       } else if (studentRailOpen) {
         setStudentRailOpen(false);
+        window.requestAnimationFrame(() => studentRailTriggerRef.current?.focus());
       } else if (sidebarOpen) {
         setSidebarOpen(false);
         window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -693,8 +749,31 @@ export default function DashboardLayout({
         </div>
       </aside>
 
+      {showStudentRail && studentRailOpen ? (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-40 bg-[var(--portal-scrim)] 2xl:hidden"
+            onClick={closeStudentRail}
+            aria-label={messages.dashboardShell.controls.closeStudentRailOverlay}
+          />
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 2xl:hidden">
+            <StudentContextRail
+              mobile
+              containerRef={studentRailRef}
+              currentPageTitle={currentPage.title}
+              currentPageDescription={currentPage.description}
+              unreadCount={unreadCount}
+              collapsed={false}
+              onToggleCollapsed={() => undefined}
+              onCloseMobile={closeStudentRail}
+            />
+          </div>
+        </>
+      ) : null}
+
       <div
-        inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
+        inert={!isDesktopSidebar && (sidebarOpen || studentRailOpen) ? true : undefined}
         className={cn(
           'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
           sidebarCollapsed
@@ -731,6 +810,7 @@ export default function DashboardLayout({
             <div className="flex items-center gap-2">
               {showStudentRail ? (
                 <Button
+                  ref={studentRailTriggerRef}
                   type="button"
                   variant="ghost"
                   size="icon"
@@ -738,6 +818,7 @@ export default function DashboardLayout({
                   onClick={() => setStudentRailOpen(true)}
                   aria-label={messages.dashboardShell.controls.openStudentRail}
                   aria-expanded={studentRailOpen}
+                  aria-controls="student-context-rail"
                 >
                   <DoorOpen className="h-5 w-5" aria-hidden="true" />
                 </Button>
@@ -893,28 +974,6 @@ export default function DashboardLayout({
             </div>
           </div>
         </header>
-
-        {showStudentRail && studentRailOpen ? (
-          <>
-            <button
-              type="button"
-              className="fixed inset-0 z-40 bg-[var(--portal-scrim)] 2xl:hidden"
-              onClick={() => setStudentRailOpen(false)}
-              aria-label={messages.dashboardShell.controls.closeStudentRailOverlay}
-            />
-            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 2xl:hidden">
-              <StudentContextRail
-                mobile
-                currentPageTitle={currentPage.title}
-                currentPageDescription={currentPage.description}
-                unreadCount={unreadCount}
-                collapsed={false}
-                onToggleCollapsed={() => undefined}
-                onCloseMobile={() => setStudentRailOpen(false)}
-              />
-            </div>
-          </>
-        ) : null}
 
         <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
           {showStudentRail ? (

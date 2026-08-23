@@ -65,6 +65,29 @@ class AdminUserMutationPersistenceTest {
                 Integer.class,
                 "target-user"))
                 .isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Lecturer\" WHERE \"userId\" = ?",
+                Integer.class,
+                "target-user"))
+                .isZero();
+    }
+
+    @Test
+    void ordinaryAdminCannotGrantOrEditSuperAdminAccounts() throws Exception {
+        mvc.perform(put("/api/v1/users/target-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"SUPER_ADMIN\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+
+        insertUserRole("user-role-super-target", "target-user", "role-super-admin");
+        mvc.perform(put("/api/v1/users/target-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"firstName\":\"Blocked\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
     }
 
     @Test
@@ -169,6 +192,7 @@ class AdminUserMutationPersistenceTest {
 
     private void insertFixture() {
         insertRole("role-admin", "ADMIN", true);
+        insertRole("role-super-admin", "SUPER_ADMIN", true);
         insertRole("role-student", "STUDENT", true);
         insertRole("role-auditor", "AUDITOR", false);
         insertPermission("permission-admin", "admin", "write");
@@ -182,6 +206,14 @@ class AdminUserMutationPersistenceTest {
         insertUser("third-user", "third@campuscore.edu", "Third", "User");
         insertUserRole("user-role-admin", "target-user", "role-admin");
         insertUserRole("user-role-auditor", "target-user", "role-auditor");
+        jdbc.update("INSERT INTO \"auth\".\"Student\""
+                        + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                        + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES ('target-student-profile', 'target-user', 'SV-TARGET', 'curriculum-demo',"
+                        + " 2, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+        jdbc.update("INSERT INTO \"auth\".\"Lecturer\""
+                        + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                        + " VALUES ('target-lecturer-profile', 'target-user', 'department-demo', 'GV-TARGET', TRUE)");
     }
 
     private void insertRole(String id, String name, boolean system) {

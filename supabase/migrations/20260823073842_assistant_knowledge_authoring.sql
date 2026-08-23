@@ -27,8 +27,8 @@ create table if not exists assistant.knowledge_document (
         check (visibility in ('PUBLIC', 'STAFF')),
     constraint assistant_knowledge_priority_valid
         check (priority between 1 and 1000),
-    constraint assistant_knowledge_slug_locale_unique
-        unique (slug, locale)
+    constraint assistant_knowledge_slug_unique
+        unique (slug)
 );
 
 -- Existing controller-created rows may predate the authoring columns. Add only
@@ -52,6 +52,14 @@ alter table assistant.knowledge_document
             coalesce(title, '') || ' ' || coalesce(content, '') || ' ' || coalesce(source, '')
         )
     ) stored;
+
+-- Slug is the cross-store document identity. Locale is content metadata, not
+-- part of identity, so bilingual variants use distinct locale-qualified slugs.
+alter table assistant.knowledge_document
+    drop constraint if exists assistant_knowledge_slug_locale_unique;
+
+drop index if exists assistant.knowledge_document_slug_locale_idx;
+drop index if exists knowledge_document_slug_locale_idx;
 
 do $$
 begin
@@ -90,13 +98,18 @@ begin
 
     if not exists (
         select 1
-        from pg_constraint
-        where conrelid = 'assistant.knowledge_document'::regclass
-          and conname = 'assistant_knowledge_slug_locale_unique'
+        from pg_index index_info
+        join pg_attribute column_info
+          on column_info.attrelid = index_info.indrelid
+         and column_info.attnum = any(index_info.indkey)
+        where index_info.indrelid = 'assistant.knowledge_document'::regclass
+          and index_info.indisunique
+          and index_info.indnkeyatts = 1
+          and column_info.attname = 'slug'
     ) then
         alter table assistant.knowledge_document
-            add constraint assistant_knowledge_slug_locale_unique
-            unique (slug, locale);
+            add constraint assistant_knowledge_slug_unique
+            unique (slug);
     end if;
 end
 $$;
