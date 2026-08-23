@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { useI18n } from '@/i18n';
-import { getLocalEdgeOrigin, isLocalPreviewHost } from '@/lib/site';
 import { toast } from 'sonner';
 
 export const dynamic = 'force-dynamic';
@@ -39,11 +38,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
-  const [runtimeNotice, setRuntimeNotice] = useState<{
-    tone: 'info' | 'warning';
-    title: string;
-    body: string;
-  } | null>(null);
   const { login } = useAuth();
   const { href, messages } = useI18n();
   const router = useRouter();
@@ -52,72 +46,6 @@ export default function LoginPage() {
   useEffect(() => {
     setIsClientReady(true);
   }, []);
-
-  useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
-    }
-
-    if (!isLocalPreviewHost(window.location.hostname)) {
-      setRuntimeNotice(null);
-      return;
-    }
-
-    const localEdgeOrigin = getLocalEdgeOrigin();
-    const usingPreviewServer = window.location.origin !== localEdgeOrigin;
-
-    if (!usingPreviewServer) {
-      setRuntimeNotice(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const checkRuntime = async () => {
-      const probeTargets = ['/health', '/api/docs'];
-
-      try {
-        for (const target of probeTargets) {
-          const response = await fetch(target, {
-            cache: 'no-store',
-          });
-
-          if (cancelled) {
-            return;
-          }
-
-          if (response.ok) {
-            setRuntimeNotice(null);
-            return;
-          }
-        }
-
-        setRuntimeNotice({
-          tone: 'warning',
-          title: messages.login.runtimeNotice.warningTitle,
-          body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
-        });
-      } catch {
-        if (!cancelled) {
-          setRuntimeNotice({
-            tone: 'warning',
-            title: messages.login.runtimeNotice.warningTitle,
-            body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
-          });
-        }
-      }
-    };
-
-    void checkRuntime();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    messages.login.runtimeNotice.infoBody,
-    messages.login.runtimeNotice.infoTitle,
-    messages.login.runtimeNotice.warningBody,
-    messages.login.runtimeNotice.warningTitle,
-  ]);
 
   const reason = searchParams.get('reason') ?? '';
   const notice = useMemo(() => {
@@ -215,23 +143,6 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {runtimeNotice ? (
-          <div
-            className={`rounded-lg px-4 py-3 ${
-              runtimeNotice.tone === 'warning'
-                ? 'border border-amber-500/30 bg-amber-500/10'
-                : 'border border-border/80 bg-secondary/40'
-            }`}
-          >
-            <div className="text-sm font-semibold text-foreground">
-              {runtimeNotice.title}
-            </div>
-            <div className="mt-1 text-sm leading-6 text-muted-foreground">
-              {runtimeNotice.body}
-            </div>
-          </div>
-        ) : null}
-
         {formError ? (
           <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
             {formError}
@@ -266,12 +177,7 @@ export default function LoginPage() {
               >
                 {messages.login.passwordLabel}
               </label>
-              <LocalizedLink
-                href="/forgot-password"
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {messages.login.forgotPassword}
-              </LocalizedLink>
+              <span className="text-xs text-muted-foreground">Academic office support</span>
             </div>
             <div className="relative">
               <Input

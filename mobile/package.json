@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo/vector-icons": "~14.0.4",
     "expo": "~52.0.0",
     "react": "18.3.1",
     "react-native": "0.76.5"

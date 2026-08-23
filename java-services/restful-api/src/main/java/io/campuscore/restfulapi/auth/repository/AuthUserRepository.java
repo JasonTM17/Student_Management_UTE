@@ -11,7 +11,7 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -21,7 +21,6 @@ import org.springframework.stereotype.Repository;
 /** JDBC adapter for the Prisma-owned auth schema. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
 public class AuthUserRepository {
 
     private static final String SCHEMA = "\"auth\".";
@@ -75,6 +74,53 @@ public class AuthUserRepository {
         return matches.stream().findFirst().map(user -> user.withAuthorities(
                 findRoles(user.id()),
                 findPermissions(user.id())));
+    }
+
+    public AuthUserRecord createUser(RegisterCommand command) {
+        String userId = UUID.randomUUID().toString();
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("id", userId)
+                .addValue("email", command.email())
+                .addValue("password", command.passwordHash())
+                .addValue("firstName", command.firstName())
+                .addValue("lastName", command.lastName())
+                .addValue("phone", command.phone())
+                .addValue("gender", command.gender())
+                .addValue("dateOfBirth", localDateTime(command.dateOfBirth()))
+                .addValue("address", command.address());
+        jdbc.update(
+                "INSERT INTO " + USER_TABLE
+                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\","
+                        + " \"phone\", \"gender\", \"dateOfBirth\", \"address\", \"status\","
+                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (:id, :email, :password, :firstName, :lastName, :phone, :gender,"
+                        + " :dateOfBirth, :address, 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                parameters);
+
+        String roleId = jdbc.query(
+                        "SELECT \"id\" FROM " + ROLE_TABLE + " WHERE \"name\" = 'STUDENT'",
+                        new MapSqlParameterSource(),
+                        (resultSet, ignored) -> resultSet.getString("id"))
+                .stream()
+                .findFirst()
+                .orElseGet(() -> {
+                    String id = UUID.randomUUID().toString();
+                    jdbc.update(
+                            "INSERT INTO " + ROLE_TABLE
+                                    + " (\"id\", \"name\", \"description\", \"isSystem\", \"createdAt\", \"updatedAt\")"
+                                    + " VALUES (:id, 'STUDENT', 'Student access', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                            new MapSqlParameterSource("id", id));
+                    return id;
+                });
+        jdbc.update(
+                "INSERT INTO " + USER_ROLE_TABLE + " (\"id\", \"userId\", \"roleId\")"
+                        + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
+                        + " (SELECT 1 FROM " + USER_ROLE_TABLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
+                new MapSqlParameterSource()
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("userId", userId)
+                        .addValue("roleId", roleId));
+        return findById(userId).orElseThrow(() -> new IllegalStateException("created user was not found"));
     }
 
     public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
@@ -335,5 +381,16 @@ public class AuthUserRepository {
                     lecturerId,
                     student);
         }
+    }
+
+    public record RegisterCommand(
+            String email,
+            String passwordHash,
+            String firstName,
+            String lastName,
+            String phone,
+            String gender,
+            Instant dateOfBirth,
+            String address) {
     }
 }

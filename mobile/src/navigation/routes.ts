@@ -1,3 +1,7 @@
+import { MaterialCommunityIcons } from '@expo/vector-icons';
+import type { ComponentProps } from 'react';
+
+export type NavigationIconName = ComponentProps<typeof MaterialCommunityIcons>['name'];
 export type UserRole = 'student' | 'lecturer' | 'admin';
 
 export type ScreenName =
@@ -8,14 +12,12 @@ export type ScreenName =
   | 'grades'
   | 'attendance'
   | 'registration'
-  | 'invoices'
   | 'notifications'
   | 'profile'
   | 'thesis.topics'
   | 'thesis.detail'
   | 'thesis.registration'
   | 'thesis.progress'
-  | 'thesis.evaluation'
   | 'assistant.chat'
   | 'admin.dashboard'
   | 'admin.students'
@@ -37,13 +39,13 @@ export interface ScreenDefinition {
   title: string;
   family: ScreenFamily;
   roles: readonly UserRole[];
-  icon: string;
+  icon: NavigationIconName;
 }
 
 export interface BottomNavigationItem {
   route: ScreenName;
   label: string;
-  icon: string;
+  icon: NavigationIconName;
 }
 
 export interface StitchMobileReference {
@@ -57,49 +59,47 @@ const lecturerRoles: readonly UserRole[] = ['lecturer', 'admin'];
 const adminRoles: readonly UserRole[] = ['admin'];
 
 export const screenRegistry: readonly ScreenDefinition[] = [
-  { name: 'auth.signIn', title: 'Sign in', family: 'auth', roles: allRoles, icon: '→' },
-  { name: 'dashboard.student', title: 'Dashboard', family: 'student', roles: studentRoles, icon: '⌂' },
-  { name: 'schedule', title: 'Schedule', family: 'student', roles: studentRoles, icon: '◷' },
-  { name: 'courses', title: 'Courses', family: 'student', roles: studentRoles, icon: '▦' },
-  { name: 'grades', title: 'Grades', family: 'student', roles: studentRoles, icon: '✓' },
-  { name: 'attendance', title: 'Attendance', family: 'student', roles: studentRoles, icon: '◉' },
-  { name: 'registration', title: 'Registration', family: 'student', roles: studentRoles, icon: '+' },
-  { name: 'invoices', title: 'Invoices', family: 'student', roles: studentRoles, icon: '$' },
-  { name: 'notifications', title: 'Notifications', family: 'student', roles: allRoles, icon: '!' },
-  { name: 'profile', title: 'Profile', family: 'student', roles: allRoles, icon: '○' },
-  { name: 'thesis.topics', title: 'Thesis topics', family: 'thesis', roles: studentRoles, icon: 'T' },
-  { name: 'thesis.detail', title: 'Topic detail', family: 'thesis', roles: studentRoles, icon: 'i' },
-  { name: 'thesis.registration', title: 'Thesis registration', family: 'thesis', roles: studentRoles, icon: 'R' },
-  { name: 'thesis.progress', title: 'Thesis progress', family: 'thesis', roles: studentRoles, icon: '↗' },
-  { name: 'thesis.evaluation', title: 'Thesis evaluation', family: 'thesis', roles: studentRoles, icon: '★' },
-  { name: 'assistant.chat', title: 'Academic assistant', family: 'assistant', roles: allRoles, icon: '?' },
-  { name: 'admin.dashboard', title: 'Admin dashboard', family: 'operations', roles: adminRoles, icon: 'A' },
-  { name: 'admin.students', title: 'Manage students', family: 'operations', roles: adminRoles, icon: 'S' },
-  { name: 'admin.lecturers', title: 'Manage lecturers', family: 'operations', roles: adminRoles, icon: 'L' },
-  { name: 'lecturer.dashboard', title: 'Lecturer dashboard', family: 'operations', roles: lecturerRoles, icon: 'D' },
-  { name: 'lecturer.schedule', title: 'Teaching schedule', family: 'operations', roles: lecturerRoles, icon: 'C' },
-  { name: 'lecturer.grading', title: 'Gradebook', family: 'operations', roles: lecturerRoles, icon: 'G' },
-  { name: 'lecturer.attendance', title: 'Class attendance', family: 'operations', roles: lecturerRoles, icon: 'P' },
+  { name: 'auth.signIn', title: 'Sign in', family: 'auth', roles: allRoles, icon: 'login' },
+  { name: 'dashboard.student', title: 'Dashboard', family: 'student', roles: studentRoles, icon: 'home-variant' },
+  { name: 'schedule', title: 'Schedule', family: 'student', roles: studentRoles, icon: 'calendar-week' },
+  { name: 'courses', title: 'Courses', family: 'student', roles: studentRoles, icon: 'book-open-page-variant' },
+  { name: 'grades', title: 'Grades', family: 'student', roles: studentRoles, icon: 'chart-box-outline' },
+  { name: 'attendance', title: 'Attendance', family: 'student', roles: studentRoles, icon: 'clipboard-check-outline' },
+  { name: 'registration', title: 'Registration', family: 'student', roles: studentRoles, icon: 'book-plus-outline' },
+  { name: 'notifications', title: 'Notifications', family: 'student', roles: allRoles, icon: 'bell-outline' },
+  { name: 'profile', title: 'Profile', family: 'student', roles: allRoles, icon: 'account-circle-outline' },
+  { name: 'thesis.topics', title: 'Thesis topics', family: 'thesis', roles: studentRoles, icon: 'lightbulb-on-outline' },
+  { name: 'thesis.detail', title: 'Topic detail', family: 'thesis', roles: studentRoles, icon: 'text-box-search-outline' },
+  { name: 'thesis.registration', title: 'Thesis registration', family: 'thesis', roles: studentRoles, icon: 'account-group-outline' },
+  { name: 'thesis.progress', title: 'Thesis progress', family: 'thesis', roles: studentRoles, icon: 'chart-timeline-variant' },
+  { name: 'assistant.chat', title: 'Academic assistant', family: 'assistant', roles: allRoles, icon: 'robot-outline' },
+  { name: 'admin.dashboard', title: 'Admin dashboard', family: 'operations', roles: adminRoles, icon: 'shield-account-outline' },
+  { name: 'admin.students', title: 'Manage students', family: 'operations', roles: adminRoles, icon: 'school-outline' },
+  { name: 'admin.lecturers', title: 'Manage lecturers', family: 'operations', roles: adminRoles, icon: 'account-tie-outline' },
+  { name: 'lecturer.dashboard', title: 'Lecturer dashboard', family: 'operations', roles: lecturerRoles, icon: 'view-dashboard-outline' },
+  { name: 'lecturer.schedule', title: 'Teaching schedule', family: 'operations', roles: lecturerRoles, icon: 'calendar-account-outline' },
+  { name: 'lecturer.grading', title: 'Gradebook', family: 'operations', roles: lecturerRoles, icon: 'notebook-edit-outline' },
+  { name: 'lecturer.attendance', title: 'Class attendance', family: 'operations', roles: lecturerRoles, icon: 'account-check-outline' },
 ];
 
 const bottomNavigationByRole: Readonly<Record<UserRole, readonly BottomNavigationItem[]>> = {
   student: [
-    { route: 'dashboard.student', label: 'Home', icon: '⌂' },
-    { route: 'schedule', label: 'Schedule', icon: '◷' },
-    { route: 'courses', label: 'Courses', icon: '▦' },
-    { route: 'notifications', label: 'Alerts', icon: '!' },
+    { route: 'dashboard.student', label: 'Home', icon: 'home-variant' },
+    { route: 'schedule', label: 'Schedule', icon: 'calendar-week' },
+    { route: 'courses', label: 'Courses', icon: 'book-open-page-variant' },
+    { route: 'notifications', label: 'Alerts', icon: 'bell-outline' },
   ],
   lecturer: [
-    { route: 'lecturer.dashboard', label: 'Home', icon: '⌂' },
-    { route: 'lecturer.schedule', label: 'Schedule', icon: '◷' },
-    { route: 'lecturer.grading', label: 'Gradebook', icon: 'G' },
-    { route: 'notifications', label: 'Alerts', icon: '!' },
+    { route: 'lecturer.dashboard', label: 'Home', icon: 'home-variant' },
+    { route: 'lecturer.schedule', label: 'Schedule', icon: 'calendar-account-outline' },
+    { route: 'lecturer.grading', label: 'Gradebook', icon: 'notebook-edit-outline' },
+    { route: 'notifications', label: 'Alerts', icon: 'bell-outline' },
   ],
   admin: [
-    { route: 'admin.dashboard', label: 'Home', icon: '⌂' },
-    { route: 'admin.students', label: 'Students', icon: 'S' },
-    { route: 'admin.lecturers', label: 'Lecturers', icon: 'L' },
-    { route: 'notifications', label: 'Alerts', icon: '!' },
+    { route: 'admin.dashboard', label: 'Home', icon: 'shield-account-outline' },
+    { route: 'admin.students', label: 'Students', icon: 'school-outline' },
+    { route: 'admin.lecturers', label: 'Lecturers', icon: 'account-tie-outline' },
+    { route: 'notifications', label: 'Alerts', icon: 'bell-outline' },
   ],
 };
 
@@ -136,9 +136,6 @@ export const stitchMobileReferences: Readonly<
   ],
   'thesis.progress': [
     { id: '5cb62add07304fa689a98c8512495482', title: 'Theo dõi tiến độ - Mobile App' },
-  ],
-  'thesis.evaluation': [
-    { id: '3073bce589eb4d4e97ef9775e921a506', title: 'Đánh giá Đề tài - Mobile App' },
   ],
   'admin.lecturers': [
     { id: '36c60dec6ed9458a80bc5b1cfe6f82a5', title: 'Danh sách Giảng viên - Mobile App' },

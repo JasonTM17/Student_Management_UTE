@@ -8,17 +8,15 @@ import java.sql.SQLException;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SELECT-only adapter for legacy Prisma academic section schedule tables. */
+/** JDBC adapter for academic schedule tables. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-schedule-read", name = "enabled", havingValue = "true")
 public class AcademicScheduleReadRepository {
 
     private static final String SCHEDULE = "\"academic\".\"SectionSchedule\"";

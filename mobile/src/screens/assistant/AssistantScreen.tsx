@@ -1,22 +1,22 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { ApiClientError, apiClient, campusApi } from '../../api/client';
+import { ApiClientError, apiClient, campusApi, type AssistantCitation } from '../../api/client';
 import { Button, Card, Field, ScreenShell, ScreenSpacer, UiText } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
 import type { MobileScreenProps } from '../../navigation/types';
 
-type ChatMessage = { from: 'assistant' | 'student'; text: string };
-
-const starterMessages: ChatMessage[] = [
-  { from: 'assistant', text: 'Hello Minh. I can help you find a course, understand a grade, or plan your next thesis milestone.' },
-  { from: 'student', text: 'What should I prepare before thesis registration?' },
-  { from: 'assistant', text: 'Confirm your group members, shortlist one topic, and review the supervisor availability before submitting.' },
-];
+type ChatMessage = {
+  from: 'assistant' | 'student';
+  text: string;
+  citations?: AssistantCitation[];
+  degraded?: boolean;
+  reasonCode?: string;
+};
 
 export function AssistantChatScreen({ navigation }: MobileScreenProps) {
   const [message, setMessage] = useState('');
-  const [messages, setMessages] = useState<ChatMessage[]>(starterMessages);
+  const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [isSending, setIsSending] = useState(false);
   const isPreview = apiClient.mode === 'preview';
 
@@ -42,14 +42,15 @@ export function AssistantChatScreen({ navigation }: MobileScreenProps) {
 
     setIsSending(true);
     try {
-      const reply = await campusApi.assistantChat(trimmedMessage, 'en');
+      const reply = await campusApi.assistantChat(trimmedMessage, 'vi');
       setMessages((current) => [
         ...current,
         {
           from: 'assistant',
-          text: reply.degraded
-            ? `${reply.answer}\n\nLocal fallback · ${reply.model}`
-            : reply.answer,
+          text: reply.answer,
+          citations: reply.citations,
+          degraded: reply.degraded,
+          reasonCode: reply.reasonCode,
         },
       ]);
     } catch (assistantError) {
@@ -88,6 +89,18 @@ export function AssistantChatScreen({ navigation }: MobileScreenProps) {
             <UiText variant="bodySmall" tone={chatMessage.from === 'student' ? 'default' : 'muted'} style={styles.messageText}>
               {chatMessage.text}
             </UiText>
+            {chatMessage.from === 'assistant' && chatMessage.reasonCode ? (
+              <UiText variant="meta" tone={chatMessage.degraded ? 'warning' : 'muted'} style={styles.reasonCode}>
+                {chatMessage.degraded ? 'DEGRADED' : chatMessage.reasonCode}
+              </UiText>
+            ) : null}
+            {chatMessage.citations?.map((citation) => (
+              <View key={citation.id} style={styles.citation}>
+                <UiText variant="label" tone="primary">{citation.title}</UiText>
+                <UiText variant="meta" tone="muted">{citation.source} · {citation.locale.toUpperCase()}</UiText>
+                <UiText variant="bodySmall" tone="muted" style={styles.citationExcerpt}>{citation.excerpt}</UiText>
+              </View>
+            ))}
           </Card>
         </View>
       ))}
@@ -113,6 +126,9 @@ const styles = StyleSheet.create({
   studentRow: { alignItems: 'flex-end' },
   messageCard: { maxWidth: '88%', padding: tokens.spacing.md },
   messageText: { marginTop: tokens.spacing.xs },
+  reasonCode: { marginTop: tokens.spacing.sm },
+  citation: { borderLeftColor: tokens.colors.primary, borderLeftWidth: 2, marginTop: tokens.spacing.sm, paddingLeft: tokens.spacing.sm },
+  citationExcerpt: { marginTop: tokens.spacing.xs },
   composer: { padding: tokens.spacing.md },
   progressButton: { marginTop: tokens.spacing.sm },
 });

@@ -7,23 +7,15 @@ import java.sql.Timestamp;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Read adapter for the legacy notifications schema.
- *
- * <p>There is deliberately no JPA entity or Flyway migration here. The
- * monolith must not create, mutate, or become the owner of the legacy table as
- * part of this candidate.</p>
- */
+/** JDBC read adapter for the notification inbox. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.notifications-read", name = "enabled", havingValue = "true")
 public class NotificationReadRepository {
 
     private static final String SELECT_COLUMNS = """

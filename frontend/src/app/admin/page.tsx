@@ -2,10 +2,10 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BarChart3, Bell, BookMarked, BookOpen, Building2, CreditCard, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, Building2, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { analyticsApi } from '@/lib/api';
+import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard, AdminTableCard } from '@/components/admin/AdminSurface';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -25,7 +25,7 @@ const menuItems = [
     href: '/admin/thesis',
     icon: GraduationCap,
     label: 'Thesis management',
-    description: 'Create registration rounds, manage lifecycle, and monitor councils.',
+    description: 'Create registration rounds and monitor topics, groups, and progress.',
     tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
   },
   {
@@ -85,20 +85,6 @@ const menuItems = [
     tone: 'bg-orange-500/12 text-orange-600 dark:text-orange-400',
   },
   {
-    href: '/admin/analytics',
-    icon: BarChart3,
-    label: 'Analytics',
-    description: 'Review operational reporting and top-level data health.',
-    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    href: '/admin/invoices',
-    icon: CreditCard,
-    label: 'Invoices',
-    description: 'Handle tuition invoicing, balances, and payment review.',
-    tone: 'bg-lime-500/12 text-lime-600 dark:text-lime-400',
-  },
-  {
     href: '/admin/announcements',
     icon: Bell,
     label: 'Announcements',
@@ -141,12 +127,17 @@ export default function AdminDashboardPage() {
     setError('');
 
     try {
-      const data = await analyticsApi.getOverview();
+      const [users, lecturers, courses, enrollments] = await Promise.all([
+        usersApi.getAll({ limit: 1 }),
+        lecturersApi.getAll({ limit: 1 }),
+        coursesApi.getAll({ limit: 1 }),
+        enrollmentsApi.getAll({ limit: 1 }),
+      ]);
       setStats({
-        totalStudents: data.totalStudents || 0,
-        totalLecturers: data.totalLecturers || 0,
-        totalCourses: data.totalCourses || 0,
-        totalEnrollments: data.totalEnrollments || 0,
+        totalStudents: users.meta?.total ?? users.data.length,
+        totalLecturers: lecturers.meta?.total ?? lecturers.data.length,
+        totalCourses: courses.meta?.total ?? courses.data.length,
+        totalEnrollments: enrollments.meta?.total ?? enrollments.data.length,
       });
     } catch {
       setError(messages.admin.unavailableDescription);
@@ -211,8 +202,8 @@ export default function AdminDashboardPage() {
             </LocalizedLink>
           </Button>
           <Button asChild>
-            <LocalizedLink href="/admin/analytics">
-              {messages.common.actions.openAnalytics}
+            <LocalizedLink href="/admin/courses">
+              {messages.dashboardShell.menu.myCourses}
             </LocalizedLink>
           </Button>
         </>

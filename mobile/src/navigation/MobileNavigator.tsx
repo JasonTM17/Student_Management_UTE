@@ -103,6 +103,7 @@ export function MobileNavigator() {
             onClose={() => setMenuOpen(false)}
             onNavigate={navigation.navigate}
             onSwitchRole={navigation.switchRole}
+            allowRoleSwitch={isPreviewSession}
           />
         ) : null}
       </View>

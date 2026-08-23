@@ -3,13 +3,7 @@ package io.campuscore.restfulapi.notification.web;
 import java.time.Instant;
 import java.util.List;
 
-/**
- * Read-only notification DTOs kept separate from the legacy persistence model.
- *
- * <p>The envelope intentionally follows the Nest/Prisma response rather than
- * exposing Spring Data's {@code Page} shape. This module must remain a read
- * adapter until the legacy contract and database ownership are verified.</p>
- */
+/** Stable notification DTOs that avoid exposing persistence implementation details. */
 public final class NotificationReadDtos {
 
     private NotificationReadDtos() {

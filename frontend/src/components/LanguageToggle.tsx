@@ -9,8 +9,10 @@ import { cn } from '@/lib/utils';
 
 export function LanguageToggle({
   className,
+  inverse = false,
 }: {
   className?: string;
+  inverse?: boolean;
 }) {
   const router = useRouter();
   const pathname = usePathname();
@@ -40,6 +42,7 @@ export function LanguageToggle({
     <div
       className={cn(
         'inline-flex items-center rounded-full border border-border/70 bg-card/80 p-1 shadow-sm',
+        inverse && 'border-white/20 bg-white/10 shadow-none',
         className,
       )}
       role="group"
@@ -61,10 +64,16 @@ export function LanguageToggle({
             type="button"
             onClick={() => handleSwitch(item)}
             className={cn(
-              'rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-colors',
+              'min-h-11 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              inverse &&
+                'focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-[var(--portal-sidebar)]',
               isActive
-                ? 'bg-primary text-primary-foreground'
-                : 'text-muted-foreground hover:text-foreground',
+                ? inverse
+                  ? 'bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]'
+                  : 'bg-primary text-primary-foreground'
+                : inverse
+                  ? 'text-[var(--portal-sidebar-muted)] hover:text-[var(--portal-sidebar-text)]'
+                  : 'text-muted-foreground hover:text-foreground',
             )}
             aria-pressed={isActive}
             aria-label={label}

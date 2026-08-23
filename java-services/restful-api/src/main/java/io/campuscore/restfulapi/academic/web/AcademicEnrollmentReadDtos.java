@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only academic enrollment/grade candidate. */
+/** DTOs for enrollment, grade and transcript reads. */
 public final class AcademicEnrollmentReadDtos {
     private AcademicEnrollmentReadDtos() {
     }

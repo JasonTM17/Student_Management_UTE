@@ -1,8 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: campuscore-shared-env
-data:
-  SWAGGER_ENABLED: "false"
-  COOKIE_SECURE: "true"
-  FRONTEND_URL: https://campuscore.example.com

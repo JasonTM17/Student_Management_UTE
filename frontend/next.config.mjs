@@ -1,8 +1,4 @@
-const localEdgeOrigin =
-  (process.env.LOCAL_EDGE_ORIGIN || 'http://127.0.0.1:8080').replace(/\/$/, '');
-const enableLocalEdgeRewrites =
-  process.env.NODE_ENV === 'development' ||
-  process.env.ENABLE_LOCAL_EDGE_REWRITES === '1';
+const javaApiOrigin = (process.env.JAVA_API_ORIGIN || 'http://127.0.0.1:4010').replace(/\/$/, '');
 
 /** @type {import('next').NextConfig} */
 const nextConfig = {
@@ -17,30 +13,14 @@ const nextConfig = {
     unoptimized: true,
   },
   async rewrites() {
-    if (!enableLocalEdgeRewrites) {
-      return [];
-    }
-
     return [
       {
         source: '/api/v1/:path*',
-        destination: `${localEdgeOrigin}/api/v1/:path*`,
+        destination: `${javaApiOrigin}/api/v1/:path*`,
       },
       {
         source: '/api/docs',
-        destination: `${localEdgeOrigin}/api/docs`,
-      },
-      {
-        source: '/health',
-        destination: `${localEdgeOrigin}/health`,
-      },
-      {
-        source: '/socket.io/:path*',
-        destination: `${localEdgeOrigin}/socket.io/:path*`,
-      },
-      {
-        source: '/notifications/:path*',
-        destination: `${localEdgeOrigin}/notifications/:path*`,
+        destination: `${javaApiOrigin}/api/docs`,
       },
     ];
   },

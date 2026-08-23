@@ -23,7 +23,6 @@ import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { useI18n } from '@/i18n';
 import {
   thesisApi,
-  type ThesisCouncil,
   type ThesisGroup,
   type ThesisRound,
   type ThesisTopic,
@@ -31,11 +30,10 @@ import {
 
 export default function AdminThesisPage() {
   const { isAdmin, isSuperAdmin } = useAuth();
-  const { formatDateTime, messages } = useI18n();
+  const { messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
-  const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [error, setError] = useState('');
@@ -50,7 +48,6 @@ export default function AdminThesisPage() {
   const [formEnd, setFormEnd] = useState('');
   const [formProposal, setFormProposal] = useState('');
   const [formReport, setFormReport] = useState('');
-  const [formDefense, setFormDefense] = useState('');
 
   const canAccess = Boolean(isAdmin || isSuperAdmin);
 
@@ -73,14 +70,12 @@ export default function AdminThesisPage() {
 
   const loadRoundDetail = async (roundId: string) => {
     try {
-      const [t, g, c] = await Promise.all([
+      const [t, g] = await Promise.all([
         thesisApi.listTopics(roundId),
         thesisApi.listGroups(roundId),
-        thesisApi.listCouncils(roundId),
       ]);
       setTopics(t);
       setGroups(g);
-      setCouncils(c);
     } catch {
       setError(messages.thesis.loadFailed);
     }
@@ -111,7 +106,6 @@ export default function AdminThesisPage() {
         registrationEnd: new Date(formEnd).toISOString(),
         proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
         reportDate: formReport ? new Date(formReport).toISOString() : undefined,
-        defenseDate: formDefense ? new Date(formDefense).toISOString() : undefined,
       });
       setSuccess(messages.thesis.admin.created);
       setShowCreateModal(false);
@@ -120,7 +114,6 @@ export default function AdminThesisPage() {
       setFormEnd('');
       setFormProposal('');
       setFormReport('');
-      setFormDefense('');
       await loadData();
     } catch {
       setError(messages.thesis.actionFailed);
@@ -239,7 +232,7 @@ export default function AdminThesisPage() {
                         <div>
                           <CardTitle className="text-lg">{round.name}</CardTitle>
                           <CardDescription className="mt-1">
-                            {round.thesisType} · {formatDateTime(round.registrationStart)} → {formatDateTime(round.registrationEnd)}
+                            {round.thesisType} · {new Date(round.registrationStart).toLocaleString()} → {new Date(round.registrationEnd).toLocaleString()}
                           </CardDescription>
                         </div>
                       </div>
@@ -313,10 +306,6 @@ export default function AdminThesisPage() {
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate}
               <Input type="datetime-local" value={formReport} onChange={(e) => setFormReport(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.defenseDate}
-              <Input type="datetime-local" value={formDefense} onChange={(e) => setFormDefense(e.target.value)} />
             </label>
           </div>
           <div className="flex justify-end gap-2 pt-2">

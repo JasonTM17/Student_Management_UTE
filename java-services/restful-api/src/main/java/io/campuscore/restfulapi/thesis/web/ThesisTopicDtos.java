@@ -12,12 +12,12 @@ public final class ThesisTopicDtos {
     public record TopicResponse(
             UUID id,
             UUID roundId,
-            UUID departmentId,
+            String departmentId,
             String title,
             String description,
             int maxGroups,
             TopicStatus status,
-            UUID createdBy) {
+            String createdBy) {
 
         public static TopicResponse from(ThesisTopic topic) {
             return new TopicResponse(

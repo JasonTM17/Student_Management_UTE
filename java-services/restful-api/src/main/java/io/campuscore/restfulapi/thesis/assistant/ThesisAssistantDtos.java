@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.assistant;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Pattern;
 import jakarta.validation.constraints.Size;
+import java.util.List;
 
 public final class ThesisAssistantDtos {
 
@@ -17,6 +18,21 @@ public final class ThesisAssistantDtos {
             String locale) {
     }
 
-    public record ChatResponse(String answer, String model, boolean degraded) {
+    public record Citation(
+            String id,
+            String slug,
+            String title,
+            String source,
+            String locale,
+            String excerpt) {
+    }
+
+    public record ChatResponse(
+            String answer,
+            String model,
+            boolean degraded,
+            String reasonCode,
+            String locale,
+            List<Citation> citations) {
     }
 }

@@ -8,7 +8,6 @@ import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.StudentA
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -20,13 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated academic attendance reads. Attendance mark/update/delete
- * mutations remain owned by the legacy academic service in this wave.
- */
+/** Role-protected academic attendance query routes. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-attendance-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/attendance")
 public class AcademicAttendanceReadController {
 

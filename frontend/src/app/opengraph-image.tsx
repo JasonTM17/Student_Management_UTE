@@ -83,7 +83,7 @@ export default function OpenGraphImage() {
                 maxWidth: 820,
               }}
             >
-              Identity, academics, finance, engagement, people data, and analytics in one release-verified workspace.
+              Identity, academics, announcements, notifications, and thesis workflows in one course-ready portal.
             </div>
           </div>
 
@@ -96,8 +96,8 @@ export default function OpenGraphImage() {
           >
             {[
               'Cookie sessions + CSRF',
-              '9-image topology',
-              'Compose + Kubernetes',
+              'One Java REST API',
+              'PostgreSQL + Compose',
             ].map((item) => (
               <div
                 key={item}

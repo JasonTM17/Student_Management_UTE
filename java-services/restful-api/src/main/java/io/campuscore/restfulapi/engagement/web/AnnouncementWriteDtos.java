@@ -12,7 +12,7 @@ import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Set;
 
-/** Request records for feature-gated announcement write candidates. */
+/** Request records for announcement mutations. */
 public final class AnnouncementWriteDtos {
 
     private static final Set<String> ANNOUNCEMENT_FIELDS = Set.of(

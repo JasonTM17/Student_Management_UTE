@@ -7,7 +7,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.Set;
 
-/** Disabled-by-default notification write DTOs for the strangler candidate. */
+/** DTOs for notification inbox mutations. */
 public final class NotificationWriteDtos {
 
     private static final Set<String> WRITE_FIELDS = Set.of(

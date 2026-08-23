@@ -1,4 +1,5 @@
 import { Pressable, StyleSheet, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { tokens } from '../design/tokens';
 import {
@@ -34,9 +35,11 @@ export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: Bott
               style={({ pressed }) => [styles.item, pressed ? styles.pressed : undefined]}
             >
               <View style={[styles.icon, active ? styles.activeIcon : undefined]}>
-                <UiText variant="label" tone={active ? 'onPrimary' : 'muted'}>
-                  {item.icon}
-                </UiText>
+                <MaterialCommunityIcons
+                  color={active ? tokens.colors.onPrimary : tokens.colors.textMuted}
+                  name={item.icon}
+                  size={19}
+                />
               </View>
               <UiText variant="meta" tone={active ? 'primary' : 'muted'}>
                 {item.label}
@@ -51,9 +54,7 @@ export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: Bott
           style={({ pressed }) => [styles.item, pressed ? styles.pressed : undefined]}
         >
           <View style={styles.icon}>
-            <UiText variant="label" tone="muted">
-              ≡
-            </UiText>
+            <MaterialCommunityIcons color={tokens.colors.textMuted} name="menu" size={20} />
           </View>
           <UiText variant="meta" tone="muted">
             Menu

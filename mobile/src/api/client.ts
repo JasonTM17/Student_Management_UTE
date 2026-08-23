@@ -5,10 +5,22 @@ declare const process: {
   env: Record<string, string | undefined>;
 };
 
+export interface AssistantCitation {
+  id: string;
+  slug: string;
+  title: string;
+  source: string;
+  locale: AssistantLocale;
+  excerpt: string;
+}
+
 export interface AssistantReply {
   answer: string;
   model: string;
   degraded: boolean;
+  reasonCode: 'ANSWERED' | 'NO_MATCH' | 'KNOWLEDGE_UNAVAILABLE' | string;
+  locale: AssistantLocale;
+  citations: AssistantCitation[];
 }
 
 export interface AuthUser {
@@ -26,6 +38,88 @@ export interface LoginResponse {
   user: AuthUser;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface MobileSection {
+  id: string;
+  sectionNumber: string;
+  semesterId: string;
+  capacity: number;
+  enrolledCount: number;
+  status: string;
+  course?: { code?: string; name?: string; nameEn?: string; nameVi?: string; credits?: number };
+  schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string; classroom?: { building?: string; roomNumber?: string } }>;
+}
+
+export interface MobileEnrollment {
+  id: string;
+  sectionId: string;
+  semesterId: string;
+  status: string;
+  finalGrade?: number | null;
+  letterGrade?: string | null;
+  gradeStatus?: string;
+  section?: MobileSection;
+}
+
+export interface MobileGrade {
+  id: string;
+  courseCode: string;
+  courseName: string;
+  finalGrade?: number | null;
+  letterGrade?: string | null;
+  gradeStatus: string;
+  credits?: number;
+}
+
+export interface MobileAttendanceSummary {
+  sectionId: string;
+  courseCode: string;
+  courseName: string;
+  courseNameEn?: string | null;
+  courseNameVi?: string | null;
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  attendanceRate: number;
+}
+
+export interface MobileThesisRound {
+  id: string;
+  name: string;
+  status: string;
+  registrationStart: string;
+  registrationEnd: string;
+}
+
+export interface MobileThesisTopic {
+  id: string;
+  roundId: string;
+  departmentId: string;
+  title: string;
+  description: string;
+  maxGroups: number;
+  status: string;
+}
+
+export interface MobileThesisGroup {
+  id: string;
+  roundId: string;
+  leaderStudentId: string;
+  topicId?: string | null;
+  status: string;
+  approvalStatus: string;
+  memberStudentIds: string[];
+}
+
+export interface MobileNotification {
+  id: string;
+  title: string;
+  message: string;
+  isRead: boolean;
+  createdAt: string;
 }
 
 export interface ApiClientOptions {
@@ -68,7 +162,7 @@ export class ApiClientError extends Error {
 export const DEFAULT_API_BASE_URL = 'http://127.0.0.1:4010/api/v1';
 
 const configuredApiBaseUrl = process.env.EXPO_PUBLIC_API_URL;
-const configuredApiMode: ApiMode = process.env.EXPO_PUBLIC_API_MODE === 'live' ? 'live' : 'preview';
+const configuredApiMode: ApiMode = process.env.EXPO_PUBLIC_API_MODE === 'preview' ? 'preview' : 'live';
 
 function normalizeBaseUrl(value: string) {
   return value.replace(/\/+$/, '');
@@ -300,15 +394,22 @@ export const apiRoutes = {
   contract: '/contract',
   notifications: '/notifications/my',
   thesis: {
+    rounds: '/thesis/rounds',
     topics: '/thesis/topics',
+    groups: '/thesis/groups',
     assistantChat: '/thesis/assistant/chat',
   },
+  sections: '/sections',
+  enrollments: '/enrollments/my',
+  grades: '/enrollments/my/grades',
+  attendanceSummary: '/attendance/my/summary',
 } as const;
 
 export const campusApi = {
   health: () => apiClient.get<JsonObject>(apiRoutes.health),
   contract: () => apiClient.get<JsonObject>(apiRoutes.contract),
   me: () => apiClient.get<JsonObject>(apiRoutes.identity),
+  account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
   refresh: async () => {
@@ -321,8 +422,44 @@ export const campusApi = {
   },
   logout: () =>
     apiClient.post<void>(apiRoutes.auth.logout, { refreshToken: apiClient.getRefreshToken() }),
-  notifications: () => apiClient.get<JsonObject>(apiRoutes.notifications),
-  thesisTopics: () => apiClient.get<JsonObject>(apiRoutes.thesis.topics),
+  sections: (semesterId?: string) =>
+    apiClient.get<{ data: MobileSection[] }>(
+      apiRoutes.sections + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
+    ),
+  enrollments: (semesterId?: string) =>
+    apiClient.get<MobileEnrollment[]>(
+      apiRoutes.enrollments + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
+    ),
+  enroll: (sectionId: string, locale: AssistantLocale = 'vi') =>
+    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }),
+  dropEnrollment: (enrollmentId: string) =>
+    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}),
+  grades: (semesterId?: string) =>
+    apiClient.get<MobileGrade[]>(
+      apiRoutes.grades + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
+    ),
+  attendanceSummary: (semesterId?: string) =>
+    apiClient.get<MobileAttendanceSummary[]>(
+      apiRoutes.attendanceSummary + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
+    ),
+  notifications: () => apiClient.get<{ data: MobileNotification[] }>(apiRoutes.notifications),
+  markNotificationRead: (id: string) =>
+    apiClient.patch<JsonObject>(`/notifications/my/${id}/read`, {}),
+  markAllNotificationsRead: () =>
+    apiClient.patch<{ updated: number }>('/notifications/my/read-all', {}),
+  thesisRounds: () => apiClient.get<MobileThesisRound[]>(apiRoutes.thesis.rounds),
+  thesisTopics: (roundId: string) =>
+    apiClient.get<MobileThesisTopic[]>(
+      `${apiRoutes.thesis.topics}?roundId=${encodeURIComponent(roundId)}&status=PUBLISHED`,
+    ),
+  thesisGroups: (roundId: string) =>
+    apiClient.get<MobileThesisGroup[]>(
+      `${apiRoutes.thesis.groups}?roundId=${encodeURIComponent(roundId)}`,
+    ),
+  createThesisGroup: (roundId: string) =>
+    apiClient.post<MobileThesisGroup>(apiRoutes.thesis.groups, { roundId }),
+  assignThesisTopic: (groupId: string, topicId: string) =>
+    apiClient.post<MobileThesisGroup>(`${apiRoutes.thesis.groups}/${groupId}/topic`, { topicId }),
   assistantChat: (message: string, locale: AssistantLocale = 'en') =>
     apiClient.post<AssistantReply>(apiRoutes.thesis.assistantChat, { message, locale }),
 };

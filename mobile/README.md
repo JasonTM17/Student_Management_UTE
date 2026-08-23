@@ -1,9 +1,7 @@
 # CampusCore Mobile
 
-Lightweight Expo + React Native + TypeScript scaffold for the CampusCore mobile
-surface. The implementation keeps navigation local and dependency-free so the
-screen atlas can be explored before the mobile runtime is connected to every
-domain contract.
+Expo + React Native + TypeScript mobile client for the Java REST API course
+project.
 
 ## Design contract
 
@@ -36,15 +34,14 @@ The dependency-free screen-atlas regression can run now:
 npm test --prefix mobile
 ```
 
-It verifies 23 registered screens and the shared Stitch token anchors. The
+It verifies 21 registered screens and the shared Stitch token anchors. The
 real `npm run typecheck` remains deferred until Expo/React Native dependencies
 are provisioned in a bounded environment; source transpile has been checked,
 but transpile is not a substitute for Expo typechecking.
 
-The default mode is `preview`: API calls fail closed with
-`MOBILE_API_PREVIEW`, so the scaffold cannot accidentally target the
-incomplete Java candidate. To exercise a deliberately provisioned runtime,
-set `EXPO_PUBLIC_API_MODE=live` and `EXPO_PUBLIC_API_URL` from `.env.example`.
+The default mode is `live`: API calls target the Java REST API at
+`EXPO_PUBLIC_API_URL`. Preview mode remains an explicit local-only option for
+design inspection and is never treated as authenticated evidence.
 The app uses one base URL for all requests and does not embed credentials. The
 local preview entry point is deliberately labeled as a preview; it does not
 represent a successful Java authentication. When live mode is selected, sign
@@ -66,21 +63,19 @@ substitute.
 GET/POST/PATCH/PUT/DELETE helpers plus named probes for auth, identity, health,
 notifications, thesis topics, and the assistant route. The assistant seam sends
 `{ message, locale }` and expects the Java/web-compatible
-`{ answer, model, degraded }` shape. The assistant screen keeps preview
-responses local, then calls the Java assistant route only in explicit live mode
-after sign-in has supplied a bearer token. The current Java RESTful API shell
-only publishes a subset of those contracts; the remaining screen families
-intentionally use representative local data until their public routes are cut
-over.
+`{ answer, model, degraded, reasonCode, citations }` shape. The assistant
+screen renders provenance in live mode and only uses local responses in the
+explicit preview state. Retained role routes must show an explicit
+not-available state when their Java contract is not yet present.
 
 ## Screen atlas
 
-The registry contains 23 navigable screens:
+The registry contains 21 navigable screens:
 
 - Auth: sign in.
 - Student: dashboard, schedule, courses, grades, attendance, registration,
-  invoices, notifications, profile.
-- Thesis: topics, topic detail, registration, progress, evaluation.
+  notifications, profile.
+- Thesis: topics, topic detail, registration, progress.
 - Assistant: academic assistant/chatbot.
 - Operations: admin dashboard, students, lecturers; lecturer dashboard,
   schedule, grading, attendance.

@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.repository;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.domain.ThesisRegistrationRound;
 import java.util.List;
+import java.util.Optional;
 import java.util.UUID;
 import org.springframework.data.repository.Repository;
 
@@ -15,4 +16,6 @@ public interface ThesisRegistrationRoundRepository extends Repository<ThesisRegi
     List<ThesisRegistrationRound> findAllByOrderByRegistrationStartDesc();
 
     List<ThesisRegistrationRound> findAllByStatusOrderByRegistrationStartDesc(RoundStatus status);
+
+    Optional<ThesisRegistrationRound> findById(UUID id);
 }

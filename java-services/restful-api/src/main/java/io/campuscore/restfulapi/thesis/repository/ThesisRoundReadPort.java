@@ -1,17 +1,15 @@
 package io.campuscore.restfulapi.thesis.repository;
 
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.stereotype.Component;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-side boundary that preserves the legacy round existence contract. */
+/** Read-side boundary for thesis round existence checks. */
 @Component
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.thesis-read", name = "enabled", havingValue = "true")
 public class ThesisRoundReadPort {
 
     private final JdbcTemplate jdbc;
