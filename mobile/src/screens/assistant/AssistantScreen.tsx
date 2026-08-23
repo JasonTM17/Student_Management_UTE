@@ -74,8 +74,8 @@ export function AssistantChatScreen({ navigation }: MobileScreenProps) {
         <UiText variant="label" tone="primary">Context-aware by design</UiText>
         <UiText variant="bodySmall" tone="muted">
           {isPreview
-            ? 'Preview keeps responses local. Live mode calls the Java assistant route with your bearer session.'
-            : 'Live mode calls the Java assistant route with your bearer session and keeps the fallback label visible.'}
+            ? 'Preview keeps responses local. Live mode uses your signed-in campus session.'
+            : 'Live mode uses your signed-in campus session and keeps the fallback label visible.'}
         </UiText>
       </Card>
       <ScreenSpacer />
