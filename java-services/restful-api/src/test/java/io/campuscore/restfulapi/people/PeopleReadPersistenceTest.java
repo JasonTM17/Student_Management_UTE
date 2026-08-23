@@ -22,7 +22,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.people-read.enabled=true",
         "spring.flyway.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:people_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })

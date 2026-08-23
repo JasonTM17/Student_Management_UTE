@@ -40,8 +40,6 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.thesis-read.enabled=false",
-        "migration.auth-login.enabled=true",
         "spring.flyway.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:auth_login;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })

@@ -6,38 +6,6 @@ security:
 health:
   readiness-key: test-health-key
 
-migration:
-  thesis-read:
-    enabled: true
-  notifications-read:
-    enabled: false
-  notifications-write:
-    enabled: false
-  engagement-read:
-    enabled: false
-  academic-read:
-    enabled: false
-  academic-enrollment-read:
-    enabled: false
-  academic-schedule-read:
-    enabled: false
-  academic-waitlist-read:
-    enabled: false
-  academic-attendance-read:
-    enabled: false
-  academic-section-read:
-    enabled: false
-  people-read:
-    enabled: false
-  finance-read:
-    enabled: false
-  analytics-read:
-    enabled: false
-  thesis-assistant:
-    enabled: false
-  auth-login:
-    enabled: false
-
 spring:
   datasource:
     url: jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1

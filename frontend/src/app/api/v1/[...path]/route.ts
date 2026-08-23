@@ -1,5 +1,7 @@
 import type { NextRequest } from 'next/server';
 
+import { buildApiProxyUrl } from '@/lib/proxy-url';
+
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
 
@@ -13,7 +15,9 @@ async function handle(request: NextRequest, context: RouteContext) {
   const headers = new Headers(request.headers);
   headers.delete('host');
 
-  return fetch(`${origin}/api/v1/${path.join('/')}`, {
+  const upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
+
+  return fetch(upstreamUrl, {
     method: request.method,
     headers,
     body: ['GET', 'HEAD'].includes(request.method) ? undefined : await request.arrayBuffer(),
