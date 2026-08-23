@@ -5,10 +5,12 @@
 **Deferred / HOLD by backend-first sequencing.** The web P0 layout repairs and
 native mobile scaffold are preserved, but no further Stitch web/mobile
 implementation will be performed until the backend foundation gate in
-`plan.md` passes. Current backend exact-head evidence remains HOLD at
-`dc56651447372188695cc64f652c496a9aad4c49`, so this phase stays staged only.
-No fresh browser capture, Expo typecheck with installed dependencies,
-emulator, or device run has been observed.
+`plan.md` passes. Current backend exact-head evidence is partial on the current
+checkout `e9ba156`: the canonical Java build boundary now passes, but the
+broader backend foundation gate still needs PostgreSQL parity, fresh exact-head
+review gates, and route canary/rollback evidence. No fresh browser capture,
+Expo typecheck with installed dependencies, emulator, or device run has been
+observed.
 
 ## Outcome and success signal
 
@@ -65,7 +67,7 @@ student, thesis, notification, assistant, lecturer, and admin flows.
 
 ### Fresh bounded checks — 2026-08-20 continuations
 
-- `npm test --prefix frontend`: PASS, 29/29 smoke tests.
+- `npm test --prefix frontend`: PASS, 30/30 smoke tests.
 - `npm test --prefix mobile`: PASS, 5/5 dependency-free atlas/API/navigation
   tests.
 

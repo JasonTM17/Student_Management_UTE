@@ -58,6 +58,18 @@ PostgreSQL read parity, canary and rollback remain open.
   JWT `token` terminology in tests, so it was treated as a false positive after
   the high-confidence scan passed without printing matched content.
 
+## Current exact-head refresh — 2026-08-21
+
+- Exact current HEAD: `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`
+- `mvn -q -f java-services/pom.xml test`
+  - `JAVA_HOME=C:\Program Files\Java\jdk-26.0.1`
+  - result: PASS
+  - Surefire summary: 27 reports / 178 tests / 0 failures / 0 errors / 1
+    skipped
+- This refresh preserves the historical source checkpoint at
+  `27d34f736da87f439a7ac600f839a0819402d109` while tying the phase record to
+  the current exact head.
+
 ## Open gates
 
 - Restored PostgreSQL read parity against an approved legacy-data snapshot.

@@ -61,7 +61,15 @@ const routes = [
   { role: 'student', path: '/dashboard/announcements', label: 'Announcements' },
   { role: 'student', path: '/dashboard/notifications', label: 'Notifications' },
   { role: 'student', path: '/dashboard/profile', label: 'Profile' },
-  { role: 'student', path: '/dashboard/sign-out', label: 'Sign out' },
+  {
+    role: 'student',
+    path: '/dashboard/sign-out',
+    label: 'Sign out',
+    // This route intentionally clears the session and lands on public login.
+    // It is not a mounted dashboard surface, so it has no bottom navigation.
+    allowsSignedOutRedirect: true,
+    expectsMobileBottomNav: false,
+  },
   { role: 'student', path: '/dashboard/thesis', label: 'Thesis home' },
   { role: 'student', path: '/dashboard/thesis/topics', label: 'Thesis topics' },
   {
@@ -342,12 +350,15 @@ async function captureRoute(browser, viewport, sessions, route) {
   const metrics = await evaluatePage(page);
   const finalUrl = page.url();
   const isAuthenticatedRoute = route.role !== 'public';
+  const landedOnLogin = new URL(finalUrl).pathname.includes('/login');
   const expectsMobileBottomNav =
-    viewport.name === 'mobile' && (route.role === 'student' || route.role === 'lecturer');
+    route.expectsMobileBottomNav ??
+    (viewport.name === 'mobile' && (route.role === 'student' || route.role === 'lecturer'));
 
   const checks = {
     navigationOk: !navigationError && responseStatus !== null && responseStatus < 400,
-    authenticatedRouteStayedAuthed: !isAuthenticatedRoute || !new URL(finalUrl).pathname.includes('/login'),
+    authenticatedRouteStayedAuthed:
+      !isAuthenticatedRoute || (route.allowsSignedOutRedirect ? landedOnLogin : !landedOnLogin),
     hasReadableContent: metrics.textLength > 120 && metrics.headings.length > 0,
     usesStitchFont: /Be Vietnam Pro/i.test(metrics.fontFamily),
     noHorizontalOverflow: metrics.overflowX <= 8,
