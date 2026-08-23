@@ -16,8 +16,9 @@ refresh tokens. Both clients consume the same OpenAPI contract.
 
 The Java API owns authentication, identity, people, catalog, sections,
 enrollment, grades, schedules, announcements, notifications, thesis core and
-the local thesis assistant. Domain identifiers use UUIDs internally; student
-and lecturer codes remain unique business identifiers.
+the local thesis assistant. Auth and academic records use stable string IDs;
+thesis and assistant records use UUIDs. Student and lecturer codes remain
+unique business identifiers.
 
 Flyway owns the schema. A fresh course database is seeded deterministically
 with roles, demo users, academic catalog, sections, announcements,

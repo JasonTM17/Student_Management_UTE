@@ -32,9 +32,9 @@ docker compose up --build postgres restful-api
 The API listens on `http://localhost:4010` by default. Useful checks:
 
 ```powershell
-curl http://localhost:4010/api/v1/health/liveness
-curl http://localhost:4010/api/v1/health/readiness
-curl http://localhost:4010/v3/api-docs
+curl.exe http://localhost:4010/api/v1/health/liveness
+curl.exe -H "X-Health-Key: local-course-health-key" http://localhost:4010/api/v1/health/readiness
+curl.exe http://localhost:4010/v3/api-docs
 ```
 
 The local seed includes `student@campuscore.edu` with password `password123`
