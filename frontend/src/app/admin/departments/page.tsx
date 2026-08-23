@@ -306,6 +306,8 @@ export default function AdminDepartmentsPage() {
         ...formData,
         name: formData.nameEn || formData.nameVi,
         description: formData.descriptionEn || formData.descriptionVi,
+        descriptionEn: formData.descriptionEn,
+        descriptionVi: formData.descriptionVi,
       };
       if (editingDepartment) {
         await departmentsApi.update(editingDepartment.id, payload);

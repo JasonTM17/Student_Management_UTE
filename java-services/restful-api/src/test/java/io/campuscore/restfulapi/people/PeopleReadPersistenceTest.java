@@ -14,6 +14,7 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
@@ -81,13 +82,18 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.meta.total").value(2));
 
         mvc.perform(get("/api/v1/students/student-old")
-                        .with(jwt().jwt(token -> token.subject("student-user"))))
+                        .with(jwt().jwt(token -> token.subject("user-student-old"))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("student-old"))
                 .andExpect(jsonPath("$.studentId").value("S001"))
                 .andExpect(jsonPath("$.curriculum.id").value("curriculum-student-old"))
                 .andExpect(jsonPath("$.curriculum.department.name").value("Software Engineering"))
                 .andExpect(jsonPath("$.admissionDate").value("2025-08-20T00:00:00.000Z"));
+
+        mvc.perform(get("/api/v1/students/student-old")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))
+                                .jwt(token -> token.subject("student-user"))))
+                .andExpect(status().isNotFound());
     }
 
     @Test

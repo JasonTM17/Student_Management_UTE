@@ -300,7 +300,13 @@ public class ThesisMutationService {
     private static String normalize(String value) { return value == null ? "" : value.trim(); }
     private static void requireText(String value, String name) { if (value == null || value.isBlank()) throw invalid(name + " is required"); }
     private static void requireDates(Instant start, Instant end) { if (start == null || end == null || !end.isAfter(start)) throw invalid("registrationEnd must be after registrationStart"); }
-    private static boolean isAdmin(Jwt actor) { return actor != null && actor.getClaimAsStringList("roles").contains("ADMIN"); }
+    private static boolean isAdmin(Jwt actor) {
+        if (actor == null) {
+            return false;
+        }
+        List<String> roles = actor.getClaimAsStringList("roles");
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+    }
     private static boolean isProgressStatus(GroupStatus status) { return status == GroupStatus.DRAFT || status == GroupStatus.SUBMITTED || status == GroupStatus.COMPLETED || status == GroupStatus.CANCELLED; }
     private static DomainException invalid(String message) { return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message); }
     private static DomainException conflict(String code, String message) { return new DomainException(HttpStatus.CONFLICT, code, message); }

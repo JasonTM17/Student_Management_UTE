@@ -23,8 +23,9 @@ index for lexical authoring search. It adds no seed rows and does not create a
 second corpus authority.
 
 RLS is enabled. `anon` has no table grant or policy. Authenticated users need
-`auth.jwt() -> 'app_metadata' ->> 'role'` equal to `ADMIN`, `SUPER_ADMIN`, or
-`LECTURER` for select/insert/update/delete. Authorization must be stored in trusted
+`auth.jwt() -> 'app_metadata' ->> 'role'` equal to `ADMIN` or `SUPER_ADMIN`
+for select/insert/update/delete after applying the admin-only policy migration.
+Authorization must be stored in trusted
 `app_metadata`, never editable user metadata. The importer uses
 `SUPABASE_SERVICE_ROLE_KEY`, which bypasses RLS and must remain server-only.
 Never place it in frontend code, `NEXT_PUBLIC_*`, a committed file, shell

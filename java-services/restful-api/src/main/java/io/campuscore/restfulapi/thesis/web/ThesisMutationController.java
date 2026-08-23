@@ -38,31 +38,31 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/rounds")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public RoundResponse createRound(@RequestBody RoundCreateRequest request) {
         return mutations.createRound(request);
     }
 
     @PostMapping("/rounds/{id}/open-registration")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public RoundResponse openRegistration(@PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.REGISTRATION_OPEN);
     }
 
     @PostMapping("/rounds/{id}/close-registration")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public RoundResponse closeRegistration(@PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
     }
 
     @PostMapping("/rounds/{id}/publish-proposals")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public RoundResponse publishProposals(@PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.PROPOSALS_PUBLISHED);
     }
 
     @PostMapping("/topics")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     public TopicResponse createTopic(
             @RequestBody TopicCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -70,7 +70,7 @@ public class ThesisMutationController {
     }
 
     @PutMapping("/topics/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     public TopicResponse updateTopic(
             @PathVariable UUID id,
             @RequestBody TopicUpdateRequest request,
@@ -79,13 +79,13 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/topics/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     public TopicResponse publishTopic(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         return mutations.publishTopic(id, actor);
     }
 
     @PostMapping("/groups")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse createGroup(
             @RequestBody GroupCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -93,7 +93,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/members")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse addMember(
             @PathVariable UUID id,
             @RequestBody MemberRequest request,
@@ -102,7 +102,7 @@ public class ThesisMutationController {
     }
 
     @DeleteMapping("/groups/{id}/members/{studentId}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse removeMember(
             @PathVariable UUID id,
             @PathVariable String studentId,
@@ -111,7 +111,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/topic")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse assignTopic(
             @PathVariable UUID id,
             @RequestBody TopicAssignmentRequest request,
@@ -120,7 +120,7 @@ public class ThesisMutationController {
     }
 
     @PatchMapping("/groups/{id}/progress")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse updateProgress(
             @PathVariable UUID id,
             @RequestBody ProgressRequest request,
