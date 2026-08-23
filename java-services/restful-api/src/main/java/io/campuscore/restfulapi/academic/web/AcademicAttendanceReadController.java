@@ -32,7 +32,7 @@ public class AcademicAttendanceReadController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public AttendanceListResponse getAttendance(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit,
@@ -79,26 +79,41 @@ public class AcademicAttendanceReadController {
     @GetMapping("section/{sectionId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
     public List<AttendanceResponse> getSectionAttendance(
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String sectionId,
             @RequestParam(required = false) String date,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("date"));
-        return academic.findSectionAttendance(sectionId, date);
+        return academic.findSectionAttendance(
+                sectionId,
+                date,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"));
     }
 
     @GetMapping("section/{sectionId}/summary")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
     public SectionAttendanceSummaryResponse getSectionAttendanceSummary(
+            @AuthenticationPrincipal Jwt jwt,
             @PathVariable String sectionId,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of());
-        return academic.findSectionAttendanceSummary(sectionId);
+        return academic.findSectionAttendanceSummary(
+                sectionId,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"));
     }
 
     @GetMapping("{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT')")
-    public AttendanceResponse getAttendanceRecord(@PathVariable String id) {
-        return academic.findOne(id);
+    public AttendanceResponse getAttendanceRecord(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String id) {
+        return academic.findOne(
+                id,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("studentId"),
+                jwt.getClaimAsString("lecturerId"));
     }
 
     private static void requireAllowedQuery(

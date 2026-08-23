@@ -20,6 +20,8 @@ public class AdminUserMutationService {
     private static final String USER = "\"auth\".\"User\"";
     private static final String ROLE = "\"auth\".\"Role\"";
     private static final String USER_ROLE = "\"auth\".\"UserRole\"";
+    private static final String STUDENT = "\"auth\".\"Student\"";
+    private static final String LECTURER = "\"auth\".\"Lecturer\"";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
@@ -59,13 +61,18 @@ public class AdminUserMutationService {
         String password = required(input, "password");
         String id = UUID.randomUUID().toString();
         jdbc.update(
-                "INSERT INTO " + USER + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\")"
-                        + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE')",
+                "INSERT INTO " + USER
+                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
+                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE',"
+                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 new MapSqlParameterSource().addValue("id", id).addValue("email", email)
                         .addValue("password", passwordEncoder.encode(password))
                         .addValue("firstName", required(input, "firstName"))
                         .addValue("lastName", required(input, "lastName")));
-        assignRole(id, text(input, "role", "STUDENT"));
+        String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
+        assignRole(id, role);
+        ensureProfile(id, role, input);
         return find(id);
     }
 
@@ -79,7 +86,11 @@ public class AdminUserMutationService {
                         .addValue("lastName", input.get("lastName")).addValue("phone", input.get("phone"))
                         .addValue("status", input.get("status")));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
-        if (input.get("role") != null) assignRole(id, text(input, "role", "STUDENT"));
+        if (input.get("role") != null) {
+            String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
+            assignRole(id, role);
+            ensureProfile(id, role, input);
+        }
         return find(id);
     }
 
@@ -101,6 +112,53 @@ public class AdminUserMutationService {
         String roleId = jdbc.queryForObject("SELECT \"id\" FROM " + ROLE + " WHERE \"name\" = :name", new MapSqlParameterSource("name", roleName.toUpperCase()), String.class);
         if (roleId == null) throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
         jdbc.update("INSERT INTO " + USER_ROLE + " (\"id\", \"userId\", \"roleId\") SELECT :id, :userId, :roleId WHERE NOT EXISTS (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)", new MapSqlParameterSource().addValue("id", UUID.randomUUID().toString()).addValue("userId", userId).addValue("roleId", roleId));
+    }
+
+    private void ensureProfile(String userId, String roleName, Map<String, Object> input) {
+        if (profileExists(userId, roleName)) {
+            return;
+        }
+        String profileId = UUID.randomUUID().toString();
+        if ("STUDENT".equals(roleName)) {
+            String studentNumber = text(input, "studentId", "SV" + java.time.Year.now().getValue()
+                    + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT));
+            jdbc.update(
+                    "INSERT INTO " + STUDENT
+                            + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                            + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                            + " VALUES (:id, :userId, :studentId, :curriculumId, :year, 'ACTIVE',"
+                            + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    new MapSqlParameterSource()
+                            .addValue("id", profileId)
+                            .addValue("userId", userId)
+                            .addValue("studentId", studentNumber)
+                            .addValue("curriculumId", text(input, "curriculumId", "curriculum-demo"))
+                            .addValue("year", Integer.parseInt(text(input, "year", "1"))));
+        } else if ("LECTURER".equals(roleName)) {
+            String employeeId = text(input, "employeeId", "GV"
+                    + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT));
+            jdbc.update(
+                    "INSERT INTO " + LECTURER
+                            + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
+                            + " VALUES (:id, :userId, :departmentId, :employeeId, TRUE)",
+                    new MapSqlParameterSource()
+                            .addValue("id", profileId)
+                            .addValue("userId", userId)
+                            .addValue("departmentId", text(input, "departmentId", "department-demo"))
+                            .addValue("employeeId", employeeId));
+        }
+    }
+
+    private boolean profileExists(String userId, String roleName) {
+        String table = "STUDENT".equals(roleName) ? STUDENT : "LECTURER".equals(roleName) ? LECTURER : null;
+        if (table == null) {
+            return true;
+        }
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE \"userId\" = :userId",
+                new MapSqlParameterSource("userId", userId),
+                Long.class);
+        return count != null && count > 0;
     }
 
     private static String required(Map<String, Object> input, String key) {

@@ -59,12 +59,12 @@ export function AssistantPanel() {
   };
 
   return (
-    <div className="fixed bottom-[calc(5.75rem+env(safe-area-inset-bottom))] right-3 z-50 w-[min(24rem,calc(100vw-1.5rem))] md:bottom-6 md:right-6 md:w-[min(24rem,calc(100vw-3rem))]">
+    <div className="relative z-20 mx-3 mt-4 w-auto pb-[calc(1rem+env(safe-area-inset-bottom))] md:fixed md:bottom-6 md:right-6 md:mx-0 md:mt-0 md:w-[min(24rem,calc(100vw-3rem))] md:pb-0">
       {!open ? (
         <Button
           type="button"
           size="lg"
-          className="ml-auto flex h-12 w-12 justify-center rounded-full border border-white/15 bg-[hsl(var(--foreground))] px-0 text-[hsl(var(--background))] shadow-2xl hover:bg-[hsl(var(--foreground))/0.9] md:h-10 md:w-auto md:justify-start md:px-5"
+          className="ml-auto flex h-11 w-11 justify-center rounded-full border border-white/15 bg-[hsl(var(--foreground))] px-0 text-[hsl(var(--background))] shadow-lg hover:bg-[hsl(var(--foreground))/0.9] md:w-auto md:justify-start md:rounded-md md:px-4"
           onClick={() => setOpen(true)}
           aria-label={messages.assistant.open}
         >
@@ -76,7 +76,7 @@ export function AssistantPanel() {
           role="dialog"
           aria-modal="false"
           aria-labelledby="assistant-panel-title"
-          className="overflow-hidden rounded-2xl border border-border/80 bg-card shadow-2xl"
+          className="overflow-hidden rounded-md border border-border/80 bg-card shadow-2xl"
         >
           <header className="flex items-start justify-between gap-4 border-b border-border/70 bg-[hsl(var(--foreground))] px-4 py-4 text-[hsl(var(--background))]">
             <div className="flex items-start gap-3">
@@ -117,15 +117,15 @@ export function AssistantPanel() {
                 <div
                   key={message.id}
                   className={cn(
-                    'max-w-[88%] rounded-2xl px-3.5 py-2.5 text-sm leading-6',
+                    'max-w-[88%] rounded-md px-3.5 py-2.5 text-sm leading-6',
                     message.role === 'user'
-                      ? 'ml-auto rounded-br-md bg-primary text-primary-foreground'
-                      : 'rounded-bl-md border border-border/70 bg-card text-foreground',
+                      ? 'ml-auto bg-primary text-primary-foreground'
+                      : 'border border-border/70 bg-card text-foreground',
                   )}
                 >
                   <p>{message.content}</p>
                   {message.role === 'assistant' && message.reasonCode ? (
-                    <p className={cn('mt-2 text-[11px] uppercase tracking-[0.08em]', message.degraded ? 'text-amber-700' : 'text-muted-foreground')}>
+                    <p className={cn('mt-2 text-[11px] uppercase', message.degraded ? 'text-amber-700' : 'text-muted-foreground')}>
                       {message.degraded ? 'DEGRADED' : message.reasonCode}
                     </p>
                   ) : null}
@@ -152,7 +152,7 @@ export function AssistantPanel() {
           </div>
 
           <form onSubmit={sendMessage} className="border-t border-border/70 bg-card p-3">
-            <div className="flex items-end gap-2 rounded-xl border border-border/80 bg-background p-2 focus-within:ring-2 focus-within:ring-ring">
+            <div className="flex items-end gap-2 rounded-md border border-border/80 bg-background p-2 focus-within:ring-2 focus-within:ring-ring">
               <textarea
                 value={input}
                 onChange={(event) => setInput(event.target.value)}

@@ -23,8 +23,8 @@ interface MenuPanelProps {
 export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole, allowRoleSwitch }: MenuPanelProps) {
   return (
     <View style={styles.overlay}>
-      <Pressable accessibilityLabel="Close menu" onPress={onClose} style={styles.backdrop} />
-      <View style={styles.panel}>
+      <Pressable accessibilityLabel="Close menu" accessibilityRole="button" onPress={onClose} style={styles.backdrop} />
+      <View accessibilityViewIsModal importantForAccessibility="yes" style={styles.panel}>
         <View style={styles.panelHeader}>
           <View style={styles.headerCopy}>
             <UiText variant="meta" tone="primary">
@@ -76,6 +76,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
                     <Pressable
                       key={screen.name}
                       accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
                       onPress={() => onNavigate(screen.name)}
                       style={[styles.menuItem, active ? styles.menuItemActive : undefined]}
                     >
@@ -109,26 +110,28 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
 
 const styles = StyleSheet.create({
   overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 10 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(25, 28, 33, 0.32)' },
+  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 27, 44, 0.52)' },
   panel: {
-    backgroundColor: tokens.colors.background,
+    backgroundColor: tokens.colors.card,
+    borderColor: tokens.colors.outlineVariant,
+    borderWidth: 1,
     borderTopLeftRadius: tokens.radii.card,
     borderTopRightRadius: tokens.radii.card,
     maxHeight: '86%',
     paddingHorizontal: tokens.layout.mobileGutter,
-    paddingTop: tokens.spacing.lg,
+    paddingTop: tokens.spacing.md,
   },
-  panelHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.md },
+  panelHeader: { alignItems: 'center', borderBottomColor: tokens.colors.outlineVariant, borderBottomWidth: 1, flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.md, paddingBottom: tokens.spacing.sm },
   headerCopy: { flex: 1 },
   roleLabel: { marginBottom: tokens.spacing.xs },
   roleRow: { flexDirection: 'row', marginBottom: tokens.spacing.md },
-  roleButton: { alignItems: 'center', backgroundColor: tokens.colors.surface, borderRadius: tokens.radii.control, justifyContent: 'center', marginRight: tokens.spacing.sm, minHeight: tokens.layout.touchTarget, paddingHorizontal: tokens.spacing.md },
+  roleButton: { alignItems: 'center', backgroundColor: tokens.colors.surfaceLow, borderColor: tokens.colors.outlineVariant, borderRadius: tokens.radii.control, borderWidth: 1, justifyContent: 'center', marginRight: tokens.spacing.sm, minHeight: tokens.layout.touchTarget, paddingHorizontal: tokens.spacing.md },
   roleButtonActive: { backgroundColor: tokens.colors.primary },
   menuContent: { paddingBottom: tokens.spacing.xl },
   section: { marginBottom: tokens.spacing.lg },
   sectionTitle: { marginBottom: tokens.spacing.xs },
-  menuItem: { alignItems: 'center', borderRadius: tokens.radii.control, flexDirection: 'row', minHeight: tokens.layout.touchTarget, paddingHorizontal: tokens.spacing.sm, paddingVertical: tokens.spacing.xs },
-  menuItemActive: { backgroundColor: tokens.colors.primaryFixed },
+  menuItem: { alignItems: 'center', borderBottomColor: tokens.colors.outlineVariant, borderBottomWidth: StyleSheet.hairlineWidth, flexDirection: 'row', minHeight: tokens.layout.touchTarget, paddingHorizontal: tokens.spacing.sm, paddingVertical: tokens.spacing.xs },
+  menuItemActive: { backgroundColor: tokens.colors.primaryFixed, borderLeftColor: tokens.colors.primary, borderLeftWidth: 3 },
   menuIcon: { alignItems: 'center', width: 32 },
   menuLabel: { flex: 1, marginLeft: tokens.spacing.sm },
   menuNote: { paddingTop: tokens.spacing.sm },

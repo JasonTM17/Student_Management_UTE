@@ -71,9 +71,9 @@ public class ThesisMutationService {
         jdbc.update("""
                 INSERT INTO thesis.thesis_registration_round
                     (id, name, thesis_type, registration_start, registration_end,
-                     proposal_publish_at, report_date, defense_date, status)
+                     proposal_publish_at, report_date, status)
                 VALUES (:id, :name, :thesisType, :registrationStart, :registrationEnd,
-                        :proposalPublishAt, :reportDate, :defenseDate, 'DRAFT')
+                        :proposalPublishAt, :reportDate, 'DRAFT')
                 """, params()
                 .addValue("id", id)
                 .addValue("name", request.name().trim())
@@ -81,8 +81,7 @@ public class ThesisMutationService {
                 .addValue("registrationStart", request.registrationStart())
                 .addValue("registrationEnd", request.registrationEnd())
                 .addValue("proposalPublishAt", request.proposalPublishAt())
-                .addValue("reportDate", request.reportDate())
-                .addValue("defenseDate", request.defenseDate()));
+                .addValue("reportDate", request.reportDate()));
         return roundReads.get(id);
     }
 
@@ -205,7 +204,7 @@ public class ThesisMutationService {
         if (topicId == null) {
             throw invalid("topicId is required");
         }
-        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups FROM thesis.thesis_topic WHERE id = :id", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        Map<String, Object> topic = one("SELECT id, round_id, status, max_groups FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }

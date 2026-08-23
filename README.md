@@ -44,6 +44,6 @@ npm run typecheck --prefix mobile
 - [README.en.md](README.en.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/RELEASE.md](docs/RELEASE.md)
-- [plans/20260822-restful-api-course/plan.md](plans/20260822-restful-api-course/plan.md)
+- [docs/RESTFUL_API_CONSOLIDATION.md](docs/RESTFUL_API_CONSOLIDATION.md)
 
 Đây là local/course demo reproducible, không phải production deployment.

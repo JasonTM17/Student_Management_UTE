@@ -41,13 +41,14 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   assert.match(readme, /21 navigable screens/);
 });
 
-test('native tokens preserve the Academic Continuity contract', () => {
-  assert.match(tokens, /background: '#F9F9FF'/);
-  assert.match(tokens, /primary: '#003F87'/);
-  assert.match(tokens, /primaryContainer: '#0056B3'/);
+test('native tokens preserve the institutional portal contract', () => {
+  assert.match(tokens, /background: '#F4F6F8'/);
+  assert.match(tokens, /primary: '#0B4A86'/);
+  assert.match(tokens, /primaryContainer: '#0D5AA2'/);
+  assert.match(tokens, /accent: '#E5A900'/);
   assert.match(tokens, /mobileGutter: 16/);
-  assert.match(tokens, /touchTarget: 44/);
-  assert.match(tokens, /family: 'Be Vietnam Pro'/);
+  assert.match(tokens, /touchTarget: 48/);
+  assert.match(tokens, /family: Platform\.select\(/);
 });
 
 test('native API seam fails closed until live mode is explicitly enabled', () => {
@@ -129,7 +130,8 @@ test('Stitch mobile references stay traceable and live sign-in enforces the stud
   assert.match(signIn, /await campusApi\.logout\(\)\.catch\(\(\) => undefined\)/);
   assert.match(signIn, /navigation\.completeSignIn\(role\)/);
   assert.doesNotMatch(signIn, /navigation\.navigate\('dashboard\.student'\)/);
-  assert.match(signIn, /Live mode signs student accounts into the Java REST API/);
+  assert.match(signIn, /The Java auth response did not include an access token/);
+  assert.match(signIn, /Live sign in could not be completed against the Java auth contract/);
   assert.match(signIn, /Use the web portal for lecturer or admin work/);
   assert.match(readme, /role-specific bottom bar/);
 });

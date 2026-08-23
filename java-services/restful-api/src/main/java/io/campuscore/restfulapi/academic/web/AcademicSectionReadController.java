@@ -73,8 +73,13 @@ public class AcademicSectionReadController {
 
     @GetMapping("{id}/grades")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
-    public SectionGradesResponse getSectionGrades(@PathVariable String id) {
-        return academic.findSectionGrades(id);
+    public SectionGradesResponse getSectionGrades(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String id) {
+        return academic.findSectionGrades(
+                id,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"));
     }
 
     private static void requireAllowedQuery(

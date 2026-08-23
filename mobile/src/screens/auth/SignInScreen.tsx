@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { Button, Card, Field, ScreenShell, UiText } from '../../components/Ui';
 import { ApiClientError, apiClient, campusApi } from '../../api/client';
@@ -19,7 +20,7 @@ function resolveRole(roles: readonly string[] | undefined): UserRole {
 }
 
 export function SignInScreen({ navigation }: MobileScreenProps) {
-  const [email, setEmail] = useState('student@campuscore.local');
+  const [email, setEmail] = useState('student@campuscore.edu');
   const [password, setPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
   const [isSubmitting, setIsSubmitting] = useState(false);
@@ -67,22 +68,20 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
 
   return (
     <ScreenShell
-      eyebrow="Academic continuity"
+      eyebrow="CampusCore mobile"
       title="Welcome back"
-      subtitle="Keep your academic workflow clear, calm, and connected."
+      subtitle="Sign in with your university account."
       contentStyle={styles.content}
     >
-      <Card style={styles.brandCard} tone="primary">
-        <UiText variant="meta" tone="primary">
-          CAMPUSCORE MOBILE
-        </UiText>
-        <UiText variant="headlineSmall" style={styles.brandTitle}>
-          One place for your semester.
-        </UiText>
-        <UiText variant="bodySmall" tone="muted">
-          Schedule, grades, thesis milestones, and notices in a mobile-first workspace.
-        </UiText>
-      </Card>
+      <View style={styles.brandRow}>
+        <View style={styles.brandMark}>
+          <MaterialCommunityIcons color={tokens.colors.text} name="school-outline" size={22} />
+        </View>
+        <View style={styles.brandCopy}>
+          <UiText variant="headlineSmall">CampusCore</UiText>
+          <UiText variant="bodySmall" tone="muted">Academic information portal</UiText>
+        </View>
+      </View>
 
       <Card style={styles.formCard}>
         <UiText variant="headlineSmall">Sign in</UiText>
@@ -115,38 +114,24 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
           style={styles.submit}
         />
         {error ? (
-          <UiText variant="bodySmall" tone="error" style={styles.errorText}>
-            {error}
-          </UiText>
+          <View accessibilityLiveRegion="assertive" accessibilityRole="alert" style={styles.errorPanel}>
+            <UiText variant="bodySmall" tone="error">
+              {error}
+            </UiText>
+          </View>
         ) : null}
-        <UiText variant="bodySmall" tone="muted" style={styles.previewNotice}>
-          {isPreview
-            ? 'Preview data is local. No account is authenticated until the Java auth contract is implemented and verified.'
-            : 'Live mode signs student accounts into the Java REST API. Lecturer and admin work remains in the web portal.'}
-        </UiText>
       </Card>
-
-      <View style={styles.footerNote}>
-        <UiText variant="bodySmall" tone="muted" style={styles.centerText}>
-          API seam: one Java REST API at `/api/v1`.
-        </UiText>
-        <UiText variant="meta" tone="muted" style={styles.centerText}>
-          Be Vietnam Pro · 44px targets · 4px spacing
-        </UiText>
-      </View>
     </ScreenShell>
   );
 }
 
 const styles = StyleSheet.create({
   content: { paddingTop: tokens.spacing.sm },
-  brandCard: { marginBottom: tokens.spacing.lg },
-  brandTitle: { marginBottom: tokens.spacing.xs, marginTop: tokens.spacing.sm },
+  brandRow: { alignItems: 'center', borderBottomColor: tokens.colors.outlineVariant, borderBottomWidth: 1, flexDirection: 'row', marginBottom: tokens.spacing.lg, paddingBottom: tokens.spacing.md },
+  brandMark: { alignItems: 'center', backgroundColor: tokens.colors.accent, borderRadius: tokens.radii.control, height: 44, justifyContent: 'center', width: 44 },
+  brandCopy: { flex: 1, marginLeft: tokens.spacing.sm },
   formCard: { padding: tokens.spacing.lg },
   formIntro: { marginBottom: tokens.spacing.lg, marginTop: tokens.spacing.xs },
   submit: { marginTop: tokens.spacing.sm },
-  errorText: { marginTop: tokens.spacing.sm, textAlign: 'center' },
-  previewNotice: { marginTop: tokens.spacing.md, textAlign: 'center' },
-  footerNote: { alignItems: 'center', paddingHorizontal: tokens.spacing.md, paddingTop: tokens.spacing.lg },
-  centerText: { textAlign: 'center' },
+  errorPanel: { backgroundColor: '#FFF1F0', borderColor: '#F3C7C3', borderLeftColor: tokens.colors.error, borderLeftWidth: 3, borderRadius: tokens.radii.control, borderWidth: 1, marginTop: tokens.spacing.md, padding: tokens.spacing.sm },
 });

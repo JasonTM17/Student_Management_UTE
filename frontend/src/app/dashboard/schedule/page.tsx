@@ -131,7 +131,9 @@ export default function SchedulePage() {
     enrollments
       .filter(
         (enrollment) =>
-          enrollment.status === 'CONFIRMED' || enrollment.status === 'PENDING',
+          enrollment.status === 'ENROLLED' ||
+          enrollment.status === 'CONFIRMED' ||
+          enrollment.status === 'PENDING',
       )
       .forEach((enrollment) => {
         const section = enrollment.section;

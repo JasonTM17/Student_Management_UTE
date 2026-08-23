@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
@@ -38,6 +37,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
+  const formErrorRef = useRef<HTMLDivElement>(null);
   const { login } = useAuth();
   const { href, messages } = useI18n();
   const router = useRouter();
@@ -46,6 +46,12 @@ export default function LoginPage() {
   useEffect(() => {
     setIsClientReady(true);
   }, []);
+
+  useEffect(() => {
+    if (formError) {
+      formErrorRef.current?.focus();
+    }
+  }, [formError]);
 
   const reason = searchParams.get('reason') ?? '';
   const notice = useMemo(() => {
@@ -123,7 +129,7 @@ export default function LoginPage() {
         <div className="space-y-3">
           <SectionEyebrow>{messages.login.sectionEyebrow}</SectionEyebrow>
           <div className="space-y-2">
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
+            <h2 className="text-2xl font-semibold leading-8 text-foreground">
               {messages.login.heading}
             </h2>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -133,7 +139,7 @@ export default function LoginPage() {
         </div>
 
         {notice ? (
-          <div className="rounded-lg border border-border/80 bg-secondary/50 px-4 py-3">
+          <div role="status" className="rounded-md border border-border/80 bg-secondary/50 px-4 py-3">
             <div className="text-sm font-semibold text-foreground">
               {notice.title}
             </div>
@@ -144,12 +150,23 @@ export default function LoginPage() {
         ) : null}
 
         {formError ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <div
+            id="login-error"
+            ref={formErrorRef}
+            role="alert"
+            aria-live="assertive"
+            tabIndex={-1}
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          >
             {formError}
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5"
+          aria-describedby={formError ? 'login-error' : undefined}
+        >
           <div className="space-y-2">
             <label
               htmlFor="email"
@@ -188,12 +205,13 @@ export default function LoginPage() {
                 placeholder={messages.login.passwordPlaceholder}
                 autoComplete="current-password"
                 icon={<Lock className="h-4 w-4" />}
+                className="pr-12"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                 title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                 aria-pressed={showPassword}
@@ -223,9 +241,9 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="rounded-lg border border-border/70 bg-card/70 px-4 py-4">
+        <div className="border-l-2 border-primary bg-secondary/35 px-4 py-3">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <KeyRound className="h-4 w-4" />
             </div>
             <div>

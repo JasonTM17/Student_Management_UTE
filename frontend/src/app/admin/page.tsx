@@ -7,7 +7,7 @@ import { ArrowRight, Bell, BookMarked, BookOpen, Building2, DoorOpen, FileText, 
 import { useAuth } from '@/context/AuthContext';
 import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
-import { AdminMetricCard, AdminTableCard } from '@/components/admin/AdminSurface';
+import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -218,8 +218,8 @@ export default function AdminDashboardPage() {
       ) : isLoading ? (
         <LoadingState label={messages.admin.loading} />
       ) : (
-        <div className="space-y-8">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {statCards.map((stat) => (
               <AdminMetricCard
                 key={stat.label}
@@ -232,12 +232,16 @@ export default function AdminDashboardPage() {
             ))}
           </div>
 
-              <AdminTableCard
-            title={messages.admin.managementConsoleTitle}
-            description={messages.admin.managementConsoleDescription}
-            contentClassName="space-y-0"
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section aria-labelledby="admin-management-title" className="min-w-0">
+            <div className="mb-3 border-b border-border pb-3">
+              <h2 id="admin-management-title" className="text-lg font-semibold text-foreground">
+                {messages.admin.managementConsoleTitle}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
+                {messages.admin.managementConsoleDescription}
+              </p>
+            </div>
+            <div className="grid overflow-hidden border border-border/80 bg-card md:grid-cols-2">
               {menuItems.map((item, index) => {
                 const localizedItem = messages.admin.menuItems[index] ?? [
                   item.label,
@@ -248,32 +252,27 @@ export default function AdminDashboardPage() {
                   <LocalizedLink
                     key={item.href}
                     href={item.href}
-                    className="group rounded-lg border border-border/70 bg-card px-5 py-5 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="group flex min-h-[100px] min-w-0 items-start gap-3 border-b border-border/70 p-4 transition-colors hover:bg-secondary/35 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:border-r md:[&:nth-child(2n)]:border-r-0"
                   >
-                    <div className="flex h-full flex-col gap-4">
-                      <div
-                        className={`flex h-11 w-11 items-center justify-center rounded-lg ${item.tone}`}
-                      >
-                        <item.icon className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-3">
-                        <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${item.tone}`}
+                    >
+                      <item.icon className="h-4 w-4" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-base font-semibold text-foreground transition-colors group-hover:text-primary">
                           {localizedItem[0]}
                         </h3>
-                        <p className="text-sm leading-6 text-muted-foreground">
+                        <p className="text-sm leading-5 text-muted-foreground">
                           {localizedItem[1]}
                         </p>
-                      </div>
-                      <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary">
-                        <span>{messages.common.actions.openWorkspace}</span>
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </div>
                     </div>
+                    <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   </LocalizedLink>
                 );
               })}
             </div>
-          </AdminTableCard>
+          </section>
         </div>
       )}
     </AdminFrame>

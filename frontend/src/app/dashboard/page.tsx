@@ -131,13 +131,13 @@ export default function DashboardPage() {
   const highlightedCourses = confirmedCourses.slice(0, 3);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{messages.studentDashboard.eyebrow}</SectionEyebrow>}
         title={messages.studentDashboard.title.replace('{name}', user?.firstName ?? 'student')}
         description={messages.studentDashboard.description.replace('{semester}', currentSemesterName)}
         actions={
-          <div className="inline-flex rounded-full border border-border/70 bg-secondary/35 px-3.5 py-2 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+          <div className="inline-flex rounded-md border border-border/70 bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
             {formatDate(new Date(), {
               weekday: 'long',
               month: 'long',
@@ -158,7 +158,7 @@ export default function DashboardPage() {
         <LoadingState label={messages.studentDashboard.errors.loading} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 2xl:grid-cols-4">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.coursesInScope}
               value={formatNumber(enrollments.length)}
@@ -239,9 +239,9 @@ export default function DashboardPage() {
                       return (
                       <div
                         key={enrollment.id}
-                        className="flex items-center gap-4 rounded-lg border border-border/70 bg-card px-4 py-4"
+                        className="flex items-center gap-3 rounded-md border border-border/70 bg-card px-4 py-3"
                       >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-foreground">
+                        <div className="flex h-9 w-9 items-center justify-center rounded-md bg-secondary text-foreground">
                           <BookMarked className="h-5 w-5" />
                         </div>
                         <div className="min-w-0 flex-1">
@@ -288,7 +288,7 @@ export default function DashboardPage() {
               description={messages.studentDashboard.panels.currentStatus.description}
               contentClassName="space-y-4"
             >
-                <div className="rounded-lg border border-border/70 bg-secondary/30 px-4 py-4">
+                <div className="border-l-2 border-primary bg-secondary/30 px-4 py-3">
                   <div className="text-sm font-semibold text-foreground">
                     {messages.studentDashboard.panels.currentStatus.semesterSelectionTitle}
                   </div>
@@ -298,7 +298,7 @@ export default function DashboardPage() {
                       : messages.studentDashboard.panels.currentStatus.semesterSelectionEmpty}
                   </p>
                 </div>
-                <div className="rounded-lg border border-border/70 bg-secondary/30 px-4 py-4">
+                <div className="border-l-2 border-[hsl(var(--accent-warm))] bg-secondary/30 px-4 py-3">
                   <div className="text-sm font-semibold text-foreground">
                     {messages.studentDashboard.panels.currentStatus.enrollmentHealthTitle}
                   </div>

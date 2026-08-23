@@ -23,7 +23,7 @@ import {
 } from '@/lib/thesis-api';
 
 function statusClass(status: string) {
-  if (['APPROVED', 'RESULTS_PUBLISHED', 'PROPOSALS_PUBLISHED'].includes(status)) {
+  if (['APPROVED', 'PROPOSALS_PUBLISHED'].includes(status)) {
     return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
   }
   if (['REJECTED', 'CANCELLED'].includes(status)) {

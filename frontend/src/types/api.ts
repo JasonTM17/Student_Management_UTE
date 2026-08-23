@@ -114,7 +114,7 @@ export interface Enrollment {
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
   enrolledAt: string;
   droppedAt?: string;
   gradeStatus: 'DRAFT' | 'PUBLISHED' | 'APPEALED';

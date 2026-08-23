@@ -65,7 +65,7 @@ export function ErrorState({
         className,
       )}
     >
-      <div className="flex items-start gap-4">
+      <div className="flex flex-col items-start gap-4 sm:flex-row">
         <div className="mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-destructive/10 text-destructive">
           <AlertCircle className="h-5 w-5" aria-hidden="true" />
         </div>
@@ -80,7 +80,7 @@ export function ErrorState({
             type="button"
             variant="outline"
             onClick={onRetry}
-            className="shrink-0"
+            className="shrink-0 sm:ml-auto"
           >
             <RefreshCw className="mr-2 h-4 w-4" aria-hidden="true" />
             {retryLabel || messages.common.actions.retry}

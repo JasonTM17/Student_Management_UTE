@@ -19,9 +19,13 @@ import org.springframework.web.method.annotation.MethodArgumentTypeMismatchExcep
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<ApiError> unauthenticated(
@@ -107,6 +111,14 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception exception, HttpServletRequest request) {
+        Object requestId = request.getAttribute(
+                io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
+        LOGGER.error(
+                "Unhandled API exception requestId={} method={} path={}",
+                requestId,
+                request.getMethod(),
+                request.getRequestURI(),
+                exception);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error", request, Map.of());
     }
 

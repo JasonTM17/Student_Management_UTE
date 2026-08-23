@@ -493,7 +493,7 @@ export default function DashboardLayout({
         aria-hidden={!isDesktopSidebar && !sidebarOpen}
         inert={!isDesktopSidebar && !sidebarOpen ? true : undefined}
         className={cn(
-          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
+          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col border-r border-white/10 shadow-xl transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
           sidebarCollapsed
             ? 'lg:w-[var(--portal-sidebar-collapsed)]'
             : 'lg:w-[var(--portal-sidebar-width)]',
@@ -502,7 +502,7 @@ export default function DashboardLayout({
       >
         <div
           className={cn(
-            'flex min-h-16 items-center justify-between border-b border-white/20 py-3',
+            'flex min-h-[4.25rem] items-center justify-between border-b border-white/10 py-3',
             sidebarCollapsed ? 'px-3' : 'px-5',
           )}
         >
@@ -563,7 +563,7 @@ export default function DashboardLayout({
 
         <div
           className={cn(
-            'border-b border-white/20 py-4',
+            'border-b border-white/10 bg-[var(--portal-sidebar-strong)] py-3',
             sidebarCollapsed ? 'px-3' : 'px-5',
           )}
         >
@@ -573,7 +573,7 @@ export default function DashboardLayout({
               sidebarCollapsed && 'justify-center',
             )}
           >
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-[var(--portal-sidebar-text)]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
               {user.firstName?.[0]}
               {user.lastName?.[0]}
             </div>
@@ -602,7 +602,7 @@ export default function DashboardLayout({
 
         <nav
           className={cn(
-            'flex-1 space-y-5 overflow-y-auto overscroll-contain py-4',
+            'flex-1 space-y-4 overflow-y-auto overscroll-contain py-3',
             sidebarCollapsed ? 'px-3' : 'px-4',
           )}
         >
@@ -628,10 +628,10 @@ export default function DashboardLayout({
                       aria-current={isActive ? 'page' : undefined}
                       title={sidebarCollapsed ? item.label : undefined}
                       className={cn(
-                        'relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
                         sidebarCollapsed && 'justify-center px-0',
                         isActive &&
-                          'bg-white/10 font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-1 before:rounded-r before:bg-[var(--portal-yellow)]',
+                          'bg-white/[0.12] font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-[var(--portal-yellow)]',
                       )}
                     >
                       <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -646,7 +646,7 @@ export default function DashboardLayout({
 
         <div
           className={cn(
-            'border-t border-white/20 py-4',
+            'border-t border-white/10 py-3',
             sidebarCollapsed ? 'px-3' : 'px-4',
           )}
         >
@@ -655,7 +655,7 @@ export default function DashboardLayout({
               <span className="portal-menu-label">
                 {messages.dashboardShell.controls.preferences}
               </span>
-              <div className="flex items-center gap-1 rounded-lg bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
+              <div className="flex items-center gap-1 rounded-md bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
                 <LanguageToggle inverse />
                 <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-yellow)]" />
               </div>
@@ -670,7 +670,7 @@ export default function DashboardLayout({
                 : undefined
             }
             className={cn(
-              'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--portal-sidebar-muted)] transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+              'flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
@@ -683,7 +683,7 @@ export default function DashboardLayout({
             aria-label={messages.common.actions.signOut}
             title={sidebarCollapsed ? messages.common.actions.signOut : undefined}
             className={cn(
-              'mt-1 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-[var(--portal-sidebar-text)] transition-[background-color,color,transform] duration-150 hover:bg-red-500/20 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+              'mt-1 flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm text-[var(--portal-sidebar-text)] transition-[background-color,color] duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
@@ -702,8 +702,8 @@ export default function DashboardLayout({
             : 'lg:pl-[var(--portal-sidebar-width)]',
         )}
       >
-        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]">
-          <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--portal-surface)]/90">
+          <div className="flex min-h-[var(--portal-header-height)] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <Button
                 ref={openSidebarButtonRef}
@@ -719,10 +719,10 @@ export default function DashboardLayout({
                 <Menu className="h-5 w-5" aria-hidden="true" />
               </Button>
               <div className="min-w-0">
-                <div className="hidden text-xs font-semibold text-primary sm:block">
+                <div className="hidden text-sm font-medium text-muted-foreground sm:block">
                   {messages.dashboardShell.portalTitle}
                 </div>
-                <div className="truncate text-base font-semibold text-foreground sm:text-lg">
+                <div className="truncate text-base font-semibold text-foreground sm:hidden">
                   {currentPage.title}
                 </div>
               </div>
@@ -770,7 +770,7 @@ export default function DashboardLayout({
                     id="dashboard-notifications-panel"
                     role="dialog"
                     aria-label={messages.dashboardShell.notifications.title}
-                    className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-border/80 bg-card shadow-2xl"
+                    className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl"
                   >
                     <div className="border-b border-border/70 px-4 py-3">
                       <h3 className="text-sm font-semibold text-foreground">
@@ -791,7 +791,7 @@ export default function DashboardLayout({
                           {notifications.map((notification) => (
                             <div
                               key={notification.id}
-                              className="rounded-lg border border-border/60 bg-secondary/30 px-3 py-3"
+                              className="rounded-md border border-border/60 bg-secondary/30 px-3 py-3"
                             >
                               <div className="text-sm font-medium text-foreground">
                                 {notification.title || messages.dashboardShell.notifications.fallbackTitle}
@@ -821,7 +821,7 @@ export default function DashboardLayout({
                 <button
                   type="button"
                   onClick={() => setProfileOpen((current) => !current)}
-                  className="flex min-h-11 items-center gap-3 rounded-lg border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color,transform] duration-150 hover:bg-secondary/50 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
+                  className="flex min-h-11 items-center gap-3 rounded-md border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color] duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
                   aria-label={messages.dashboardShell.controls.toggleProfile}
                   aria-expanded={profileOpen}
                   aria-controls="dashboard-profile-menu"
@@ -845,7 +845,7 @@ export default function DashboardLayout({
                   <div
                     id="dashboard-profile-menu"
                     role="menu"
-                    className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-2rem))] rounded-lg border border-border/80 bg-card shadow-2xl"
+                    className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl"
                   >
                     <div className="border-b border-border/70 px-4 py-4">
                       <p className="font-semibold text-foreground">
@@ -916,7 +916,7 @@ export default function DashboardLayout({
           </>
         ) : null}
 
-        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
           {showStudentRail ? (
             <div
               className={cn(

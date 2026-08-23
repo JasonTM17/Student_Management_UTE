@@ -120,7 +120,24 @@ public class AuthUserRepository {
                         .addValue("id", UUID.randomUUID().toString())
                         .addValue("userId", userId)
                         .addValue("roleId", roleId));
+        createStudentProfile(userId);
         return findById(userId).orElseThrow(() -> new IllegalStateException("created user was not found"));
+    }
+
+    private void createStudentProfile(String userId) {
+        String profileId = UUID.randomUUID().toString();
+        String studentNumber = "SV" + java.time.Year.now().getValue()
+                + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT);
+        jdbc.update(
+                "INSERT INTO " + STUDENT_TABLE
+                        + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                        + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (:id, :userId, :studentId, 'curriculum-demo', 1, 'ACTIVE',"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                new MapSqlParameterSource()
+                        .addValue("id", profileId)
+                        .addValue("userId", userId)
+                        .addValue("studentId", studentNumber));
     }
 
     public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
@@ -135,7 +152,7 @@ public class AuthUserRepository {
                         + " LEFT JOIN " + STUDENT_TABLE + " st ON st.\"userId\" = u.\"id\""
                         + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
                         + " WHERE se.\"refreshToken\" = :refreshToken"
-                        + " AND se.\"expiresAt\" > :now",
+                        + " AND se.\"expiresAt\" > :now FOR UPDATE OF se",
                 new MapSqlParameterSource()
                         .addValue("refreshToken", refreshTokenHash)
                         .addValue("now", localDateTime(now)),

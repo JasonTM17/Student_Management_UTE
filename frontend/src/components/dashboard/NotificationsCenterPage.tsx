@@ -13,7 +13,6 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import {
   EmptyState,
@@ -137,7 +136,7 @@ export default function NotificationsCenterPage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.title}</SectionEyebrow>}
         title={copy.title}
@@ -149,12 +148,15 @@ export default function NotificationsCenterPage() {
               variant="outline"
               onClick={() => void fetchNotifications()}
               disabled={isLoading || isMarkingAll}
+              aria-label={copy.refresh}
+              title={copy.refresh}
+              className="w-11 px-0 sm:w-auto sm:px-4"
             >
               <RefreshCw
-                className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')}
+                className={cn('h-4 w-4 sm:mr-2', isLoading && 'animate-spin')}
                 aria-hidden="true"
               />
-              {copy.refresh}
+              <span className="hidden sm:inline">{copy.refresh}</span>
             </Button>
             <Button
               type="button"
@@ -169,7 +171,7 @@ export default function NotificationsCenterPage() {
         }
       />
 
-      <div className="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+      <div className="flex flex-col gap-3 border border-border/70 bg-card p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label={copy.title}>
           {(['all', 'unread'] as const).map((tab) => {
             const selected = filter === tab;
@@ -190,7 +192,7 @@ export default function NotificationsCenterPage() {
                 onClick={() => setFilter(tab)}
                 onKeyDown={(event) => moveFilterFocus(event, tab)}
                 className={cn(
-                  'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   selected
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -218,7 +220,7 @@ export default function NotificationsCenterPage() {
       {status ? (
         <div
           role="status"
-          className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+          className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
         >
           {status}
         </div>
@@ -253,8 +255,7 @@ export default function NotificationsCenterPage() {
             }
           />
         ) : (
-          <Card variant="muted">
-            <CardContent className="space-y-3 p-3 sm:p-5">
+          <div className="divide-y divide-border/70 border border-border/80 bg-card">
               {visibleItems.map((item) => {
               const title = item.title || copy.fallbackTitle;
               const content = item.content || item.message || copy.fallbackContent;
@@ -264,16 +265,16 @@ export default function NotificationsCenterPage() {
                   <article
                   key={item.id}
                   className={cn(
-                    'rounded-lg border bg-card px-4 py-4 transition-colors sm:px-5',
+                    'bg-card px-4 py-4 transition-colors sm:px-5',
                     item.isRead
-                      ? 'border-border/70'
-                      : 'border-primary/35 bg-primary/[0.035] shadow-sm',
+                      ? ''
+                      : 'border-l-2 border-l-primary bg-primary/[0.035]',
                   )}
                 >
                   <div className="flex items-start gap-3 sm:gap-4">
                     <div
                       className={cn(
-                        'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                        'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
                         item.isRead
                           ? 'bg-secondary text-muted-foreground'
                           : 'bg-primary/10 text-primary',
@@ -292,7 +293,7 @@ export default function NotificationsCenterPage() {
                             {title}
                           </h2>
                           {!item.isRead ? (
-                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase text-primary">
                               {copy.unread}
                             </span>
                           ) : null}
@@ -327,8 +328,7 @@ export default function NotificationsCenterPage() {
                   </article>
                 );
               })}
-            </CardContent>
-          </Card>
+          </div>
         )}
       </div>
     </div>
