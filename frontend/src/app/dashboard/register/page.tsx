@@ -181,7 +181,8 @@ export default function RegisterPage() {
         {filteredSections.length === 0 ? (
           <EmptyState icon={BookOpen} title={copy.empty} description={copy.emptyDescription} />
         ) : (
-          <div className="overflow-x-auto">
+          <>
+            <div className="hidden overflow-x-auto md:block">
             <table className="w-full min-w-[760px] text-left text-sm">
               <thead className="bg-primary text-primary-foreground">
                 <tr>
@@ -215,7 +216,50 @@ export default function RegisterPage() {
                 })}
               </tbody>
             </table>
-          </div>
+            </div>
+            <div className="space-y-3 p-3 md:hidden">
+            {filteredSections.map((section) => {
+              const enrollment = enrollmentBySection.get(section.id);
+              const seats = Math.max(0, (section.capacity ?? 0) - (section.enrolledCount ?? 0));
+              const name = locale === 'vi' ? section.course?.nameVi || section.course?.name : section.course?.nameEn || section.course?.name;
+              const schedule = section.schedules?.map((item) => `${item.dayOfWeek} · ${item.startTime}-${item.endTime}`).join(', ') || '—';
+              return (
+                <article key={section.id} className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
+                  <div className="flex items-start justify-between gap-4">
+                    <div>
+                      <p className="font-semibold text-foreground">{section.course?.code}</p>
+                      <p className="mt-1 text-sm text-muted-foreground">{name}</p>
+                    </div>
+                    <span className="shrink-0 text-sm font-semibold text-muted-foreground">{section.sectionNumber}</span>
+                  </div>
+                  <dl className="mt-4 grid gap-3 text-sm">
+                    <div>
+                      <dt className="font-semibold text-foreground">{locale === 'vi' ? 'Lịch học' : 'Schedule'}</dt>
+                      <dd className="mt-1 text-muted-foreground">{schedule}</dd>
+                    </div>
+                    <div>
+                      <dt className="font-semibold text-foreground">{copy.seats}</dt>
+                      <dd className={seats > 0 ? 'mt-1 font-semibold text-emerald-700 dark:text-emerald-300' : 'mt-1 font-semibold text-muted-foreground'}>
+                        {seats > 0 ? formatNumber(seats) : copy.full}
+                      </dd>
+                    </div>
+                  </dl>
+                  <div className="mt-4 flex justify-end">
+                    {enrollment && enrollment.status !== 'DROPPED' ? (
+                      <Button type="button" size="sm" variant="outline" onClick={() => void drop(enrollment)} disabled={pending === enrollment.id}>
+                        <CheckCircle2 className="mr-2 h-4 w-4" />{pending === enrollment.id ? '...' : copy.drop}
+                      </Button>
+                    ) : (
+                      <Button type="button" size="sm" onClick={() => void register(section.id)} disabled={seats === 0 || pending === section.id}>
+                        <UserPlus className="mr-2 h-4 w-4" />{pending === section.id ? '...' : copy.register}
+                      </Button>
+                    )}
+                  </div>
+                </article>
+              );
+            })}
+            </div>
+          </>
         )}
       </Card>
     </div>

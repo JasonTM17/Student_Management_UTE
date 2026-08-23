@@ -11,6 +11,7 @@
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
     "@expo/vector-icons": "~14.0.4",
     "expo": "~52.0.0",
     "react": "18.3.1",

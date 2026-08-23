@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.Authentication;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -39,8 +40,10 @@ public class PeopleReadController {
     }
 
     @GetMapping("students/{id}")
-    public StudentResponse getStudent(@PathVariable String id) {
-        return people.findStudent(id);
+    public StudentResponse getStudent(
+            @PathVariable String id,
+            Authentication authentication) {
+        return people.findStudent(id, authentication);
     }
 
     @GetMapping("lecturers")

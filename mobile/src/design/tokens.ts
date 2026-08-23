@@ -41,7 +41,7 @@ export const tokens = {
     touchTarget: 48,
   },
   typography: {
-    family: Platform.select({ ios: 'System', android: 'sans-serif', default: 'System' }),
+    family: Platform.select({ ios: 'BeVietnamPro_400Regular', android: 'BeVietnamPro_400Regular', default: 'BeVietnamPro_400Regular' }),
     fallback: 'System',
     display: { fontSize: 34, lineHeight: 40, fontWeight: '700' as const },
     headlineLarge: { fontSize: 26, lineHeight: 32, fontWeight: '700' as const },

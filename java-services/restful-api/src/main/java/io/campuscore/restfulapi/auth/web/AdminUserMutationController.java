@@ -52,8 +52,10 @@ public class AdminUserMutationController {
     }
 
     @DeleteMapping("/{id}")
-    public Map<String, String> delete(@PathVariable String id) {
-        users.delete(id);
+    public Map<String, String> delete(
+            @PathVariable String id,
+            Authentication authentication) {
+        users.delete(id, isSuperAdmin(authentication));
         return Map.of("message", "User deleted successfully");
     }
 

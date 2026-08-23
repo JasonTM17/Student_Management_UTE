@@ -39,8 +39,8 @@ public class AdminCatalogMutationService {
         String facultyId = text(input, "facultyId", "faculty-demo");
         jdbc.update(
                 "INSERT INTO " + DEPARTMENT
-                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\", \"facultyId\")"
-                        + " VALUES (:id, :name, :nameEn, :nameVi, :code, :description, :facultyId)",
+                        + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\", \"descriptionEn\", \"descriptionVi\", \"facultyId\")"
+                        + " VALUES (:id, :name, :nameEn, :nameVi, :code, :description, :descriptionEn, :descriptionVi, :facultyId)",
                 params(input, id).addValue("facultyId", facultyId));
         return get(DEPARTMENT, id);
     }
@@ -68,8 +68,8 @@ public class AdminCatalogMutationService {
         required(input, "name");
         jdbc.update(
                 "INSERT INTO " + COURSE
-                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"credits\", \"departmentId\")"
-                        + " VALUES (:id, :code, :name, :nameEn, :nameVi, :description, :credits, :departmentId)",
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\", \"credits\", \"departmentId\")"
+                        + " VALUES (:id, :code, :name, :nameEn, :nameVi, :description, :descriptionEn, :descriptionVi, :credits, :departmentId)",
                 params(input, id)
                         .addValue("credits", number(input, "credits", 3))
                         .addValue("departmentId", text(input, "departmentId", "department-demo")));
@@ -197,10 +197,14 @@ public class AdminCatalogMutationService {
             columns.put("endDate", "\"endDate\""); columns.put("isCurrent", "\"isCurrent\"");
         } else if (DEPARTMENT.equals(table)) {
             columns.put("name", "\"name\""); columns.put("nameEn", "\"nameEn\""); columns.put("nameVi", "\"nameVi\"");
-            columns.put("code", "\"code\""); columns.put("description", "\"description\""); columns.put("facultyId", "\"facultyId\"");
+            columns.put("code", "\"code\""); columns.put("description", "\"description\"");
+            columns.put("descriptionEn", "\"descriptionEn\""); columns.put("descriptionVi", "\"descriptionVi\"");
+            columns.put("facultyId", "\"facultyId\"");
         } else if (COURSE.equals(table)) {
             columns.put("code", "\"code\""); columns.put("name", "\"name\""); columns.put("nameEn", "\"nameEn\"");
-            columns.put("nameVi", "\"nameVi\""); columns.put("description", "\"description\""); columns.put("credits", "\"credits\"");
+            columns.put("nameVi", "\"nameVi\""); columns.put("description", "\"description\"");
+            columns.put("descriptionEn", "\"descriptionEn\""); columns.put("descriptionVi", "\"descriptionVi\"");
+            columns.put("credits", "\"credits\"");
             columns.put("departmentId", "\"departmentId\""); columns.put("isActive", "\"isActive\"");
         } else if (CLASSROOM.equals(table)) {
             columns.put("building", "\"building\""); columns.put("roomNumber", "\"roomNumber\""); columns.put("capacity", "\"capacity\"");
@@ -297,7 +301,9 @@ public class AdminCatalogMutationService {
                 .addValue("nameEn", input.get("nameEn"))
                 .addValue("nameVi", input.get("nameVi"))
                 .addValue("code", text(input, "code", id))
-                .addValue("description", input.get("description"));
+                .addValue("description", input.get("description"))
+                .addValue("descriptionEn", input.get("descriptionEn"))
+                .addValue("descriptionVi", input.get("descriptionVi"));
     }
 
     private static String id(Map<String, Object> input) {

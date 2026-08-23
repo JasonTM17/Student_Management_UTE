@@ -356,6 +356,8 @@ export default function AdminCoursesPage() {
         ...formData,
         name: formData.nameEn || formData.nameVi,
         description: formData.descriptionEn || formData.descriptionVi,
+        descriptionEn: formData.descriptionEn,
+        descriptionVi: formData.descriptionVi,
       };
       if (editingCourse) {
         await coursesApi.update(editingCourse.id, payload);

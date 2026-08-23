@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
@@ -86,6 +87,21 @@ class AdminUserMutationPersistenceTest {
                         .with(adminJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"firstName\":\"Blocked\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+    }
+
+    @Test
+    void ordinaryAdminCannotDeleteSuperAdminOrAssignCustomRole() throws Exception {
+        insertUserRole("user-role-super-target", "target-user", "role-super-admin");
+        mvc.perform(delete("/api/v1/users/target-user").with(adminJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+
+        mvc.perform(put("/api/v1/users/second-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"AUDITOR\"}"))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
     }

@@ -119,21 +119,28 @@ export function DataTable<T extends Record<string, unknown>>({
                 {columns.map((column) => (
                   <th
                     key={column.key}
+                    aria-sort={
+                      column.sortable && sortKey === column.key
+                        ? sortOrder === 'asc' ? 'ascending' : 'descending'
+                        : 'none'
+                    }
                     className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => column.sortable && handleSort(column.key)}
                   >
-                    <div className="flex items-center gap-1">
-                      {column.header}
-                      {column.sortable && sortKey === column.key && (
-                        <span aria-hidden="true" className="inline-flex items-center">
-                          {sortOrder === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )}
-                        </span>
-                      )}
-                    </div>
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        className="flex min-h-10 w-full items-center gap-1 text-left focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary"
+                        onClick={() => handleSort(column.key)}
+                        aria-label={`Sort by ${column.header}`}
+                      >
+                        {column.header}
+                        {sortKey === column.key && (
+                          <span aria-hidden="true" className="inline-flex items-center">
+                            {sortOrder === 'asc' ? <ArrowUp className="h-3 w-3" /> : <ArrowDown className="h-3 w-3" />}
+                          </span>
+                        )}
+                      </button>
+                    ) : column.header}
                   </th>
                 ))}
               </tr>

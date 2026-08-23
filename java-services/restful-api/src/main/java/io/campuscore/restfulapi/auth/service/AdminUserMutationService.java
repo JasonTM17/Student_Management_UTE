@@ -126,6 +126,17 @@ public class AdminUserMutationService {
 
     @Transactional
     public void delete(String id) {
+        delete(id, false);
+    }
+
+    @Transactional
+    public void delete(String id, boolean canManageSuperAdmin) {
+        if (!canManageSuperAdmin && hasRole(id, "SUPER_ADMIN")) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can manage super administrator accounts");
+        }
         try {
             int deleted = jdbc.update("DELETE FROM " + USER + " WHERE \"id\" = :id", new MapSqlParameterSource("id", id));
             if (deleted == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
@@ -170,6 +181,12 @@ public class AdminUserMutationService {
         }
         if (!SYSTEM_ROLES.contains(roleName) && !roleExists(roleName)) {
             throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
+        }
+        if (!canManageSuperAdmin && !SYSTEM_ROLES.contains(roleName)) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can assign custom roles");
         }
         if (!canManageSuperAdmin
                 && ("SUPER_ADMIN".equals(roleName) || (userId != null && hasRole(userId, "SUPER_ADMIN")))) {

@@ -69,6 +69,14 @@ public class PeopleReadRepository {
         return matches.stream().findFirst();
     }
 
+    public Optional<StudentResponse> findStudentByIdAndUserId(String id, String userId) {
+        List<StudentResponse> matches = jdbc.query(
+                studentSelect() + " WHERE student.\"id\" = :id AND student.\"userId\" = :userId",
+                new MapSqlParameterSource().addValue("id", id).addValue("userId", userId),
+                STUDENT_MAPPER);
+        return matches.stream().findFirst();
+    }
+
     public List<LecturerResponse> findLecturers(long offset, int limit) {
         return jdbc.query(
                 lecturerSelect()

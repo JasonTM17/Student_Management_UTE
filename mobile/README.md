@@ -8,8 +8,9 @@ project.
 The UI follows the canonical `Academic Continuity` evidence in
 `frontend/.stitch/DESIGN.md`:
 
-- Be Vietnam Pro is the preferred typeface; the platform system font remains the
-  runtime fallback when the font is not bundled.
+- Be Vietnam Pro is bundled with Expo and loaded before the navigator renders;
+  the platform system font remains the runtime fallback for native text that
+  cannot use the bundled family.
 - The canvas is `#F9F9FF`, cards are white, and primary actions use `#003F87`
   with `#0056B3` for filled emphasis.
 - Spacing uses a 4px baseline, with a 16px mobile gutter and 8px card radius.
