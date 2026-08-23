@@ -53,6 +53,7 @@ public final class AuthDtos {
             String status,
             Instant createdAt,
             List<String> roles,
+            String role,
             List<String> permissions,
             String studentId,
             String lecturerId,

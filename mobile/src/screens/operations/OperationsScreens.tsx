@@ -61,7 +61,7 @@ export function AdminStudentsScreen({ navigation }: MobileScreenProps) {
     <ScreenShell title="Manage students" eyebrow="Admin workspace" subtitle="A mobile-friendly record list for common operations.">
       <Card tone="low" style={styles.summaryCard}>
         <UiText variant="label">12,418 active students</UiText>
-        <UiText variant="bodySmall" tone="muted">Updated 10 minutes ago · data comes from the Java API seam when connected.</UiText>
+        <UiText variant="bodySmall" tone="muted">Updated 10 minutes ago · review the latest academic records when connected.</UiText>
       </Card>
       <ScreenSpacer />
       <SectionHeading title="Recently active" actionLabel="Dashboard" onAction={() => navigation.navigate('admin.dashboard')} />

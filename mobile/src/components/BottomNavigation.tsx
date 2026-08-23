@@ -28,7 +28,8 @@ export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: Bott
             <Pressable
               key={item.route}
               accessibilityLabel={item.label}
-              accessibilityRole="button"
+              accessibilityRole="tab"
+              accessibilityHint={`Open ${item.label}`}
               accessibilityState={{ selected: active }}
               onPress={() => onNavigate(item.route)}
               style={({ pressed }) => [styles.item, pressed ? styles.pressed : undefined]}
@@ -47,6 +48,7 @@ export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: Bott
         <Pressable
           accessibilityLabel="Open menu"
           accessibilityRole="button"
+          accessibilityHint="Open the complete workspace menu"
           onPress={onMenu}
           style={({ pressed }) => [styles.item, pressed ? styles.pressed : undefined]}
         >

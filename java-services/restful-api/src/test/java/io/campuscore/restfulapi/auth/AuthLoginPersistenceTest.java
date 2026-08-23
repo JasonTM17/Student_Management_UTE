@@ -40,7 +40,8 @@ import org.springframework.test.web.servlet.MvcResult;
 @TestPropertySource(properties = {
         "migration.thesis-read.enabled=false",
         "migration.auth-login.enabled=true",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.jpa.hibernate.ddl-auto=none"
 })
 class AuthLoginPersistenceTest {
 
@@ -176,6 +177,7 @@ class AuthLoginPersistenceTest {
                 .andExpect(jsonPath("$.user.id").value("student-user"))
                 .andExpect(jsonPath("$.user.email").value("student@campuscore.edu"))
                 .andExpect(jsonPath("$.user.roles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.user.role").value("STUDENT"))
                 .andExpect(jsonPath("$.user.permissions[0]").value("thesis:read"))
                 .andExpect(jsonPath("$.user.studentId").value("student-profile-student-user"))
                 .andExpect(jsonPath("$.user.student.year").value(2))

@@ -237,7 +237,7 @@ export default function AdminCoursesPage() {
           unavailableTitle: 'Courses unavailable',
           emptyTitle: 'No matching courses',
           emptyDescription:
-            'Create a course so sections, registration, and finance flows inherit a clean catalog source.',
+            'Create a course so sections and registration inherit a clean catalog source.',
           tableTitle: 'Course records',
           headers: {
             code: 'Code',

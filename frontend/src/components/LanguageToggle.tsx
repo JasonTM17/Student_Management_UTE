@@ -39,7 +39,7 @@ export function LanguageToggle({
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border border-border/70 bg-card/80 p-1 shadow-sm',
+        'inline-flex min-h-10 items-center rounded-md border border-border/70 bg-card p-0.5',
         className,
       )}
       role="group"
@@ -61,7 +61,7 @@ export function LanguageToggle({
             type="button"
             onClick={() => handleSwitch(item)}
             className={cn(
-              'rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-colors',
+              'min-h-9 rounded-sm px-2.5 py-1 text-xs font-semibold uppercase transition-colors',
               isActive
                 ? 'bg-primary text-primary-foreground'
                 : 'text-muted-foreground hover:text-foreground',

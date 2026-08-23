@@ -1,7 +1,7 @@
 {
   "name": "campuscore-frontend",
   "version": "1.0.0",
-  "description": "CampusCore web frontend for the current production-like microservices portfolio",
+  "description": "CampusCore web frontend for the course-focused Java RESTful API stack",
   "author": "Nguyen Tien Son <jasonbmt06@gmail.com>",
   "homepage": "https://github.com/JasonTM17/CampusCore_FullStack_Individual",
   "private": true,
@@ -13,9 +13,7 @@
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
     "test": "node --test tests/frontend-smoke.test.js",
-    "test:e2e:finance": "node ../scripts/run-finance-e2e.mjs",
-    "test:e2e": "node ../scripts/run-fast-e2e.mjs",
-    "test:e2e:edge": "node ../scripts/run-edge-e2e.mjs"
+    "test:e2e": "node ../scripts/run-course-e2e.mjs"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "5.3.0",
@@ -45,7 +43,6 @@
     "eslint": "^8.57.0",
     "eslint-config-next": "^15.5.15",
     "postcss": "^8.5.10",
-    "socket.io-client": "^4.8.3",
     "tailwindcss": "^3.4.6",
     "typescript": "^5.5.3"
   },

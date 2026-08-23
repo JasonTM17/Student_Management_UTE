@@ -89,8 +89,8 @@ export function DataTable<T extends Record<string, unknown>>({
   }
 
   return (
-    <div className="space-y-4">
-      <div className="flex flex-col sm:flex-row gap-4 justify-between">
+    <div className="space-y-3">
+      <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
         <div className="w-full sm:w-72">
           <Input
             type="text"
@@ -111,37 +111,55 @@ export function DataTable<T extends Record<string, unknown>>({
         )}
       </div>
 
-      <div className="rounded-md border overflow-hidden">
+      <div className="overflow-hidden rounded-md border border-border/80 bg-card">
         <div className="overflow-x-auto">
-          <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800">
+          <table className="portal-table w-full border-collapse">
+            <thead>
               <tr>
                 {columns.map((column) => (
                   <th
                     key={column.key}
-                    className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
-                    onClick={() => column.sortable && handleSort(column.key)}
+                    scope="col"
+                    aria-sort={
+                      sortKey === column.key
+                        ? sortOrder === 'asc'
+                          ? 'ascending'
+                          : 'descending'
+                        : column.sortable
+                          ? 'none'
+                          : undefined
+                    }
+                    className="px-3 py-2.5 text-left"
                   >
-                    <div className="flex items-center gap-1">
-                      {column.header}
-                      {column.sortable && sortKey === column.key && (
-                        <span aria-hidden="true" className="inline-flex items-center">
-                          {sortOrder === 'asc' ? (
-                            <ArrowUp className="h-3 w-3" />
-                          ) : (
-                            <ArrowDown className="h-3 w-3" />
-                          )}
-                        </span>
-                      )}
-                    </div>
+                    {column.sortable ? (
+                      <button
+                        type="button"
+                        onClick={() => handleSort(column.key)}
+                        aria-label={column.header}
+                        title={column.header}
+                      >
+                        <span>{column.header}</span>
+                        {sortKey === column.key ? (
+                          <span aria-hidden="true" className="inline-flex items-center">
+                            {sortOrder === 'asc' ? (
+                              <ArrowUp className="h-3 w-3" />
+                            ) : (
+                              <ArrowDown className="h-3 w-3" />
+                            )}
+                          </span>
+                        ) : null}
+                      </button>
+                    ) : (
+                      column.header
+                    )}
                   </th>
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="divide-y divide-border/60">
               {loading ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                    <td colSpan={columns.length} className="px-3 py-8 text-center text-muted-foreground">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
@@ -157,10 +175,10 @@ export function DataTable<T extends Record<string, unknown>>({
                 paginatedData.map((item) => (
                   <tr
                     key={String(item[keyField])}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    className="transition-colors"
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className="px-4 py-3 text-sm">
+                      <td key={column.key} className="px-3 py-2.5 text-sm text-foreground">
                         {column.render ? column.render(item) : String(item[column.key] ?? '-')}
                       </td>
                     ))}
@@ -174,7 +192,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
               {messages.common.states.showingResults} {(page - 1) * pageSize + 1} {messages.common.states.to} {Math.min(page * pageSize, sortedData.length)} {messages.common.states.of} {sortedData.length} {messages.common.states.results}
             </span>

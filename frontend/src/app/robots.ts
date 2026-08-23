@@ -15,7 +15,6 @@ export default function robots(): MetadataRoute.Robots {
           '/en/dashboard/',
           '/vi/dashboard/',
           '/api/',
-          '/socket.io/',
         ],
       },
     ],

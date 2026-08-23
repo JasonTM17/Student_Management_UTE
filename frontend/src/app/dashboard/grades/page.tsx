@@ -279,7 +279,7 @@ export default function GradesPage() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.currentGpa}</div>
@@ -292,7 +292,7 @@ export default function GradesPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.completedCredits}</div>
@@ -305,7 +305,7 @@ export default function GradesPage() {
                 </div>
               </CardContent>
             </Card>
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.gradedCourses}</div>
@@ -322,7 +322,7 @@ export default function GradesPage() {
 
           <div className="space-y-6">
             {Object.entries(groupedGrades).map(([semesterName, records]) => (
-              <Card key={semesterName} variant="muted">
+              <Card key={semesterName} variant="muted" className="portal-section-card">
                 <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                   <CardTitle className="text-xl">{semesterName}</CardTitle>
                   <div className="text-sm text-muted-foreground">
@@ -341,7 +341,7 @@ export default function GradesPage() {
                     {records.map((record) => (
                       <article
                         key={`${record.id}-mobile`}
-                        className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                        className="portal-section-card rounded-md p-4 shadow-sm"
                         role="listitem"
                       >
                         <div className="flex items-start justify-between gap-3">
@@ -408,7 +408,7 @@ export default function GradesPage() {
                     ))}
                   </div>
                   <div className="hidden overflow-x-auto md:block">
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="portal-table w-full min-w-[760px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">
                           <th className="px-2 py-3 font-medium">{copy.tableHeaders.course}</th>

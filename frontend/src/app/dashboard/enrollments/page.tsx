@@ -2,7 +2,6 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Calendar, Clock, MapPin, Trash2 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
 import { enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -17,6 +16,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { WorkspaceMetricCard } from '@/components/dashboard/WorkspaceSurface';
 import { toast } from 'sonner';
 
 const statusTone: Record<string, string> = {
@@ -52,17 +52,17 @@ function getDayName(day: number, locale: 'en' | 'vi') {
 }
 
 export default function EnrollmentsPage() {
-  const { user } = useAuth();
-  const { locale, formatDate, formatNumber } = useI18n();
+  const { locale, formatDate, formatNumber, messages } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [isDropping, setIsDropping] = useState<string | null>(null);
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
-  const copy =
-    locale === 'vi'
-      ? {
+  const copy = useMemo(
+    () =>
+      locale === 'vi'
+        ? {
           eyebrow: 'Workspace sinh viên',
           title: 'Môn học của tôi',
           description:
@@ -94,7 +94,7 @@ export default function EnrollmentsPage() {
             'Không tìm thấy hồ sơ sinh viên trong phiên hiện tại.',
           loadFailed: 'Hiện chưa thể tải danh sách đăng ký học của bạn.',
         }
-      : {
+        : {
           eyebrow: 'Student workspace',
           title: 'My courses',
           description:
@@ -125,7 +125,9 @@ export default function EnrollmentsPage() {
           studentProfileMissing:
             'Your student profile is not available in this session.',
           loadFailed: 'Your current enrollments could not be loaded.',
-        };
+        },
+    [locale],
+  );
 
   const fetchEnrollments = useCallback(async () => {
     setIsLoading(true);
@@ -139,40 +141,44 @@ export default function EnrollmentsPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [copy.loadFailed]);
+  }, [copy]);
 
   useEffect(() => {
     void fetchEnrollments();
   }, [fetchEnrollments]);
 
-  const handleDrop = async (enrollmentId: string, courseLabel: string) => {
-    if (!user?.studentId) {
-      toast.error(copy.studentProfileMissing);
-      return;
-    }
+  const handleDrop = useCallback(
+    async (enrollmentId: string, courseLabel: string) => {
+      const confirmed = await confirm({
+        title: copy.confirmTitle,
+        message: copy.confirmMessage(courseLabel),
+        confirmText: copy.dropCourse,
+        cancelText: messages.common.actions.cancel,
+        variant: 'destructive',
+      });
 
-    const shouldContinue = await confirm({
-      title: copy.confirmTitle,
-      message: copy.confirmMessage(courseLabel),
-      confirmText: copy.dropCourse,
-      variant: 'destructive',
-    });
+      if (!confirmed) {
+        return;
+      }
 
-    if (!shouldContinue) {
-      return;
-    }
-
-    setIsDropping(enrollmentId);
-    try {
-      await enrollmentsApi.drop(enrollmentId);
-      toast.success(copy.dropped);
-      await fetchEnrollments();
-    } catch (error: any) {
-      toast.error(error.response?.data?.message || copy.dropFailed);
-    } finally {
-      setIsDropping(null);
-    }
-  };
+      setIsDropping(enrollmentId);
+      try {
+        await enrollmentsApi.drop(enrollmentId);
+        toast.success(copy.dropped);
+        await fetchEnrollments();
+      } catch {
+        toast.error(copy.dropFailed);
+      } finally {
+        setIsDropping(null);
+      }
+    },
+    [
+      confirm,
+      copy,
+      fetchEnrollments,
+      messages.common.actions.cancel,
+    ],
+  );
 
   const confirmedCourses = enrollments.filter(
     (enrollment) => enrollment.status === 'CONFIRMED',
@@ -211,7 +217,7 @@ export default function EnrollmentsPage() {
   );
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
@@ -268,7 +274,7 @@ export default function EnrollmentsPage() {
             <CardHeader>
               <CardTitle className="text-xl">{copy.recordTitle}</CardTitle>
             </CardHeader>
-            <CardContent className="space-y-4">
+            <CardContent className="space-y-3">
               {enrollments.map((enrollment) => {
                 const courseCode = enrollment.section?.course?.code ?? copy.unknownCourse;
                 const courseName = getLocalizedName(
@@ -281,12 +287,12 @@ export default function EnrollmentsPage() {
                 return (
                   <div
                     key={enrollment.id}
-                    className="rounded-lg border border-border/70 bg-card px-5 py-5"
+                    className="min-w-0 rounded-lg border border-border/70 bg-card px-4 py-4 sm:px-5 sm:py-5"
                   >
                     <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                      <div className="space-y-3">
+                      <div className="min-w-0 space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <h2 className="text-lg font-semibold text-foreground">
+                          <h2 className="min-w-0 break-words text-lg font-semibold text-foreground">
                             {courseCode} - {courseName}
                           </h2>
                           <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
@@ -303,7 +309,7 @@ export default function EnrollmentsPage() {
                           </span>
                         </div>
 
-                        <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
+                        <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                           <span className="inline-flex items-center gap-2">
                             <Calendar className="h-4 w-4" />
                             {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}

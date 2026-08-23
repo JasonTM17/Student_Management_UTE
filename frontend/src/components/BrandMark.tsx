@@ -27,7 +27,7 @@ export function BrandMark({
     <div className={cn('flex items-center gap-3', className)}>
       <div
         className={cn(
-          'flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm',
+          'flex h-10 w-10 items-center justify-center rounded-md border border-white/15 bg-[hsl(var(--nav-active))] text-[hsl(var(--nav-surface))]',
           compact && 'h-9 w-9',
           markClassName,
         )}

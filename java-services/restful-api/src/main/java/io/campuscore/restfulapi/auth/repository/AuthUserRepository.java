@@ -11,7 +11,6 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -21,7 +20,6 @@ import org.springframework.stereotype.Repository;
 /** JDBC adapter for the Prisma-owned auth schema. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
 public class AuthUserRepository {
 
     private static final String SCHEMA = "\"auth\".";
@@ -330,6 +328,7 @@ public class AuthUserRepository {
                     status,
                     createdAt,
                     roles,
+                    roles.isEmpty() ? null : roles.get(0),
                     permissions,
                     studentId,
                     lecturerId,

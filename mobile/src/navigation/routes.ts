@@ -148,7 +148,7 @@ export const stitchMobileReferences: Readonly<
 export const menuSections = [
   {
     title: 'Student workspace',
-    families: ['student', 'thesis', 'assistant'] as const,
+    families: ['student', 'thesis'] as const,
   },
   {
     title: 'Operations',

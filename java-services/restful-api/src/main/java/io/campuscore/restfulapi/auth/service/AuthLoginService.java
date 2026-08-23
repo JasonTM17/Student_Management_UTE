@@ -21,7 +21,6 @@ import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -35,7 +34,6 @@ import org.springframework.web.server.ResponseStatusException;
 /** Feature-gated Java auth session candidate for the monolith cutover path. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
 public class AuthLoginService {
 
     private static final int MAX_FAILED_ATTEMPTS = 5;

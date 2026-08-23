@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.migration;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
@@ -92,5 +93,27 @@ class MigrationSafetyConfigTest {
         when(context.getEnvironment()).thenReturn(environment);
 
         assertTrue(new ReadOnlyMigrationCandidateCondition().matches(context, null));
+    }
+
+    @Test
+    void courseApiModeKeepsFlywayAvailableForOwnedCoreSlices() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("migration.course-api.enabled", "true")
+                .withProperty("migration.academic-enrollment-read.enabled", "true");
+        ConditionContext context = mock(ConditionContext.class);
+        when(context.getEnvironment()).thenReturn(environment);
+
+        assertFalse(new ReadOnlyMigrationCandidateCondition().matches(context, null));
+    }
+
+    @Test
+    void thesisOwnedRoutesDoNotActivateLegacyMigrationSafetyCondition() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("migration.thesis-read.enabled", "true")
+                .withProperty("migration.thesis-assistant.enabled", "true");
+        ConditionContext context = mock(ConditionContext.class);
+        when(context.getEnvironment()).thenReturn(environment);
+
+        assertFalse(new ReadOnlyMigrationCandidateCondition().matches(context, null));
     }
 }
