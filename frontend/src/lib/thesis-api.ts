@@ -238,7 +238,7 @@ export const thesisApi = {
     return response.data;
   },
 
-  chat: async (message: string, locale: 'en' | 'vi'): Promise<AssistantReply> => {
+  chat: async (message: string, locale: 'en' | 'vi' = 'en'): Promise<AssistantReply> => {
     const response = await api.post<AssistantReply>('/thesis/assistant/chat', {
       message,
       locale,
