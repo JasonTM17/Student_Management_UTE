@@ -1,7 +1,7 @@
 import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
-import { Button, Card, Field, ScreenShell, UiText } from '../../components/Ui';
+import { Button, Card, ErrorState, Field, ScreenShell, UiText } from '../../components/Ui';
 import { ApiClientError, apiClient, campusApi } from '../../api/client';
 import { tokens } from '../../design/tokens';
 import type { UserRole } from '../../navigation/routes';
@@ -42,7 +42,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
     try {
       const response = await campusApi.login(email.trim(), password);
       if (!response.accessToken) {
-        throw new Error('The Java auth response did not include an access token.');
+        throw new Error('Sign-in could not be completed because the session was not created.');
       }
       apiClient.setSessionTokens(response.accessToken, response.refreshToken);
       navigation.completeSignIn(resolveRole(response.user?.roles));
@@ -51,7 +51,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
       setError(
         signInError instanceof ApiClientError
           ? signInError.message
-          : 'Live sign in could not be completed against the Java auth contract.',
+          : 'Live sign in could not be completed. Please try again.',
       );
     } finally {
       setIsSubmitting(false);
@@ -108,21 +108,17 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
           style={styles.submit}
         />
         <Button label="Forgot password?" onPress={() => undefined} variant="text" />
-        {error ? (
-          <UiText variant="bodySmall" tone="error" style={styles.errorText}>
-            {error}
-          </UiText>
-        ) : null}
+        {error ? <ErrorState title="Sign-in unavailable" description={error} /> : null}
         <UiText variant="bodySmall" tone="muted" style={styles.previewNotice}>
           {isPreview
-            ? 'Preview data is local. No account is authenticated until the Java auth contract is implemented and verified.'
-            : 'Live mode sends credentials to the Java auth candidate and enters the app only after a bearer token is returned.'}
+            ? 'No account is authenticated until the Java auth contract is implemented and verified.'
+            : 'Your account enters the app only after a bearer token is returned.'}
         </UiText>
       </Card>
 
       <View style={styles.footerNote}>
         <UiText variant="bodySmall" tone="muted" style={styles.centerText}>
-          API seam: one Java REST API at `/api/v1`.
+          CampusCore course-project workspace.
         </UiText>
         <UiText variant="meta" tone="muted" style={styles.centerText}>
           Be Vietnam Pro · 44px targets · 4px spacing
@@ -139,7 +135,6 @@ const styles = StyleSheet.create({
   formCard: { padding: tokens.spacing.lg },
   formIntro: { marginBottom: tokens.spacing.lg, marginTop: tokens.spacing.xs },
   submit: { marginTop: tokens.spacing.sm },
-  errorText: { marginTop: tokens.spacing.sm, textAlign: 'center' },
   previewNotice: { marginTop: tokens.spacing.md, textAlign: 'center' },
   footerNote: { alignItems: 'center', paddingHorizontal: tokens.spacing.md, paddingTop: tokens.spacing.lg },
   centerText: { textAlign: 'center' },
