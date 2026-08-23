@@ -10,7 +10,6 @@ import java.util.Set;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.annotation.Transactional;
 
 /** Deterministic lexical RAG over the curated PostgreSQL thesis corpus. */
 @Service
@@ -27,7 +26,6 @@ public class ThesisAssistantService {
         this.knowledge = knowledge;
     }
 
-    @Transactional(readOnly = true)
     public ChatResponse answer(String message, String locale) {
         String normalizedMessage = message == null ? "" : message.trim();
         if (normalizedMessage.isBlank()) {

@@ -91,10 +91,17 @@ jobs:
           curl --fail --silent --show-error http://127.0.0.1:4010/api/v1/health/liveness
           curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
           curl --fail --silent --show-error http://127.0.0.1:4010/v3/api-docs > openapi.json
+          python3 -c 'import json; paths=json.load(open("openapi.json", encoding="utf-8"))["paths"]; required={"/api/v1/auth/login", "/api/v1/students", "/api/v1/lecturers", "/api/v1/sections", "/api/v1/enrollments", "/api/v1/sections/{sectionId}/grades", "/api/v1/announcements", "/api/v1/notifications", "/api/v1/thesis/assistant/chat", "/api/v1/health/readiness"}; assert len(paths) >= 86 and not required.difference(paths)'
           login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"student@campuscore.edu","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
           token="$(LOGIN="$login" python3 -c 'import json, os; print(json.loads(os.environ["LOGIN"])["accessToken"])')"
           assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
           ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "ANSWERED" and data["degraded"] is False and len(data["citations"]) > 0'
+          docker compose stop postgres
+          outage="$(curl --max-time 8 --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
+          OUTAGE="$outage" python3 -c 'import json, os; data=json.loads(os.environ["OUTAGE"]); assert data["reasonCode"] == "KNOWLEDGE_UNAVAILABLE" and data["degraded"] is True and data["citations"] == []'
+          docker compose start postgres
+          docker compose up -d --wait
+          curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
       - name: Show runtime logs after failure
         if: failure()
         run: docker compose logs --no-color
