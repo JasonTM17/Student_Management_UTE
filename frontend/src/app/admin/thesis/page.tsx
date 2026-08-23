@@ -13,12 +13,17 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
-import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import {
+  EmptyState,
+  ForbiddenState,
+  LoadingState,
+} from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { useI18n } from '@/i18n';
 import {
@@ -29,7 +34,14 @@ import {
 } from '@/lib/thesis-api';
 
 export default function AdminThesisPage() {
-  const { isAdmin, isSuperAdmin } = useAuth();
+  const {
+    user,
+    isAdmin,
+    isLecturer,
+    isLoading: isAuthLoading,
+    isLoggingOut,
+    isSuperAdmin,
+  } = useAuth();
   const { messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
@@ -47,9 +59,8 @@ export default function AdminThesisPage() {
   const [formStart, setFormStart] = useState('');
   const [formEnd, setFormEnd] = useState('');
   const [formProposal, setFormProposal] = useState('');
-  const [formReport, setFormReport] = useState('');
 
-  const canAccess = Boolean(isAdmin || isSuperAdmin);
+  const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -105,7 +116,6 @@ export default function AdminThesisPage() {
         registrationStart: new Date(formStart).toISOString(),
         registrationEnd: new Date(formEnd).toISOString(),
         proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
-        reportDate: formReport ? new Date(formReport).toISOString() : undefined,
       });
       setSuccess(messages.thesis.admin.created);
       setShowCreateModal(false);
@@ -113,7 +123,6 @@ export default function AdminThesisPage() {
       setFormStart('');
       setFormEnd('');
       setFormProposal('');
-      setFormReport('');
       await loadData();
     } catch {
       setError(messages.thesis.actionFailed);
@@ -144,6 +153,46 @@ export default function AdminThesisPage() {
       setIsSaving(false);
     }
   };
+
+  if (isAuthLoading || isLoggingOut) {
+    return (
+      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
+        <LoadingState label={messages.thesis.loading} />
+      </AdminFrame>
+    );
+  }
+
+  if (!user) {
+    return (
+      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
+        <ForbiddenState
+          title={messages.thesis.admin.forbiddenTitle}
+          description={messages.thesis.admin.forbiddenDescription}
+          action={
+            <LinkButton href="/login" variant="outline">
+              {messages.common.actions.signIn}
+            </LinkButton>
+          }
+        />
+      </AdminFrame>
+    );
+  }
+
+  if (!canAccess) {
+    return (
+      <AdminFrame title={messages.thesis.admin.title} description={messages.thesis.admin.description}>
+        <ForbiddenState
+          title={messages.thesis.admin.forbiddenTitle}
+          description={messages.thesis.admin.forbiddenDescription}
+          action={
+            <LinkButton href={isLecturer ? '/dashboard/lecturer' : '/dashboard'} variant="outline">
+              {messages.thesis.admin.returnToWorkspace}
+            </LinkButton>
+          }
+        />
+      </AdminFrame>
+    );
+  }
 
   if (isLoading && rounds.length === 0) {
     return (
@@ -298,16 +347,10 @@ export default function AdminThesisPage() {
               <Input type="datetime-local" value={formEnd} onChange={(e) => setFormEnd(e.target.value)} />
             </label>
           </div>
-          <div className="grid gap-4 sm:grid-cols-3">
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.proposalPublishAt}
-              <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
-            </label>
-            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-              {messages.thesis.admin.reportDate}
-              <Input type="datetime-local" value={formReport} onChange={(e) => setFormReport(e.target.value)} />
-            </label>
-          </div>
+          <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+            {messages.thesis.admin.proposalPublishAt}
+            <Input type="datetime-local" value={formProposal} onChange={(e) => setFormProposal(e.target.value)} />
+          </label>
           <div className="flex justify-end gap-2 pt-2">
             <Button type="button" variant="outline" onClick={() => setShowCreateModal(false)}>
               {messages.common.actions.cancel}

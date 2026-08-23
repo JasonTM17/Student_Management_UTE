@@ -73,7 +73,7 @@ export default function OpenGraphImage() {
                 maxWidth: 760,
               }}
             >
-              Campus operations that stay calm under real load.
+              Academic work that stays clear from sign-in to thesis progress.
             </div>
             <div
               style={{

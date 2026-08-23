@@ -495,6 +495,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   );
   const liveSections = registrationData.sections;
   const enrollments = registrationData.enrollments;
+  const activeEnrollmentCount = enrollments.filter((item) => item.status !== 'DROPPED').length;
 
   const availableSections = apiClient.mode === 'preview'
     ? [
@@ -556,18 +557,23 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   }
 
   return (
-    <ScreenShell title="Registration" eyebrow="Course planning" subtitle="The next round closes in 4 days.">
+    <ScreenShell title="Registration" eyebrow="Course planning" subtitle="Compare available sections and review your current choices.">
       <Card tone="primary" style={styles.registrationHero}>
-        <View style={styles.courseHeader}>
-          <View style={styles.courseCopy}>
-            <UiText variant="meta" tone="primary">ROUND 02 · OPEN</UiText>
-            <UiText variant="headlineSmall">Spring 2026 add/drop</UiText>
+        <UiText variant="meta" tone="primary">COURSE REGISTRATION</UiText>
+        <View style={styles.registrationHeroHeader}>
+          <View style={styles.registrationHeroCopy}>
+            <UiText variant="headlineSmall">Current selections</UiText>
+            <UiText variant="bodySmall" tone="muted">
+              {apiClient.mode === 'preview'
+                ? 'Preview data stays on this device.'
+                : `${activeEnrollmentCount} active section${activeEnrollmentCount === 1 ? '' : 's'} selected.`}
+            </UiText>
           </View>
-          <Badge label="4 days left" tone="warning" />
+          <Badge
+            label={apiClient.mode === 'preview' ? 'Preview' : `${activeEnrollmentCount} selected`}
+            tone={activeEnrollmentCount > 0 ? 'success' : 'primary'}
+          />
         </View>
-        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>
-          {apiClient.mode === 'preview' ? 'Preview data is local.' : `You have ${enrollments.length} active sections.`}
-        </UiText>
         <Button label="View selected courses" onPress={() => navigation.navigate('courses')} variant="secondary" />
       </Card>
       <ScreenSpacer />
@@ -580,15 +586,18 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         const isPreview = apiClient.mode === 'preview';
         return (
         <Card key={section.id} style={styles.registrationCard}>
-          <View style={styles.courseHeader}>
-            <View style={styles.courseCopy}>
-              <UiText variant="label">{section.code}</UiText>
-              <UiText variant="headlineSmall">{section.name}</UiText>
-              <UiText variant="bodySmall" tone="muted">{section.slot}</UiText>
-            </View>
-            <UiText variant="meta" tone={section.seats === 'Full' ? 'warning' : 'success'} style={styles.seatsText}>
-              {section.seats}
+          <UiText variant="meta" tone="primary">{section.code}</UiText>
+          <UiText variant="headlineSmall" style={styles.registrationCourseTitle}>
+            {section.name}
+          </UiText>
+          <View style={styles.registrationMeta}>
+            <UiText variant="bodySmall" tone="muted" style={styles.registrationSlot}>
+              {section.slot}
             </UiText>
+            <Badge
+              label={section.seats}
+              tone={section.seats === 'Full' ? 'warning' : 'success'}
+            />
           </View>
           <Button
             label={isPreview ? 'Preview only' : enrolled ? 'Drop section' : 'Add section'}
@@ -671,8 +680,10 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
   return (
     <ScreenShell title="Notifications" eyebrow="Stay informed" subtitle="Unread items are marked clearly for continuity.">
       <Card tone="low" style={styles.notificationSummary}>
-        <UiText variant="label" tone="primary">{visibleNotifications.filter((item) => !item.isRead).length} unread updates</UiText>
-        <UiText variant="bodySmall" tone="muted">Your next action is thesis registration.</UiText>
+        <View accessibilityLiveRegion="polite">
+          <UiText variant="label" tone="primary">{visibleNotifications.filter((item) => !item.isRead).length} unread updates</UiText>
+          <UiText variant="bodySmall" tone="muted">Your next action is thesis registration.</UiText>
+        </View>
       </Card>
       <ScreenSpacer />
       {mutationError ? (
@@ -798,8 +809,12 @@ const styles = StyleSheet.create({
   attendanceHero: { padding: tokens.spacing.lg },
   attendanceCard: { marginBottom: tokens.spacing.sm },
   registrationHero: { padding: tokens.spacing.lg },
+  registrationHeroHeader: { alignItems: 'flex-start', flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.md, marginTop: tokens.spacing.xs },
+  registrationHeroCopy: { flex: 1, gap: tokens.spacing.xs },
   registrationCard: { marginBottom: tokens.spacing.sm },
-  seatsText: { maxWidth: 78, textAlign: 'right' },
+  registrationCourseTitle: { marginTop: tokens.spacing.xs },
+  registrationMeta: { alignItems: 'flex-start', flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.md, marginTop: tokens.spacing.sm },
+  registrationSlot: { flex: 1 },
   notificationSummary: { padding: tokens.spacing.md },
   profileHero: { padding: tokens.spacing.lg },
   profileHeader: { alignItems: 'center', flexDirection: 'row' },

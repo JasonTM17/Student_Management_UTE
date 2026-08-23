@@ -2,10 +2,9 @@
 
 import { ArrowLeft, FileStack } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -35,9 +34,9 @@ export default function ThesisTopicDetailPage() {
         title={messages.thesis.noTopics}
         description={messages.thesis.noTopicsDescription}
         action={
-          <LocalizedLink href="/dashboard/thesis/topics">
-            <Button variant="outline">{messages.thesis.navigation.catalog}</Button>
-          </LocalizedLink>
+          <LinkButton href="/dashboard/thesis/topics" variant="outline">
+            {messages.thesis.navigation.catalog}
+          </LinkButton>
         }
       />
     );
@@ -50,9 +49,13 @@ export default function ThesisTopicDetailPage() {
         title={topic.title}
         description={messages.thesis.topicDetailDescription}
         actions={
-          <LocalizedLink href={`/dashboard/thesis/topics?roundId=${workspace.selectedRoundId}`}>
-            <Button variant="outline"><ArrowLeft className="mr-2 h-4 w-4" />{messages.thesis.navigation.catalog}</Button>
-          </LocalizedLink>
+          <LinkButton
+            href={`/dashboard/thesis/topics?roundId=${workspace.selectedRoundId}`}
+            variant="outline"
+          >
+            <ArrowLeft className="mr-2 h-4 w-4" />
+            {messages.thesis.navigation.catalog}
+          </LinkButton>
         }
       />
 
@@ -66,9 +69,11 @@ export default function ThesisTopicDetailPage() {
             <div className="rounded-lg border border-primary/20 bg-primary/[0.035] p-5 text-sm leading-7 text-muted-foreground">
               {topic.description}
             </div>
-            <LocalizedLink href={`/dashboard/thesis?roundId=${workspace.selectedRoundId}`}>
-              <Button>{messages.thesis.chooseTopic}</Button>
-            </LocalizedLink>
+            <LinkButton
+              href={`/dashboard/thesis?roundId=${workspace.selectedRoundId}&topicId=${topic.id}`}
+            >
+              {messages.thesis.chooseTopic}
+            </LinkButton>
           </CardContent>
         </Card>
 

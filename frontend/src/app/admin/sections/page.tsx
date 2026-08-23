@@ -38,6 +38,10 @@ import {
   getLocalizedCourseLabel,
   getLocalizedName,
 } from '@/lib/academic-content';
+import {
+  ACADEMIC_REFERENCE_LIMIT,
+  PEOPLE_REFERENCE_LIMIT,
+} from '@/lib/reference-data';
 
 interface Section {
   id: string;
@@ -118,6 +122,7 @@ export default function AdminSectionsPage() {
   const [classrooms, setClassrooms] = useState<Classroom[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
   const [semesterFilter, setSemesterFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -152,26 +157,30 @@ export default function AdminSectionsPage() {
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
   const fetchDropdownData = useCallback(async () => {
-    try {
-      const [
-        coursesResponse,
-        semestersResponse,
-        lecturersResponse,
-        classroomsResponse,
-      ] = await Promise.all([
-        coursesApi.getAll({ limit: 1000 }),
-        adminSemestersApi.getAll({ limit: 1000 }),
-        lecturersApi.getAll({ limit: 1000 }),
-        classroomsApi.getAll({ limit: 1000 }),
+    setReferenceError('');
+    const [coursesResult, semestersResult, lecturersResult, classroomsResult] =
+      await Promise.allSettled([
+        coursesApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT }),
+        adminSemestersApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT }),
+        lecturersApi.getAll({ limit: PEOPLE_REFERENCE_LIMIT }),
+        classroomsApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT }),
       ]);
-      setCourses(coursesResponse.data || []);
-      setSemesters(semestersResponse.data || []);
-      setLecturers(lecturersResponse.data || []);
-      setClassrooms(classroomsResponse.data || []);
-    } catch {
-      // Reference data is best effort.
+
+    if (coursesResult.status === 'fulfilled') setCourses(coursesResult.value.data || []);
+    if (semestersResult.status === 'fulfilled') setSemesters(semestersResult.value.data || []);
+    if (lecturersResult.status === 'fulfilled') setLecturers(lecturersResult.value.data || []);
+    if (classroomsResult.status === 'fulfilled') setClassrooms(classroomsResult.value.data || []);
+
+    if ([coursesResult, semestersResult, lecturersResult, classroomsResult].some(
+      (result) => result.status === 'rejected',
+    )) {
+      setReferenceError(
+        locale === 'vi'
+          ? 'Một hoặc nhiều danh sách tham chiếu cho biểu mẫu section chưa tải được.'
+          : 'One or more section form reference lists could not be loaded.',
+      );
     }
-  }, []);
+  }, [locale]);
 
   const fetchSections = useCallback(async () => {
     setIsLoading(true);
@@ -577,6 +586,14 @@ export default function AdminSectionsPage() {
               </div>
             </div>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchDropdownData()}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

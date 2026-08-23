@@ -6,8 +6,7 @@ import { useAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
-import { LocalizedLink } from '@/components/LocalizedLink';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import {
@@ -221,9 +220,9 @@ export default function DashboardPage() {
                     title={messages.studentDashboard.panels.currentCourses.emptyTitle}
                     description={messages.studentDashboard.panels.currentCourses.emptyDescription}
                     action={
-                      <LocalizedLink href="/dashboard/register">
-                        <Button>{messages.common.actions.browseSections}</Button>
-                      </LocalizedLink>
+                      <LinkButton href="/dashboard/register">
+                        {messages.common.actions.browseSections}
+                      </LinkButton>
                     }
                     className="min-h-[280px] border-none bg-transparent px-0 py-0"
                   />
@@ -308,11 +307,9 @@ export default function DashboardPage() {
                       : messages.studentDashboard.panels.currentStatus.enrollmentHealthClear}
                   </p>
                 </div>
-                <LocalizedLink href="/dashboard/profile">
-                  <Button variant="outline" className="w-full">
-                    {messages.common.actions.reviewProfileSettings}
-                  </Button>
-                </LocalizedLink>
+                <LinkButton href="/dashboard/profile" variant="outline" className="w-full">
+                  {messages.common.actions.reviewProfileSettings}
+                </LinkButton>
             </WorkspacePanel>
           </div>
         </>

@@ -78,7 +78,7 @@ The registry contains 21 navigable screens:
   notifications, profile.
 - Thesis: topics, topic detail, registration, progress.
 - Assistant: academic assistant/chatbot.
-- Operations: admin dashboard, students, lecturers; lecturer dashboard,
+- Staff: admin dashboard, students, lecturers; lecturer dashboard,
   schedule, grading, attendance.
 
 This is a scaffold, not a claim of live Expo, device, API, or visual validation.
