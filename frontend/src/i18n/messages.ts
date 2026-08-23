@@ -18,6 +18,7 @@ export const en = {
       confirm: 'Confirm',
       retry: 'Try again',
       refresh: 'Refresh data',
+      openSchedule: 'Open schedule',
       openTool: 'Open tool',
       openView: 'Open view',
       openWorkspace: 'Open workspace',
@@ -28,7 +29,6 @@ export const en = {
       reviewAdmin: 'Review admin surfaces',
       browseSections: 'Browse sections',
       clearFilters: 'Clear filters',
-      openAnalytics: 'Open analytics',
       addUser: 'Add user',
       createUser: 'Create user',
       search: 'Search',
@@ -41,7 +41,7 @@ export const en = {
     },
     states: {
       loadingContent: 'Loading content',
-      loading: 'Loading...',
+      loading: 'Loading…',
       closeModal: 'Close modal',
       goToPreviousPage: 'Go to previous page',
       goToNextPage: 'Go to next page',
@@ -62,18 +62,18 @@ export const en = {
   meta: {
     defaults: {
       siteName: 'CampusCore',
-      title: 'Campus operations workspace',
+      title: 'Campus academic workspace',
       description:
-        'CampusCore is a campus operations workspace for identity, academics, finance, engagement, people data, and analytics.',
+        'CampusCore is a focused academic workspace powered by one Java RESTful API and PostgreSQL.',
       ogAlt: 'CampusCore workspace overview',
       twitterTitle: 'CampusCore',
       twitterDescription:
-        'A campus operations workspace for academics, finance, engagement, analytics, and secure browser sessions.',
+        'A role-aware academic workspace for registration, schedules, grades, announcements, and thesis work.',
     },
     home: {
-      title: 'Campus operations workspace',
+      title: 'Campus academic workspace',
       description:
-        'CampusCore gives operators, lecturers, and students one steady workspace while keeping auth, academics, finance, analytics, and people workflows inside clear service boundaries.',
+        'CampusCore gives administrators, lecturers, and students one steady workspace backed by a single Java API contract.',
     },
     login: {
       title: 'Sign in',
@@ -98,27 +98,27 @@ export const en = {
     },
     socialImage: {
       eyebrow: 'CampusCore',
-      title: 'Campus operations that stay calm under real load.',
+      title: 'Academic work that stays clear from sign-in to thesis progress.',
       description:
-        'Registration, teaching, billing, people data, and reporting in one workspace with clear service ownership.',
+        'Registration, teaching, people records, announcements, and thesis work in one focused workspace.',
       badges: [
         'Role-aware workspace',
         'Verified releases',
-        'Service-owned domains',
+        'Single Java API',
       ],
     },
   },
   home: {
-    navSubtitle: 'Campus operations workspace',
-    eyebrow: 'Campus operations workspace',
-    title: 'Keep academic operations moving without the usual friction.',
+    navSubtitle: 'Campus academic workspace',
+    eyebrow: 'Role-aware academic workspace',
+    title: 'Keep learning, teaching, and registration connected.',
     description:
-      'CampusCore brings registration, schedules, billing, announcements, and reporting into one steady workspace for students, lecturers, and campus teams.',
+      'CampusCore brings registration, schedules, grades, announcements, and thesis work into one steady workspace for students, lecturers, and campus teams.',
     metricCards: [
       {
-        title: 'Operationally ready',
+        title: 'Course-demo ready',
         description:
-          'The product is shaped for real campus operations, from day-to-day sign-in to release handoff.',
+          'The portal covers the core academic flows needed for a reproducible local course demo.',
       },
       {
         title: 'Security-first',
@@ -126,30 +126,30 @@ export const en = {
           'Account protection and transaction safeguards stay in place without turning the interface into a status console.',
       },
       {
-        title: 'Operational clarity',
+        title: 'Clear academic ownership',
         description:
           'The UI maps to clear owners instead of collapsing everything back into core.',
       },
     ],
-    snapshotEyebrow: 'Operational readout',
+    snapshotEyebrow: 'Academic snapshot',
     snapshotTitle: 'A calmer way to keep campus work moving',
     snapshotChecks: [
       'Students, lecturers, and admins start from one steady workspace',
-      'Registration, billing, announcements, and reporting stay connected in the same session',
-      'Each domain can change on its own release path without dragging the whole product',
-      'Public access stays simple while internal service traffic remains separate',
+      'Registration, grades, announcements, and thesis work stay connected in the same session',
+      'One OpenAPI contract keeps the web, mobile app, and Java backend aligned',
+      'A fresh PostgreSQL database is reproducible through Flyway and seed data',
     ],
     snapshotPrimaryAccessTitle: 'Primary access',
     snapshotPrimaryAccessDescription:
       'Students, lecturers, and admins all enter through one consistent sign-in experience.',
-    snapshotReleaseTitle: 'Delivery posture',
+    snapshotReleaseTitle: 'Course-demo scope',
     snapshotReleaseDescription:
-      'Releases, verification, and runtime checks stay traceable from build to browser.',
+      'One Java API, one PostgreSQL database, and focused clients keep the demo easy to verify.',
     capabilitiesEyebrow: 'What the portal is built to do',
     capabilitiesTitle:
       'One frontend language across the critical campus workflows',
     capabilitiesDescription:
-      'The interface is designed for live campus operations, with calmer defaults for auth, data states, and role-aware tasks.',
+      'The interface supports day-to-day academic work with clear auth, data states, and role-aware tasks.',
     pillars: [
       {
         title: 'Identity you can trust',
@@ -159,22 +159,22 @@ export const en = {
       {
         title: 'Academic workflows',
         description:
-          'Registration, schedules, grades, transcript views, and section operations live behind clear service boundaries.',
+          'Registration, schedules, grades, transcript views, and section work share one stable API contract.',
       },
       {
-        title: 'Operational visibility',
+        title: 'Clear academic states',
         description:
-          'Dashboards and reporting move through analytics ownership instead of leaking through unrelated domains.',
+          'Loading, empty, error, forbidden, and success states remain explicit across role workflows.',
       },
       {
-        title: 'People ownership',
+        title: 'People records',
         description:
-          'Student and lecturer records remain readable through the frontend without dragging the UI back into a monolith.',
+          'Student and lecturer records stay readable and role-protected in the same course database.',
       },
       {
         title: 'Release discipline',
         description:
-          'Deployments, runtime checks, and service handoffs stay readable as the platform grows.',
+          'Builds, runtime checks, migrations, and handoffs stay readable for a reproducible course demo.',
       },
       {
         title: 'Campus-ready shell',
@@ -182,67 +182,67 @@ export const en = {
           'One portal for students, lecturers, and admins with sharper states, fewer dead ends, and calmer navigation.',
       },
     ],
-    whyEyebrow: 'Why microservices for CampusCore',
-    whyTitle: 'Split ownership where campus operations actually split',
+    whyEyebrow: 'Why one RESTful API for CampusCore',
+    whyTitle: 'Keep the course project focused and reproducible',
     whyDescription:
-      'CampusCore is split into services because campus work does not peak or fail in one place at a time. Identity, academics, finance, engagement, people data, and analytics move at different speeds and deserve different operating rhythms.',
+      'CampusCore keeps the backend in one Java application so the academic contract, database migrations, authorization, and local demo remain easy to understand and verify.',
     whyPoints: [
       {
-        title: 'Smaller blast radius',
+        title: 'One contract',
         description:
-          'A grading issue should not take down finance, and a billing change should not block sign-in.',
+          'Web and mobile clients use the same `/api/v1` OpenAPI surface.',
       },
       {
-        title: 'Independent auth ownership',
+        title: 'Consistent authorization',
         description:
-          'Identity and sign-in can evolve without forcing unrelated academic or finance changes.',
+          'Authentication and role checks are applied in one Spring Security boundary.',
       },
       {
-        title: 'Scaling by workload',
+        title: 'Reproducible data',
         description:
-          'Analytics, announcements, and enrollment-heavy flows can scale without dragging the entire platform with them.',
+          'Flyway and deterministic seed data rebuild the course database from empty PostgreSQL.',
       },
       {
-        title: 'Release verification',
+        title: 'Straightforward verification',
         description:
-          'Clear service ownership makes it easier to trace what changed, what shipped, and what is running now.',
+          'Focused Java, frontend, mobile, and Compose gates make the demo state traceable.',
       },
       {
-        title: 'Stronger edge boundaries',
+        title: 'Simple local runtime',
         description:
-          'People-facing routes stay clear while internal service contracts remain out of the browser path.',
+          'The local stack needs only the Java API and PostgreSQL.',
       },
       {
-        title: 'Clearer operator handoff',
+        title: 'Clearer course handoff',
         description:
-          'Operators can reason about incidents and deployments one domain at a time instead of untangling one giant surface.',
+          'Students can explain the architecture and demonstrate core academic flows end to end.',
       },
     ],
-    footerSubtitle: 'Operational workspace',
+    footerSubtitle: 'Academic workspace',
     footerDescription:
-      'A campus platform built for steady sign-in, clearer ownership, and calmer day-to-day operations.',
+      'A campus platform built for steady sign-in, clearer ownership, and calmer day-to-day academic work.',
     footerWorkspace: 'Workspace',
     footerDelivery: 'Delivery',
     footerLinks: {
-      workspace: ['Student access', 'Lecturer workflows', 'Admin operations'],
-      delivery: ['Deployment handoff', 'Release verification', 'Operational monitoring'],
+      workspace: ['Student access', 'Lecturer workflows', 'Admin tools'],
+      delivery: ['Local setup', 'OpenAPI contract', 'Seeded demo data'],
     },
     footerCopyright: 'All rights reserved.',
   },
   authShell: {
-    desktopSubtitle: 'Campus operations workspace',
+    desktopSubtitle: 'Campus academic workspace',
     mobileSubtitle: 'Academic access',
   },
   login: {
     eyebrow: 'Secure access',
     title: 'Sign in to the campus workspace.',
     description:
-      'Sign in with your campus account to continue across registration, billing, schedules, and updates.',
-    featureTitles: ['Role-aware access', 'Session protection', 'Operational continuity'],
+      'Sign in with your campus account to continue across registration, grades, schedules, and updates.',
+    featureTitles: ['Role-aware access', 'Session protection', 'Academic continuity'],
     featureDescriptions: [
       'Admins, lecturers, and students land in the right workspace without a second sign-in step.',
       'Sign-in stays steady across the pages people actually need during the academic day.',
-      'Registration, billing, and reporting all start from the same calm entry point.',
+      'Registration, schedules, and grades all start from the same calm entry point.',
     ],
     sectionEyebrow: 'Account access',
     heading: 'Welcome back',
@@ -351,6 +351,23 @@ export const en = {
   },
   adminShell: {
     eyebrow: 'Admin workspace',
+    portalTitle: 'Academic administration',
+    identityLabel: 'Signed in as',
+    adminRole: 'Administrator',
+    superAdminRole: 'Super administrator',
+    academicYears: 'Academic years',
+    preferences: 'Preferences',
+    skipToContent: 'Skip to admin content',
+    sidebarNavigation: 'Admin portal navigation',
+    openSidebar: 'Open admin navigation',
+    closeSidebar: 'Close admin navigation',
+    closeOverlay: 'Close admin navigation overlay',
+    menuSections: {
+      overview: 'Overview',
+      people: 'People and roles',
+      academics: 'Academic records',
+      campus: 'Campus services',
+    },
     signOut: 'Sign out',
     backToDashboard: 'Back to admin dashboard',
     mobileNavigation: 'Admin mobile navigation',
@@ -358,12 +375,12 @@ export const en = {
   admin: {
     title: 'Admin dashboard',
     description:
-      'Keep the campus workspace aligned across people, academics, finance, and reporting without leaving the admin shell.',
+      'Manage campus identities, academic records, announcements, and core thesis workflows from one consistent portal.',
     managementConsoleTitle: 'Management console',
     managementConsoleDescription:
-      'Jump straight into the workspace that needs attention. Each area keeps the same admin shell, confirmation flow, and route grammar.',
+      'Open the record area that needs attention. Every retained route uses the same navigation, state, and confirmation grammar.',
     menuItems: [
-      ['Thesis management', 'Create registration rounds, manage lifecycle, and monitor councils.'],
+      ['Thesis management', 'Manage registration rounds, topics, groups, and progress.'],
       ['User management', 'Review campus accounts, statuses, and role assignments.'],
       ['Lecturers', 'Manage lecturer records and academic ownership data.'],
       ['Courses', 'Maintain catalog structure, codes, and course metadata.'],
@@ -372,8 +389,6 @@ export const en = {
       ['Semesters', 'Control the academic timeline and current registration window.'],
       ['Departments', 'Manage departmental structure and faculty mappings.'],
       ['Classrooms', 'Track rooms, buildings, and capacity readiness.'],
-      ['Analytics', 'Review operational reporting and top-level data health.'],
-      ['Invoices', 'Handle tuition invoicing, balances, and payment review.'],
       ['Announcements', 'Publish updates that flow out to the rest of the campus.'],
     ],
     stats: ['Students', 'Lecturers', 'Courses', 'Enrollments'],
@@ -381,153 +396,21 @@ export const en = {
       'People records reachable through the current ownership model.',
       'Active lecturer accounts and teaching-facing identities.',
       'Catalog rows available for section planning and registration.',
-      'Enrollment rows reflected across academic and analytics views.',
+      'Enrollment rows available across the retained academic record views.',
     ],
     loading: 'Loading campus overview',
     unavailableTitle: 'Admin overview unavailable',
     unavailableDescription: 'Campus overview is not available right now.',
   },
-  adminAnalytics: {
-    title: 'Reports and analytics',
-    description:
-      'Track enrollment volume, grading distribution, and classroom utilization without leaving the same admin grammar used across live record management.',
-    overviewSectionTitle: 'Overview stats',
-    refreshData: 'Refresh data',
-    loading: 'Loading analytics overview',
-    unavailableTitle: 'Analytics unavailable',
-    unavailableDescription: 'Analytics data could not be loaded right now.',
-    stats: [
-      'Students',
-      'Lecturers',
-      'Courses',
-      'Sections',
-      'Enrollments',
-      'Departments',
-      'Faculties',
-      'Classrooms',
-    ],
-    statDetails: [
-      'Active student records in the current analytics snapshot.',
-      'Teaching-facing identities available to academic operations.',
-      'Catalog rows currently feeding sections and registration.',
-      'Live section records currently visible to reporting.',
-      'Enrollment throughput reflected across academic reporting.',
-      'Department records tied to faculty and staffing views.',
-      'Faculty groupings available for academic segmentation.',
-      'Rooms currently available for section occupancy tracking.',
-    ],
-    panels: {
-      enrollmentsBySemester: {
-        title: 'Enrollments by semester',
-        description:
-          'Compare academic terms by current enrollment volume without leaving the reporting workspace.',
-        emptyTitle: 'No semester enrollment data yet',
-        emptyDescription:
-          'Once enrollment rows are available, this panel will show which academic terms are carrying the most volume.',
-      },
-      gradeDistribution: {
-        title: 'Grade distribution',
-        description:
-          'Watch published grades settle across the current academic workload.',
-        emptyTitle: 'No published grades yet',
-        emptyDescription:
-          'This panel becomes more useful as sections publish final grades.',
-      },
-      sectionOccupancy: {
-        title: 'Section occupancy',
-        description:
-          'Surface the sections that are close to capacity before they become an operational problem.',
-        emptyTitle: 'No section occupancy data',
-        emptyDescription:
-          'Section and enrollment counts need to be present before occupancy can be visualized.',
-      },
-      enrollmentTrends: {
-        title: 'Enrollment trends',
-        description:
-          'Review monthly intake, completions, and drop activity in one operational readout.',
-        emptyTitle: 'No recent trend data',
-        emptyDescription:
-          'Trend cards appear when monthly enrollment activity is available.',
-      },
-    },
-    tableHeaders: {
-      course: 'Course',
-      section: 'Section',
-      semester: 'Semester',
-      capacity: 'Capacity',
-      enrolled: 'Enrolled',
-      occupancy: 'Occupancy',
-      students: 'students',
-      grades: {
-        enrolled: 'Enrolled',
-        completed: 'Completed',
-        dropped: 'Dropped',
-      },
-    },
-    cockpit: {
-      kpis: {
-        serviceHealth: 'Service health',
-        serviceHealthDetail: 'Observed service targets in the local operator stack.',
-        registrationPressure: 'Registration pressure',
-        registrationPressureDetail: 'Full or near-full sections that need attention.',
-        paymentRisk: 'Payment risk',
-        paymentRiskDetail: 'Failed, overdue, or pending finance work.',
-        notificationHealth: 'Notification health',
-        notificationHealthDetail: 'Unread or warning-level operational messages.',
-      },
-      labels: {
-        healthy: 'healthy',
-        sectionsAtRisk: 'sections at risk',
-        failedPayments: 'failed payments',
-        unreadNotifications: 'unread',
-        totalInvoiced: 'Invoiced',
-        paidAmount: 'Paid',
-        outstanding: 'Outstanding',
-        waitlist: 'Waitlist',
-        full: 'Full',
-        nearCapacity: 'Near capacity',
-        averageOccupancy: 'Average occupancy',
-        noAttention: 'No immediate operator action is queued.',
-      },
-      panels: {
-        enrollmentFlow: {
-          title: 'Enrollment movement',
-          description:
-            'Twelve-month enrollment, completion, and drop activity with structured buckets for localized reporting.',
-        },
-        registrationPressure: {
-          title: 'Registration pressure',
-          description:
-            'Sections closest to capacity, with active waitlist signals visible before students hit a dead end.',
-        },
-        financeFunnel: {
-          title: 'Finance checkout posture',
-          description:
-            'Invoice exposure and provider payment activity in one reconciliation view.',
-        },
-        notificationDelivery: {
-          title: 'Notification delivery',
-          description:
-            'Unread, warning, and error-level messages that may require an operator follow-up.',
-        },
-        operatorLinks: {
-          title: 'Operator drill-down',
-          description:
-            'Use these internal links for detailed metrics, logs, traces, and alert review.',
-        },
-        actionQueue: {
-          title: 'Attention queue',
-          description:
-            'The highest-value operational follow-ups from enrollment, finance, and notification signals.',
-        },
-      },
-      actions: {
-        open: 'Open',
-        opensInNewTab: 'opens in a new tab',
-      },
-    },
-  },
   dashboardShell: {
+    portalTitle: 'Academic information portal',
+    identityLabel: 'Signed in as',
+    menuSections: {
+      overview: 'Overview',
+      academic: 'Academic records',
+      teaching: 'Teaching',
+      campus: 'Campus services',
+    },
     roles: {
       student: 'Student access',
       lecturer: 'Lecturer access',
@@ -538,13 +421,13 @@ export const en = {
     studentRail: {
       title: 'Student context',
       subtitle:
-        'Keep the current route, billing signals, and registration shortcuts visible without crowding the main workspace.',
+        'Keep the current route, academic signals, and registration shortcuts visible without crowding the main workspace.',
       currentViewLabel: 'Current view',
       signalsTitle: 'Signals',
       notificationLabel: 'Unread updates',
       localeLabel: 'Language',
       sessionSummary:
-        'Your student workspace stays in the same signed-in context while you move between registration, billing, and records.',
+        'Your student workspace stays in the same signed-in context while you move between registration, schedules, and records.',
       quickActionsTitle: 'Quick actions',
       collapse: 'Collapse student context panel',
       expand: 'Expand student context panel',
@@ -560,15 +443,10 @@ export const en = {
           description:
             'Keep this term’s meetings close while you compare sections.',
         },
-        billing: {
-          title: 'Billing status',
-          description:
-            'Check outstanding invoices and payment follow-up without leaving the workspace.',
-        },
         announcements: {
           title: 'Campus updates',
           description:
-            'Open the latest shared notices affecting classes, billing, and student activity.',
+            'Open the latest shared notices affecting classes and student activity.',
         },
       },
     },
@@ -579,7 +457,6 @@ export const en = {
       schedule: 'Schedule',
       grades: 'Grades',
       transcript: 'Transcript',
-      invoices: 'Invoices',
       announcements: 'Announcements',
       notifications: 'Notifications',
       thesis: 'Thesis workspace',
@@ -591,7 +468,7 @@ export const en = {
     },
     notifications: {
       title: 'Notifications',
-      loading: 'Loading recent alerts...',
+      loading: 'Loading recent alerts…',
       empty:
         'No unread alerts right now. Announcements remain the main broadcast channel for shared updates.',
       fallbackTitle: 'New update',
@@ -623,6 +500,9 @@ export const en = {
       toggleNotifications: 'Toggle notifications panel',
       toggleProfile: 'Toggle profile menu',
       mobileNavigation: 'Mobile workspace navigation',
+      skipToContent: 'Skip to portal content',
+      sidebarNavigation: 'Student and lecturer portal navigation',
+      preferences: 'Preferences',
     },
     pageDefaults: {
       description:
@@ -640,7 +520,7 @@ export const en = {
     },
     routeDescriptions: {
       dashboard:
-        'Registration, coursework, billing, and profile tasks stay in one student workspace.',
+        'Registration, coursework, schedules, and profile tasks stay in one student workspace.',
       profile:
         'Keep contact details and credential rotation aligned with the active browser session.',
       register:
@@ -651,7 +531,6 @@ export const en = {
         'Keep the weekly class view close while the rest of the portal stays reachable.',
       grades: 'Review published grades and current academic standing.',
       transcript: 'View cumulative academic history and semester outcomes.',
-      invoices: 'Review billing status and payment history.',
       announcements: 'Read campus-wide updates and shared notices.',
       notifications:
         'Review account alerts, academic deadlines, and workflow updates in one focused inbox.',
@@ -663,7 +542,7 @@ export const en = {
       lecturerAnnouncements:
         'Share updates with the students connected to your sections.',
       thesis:
-        'Track thesis registration rounds, group decisions, defense councils, and published results.',
+        'Track thesis registration rounds, topics, groups, and progress.',
     },
     loading: 'Loading workspace',
   },
@@ -671,7 +550,7 @@ export const en = {
     eyebrow: 'Student workspace',
     title: 'Welcome back, {name}',
     description:
-      'The current term is {semester}. Move between registration, coursework, billing, and profile updates without leaving the student workspace.',
+      'The current term is {semester}. Move between registration, coursework, schedules, and profile updates without leaving the student workspace.',
     currentTermFallback: 'No active term',
     currentDateLabel: 'Today',
     metrics: {
@@ -725,7 +604,6 @@ export const en = {
       ['Register courses', 'Browse available sections and make enrollment decisions.'],
       ['Open schedule', 'Check what is on the calendar this week.'],
       ['Review grades', 'See published results and academic standing.'],
-      ['Check invoices', 'Keep track of outstanding balances and payment status.'],
     ],
     portalLinks: [
       ['My courses', 'Current registrations, section details, and status.'],
@@ -790,7 +668,7 @@ export const en = {
     eyebrow: 'Lecturer workspace',
     title: 'Welcome back, {name}',
     description:
-      'Keep section operations, grading queues, and teaching updates in one lecturer-focused workspace.',
+      'Keep section work, grading queues, and teaching updates in one lecturer-focused workspace.',
     quickActionsTitle: 'Quick actions',
     quickActionsDescription:
       'Open the lecturer tools that usually drive the next teaching action.',
@@ -808,7 +686,7 @@ export const en = {
       'Assigned sections will appear here as soon as the current term is configured.',
     announcementsTitle: 'Latest announcements',
     announcementsDescription:
-      'Broadcast updates that affect teaching operations surface here without taking the page away from the current workload.',
+      'Broadcast teaching updates here without taking the page away from the current workload.',
     announcementsEmptyTitle: 'No new notices',
     announcementsEmptyDescription:
       'Shared notices for the lecturer workspace will show up here once they are published.',
@@ -823,7 +701,7 @@ export const en = {
         'Assigned teaching sections stay visible so grading and scheduling decisions remain grounded in the same term context.',
         'Enrollment volume stays close to the lecturer workspace so section-level follow-up remains visible.',
         'Publish-ready grading work surfaces early so final review does not get lost behind the rest of the workflow.',
-        'Broadcast updates that affect teaching operations remain visible without pulling attention away from the grading queue.',
+        'Broadcast teaching updates remain visible without pulling attention away from the grading queue.',
       ],
     },
     queueStatusReady: 'Ready to publish',
@@ -831,7 +709,7 @@ export const en = {
     studentsSuffix: 'students',
     gradedSuffix: 'graded',
     errors: {
-      loadFailed: 'The lecturer dashboard could not load its operational data.',
+      loadFailed: 'The lecturer dashboard could not load its academic data.',
       unavailableTitle: 'Lecturer dashboard unavailable',
       loading: 'Loading lecturer dashboard',
     },
@@ -878,7 +756,7 @@ export const en = {
     eyebrow: 'Thesis workspace',
     title: 'Keep the whole thesis journey in one calm timeline.',
     description:
-      'Registration rounds, topic choices, group membership, council reviews, and final results stay connected to your campus identity.',
+      'Registration rounds, topic choices, group membership, and recorded progress stay connected to your campus identity.',
     selectRound: 'Select registration round',
     noRound: 'No thesis registration round is available yet.',
     loading: 'Loading thesis workspace',
@@ -893,7 +771,7 @@ export const en = {
       'Published topics are grouped by department. Topic selection becomes a proposal your coordinator can review.',
     groupsTitle: 'Your group workspace',
     groupsDescription:
-      'Keep membership and topic decisions visible before the round moves into council scheduling.',
+      'Keep membership, topic decisions, and the current group status visible in one place.',
     createGroup: 'Create a thesis group',
     addMember: 'Add member',
     chooseTopic: 'Choose topic',
@@ -909,7 +787,6 @@ export const en = {
     navigation: {
       catalog: 'Topic catalog',
       progress: 'Thesis progress',
-      evaluation: 'Defense and evaluation',
     },
     catalogTitle: 'Published topic catalog',
     catalogDescription:
@@ -927,28 +804,17 @@ export const en = {
       'Thesis group prepared',
       'Topic proposal submitted',
       'Coordinator decision recorded',
-      'Defense and result published',
+      'Latest progress status recorded',
     ],
-    evaluationTitle: 'Defense and evaluation',
-    evaluationDescription:
-      'Keep council scheduling and evaluation readiness visible while scores remain owned by the academic service.',
-    councilsTitle: 'Defense councils',
-    noCouncils: 'No defense council has been scheduled for this round yet.',
-    defenseScheduled: 'Scheduled defense',
-    room: 'Room',
-    councilStatus: 'Council status',
     backToWorkspace: 'Back to thesis workspace',
     lifecycleViewsTitle: 'Thesis lifecycle views',
     lifecycleViewsDescription:
-      'Open a focused screen for topics, recorded progress, or defense readiness.',
+      'Open a focused screen for published topics or the latest recorded group progress.',
     status: {
       DRAFT: 'Draft',
       REGISTRATION_OPEN: 'Registration open',
       REGISTRATION_CLOSED: 'Registration closed',
       PROPOSALS_PUBLISHED: 'Topics published',
-      DEFENSE_SCHEDULED: 'Defense scheduled',
-      SCORING_OPEN: 'Scoring open',
-      RESULTS_PUBLISHED: 'Results published',
       CLOSED: 'Closed',
       CANCELLED: 'Cancelled',
       PENDING: 'Pending review',
@@ -957,60 +823,10 @@ export const en = {
       SUBMITTED: 'Submitted',
       COMPLETED: 'Completed',
     },
-    review: {
-      eyebrow: 'Review & evaluation',
-      title: 'Score thesis defenses with a calm, structured workflow.',
-      description:
-        'Select a council, then submit scores and comments for each defending group. Scores range from 0 to 10.',
-      selectCouncil: 'Select defense council',
-      noCouncil: 'No defense council is available for this round.',
-      noCouncilDescription:
-        'Councils are scheduled by the coordinator once registration closes.',
-      councilReview: 'Council review',
-      room: 'Room',
-      members: 'Council members',
-      memberCount: 'members',
-      groupsTitle: 'Defending groups',
-      groupsDescription: 'Submit a score and comment for each group.',
-      noGroups: 'No groups in this round yet.',
-      noGroupsDescription: 'Groups will appear here once students form and register.',
-      groupLabel: 'Group',
-      score: 'Score (0-10)',
-      comment: 'Comment',
-      commentPlaceholder: 'Strengths, weaknesses, suggestions...',
-      submit: 'Submit review',
-      submitted: 'Review submitted successfully.',
-      invalidScore: 'Please enter a valid score between 0 and 10.',
-      unauthorized: 'Only lecturers and admins can submit reviews.',
-      unauthorizedDescription: 'This workspace is restricted to evaluator roles.',
-    },
     progress: {
       eyebrow: 'Progress tracking',
-      title: 'Follow every milestone from proposal to result.',
-      description:
-        'See where your group stands in the thesis journey — proposal, approval, midterm, defense, and final result.',
-      noRound: 'No thesis registration round is available yet.',
-      noRoundDescription: 'Progress will appear once a round is published.',
-      overall: 'Overall progress',
-      timeline: 'Milestone timeline',
-      timelineDescription: 'Each milestone unlocks as the previous one completes.',
-      proposal: 'Proposal submitted',
-      proposalDescription: 'Your group has formed and chosen a topic.',
-      approval: 'Coordinator approval',
-      approvalDescription: 'Your coordinator reviews and approves the group.',
-      midterm: 'Midterm report',
-      midtermDescription: 'Submit your progress report at the checkpoint.',
-      defense: 'Defense',
-      defenseDescription: 'Present and defend your thesis before the council.',
-      result: 'Final result',
-      resultDescription: 'Scores are finalized and published.',
     },
     detail: {
-      councils: 'Defense councils',
-      councilsTitle: 'Defense councils',
-      councilsDescription: 'Councils scheduled for this round.',
-      noCouncils: 'No councils scheduled yet.',
-      noCouncilsDescription: 'Councils appear here once the coordinator schedules defense sessions.',
       groupsTitle: 'Registered groups',
       groupsDescription: 'Groups formed by students in this round.',
       noGroups: 'No groups registered yet.',
@@ -1018,39 +834,23 @@ export const en = {
       maxGroups: 'Max groups',
       members: 'members',
     },
-    councils: {
-      eyebrow: 'Council management',
-      title: 'Schedule and manage defense councils.',
-      description:
-        'Create councils, assign defense dates and rooms, and open scoring once the council is ready.',
-      empty: 'No councils scheduled for this round.',
-      emptyDescription: 'Councils appear here once the coordinator creates them.',
-      schedule: 'Schedule',
-      scheduleTitle: 'Schedule defense council',
-      room: 'Room',
-      roomPlaceholder: 'e.g. Room A101',
-      date: 'Date & time',
-      scheduledAt: 'Scheduled at',
-      openScoring: 'Open scoring',
-      scoringOpened: 'Scoring is now open for this council.',
-      scheduled: 'Council scheduled successfully.',
-    },
     admin: {
       title: 'Thesis administration',
-      description: 'Create registration rounds, manage their lifecycle, and monitor topics, groups, and councils.',
+      description: 'Create registration rounds, manage their lifecycle, and monitor topics and groups.',
       createRound: 'Create round',
       totalRounds: 'Total rounds',
       openRounds: 'Open for registration',
       noRounds: 'No thesis rounds yet.',
       noRoundsDescription: 'Create your first registration round to start the thesis workflow.',
+      forbiddenTitle: 'Admin access required',
+      forbiddenDescription: 'Only administrators can manage thesis registration rounds.',
+      returnToWorkspace: 'Return to your workspace',
       roundName: 'Round name',
       roundNamePlaceholder: 'e.g. Spring 2026 Thesis Round',
       thesisType: 'Thesis type',
       registrationStart: 'Registration start',
       registrationEnd: 'Registration end',
       proposalPublishAt: 'Proposal publish date',
-      reportDate: 'Report date',
-      defenseDate: 'Defense date',
       createIncomplete: 'Please fill in name, registration start, and registration end.',
       created: 'Thesis round created successfully.',
       openRegistration: 'Open registration',
@@ -1067,11 +867,16 @@ export const en = {
     description: 'Ask about the current thesis workflow and published topic context.',
     open: 'Open thesis assistant',
     close: 'Close thesis assistant',
-    placeholder: 'Ask about registration, topics, groups, or reviews...',
+    placeholder: 'Ask about registration, topics, groups, or progress...',
     send: 'Send message',
     thinking: 'Checking the authorized thesis context...',
     empty: 'Start with a question about your current thesis round.',
     unavailable: 'The assistant is not available right now. Your thesis data is unchanged.',
+    answered: 'Answered from the curated corpus',
+    noMatch: 'No matching source',
+    degraded: 'Knowledge temporarily unavailable',
+    sources: 'Sources',
+    you: 'You',
   },
 } as const;
 
@@ -1103,6 +908,7 @@ export const vi: I18nMessages = {
       confirm: 'Xác nhận',
       retry: 'Thử lại',
       refresh: 'Làm mới dữ liệu',
+      openSchedule: 'Mở thời khóa biểu',
       openTool: 'Mở công cụ',
       openView: 'Mở màn hình',
       openWorkspace: 'Mở workspace',
@@ -1113,7 +919,6 @@ export const vi: I18nMessages = {
       reviewAdmin: 'Mở khu quản trị',
       browseSections: 'Xem lớp học phần',
       clearFilters: 'Xóa bộ lọc',
-      openAnalytics: 'Mở phân tích',
       addUser: 'Thêm người dùng',
       createUser: 'Tạo người dùng',
       search: 'Tìm kiếm',
@@ -1126,7 +931,7 @@ export const vi: I18nMessages = {
     },
     states: {
       loadingContent: 'Đang tải nội dung',
-      loading: 'Đang tải...',
+      loading: 'Đang tải…',
       closeModal: 'Đóng hộp thoại',
       goToPreviousPage: 'Trang trước',
       goToNextPage: 'Trang sau',
@@ -1147,18 +952,18 @@ export const vi: I18nMessages = {
   meta: {
     defaults: {
       siteName: 'CampusCore',
-      title: 'Workspace vận hành campus',
+      title: 'Không gian học vụ CampusCore',
       description:
-        'CampusCore là workspace vận hành campus cho định danh, học vụ, tài chính, tương tác, dữ liệu con người và phân tích.',
+        'CampusCore là workspace học vụ tập trung, chạy bằng một Java RESTful API và PostgreSQL.',
       ogAlt: 'Tổng quan workspace CampusCore',
       twitterTitle: 'CampusCore',
       twitterDescription:
-        'Workspace vận hành campus cho học vụ, tài chính, tương tác, phân tích và phiên trình duyệt an toàn.',
+        'Workspace học vụ theo vai trò cho đăng ký, lịch học, điểm, thông báo và luận văn.',
     },
     home: {
-      title: 'Workspace vận hành campus',
+      title: 'Không gian học vụ CampusCore',
       description:
-        'CampusCore mang đến một workspace ổn định cho đội vận hành, giảng viên và sinh viên, đồng thời giữ ranh giới rõ ràng giữa auth, học vụ, tài chính, phân tích và dữ liệu con người.',
+        'CampusCore mang đến một workspace ổn định cho quản trị, giảng viên và sinh viên trên cùng một contract Java API.',
     },
     login: {
       title: 'Đăng nhập',
@@ -1183,27 +988,27 @@ export const vi: I18nMessages = {
     },
     socialImage: {
       eyebrow: 'CampusCore',
-      title: 'Vận hành campus vẫn vững dưới tải thực tế.',
+      title: 'Công việc học vụ rõ ràng từ đăng nhập đến tiến độ luận văn.',
       description:
-        'Đăng ký học phần, giảng dạy, học phí, dữ liệu con người và báo cáo trong một workspace có owner rõ ràng giữa các service.',
+        'Đăng ký học phần, giảng dạy, hồ sơ, thông báo và luận văn trong một workspace tập trung.',
       badges: [
         'Workspace theo vai trò',
         'Phát hành đã xác minh',
-        'Service có owner riêng',
+        'Một Java API',
       ],
     },
   },
   home: {
-    navSubtitle: 'Không gian vận hành campus',
-    eyebrow: 'Không gian vận hành campus',
-    title: 'Giữ vận hành học vụ trôi chảy, rõ ràng và đáng tin cậy.',
+    navSubtitle: 'Không gian học vụ CampusCore',
+    eyebrow: 'Không gian học vụ theo vai trò',
+    title: 'Kết nối học tập, giảng dạy và đăng ký học phần.',
     description:
-      'CampusCore gom đăng ký học phần, thời khóa biểu, học phí, thông báo và báo cáo vào một không gian làm việc ổn định cho sinh viên, giảng viên và đội ngũ vận hành.',
+      'CampusCore gom đăng ký học phần, thời khóa biểu, điểm, thông báo và luận văn vào một không gian làm việc ổn định cho sinh viên, giảng viên và quản trị.',
     metricCards: [
       {
-        title: 'Sẵn sàng cho vận hành',
+        title: 'Sẵn sàng cho demo môn học',
         description:
-          'Sản phẩm được dựng cho vận hành campus thực tế, từ đăng nhập hằng ngày đến bàn giao phát hành.',
+          'Portal bao phủ các luồng học vụ cốt lõi cần cho một demo local có thể tái lập.',
       },
       {
         title: 'Ưu tiên bảo mật',
@@ -1211,29 +1016,29 @@ export const vi: I18nMessages = {
           'Các lớp bảo vệ tài khoản và giao dịch vẫn được giữ vững mà không biến giao diện thành bảng chẩn đoán kỹ thuật.',
       },
       {
-        title: 'Vận hành rõ ràng',
+        title: 'Ownership học vụ rõ ràng',
         description:
           'UI bám theo owner rõ ràng thay vì dồn tất cả trở lại một lõi duy nhất.',
       },
     ],
-    snapshotEyebrow: 'Nhịp vận hành',
+    snapshotEyebrow: 'Tổng quan học vụ',
     snapshotTitle: 'Một cách bình tĩnh hơn để giữ campus luôn chạy',
     snapshotChecks: [
       'Sinh viên, giảng viên và quản trị cùng đi vào một workspace ổn định',
-      'Đăng ký học phần, học phí, thông báo và báo cáo luôn nối tiếp trong cùng một phiên',
-      'Mỗi domain có thể đổi theo nhịp riêng mà không kéo cả hệ thống đi theo',
-      'Lối vào công khai vẫn gọn cho người dùng, còn lưu lượng nội bộ được giữ tách riêng',
+      'Đăng ký học phần, điểm, thông báo và luận văn nối tiếp trong cùng một phiên',
+      'Một contract OpenAPI giữ web, mobile và Java backend đồng bộ',
+      'Flyway và seed data dựng lại PostgreSQL sạch một cách ổn định',
     ],
     snapshotPrimaryAccessTitle: 'Lối vào chính',
     snapshotPrimaryAccessDescription:
       'Sinh viên, giảng viên và quản trị cùng đi qua một trải nghiệm đăng nhập nhất quán.',
-    snapshotReleaseTitle: 'Nhịp triển khai',
+    snapshotReleaseTitle: 'Phạm vi demo môn học',
     snapshotReleaseDescription:
-      'Các bước phát hành, kiểm chứng và kiểm tra runtime luôn lần theo được từ build đến trình duyệt.',
+      'Một Java API, một PostgreSQL và các client tập trung giúp demo dễ kiểm chứng.',
     capabilitiesEyebrow: 'Portal này được xây để làm gì',
     capabilitiesTitle: 'Một ngôn ngữ giao diện cho các luồng campus quan trọng',
     capabilitiesDescription:
-      'Giao diện được thiết kế cho vận hành campus thực tế, với mặc định điềm tĩnh hơn cho xác thực, trạng thái dữ liệu và tác vụ theo vai trò.',
+      'Giao diện hỗ trợ công việc học vụ hằng ngày với xác thực, trạng thái dữ liệu và tác vụ theo vai trò rõ ràng.',
     pillars: [
       {
         title: 'Định danh đáng tin',
@@ -1243,22 +1048,22 @@ export const vi: I18nMessages = {
       {
         title: 'Luồng học vụ',
         description:
-          'Đăng ký, thời khóa biểu, điểm, bảng điểm và vận hành section nằm sau các ranh giới dịch vụ rõ ràng.',
+          'Đăng ký, thời khóa biểu, điểm, bảng điểm và công việc section dùng chung một contract API ổn định.',
       },
       {
-        title: 'Quan sát vận hành',
+        title: 'Trạng thái học vụ rõ ràng',
         description:
-          'Dashboard và báo cáo đi theo owner analytics thay vì rò rỉ qua các domain không liên quan.',
+          'Loading, empty, error, forbidden và success được thể hiện rõ trên các luồng theo vai trò.',
       },
       {
-        title: 'Owner dữ liệu con người',
+        title: 'Hồ sơ người dùng',
         description:
-          'Dữ liệu sinh viên và giảng viên vẫn hiển thị trên frontend mà không kéo UI quay lại kiểu monolith.',
+          'Dữ liệu sinh viên và giảng viên được phân quyền rõ trong cùng database đồ án.',
       },
       {
         title: 'Kỷ luật phát hành',
         description:
-          'Triển khai, kiểm tra runtime và bàn giao service vẫn rõ ràng khi hệ thống lớn dần.',
+          'Build, kiểm tra runtime, migration và bàn giao luôn rõ cho một demo môn học tái lập được.',
       },
       {
         title: 'Portal sẵn cho campus',
@@ -1266,67 +1071,67 @@ export const vi: I18nMessages = {
           'Một cổng chung cho sinh viên, giảng viên và quản trị với trạng thái rõ hơn, ít ngõ cụt hơn và điều hướng điềm tĩnh hơn.',
       },
     ],
-    whyEyebrow: 'Vì sao CampusCore chọn microservices',
-    whyTitle: 'Tách owner đúng nơi vận hành campus thực sự đã tách',
+    whyEyebrow: 'Vì sao CampusCore dùng một RESTful API',
+    whyTitle: 'Giữ đồ án tập trung và dễ tái lập',
     whyDescription:
-      'CampusCore được tách thành microservices vì vận hành campus không tăng tải hay gặp sự cố ở một chỗ duy nhất. Định danh, học vụ, tài chính, tương tác, dữ liệu con người và phân tích đều có nhịp vận hành riêng.',
+      'CampusCore giữ backend trong một ứng dụng Java để contract học vụ, migration database, phân quyền và demo local dễ hiểu và dễ kiểm chứng.',
     whyPoints: [
       {
-        title: 'Giảm blast radius',
+        title: 'Một contract',
         description:
-          'Một lỗi nhập điểm không nên kéo tài chính xuống, và thay đổi billing không nên chặn đăng nhập.',
+          'Web và mobile cùng dùng bề mặt OpenAPI `/api/v1`.',
       },
       {
-        title: 'Auth có owner độc lập',
+        title: 'Phân quyền nhất quán',
         description:
-          'Định danh và đăng nhập có thể thay đổi mà không buộc học vụ hay tài chính phải đi theo.',
+          'Xác thực và role check nằm trong một ranh giới Spring Security.',
       },
       {
-        title: 'Scale theo tải',
+        title: 'Dữ liệu tái lập',
         description:
-          'Analytics, announcements và luồng enrollment có thể scale riêng mà không kéo cả hệ thống theo.',
+          'Flyway và seed data dựng lại database đồ án từ PostgreSQL trống.',
       },
       {
-        title: 'Kiểm chứng phát hành rõ',
+        title: 'Kiểm chứng đơn giản',
         description:
-          'Owner rõ ràng giúp truy dấu phần nào vừa đổi, vừa phát hành và đang chạy dễ hơn.',
+          'Các gate Java, frontend, mobile và Compose giúp truy dấu trạng thái demo.',
       },
       {
-        title: 'Ranh giới edge mạnh hơn',
+        title: 'Runtime local gọn',
         description:
-          'Lối vào cho người dùng vẫn gọn, còn contract nội bộ không bị đẩy ra trước trình duyệt.',
+          'Stack local chỉ cần Java API và PostgreSQL.',
       },
       {
-        title: 'Bàn giao vận hành rõ hơn',
+        title: 'Bàn giao đồ án rõ hơn',
         description:
-          'Đội vận hành có thể xử lý sự cố và triển khai theo từng domain thay vì gỡ một khối khổng lồ.',
+          'Sinh viên có thể giải thích kiến trúc và demo các luồng học vụ từ đầu đến cuối.',
       },
     ],
-    footerSubtitle: 'Workspace vận hành',
+    footerSubtitle: 'Không gian học vụ',
     footerDescription:
-      'Nền tảng campus tập trung vào đăng nhập ổn định, owner rõ ràng và vận hành hằng ngày bớt rối hơn.',
+      'Nền tảng campus tập trung vào đăng nhập ổn định, owner rõ ràng và công việc học vụ hằng ngày bớt rối hơn.',
     footerWorkspace: 'Workspace',
     footerDelivery: 'Triển khai',
     footerLinks: {
-      workspace: ['Khu sinh viên', 'Luồng giảng viên', 'Vận hành quản trị'],
-      delivery: ['Bàn giao triển khai', 'Xác minh phát hành', 'Theo dõi vận hành'],
+      workspace: ['Khu sinh viên', 'Luồng giảng viên', 'Công cụ quản trị'],
+      delivery: ['Thiết lập local', 'Contract OpenAPI', 'Dữ liệu demo đã seed'],
     },
     footerCopyright: 'Mọi quyền được bảo lưu.',
   },
   authShell: {
-    desktopSubtitle: 'Không gian vận hành campus',
+    desktopSubtitle: 'Không gian học vụ CampusCore',
     mobileSubtitle: 'Truy cập học vụ',
   },
   login: {
     eyebrow: 'Truy cập an toàn',
-    title: 'Đăng nhập vào không gian vận hành campus.',
+    title: 'Đăng nhập vào không gian học vụ CampusCore.',
     description:
-      'Dùng cùng một phiên trình duyệt đã được bảo vệ để di chuyển giữa học vụ, tài chính, thông báo và bảng điều khiển vận hành.',
-    featureTitles: ['Vào đúng vai trò', 'Phiên đăng nhập an toàn', 'Luồng vận hành liền mạch'],
+      'Dùng cùng một phiên trình duyệt đã được bảo vệ để di chuyển giữa đăng ký, điểm, thông báo và không gian theo vai trò.',
+    featureTitles: ['Vào đúng vai trò', 'Phiên đăng nhập an toàn', 'Luồng học vụ liền mạch'],
     featureDescriptions: [
       'Quản trị, giảng viên và sinh viên đi vào đúng không gian làm việc mà không cần một bước đăng nhập thứ hai.',
       'Đăng nhập được giữ nhất quán trên những màn quan trọng nhất trong ngày học vụ.',
-      'Các luồng học vụ, tài chính, tương tác và báo cáo luôn đi qua cùng một điểm vào điềm tĩnh.',
+      'Đăng ký, thời khóa biểu và điểm luôn đi qua cùng một điểm vào rõ ràng.',
     ],
     sectionEyebrow: 'Truy cập tài khoản',
     heading: 'Chào mừng bạn quay lại',
@@ -1435,6 +1240,23 @@ export const vi: I18nMessages = {
   },
   adminShell: {
     eyebrow: 'Workspace quản trị',
+    portalTitle: 'Cổng quản trị học vụ',
+    identityLabel: 'Đăng nhập với vai trò',
+    adminRole: 'Quản trị viên',
+    superAdminRole: 'Quản trị viên cấp cao',
+    academicYears: 'Năm học',
+    preferences: 'Tùy chọn',
+    skipToContent: 'Chuyển đến nội dung quản trị',
+    sidebarNavigation: 'Điều hướng cổng quản trị',
+    openSidebar: 'Mở điều hướng quản trị',
+    closeSidebar: 'Đóng điều hướng quản trị',
+    closeOverlay: 'Đóng lớp phủ điều hướng quản trị',
+    menuSections: {
+      overview: 'Tổng quan',
+      people: 'Người dùng và vai trò',
+      academics: 'Hồ sơ học vụ',
+      campus: 'Dịch vụ nhà trường',
+    },
     signOut: 'Đăng xuất',
     backToDashboard: 'Quay lại dashboard quản trị',
     mobileNavigation: 'Điều hướng quản trị trên mobile',
@@ -1442,12 +1264,12 @@ export const vi: I18nMessages = {
   admin: {
     title: 'Dashboard quản trị',
     description:
-      'Giữ workspace campus nhất quán giữa dữ liệu con người, học vụ, tài chính và báo cáo mà không rời khỏi admin shell.',
+      'Quản lý tài khoản, hồ sơ học vụ, thông báo và luồng luận văn cốt lõi trong một cổng thống nhất.',
     managementConsoleTitle: 'Bảng điều hướng quản trị',
     managementConsoleDescription:
-      'Đi thẳng vào khu cần xử lý. Mỗi khu vẫn dùng cùng admin shell, confirmation flow và route grammar.',
+      'Mở khu dữ liệu cần xử lý. Mọi route được giữ lại đều dùng cùng điều hướng, trạng thái và luồng xác nhận.',
     menuItems: [
-      ['Quản lý luận văn', 'Tạo đợt đăng ký, quản lý vòng đời và theo dõi hội đồng.'],
+      ['Quản lý luận văn', 'Quản lý đợt đăng ký, đề tài, nhóm và tiến độ.'],
       ['Quản lý người dùng', 'Xem tài khoản campus, trạng thái và phân quyền.'],
       ['Giảng viên', 'Quản lý hồ sơ giảng viên và dữ liệu sở hữu học vụ.'],
       ['Môn học', 'Duy trì danh mục, mã môn và metadata môn học.'],
@@ -1456,8 +1278,6 @@ export const vi: I18nMessages = {
       ['Học kỳ', 'Kiểm soát dòng thời gian học vụ và cửa sổ đăng ký hiện tại.'],
       ['Bộ môn', 'Quản lý cấu trúc bộ môn và ánh xạ khoa.'],
       ['Phòng học', 'Theo dõi phòng, tòa nhà và mức sẵn sàng về sức chứa.'],
-      ['Phân tích', 'Xem báo cáo vận hành và sức khỏe dữ liệu ở mức tổng quan.'],
-      ['Hóa đơn', 'Xử lý học phí, số dư và đối soát thanh toán.'],
       ['Thông báo', 'Phát hành cập nhật ra toàn campus.'],
     ],
     stats: ['Sinh viên', 'Giảng viên', 'Môn học', 'Đăng ký học'],
@@ -1465,153 +1285,21 @@ export const vi: I18nMessages = {
       'Bản ghi con người có thể truy cập theo mô hình owner hiện tại.',
       'Tài khoản giảng viên đang hoạt động và danh tính phục vụ giảng dạy.',
       'Các dòng catalog sẵn sàng cho hoạch định section và đăng ký.',
-      'Các dòng enrollment đã phản ánh vào góc nhìn học vụ và analytics.',
+      'Các dòng đăng ký hiện có trong những màn hồ sơ học vụ được giữ lại.',
     ],
     loading: 'Đang tải tổng quan campus',
     unavailableTitle: 'Tổng quan quản trị chưa sẵn sàng',
     unavailableDescription: 'Hiện chưa thể tải tổng quan campus.',
   },
-  adminAnalytics: {
-    title: 'Báo cáo và phân tích',
-    description:
-      'Theo dõi lưu lượng enrollment, phân bố điểm và sử dụng phòng học mà vẫn ở trong cùng admin grammar dùng cho quản trị dữ liệu sống.',
-    overviewSectionTitle: 'Chỉ số tổng quan',
-    refreshData: 'Làm mới dữ liệu',
-    loading: 'Đang tải tổng quan phân tích',
-    unavailableTitle: 'Phân tích chưa sẵn sàng',
-    unavailableDescription: 'Hiện chưa thể tải dữ liệu phân tích.',
-    stats: [
-      'Sinh viên',
-      'Giảng viên',
-      'Môn học',
-      'Lớp học phần',
-      'Đăng ký học',
-      'Bộ môn',
-      'Khoa',
-      'Phòng học',
-    ],
-    statDetails: [
-      'Bản ghi sinh viên đang hoạt động trong snapshot analytics hiện tại.',
-      'Danh tính hướng giảng dạy hiện sẵn sàng cho vận hành học vụ.',
-      'Các dòng catalog đang cấp dữ liệu cho lớp học phần và đăng ký.',
-      'Các bản ghi lớp học phần trực tiếp hiện hiển thị trong báo cáo.',
-      'Lưu lượng đăng ký học đang được phản ánh xuyên suốt các báo cáo học vụ.',
-      'Bản ghi bộ môn gắn với góc nhìn khoa và nhân sự.',
-      'Các nhóm khoa đang sẵn sàng cho phân đoạn học vụ.',
-      'Các phòng hiện sẵn sàng cho việc theo dõi mức đầy của section.',
-    ],
-    panels: {
-      enrollmentsBySemester: {
-        title: 'Đăng ký theo học kỳ',
-        description:
-          'So sánh các học kỳ theo lưu lượng đăng ký hiện tại mà không rời màn hình báo cáo.',
-        emptyTitle: 'Chưa có dữ liệu đăng ký theo học kỳ',
-        emptyDescription:
-          'Khi có dữ liệu enrollment, khối này sẽ cho biết học kỳ nào đang mang nhiều lưu lượng nhất.',
-      },
-      gradeDistribution: {
-        title: 'Phân bố điểm',
-        description:
-          'Theo dõi cách điểm số đã công bố đang phân bổ theo khối lượng học vụ hiện tại.',
-        emptyTitle: 'Chưa có điểm đã công bố',
-        emptyDescription:
-          'Khối này sẽ hữu ích hơn khi các lớp học phần bắt đầu công bố điểm cuối kỳ.',
-      },
-      sectionOccupancy: {
-        title: 'Mức đầy của lớp học phần',
-        description:
-          'Đưa các lớp học phần gần đầy lên sớm trước khi chúng trở thành vấn đề vận hành.',
-        emptyTitle: 'Chưa có dữ liệu mức đầy',
-        emptyDescription:
-          'Cần có số lượng lớp học phần và đăng ký học trước khi hiển thị được mức đầy.',
-      },
-      enrollmentTrends: {
-        title: 'Xu hướng đăng ký học',
-        description:
-          'Xem lượt vào học, hoàn tất và rút môn theo tháng trong một màn đọc vận hành thống nhất.',
-        emptyTitle: 'Chưa có dữ liệu xu hướng gần đây',
-        emptyDescription:
-          'Các thẻ xu hướng sẽ xuất hiện khi có hoạt động đăng ký học theo tháng.',
-      },
-    },
-    tableHeaders: {
-      course: 'Môn học',
-      section: 'Lớp học phần',
-      semester: 'Học kỳ',
-      capacity: 'Sức chứa',
-      enrolled: 'Đã đăng ký',
-      occupancy: 'Mức đầy',
-      students: 'sinh viên',
-      grades: {
-        enrolled: 'Đăng ký',
-        completed: 'Hoàn tất',
-        dropped: 'Rút môn',
-      },
-    },
-    cockpit: {
-      kpis: {
-        serviceHealth: 'Sức khỏe service',
-        serviceHealthDetail: 'Các service target đang được operator stack theo dõi.',
-        registrationPressure: 'Áp lực đăng ký',
-        registrationPressureDetail: 'Lớp đã đầy hoặc gần đầy cần được chú ý.',
-        paymentRisk: 'Rủi ro thanh toán',
-        paymentRiskDetail: 'Thanh toán lỗi, quá hạn hoặc còn chờ xử lý.',
-        notificationHealth: 'Tình trạng thông báo',
-        notificationHealthDetail: 'Thông báo chưa đọc hoặc cảnh báo cần theo dõi.',
-      },
-      labels: {
-        healthy: 'ổn định',
-        sectionsAtRisk: 'lớp có rủi ro',
-        failedPayments: 'thanh toán lỗi',
-        unreadNotifications: 'chưa đọc',
-        totalInvoiced: 'Đã lập hóa đơn',
-        paidAmount: 'Đã thanh toán',
-        outstanding: 'Còn phải thu',
-        waitlist: 'Danh sách chờ',
-        full: 'Đã đầy',
-        nearCapacity: 'Gần đầy',
-        averageOccupancy: 'Mức đầy trung bình',
-        noAttention: 'Hiện chưa có tác vụ vận hành cần xử lý ngay.',
-      },
-      panels: {
-        enrollmentFlow: {
-          title: 'Dòng đăng ký học',
-          description:
-            'Hoạt động đăng ký, hoàn tất và rút môn trong 12 tháng với bucket có cấu trúc cho báo cáo song ngữ.',
-        },
-        registrationPressure: {
-          title: 'Áp lực đăng ký',
-          description:
-            'Các lớp gần đạt sức chứa nhất, kèm tín hiệu danh sách chờ trước khi sinh viên gặp ngõ cụt.',
-        },
-        financeFunnel: {
-          title: 'Tình trạng checkout học phí',
-          description:
-            'Mức phải thu và hoạt động thanh toán theo provider trong một góc nhìn đối soát.',
-        },
-        notificationDelivery: {
-          title: 'Luồng thông báo',
-          description:
-            'Thông báo chưa đọc, cảnh báo và lỗi có thể cần quản trị viên theo dõi.',
-        },
-        operatorLinks: {
-          title: 'Đi sâu vận hành',
-          description:
-            'Dùng các liên kết nội bộ này để xem metric, log, trace và alert chi tiết.',
-        },
-        actionQueue: {
-          title: 'Hàng đợi cần chú ý',
-          description:
-            'Các việc vận hành đáng xử lý nhất từ tín hiệu đăng ký, tài chính và thông báo.',
-        },
-      },
-      actions: {
-        open: 'Mở',
-        opensInNewTab: 'mở trong tab mới',
-      },
-    },
-  },
   dashboardShell: {
+    portalTitle: 'Cổng thông tin học vụ',
+    identityLabel: 'Đăng nhập với vai trò',
+    menuSections: {
+      overview: 'Tổng quan',
+      academic: 'Hồ sơ học vụ',
+      teaching: 'Giảng dạy',
+      campus: 'Dịch vụ nhà trường',
+    },
     roles: {
       student: 'Truy cập sinh viên',
       lecturer: 'Truy cập giảng viên',
@@ -1622,13 +1310,13 @@ export const vi: I18nMessages = {
     studentRail: {
       title: 'Ngữ cảnh sinh viên',
       subtitle:
-        'Giữ lối đi hiện tại, tín hiệu học phí và lối tắt đăng ký ở gần mà không làm chật khu làm việc chính.',
+        'Giữ lối đi hiện tại, tín hiệu học vụ và lối tắt đăng ký ở gần mà không làm chật khu làm việc chính.',
       currentViewLabel: 'Màn hiện tại',
       signalsTitle: 'Tín hiệu nhanh',
       notificationLabel: 'Cập nhật chưa đọc',
       localeLabel: 'Ngôn ngữ',
       sessionSummary:
-        'Không gian sinh viên giữ cùng một ngữ cảnh đăng nhập khi bạn chuyển giữa đăng ký, hóa đơn và hồ sơ học tập.',
+        'Không gian sinh viên giữ cùng một ngữ cảnh đăng nhập khi bạn chuyển giữa đăng ký, lịch học và hồ sơ học tập.',
       quickActionsTitle: 'Lối tắt nhanh',
       collapse: 'Thu gọn cột ngữ cảnh sinh viên',
       expand: 'Mở rộng cột ngữ cảnh sinh viên',
@@ -1644,15 +1332,10 @@ export const vi: I18nMessages = {
           description:
             'Giữ lịch học kỳ này ở gần khi bạn so sánh các section.',
         },
-        billing: {
-          title: 'Tình trạng học phí',
-          description:
-            'Kiểm tra số dư và việc cần theo dõi về thanh toán mà không rời khỏi workspace.',
-        },
         announcements: {
           title: 'Cập nhật campus',
           description:
-            'Mở các thông báo chung ảnh hưởng đến lớp học, học phí và hoạt động sinh viên.',
+            'Mở các thông báo chung ảnh hưởng đến lớp học và hoạt động sinh viên.',
         },
       },
     },
@@ -1663,7 +1346,6 @@ export const vi: I18nMessages = {
       schedule: 'Thời khóa biểu',
       grades: 'Điểm số',
       transcript: 'Bảng điểm',
-      invoices: 'Hóa đơn',
       announcements: 'Thông báo',
       notifications: 'Trung tâm thông báo',
       thesis: 'Không gian luận văn',
@@ -1675,7 +1357,7 @@ export const vi: I18nMessages = {
     },
     notifications: {
       title: 'Thông báo',
-      loading: 'Đang tải các cảnh báo gần đây...',
+      loading: 'Đang tải các cảnh báo gần đây…',
       empty:
         'Hiện chưa có cảnh báo chưa đọc. Thông báo vẫn là kênh broadcast chính cho các cập nhật dùng chung.',
       fallbackTitle: 'Cập nhật mới',
@@ -1707,6 +1389,9 @@ export const vi: I18nMessages = {
       toggleNotifications: 'Bật tắt bảng thông báo',
       toggleProfile: 'Bật tắt menu hồ sơ',
       mobileNavigation: 'Điều hướng workspace trên mobile',
+      skipToContent: 'Chuyển đến nội dung cổng thông tin',
+      sidebarNavigation: 'Điều hướng cổng sinh viên và giảng viên',
+      preferences: 'Tùy chọn',
     },
     pageDefaults: {
       description:
@@ -1724,7 +1409,7 @@ export const vi: I18nMessages = {
     },
     routeDescriptions: {
       dashboard:
-        'Giữ đăng ký, môn học, hóa đơn và tác vụ hồ sơ trong cùng một không gian sinh viên.',
+        'Giữ đăng ký, môn học, lịch học và tác vụ hồ sơ trong cùng một không gian sinh viên.',
       profile:
         'Giữ thông tin liên hệ và vòng đời thông tin xác thực khớp với phiên trình duyệt đang hoạt động.',
       register:
@@ -1735,7 +1420,6 @@ export const vi: I18nMessages = {
         'Giữ góc nhìn thời khóa biểu theo tuần trong tầm tay khi phần còn lại của portal vẫn sẵn sàng.',
       grades: 'Xem điểm đã công bố và trạng thái học tập hiện tại.',
       transcript: 'Xem lịch sử học tập tích lũy và kết quả theo học kỳ.',
-      invoices: 'Xem tình trạng hóa đơn và lịch sử thanh toán.',
       announcements: 'Đọc các cập nhật dùng chung trên toàn campus.',
       notifications:
         'Xem cảnh báo tài khoản, hạn học vụ và cập nhật quy trình trong một hộp thư tập trung.',
@@ -1747,7 +1431,7 @@ export const vi: I18nMessages = {
       lecturerAnnouncements:
         'Chia sẻ cập nhật với sinh viên đang gắn với các section của bạn.',
       thesis:
-        'Theo dõi đợt đăng ký đề tài, nhóm sinh viên, hội đồng phản biện và kết quả đã công bố.',
+        'Theo dõi đợt đăng ký đề tài, nhóm sinh viên và tiến độ luận văn.',
     },
     loading: 'Đang tải workspace',
   },
@@ -1755,7 +1439,7 @@ export const vi: I18nMessages = {
     eyebrow: 'Không gian sinh viên',
     title: 'Chào mừng quay lại, {name}',
     description:
-      'Học kỳ hiện tại là {semester}. Di chuyển giữa đăng ký, môn học, hóa đơn và cập nhật hồ sơ mà không rời khỏi không gian sinh viên.',
+      'Học kỳ hiện tại là {semester}. Di chuyển giữa đăng ký, môn học, lịch học và cập nhật hồ sơ mà không rời khỏi không gian sinh viên.',
     currentTermFallback: 'Chưa có học kỳ hoạt động',
     currentDateLabel: 'Hôm nay',
     metrics: {
@@ -1809,7 +1493,6 @@ export const vi: I18nMessages = {
       ['Đăng ký học phần', 'Xem các section đang mở và đưa ra quyết định đăng ký.'],
       ['Mở thời khóa biểu', 'Kiểm tra lịch học của tuần này.'],
       ['Xem điểm số', 'Xem kết quả đã công bố và tình trạng học tập.'],
-      ['Kiểm tra hóa đơn', 'Theo dõi số dư chưa thanh toán và trạng thái thanh toán.'],
     ],
     portalLinks: [
       ['Môn học của tôi', 'Đăng ký hiện tại, chi tiết section và trạng thái.'],
@@ -1874,7 +1557,7 @@ export const vi: I18nMessages = {
     eyebrow: 'Không gian giảng viên',
     title: 'Chào mừng quay lại, {name}',
     description:
-      'Giữ vận hành section, hàng chờ chấm điểm và cập nhật giảng dạy trong cùng một không gian giảng viên.',
+      'Giữ công việc section, hàng chờ chấm điểm và cập nhật giảng dạy trong cùng một không gian giảng viên.',
     quickActionsTitle: 'Tác vụ nhanh',
     quickActionsDescription:
       'Mở các công cụ giảng viên thường dẫn đến tác vụ tiếp theo trong ngày.',
@@ -1915,7 +1598,7 @@ export const vi: I18nMessages = {
     studentsSuffix: 'sinh viên',
     gradedSuffix: 'đã chấm',
     errors: {
-      loadFailed: 'Hiện chưa thể tải dữ liệu vận hành của dashboard giảng viên.',
+      loadFailed: 'Hiện chưa thể tải dữ liệu học thuật của dashboard giảng viên.',
       unavailableTitle: 'Dashboard giảng viên chưa sẵn sàng',
       loading: 'Đang tải dashboard giảng viên',
     },
@@ -1962,7 +1645,7 @@ export const vi: I18nMessages = {
     eyebrow: 'Không gian luận văn',
     title: 'Giữ toàn bộ hành trình đề tài trong một timeline rõ ràng.',
     description:
-      'Đợt đăng ký, lựa chọn đề tài, thành viên nhóm, hội đồng phản biện và kết quả cuối cùng được nối với cùng một danh tính campus.',
+      'Đợt đăng ký, lựa chọn đề tài, thành viên nhóm và tiến độ đã ghi nhận được nối với cùng một danh tính campus.',
     selectRound: 'Chọn đợt đăng ký đề tài',
     noRound: 'Chưa có đợt đăng ký đề tài nào.',
     loading: 'Đang tải không gian luận văn',
@@ -1977,7 +1660,7 @@ export const vi: I18nMessages = {
       'Các đề tài đã công bố được gom theo bộ môn. Lựa chọn của nhóm sẽ trở thành đề xuất để điều phối viên xét duyệt.',
     groupsTitle: 'Không gian nhóm của bạn',
     groupsDescription:
-      'Giữ thành viên và lựa chọn đề tài ở gần nhau trước khi đợt chuyển sang bước lập hội đồng.',
+      'Giữ thành viên, lựa chọn đề tài và trạng thái hiện tại của nhóm ở cùng một nơi.',
     createGroup: 'Tạo nhóm đề tài',
     addMember: 'Thêm thành viên',
     chooseTopic: 'Chọn đề tài',
@@ -1993,7 +1676,6 @@ export const vi: I18nMessages = {
     navigation: {
       catalog: 'Danh mục đề tài',
       progress: 'Tiến độ luận văn',
-      evaluation: 'Bảo vệ và đánh giá',
     },
     catalogTitle: 'Danh mục đề tài đã công bố',
     catalogDescription:
@@ -2011,28 +1693,17 @@ export const vi: I18nMessages = {
       'Đã chuẩn bị nhóm luận văn',
       'Đã gửi đề xuất đề tài',
       'Đã ghi nhận quyết định điều phối',
-      'Đã công bố lịch bảo vệ và kết quả',
+      'Đã ghi nhận trạng thái tiến độ mới nhất',
     ],
-    evaluationTitle: 'Bảo vệ và đánh giá',
-    evaluationDescription:
-      'Giữ lịch hội đồng và trạng thái sẵn sàng đánh giá trong tầm nhìn, còn điểm số vẫn thuộc quyền sở hữu của academic service.',
-    councilsTitle: 'Hội đồng bảo vệ',
-    noCouncils: 'Chưa có hội đồng bảo vệ nào được xếp lịch cho đợt này.',
-    defenseScheduled: 'Lịch bảo vệ',
-    room: 'Phòng',
-    councilStatus: 'Trạng thái hội đồng',
     backToWorkspace: 'Quay lại không gian luận văn',
     lifecycleViewsTitle: 'Các màn hình trong vòng đời luận văn',
     lifecycleViewsDescription:
-      'Mở màn hình tập trung cho đề tài, tiến độ đã ghi nhận hoặc trạng thái sẵn sàng bảo vệ.',
+      'Mở màn hình tập trung cho đề tài đã công bố hoặc tiến độ nhóm mới nhất.',
     status: {
       DRAFT: 'Bản nháp',
       REGISTRATION_OPEN: 'Đang mở đăng ký',
       REGISTRATION_CLOSED: 'Đã đóng đăng ký',
       PROPOSALS_PUBLISHED: 'Đã công bố đề tài',
-      DEFENSE_SCHEDULED: 'Đã xếp lịch bảo vệ',
-      SCORING_OPEN: 'Đang chấm điểm',
-      RESULTS_PUBLISHED: 'Đã công bố kết quả',
       CLOSED: 'Đã đóng',
       CANCELLED: 'Đã hủy',
       PENDING: 'Chờ xét duyệt',
@@ -2041,60 +1712,10 @@ export const vi: I18nMessages = {
       SUBMITTED: 'Đã gửi',
       COMPLETED: 'Đã hoàn thành',
     },
-    review: {
-      eyebrow: 'Chấm điểm & phản biện',
-      title: 'Chấm điểm bảo vệ luận văn bằng quy trình rõ ràng, tinh tế.',
-      description:
-        'Chọn hội đồng, sau đó gửi điểm và nhận xét cho từng nhóm bảo vệ. Thang điểm từ 0 đến 10.',
-      selectCouncil: 'Chọn hội đồng bảo vệ',
-      noCouncil: 'Chưa có hội đồng bảo vệ nào trong đợt này.',
-      noCouncilDescription:
-        'Hội đồng được điều phối viên lập lịch sau khi đóng đăng ký.',
-      councilReview: 'Chấm điểm hội đồng',
-      room: 'Phòng',
-      members: 'Thành viên hội đồng',
-      memberCount: 'thành viên',
-      groupsTitle: 'Nhóm bảo vệ',
-      groupsDescription: 'Gửi điểm và nhận xét cho từng nhóm.',
-      noGroups: 'Chưa có nhóm nào trong đợt này.',
-      noGroupsDescription: 'Các nhóm sẽ xuất hiện tại đây sau khi sinh viên thành lập và đăng ký.',
-      groupLabel: 'Nhóm',
-      score: 'Điểm (0-10)',
-      comment: 'Nhận xét',
-      commentPlaceholder: 'Điểm mạnh, điểm yếu, gợi ý...',
-      submit: 'Gửi đánh giá',
-      submitted: 'Đã gửi đánh giá thành công.',
-      invalidScore: 'Vui lòng nhập điểm hợp lệ từ 0 đến 10.',
-      unauthorized: 'Chỉ giảng viên và quản trị viên mới được chấm điểm.',
-      unauthorizedDescription: 'Không gian này chỉ dành cho vai trò người đánh giá.',
-    },
     progress: {
       eyebrow: 'Theo dõi tiến độ',
-      title: 'Theo dõi từng mốc từ đề xuất đến kết quả.',
-      description:
-        'Xem nhóm đang ở đâu trong hành trình luận văn — đề xuất, phê duyệt, báo cáo giữa kỳ, bảo vệ và kết quả cuối cùng.',
-      noRound: 'Chưa có đợt đăng ký đề tài nào.',
-      noRoundDescription: 'Tiến độ sẽ xuất hiện khi đợt đăng ký được công bố.',
-      overall: 'Tiến độ tổng',
-      timeline: 'Timeline các mốc',
-      timelineDescription: 'Mỗi mốc được mở khóa khi mốc trước hoàn thành.',
-      proposal: 'Đã gửi đề xuất',
-      proposalDescription: 'Nhóm đã thành lập và chọn đề tài.',
-      approval: 'Điều phối viên phê duyệt',
-      approvalDescription: 'Điều phối viên xét duyệt và phê duyệt nhóm.',
-      midterm: 'Báo cáo giữa kỳ',
-      midtermDescription: 'Nộp báo cáo tiến độ tại mốc kiểm tra.',
-      defense: 'Bảo vệ',
-      defenseDescription: 'Trình bày và bảo vệ luận văn trước hội đồng.',
-      result: 'Kết quả cuối cùng',
-      resultDescription: 'Điểm được chốt và công bố.',
     },
     detail: {
-      councils: 'Hội đồng bảo vệ',
-      councilsTitle: 'Hội đồng bảo vệ',
-      councilsDescription: 'Các hội đồng được lập lịch cho đợt này.',
-      noCouncils: 'Chưa có hội đồng nào được lập lịch.',
-      noCouncilsDescription: 'Hội đồng sẽ xuất hiện khi điều phối viên lập lịch bảo vệ.',
       groupsTitle: 'Nhóm đã đăng ký',
       groupsDescription: 'Các nhóm do sinh viên thành lập trong đợt.',
       noGroups: 'Chưa có nhóm nào đăng ký.',
@@ -2102,39 +1723,23 @@ export const vi: I18nMessages = {
       maxGroups: 'Số nhóm tối đa',
       members: 'thành viên',
     },
-    councils: {
-      eyebrow: 'Quản lý hội đồng',
-      title: 'Lập lịch và quản lý hội đồng bảo vệ.',
-      description:
-        'Tạo hội đồng, gán ngày giờ và phòng bảo vệ, và mở chấm điểm khi hội đồng sẵn sàng.',
-      empty: 'Chưa có hội đồng nào được lập lịch cho đợt này.',
-      emptyDescription: 'Hội đồng sẽ xuất hiện khi điều phối viên tạo.',
-      schedule: 'Lập lịch',
-      scheduleTitle: 'Lập lịch hội đồng bảo vệ',
-      room: 'Phòng',
-      roomPlaceholder: 'VD: Phòng A101',
-      date: 'Ngày giờ',
-      scheduledAt: 'Đã lịch',
-      openScoring: 'Mở chấm điểm',
-      scoringOpened: 'Đã mở chấm điểm cho hội đồng này.',
-      scheduled: 'Đã lập lịch hội đồng thành công.',
-    },
     admin: {
       title: 'Quản trị luận văn',
-      description: 'Tạo đợt đăng ký, quản lý vòng đời đợt, và theo dõi đề tài, nhóm, hội đồng.',
+      description: 'Tạo đợt đăng ký, quản lý vòng đời đợt, và theo dõi đề tài cùng nhóm.',
       createRound: 'Tạo đợt',
       totalRounds: 'Tổng số đợt',
       openRounds: 'Đang mở đăng ký',
       noRounds: 'Chưa có đợt luận văn nào.',
       noRoundsDescription: 'Tạo đợt đăng ký đầu tiên để bắt đầu quy trình luận văn.',
+      forbiddenTitle: 'Cần quyền quản trị',
+      forbiddenDescription: 'Chỉ quản trị viên mới có thể quản lý các đợt đăng ký luận văn.',
+      returnToWorkspace: 'Quay lại không gian của bạn',
       roundName: 'Tên đợt',
       roundNamePlaceholder: 'VD: Đợt luận văn Xuân 2026',
       thesisType: 'Loại luận văn',
       registrationStart: 'Bắt đầu đăng ký',
       registrationEnd: 'Kết thúc đăng ký',
       proposalPublishAt: 'Ngày công bố đề tài',
-      reportDate: 'Ngày báo cáo',
-      defenseDate: 'Ngày bảo vệ',
       createIncomplete: 'Vui lòng điền tên, thời gian bắt đầu và kết thúc đăng ký.',
       created: 'Đã tạo đợt luận văn thành công.',
       openRegistration: 'Mở đăng ký',
@@ -2151,11 +1756,16 @@ export const vi: I18nMessages = {
     description: 'Hỏi về quy trình luận văn và ngữ cảnh đề tài đã được công bố.',
     open: 'Mở trợ lý luận văn',
     close: 'Đóng trợ lý luận văn',
-    placeholder: 'Hỏi về đăng ký, đề tài, nhóm hoặc phản biện...',
+    placeholder: 'Hỏi về đăng ký, đề tài, nhóm hoặc tiến độ...',
     send: 'Gửi tin nhắn',
     thinking: 'Đang kiểm tra ngữ cảnh luận văn được phép xem...',
     empty: 'Bắt đầu bằng câu hỏi về đợt luận văn hiện tại của bạn.',
     unavailable: 'Trợ lý hiện chưa sẵn sàng. Dữ liệu luận văn của bạn không bị thay đổi.',
+    answered: 'Trả lời từ kho kiến thức đã duyệt',
+    noMatch: 'Chưa có nguồn phù hợp',
+    degraded: 'Kho kiến thức tạm thời gián đoạn',
+    sources: 'Nguồn tham khảo',
+    you: 'Bạn',
   },
 };
 

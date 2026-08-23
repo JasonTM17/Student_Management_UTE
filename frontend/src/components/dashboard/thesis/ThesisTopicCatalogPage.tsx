@@ -4,7 +4,7 @@ import { ArrowUpRight, FileStack } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
@@ -38,9 +38,9 @@ export default function ThesisTopicCatalogPage() {
         title={messages.thesis.catalogTitle}
         description={messages.thesis.catalogDescription}
         actions={
-          <LocalizedLink href="/dashboard/thesis">
-            <Button variant="outline">{messages.thesis.backToWorkspace}</Button>
-          </LocalizedLink>
+          <LinkButton href="/dashboard/thesis" variant="outline">
+            {messages.thesis.backToWorkspace}
+          </LinkButton>
         }
       />
 

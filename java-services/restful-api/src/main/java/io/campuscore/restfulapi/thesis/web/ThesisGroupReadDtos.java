@@ -8,7 +8,7 @@ import java.util.UUID;
 public final class ThesisGroupReadDtos {
     private ThesisGroupReadDtos() { }
 
-    public record GroupResponse(UUID id, UUID roundId, UUID leaderStudentId, UUID topicId,
+    public record GroupResponse(UUID id, UUID roundId, String leaderStudentId, UUID topicId,
             GroupStatus status, ApprovalStatus approvalStatus, String rejectionReason,
-            List<UUID> memberStudentIds) { }
+            List<String> memberStudentIds) { }
 }

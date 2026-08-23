@@ -24,23 +24,15 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Read adapter for the Prisma-owned academic catalog schema.
- *
- * <p>This candidate deliberately uses JDBC SELECTs only. Legacy academic
- * mutations and schema ownership remain with the Nest academic service until
- * PostgreSQL parity, canary, and rollback gates pass.</p>
- */
+/** JDBC read adapter for the academic catalog. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-read", name = "enabled", havingValue = "true")
 public class AcademicReadRepository {
 
     private static final String ACADEMIC_YEAR_COLUMNS = """

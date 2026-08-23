@@ -10,7 +10,7 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Temporary authenticated contract probe for the single-app migration shell. */
+/** Small authenticated contract probe for web/mobile integration checks. */
 @RestController
 @RequestMapping("/api/v1/contract")
 public class ContractController {
@@ -20,8 +20,8 @@ public class ContractController {
         return Map.of(
                 "apiVersion", "v1",
                 "application", "restful-api",
-                "status", "shell",
-                "migration", "not-cut-over");
+                "status", "course-ready",
+                "architecture", "single-java-api");
     }
 
     @PostMapping("/ping")
@@ -29,7 +29,7 @@ public class ContractController {
         return ResponseEntity.ok(Map.of(
                 "status", "ok",
                 "echo", request.message(),
-                "writer", "restful-api-shell"));
+                "writer", "restful-api"));
     }
 
     public record PingRequest(@NotBlank(message = "message is required") String message) {

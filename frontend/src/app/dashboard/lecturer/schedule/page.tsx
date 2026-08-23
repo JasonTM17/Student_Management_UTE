@@ -154,7 +154,7 @@ export default function LecturerSchedulePage() {
       ? {
           eyebrow: 'Không gian giảng viên',
           title: 'Lịch giảng dạy',
-          description: `Giữ thời khóa biểu của ${selectedSemesterName} luôn hiển thị trong khi chấm điểm và vận hành lớp học phần vẫn chỉ cách một lần chạm.`,
+          description: `Giữ thời khóa biểu của ${selectedSemesterName} luôn hiển thị trong khi chấm điểm và quản lý lớp học phần vẫn chỉ cách một lần chạm.`,
           selectSemester: 'Chọn học kỳ cho lịch giảng dạy',
           allSemesters: 'Tất cả học kỳ',
           loading: 'Đang tải lịch giảng dạy',
@@ -176,7 +176,7 @@ export default function LecturerSchedulePage() {
       : {
           eyebrow: 'Lecturer workspace',
           title: 'Teaching schedule',
-          description: `Keep your timetable for ${selectedSemesterName} visible while grading and section operations stay one click away.`,
+          description: `Keep your timetable for ${selectedSemesterName} visible while grading and section work stays one click away.`,
           selectSemester: 'Select semester for teaching schedule',
           allSemesters: 'All semesters',
           loading: 'Loading teaching schedule',

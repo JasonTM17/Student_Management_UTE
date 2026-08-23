@@ -6,20 +6,18 @@ import io.campuscore.restfulapi.notification.web.NotificationReadDtos.Notificati
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.PageMeta;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCountResponse;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-only application service for the first notification strangler slice. */
+/** Notification inbox query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.notifications-read", name = "enabled", havingValue = "true")
 public class NotificationReadService {
 
-    /** A bounded candidate limit prevents an accidental unbounded legacy read. */
+    /** A bounded limit prevents an accidental unbounded inbox read. */
     public static final int MAX_PAGE_SIZE = 100;
 
     private final NotificationReadRepository notifications;
@@ -36,7 +34,7 @@ public class NotificationReadService {
             String isReadQuery) {
         requireSubject(userId);
         requirePage(page, limit);
-        Boolean isRead = parseLegacyIsRead(isReadQuery);
+        Boolean isRead = parseIsRead(isReadQuery);
         long offset = (long) (page - 1) * limit;
         long total = notifications.countMy(userId, isRead);
         List<NotificationResponse> data = notifications.findMy(userId, offset, limit, isRead);
@@ -57,7 +55,7 @@ public class NotificationReadService {
             int limit,
             String userId) {
         requirePage(page, limit);
-        String userFilter = normalizeLegacyOptionalText(userId);
+        String userFilter = normalizeOptionalText(userId);
         long offset = (long) (page - 1) * limit;
         long total = notifications.countAll(userFilter);
         List<NotificationResponse> data = notifications.findAll(offset, limit, userFilter);
@@ -77,7 +75,7 @@ public class NotificationReadService {
      * Matches the current Nest controller's strict source semantics: only the
      * exact string "true" means true; any other supplied value means false.
      */
-    static Boolean parseLegacyIsRead(String value) {
+    static Boolean parseIsRead(String value) {
         return value == null ? null : Boolean.valueOf("true".equals(value));
     }
 
@@ -102,7 +100,7 @@ public class NotificationReadService {
         }
     }
 
-    private static String normalizeLegacyOptionalText(String value) {
+    private static String normalizeOptionalText(String value) {
         return value == null || value.isBlank() ? null : value;
     }
 

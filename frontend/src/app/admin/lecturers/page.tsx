@@ -29,6 +29,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
+import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
 interface Lecturer {
   id: string;
@@ -56,6 +57,7 @@ export default function AdminLecturersPage() {
   const [departments, setDepartments] = useState<Department[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -87,13 +89,18 @@ export default function AdminLecturersPage() {
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
   const fetchDepartments = useCallback(async () => {
+    setReferenceError('');
     try {
-      const response = await departmentsApi.getAll({ limit: 1000 });
+      const response = await departmentsApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT });
       setDepartments(response.data || []);
     } catch {
-      // Department lookup is optional for the table shell.
+      setReferenceError(
+        locale === 'vi'
+          ? 'Hiện chưa thể tải dữ liệu khoa cho biểu mẫu giảng viên.'
+          : 'Department options could not be loaded.',
+      );
     }
-  }, []);
+  }, [locale]);
 
   const fetchLecturers = useCallback(async () => {
     setIsLoading(true);
@@ -136,7 +143,7 @@ export default function AdminLecturersPage() {
           loading: 'Đang tải giảng viên',
           title: 'Giảng viên',
           description:
-            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đúng metadata vận hành.',
+            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đúng metadata học thuật.',
           create: 'Tạo giảng viên',
           searchLabel: 'Tìm giảng viên',
           searchPlaceholder: 'Tìm theo tên, email hoặc mã nhân sự',
@@ -398,6 +405,14 @@ export default function AdminLecturersPage() {
               />
             </form>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchDepartments()}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

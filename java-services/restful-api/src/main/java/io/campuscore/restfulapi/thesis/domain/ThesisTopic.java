@@ -23,7 +23,7 @@ public class ThesisTopic {
     private UUID roundId;
 
     @Column(name = "department_id", nullable = false)
-    private UUID departmentId;
+    private String departmentId;
 
     @Column(nullable = false, length = 240)
     private String title;
@@ -39,7 +39,7 @@ public class ThesisTopic {
     private TopicStatus status;
 
     @Column(name = "created_by", nullable = false)
-    private UUID createdBy;
+    private String createdBy;
 
     @Version
     private long version;
@@ -55,11 +55,11 @@ public class ThesisTopic {
 
     public ThesisTopic(
             UUID roundId,
-            UUID departmentId,
+            String departmentId,
             String title,
             String description,
             int maxGroups,
-            UUID createdBy) {
+            String createdBy) {
         this.id = UUID.randomUUID();
         this.roundId = roundId;
         this.departmentId = departmentId;
@@ -68,6 +68,18 @@ public class ThesisTopic {
         this.maxGroups = maxGroups;
         this.createdBy = createdBy;
         this.status = TopicStatus.DRAFT;
+    }
+
+    /** Compatibility constructor for persistence fixtures that use UUID placeholders. */
+    public ThesisTopic(
+            UUID roundId,
+            UUID departmentId,
+            String title,
+            String description,
+            int maxGroups,
+            UUID createdBy) {
+        this(roundId, departmentId == null ? null : departmentId.toString(), title, description, maxGroups,
+                createdBy == null ? null : createdBy.toString());
     }
 
     @PrePersist
@@ -90,7 +102,7 @@ public class ThesisTopic {
         return roundId;
     }
 
-    public UUID getDepartmentId() {
+    public String getDepartmentId() {
         return departmentId;
     }
 
@@ -117,7 +129,14 @@ public class ThesisTopic {
         status = TopicStatus.PUBLISHED;
     }
 
-    public UUID getCreatedBy() {
+    public void update(String departmentId, String title, String description, int maxGroups) {
+        this.departmentId = departmentId;
+        this.title = title;
+        this.description = description;
+        this.maxGroups = maxGroups;
+    }
+
+    public String getCreatedBy() {
         return createdBy;
     }
 }

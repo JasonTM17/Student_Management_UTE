@@ -1,7 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
-import Link from 'next/link';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
 import { ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
@@ -13,7 +12,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { useI18n } from '@/i18n';
-import { getLocalEdgeOrigin, isLocalPreviewHost } from '@/lib/site';
 import { toast } from 'sonner';
 
 export const dynamic = 'force-dynamic';
@@ -39,11 +37,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
-  const [runtimeNotice, setRuntimeNotice] = useState<{
-    tone: 'info' | 'warning';
-    title: string;
-    body: string;
-  } | null>(null);
+  const formErrorRef = useRef<HTMLDivElement>(null);
   const { login } = useAuth();
   const { href, messages } = useI18n();
   const router = useRouter();
@@ -54,70 +48,10 @@ export default function LoginPage() {
   }, []);
 
   useEffect(() => {
-    if (typeof window === 'undefined') {
-      return;
+    if (formError) {
+      formErrorRef.current?.focus();
     }
-
-    if (!isLocalPreviewHost(window.location.hostname)) {
-      setRuntimeNotice(null);
-      return;
-    }
-
-    const localEdgeOrigin = getLocalEdgeOrigin();
-    const usingPreviewServer = window.location.origin !== localEdgeOrigin;
-
-    if (!usingPreviewServer) {
-      setRuntimeNotice(null);
-      return;
-    }
-
-    let cancelled = false;
-
-    const checkRuntime = async () => {
-      const probeTargets = ['/health', '/api/docs'];
-
-      try {
-        for (const target of probeTargets) {
-          const response = await fetch(target, {
-            cache: 'no-store',
-          });
-
-          if (cancelled) {
-            return;
-          }
-
-          if (response.ok) {
-            setRuntimeNotice(null);
-            return;
-          }
-        }
-
-        setRuntimeNotice({
-          tone: 'warning',
-          title: messages.login.runtimeNotice.warningTitle,
-          body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
-        });
-      } catch {
-        if (!cancelled) {
-          setRuntimeNotice({
-            tone: 'warning',
-            title: messages.login.runtimeNotice.warningTitle,
-            body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
-          });
-        }
-      }
-    };
-
-    void checkRuntime();
-    return () => {
-      cancelled = true;
-    };
-  }, [
-    messages.login.runtimeNotice.infoBody,
-    messages.login.runtimeNotice.infoTitle,
-    messages.login.runtimeNotice.warningBody,
-    messages.login.runtimeNotice.warningTitle,
-  ]);
+  }, [formError]);
 
   const reason = searchParams.get('reason') ?? '';
   const notice = useMemo(() => {
@@ -195,7 +129,7 @@ export default function LoginPage() {
         <div className="space-y-3">
           <SectionEyebrow>{messages.login.sectionEyebrow}</SectionEyebrow>
           <div className="space-y-2">
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
+            <h2 className="text-2xl font-semibold leading-8 text-foreground">
               {messages.login.heading}
             </h2>
             <p className="text-sm leading-6 text-muted-foreground">
@@ -205,7 +139,7 @@ export default function LoginPage() {
         </div>
 
         {notice ? (
-          <div className="rounded-lg border border-border/80 bg-secondary/50 px-4 py-3">
+          <div role="status" className="rounded-md border border-border/80 bg-secondary/50 px-4 py-3">
             <div className="text-sm font-semibold text-foreground">
               {notice.title}
             </div>
@@ -215,30 +149,24 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {runtimeNotice ? (
-          <div
-            className={`rounded-lg px-4 py-3 ${
-              runtimeNotice.tone === 'warning'
-                ? 'border border-amber-500/30 bg-amber-500/10'
-                : 'border border-border/80 bg-secondary/40'
-            }`}
-          >
-            <div className="text-sm font-semibold text-foreground">
-              {runtimeNotice.title}
-            </div>
-            <div className="mt-1 text-sm leading-6 text-muted-foreground">
-              {runtimeNotice.body}
-            </div>
-          </div>
-        ) : null}
-
         {formError ? (
-          <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+          <div
+            id="login-error"
+            ref={formErrorRef}
+            role="alert"
+            aria-live="assertive"
+            tabIndex={-1}
+            className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+          >
             {formError}
           </div>
         ) : null}
 
-        <form onSubmit={handleSubmit} className="space-y-5">
+        <form
+          onSubmit={handleSubmit}
+          className="space-y-5"
+          aria-describedby={formError ? 'login-error' : undefined}
+        >
           <div className="space-y-2">
             <label
               htmlFor="email"
@@ -266,12 +194,7 @@ export default function LoginPage() {
               >
                 {messages.login.passwordLabel}
               </label>
-              <LocalizedLink
-                href="/forgot-password"
-                className="text-sm font-medium text-primary hover:underline"
-              >
-                {messages.login.forgotPassword}
-              </LocalizedLink>
+              <span className="text-xs text-muted-foreground">Academic office support</span>
             </div>
             <div className="relative">
               <Input
@@ -282,12 +205,13 @@ export default function LoginPage() {
                 placeholder={messages.login.passwordPlaceholder}
                 autoComplete="current-password"
                 icon={<Lock className="h-4 w-4" />}
+                className="pr-12"
                 required
               />
               <button
                 type="button"
                 onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-3 top-1/2 -translate-y-1/2 rounded-md p-1 text-muted-foreground transition-colors hover:text-foreground"
+                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                 title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                 aria-pressed={showPassword}
@@ -317,9 +241,9 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="rounded-lg border border-border/70 bg-card/70 px-4 py-4">
+        <div className="border-l-2 border-primary bg-secondary/35 px-4 py-3">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
               <KeyRound className="h-4 w-4" />
             </div>
             <div>

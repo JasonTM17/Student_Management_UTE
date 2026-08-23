@@ -30,7 +30,25 @@ interface UserRecord {
   firstName: string;
   lastName: string;
   status: string;
+  roles?: string | string[];
   createdAt: string;
+}
+
+type ManagedRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN';
+const defaultRole: ManagedRole = 'STUDENT';
+
+function primaryRole(roles?: string | string[]): ManagedRole {
+  const values = Array.isArray(roles) ? roles : roles?.split(',') ?? [];
+  return (
+    values.find((role): role is ManagedRole =>
+      ['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'].includes(role.trim().toUpperCase()),
+    )?.trim().toUpperCase() as ManagedRole | undefined
+  ) ?? defaultRole;
+}
+
+function roleLabel(roles?: string | string[]) {
+  const values = Array.isArray(roles) ? roles : roles?.split(',') ?? [];
+  return values.filter(Boolean).join(', ') || defaultRole;
 }
 
 export default function AdminUsersPage() {
@@ -52,6 +70,7 @@ export default function AdminUsersPage() {
     password: '',
     firstName: '',
     lastName: '',
+    role: defaultRole as ManagedRole,
   });
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -128,6 +147,7 @@ export default function AdminUsersPage() {
             name: 'Tên',
             email: 'Email',
             status: 'Trạng thái',
+            role: 'Vai trò',
             created: 'Tạo ngày',
             actions: 'Tác vụ',
           },
@@ -148,6 +168,13 @@ export default function AdminUsersPage() {
             'Hãy dùng mật khẩu tạm thời và yêu cầu người dùng đổi lại sau lần đăng nhập đầu tiên.',
           firstName: 'Tên',
           lastName: 'Họ',
+          roleLabel: 'Vai trò hệ thống',
+          roles: {
+            STUDENT: 'Sinh viên',
+            LECTURER: 'Giảng viên',
+            ADMIN: 'Quản trị viên',
+            SUPER_ADMIN: 'Siêu quản trị viên',
+          },
           saving: 'Đang lưu...',
           editAction: messages.common.actions.saveChanges,
           closeDialog: 'Đóng biểu mẫu người dùng',
@@ -173,6 +200,7 @@ export default function AdminUsersPage() {
             name: 'Name',
             email: 'Email',
             status: 'Status',
+            role: 'Role',
             created: 'Created',
             actions: 'Actions',
           },
@@ -193,6 +221,13 @@ export default function AdminUsersPage() {
             'Use a temporary password and ask the user to rotate it after first sign-in.',
           firstName: 'First name',
           lastName: 'Last name',
+          roleLabel: 'System role',
+          roles: {
+            STUDENT: 'Student',
+            LECTURER: 'Lecturer',
+            ADMIN: 'Administrator',
+            SUPER_ADMIN: 'Super administrator',
+          },
           saving: 'Saving...',
           editAction: messages.common.actions.saveChanges,
           closeDialog: 'Close user form',
@@ -209,7 +244,7 @@ export default function AdminUsersPage() {
   const resetForm = () => {
     setEditingUser(null);
     setFormError('');
-    setFormData({ email: '', password: '', firstName: '', lastName: '' });
+    setFormData({ email: '', password: '', firstName: '', lastName: '', role: defaultRole });
   };
 
   const openCreate = () => {
@@ -225,6 +260,7 @@ export default function AdminUsersPage() {
       password: '',
       firstName: userRecord.firstName,
       lastName: userRecord.lastName,
+      role: primaryRole(userRecord.roles),
     });
     setShowCreateModal(true);
   };
@@ -271,6 +307,7 @@ export default function AdminUsersPage() {
         await usersApi.update(editingUser.id, {
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
+          role: formData.role,
         });
         toast.success(copy.updated);
       } else {
@@ -279,6 +316,7 @@ export default function AdminUsersPage() {
           password: formData.password,
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
+          role: formData.role,
         });
         toast.success(copy.created);
       }
@@ -384,6 +422,10 @@ export default function AdminUsersPage() {
                         <dt className="text-muted-foreground">{copy.headers.created}</dt>
                         <dd className="text-right text-foreground">{formatDate(record.createdAt)}</dd>
                       </div>
+                      <div className="mt-2 flex items-center justify-between gap-4 text-sm">
+                        <dt className="text-muted-foreground">{copy.headers.role}</dt>
+                        <dd className="text-right text-foreground">{roleLabel(record.roles)}</dd>
+                      </div>
                     </dl>
                     <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
                       <Button
@@ -416,6 +458,7 @@ export default function AdminUsersPage() {
                       <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.email}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.status}</th>
+                      <th className="px-2 py-3 font-medium">{copy.headers.role}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.created}</th>
                       <th className="px-2 py-3 text-right font-medium">{copy.headers.actions}</th>
                     </tr>
@@ -435,6 +478,9 @@ export default function AdminUsersPage() {
                           <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {record.status}
                           </span>
+                        </td>
+                        <td className="px-2 py-4 text-muted-foreground">
+                          {roleLabel(record.roles)}
                         </td>
                         <td className="px-2 py-4 text-muted-foreground">
                           {formatDate(record.createdAt)}
@@ -526,6 +572,28 @@ export default function AdminUsersPage() {
               />
             </AdminFormField>
           </div>
+
+          <AdminFormField label={copy.roleLabel}>
+            <select
+              value={formData.role}
+              onChange={(event) =>
+                setFormData((current) => ({
+                  ...current,
+                  role: event.target.value as ManagedRole,
+                }))
+              }
+              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+            >
+              {(isSuperAdmin
+                ? (['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'] as ManagedRole[])
+                : (['STUDENT', 'LECTURER', 'ADMIN'] as ManagedRole[])
+              ).map((role) => (
+                <option key={role} value={role}>
+                  {copy.roles[role]}
+                </option>
+              ))}
+            </select>
+          </AdminFormField>
 
           <AdminDialogFooter>
             <Button type="button" variant="outline" onClick={closeModal}>

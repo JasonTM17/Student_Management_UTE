@@ -2,14 +2,14 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BarChart3, Bell, BookMarked, BookOpen, Building2, CreditCard, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, Building2, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { analyticsApi } from '@/lib/api';
+import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
-import { AdminMetricCard, AdminTableCard } from '@/components/admin/AdminSurface';
+import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { LocalizedLink } from '@/components/LocalizedLink';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
 
@@ -25,7 +25,7 @@ const menuItems = [
     href: '/admin/thesis',
     icon: GraduationCap,
     label: 'Thesis management',
-    description: 'Create registration rounds, manage lifecycle, and monitor councils.',
+    description: 'Create registration rounds and monitor topics, groups, and progress.',
     tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
   },
   {
@@ -85,20 +85,6 @@ const menuItems = [
     tone: 'bg-orange-500/12 text-orange-600 dark:text-orange-400',
   },
   {
-    href: '/admin/analytics',
-    icon: BarChart3,
-    label: 'Analytics',
-    description: 'Review operational reporting and top-level data health.',
-    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    href: '/admin/invoices',
-    icon: CreditCard,
-    label: 'Invoices',
-    description: 'Handle tuition invoicing, balances, and payment review.',
-    tone: 'bg-lime-500/12 text-lime-600 dark:text-lime-400',
-  },
-  {
     href: '/admin/announcements',
     icon: Bell,
     label: 'Announcements',
@@ -141,12 +127,17 @@ export default function AdminDashboardPage() {
     setError('');
 
     try {
-      const data = await analyticsApi.getOverview();
+      const [users, lecturers, courses, enrollments] = await Promise.all([
+        usersApi.getAll({ limit: 1 }),
+        lecturersApi.getAll({ limit: 1 }),
+        coursesApi.getAll({ limit: 1 }),
+        enrollmentsApi.getAll({ limit: 1 }),
+      ]);
       setStats({
-        totalStudents: data.totalStudents || 0,
-        totalLecturers: data.totalLecturers || 0,
-        totalCourses: data.totalCourses || 0,
-        totalEnrollments: data.totalEnrollments || 0,
+        totalStudents: users.meta?.total ?? users.data.length,
+        totalLecturers: lecturers.meta?.total ?? lecturers.data.length,
+        totalCourses: courses.meta?.total ?? courses.data.length,
+        totalEnrollments: enrollments.meta?.total ?? enrollments.data.length,
       });
     } catch {
       setError(messages.admin.unavailableDescription);
@@ -204,17 +195,13 @@ export default function AdminDashboardPage() {
       description={messages.admin.description}
       actions={
         <>
-          <Button asChild variant="outline">
-            <LocalizedLink href="/admin/users">
-              <UserPlus className="mr-2 h-4 w-4" />
-              {messages.common.actions.addUser}
-            </LocalizedLink>
-          </Button>
-          <Button asChild>
-            <LocalizedLink href="/admin/analytics">
-              {messages.common.actions.openAnalytics}
-            </LocalizedLink>
-          </Button>
+          <LinkButton href="/admin/users" variant="outline">
+            <UserPlus className="mr-2 h-4 w-4" />
+            {messages.common.actions.addUser}
+          </LinkButton>
+          <LinkButton href="/admin/courses">
+            {messages.dashboardShell.menu.myCourses}
+          </LinkButton>
         </>
       }
     >
@@ -227,8 +214,8 @@ export default function AdminDashboardPage() {
       ) : isLoading ? (
         <LoadingState label={messages.admin.loading} />
       ) : (
-        <div className="space-y-8">
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+        <div className="space-y-6">
+          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {statCards.map((stat) => (
               <AdminMetricCard
                 key={stat.label}
@@ -241,12 +228,16 @@ export default function AdminDashboardPage() {
             ))}
           </div>
 
-              <AdminTableCard
-            title={messages.admin.managementConsoleTitle}
-            description={messages.admin.managementConsoleDescription}
-            contentClassName="space-y-0"
-          >
-            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+          <section aria-labelledby="admin-management-title" className="min-w-0">
+            <div className="mb-3 border-b border-border pb-3">
+              <h2 id="admin-management-title" className="text-lg font-semibold text-foreground">
+                {messages.admin.managementConsoleTitle}
+              </h2>
+              <p className="mt-1 max-w-3xl text-sm leading-5 text-muted-foreground">
+                {messages.admin.managementConsoleDescription}
+              </p>
+            </div>
+            <div className="grid overflow-hidden border border-border/80 bg-card md:grid-cols-2">
               {menuItems.map((item, index) => {
                 const localizedItem = messages.admin.menuItems[index] ?? [
                   item.label,
@@ -257,32 +248,27 @@ export default function AdminDashboardPage() {
                   <LocalizedLink
                     key={item.href}
                     href={item.href}
-                    className="group rounded-lg border border-border/70 bg-card px-5 py-5 transition-colors hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                    className="group flex min-h-[100px] min-w-0 items-start gap-3 border-b border-border/70 p-4 transition-colors hover:bg-secondary/35 focus-visible:z-10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-inset focus-visible:ring-ring md:border-r md:[&:nth-child(2n)]:border-r-0"
                   >
-                    <div className="flex h-full flex-col gap-4">
-                      <div
-                        className={`flex h-11 w-11 items-center justify-center rounded-lg ${item.tone}`}
-                      >
-                        <item.icon className="h-5 w-5" />
-                      </div>
-                      <div className="space-y-3">
-                        <h3 className="text-lg font-semibold text-foreground transition-colors group-hover:text-primary">
+                    <div
+                      className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-md ${item.tone}`}
+                    >
+                      <item.icon className="h-4 w-4" aria-hidden="true" />
+                    </div>
+                    <div className="min-w-0 flex-1 space-y-1">
+                        <h3 className="text-base font-semibold text-foreground transition-colors group-hover:text-primary">
                           {localizedItem[0]}
                         </h3>
-                        <p className="text-sm leading-6 text-muted-foreground">
+                        <p className="text-sm leading-5 text-muted-foreground">
                           {localizedItem[1]}
                         </p>
-                      </div>
-                      <div className="mt-auto flex items-center gap-2 text-sm font-medium text-primary">
-                        <span>{messages.common.actions.openWorkspace}</span>
-                        <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-0.5" />
-                      </div>
                     </div>
+                    <ArrowRight className="mt-2 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
                   </LocalizedLink>
                 );
               })}
             </div>
-          </AdminTableCard>
+          </section>
         </div>
       )}
     </AdminFrame>

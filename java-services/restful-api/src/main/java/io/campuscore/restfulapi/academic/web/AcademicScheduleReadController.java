@@ -6,7 +6,6 @@ import io.campuscore.restfulapi.academic.web.AcademicScheduleReadDtos.ScheduleRe
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -15,13 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated academic schedule reads. Schedule creation, update, deletion
- * and lecturer timetable shortcuts remain owned by the legacy academic service.
- */
+/** Academic schedule query routes. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-schedule-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/schedules")
 public class AcademicScheduleReadController {
 

@@ -24,8 +24,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.thesis-read.enabled=false",
-        "migration.notifications-read.enabled=true",
         "spring.flyway.enabled=false"
 })
 class NotificationReadPersistenceTest {

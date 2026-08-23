@@ -10,13 +10,11 @@ import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
-import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
-@TestPropertySource(properties = "migration.thesis-assistant.enabled=true")
+@ActiveProfiles({"test", "persistence"})
 class ThesisAssistantContractTest {
 
     @Autowired
@@ -32,7 +30,7 @@ class ThesisAssistantContractTest {
     }
 
     @Test
-    void chatReturnsLegacyCompatibleLocalFallbackShape() throws Exception {
+    void chatReturnsCuratedAnswerWithCitation() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
                         .with(jwt())
                         .contentType("application/json")
@@ -40,8 +38,11 @@ class ThesisAssistantContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").isString())
                 .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("thesis topic")))
-                .andExpect(jsonPath("$.model").value("campuscore-local-advisor-v1"))
-                .andExpect(jsonPath("$.degraded").value(true));
+                .andExpect(jsonPath("$.model").value("curated-lexical-rag"))
+                .andExpect(jsonPath("$.degraded").value(false))
+                .andExpect(jsonPath("$.reasonCode").value("ANSWERED"))
+                .andExpect(jsonPath("$.locale").value("en"))
+                .andExpect(jsonPath("$.citations[0].slug").value("en-topic-selection"));
     }
 
     @Test
@@ -52,7 +53,9 @@ class ThesisAssistantContractTest {
                         .content("{\"message\":\"Em nên chọn đề tài thế nào?\",\"locale\":\"vi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("đề tài")))
-                .andExpect(jsonPath("$.degraded").value(true));
+                .andExpect(jsonPath("$.degraded").value(false))
+                .andExpect(jsonPath("$.reasonCode").value("ANSWERED"))
+                .andExpect(jsonPath("$.citations[0].source").value("academic-office"));
 
         mvc.perform(post("/api/v1/thesis/assistant/chat")
                         .with(jwt())
@@ -62,5 +65,17 @@ class ThesisAssistantContractTest {
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.fields.message").value("message is required"))
                 .andExpect(jsonPath("$.fields.locale").value("locale must be en or vi"));
+    }
+
+    @Test
+    void noMatchDoesNotInventCitation() throws Exception {
+        mvc.perform(post("/api/v1/thesis/assistant/chat")
+                        .with(jwt())
+                        .contentType("application/json")
+                        .content("{\"message\":\"What is the weather tomorrow?\",\"locale\":\"en\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.reasonCode").value("NO_MATCH"))
+                .andExpect(jsonPath("$.citations").isEmpty())
+                .andExpect(jsonPath("$.degraded").value(false));
     }
 }

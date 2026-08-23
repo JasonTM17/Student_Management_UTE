@@ -5,7 +5,7 @@ import com.fasterxml.jackson.annotation.JsonInclude;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only academic catalog candidate. */
+/** DTOs for the academic catalog. */
 public final class AcademicReadDtos {
 
     private AcademicReadDtos() {

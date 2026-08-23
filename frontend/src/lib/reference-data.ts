@@ -1,0 +1,2 @@
+export const ACADEMIC_REFERENCE_LIMIT = 200;
+export const PEOPLE_REFERENCE_LIMIT = 100;

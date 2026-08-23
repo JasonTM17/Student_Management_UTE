@@ -4,27 +4,27 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const buttonVariants = cva(
-  'inline-flex items-center justify-center whitespace-nowrap rounded-lg text-sm font-semibold ring-offset-background transition-[background-color,border-color,color,box-shadow,transform] duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
+  'inline-flex items-center justify-center whitespace-nowrap rounded-md text-sm font-semibold ring-offset-background transition-[background-color,border-color,color,box-shadow] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:pointer-events-none disabled:opacity-50 disabled:shadow-none',
   {
     variants: {
       variant: {
         default:
-          'bg-primary text-primary-foreground shadow-sm hover:bg-primary/92 hover:shadow-md',
+          'bg-primary text-primary-foreground hover:bg-primary/90',
         destructive:
-          'bg-destructive text-destructive-foreground shadow-sm hover:bg-destructive/92',
+          'bg-destructive text-destructive-foreground hover:bg-destructive/90',
         outline:
           'border border-input bg-background text-foreground hover:bg-secondary/80',
         secondary:
           'bg-secondary text-secondary-foreground hover:bg-secondary/85',
         ghost: 'text-foreground hover:bg-secondary/75',
         link: 'text-primary underline-offset-4 hover:underline',
-        warm: 'bg-[hsl(var(--accent-warm))] text-white shadow-sm hover:bg-[hsl(var(--accent-warm))/0.92]',
+        warm: 'bg-[hsl(var(--accent-warm))] text-[var(--portal-yellow-ink)] hover:bg-[hsl(var(--accent-warm))/0.9]',
       },
       size: {
-        default: 'h-10 px-4 py-2',
-        sm: 'h-9 px-3',
+        default: 'h-11 px-4 py-2',
+        sm: 'h-11 px-3',
         lg: 'h-11 px-6 text-[15px]',
-        icon: 'h-10 w-10',
+        icon: 'h-11 w-11',
       },
     },
     defaultVariants: {

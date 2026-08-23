@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth;
 import static org.hamcrest.Matchers.containsString;
 import static org.hamcrest.Matchers.notNullValue;
 import static org.junit.jupiter.api.Assertions.assertNotEquals;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
@@ -28,6 +29,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.crypto.password.PasswordEncoder;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.security.oauth2.jwt.JwtDecoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -38,9 +40,8 @@ import org.springframework.test.web.servlet.MvcResult;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.thesis-read.enabled=false",
-        "migration.auth-login.enabled=true",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:auth_login;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class AuthLoginPersistenceTest {
 
@@ -167,6 +168,64 @@ class AuthLoginPersistenceTest {
         jdbc.update("DELETE FROM \"auth\".\"Role\"");
         jdbc.update("DELETE FROM \"auth\".\"User\"");
         insertStudentUser("student-user", "student@campuscore.edu", "password123", 0, null);
+    }
+
+    @Test
+    void registrationCreatesAnImmediatelyUsableStudentProfile() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"new.student@campuscore.edu",
+                                  "password":"password123",
+                                  "firstName":"New",
+                                  "lastName":"Student"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("new.student@campuscore.edu"))
+                .andExpect(jsonPath("$.user.roles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.user.studentId", notNullValue()))
+                .andReturn();
+
+        String userId = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("user").path("id").asText();
+        Integer profiles = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?"
+                        + " AND \"curriculumId\" = 'curriculum-demo' AND \"status\" = 'ACTIVE'",
+                Integer.class,
+                userId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
+    }
+
+    @Test
+    void adminUserCreationCreatesTheMatchingAcademicProfile() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/users")
+                        .with(jwt()
+                                .jwt(token -> token.subject("admin-user").claim("roles", java.util.List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"managed.student@campuscore.edu",
+                                  "password":"password123",
+                                  "firstName":"Managed",
+                                  "lastName":"Student",
+                                  "role":"STUDENT",
+                                  "studentId":"SV-MANAGED-001"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.email").value("managed.student@campuscore.edu"))
+                .andReturn();
+
+        String userId = objectMapper.readTree(result.getResponse().getContentAsString()).path("id").asText();
+        Integer profiles = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?"
+                        + " AND \"studentId\" = 'SV-MANAGED-001'",
+                Integer.class,
+                userId);
+        org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
     }
 
     @Test

@@ -5,7 +5,7 @@ import { Bell, BookOpen, RefreshCw } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { announcementsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import {
@@ -139,9 +139,7 @@ export default function StudentAnnouncementsPage() {
           title={copy.emptyTitle}
           description={copy.emptyDescription}
           action={
-            <LocalizedLink href="/dashboard">
-              <Button>{copy.returnDashboard}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard">{copy.returnDashboard}</LinkButton>
           }
         />
       ) : (

@@ -18,7 +18,6 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.util.MultiValueMap;
@@ -28,13 +27,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated academic catalog reads. Legacy writes, enrollment, and grade
- * routes remain owned by the academic service in this wave.
- */
+/** Role-protected academic catalog query routes. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1")
 public class AcademicReadController {
 

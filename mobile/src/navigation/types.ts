@@ -1,7 +1,11 @@
 import type { ScreenName, UserRole } from './routes';
 
+export interface MobileNavigationOptions {
+  thesisTopicId?: string;
+}
+
 export interface MobileNavigation {
-  navigate(route: ScreenName): void;
+  navigate(route: ScreenName, options?: MobileNavigationOptions): void;
   enterPreview(): void;
   completeSignIn(role: UserRole): void;
   goBack(): void;
@@ -12,4 +16,5 @@ export interface MobileNavigation {
 export interface MobileScreenProps {
   navigation: MobileNavigation;
   role: UserRole;
+  selectedThesisTopicId: string | null;
 }

@@ -19,7 +19,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.academic-schedule-read.enabled=true",
         "spring.flyway.enabled=false"
 })
 class AcademicScheduleReadPersistenceTest {

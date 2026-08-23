@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi } from '@/lib/api';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
@@ -333,15 +333,14 @@ export default function SectionGradingPage() {
           title={copy.title}
           description={copy.errorDescription}
           actions={
-            <LocalizedLink href="/dashboard/lecturer/grades">
-              <Button
-                variant="outline"
-                aria-label={copy.backToGrades}
-                title={copy.backToGrades}
-              >
-                {copy.backToGrades}
-              </Button>
-            </LocalizedLink>
+            <LinkButton
+              href="/dashboard/lecturer/grades"
+              variant="outline"
+              aria-label={copy.backToGrades}
+              title={copy.backToGrades}
+            >
+              {copy.backToGrades}
+            </LinkButton>
           }
         />
         <ErrorState
@@ -365,15 +364,14 @@ export default function SectionGradingPage() {
         description={copy.pageDescription(localizedCourseName)}
         actions={
           <div className="flex flex-wrap gap-3">
-            <LocalizedLink href="/dashboard/lecturer/grades">
-              <Button
-                variant="outline"
-                aria-label={copy.backToGrades}
-                title={copy.backToGrades}
-              >
-                {copy.backToGrades}
-              </Button>
-            </LocalizedLink>
+            <LinkButton
+              href="/dashboard/lecturer/grades"
+              variant="outline"
+              aria-label={copy.backToGrades}
+              title={copy.backToGrades}
+            >
+              {copy.backToGrades}
+            </LinkButton>
             <Button
               type="button"
               variant="outline"

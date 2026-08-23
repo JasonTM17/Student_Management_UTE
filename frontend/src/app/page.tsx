@@ -14,8 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
 import { LanguageToggle } from '@/components/LanguageToggle';
-import { LocalizedLink } from '@/components/LocalizedLink';
-import { Button } from '@/components/ui/button';
+import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { buildSiteUrl } from '@/lib/site';
@@ -25,10 +24,16 @@ import { buildCanonicalPath } from '@/i18n/paths';
 export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
-  const { user, isLoading } = useAuth();
+  const {
+    user,
+    isAdmin,
+    isLecturer,
+    isLoading,
+    isSuperAdmin,
+  } = useAuth();
   const { locale, messages } = useI18n();
   const currentYear = new Date().getFullYear();
-  const operationalPillars = [
+  const academicPillars = [
     { icon: ShieldCheck, ...messages.home.pillars[0] },
     { icon: BookOpen, ...messages.home.pillars[1] },
     { icon: BarChart3, ...messages.home.pillars[2] },
@@ -36,6 +41,25 @@ export default function HomePage() {
     { icon: CalendarRange, ...messages.home.pillars[4] },
     { icon: GraduationCap, ...messages.home.pillars[5] },
   ];
+  const workspaceHref = isAdmin || isSuperAdmin
+    ? '/admin'
+    : isLecturer
+      ? '/dashboard/lecturer'
+      : '/dashboard';
+  const secondaryWorkspace = isAdmin || isSuperAdmin
+    ? {
+        href: '/admin/thesis',
+        label: messages.common.actions.reviewAdmin,
+      }
+    : isLecturer
+      ? {
+          href: '/dashboard/lecturer/schedule',
+          label: messages.common.actions.openSchedule,
+        }
+      : {
+          href: '/dashboard/register',
+          label: messages.common.actions.browseSections,
+        };
   const homepageStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -74,16 +98,14 @@ export default function HomePage() {
             <ThemeToggle />
             {!isLoading &&
               (user ? (
-                <LocalizedLink href="/dashboard" className="hidden sm:inline-flex">
-                  <Button>
-                    {messages.common.actions.openDashboard}
-                    <ArrowRight className="ml-2 h-4 w-4" />
-                  </Button>
-                </LocalizedLink>
+                <LinkButton href={workspaceHref} className="hidden sm:inline-flex">
+                  {messages.common.actions.openDashboard}
+                  <ArrowRight className="ml-2 h-4 w-4" />
+                </LinkButton>
               ) : (
-                <LocalizedLink href="/login" className="hidden sm:inline-flex">
-                  <Button variant="outline">{messages.common.actions.signIn}</Button>
-                </LocalizedLink>
+                <LinkButton href="/login" variant="outline" className="hidden sm:inline-flex">
+                  {messages.common.actions.signIn}
+                </LinkButton>
               ))}
           </div>
         </div>
@@ -103,19 +125,17 @@ export default function HomePage() {
             </div>
 
             <div className="flex flex-wrap items-center gap-3">
-              <LocalizedLink href={user ? '/dashboard' : '/login'}>
-                <Button size="lg">
-                  {user
-                    ? messages.common.actions.continueToWorkspace
-                    : messages.common.actions.signInToWorkspace}
-                  <ArrowRight className="ml-2 h-4 w-4" />
-                </Button>
-              </LocalizedLink>
-              <LocalizedLink href={user ? '/admin' : '/login'}>
-                <Button size="lg" variant="outline">
-                  {messages.common.actions.reviewAdmin}
-                </Button>
-              </LocalizedLink>
+              <LinkButton href={user ? workspaceHref : '/login'} size="lg">
+                {user
+                  ? messages.common.actions.continueToWorkspace
+                  : messages.common.actions.signInToWorkspace}
+                <ArrowRight className="ml-2 h-4 w-4" />
+              </LinkButton>
+              {user ? (
+                <LinkButton href={secondaryWorkspace.href} size="lg" variant="outline">
+                  {secondaryWorkspace.label}
+                </LinkButton>
+              ) : null}
             </div>
 
             <div className="grid gap-4 sm:grid-cols-3">
@@ -189,7 +209,7 @@ export default function HomePage() {
           </div>
 
           <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {operationalPillars.map((pillar) => (
+            {academicPillars.map((pillar) => (
               <Card key={pillar.title} variant="default" className="h-full">
                 <CardContent className="flex h-full flex-col gap-4 pt-6">
                   <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">

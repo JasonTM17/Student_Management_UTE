@@ -5,7 +5,7 @@ import { BookOpen, Calendar, Clock, MapPin, Trash2 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -217,9 +217,7 @@ export default function EnrollmentsPage() {
         title={copy.title}
         description={copy.description}
         actions={
-          <LocalizedLink href="/dashboard/register">
-            <Button>{copy.browseSections}</Button>
-          </LocalizedLink>
+          <LinkButton href="/dashboard/register">{copy.browseSections}</LinkButton>
         }
       />
 
@@ -237,9 +235,7 @@ export default function EnrollmentsPage() {
           title={copy.emptyTitle}
           description={copy.emptyDescription}
           action={
-            <LocalizedLink href="/dashboard/register">
-              <Button>{copy.browseSections}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/register">{copy.browseSections}</LinkButton>
           }
         />
       ) : (

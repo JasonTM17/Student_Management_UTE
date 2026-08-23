@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -25,11 +26,11 @@ const adminMetrics = [
 
 export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
   return (
-    <ScreenShell title="Admin dashboard" eyebrow="Operations · Admin" subtitle="A focused view of campus continuity signals.">
+    <ScreenShell title="Admin dashboard" eyebrow="Admin workspace" subtitle="A focused view of campus academic activity.">
       <Card tone="primary" style={styles.hero}>
         <UiText variant="meta" tone="primary">TODAY · 24 AUGUST 2026</UiText>
         <UiText variant="headlineSmall" style={styles.heroTitle}>Keep the campus moving.</UiText>
-        <UiText variant="bodySmall" tone="muted">Review registration pressure and people operations from one mobile surface.</UiText>
+        <UiText variant="bodySmall" tone="muted">Review registration demand and people records from one mobile surface.</UiText>
       </Card>
       <ScreenSpacer />
       <View style={styles.metricGrid}>
@@ -44,7 +45,7 @@ export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
         ))}
       </View>
       <ScreenSpacer />
-      <SectionHeading title="Operational shortcuts" />
+      <SectionHeading title="Admin shortcuts" />
       <Card>
         <ListRow leading="S" title="Manage students" subtitle="Search and review student records" onPress={() => navigation.navigate('admin.students')} trailing={<UiText variant="bodyMedium" tone="muted">›</UiText>} />
         <Divider />
@@ -58,7 +59,7 @@ export function AdminDashboardScreen({ navigation }: MobileScreenProps) {
 
 export function AdminStudentsScreen({ navigation }: MobileScreenProps) {
   return (
-    <ScreenShell title="Manage students" eyebrow="Admin workspace" subtitle="A mobile-friendly record list for common operations.">
+    <ScreenShell title="Manage students" eyebrow="Admin workspace" subtitle="A mobile-friendly list for common student record tasks.">
       <Card tone="low" style={styles.summaryCard}>
         <UiText variant="label">12,418 active students</UiText>
         <UiText variant="bodySmall" tone="muted">Updated 10 minutes ago · data comes from the Java API seam when connected.</UiText>
@@ -109,7 +110,7 @@ export function AdminLecturersScreen({ navigation }: MobileScreenProps) {
 
 export function LecturerDashboardScreen({ navigation, role }: MobileScreenProps) {
   return (
-    <ScreenShell title="Lecturer dashboard" eyebrow={`Operations · ${role}`} subtitle="Your teaching day, kept readable.">
+    <ScreenShell title="Lecturer dashboard" eyebrow={`${role} workspace`} subtitle="Your teaching day, kept readable.">
       <Card tone="primary" style={styles.hero}>
         <UiText variant="meta" tone="primary">TUESDAY · 19 AUGUST 2026</UiText>
         <UiText variant="headlineSmall" style={styles.heroTitle}>Two classes need you today.</UiText>
@@ -163,6 +164,8 @@ export function LecturerScheduleScreen({ navigation }: MobileScreenProps) {
 }
 
 export function LecturerGradingScreen({ navigation }: MobileScreenProps) {
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+
   return (
     <ScreenShell title="Gradebook" eyebrow="CS204 · Software Architecture" subtitle="Keep feedback clear before publishing.">
       <Card tone="primary" style={styles.gradingHero}>
@@ -190,8 +193,13 @@ export function LecturerGradingScreen({ navigation }: MobileScreenProps) {
         ))}
       </Card>
       <ScreenSpacer />
-      <Button label="Save draft grades" onPress={() => undefined} />
-      <Button label="Preview publish" onPress={() => undefined} variant="secondary" style={styles.secondaryButton} />
+      {actionStatus ? (
+        <View accessibilityLiveRegion="polite" style={styles.actionStatus}>
+          <UiText variant="bodySmall" tone="success">{actionStatus}</UiText>
+        </View>
+      ) : null}
+      <Button label="Save preview draft" onPress={() => setActionStatus('Preview draft saved on this device.')} />
+      <Button label="Review publish summary" onPress={() => setActionStatus('Publish summary ready. No academic records were changed.')} variant="secondary" style={styles.secondaryButton} />
     </ScreenShell>
   );
 }
@@ -245,5 +253,6 @@ const styles = StyleSheet.create({
   gradingHero: { padding: tokens.spacing.lg },
   courseHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   secondaryButton: { marginTop: tokens.spacing.sm },
+  actionStatus: { backgroundColor: '#EDF8F1', borderColor: '#B8DEC7', borderLeftColor: tokens.colors.success, borderLeftWidth: 3, borderRadius: tokens.radii.control, borderWidth: 1, marginBottom: tokens.spacing.sm, padding: tokens.spacing.sm },
   attendanceSummary: { padding: tokens.spacing.md },
 });
