@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleProp,
@@ -50,6 +51,55 @@ export interface ScreenShellProps {
   children: ReactNode;
   headerAction?: ReactNode;
   contentStyle?: StyleProp<ViewStyle>;
+}
+
+type StateBlockVariant = 'loading' | 'empty' | 'error' | 'forbidden';
+
+interface StateBlockProps {
+  variant: StateBlockVariant;
+  title: string;
+  description: string;
+  action?: ReactNode;
+}
+
+export function StateBlock({ variant, title, description, action }: StateBlockProps) {
+  const isLoading = variant === 'loading';
+  const tone = variant === 'error' || variant === 'forbidden' ? 'error' : 'muted';
+
+  return (
+    <View
+      accessible
+      accessibilityRole={isLoading ? 'progressbar' : variant === 'empty' ? 'text' : 'alert'}
+      accessibilityLiveRegion={isLoading ? 'polite' : 'assertive'}
+      accessibilityLabel={`${title}. ${description}`}
+      style={[styles.stateBlock, variant === 'error' || variant === 'forbidden' ? styles.stateBlockError : undefined]}
+    >
+      {isLoading ? <ActivityIndicator color={tokens.colors.primary} /> : null}
+      <UiText variant="headlineSmall" tone={tone} style={styles.stateTitle}>
+        {title}
+      </UiText>
+      <UiText variant="bodySmall" tone="muted" style={styles.stateDescription}>
+        {description}
+      </UiText>
+      {action ? <View style={styles.stateAction}>{action}</View> : null}
+    </View>
+  );
+}
+
+export function LoadingState({ label = 'Loading content' }: { label?: string }) {
+  return <StateBlock variant="loading" title={label} description="Please wait while this screen is prepared." />;
+}
+
+export function EmptyState({ title, description, action }: Omit<StateBlockProps, 'variant'>) {
+  return <StateBlock variant="empty" title={title} description={description} action={action} />;
+}
+
+export function ErrorState({ title, description, action }: Omit<StateBlockProps, 'variant'>) {
+  return <StateBlock variant="error" title={title} description={description} action={action} />;
+}
+
+export function ForbiddenState({ title, description, action }: Omit<StateBlockProps, 'variant'>) {
+  return <StateBlock variant="forbidden" title={title} description={description} action={action} />;
 }
 
 export function ScreenShell({
@@ -428,6 +478,19 @@ const styles = StyleSheet.create({
   divider: { backgroundColor: tokens.colors.outlineVariant, height: 1, marginVertical: tokens.spacing.sm },
   avatar: { alignItems: 'center', backgroundColor: tokens.colors.primaryFixed, justifyContent: 'center' },
   scrollSection: { marginBottom: tokens.spacing.lg },
+  stateBlock: {
+    alignItems: 'center',
+    backgroundColor: tokens.colors.card,
+    borderColor: tokens.colors.outlineVariant,
+    borderRadius: tokens.radii.card,
+    borderWidth: 1,
+    justifyContent: 'center',
+    padding: tokens.spacing.lg,
+  },
+  stateBlockError: { backgroundColor: '#FFF7F5', borderColor: '#E9B5AE' },
+  stateTitle: { marginTop: tokens.spacing.sm, textAlign: 'center' },
+  stateDescription: { marginTop: tokens.spacing.xs, textAlign: 'center' },
+  stateAction: { marginTop: tokens.spacing.md },
 });
 
 const cardTones = {

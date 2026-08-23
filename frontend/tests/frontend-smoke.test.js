@@ -523,9 +523,8 @@ test('admin department, semester, and lecturer views expose mobile card lists', 
   }
 });
 
-test('admin invoice, enrollment, and section views expose mobile card lists', () => {
+test('admin enrollment and section views expose mobile card lists', () => {
   for (const relPath of [
-    'src/app/admin/invoices/page.tsx',
     'src/app/admin/enrollments/page.tsx',
     'src/app/admin/sections/page.tsx',
   ]) {
@@ -536,22 +535,17 @@ test('admin invoice, enrollment, and section views expose mobile card lists', ()
   }
 });
 
-test('admin academic-year and analytics views expose mobile card lists', () => {
+test('admin academic-year view exposes a mobile card list', () => {
   const academicYearSource = read('src/app/admin/academic-years/page.tsx');
   assert.match(academicYearSource, /role="list"/);
   assert.match(academicYearSource, /className="space-y-3 md:hidden"/);
   assert.match(academicYearSource, /<AdminTableScroll className="hidden md:block">/);
 
-  const analyticsSource = read('src/app/admin/analytics/page.tsx');
-  assert.match(analyticsSource, /role="list"/);
-  assert.match(analyticsSource, /className="mt-5 space-y-3 md:hidden"/);
-  assert.match(analyticsSource, /<AdminTableScroll className="mt-5 hidden md:block">/);
 });
 
-test('workspace grade and invoice views expose mobile card lists', () => {
+test('workspace grade views expose mobile card lists', () => {
   for (const relPath of [
     'src/app/dashboard/grades/page.tsx',
-    'src/app/dashboard/invoices/page.tsx',
     'src/app/dashboard/transcript/page.tsx',
     'src/app/dashboard/lecturer/grades/[id]/page.tsx',
   ]) {
@@ -573,6 +567,49 @@ test('homepage copy avoids demo placeholders and dead hrefs', () => {
   assert.match(source, /messages\.home\.whyTitle/);
   assert.doesNotMatch(source, contactSalesPattern);
   assert.match(source, /href=\{user \? '\/dashboard' : '\/login'\}/);
+});
+
+test('homepage metadata stays aligned with the monolith transition', () => {
+  const packageSource = read('package.json');
+  const messagesSource = read('src/i18n/messages.ts');
+  const homeEnSource = read('public/screenshots/home-en.svg');
+  const homeViSource = read('public/screenshots/home-vi.svg');
+
+  assert.match(packageSource, /course-focused Java RESTful API stack/);
+  assert.doesNotMatch(packageSource, /microservices portfolio/);
+  assert.doesNotMatch(messagesSource, /Why microservices for CampusCore/);
+  assert.doesNotMatch(messagesSource, /Vì sao CampusCore chọn microservices/);
+  assert.doesNotMatch(homeEnSource, /Why microservices for CampusCore/);
+  assert.doesNotMatch(homeViSource, /Vì sao CampusCore dùng microservices/);
+});
+
+test('out-of-scope product routes are removed from the web app', () => {
+  const removedRoutes = [
+    'src/app/admin/analytics/page.tsx',
+    'src/app/admin/invoices/page.tsx',
+    'src/app/dashboard/invoices/page.tsx',
+    'src/app/[locale]/admin/analytics/page.tsx',
+    'src/app/[locale]/admin/invoices/page.tsx',
+    'src/app/[locale]/dashboard/invoices/page.tsx',
+    'src/components/assistant/AssistantPanel.tsx',
+    'src/lib/finance-content.ts',
+  ];
+
+  for (const relPath of removedRoutes) {
+    assert.equal(fs.existsSync(path.join(root, relPath)), false, relPath);
+  }
+
+  const activeSourceFiles = [
+    'src/app/admin/page.tsx',
+    'src/app/dashboard/layout.tsx',
+    'src/app/dashboard/page.tsx',
+    'src/app/dashboard/register/page.tsx',
+  ];
+  for (const relPath of activeSourceFiles) {
+    const source = read(relPath);
+    assert.doesNotMatch(source, /(?:\/admin|\/dashboard)\/(?:analytics|invoices)/);
+    assert.doesNotMatch(source, /financeApi|AssistantPanel|thesisApi\.chat/);
+  }
 });
 
 test('auth client uses cookie sessions and CSRF headers', () => {
@@ -624,7 +661,7 @@ test('high-frequency auth and profile forms associate labels with controls', () 
   }
 });
 
-test('frontend config exposes local edge rewrites and SEO runtime files', () => {
+test('frontend config keeps the Java REST API as the only browser API seam', () => {
   const nextConfigSource = fs.readFileSync(
     path.join(root, 'next.config.mjs'),
     'utf8',
@@ -632,25 +669,22 @@ test('frontend config exposes local edge rewrites and SEO runtime files', () => 
   const envExampleSource = read('.env.example');
   const layoutSource = read('src/app/layout.tsx');
   const serverMetadataSource = read('src/i18n/server.ts');
-  const proxyHelperSource = read('src/lib/local-edge-proxy.ts');
 
-  assert.match(nextConfigSource, /source:\s*'\/api\/v1\/:path\*'/);
-  assert.match(nextConfigSource, /LOCAL_EDGE_ORIGIN/);
-  assert.match(nextConfigSource, /ENABLE_LOCAL_EDGE_REWRITES/);
+  assert.doesNotMatch(nextConfigSource, /LOCAL_EDGE_ORIGIN|ENABLE_LOCAL_EDGE_REWRITES|socket\.io/);
   assert.match(envExampleSource, /NEXT_PUBLIC_SITE_URL=https:\/\/tienson\.io\.vn/);
-  assert.match(envExampleSource, /NEXT_PUBLIC_API_URL=\/api\/v1/);
-  assert.match(envExampleSource, /LOCAL_EDGE_ORIGIN=http:\/\/127\.0\.0\.1:8080/);
-  assert.match(envExampleSource, /ENABLE_LOCAL_EDGE_REWRITES=0/);
+  assert.match(envExampleSource, /NEXT_PUBLIC_API_URL=http:\/\/127\.0\.0\.1:4010\/api\/v1/);
+  assert.doesNotMatch(envExampleSource, /LOCAL_EDGE_ORIGIN|ENABLE_LOCAL_EDGE_REWRITES/);
   assert.match(layoutSource, /<html lang=\{htmlLang\}/);
   assert.match(layoutSource, /themeColor:/);
   assert.match(serverMetadataSource, /metadataBase:\s*new URL\(getSiteUrl\(\)\)/);
   assert.match(serverMetadataSource, /alternates:/);
   assert.doesNotMatch(serverMetadataSource, /themeColor:/);
   assert.match(serverMetadataSource, /manifest:\s*'\/manifest\.webmanifest'/);
-  assert.match(proxyHelperSource, /proxyToLocalEdge/);
-  assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'api', 'v1', '[...path]', 'route.ts')));
-  assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'api', 'docs', '[[...path]]', 'route.ts')));
-  assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'health', 'route.ts')));
+  assert.doesNotMatch(read('src/lib/site.ts'), /LOCAL_EDGE|LocalEdge|local-edge/);
+  assert.equal(fs.existsSync(path.join(root, 'src', 'lib', 'local-edge-proxy.ts')), false);
+  assert.equal(fs.existsSync(path.join(root, 'src', 'app', 'api', 'v1', '[...path]', 'route.ts')), false);
+  assert.equal(fs.existsSync(path.join(root, 'src', 'app', 'api', 'docs', '[[...path]]', 'route.ts')), false);
+  assert.equal(fs.existsSync(path.join(root, 'src', 'app', 'health', 'route.ts')), false);
   assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'robots.ts')));
   assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'sitemap.ts')));
   assert.ok(fs.existsSync(path.join(root, 'src', 'app', 'manifest.ts')));
@@ -678,6 +712,11 @@ test('FE Stitch visual QA matrix covers audit-missing routes and fails noisy cap
   assert.match(source, /name: 'tablet'[\s\S]*?width: 768[\s\S]*?height: 1024/);
   assert.match(source, /discoverFrom:[\s\S]*?hrefIncludes: '\/dashboard\/thesis\/topics\/'/);
   assert.match(source, /discoverFrom:[\s\S]*?hrefIncludes: '\/dashboard\/lecturer\/grades\/'/);
+  assert.match(source, /path: '\/dashboard\/sign-out'[\s\S]*?allowsSignedOutRedirect: true/);
+  assert.match(source, /path: '\/dashboard\/sign-out'[\s\S]*?expectsMobileBottomNav: false/);
+  assert.match(source, /const landedOnLogin = new URL\(finalUrl\)\.pathname\.includes\('\/login'\)/);
+  assert.match(source, /route\.allowsSignedOutRedirect \? landedOnLogin : !landedOnLogin/);
+  assert.match(source, /route\.expectsMobileBottomNav \?\?\n\s*\(viewport\.name === 'mobile'/);
   assert.match(source, /noConsoleErrors: consoleErrors\.length === 0/);
   assert.match(source, /noFailedRequests: failedRequests\.length === 0/);
   assert.match(source, /Console-error route captures/);
@@ -790,7 +829,6 @@ test('legacy admin CRUD surfaces use shared admin surface primitives', () => {
     'src/app/admin/courses/page.tsx',
     'src/app/admin/departments/page.tsx',
     'src/app/admin/enrollments/page.tsx',
-    'src/app/admin/invoices/page.tsx',
     'src/app/admin/lecturers/page.tsx',
     'src/app/admin/sections/page.tsx',
     'src/app/admin/semesters/page.tsx',
@@ -805,14 +843,11 @@ test('legacy admin CRUD surfaces use shared admin surface primitives', () => {
   }
 });
 
-test('admin overview and analytics reuse the shared admin metric and panel grammar', () => {
+test('admin overview reuses the shared admin metric and panel grammar', () => {
   const adminOverviewSource = read('src/app/admin/page.tsx');
-  const adminAnalyticsSource = read('src/app/admin/analytics/page.tsx');
 
   assert.match(adminOverviewSource, /AdminMetricCard/);
   assert.match(adminOverviewSource, /AdminTableCard/);
-  assert.match(adminAnalyticsSource, /AdminMetricCard/);
-  assert.match(adminAnalyticsSource, /AdminTableCard/);
 });
 
 test('student and lecturer workspace surfaces use shared dashboard primitives', () => {
@@ -832,16 +867,14 @@ test('student and lecturer workspace surfaces use shared dashboard primitives', 
   assert.match(lecturerGradesSource, /WorkspacePanel/);
 });
 
-test('Stitch workspace guardrails keep long values and assistant clear of mobile navigation', () => {
+test('Stitch workspace guardrails keep long values clear of mobile navigation', () => {
   const metricSource = read('src/components/dashboard/WorkspaceSurface.tsx');
   const studentDashboardSource = read('src/app/dashboard/page.tsx');
-  const assistantSource = read('src/components/assistant/AssistantPanel.tsx');
   const shellSource = read('src/app/dashboard/layout.tsx');
   const globalsSource = read('src/app/globals.css');
 
   assert.match(metricSource, /break-normal/);
   assert.match(studentDashboardSource, /valueClassName="text-xl sm:text-2xl"/);
-  assert.match(assistantSource, /bottom-\[5\.75rem\].*z-50/);
   assert.match(shellSource, /backdrop-blur md:hidden/);
   assert.match(globalsSource, /--background: 240 100% 98\.8%/);
 });
@@ -852,11 +885,6 @@ test('key frontend surfaces label icon-only buttons', () => {
   ]);
   assertPatterns('src/app/reset-password/page.tsx', [
     /aria-label=\{showPassword \? messages\.login\.hidePassword : messages\.login\.showPassword\}/,
-  ]);
-  assertPatterns('src/app/dashboard/invoices/page.tsx', [
-    /closeLabel=\{copy\.closeDetail\}/,
-    /handleContinueCheckout/,
-    /getCheckoutActionLabel/,
   ]);
   assertPatterns('src/app/admin/academic-years/page.tsx', [
     /aria-label=\{copy\.editLabel\(record\.year\)\}/,
@@ -883,11 +911,6 @@ test('key frontend surfaces label icon-only buttons', () => {
     /aria-label=\{copy\.deleteLabel\(learnerLabel\)\}/,
     /closeLabel=\{copy\.closeDetail\}/,
   ]);
-  assertPatterns('src/app/admin/invoices/page.tsx', [
-    /aria-label=\{copy\.viewLabel\(invoice\.invoiceNumber\)\}/,
-    /aria-label=\{copy\.deleteLabel\(invoice\.invoiceNumber\)\}/,
-    /closeLabel=\{copy\.closeDetail\}/,
-  ]);
   assertPatterns('src/app/admin/lecturers/page.tsx', [
     /aria-label=\{copy\.editLabel\(lecturer\.employeeId\)\}/,
     /aria-label=\{copy\.deleteLabel\(lecturer\.employeeId\)\}/,
@@ -907,7 +930,6 @@ test('key frontend surfaces label icon-only buttons', () => {
   ]);
   assertPatterns('src/app/admin/page.tsx', [
     /href="\/admin\/users"/,
-    /href="\/admin\/analytics"/,
   ]);
   assertPatterns('src/components/ui/data-table.tsx', [
     /aria-label=\{messages\.common\.states\.goToPreviousPage\}/,
@@ -921,19 +943,6 @@ test('key frontend surfaces label icon-only buttons', () => {
   ]);
 });
 
-test('student invoice checkout uses provider handoff instead of inline sandbox status controls', () => {
-  const source = read('src/app/dashboard/invoices/page.tsx');
-  const adminInvoiceSource = read('src/app/admin/invoices/page.tsx');
-  const financeContentSource = read('src/lib/finance-content.ts');
-
-  assert.match(source, /handleContinueCheckout/);
-  assert.match(source, /nextAction\?\.flow/);
-  assert.doesNotMatch(source, /handleSandboxSignal/);
-  assert.match(source, /getLocalizedInvoiceItemDescription/);
-  assert.match(adminInvoiceSource, /getLocalizedInvoiceItemDescription/);
-  assert.match(financeContentSource, /Học phí và dịch vụ campus/);
-});
-
 test('admin CRUD routes rely on localized AdminFrame back labels', () => {
   for (const relPath of [
     'src/app/admin/academic-years/page.tsx',
@@ -942,7 +951,6 @@ test('admin CRUD routes rely on localized AdminFrame back labels', () => {
     'src/app/admin/courses/page.tsx',
     'src/app/admin/departments/page.tsx',
     'src/app/admin/enrollments/page.tsx',
-    'src/app/admin/invoices/page.tsx',
     'src/app/admin/lecturers/page.tsx',
     'src/app/admin/sections/page.tsx',
     'src/app/admin/semesters/page.tsx',

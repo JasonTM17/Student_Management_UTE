@@ -29,6 +29,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
+        "migration.course-api.enabled=true",
         "migration.thesis-read.enabled=true",
         "spring.datasource.url=jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa",

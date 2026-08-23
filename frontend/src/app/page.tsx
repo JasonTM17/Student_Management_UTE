@@ -52,7 +52,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <main className="portal-content-canvas min-h-screen">
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -60,14 +60,15 @@ export default function HomePage() {
           __html: JSON.stringify(homepageStructuredData),
         }}
       />
-      <nav className="border-b border-border/70 bg-background/95 backdrop-blur">
+      <nav className="portal-sidebar-header border-b border-white/10 backdrop-blur">
         <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
           <BrandMark
             href="/"
             subtitle={messages.home.navSubtitle}
             compact
             className="min-w-0"
-            subtitleClassName="hidden sm:block"
+            titleClassName="text-white"
+            subtitleClassName="hidden text-white/70 sm:block"
           />
           <div className="flex shrink-0 items-center gap-2">
             <LanguageToggle />
@@ -89,7 +90,7 @@ export default function HomePage() {
         </div>
       </nav>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
+      <section className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8 lg:py-16">
         <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
           <div className="space-y-8">
             <div className="space-y-4">
@@ -134,7 +135,7 @@ export default function HomePage() {
             </div>
           </div>
 
-          <Card variant="elevated" className="overflow-hidden">
+          <Card variant="elevated" className="portal-section-card overflow-hidden">
             <div className="orbital-divider h-px w-full" />
             <CardHeader className="space-y-3">
               <SectionEyebrow>{messages.home.snapshotEyebrow}</SectionEyebrow>
@@ -239,7 +240,7 @@ export default function HomePage() {
         </div>
       </section>
 
-      <footer className="bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+      <footer className="portal-sidebar text-[hsl(var(--nav-foreground))]">
         <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
           <div className="grid gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
             <div className="space-y-3">

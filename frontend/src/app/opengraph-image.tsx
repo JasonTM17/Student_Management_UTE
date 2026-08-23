@@ -83,7 +83,7 @@ export default function OpenGraphImage() {
                 maxWidth: 820,
               }}
             >
-              Identity, academics, finance, engagement, people data, and analytics in one release-verified workspace.
+              Identity, academics, people, schedules, grades, and reporting in one focused campus workspace.
             </div>
           </div>
 
@@ -95,9 +95,9 @@ export default function OpenGraphImage() {
             }}
           >
             {[
-              'Cookie sessions + CSRF',
-              '9-image topology',
-              'Compose + Kubernetes',
+              'Secure sign-in',
+              'Academic workflows',
+              'Course-project workspace',
             ].map((item) => (
               <div
                 key={item}

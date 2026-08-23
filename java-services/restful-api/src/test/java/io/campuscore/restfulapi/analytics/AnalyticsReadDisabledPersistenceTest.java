@@ -16,7 +16,10 @@ import org.springframework.test.web.servlet.MockMvc;
 @SpringBootTest
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
-@TestPropertySource(properties = "migration.analytics-read.enabled=false")
+@TestPropertySource(properties = {
+        "migration.course-api.enabled=true",
+        "migration.analytics-read.enabled=false"
+})
 class AnalyticsReadDisabledPersistenceTest {
 
     @Autowired

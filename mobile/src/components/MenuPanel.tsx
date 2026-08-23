@@ -22,7 +22,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
   return (
     <View style={styles.overlay}>
       <Pressable accessibilityLabel="Close menu" onPress={onClose} style={styles.backdrop} />
-      <View style={styles.panel}>
+      <View style={styles.panel} accessibilityViewIsModal accessible>
         <View style={styles.panelHeader}>
           <View style={styles.headerCopy}>
             <UiText variant="meta" tone="primary">
@@ -41,6 +41,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
             <Pressable
               key={candidate}
               accessibilityRole="button"
+              accessibilityHint={`Switch preview to the ${candidate} workspace`}
               accessibilityState={{ selected: candidate === role }}
               onPress={() => onSwitchRole(candidate)}
               style={[styles.roleButton, candidate === role ? styles.roleButtonActive : undefined]}
@@ -57,6 +58,8 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
             const screens = screenRegistry.filter(
               (screen) =>
                 section.families.some((family) => family === screen.family) &&
+                screen.name !== 'invoices' &&
+                screen.family !== 'assistant' &&
                 screen.roles.includes(role),
             );
 
@@ -72,6 +75,8 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
                     <Pressable
                       key={screen.name}
                       accessibilityRole="button"
+                      accessibilityState={{ selected: active }}
+                      accessibilityHint={`Open ${screen.title}`}
                       onPress={() => onNavigate(screen.name)}
                       style={[styles.menuItem, active ? styles.menuItemActive : undefined]}
                     >

@@ -10,21 +10,17 @@ import {
   ClipboardList,
   Clock3,
   ListOrdered,
-  Loader2,
   ShieldAlert,
   Users,
-  Wallet,
 } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import {
   WorkspaceMetricCard,
   WorkspacePanel,
 } from '@/components/dashboard/WorkspaceSurface';
-import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import {
-  financeApi,
   enrollmentsApi,
   sectionsApi,
   semestersApi,
@@ -45,13 +41,6 @@ import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
-import { toast } from 'sonner';
-
-type InvoiceSummary = {
-  id: string;
-  status: string;
-  balance: number;
-};
 
 type RegistrationLoadState = 'ready' | 'backend-unavailable' | 'unavailable';
 const SEAT_CONSUMING_ENROLLMENT_STATUSES = new Set([
@@ -179,22 +168,17 @@ function deriveCoursesFromSections(sections: Section[], departmentId: string) {
 export default function RegisterPage() {
   const { user, isLoading: authLoading, hasAccess } = useRequireAuth(['STUDENT']);
   const { locale, formatDate, formatNumber } = useI18n();
-  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [sections, setSections] = useState<Section[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [waitlistEntries, setWaitlistEntries] = useState<WaitlistEntry[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [courses, setCourses] = useState<Course[]>([]);
-  const [invoices, setInvoices] = useState<InvoiceSummary[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedDepartment, setSelectedDepartment] = useState('');
   const [selectedCourse, setSelectedCourse] = useState('');
   const [plannedSectionIds, setPlannedSectionIds] = useState<string[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [isEnrolling, setIsEnrolling] = useState<string | null>(null);
-  const [isSubmittingPlan, setIsSubmittingPlan] = useState(false);
-  const [isRemovingWaitlist, setIsRemovingWaitlist] = useState<string | null>(null);
   const [error, setError] = useState('');
   const [loadState, setLoadState] = useState<RegistrationLoadState>('ready');
 
@@ -239,18 +223,13 @@ export default function RegisterPage() {
             conflictCount: 'Xung đột lịch',
             remove: 'Bỏ khỏi kế hoạch',
             review: 'Rà soát kế hoạch',
-            holdMessage:
-              'Cần xử lý các khoản học phí quá hạn trước khi gửi đăng ký mới.',
             planningMessage:
               'Bạn vẫn có thể lên kế hoạch trước, nhưng chỉ gửi đăng ký khi cửa sổ học vụ đang mở.',
           },
           readiness: {
             title: 'Mức sẵn sàng đăng ký',
             description:
-              'Đọc nhanh cửa sổ đăng ký, tín hiệu học phí và tình hình danh sách chờ trước khi gửi quyết định.',
-            holdTitle: 'Đang có chặn đăng ký từ học phí',
-            holdBody: (count: number) =>
-              `${count} hóa đơn quá hạn đang chặn thao tác đăng ký mới. Hãy xử lý trước khi thêm hoặc chờ chỗ.`,
+              'Đọc nhanh cửa sổ đăng ký, sức chứa section và tình hình danh sách chờ trước khi gửi quyết định.',
             registrationOpenTitle: 'Đang trong cửa sổ đăng ký',
             registrationOpenBody:
               'Bạn có thể đăng ký ngay hoặc chuyển sang danh sách chờ cho các section đã đầy.',
@@ -266,11 +245,6 @@ export default function RegisterPage() {
             planningTitle: 'Đang ở chế độ lên kế hoạch',
             planningBody:
               'Môi trường này đang ưu tiên so sánh section, lịch học và các bước tiếp theo trước khi ghi nhận đăng ký.',
-            billingTitle: 'Theo dõi học phí',
-            billingBody: (count: number) =>
-              `${count} hóa đơn còn số dư hoặc quá hạn. Nên rà lại trước khi chốt lịch học.`,
-            billingClear: 'Không có hóa đơn nào đang cần theo dõi thêm cho học kỳ hiện tại.',
-            openBilling: 'Mở học phí',
           },
           waitlist: {
             title: 'Danh sách chờ của tôi',
@@ -314,7 +288,6 @@ export default function RegisterPage() {
             removeFromPlan: 'Bỏ khỏi kế hoạch',
             joinWaitlist: 'Vào danh sách chờ',
             enrollNow: 'Đăng ký ngay',
-            resolveHold: 'Xử lý học phí trước',
             resolveConflict: 'Xử lý xung đột trước',
             planningOnly: 'Đang ở chế độ lên kế hoạch',
             statusClosed: 'Đã đóng',
@@ -335,8 +308,6 @@ export default function RegisterPage() {
             plannedSubmitted: (enrolled: number, waitlisted: number) =>
               `Đã xử lý ${enrolled} đăng ký và ${waitlisted} mục danh sách chờ từ kế hoạch hiện tại.`,
             noPlannedSections: 'Hãy thêm ít nhất một section vào kế hoạch trước.',
-            resolveBillingHold:
-              'Cần xử lý các hóa đơn quá hạn trước khi gửi đăng ký mới.',
             registrationWindowClosed:
               'Cửa sổ đăng ký hiện chưa cho phép ghi nhận thay đổi mới.',
             resolveScheduleConflict:
@@ -386,24 +357,19 @@ export default function RegisterPage() {
             conflictCount: 'Schedule conflicts',
             remove: 'Remove from plan',
             review: 'Review plan',
-            holdMessage:
-              'Resolve overdue billing before you submit new registration changes.',
             planningMessage:
               'You can keep planning now, but final registration only opens during the active academic window.',
           },
           readiness: {
             title: 'Registration readiness',
             description:
-              'Check the current registration window, billing follow-up, and waitlist posture before submitting changes.',
-            holdTitle: 'Registration is blocked by overdue billing',
-            holdBody: (count: number) =>
-              `${count} overdue invoice(s) are currently blocking new registration changes. Resolve them before you enroll or join a waitlist.`,
+              'Check the current registration window, section capacity, and waitlist posture before submitting changes.',
             registrationOpenTitle: 'Registration window is open',
             registrationOpenBody:
               'You can enroll now or move into waitlists for sections that are already full.',
             addDropTitle: 'Add/drop is active',
             addDropBody:
-              'Changes are still allowed, but this is the right moment to recheck schedules and billing.',
+              'Changes are still allowed, but this is the right moment to recheck schedules and capacity.',
             upcomingTitle: 'Registration has not opened yet',
             upcomingBody:
               'You can still build a plan now so the actual registration window starts with less friction.',
@@ -413,11 +379,6 @@ export default function RegisterPage() {
             planningTitle: 'Planning mode',
             planningBody:
               'This environment is currently focused on comparing sections, schedules, and the next action before enrollment is recorded.',
-            billingTitle: 'Billing follow-up',
-            billingBody: (count: number) =>
-              `${count} invoice(s) still have an outstanding or overdue balance. Review them before you lock the term plan.`,
-            billingClear: 'No invoice requires follow-up for the current planning context.',
-            openBilling: 'Open billing',
           },
           waitlist: {
             title: 'My waitlist',
@@ -461,7 +422,6 @@ export default function RegisterPage() {
             removeFromPlan: 'Remove from plan',
             joinWaitlist: 'Join waitlist',
             enrollNow: 'Enroll now',
-            resolveHold: 'Resolve billing first',
             resolveConflict: 'Resolve conflict first',
             planningOnly: 'Planning only',
             statusClosed: 'Closed',
@@ -482,8 +442,6 @@ export default function RegisterPage() {
             plannedSubmitted: (enrolled: number, waitlisted: number) =>
               `Processed ${enrolled} enrollment(s) and ${waitlisted} waitlist move(s) from the current plan.`,
             noPlannedSections: 'Add at least one section to the plan first.',
-            resolveBillingHold:
-              'Resolve overdue invoices before you submit new registration changes.',
             registrationWindowClosed:
               'The current registration window is not accepting new changes.',
             resolveScheduleConflict:
@@ -494,6 +452,11 @@ export default function RegisterPage() {
               'The plan still contains closed sections or schedule conflicts. Review it before submitting.',
           },
         };
+
+  const readOnlyCopy =
+    locale === 'vi'
+      ? 'Danh mục học phần và danh sách chờ đang ở chế độ chỉ đọc. API Java hiện chưa sở hữu thao tác đăng ký hoặc rời danh sách chờ.'
+      : 'The course catalog and waitlist are read-only. The Java API does not own enrollment or waitlist mutations yet.';
 
   const fetchBaseData = useCallback(async () => {
     setIsLoading(true);
@@ -506,13 +469,11 @@ export default function RegisterPage() {
         enrollmentsResult,
         waitlistResult,
         semestersResult,
-        invoicesResult,
       ] = await Promise.allSettled([
         sectionsApi.getAll({ limit: 150 }),
         enrollmentsApi.getMyEnrollments(),
         waitlistApi.getMyWaitlist(),
         semestersApi.getAll(),
-        financeApi.getMyInvoices(),
       ]);
 
       if (
@@ -547,15 +508,6 @@ export default function RegisterPage() {
       setWaitlistEntries(waitlistResult.status === 'fulfilled' ? waitlistResult.value : []);
       setSemesters(semestersResult.value.data ?? []);
       setDepartments(deriveDepartmentsFromSections(loadedSections));
-      setInvoices(
-        invoicesResult.status === 'fulfilled'
-          ? invoicesResult.value.map((invoice) => ({
-              id: invoice.id,
-              status: invoice.status,
-              balance: invoice.balance,
-            }))
-          : [],
-      );
 
       const preferredSemesterId = pickPreferredSemesterId(
         semestersResult.value.data,
@@ -758,27 +710,16 @@ export default function RegisterPage() {
   }, [plannedSections, seatConsumingEnrollments]);
 
   const registrationWindowState = getRegistrationWindowState(selectedSemesterRecord);
-  const overdueInvoices = invoices.filter((invoice) => invoice.status === 'OVERDUE');
   const waitlistOnlyCount = filteredSections.filter((section) => {
     const seatsLeft = Math.max(section.capacity - (section.enrolledCount ?? 0), 0);
     return section.status === 'OPEN' && seatsLeft === 0;
   }).length;
-  const outstandingInvoices = invoices.filter(
-    (invoice) => invoice.balance > 0 || invoice.status === 'OVERDUE',
-  );
   const waitlistOnlyView =
     filteredSections.length > 0 &&
     filteredSections.every((section) => {
       const seatsLeft = Math.max(section.capacity - (section.enrolledCount ?? 0), 0);
       return section.status !== 'OPEN' || seatsLeft === 0;
     });
-  const hasRegistrationHold = overdueInvoices.length > 0;
-  const registrationWindowAllowsChanges =
-    registrationWindowState === 'registration-open' ||
-    registrationWindowState === 'add-drop';
-  const canSubmitRegistrations =
-    registrationWindowAllowsChanges && !hasRegistrationHold;
-
   const togglePlannedSection = (sectionId: string) => {
     setPlannedSectionIds((current) =>
       current.includes(sectionId)
@@ -787,151 +728,12 @@ export default function RegisterPage() {
     );
   };
 
-  const getEnrollmentActionBlockMessage = (section?: Section) => {
-    if (hasRegistrationHold) {
-      return copy.toasts.resolveBillingHold;
-    }
-
-    if (!registrationWindowAllowsChanges) {
-      return copy.toasts.registrationWindowClosed;
-    }
-
-    if (section && section.status !== 'OPEN') {
-      return copy.toasts.sectionUnavailable;
-    }
-
-    if (section && conflictSectionIds.has(section.id)) {
-      return copy.toasts.resolveScheduleConflict;
-    }
-
-    return null;
-  };
-
-  const handleEnroll = async (section: Section) => {
-    if (!user?.studentId) {
-      toast.error(copy.toasts.missingProfile);
-      return;
-    }
-
-    const blockedMessage = getEnrollmentActionBlockMessage(section);
-    if (blockedMessage) {
-      toast.error(blockedMessage);
-      return;
-    }
-
-    setIsEnrolling(section.id);
-
-    try {
-      const result = await enrollmentsApi.enroll(section.id, locale);
-
-      if (result.kind === 'waitlist' && result.record.status === 'ACTIVE') {
-        toast.success(copy.toasts.waitlistSuccess(result.record.position));
-      } else {
-        toast.success(copy.toasts.enrollSuccess);
-      }
-
-      setPlannedSectionIds((current) => current.filter((id) => id !== section.id));
-      await fetchBaseData();
-    } catch (enrollError: any) {
-      toast.error(enrollError.response?.data?.message || copy.toasts.enrollFailed);
-    } finally {
-      setIsEnrolling(null);
-    }
-  };
-
-  const handleSubmitPlan = async () => {
-    if (!plannedSections.length) {
-      toast.error(copy.toasts.noPlannedSections);
-      return;
-    }
-
-    const blockedMessage = getEnrollmentActionBlockMessage();
-    if (blockedMessage) {
-      toast.error(blockedMessage);
-      return;
-    }
-
-    const hasPlanConflicts = plannedSections.some((section) =>
-      conflictSectionIds.has(section.id),
-    );
-    const hasUnavailableSections = plannedSections.some(
-      (section) => section.status !== 'OPEN',
-    );
-
-    if (hasPlanConflicts || hasUnavailableSections) {
-      toast.error(copy.toasts.planNeedsReview);
-      return;
-    }
-
-    setIsSubmittingPlan(true);
-
-    let enrolledCount = 0;
-    let waitlistedCount = 0;
-
-    try {
-      for (const section of plannedSections) {
-        if (enrolledSectionIds.has(section.id)) {
-          continue;
-        }
-
-        const result = await enrollmentsApi.enroll(section.id, locale);
-        if (result.kind === 'waitlist' && result.record.status === 'ACTIVE') {
-          waitlistedCount += 1;
-        } else {
-          enrolledCount += 1;
-        }
-      }
-
-      toast.success(copy.toasts.plannedSubmitted(enrolledCount, waitlistedCount));
-      setPlannedSectionIds([]);
-      await fetchBaseData();
-    } catch (submitError: any) {
-      toast.error(submitError.response?.data?.message || copy.toasts.enrollFailed);
-    } finally {
-      setIsSubmittingPlan(false);
-    }
-  };
-
-  const handleLeaveWaitlist = async (entry: WaitlistEntry) => {
-    const confirmed = await confirm({
-      title: copy.waitlist.confirmTitle,
-      message: copy.waitlist.confirmMessage,
-      confirmText: copy.waitlist.confirmAction,
-      variant: 'destructive',
-    });
-
-    if (!confirmed) {
-      return;
-    }
-
-    setIsRemovingWaitlist(entry.id);
-
-    try {
-      await waitlistApi.removeMyWaitlistEntry(entry.id);
-      toast.success(copy.toasts.waitlistRemoved);
-      await fetchBaseData();
-    } catch (nextError: any) {
-      toast.error(
-        nextError.response?.data?.message || copy.toasts.waitlistRemoveFailed,
-      );
-    } finally {
-      setIsRemovingWaitlist(null);
-    }
-  };
-
   if (authLoading || !hasAccess) {
     return <LoadingState label={copy.loading} />;
   }
 
   const readinessCard =
-    hasRegistrationHold
-      ? {
-          icon: ShieldAlert,
-          title: copy.readiness.holdTitle,
-          description: copy.readiness.holdBody(overdueInvoices.length),
-          tone: 'bg-rose-500/10 text-rose-600 dark:text-rose-300',
-        }
-      : registrationWindowState === 'registration-open'
+    registrationWindowState === 'registration-open'
       ? {
           icon: CheckCircle2,
           title: copy.readiness.registrationOpenTitle,
@@ -967,7 +769,7 @@ export default function RegisterPage() {
               };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
@@ -978,6 +780,11 @@ export default function RegisterPage() {
           </LocalizedLink>
         }
       />
+
+      <div className="portal-readonly-notice" role="status">
+        <ShieldAlert className="h-4 w-4 shrink-0" />
+        <span>{readOnlyCopy}</span>
+      </div>
 
       {error ? (
         <ErrorState
@@ -993,8 +800,9 @@ export default function RegisterPage() {
         <LoadingState label={copy.loading} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
             <WorkspaceMetricCard
+              compact
               label={copy.metrics.openSections}
               value={formatNumber(filteredSections.filter((section) => section.status === 'OPEN').length)}
               icon={<ClipboardList className="h-5 w-5" />}
@@ -1002,6 +810,7 @@ export default function RegisterPage() {
               toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-300"
             />
             <WorkspaceMetricCard
+              compact
               label={copy.metrics.currentEnrollments}
               value={formatNumber(enrollments.length)}
               icon={<BookOpen className="h-5 w-5" />}
@@ -1009,6 +818,7 @@ export default function RegisterPage() {
               toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-300"
             />
             <WorkspaceMetricCard
+              compact
               label={copy.metrics.waitlistOnly}
               value={formatNumber(waitlistOnlyCount)}
               icon={<Users className="h-5 w-5" />}
@@ -1016,6 +826,7 @@ export default function RegisterPage() {
               toneClassName="bg-amber-500/12 text-amber-600 dark:text-amber-300"
             />
             <WorkspaceMetricCard
+              compact
               label={copy.metrics.planned}
               value={formatNumber(plannedSections.length)}
               icon={<CalendarClock className="h-5 w-5" />}
@@ -1094,7 +905,7 @@ export default function RegisterPage() {
               variant="muted"
               contentClassName="space-y-4"
             >
-              <div className="rounded-lg border border-border/70 bg-card px-4 py-4">
+              <div className="portal-section-card rounded-md px-4 py-4">
                 <div className="flex items-start gap-3">
                   <div
                     className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${readinessCard.tone}`}
@@ -1111,30 +922,6 @@ export default function RegisterPage() {
                   </div>
                 </div>
               </div>
-              <div className="rounded-lg border border-border/70 bg-card px-4 py-4">
-                <div className="flex items-start gap-3">
-                  <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-[hsl(var(--accent-warm))/0.12] text-accent-warm">
-                    <Wallet className="h-5 w-5" />
-                  </div>
-                  <div className="min-w-0 flex-1">
-                    <div className="font-semibold text-foreground">
-                      {copy.readiness.billingTitle}
-                    </div>
-                    <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                      {outstandingInvoices.length > 0
-                        ? copy.readiness.billingBody(outstandingInvoices.length)
-                        : copy.readiness.billingClear}
-                    </p>
-                    <div className="mt-3">
-                      <LocalizedLink href="/dashboard/invoices">
-                        <Button type="button" variant="outline" size="sm">
-                          {copy.readiness.openBilling}
-                        </Button>
-                      </LocalizedLink>
-                    </div>
-                  </div>
-                </div>
-              </div>
             </WorkspacePanel>
           </div>
 
@@ -1144,32 +931,9 @@ export default function RegisterPage() {
               description={copy.planner.description}
               contentClassName="space-y-4"
               footer={
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div className="text-sm text-muted-foreground">
-                    {hasRegistrationHold
-                      ? copy.planner.holdMessage
-                      : canSubmitRegistrations
-                        ? copy.planner.review
-                        : copy.planner.planningMessage}
-                  </div>
-                  <Button
-                    type="button"
-                    onClick={() => void handleSubmitPlan()}
-                    disabled={
-                      !plannedSections.length ||
-                      isSubmittingPlan ||
-                      !canSubmitRegistrations
-                    }
-                  >
-                    {isSubmittingPlan ? (
-                      <span className="inline-flex items-center gap-2">
-                        <Loader2 className="h-4 w-4 animate-spin" />
-                        {copy.planner.submitting}
-                      </span>
-                    ) : (
-                      copy.planner.submit
-                    )}
-                  </Button>
+                <div className="portal-readonly-note">
+                  <ShieldAlert className="h-4 w-4 shrink-0" />
+                  <span>{readOnlyCopy}</span>
                 </div>
               }
             >
@@ -1219,7 +983,7 @@ export default function RegisterPage() {
                     return (
                       <div
                         key={section.id}
-                        className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                        className="portal-section-card rounded-md px-4 py-4"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-2">
@@ -1302,7 +1066,7 @@ export default function RegisterPage() {
                     return (
                       <div
                         key={entry.id}
-                        className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                        className="portal-section-card rounded-md px-4 py-4"
                       >
                         <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
                           <div className="space-y-2">
@@ -1318,21 +1082,9 @@ export default function RegisterPage() {
                               </span>
                             </div>
                           </div>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            onClick={() => void handleLeaveWaitlist(entry)}
-                            disabled={isRemovingWaitlist === entry.id}
-                          >
-                            {isRemovingWaitlist === entry.id ? (
-                              <span className="inline-flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                {copy.section.submitting}
-                              </span>
-                            ) : (
-                              copy.waitlist.leave
-                            )}
-                          </Button>
+                          <span className="max-w-[12rem] text-right text-xs leading-5 text-muted-foreground">
+                            {locale === 'vi' ? 'Chỉ đọc trong API Java' : 'Read-only in the Java API'}
+                          </span>
                         </div>
                       </div>
                     );
@@ -1368,147 +1120,147 @@ export default function RegisterPage() {
               }
             />
           ) : (
-            <div className="space-y-4">
-              {filteredSections.map((section) => {
-                const seatsLeft = Math.max(section.capacity - (section.enrolledCount ?? 0), 0);
-                const isEnrolled = enrolledSectionIds.has(section.id);
-                const inPlan = plannedSectionIds.includes(section.id);
-                const isJoinWaitlist = section.status === 'OPEN' && seatsLeft === 0;
-                const enrollmentActionBlockedMessage = getEnrollmentActionBlockMessage(section);
-                const actionDisabled =
-                  isEnrolled ||
-                  isEnrolling === section.id ||
-                  Boolean(enrollmentActionBlockedMessage);
-                const statusLabel =
-                  section.status === 'CANCELLED'
-                    ? copy.section.statusCancelled
-                    : section.status === 'CLOSED'
-                      ? copy.section.statusClosed
-                      : copy.section.statusOpen;
-                const actionLabel = isEnrolled
-                  ? copy.section.alreadyEnrolled
-                  : hasRegistrationHold
-                    ? copy.section.resolveHold
-                    : section.status === 'CANCELLED'
-                      ? copy.section.statusCancelled
-                      : section.status !== 'OPEN'
-                        ? copy.section.statusClosed
-                      : conflictSectionIds.has(section.id)
-                        ? copy.section.resolveConflict
-                        : !registrationWindowAllowsChanges
-                          ? copy.section.planningOnly
-                          : isJoinWaitlist
-                            ? copy.section.joinWaitlist
-                            : copy.section.enrollNow;
-                const localizedCourseName = getLocalizedName(
-                  locale,
-                  section.course,
-                  section.course?.name ?? section.course?.code ?? '',
-                );
-                const localizedDepartmentName = getLocalizedName(
-                  locale,
-                  section.course?.department,
-                  copy.section.departmentFallback,
-                );
+            <section className="portal-section-card overflow-hidden">
+              <div className="flex flex-col gap-2 border-b border-border/70 px-4 py-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                  <h2 className="font-bold text-foreground">
+                    {locale === 'vi' ? 'Danh sách lớp học phần' : 'Available sections'}
+                  </h2>
+                  <p className="mt-1 text-xs text-muted-foreground">
+                    {formatNumber(filteredSections.length)} {locale === 'vi' ? 'kết quả theo bộ lọc' : 'results in the current filter'}
+                  </p>
+                </div>
+                <span className="portal-status-badge">
+                  {locale === 'vi' ? 'Chỉ đọc' : 'Read-only'}
+                </span>
+              </div>
 
-                return (
-                  <Card key={section.id} variant="elevated">
-                    <CardContent className="pt-6">
-                      <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
-                        <div className="space-y-4">
-                          <div className="space-y-2">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <h2 className="text-lg font-semibold text-foreground">
-                                {section.course?.code} - {localizedCourseName}
-                              </h2>
-                              <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {copy.section.prefix} {section.sectionNumber}
-                              </span>
-                              <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                                  section.status === 'OPEN'
-                                    ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-300'
-                                    : section.status === 'CANCELLED'
-                                      ? 'bg-rose-500/12 text-rose-600 dark:text-rose-300'
-                                      : 'bg-secondary text-foreground'
-                                }`}
-                              >
-                                {statusLabel}
-                              </span>
-                              {seatsLeft <= 5 && seatsLeft > 0 ? (
-                                <span className="rounded-full bg-amber-500/12 px-2.5 py-1 text-xs font-medium text-amber-600 dark:text-amber-300">
-                                  {copy.section.nearCapacity}
-                                </span>
-                              ) : null}
-                              {conflictSectionIds.has(section.id) ? (
-                                <span className="rounded-full bg-rose-500/12 px-2.5 py-1 text-xs font-medium text-rose-600 dark:text-rose-300">
-                                  {copy.section.scheduleConflict}
-                                </span>
-                              ) : null}
-                            </div>
-                            <p className="text-sm leading-6 text-muted-foreground">
-                              {localizedDepartmentName}
-                            </p>
-                          </div>
+              <div className="hidden overflow-x-auto md:block">
+                <table className="portal-table w-full min-w-[980px] text-sm">
+                  <thead>
+                    <tr>
+                      <th className="px-3 py-3 text-left">{locale === 'vi' ? 'Môn học' : 'Course'}</th>
+                      <th className="px-3 py-3 text-left">{locale === 'vi' ? 'Bộ môn' : 'Department'}</th>
+                      <th className="px-3 py-3 text-left">{locale === 'vi' ? 'Lớp' : 'Section'}</th>
+                      <th className="px-3 py-3 text-left">{locale === 'vi' ? 'Lịch học' : 'Schedule'}</th>
+                      <th className="px-3 py-3 text-center">{locale === 'vi' ? 'Tín chỉ' : 'Credits'}</th>
+                      <th className="px-3 py-3 text-center">{locale === 'vi' ? 'Chỗ trống' : 'Seats'}</th>
+                      <th className="px-3 py-3 text-right">{locale === 'vi' ? 'Kế hoạch' : 'Plan'}</th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {filteredSections.map((section) => {
+                      const seatsLeft = Math.max(section.capacity - (section.enrolledCount ?? 0), 0);
+                      const isEnrolled = enrolledSectionIds.has(section.id);
+                      const inPlan = plannedSectionIds.includes(section.id);
+                      const localizedCourseName = getLocalizedName(
+                        locale,
+                        section.course,
+                        section.course?.name ?? section.course?.code ?? '',
+                      );
+                      const localizedDepartmentName = getLocalizedName(
+                        locale,
+                        section.course?.department,
+                        copy.section.departmentFallback,
+                      );
 
-                          <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                            <span>
-                              {formatNumber(section.course?.credits ?? 0)} {copy.section.creditsSuffix}
+                      return (
+                        <tr key={section.id}>
+                          <td className="px-3 py-3">
+                            <div className="font-semibold text-foreground">{section.course?.code}</div>
+                            <div className="max-w-[18rem] text-xs text-muted-foreground">{localizedCourseName}</div>
+                          </td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground">{localizedDepartmentName}</td>
+                          <td className="px-3 py-3">
+                            <div className="font-medium text-foreground">{section.sectionNumber}</div>
+                            <div className="text-xs text-muted-foreground">{section.status}</div>
+                          </td>
+                          <td className="px-3 py-3 text-xs text-muted-foreground">
+                            {section.schedules?.length
+                              ? section.schedules.map((schedule) => (
+                                  <div key={schedule.id} className="whitespace-nowrap">
+                                    {getDayName(schedule.dayOfWeek, locale)} {schedule.startTime}-{schedule.endTime}
+                                  </div>
+                                ))
+                              : '-'}
+                          </td>
+                          <td className="px-3 py-3 text-center">{formatNumber(section.course?.credits ?? 0)}</td>
+                          <td className="px-3 py-3 text-center">
+                            <span className={seatsLeft > 0 ? 'text-emerald-600' : 'text-rose-600'}>
+                              {formatNumber(seatsLeft)}/{formatNumber(section.capacity)}
                             </span>
-                            <span>
-                              {seatsLeft > 0 ? copy.section.seatsLeft(seatsLeft) : copy.section.full}
-                            </span>
-                          </div>
+                          </td>
+                          <td className="px-3 py-3 text-right">
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant={inPlan ? 'secondary' : 'outline'}
+                              onClick={() => togglePlannedSection(section.id)}
+                              disabled={isEnrolled}
+                            >
+                              {isEnrolled
+                                ? copy.section.alreadyEnrolled
+                                : inPlan
+                                  ? copy.section.removeFromPlan
+                                  : copy.section.addToPlan}
+                            </Button>
+                          </td>
+                        </tr>
+                      );
+                    })}
+                  </tbody>
+                </table>
+              </div>
 
-                          {section.schedules?.length ? (
-                            <div className="flex flex-wrap gap-2">
-                              {section.schedules.map((schedule) => (
-                                <span
-                                  key={schedule.id}
-                                  className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
-                                >
-                                  <Clock3 className="h-3.5 w-3.5" />
-                                  {getDayName(schedule.dayOfWeek, locale)} - {schedule.startTime}-{schedule.endTime}
-                                </span>
-                              ))}
-                            </div>
-                          ) : null}
-                        </div>
+              <div className="space-y-3 p-3 md:hidden">
+                {filteredSections.map((section) => {
+                  const seatsLeft = Math.max(section.capacity - (section.enrolledCount ?? 0), 0);
+                  const isEnrolled = enrolledSectionIds.has(section.id);
+                  const inPlan = plannedSectionIds.includes(section.id);
+                  const localizedCourseName = getLocalizedName(
+                    locale,
+                    section.course,
+                    section.course?.name ?? section.course?.code ?? '',
+                  );
 
-                        <div className="flex flex-col gap-3 xl:min-w-[240px]">
-                          <Button
-                            type="button"
-                            variant={inPlan ? 'secondary' : 'outline'}
-                            onClick={() => togglePlannedSection(section.id)}
-                            disabled={isEnrolled}
-                          >
-                            {inPlan ? copy.section.removeFromPlan : copy.section.addToPlan}
-                          </Button>
-                          <Button
-                            type="button"
-                            onClick={() => void handleEnroll(section)}
-                            disabled={actionDisabled}
-                          >
-                            {isEnrolling === section.id ? (
-                              <span className="inline-flex items-center gap-2">
-                                <Loader2 className="h-4 w-4 animate-spin" />
-                                {copy.section.submitting}
-                              </span>
-                            ) : (
-                              actionLabel
-                            )}
-                          </Button>
+                  return (
+                    <article key={`${section.id}-mobile`} className="rounded-md border border-border/70 bg-card p-3">
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0">
+                          <p className="text-xs font-bold uppercase text-primary">{section.course?.code}</p>
+                          <h3 className="mt-1 break-words font-semibold text-foreground">{localizedCourseName}</h3>
+                          <p className="mt-1 text-xs text-muted-foreground">
+                            {copy.section.prefix} {section.sectionNumber} · {formatNumber(section.course?.credits ?? 0)} {copy.section.creditsSuffix}
+                          </p>
                         </div>
+                        <span className="portal-status-badge min-w-0">{section.status}</span>
                       </div>
-                    </CardContent>
-                  </Card>
-                );
-              })}
-            </div>
+                      <div className="mt-3 flex items-center justify-between gap-3 border-t border-border/60 pt-3">
+                        <span className="text-xs text-muted-foreground">
+                          {seatsLeft > 0 ? copy.section.seatsLeft(seatsLeft) : copy.section.full}
+                        </span>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inPlan ? 'secondary' : 'outline'}
+                          onClick={() => togglePlannedSection(section.id)}
+                          disabled={isEnrolled}
+                        >
+                          {isEnrolled
+                            ? copy.section.alreadyEnrolled
+                            : inPlan
+                              ? copy.section.removeFromPlan
+                              : copy.section.addToPlan}
+                        </Button>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </section>
           )}
         </>
       )}
-      {confirmationDialog}
     </div>
   );
 }

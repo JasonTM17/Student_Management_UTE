@@ -7,6 +7,8 @@ health:
   readiness-key: test-health-key
 
 migration:
+  course-api:
+    enabled: false
   thesis-read:
     enabled: true
   notifications-read:

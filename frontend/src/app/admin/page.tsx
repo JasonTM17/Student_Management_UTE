@@ -2,15 +2,15 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, BarChart3, Bell, BookMarked, BookOpen, Building2, CreditCard, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, Building2, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { analyticsApi } from '@/lib/api';
+import { coursesApi, enrollmentsApi, lecturersApi, studentsApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard, AdminTableCard } from '@/components/admin/AdminSurface';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
-import { ErrorState, LoadingState } from '@/components/ui/state-block';
+import { ErrorState, ForbiddenState, LoadingState } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
 
 interface QuickStats {
@@ -85,20 +85,6 @@ const menuItems = [
     tone: 'bg-orange-500/12 text-orange-600 dark:text-orange-400',
   },
   {
-    href: '/admin/analytics',
-    icon: BarChart3,
-    label: 'Analytics',
-    description: 'Review operational reporting and top-level data health.',
-    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    href: '/admin/invoices',
-    icon: CreditCard,
-    label: 'Invoices',
-    description: 'Handle tuition invoicing, balances, and payment review.',
-    tone: 'bg-lime-500/12 text-lime-600 dark:text-lime-400',
-  },
-  {
     href: '/admin/announcements',
     icon: Bell,
     label: 'Announcements',
@@ -106,6 +92,8 @@ const menuItems = [
     tone: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
   },
 ];
+
+const visibleMenuItems = menuItems.map((item, index) => ({ item, index }));
 
 export default function AdminDashboardPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
@@ -141,12 +129,17 @@ export default function AdminDashboardPage() {
     setError('');
 
     try {
-      const data = await analyticsApi.getOverview();
+      const [students, lecturers, courses, enrollments] = await Promise.all([
+        studentsApi.getAll({ page: 1, limit: 1 }),
+        lecturersApi.getAll({ page: 1, limit: 1 }),
+        coursesApi.getAll({ page: 1, limit: 1 }),
+        enrollmentsApi.getAll({ page: 1, limit: 1 }),
+      ]);
       setStats({
-        totalStudents: data.totalStudents || 0,
-        totalLecturers: data.totalLecturers || 0,
-        totalCourses: data.totalCourses || 0,
-        totalEnrollments: data.totalEnrollments || 0,
+        totalStudents: students.meta?.total || 0,
+        totalLecturers: lecturers.meta?.total || 0,
+        totalCourses: courses.meta?.total || 0,
+        totalEnrollments: enrollments.meta?.total || 0,
       });
     } catch {
       setError(messages.admin.unavailableDescription);
@@ -163,8 +156,25 @@ export default function AdminDashboardPage() {
     void fetchStats();
   }, [canAccess, fetchStats]);
 
-  if (isAuthLoading || isLoggingOut || !canAccess) {
+  if (isAuthLoading || isLoggingOut || !user) {
     return <LoadingState label={messages.admin.loading} className="m-8" />;
+  }
+
+  if (!canAccess) {
+    return (
+      <ForbiddenState
+        title={messages.common.states.forbiddenTitle}
+        description={messages.common.states.forbiddenDescription}
+        action={
+          <Button asChild variant="outline">
+            <LocalizedLink href="/dashboard">
+              {messages.common.actions.openDashboard}
+            </LocalizedLink>
+          </Button>
+        }
+        className="m-8"
+      />
+    );
   }
 
   const statCards = [
@@ -203,19 +213,12 @@ export default function AdminDashboardPage() {
       title={messages.admin.title}
       description={messages.admin.description}
       actions={
-        <>
-          <Button asChild variant="outline">
-            <LocalizedLink href="/admin/users">
-              <UserPlus className="mr-2 h-4 w-4" />
-              {messages.common.actions.addUser}
-            </LocalizedLink>
-          </Button>
-          <Button asChild>
-            <LocalizedLink href="/admin/analytics">
-              {messages.common.actions.openAnalytics}
-            </LocalizedLink>
-          </Button>
-        </>
+        <Button asChild variant="outline">
+          <LocalizedLink href="/admin/users">
+            <UserPlus className="mr-2 h-4 w-4" />
+            {messages.common.actions.addUser}
+          </LocalizedLink>
+        </Button>
       }
     >
       {error ? (
@@ -247,7 +250,7 @@ export default function AdminDashboardPage() {
             contentClassName="space-y-0"
           >
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-              {menuItems.map((item, index) => {
+              {visibleMenuItems.map(({ item, index }) => {
                 const localizedItem = messages.admin.menuItems[index] ?? [
                   item.label,
                   item.description,

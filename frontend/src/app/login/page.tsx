@@ -13,7 +13,6 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { useI18n } from '@/i18n';
-import { getLocalEdgeOrigin, isLocalPreviewHost } from '@/lib/site';
 import { toast } from 'sonner';
 
 export const dynamic = 'force-dynamic';
@@ -58,51 +57,37 @@ export default function LoginPage() {
       return;
     }
 
-    if (!isLocalPreviewHost(window.location.hostname)) {
-      setRuntimeNotice(null);
-      return;
-    }
-
-    const localEdgeOrigin = getLocalEdgeOrigin();
-    const usingPreviewServer = window.location.origin !== localEdgeOrigin;
-
-    if (!usingPreviewServer) {
-      setRuntimeNotice(null);
-      return;
-    }
+    const apiBaseUrl = (process.env.NEXT_PUBLIC_API_URL || '/api/v1').replace(/\/$/, '');
+    const apiOrigin = new URL(apiBaseUrl, window.location.origin).origin;
 
     let cancelled = false;
 
     const checkRuntime = async () => {
-      const probeTargets = ['/health', '/api/docs'];
-
       try {
-        for (const target of probeTargets) {
-          const response = await fetch(target, {
-            cache: 'no-store',
-          });
+        const response = await fetch(`${apiBaseUrl}/health/liveness`, {
+          cache: 'no-store',
+        });
 
-          if (cancelled) {
-            return;
-          }
+        if (cancelled) {
+          return;
+        }
 
-          if (response.ok) {
-            setRuntimeNotice(null);
-            return;
-          }
+        if (response.ok) {
+          setRuntimeNotice(null);
+          return;
         }
 
         setRuntimeNotice({
           tone: 'warning',
           title: messages.login.runtimeNotice.warningTitle,
-          body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
+          body: messages.login.runtimeNotice.warningBody.replace('{origin}', apiOrigin),
         });
       } catch {
         if (!cancelled) {
           setRuntimeNotice({
             tone: 'warning',
             title: messages.login.runtimeNotice.warningTitle,
-            body: messages.login.runtimeNotice.warningBody.replace('{origin}', localEdgeOrigin),
+            body: messages.login.runtimeNotice.warningBody.replace('{origin}', apiOrigin),
           });
         }
       }
@@ -113,8 +98,6 @@ export default function LoginPage() {
       cancelled = true;
     };
   }, [
-    messages.login.runtimeNotice.infoBody,
-    messages.login.runtimeNotice.infoTitle,
     messages.login.runtimeNotice.warningBody,
     messages.login.runtimeNotice.warningTitle,
   ]);

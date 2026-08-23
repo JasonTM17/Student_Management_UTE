@@ -17,8 +17,8 @@
   <rect x="840" y="426" width="432" height="18" rx="9" fill="#E2E8F0"/>
   <rect x="840" y="464" width="356" height="18" rx="9" fill="#E2E8F0"/>
   <rect x="128" y="632" width="1168" height="248" rx="28" fill="#101826"/>
-  <text x="176" y="704" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Why microservices for CampusCore</text>
-  <text x="176" y="748" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="24">Smaller blast radius, clear auth ownership, easier workload scaling, and cleaner operator handoff.</text>
+  <text x="176" y="704" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Why CampusCore is moving to a Java monolith</text>
+  <text x="176" y="748" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="24">One backend, clearer ownership, cleaner handoff, and calmer UI boundaries.</text>
   <rect x="176" y="786" width="312" height="54" rx="18" fill="#1E293B"/>
   <rect x="504" y="786" width="312" height="54" rx="18" fill="#1E293B"/>
   <rect x="832" y="786" width="312" height="54" rx="18" fill="#1E293B"/>

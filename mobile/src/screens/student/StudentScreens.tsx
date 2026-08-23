@@ -35,8 +35,8 @@ const grades = [
 ];
 
 const invoices = [
-  { number: 'INV-2026-0041', term: 'Spring 2026', amount: '₫2,450,000', status: 'Pending', tone: 'warning' as const },
-  { number: 'INV-2025-0117', term: 'Fall 2025', amount: '₫0', status: 'Paid', tone: 'success' as const },
+  { number: 'INV-2026-0041', term: 'Spring 2026', amount: 'Tuition balance', status: 'Pending', tone: 'warning' as const },
+  { number: 'INV-2025-0117', term: 'Fall 2025', amount: 'Paid in full', status: 'Paid', tone: 'success' as const },
 ];
 
 const notifications = [
@@ -93,8 +93,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
       <View style={styles.actionGrid}>
         <Button label="Register courses" onPress={() => navigation.navigate('registration')} variant="secondary" style={styles.actionButton} />
         <Button label="View thesis" onPress={() => navigation.navigate('thesis.topics')} variant="secondary" style={styles.actionButton} />
-        <Button label="Ask assistant" onPress={() => navigation.navigate('assistant.chat')} variant="secondary" style={styles.actionButton} />
-        <Button label="Open invoices" onPress={() => navigation.navigate('invoices')} variant="secondary" style={styles.actionButton} />
+        <Button label="Open alerts" onPress={() => navigation.navigate('notifications')} variant="secondary" style={styles.actionButton} />
       </View>
     </ScreenShell>
   );
@@ -198,8 +197,8 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
       <ScreenSpacer />
       <Card tone="low">
         <UiText variant="label">Need a transcript?</UiText>
-        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Downloadable transcripts will use the Java API contract when it is connected.</UiText>
-        <Button label="Ask assistant" onPress={() => navigation.navigate('assistant.chat')} variant="secondary" />
+        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Downloadable transcripts will appear here when records are connected.</UiText>
+        <Button label="View profile" onPress={() => navigation.navigate('profile')} variant="secondary" />
       </Card>
     </ScreenShell>
   );
@@ -284,7 +283,7 @@ export function InvoicesScreen({ navigation }: MobileScreenProps) {
         <Button label="Continue to payment" onPress={() => undefined} style={styles.invoiceButton} />
       </Card>
       <ScreenSpacer />
-      <SectionHeading title="Recent invoices" actionLabel="Ask assistant" onAction={() => navigation.navigate('assistant.chat')} />
+      <SectionHeading title="Recent payment records" actionLabel="Profile" onAction={() => navigation.navigate('profile')} />
       {invoices.map((invoice) => (
         <Card key={invoice.number} style={styles.invoiceCard}>
           <View style={styles.courseHeader}>
@@ -355,9 +354,9 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
       </Card>
       <ScreenSpacer />
       <Card tone="low">
-        <UiText variant="label">Need help?</UiText>
-        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Ask the academic assistant about your schedule, grades, or thesis journey.</UiText>
-        <Button label="Open assistant" onPress={() => navigation.navigate('assistant.chat')} variant="secondary" />
+        <UiText variant="label">Next step</UiText>
+        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Keep your profile details current before the next registration window.</UiText>
+        <Button label="View thesis progress" onPress={() => navigation.navigate('thesis.progress')} variant="secondary" />
       </Card>
       <Button label="Sign out" onPress={navigation.signOut} variant="text" style={styles.signOut} />
     </ScreenShell>

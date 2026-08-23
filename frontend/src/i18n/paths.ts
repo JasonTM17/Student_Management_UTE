@@ -2,6 +2,26 @@ import { defaultLocale, isLocale, type Locale } from '@/i18n/config';
 
 const PREFIX_PATTERN = /^\/(en|vi)(?=\/|$)/;
 
+export interface RouteTargetParts {
+  pathname: string;
+  search: string;
+  hash: string;
+}
+
+export function splitRouteTarget(target: string): RouteTargetParts {
+  const normalized = target.startsWith('/') ? target : `/${target}`;
+  const hashIndex = normalized.indexOf('#');
+  const withoutHash = hashIndex >= 0 ? normalized.slice(0, hashIndex) : normalized;
+  const hash = hashIndex >= 0 ? normalized.slice(hashIndex) : '';
+  const searchIndex = withoutHash.indexOf('?');
+
+  return {
+    pathname: searchIndex >= 0 ? withoutHash.slice(0, searchIndex) : withoutHash,
+    search: searchIndex >= 0 ? withoutHash.slice(searchIndex) : '',
+    hash,
+  };
+}
+
 export function normalizePathname(pathname: string) {
   if (!pathname) {
     return '/';
@@ -44,18 +64,26 @@ export function buildCanonicalPath(pathname: string, locale: Locale) {
   return addLocalePrefix(pathname, locale);
 }
 
+export function canonicalizeRouteTarget(target: string) {
+  const parts = splitRouteTarget(target);
+  const pathname = stripLocaleFromPathname(parts.pathname).pathname;
+  return `${pathname}${parts.search}${parts.hash}`;
+}
+
 export function localizePathname(
   pathname: string,
   locale: Locale,
   isPrefixed: boolean,
 ) {
-  const normalized = stripLocaleFromPathname(pathname).pathname;
+  const parts = splitRouteTarget(pathname);
+  const normalized = stripLocaleFromPathname(parts.pathname).pathname;
+  const suffix = `${parts.search}${parts.hash}`;
 
   if (!isPrefixed && locale === defaultLocale) {
-    return normalized;
+    return `${normalized}${suffix}`;
   }
 
-  return addLocalePrefix(normalized, locale);
+  return `${addLocalePrefix(normalized, locale)}${suffix}`;
 }
 
 export function buildLocaleSwitchPath(
@@ -64,17 +92,17 @@ export function buildLocaleSwitchPath(
   search = '',
   hash = '',
 ) {
-  return `${addLocalePrefix(pathname, locale)}${search}${hash}`;
+  const parts = splitRouteTarget(pathname);
+  return `${addLocalePrefix(parts.pathname, locale)}${search || parts.search}${hash || parts.hash}`;
 }
 
 export function isBypassedPath(pathname: string) {
+  const routePath = splitRouteTarget(pathname).pathname;
   return (
-    pathname.startsWith('/api') ||
-    pathname.startsWith('/_next') ||
-    pathname.startsWith('/health') ||
-    pathname.startsWith('/socket.io') ||
-    pathname.startsWith('/notifications') ||
-    /\.[a-z0-9]+$/i.test(pathname)
+    routePath.startsWith('/api') ||
+    routePath.startsWith('/_next') ||
+    routePath.startsWith('/health') ||
+    /\.[a-z0-9]+$/i.test(routePath)
   );
 }
 

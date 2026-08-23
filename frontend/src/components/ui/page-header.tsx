@@ -41,25 +41,27 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'flex flex-col gap-5 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between',
+        'portal-page-header flex flex-col gap-4 sm:flex-row sm:items-end sm:justify-between',
         className,
       )}
     >
-      <div className="space-y-3">
-        {eyebrow ? eyebrow : null}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+      <div className="portal-page-header-copy min-w-0 space-y-2">
+        {eyebrow ? <div className="portal-section-ribbon">{eyebrow}</div> : null}
+        <div className="space-y-1">
+          <h1 className="text-xl font-bold leading-tight tracking-tight sm:text-2xl">
             {title}
           </h1>
           {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="max-w-4xl text-xs leading-5 text-muted-foreground sm:text-sm">
               {description}
             </p>
           ) : null}
         </div>
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-3">{actions}</div>
+        <div className="portal-page-header-actions flex shrink-0 flex-wrap items-center gap-2">
+          {actions}
+        </div>
       ) : null}
     </header>
   );

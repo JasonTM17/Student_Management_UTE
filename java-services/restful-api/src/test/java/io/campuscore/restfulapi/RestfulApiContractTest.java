@@ -46,6 +46,18 @@ class RestfulApiContractTest {
     }
 
     @Test
+    void openApiAndActuatorReadinessArePublic() throws Exception {
+        mvc.perform(get("/api/docs/openapi.json"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.openapi").isString())
+                .andExpect(jsonPath("$.paths['/api/v1/health/liveness']").exists());
+
+        mvc.perform(get("/actuator/health/readiness"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("UP"));
+    }
+
+    @Test
     void protectedRoutesRejectAnonymousRequests() throws Exception {
         mvc.perform(get("/api/v1/me"))
                 .andExpect(status().isUnauthorized())

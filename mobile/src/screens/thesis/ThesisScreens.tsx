@@ -16,9 +16,9 @@ import { tokens } from '../../design/tokens';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const topics = [
-  { id: 'TH-024', title: 'AI-enabled library assistant', supervisor: 'Dr. Le Minh', status: 'Open', tone: 'success' as const },
+  { id: 'TH-024', title: 'Digital library discovery', supervisor: 'Dr. Le Minh', status: 'Open', tone: 'success' as const },
   { id: 'TH-031', title: 'Inclusive campus navigation', supervisor: 'Ms. Hoang Lan', status: 'Open', tone: 'success' as const },
-  { id: 'TH-039', title: 'Learning analytics for continuity', supervisor: 'Assoc. Prof. Tran Ha', status: 'Reviewing', tone: 'warning' as const },
+  { id: 'TH-039', title: 'Learning continuity study', supervisor: 'Assoc. Prof. Tran Ha', status: 'Reviewing', tone: 'warning' as const },
 ];
 
 export function ThesisTopicsScreen({ navigation }: MobileScreenProps) {
@@ -55,11 +55,11 @@ export function ThesisTopicsScreen({ navigation }: MobileScreenProps) {
 
 export function ThesisDetailScreen({ navigation }: MobileScreenProps) {
   return (
-    <ScreenShell title="Topic detail" eyebrow="TH-024 · Open" subtitle="AI-enabled library assistant">
+    <ScreenShell title="Topic detail" eyebrow="TH-024 · Open" subtitle="Digital library discovery">
       <Card style={styles.detailCard}>
         <View style={styles.topicHeader}>
           <View style={styles.topicCopy}>
-            <UiText variant="headlineSmall">AI-enabled library assistant</UiText>
+            <UiText variant="headlineSmall">Digital library discovery</UiText>
             <UiText variant="bodySmall" tone="muted">Supervisor · Dr. Le Minh</UiText>
           </View>
           <Badge label="Open" tone="success" />
@@ -67,7 +67,7 @@ export function ThesisDetailScreen({ navigation }: MobileScreenProps) {
         <Divider />
         <UiText variant="label">Research brief</UiText>
         <UiText variant="bodySmall" tone="muted" style={styles.copy}>
-          Design a grounded assistant that helps students discover library resources while keeping recommendations transparent and useful.
+          Design a clear library discovery workflow that helps students find resources and understand why each result is useful.
         </UiText>
         <View style={styles.tagRow}>
           <Badge label="NLP" tone="primary" />
@@ -104,7 +104,7 @@ export function ThesisRegistrationScreen({ navigation }: MobileScreenProps) {
       <ScreenSpacer />
       <Card>
         <SectionHeading title="Selected topic" />
-        <UiText variant="headlineSmall">AI-enabled library assistant</UiText>
+        <UiText variant="headlineSmall">Digital library discovery</UiText>
         <UiText variant="bodySmall" tone="muted" style={styles.copy}>TH-024 · Dr. Le Minh · 12 credits</UiText>
         <Button label="Change topic" onPress={() => navigation.navigate('thesis.topics')} variant="text" />
       </Card>
@@ -158,7 +158,6 @@ export function ThesisProgressScreen({ navigation }: MobileScreenProps) {
         ))}
       </Card>
       <ScreenSpacer />
-      <Button label="Ask the assistant" onPress={() => navigation.navigate('assistant.chat')} variant="secondary" />
     </ScreenShell>
   );
 }

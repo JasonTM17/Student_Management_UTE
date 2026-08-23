@@ -33,7 +33,7 @@ test('student can traverse people and academic routes without losing jwt-backed 
   await visitRoutes(page, studentRoutes);
 });
 
-test('people-service read-through keeps student enrollment history reachable through the public path', async ({
+test('Java REST API keeps student enrollment history reachable through the public path', async ({
   playwright,
 }) => {
   const api = await playwright.request.newContext();

@@ -245,7 +245,7 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
@@ -295,7 +295,7 @@ export default function SchedulePage() {
       ) : (
         <>
           <div className="grid gap-4 md:grid-cols-3">
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.weeklyMeetings}</div>
@@ -308,7 +308,7 @@ export default function SchedulePage() {
                 </div>
               </CardContent>
             </Card>
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.coursesInRotation}</div>
@@ -325,7 +325,7 @@ export default function SchedulePage() {
                 </div>
               </CardContent>
             </Card>
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
                 <div>
                   <div className="text-sm text-muted-foreground">{copy.teachingSpaces}</div>
@@ -350,12 +350,12 @@ export default function SchedulePage() {
             </Card>
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.1fr_0.9fr]">
-            <Card variant="muted">
+          <div className="grid gap-6 2xl:grid-cols-[1.1fr_0.9fr]">
+            <Card variant="muted" className="portal-section-card">
               <CardHeader>
                 <CardTitle className="text-xl">{copy.weeklyAgenda}</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
+              <CardContent className="grid gap-4 sm:grid-cols-2">
                 {localizedDayNames.slice(1, 6).map((dayName, index) => {
                   const dayOfWeek = index + 1;
                   const items = agendaByDay[dayOfWeek] ?? [];
@@ -365,9 +365,9 @@ export default function SchedulePage() {
                       key={dayName}
                       className="rounded-lg border border-border/70 bg-card px-4 py-4"
                     >
-                      <div className="mb-3 flex items-center justify-between">
-                        <h2 className="font-semibold text-foreground">{dayName}</h2>
-                        <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
+                      <div className="mb-3 flex items-start justify-between gap-3">
+                        <h2 className="min-w-0 font-semibold text-foreground">{dayName}</h2>
+                        <span className="shrink-0 whitespace-nowrap text-xs text-muted-foreground">
                           {formatNumber(items.length)}{' '}
                           {items.length === 1 ? copy.item : copy.items}
                         </span>
@@ -382,9 +382,9 @@ export default function SchedulePage() {
                           {items.map((item) => (
                             <div
                               key={item.id}
-                              className="rounded-lg border border-border/60 bg-secondary/30 px-4 py-3"
+                              className="min-w-0 rounded-lg border border-border/60 bg-secondary/30 px-4 py-3"
                             >
-                              <div className="font-medium text-foreground">
+                              <div className="break-words font-medium text-foreground">
                                 {getLocalizedCourseLabel(
                                   locale,
                                   {
@@ -421,7 +421,7 @@ export default function SchedulePage() {
               </CardContent>
             </Card>
 
-            <Card variant="elevated">
+            <Card variant="elevated" className="portal-section-card">
               <CardHeader>
                 <CardTitle className="text-xl">{copy.upcomingClassList}</CardTitle>
               </CardHeader>
@@ -429,7 +429,7 @@ export default function SchedulePage() {
                 {agenda.map((item) => (
                   <div
                     key={item.id}
-                    className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                    className="min-w-0 rounded-lg border border-border/70 bg-card px-4 py-4"
                   >
                     <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                       <div>

@@ -211,7 +211,7 @@ export default function AdminSemestersPage() {
           unavailableTitle: 'Semesters unavailable',
           emptyTitle: 'No matching semesters',
           emptyDescription:
-            'Create a semester to anchor sections, invoices, registration timing, and reporting.',
+            'Create a semester to anchor sections, registration timing, and academic planning.',
           tableTitle: 'Semester records',
           headers: {
             name: 'Name',

@@ -30,8 +30,31 @@ export function Modal({
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
 
   React.useEffect(() => {
-    const handleEscape = (e: KeyboardEvent) => {
-      if (e.key === 'Escape') onClose();
+    const handleKeyDown = (e: KeyboardEvent) => {
+      if (e.key === 'Escape') {
+        onClose();
+        return;
+      }
+
+      if (e.key !== 'Tab' || !dialogRef.current) return;
+
+      const focusable = Array.from(
+        dialogRef.current.querySelectorAll<HTMLElement>(
+          'a[href], button:not([disabled]), textarea:not([disabled]), input:not([disabled]), select:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      );
+
+      if (focusable.length === 0) return;
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      if (e.shiftKey && document.activeElement === first) {
+        e.preventDefault();
+        last.focus();
+      } else if (!e.shiftKey && document.activeElement === last) {
+        e.preventDefault();
+        first.focus();
+      }
     };
 
     if (!isOpen) {
@@ -43,7 +66,8 @@ export function Modal({
         ? document.activeElement
         : null;
 
-    document.addEventListener('keydown', handleEscape);
+    const previousBodyOverflow = document.body.style.overflow;
+    document.addEventListener('keydown', handleKeyDown);
     document.body.style.overflow = 'hidden';
 
     requestAnimationFrame(() => {
@@ -54,8 +78,8 @@ export function Modal({
     });
 
     return () => {
-      document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      document.removeEventListener('keydown', handleKeyDown);
+      document.body.style.overflow = previousBodyOverflow;
       previousFocusRef.current?.focus();
     };
   }, [isOpen, onClose]);
@@ -75,6 +99,7 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
+          aria-label={title ? undefined : messages.common.states.dialog}
           tabIndex={-1}
           className={cn(
             'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-lg border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',

@@ -14,7 +14,6 @@ import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.Map;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -25,10 +24,9 @@ import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
-/** Disabled-by-default Java auth session endpoints for the monolith migration. */
+/** Auth session endpoints for the course API runtime. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/auth")
 public class AuthLoginController {
 

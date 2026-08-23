@@ -3,13 +3,13 @@ import { cva, type VariantProps } from 'class-variance-authority';
 import { cn } from '@/lib/utils';
 
 const cardVariants = cva(
-  'rounded-lg border text-card-foreground shadow-sm',
+  'rounded-md border text-card-foreground shadow-none',
   {
     variants: {
       variant: {
         default: 'bg-card border-border/80',
         muted: 'bg-secondary/45 border-border/60',
-        elevated: 'bg-card border-border/70 surface-shadow',
+        elevated: 'bg-card border-border/75',
         contrast:
           'bg-[hsl(var(--surface-alt))] border-white/10 text-card-foreground',
       },
@@ -38,7 +38,7 @@ const CardHeader = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex flex-col space-y-1.5 p-6', className)}
+    className={cn('flex flex-col space-y-1.5 p-4 sm:p-5', className)}
     {...props}
   />
 ))
@@ -51,7 +51,7 @@ const CardTitle = React.forwardRef<
   <h3
     ref={ref}
     className={cn(
-      'text-xl font-semibold leading-tight tracking-tight',
+      'text-base font-semibold leading-tight tracking-tight',
       className
     )}
     {...props}
@@ -65,7 +65,7 @@ const CardDescription = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <p
     ref={ref}
-    className={cn('text-sm leading-6 text-muted-foreground', className)}
+    className={cn('text-xs leading-5 text-muted-foreground sm:text-sm', className)}
     {...props}
   />
 ))
@@ -75,7 +75,7 @@ const CardContent = React.forwardRef<
   HTMLDivElement,
   React.HTMLAttributes<HTMLDivElement>
 >(({ className, ...props }, ref) => (
-  <div ref={ref} className={cn('p-6 pt-0', className)} {...props} />
+  <div ref={ref} className={cn('p-4 pt-0 sm:p-5 sm:pt-0', className)} {...props} />
 ))
 CardContent.displayName = 'CardContent';
 
@@ -85,7 +85,7 @@ const CardFooter = React.forwardRef<
 >(({ className, ...props }, ref) => (
   <div
     ref={ref}
-    className={cn('flex items-center p-6 pt-0', className)}
+    className={cn('flex items-center p-4 pt-0 sm:p-5 sm:pt-0', className)}
     {...props}
   />
 ))

@@ -6,7 +6,6 @@ import {
 } from '@playwright/test';
 import { mkdir, readFile, writeFile } from 'node:fs/promises';
 import path from 'node:path';
-import { io, type Socket } from 'socket.io-client';
 
 export const isExternalStack = process.env.E2E_EXTERNAL_STACK === '1';
 export const frontendBaseURL =
@@ -16,19 +15,12 @@ export const apiBaseURL =
   process.env.E2E_API_URL ??
   (isExternalStack
     ? 'http://127.0.0.1/api/v1'
-    : 'http://127.0.0.1:4100/api/v1');
-// Session setup may use a separately published auth-service endpoint in the
-// shared external Compose stack. This keeps seeded-session creation from
-// exhausting the public gateway throttle while the edge auth contract remains
-// covered by the dedicated gateway tests.
+    : 'http://127.0.0.1:4010/api/v1');
+// Session setup uses the single Java REST API by default. An explicit override
+// remains available for externally managed demo environments.
 export const authLoginBaseURL =
   process.env.E2E_AUTH_LOGIN_URL ?? apiBaseURL;
 export const apiOrigin = new URL(apiBaseURL).origin;
-export const notificationsURL = new URL(
-  '/notifications',
-  frontendBaseURL,
-).toString();
-
 export const SEEDED_USERS = {
   admin: {
     email: 'admin@campuscore.edu',
@@ -68,10 +60,6 @@ const dashboardProfileToggleName =
   /Toggle profile menu|Bật tắt menu hồ sơ/i;
 const adminBackLinkName =
   /Back to admin dashboard|Quay lại bảng điều khiển quản trị/i;
-const invoiceDetailsCloseName =
-  /Close invoice details|Đóng chi tiết hóa đơn/i;
-const studentInformationHeading =
-  /Student information|Thông tin sinh viên/i;
 const lecturerBackLinkName =
   /Back to lecturer dashboard|Quay lại bảng điều khiển giảng viên/i;
 const nextActionsHeading =
@@ -82,8 +70,6 @@ const accountProfileHeading =
   /Account profile|Hồ sơ tài khoản/i;
 const passwordSafetyHeading =
   /Password and session safety|Mật khẩu và an toàn phiên/i;
-const invoiceDetailsHeading =
-  /Invoice details|Chi tiết hóa đơn/i;
 const quickActionsHeading =
   /Quick actions|Tác vụ nhanh/i;
 const gradingQueueHeading =
@@ -168,28 +154,6 @@ export const studentRoutes: RouteSpec[] = [
       ).toBeVisible({ timeout: timeoutMs });
     },
   },
-  {
-    path: '/dashboard/invoices',
-    heading: /^Invoices$/i,
-    controls: [{ role: 'button', name: /View details for invoice/i }],
-    ready: async (page) => {
-      await page
-        .getByRole('button', { name: /View details for invoice/i })
-        .first()
-        .click();
-      await expect(
-        page.getByRole('heading', { name: invoiceDetailsHeading }),
-      ).toBeVisible();
-      const closeButton = page.getByRole('button', {
-        name: invoiceDetailsCloseName,
-      });
-      await expect(closeButton).toBeVisible();
-      await closeButton.click();
-      await expect(
-        page.getByRole('heading', { name: invoiceDetailsHeading }),
-      ).toBeHidden();
-    },
-  },
 ];
 
 export const adminHomeRoute: RouteSpec = {
@@ -197,7 +161,6 @@ export const adminHomeRoute: RouteSpec = {
   heading: /^Admin dashboard$/i,
   controls: [
     { role: 'link', name: 'Add user' },
-    { role: 'link', name: 'Open analytics' },
   ],
   ready: async (page, timeoutMs) => {
     await expect(
@@ -303,61 +266,6 @@ export const adminRoutes: RouteSpec[] = [
       { role: 'link', name: adminBackLinkName },
       { role: 'button', name: /Delete announcement / },
     ],
-  },
-  {
-    path: '/admin/invoices',
-    heading: /^Invoices$/i,
-    controls: [
-      { role: 'link', name: adminBackLinkName },
-      { role: 'button', name: /View invoice / },
-      { role: 'button', name: /Delete invoice / },
-    ],
-    ready: async (page, timeoutMs) => {
-      const viewButtons = page.getByRole('button', { name: /View invoice /i });
-      await expect(viewButtons.first()).toBeVisible({ timeout: timeoutMs });
-      const detailResponsePromise = page.waitForResponse(
-        (response) =>
-          response.request().method() === 'GET' &&
-          /\/finance\/invoices\/[^/?]+$/.test(response.url()),
-        { timeout: timeoutMs },
-      );
-      await viewButtons.first().click();
-      await detailResponsePromise;
-
-      const closeButton = page.getByRole('button', {
-        name: invoiceDetailsCloseName,
-      });
-      const detailHeading = page.getByRole('heading', {
-        name: studentInformationHeading,
-      });
-
-      await waitForAnyVisible([closeButton, detailHeading], timeoutMs);
-      await expect(closeButton).toBeVisible({ timeout: timeoutMs });
-      await expect(detailHeading).toBeVisible({ timeout: timeoutMs });
-      await closeButton.click();
-      await expect(
-        page.getByRole('button', { name: invoiceDetailsCloseName }),
-      ).toBeHidden({ timeout: timeoutMs });
-    },
-  },
-  {
-    path: '/admin/analytics',
-    heading: /Reports (?:&|and) analytics/i,
-    controls: [
-      { role: 'link', name: adminBackLinkName },
-      { role: 'button', name: 'Refresh data' },
-    ],
-    ready: async (page, timeoutMs) => {
-      await expect(
-        page.getByRole('heading', { name: /Enrollment movement/i }).first(),
-      ).toBeVisible({ timeout: timeoutMs });
-      await expect(
-        page.getByRole('heading', { name: /Registration pressure/i }).first(),
-      ).toBeVisible({ timeout: timeoutMs });
-      await expect(
-        page.getByRole('heading', { name: /Finance checkout posture/i }).first(),
-      ).toBeVisible({ timeout: timeoutMs });
-    },
   },
 ];
 
@@ -829,69 +737,6 @@ export async function visitRoutes(page: Page, routes: RouteSpec[]) {
       await routePage.close();
     }
   }
-}
-
-export async function emitWithAck<T>(
-  socket: Socket,
-  event: string,
-  payload: Record<string, unknown>,
-) {
-  return socket.timeout(10_000).emitWithAck(event, payload) as Promise<T>;
-}
-
-export async function connectSocket(accessToken: string) {
-  const socket = io(notificationsURL, {
-    transports: ['websocket'],
-    auth: { token: accessToken },
-    reconnection: false,
-    forceNew: true,
-  });
-
-  await new Promise<void>((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('Timed out waiting for notifications socket connect'));
-    }, 10_000);
-
-    socket.once('connect', () => {
-      clearTimeout(timeoutId);
-      resolve();
-    });
-    socket.once('connect_error', (error) => {
-      clearTimeout(timeoutId);
-      reject(error);
-    });
-    socket.once('disconnect', (reason) => {
-      clearTimeout(timeoutId);
-      reject(
-        new Error(`Notifications socket disconnected before auth: ${reason}`),
-      );
-    });
-  });
-
-  return socket;
-}
-
-export async function waitForRejectedSocket(socket: Socket) {
-  return new Promise<string>((resolve, reject) => {
-    const timeoutId = setTimeout(() => {
-      reject(new Error('Invalid socket token was not rejected in time'));
-    }, 10_000);
-
-    socket.once('connect_error', (error) => {
-      clearTimeout(timeoutId);
-      resolve(error.message);
-    });
-    socket.once('disconnect', (reason) => {
-      clearTimeout(timeoutId);
-      resolve(reason);
-    });
-    socket.once('connect', () => {
-      socket.once('disconnect', (reason) => {
-        clearTimeout(timeoutId);
-        resolve(reason);
-      });
-    });
-  });
 }
 
 export async function loginThroughApi(

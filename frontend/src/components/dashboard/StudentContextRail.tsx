@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, CreditCard, X } from 'lucide-react';
+import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, X } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
@@ -30,12 +30,6 @@ const quickLinkConfig = [
     labelKey: 'schedule',
   },
   {
-    href: '/dashboard/invoices',
-    icon: CreditCard,
-    tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-300',
-    labelKey: 'billing',
-  },
-  {
     href: '/dashboard/announcements',
     icon: Bell,
     tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-300',
@@ -62,13 +56,13 @@ export function StudentContextRail({
   return (
     <aside
       className={cn(
-        'flex h-full min-h-[calc(100vh-8rem)] flex-col rounded-lg border border-border/70 bg-card panel-shadow',
+        'flex h-full min-h-[calc(100vh-7rem)] flex-col rounded-md border border-border/80 bg-card',
         collapsed ? 'px-3 py-4' : 'px-4 py-4',
       )}
     >
       <div
         className={cn(
-          'flex items-center gap-3 border-b border-border/70 pb-4',
+          'flex items-center gap-3 border-b border-border/70 pb-3',
           collapsed ? 'justify-center' : 'justify-between',
         )}
       >
@@ -111,8 +105,8 @@ export function StudentContextRail({
         </div>
       </div>
 
-      <div className={cn('flex-1 space-y-4 pt-4', collapsed && 'space-y-3')}>
-        <div className="rounded-lg border border-border/70 bg-secondary/35 px-3 py-3">
+      <div className={cn('flex-1 space-y-3 pt-3', collapsed && 'space-y-2')}>
+        <div className="rounded-md border border-border/70 bg-secondary/35 px-3 py-3">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {copy.currentViewLabel}
           </div>
@@ -132,7 +126,7 @@ export function StudentContextRail({
           )}
         </div>
 
-        <div className="rounded-lg border border-border/70 bg-secondary/20 px-3 py-3">
+        <div className="rounded-md border border-border/70 bg-secondary/20 px-3 py-3">
           <div className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
             {copy.signalsTitle}
           </div>
@@ -179,7 +173,7 @@ export function StudentContextRail({
                 href={item.href}
                 onClick={mobile ? onCloseMobile : undefined}
                 className={cn(
-                  'group flex items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:bg-secondary/50',
+                  'group flex items-center gap-3 rounded-md border border-border/70 bg-card px-3 py-2.5 transition-colors hover:bg-secondary/50',
                   collapsed && 'justify-center px-0',
                 )}
                 aria-label={linkCopy.title}
@@ -187,7 +181,7 @@ export function StudentContextRail({
               >
                 <div
                   className={cn(
-                    'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
                     item.tone,
                   )}
                 >

@@ -15,8 +15,11 @@ import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
 @AutoConfigureMockMvc
-@ActiveProfiles("test")
-@TestPropertySource(properties = "migration.thesis-assistant.enabled=true")
+@ActiveProfiles({"test", "persistence"})
+@TestPropertySource(properties = {
+        "migration.course-api.enabled=true",
+        "migration.thesis-assistant.enabled=true"
+})
 class ThesisAssistantContractTest {
 
     @Autowired
@@ -32,16 +35,16 @@ class ThesisAssistantContractTest {
     }
 
     @Test
-    void chatReturnsLegacyCompatibleLocalFallbackShape() throws Exception {
+    void chatReturnsDbBackedRagShape() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
                         .with(jwt())
                         .contentType("application/json")
                         .content("{\"message\":\"How do I choose a thesis topic?\",\"locale\":\"en\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").isString())
-                .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("thesis topic")))
-                .andExpect(jsonPath("$.model").value("campuscore-local-advisor-v1"))
-                .andExpect(jsonPath("$.degraded").value(true));
+                .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("verifiable data")))
+                .andExpect(jsonPath("$.model").value("campuscore-thesis-rag-v1"))
+                .andExpect(jsonPath("$.degraded").value(false));
     }
 
     @Test
@@ -52,7 +55,8 @@ class ThesisAssistantContractTest {
                         .content("{\"message\":\"Em nên chọn đề tài thế nào?\",\"locale\":\"vi\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("đề tài")))
-                .andExpect(jsonPath("$.degraded").value(true));
+                .andExpect(jsonPath("$.model").value("campuscore-thesis-rag-v1"))
+                .andExpect(jsonPath("$.degraded").value(false));
 
         mvc.perform(post("/api/v1/thesis/assistant/chat")
                         .with(jwt())

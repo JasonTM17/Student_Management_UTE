@@ -62,12 +62,11 @@ test('localized admin sign-in keeps the Vietnamese workspace prefix through logo
   await expect(page).toHaveURL(/\/vi\/admin(?:\?.*)?$/);
   await expect(page.locator('html')).toHaveAttribute('lang', 'vi');
   const usersLink = page.getByRole('link', { name: /Thêm người dùng/i });
-  const analyticsLink = page.getByRole('link', { name: /Mở phân tích/i });
 
   await expect(usersLink).toBeVisible({ timeout: 10_000 });
   await expect(usersLink).toHaveAttribute('href', '/vi/admin/users');
-  await expect(analyticsLink).toBeVisible({ timeout: 10_000 });
-  await expect(analyticsLink).toHaveAttribute('href', '/vi/admin/analytics');
+  await expect(page.locator('a[href="/vi/admin/analytics"]')).toHaveCount(0);
+  await expect(page.locator('a[href="/vi/admin/invoices"]')).toHaveCount(0);
 
   await page.getByRole('button', { name: /Đăng xuất|Sign out/i }).click();
   await expect(page).toHaveURL(/\/vi\/login(?:\?.*reason=signed-out.*)?$/);

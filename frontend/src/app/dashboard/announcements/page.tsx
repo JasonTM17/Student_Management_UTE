@@ -1,12 +1,12 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
-import { Bell, BookOpen, RefreshCw } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import { Bell, RefreshCw, Search } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
-import { announcementsApi } from '@/lib/api';
+import { AnnouncementRecord, announcementsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { LocalizedLink } from '@/components/LocalizedLink';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import {
   EmptyState,
@@ -14,20 +14,9 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
-import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import { cn } from '@/lib/utils';
 
-type Announcement = {
-  id: string;
-  title: string;
-  content: string;
-  priority: string;
-  createdAt: string;
-  semester?: { name: string; nameEn?: string; nameVi?: string } | null;
-  section?: {
-    sectionNumber: string;
-    course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
-  } | null;
-};
+type AnnouncementTab = 'general' | 'personal';
 
 const priorityTone: Record<string, string> = {
   LOW: 'bg-secondary text-foreground',
@@ -36,12 +25,46 @@ const priorityTone: Record<string, string> = {
   URGENT: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
 };
 
+function getAnnouncementScope(item: AnnouncementRecord) {
+  return item.isGlobal ?? false ? 'general' : 'personal';
+}
+
+function getAnnouncementSender(item: AnnouncementRecord, locale: 'en' | 'vi') {
+  if (item.lecturerDisplayName) {
+    return item.lecturerDisplayName;
+  }
+
+  if (item.publishedBy) {
+    return item.publishedBy;
+  }
+
+  return locale === 'vi' ? 'Phòng đào tạo' : 'Academic office';
+}
+
+function getAnnouncementSearchText(item: AnnouncementRecord) {
+  return [
+    item.title,
+    item.content,
+    item.publishedBy,
+    item.lecturerDisplayName,
+    item.semesterName,
+    item.sectionNumber,
+    item.courseCode,
+    item.courseName,
+  ]
+    .filter(Boolean)
+    .join(' ')
+    .toLowerCase();
+}
+
 export default function StudentAnnouncementsPage() {
   const { user, isLoading: authLoading, hasAccess } = useRequireAuth([
     'STUDENT',
   ]);
-  const { locale, formatDateTime } = useI18n();
-  const [items, setItems] = useState<Announcement[]>([]);
+  const { locale, formatDateTime, formatNumber } = useI18n();
+  const [items, setItems] = useState<AnnouncementRecord[]>([]);
+  const [activeTab, setActiveTab] = useState<AnnouncementTab>('general');
+  const [search, setSearch] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -50,33 +73,51 @@ export default function StudentAnnouncementsPage() {
       ? {
           eyebrow: 'Không gian sinh viên',
           title: 'Thông báo',
-          description: `Đọc các cập nhật quan trọng dành cho ${user?.firstName ?? 'bạn'} mà không rời khỏi không gian sinh viên.`,
+          description: `Theo dõi các cập nhật dành cho ${user?.firstName ?? 'bạn'} ngay trong một portal gọn, dễ đọc.`,
           refresh: 'Làm mới',
+          banner: 'THÔNG BÁO',
           loading: 'Đang tải thông báo',
           unavailableTitle: 'Thông báo chưa sẵn sàng',
-          emptyTitle: 'Chưa có thông báo',
+          emptyTitle: 'Chưa có thông báo phù hợp',
           emptyDescription:
-            'Thông báo toàn trường và cập nhật từ học phần sẽ xuất hiện tại đây sau khi được phát hành.',
+            'Thông báo chung và thông báo cá nhân sẽ xuất hiện ở đây khi được phát hành.',
           returnDashboard: 'Quay lại dashboard',
-          recentNotices: 'Thông báo gần đây',
+          searchPlaceholder: 'Tìm kiếm thông báo',
+          tabGeneral: 'Thông báo chung',
+          tabPersonal: 'Thông báo cá nhân',
+          tableTitle: 'Tiêu đề',
+          tableSender: 'Người gửi',
+          tableTime: 'Thời gian gửi',
           semesterPrefix: 'Học kỳ',
-          sectionPrefix: 'lớp học phần',
+          sectionPrefix: 'Lớp học phần',
+          scopeGeneral: 'Chung',
+          scopePersonal: 'Cá nhân',
+          readMore: 'Xem chi tiết',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
           eyebrow: 'Student workspace',
           title: 'Announcements',
-          description: `Read the notices that matter to ${user?.firstName ?? 'you'} without leaving the protected student workspace.`,
+          description: `Follow the notices that matter to ${user?.firstName ?? 'you'} inside one focused portal.`,
           refresh: 'Refresh',
+          banner: 'ANNOUNCEMENTS',
           loading: 'Loading announcements',
           unavailableTitle: 'Announcements unavailable',
-          emptyTitle: 'No announcements yet',
+          emptyTitle: 'No matching announcements',
           emptyDescription:
-            'Campus-wide notices and course updates will appear here once they are published.',
+            'General notices and personal notices will appear here once they are published.',
           returnDashboard: 'Return to dashboard',
-          recentNotices: 'Recent notices',
+          searchPlaceholder: 'Search announcements',
+          tabGeneral: 'General notices',
+          tabPersonal: 'Personal notices',
+          tableTitle: 'Title',
+          tableSender: 'Sender',
+          tableTime: 'Sent time',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'section',
+          sectionPrefix: 'Section',
+          scopeGeneral: 'General',
+          scopePersonal: 'Personal',
+          readMore: 'Open notice',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 
@@ -85,7 +126,7 @@ export default function StudentAnnouncementsPage() {
     setError('');
 
     try {
-      const response = await announcementsApi.getMy({ page: 1, limit: 50 });
+      const response = await announcementsApi.getMy({ page: 1, limit: 100 });
       setItems(response.data ?? []);
     } catch {
       setError(copy.loadFailed);
@@ -100,12 +141,64 @@ export default function StudentAnnouncementsPage() {
     }
   }, [fetchFeed, hasAccess]);
 
+  const tabCounts = useMemo(
+    () => ({
+      general: items.filter((item) => getAnnouncementScope(item) === 'general')
+        .length,
+      personal: items.filter((item) => getAnnouncementScope(item) === 'personal')
+        .length,
+    }),
+    [items],
+  );
+
+  const visibleItems = useMemo(() => {
+    const narrowed = items.filter(
+      (item) => getAnnouncementScope(item) === activeTab,
+    );
+    const normalizedSearch = search.trim().toLowerCase();
+
+    if (!normalizedSearch) {
+      return narrowed.sort((left, right) => {
+        const leftTime = new Date(
+          left.publishAt ?? left.createdAt,
+        ).getTime();
+        const rightTime = new Date(
+          right.publishAt ?? right.createdAt,
+        ).getTime();
+        return rightTime - leftTime;
+      });
+    }
+
+    return narrowed
+      .filter((item) => getAnnouncementSearchText(item).includes(normalizedSearch))
+      .sort((left, right) => {
+        const leftTime = new Date(
+          left.publishAt ?? left.createdAt,
+        ).getTime();
+        const rightTime = new Date(
+          right.publishAt ?? right.createdAt,
+        ).getTime();
+        return rightTime - leftTime;
+      });
+  }, [activeTab, items, search]);
+
+  const tabs = [
+    { key: 'general' as const, label: copy.tabGeneral, count: tabCounts.general },
+    {
+      key: 'personal' as const,
+      label: copy.tabPersonal,
+      count: tabCounts.personal,
+    },
+  ];
+
+  const visibleCount = formatNumber(visibleItems.length);
+
   if (authLoading || !hasAccess) {
     return <LoadingState label={copy.loading} />;
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
@@ -118,7 +211,7 @@ export default function StudentAnnouncementsPage() {
             disabled={isLoading}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')}
             />
             {copy.refresh}
           </Button>
@@ -133,77 +226,244 @@ export default function StudentAnnouncementsPage() {
         />
       ) : isLoading ? (
         <LoadingState label={copy.loading} />
-      ) : items.length === 0 ? (
-        <EmptyState
-          icon={Bell}
-          title={copy.emptyTitle}
-          description={copy.emptyDescription}
-          action={
-            <LocalizedLink href="/dashboard">
-              <Button>{copy.returnDashboard}</Button>
-            </LocalizedLink>
-          }
-        />
       ) : (
-        <Card variant="muted">
-          <CardHeader>
-            <CardTitle className="text-xl">{copy.recentNotices}</CardTitle>
-          </CardHeader>
-          <CardContent className="space-y-4">
-            {items.map((announcement) => (
-              <article
-                key={announcement.id}
-                className="rounded-lg border border-border/70 bg-card px-5 py-5"
-              >
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                  <div className="space-y-3">
-                    <div className="flex flex-wrap items-center gap-2">
-                      <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          priorityTone[announcement.priority] ??
-                          'bg-secondary text-foreground'
-                        }`}
-                      >
-                        {announcement.priority}
-                      </span>
-                      <h2 className="text-lg font-semibold text-foreground">
-                        {announcement.title}
-                      </h2>
-                    </div>
-                    <p className="max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
-                      {announcement.content}
-                    </p>
-                    <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      {announcement.semester?.name ? (
-                        <span>
-                          {copy.semesterPrefix}{' '}
-                          {getLocalizedFlatLabel(
-                            locale,
-                            announcement.semester.name,
-                            announcement.semester.nameEn,
-                            announcement.semester.nameVi,
-                            announcement.semester.name,
-                          )}
-                        </span>
-                      ) : null}
-                      {announcement.section?.course?.code ? (
-                        <span>
-                          {announcement.section.course.code} {copy.sectionPrefix}{' '}
-                          {announcement.section.sectionNumber}
-                        </span>
-                      ) : null}
-                    </div>
-                  </div>
+        <section className="portal-section-card space-y-4 rounded-md p-4 shadow-sm">
+          <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
+            <div className="min-w-0 space-y-3">
+              <div className="inline-flex items-center bg-primary px-4 py-2 text-[15px] font-semibold uppercase tracking-[0.16em] text-primary-foreground">
+                {copy.banner}
+              </div>
+              <div className="flex flex-wrap items-center gap-3 text-xs font-medium uppercase tracking-[0.16em] text-muted-foreground">
+                <span>
+                  {copy.tabGeneral}: {formatNumber(tabCounts.general)}
+                </span>
+                <span>
+                  {copy.tabPersonal}: {formatNumber(tabCounts.personal)}
+                </span>
+                <span>
+                  {locale === 'vi' ? 'Đang hiển thị' : 'Showing'} {visibleCount}
+                </span>
+              </div>
+            </div>
 
-                  <div className="flex shrink-0 items-start gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                    <BookOpen className="h-3.5 w-3.5" />
-                    {formatDateTime(announcement.createdAt)}
-                  </div>
+            <div className="w-full max-w-xl">
+              <Input
+                value={search}
+                onChange={(event) => setSearch(event.target.value)}
+                placeholder={copy.searchPlaceholder}
+                icon={<Search className="h-4 w-4" />}
+                className="portal-search-field"
+              />
+            </div>
+          </div>
+
+          <div
+            className="portal-tab-strip"
+            role="tablist"
+            aria-label={copy.title}
+          >
+            {tabs.map((tab) => {
+              const selected = activeTab === tab.key;
+
+              return (
+                <button
+                  key={tab.key}
+                  type="button"
+                  role="tab"
+                  aria-selected={selected}
+                  onClick={() => setActiveTab(tab.key)}
+                  className={cn(
+                    'portal-tab inline-flex items-center gap-2 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    selected
+                      ? 'is-active'
+                      : 'hover:text-foreground',
+                  )}
+                >
+                  {tab.label}
+                  <span
+                    className={cn(
+                      'rounded-full px-2 py-0.5 text-xs font-semibold',
+                      selected
+                        ? 'bg-white/15 text-primary-foreground'
+                        : 'bg-card text-foreground',
+                    )}
+                  >
+                    {formatNumber(tab.count)}
+                  </span>
+                </button>
+              );
+            })}
+          </div>
+
+          {visibleItems.length === 0 ? (
+            <EmptyState
+              icon={Bell}
+              title={copy.emptyTitle}
+              description={copy.emptyDescription}
+              action={
+                <LocalizedLink href="/dashboard">
+                  <Button variant="outline">{copy.returnDashboard}</Button>
+                </LocalizedLink>
+              }
+              className="min-h-[320px] border-border/70 bg-background/40"
+            />
+          ) : (
+            <>
+              <div className="hidden overflow-hidden rounded-md border border-border/70 md:block">
+                <div className="overflow-x-auto">
+                  <table className="portal-table w-full border-collapse">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-[0.14em]">
+                          {copy.tableTitle}
+                        </th>
+                        <th className="px-4 py-3 text-left text-sm font-semibold uppercase tracking-[0.14em]">
+                          {copy.tableSender}
+                        </th>
+                        <th className="px-4 py-3 text-right text-sm font-semibold uppercase tracking-[0.14em]">
+                          {copy.tableTime}
+                        </th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60 bg-card">
+                      {visibleItems.map((announcement) => {
+                        const sender = getAnnouncementSender(announcement, locale);
+                        const timeValue =
+                          announcement.publishAt ?? announcement.createdAt;
+                        const semesterLabel =
+                          announcement.semesterName ||
+                          announcement.semester?.name ||
+                          '';
+                        const sectionLabel =
+                          announcement.courseCode && announcement.sectionNumber
+                            ? `${announcement.courseCode} - ${announcement.sectionNumber}`
+                            : announcement.sectionNumber
+                              ? `${copy.sectionPrefix} ${announcement.sectionNumber}`
+                              : '';
+
+                        return (
+                          <tr
+                            key={announcement.id}
+                            className="transition-colors hover:bg-secondary/35"
+                          >
+                            <td className="px-4 py-4 align-top">
+                              <div className="space-y-2">
+                                <div className="flex flex-wrap items-center gap-2">
+                                  <span
+                                    className={cn(
+                                      'rounded-full px-2.5 py-1 text-xs font-medium',
+                                      priorityTone[announcement.priority] ??
+                                        'bg-secondary text-foreground',
+                                    )}
+                                  >
+                                    {announcement.priority}
+                                  </span>
+                                  <div className="min-w-0 break-words text-sm font-semibold text-foreground">
+                                    {announcement.title}
+                                  </div>
+                                </div>
+                                {semesterLabel || sectionLabel ? (
+                                  <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                                    {semesterLabel ? (
+                                      <span>{copy.semesterPrefix} {semesterLabel}</span>
+                                    ) : null}
+                                    {sectionLabel ? <span>{sectionLabel}</span> : null}
+                                    <span>
+                                      {announcement.isGlobal
+                                        ? copy.scopeGeneral
+                                        : copy.scopePersonal}
+                                    </span>
+                                  </div>
+                                ) : null}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 align-top">
+                              <div className="text-sm font-medium text-foreground">
+                                {sender}
+                              </div>
+                              <div className="mt-1 text-xs text-muted-foreground">
+                                {announcement.lecturerDisplayName
+                                  ? announcement.publishedBy || sender
+                                  : announcement.isGlobal
+                                    ? copy.scopeGeneral
+                                    : copy.scopePersonal}
+                              </div>
+                            </td>
+                            <td className="px-4 py-4 align-top text-right text-sm text-muted-foreground">
+                              <time dateTime={timeValue}>
+                                {formatDateTime(timeValue)}
+                              </time>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
                 </div>
-              </article>
-            ))}
-          </CardContent>
-        </Card>
+              </div>
+
+              <div className="space-y-3 md:hidden">
+                {visibleItems.map((announcement) => {
+                  const sender = getAnnouncementSender(announcement, locale);
+                  const timeValue =
+                    announcement.publishAt ?? announcement.createdAt;
+                  const semesterLabel =
+                    announcement.semesterName || announcement.semester?.name || '';
+                  const sectionLabel =
+                    announcement.courseCode && announcement.sectionNumber
+                      ? `${announcement.courseCode} - ${announcement.sectionNumber}`
+                      : announcement.sectionNumber
+                        ? `${copy.sectionPrefix} ${announcement.sectionNumber}`
+                        : '';
+
+                  return (
+                    <article
+                      key={announcement.id}
+                      className="rounded-md border border-border/70 bg-card px-4 py-4"
+                    >
+                      <div className="flex items-start justify-between gap-3">
+                        <div className="min-w-0 space-y-2">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span
+                              className={cn(
+                                'rounded-full px-2.5 py-1 text-xs font-medium',
+                                priorityTone[announcement.priority] ??
+                                  'bg-secondary text-foreground',
+                              )}
+                            >
+                              {announcement.priority}
+                            </span>
+                            <h2 className="min-w-0 break-words text-base font-semibold text-foreground">
+                              {announcement.title}
+                            </h2>
+                          </div>
+                          <p className="break-words whitespace-pre-line text-sm leading-6 text-muted-foreground">
+                            {announcement.content}
+                          </p>
+                          {(semesterLabel || sectionLabel) && (
+                            <div className="flex flex-wrap gap-2 text-xs text-muted-foreground">
+                              {semesterLabel ? (
+                                <span>{copy.semesterPrefix} {semesterLabel}</span>
+                              ) : null}
+                              {sectionLabel ? <span>{sectionLabel}</span> : null}
+                            </div>
+                          )}
+                        </div>
+                        <div className="shrink-0 rounded-md bg-secondary px-2.5 py-1 text-xs font-semibold text-foreground">
+                          {announcement.isGlobal ? copy.scopeGeneral : copy.scopePersonal}
+                        </div>
+                      </div>
+                      <div className="mt-4 flex items-center justify-between gap-3 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                        <span className="truncate">{sender}</span>
+                        <time dateTime={timeValue}>{formatDateTime(timeValue)}</time>
+                      </div>
+                    </article>
+                  );
+                })}
+              </div>
+            </>
+          )}
+        </section>
       )}
     </div>
   );

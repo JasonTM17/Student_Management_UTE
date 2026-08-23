@@ -17,8 +17,8 @@
   <rect x="840" y="426" width="432" height="18" rx="9" fill="#E2E8F0"/>
   <rect x="840" y="464" width="356" height="18" rx="9" fill="#E2E8F0"/>
   <rect x="128" y="632" width="1168" height="248" rx="28" fill="#101826"/>
-  <text x="176" y="704" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Vì sao CampusCore dùng microservices</text>
-  <text x="176" y="748" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="24">Blast radius nhỏ hơn, auth có owner rõ ràng, scale theo tải và bàn giao vận hành sạch hơn.</text>
+  <text x="176" y="704" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Vì sao CampusCore chuyển sang Java monolith</text>
+  <text x="176" y="748" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="24">Một backend, owner rõ hơn, bàn giao sạch hơn và ranh giới UI gọn hơn.</text>
   <rect x="176" y="786" width="312" height="54" rx="18" fill="#1E293B"/>
   <rect x="504" y="786" width="312" height="54" rx="18" fill="#1E293B"/>
   <rect x="832" y="786" width="312" height="54" rx="18" fill="#1E293B"/>

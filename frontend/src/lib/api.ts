@@ -7,6 +7,7 @@ import {
   LoginResponse,
   ApiResponse,
   User,
+  Student,
   Section,
   Enrollment,
   EnrollmentActionResult,
@@ -41,17 +42,46 @@ type AuthInternalRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   _retryNoCache?: boolean;
 };
-type AnnouncementRecord = {
+export type AnnouncementRecord = {
   id: string;
   title: string;
   content: string;
   priority: string;
+  targetRoles?: string[];
+  targetYears?: number[];
+  isGlobal?: boolean;
+  publishAt?: string | null;
+  expiresAt?: string | null;
+  publishedBy?: string;
+  semesterId?: string;
+  semesterName?: string;
+  sectionId?: string;
+  sectionNumber?: string;
+  courseCode?: string;
+  courseName?: string;
+  lecturerId?: string;
+  lecturerDisplayName?: string;
   createdAt: string;
+  updatedAt?: string;
   semester?: { name: string; nameEn?: string; nameVi?: string } | null;
   section?: {
     sectionNumber: string;
     course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
   } | null;
+  lecturer?: { id?: string; displayName?: string } | null;
+};
+
+export type AssistantCitation = {
+  title?: string | null;
+  source?: string | null;
+  excerpt?: string | null;
+};
+
+export type AssistantReply = {
+  answer: string;
+  model: string;
+  degraded: boolean;
+  citations?: AssistantCitation[];
 };
 type NotificationRecord = {
   id: string;
@@ -863,6 +893,17 @@ export const gradesApi = {
 };
 
 // Admin Users API
+export const studentsApi = {
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+    status?: string;
+  }): Promise<ApiResponse<Student[]>> => {
+    const response = await api.get<ApiResponse<Student[]>>('/students', { params });
+    return response.data;
+  },
+};
+
 export const usersApi = {
   getAll: async (params?: {
     page?: number;
@@ -1257,6 +1298,19 @@ export const financeApi = {
   }): Promise<string> => {
     const response = await api.get<string>('/finance/payments/export/csv', {
       params,
+    });
+    return response.data;
+  },
+};
+
+// Local, database-backed thesis assistant. The response is intentionally
+// optional-citation tolerant so the client can show degraded answers clearly
+// while the Java contract evolves.
+export const assistantApi = {
+  chat: async (message: string, locale: 'en' | 'vi' = 'en'): Promise<AssistantReply> => {
+    const response = await api.post<AssistantReply>('/thesis/assistant/chat', {
+      message,
+      locale,
     });
     return response.data;
   },

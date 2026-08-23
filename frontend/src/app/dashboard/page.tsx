@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, BookMarked, BookOpen, Calendar, ClipboardList, CreditCard, FileText, GraduationCap, TrendingUp } from 'lucide-react';
+import { BookMarked, BookOpen, Calendar, ClipboardList, GraduationCap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
@@ -50,29 +50,6 @@ const quickActions = [
     href: '/dashboard/grades',
     icon: TrendingUp,
     tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-400',
-  },
-  {
-    href: '/dashboard/invoices',
-    icon: CreditCard,
-    tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
-  },
-];
-
-const portalLinks = [
-  {
-    href: '/dashboard/enrollments',
-    icon: BookOpen,
-    tone: 'bg-cyan-500/12 text-cyan-600 dark:text-cyan-400',
-  },
-  {
-    href: '/dashboard/transcript',
-    icon: FileText,
-    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
-  },
-  {
-    href: '/dashboard/announcements',
-    icon: Bell,
-    tone: 'bg-pink-500/12 text-pink-600 dark:text-pink-400',
   },
 ];
 
@@ -136,7 +113,7 @@ export default function DashboardPage() {
   const highlightedCourses = confirmedCourses.slice(0, 3);
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-5">
       <PageHeader
         eyebrow={<SectionEyebrow>{messages.studentDashboard.eyebrow}</SectionEyebrow>}
         title={messages.studentDashboard.title.replace('{name}', user?.firstName ?? 'student')}
@@ -163,8 +140,9 @@ export default function DashboardPage() {
         <LoadingState label={messages.studentDashboard.errors.loading} />
       ) : (
         <>
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
+          <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-4">
             <WorkspaceMetricCard
+              compact
               label={messages.studentDashboard.metrics.coursesInScope}
               value={formatNumber(enrollments.length)}
               icon={<BookOpen className="h-5 w-5" />}
@@ -172,6 +150,7 @@ export default function DashboardPage() {
               toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-400"
             />
             <WorkspaceMetricCard
+              compact
               label={messages.studentDashboard.metrics.confirmedEnrollments}
               value={formatNumber(confirmedCourses.length)}
               icon={<GraduationCap className="h-5 w-5" />}
@@ -179,6 +158,7 @@ export default function DashboardPage() {
               toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
             />
             <WorkspaceMetricCard
+              compact
               label={messages.studentDashboard.metrics.pendingDecisions}
               value={formatNumber(pendingCourses.length)}
               icon={<ClipboardList className="h-5 w-5" />}
@@ -186,6 +166,7 @@ export default function DashboardPage() {
               toneClassName="bg-amber-500/12 text-amber-600 dark:text-amber-400"
             />
             <WorkspaceMetricCard
+              compact
               label={messages.studentDashboard.metrics.currentSemester}
               value={currentSemesterName}
               icon={<Calendar className="h-5 w-5" />}
@@ -195,129 +176,115 @@ export default function DashboardPage() {
             />
           </div>
 
-          <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+          <WorkspacePanel
+            title={messages.studentDashboard.panels.currentCourses.title}
+            description={messages.studentDashboard.panels.currentCourses.description}
+            className="overflow-hidden"
+            contentClassName="p-0"
+          >
+            {highlightedCourses.length === 0 ? (
+              <EmptyState
+                icon={BookMarked}
+                title={messages.studentDashboard.panels.currentCourses.emptyTitle}
+                description={messages.studentDashboard.panels.currentCourses.emptyDescription}
+                action={
+                  <LocalizedLink href="/dashboard/register">
+                    <Button>{messages.common.actions.browseSections}</Button>
+                  </LocalizedLink>
+                }
+                className="min-h-[220px] border-none bg-transparent px-4 py-8"
+              />
+            ) : (
+              <>
+                <div className="overflow-x-auto">
+                  <table className="portal-table w-full min-w-[640px] text-sm">
+                    <thead>
+                      <tr>
+                        <th className="px-4 py-3 text-left">{locale === 'vi' ? 'Môn học' : 'Course'}</th>
+                        <th className="px-4 py-3 text-left">{locale === 'vi' ? 'Lớp' : 'Section'}</th>
+                        <th className="px-4 py-3 text-left">{locale === 'vi' ? 'Học kỳ' : 'Term'}</th>
+                        <th className="px-4 py-3 text-right">{locale === 'vi' ? 'Trạng thái' : 'Status'}</th>
+                      </tr>
+                    </thead>
+                    <tbody>
+                      {highlightedCourses.map((enrollment) => {
+                        const localizedCourseName = getLocalizedName(
+                          locale,
+                          enrollment.section?.course,
+                          enrollment.section?.course?.name ?? '',
+                        );
+
+                        return (
+                          <tr key={enrollment.id}>
+                            <td className="px-4 py-3">
+                              <div className="font-semibold text-foreground">
+                                {enrollment.section?.course?.code}
+                              </div>
+                              <div className="text-muted-foreground">{localizedCourseName}</div>
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {enrollment.section?.sectionNumber || '-'}
+                            </td>
+                            <td className="px-4 py-3 text-muted-foreground">
+                              {currentSemesterName}
+                            </td>
+                            <td className="px-4 py-3 text-right">
+                              <span className="portal-status-badge">{enrollment.status}</span>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
+                <div className="flex justify-end border-t border-border/70 px-4 py-3">
+                  <LocalizedLink href="/dashboard/enrollments" className="text-sm font-semibold text-primary hover:underline">
+                    {locale === 'vi' ? 'Xem toàn bộ môn học' : 'View all courses'}
+                  </LocalizedLink>
+                </div>
+              </>
+            )}
+          </WorkspacePanel>
+
+          <div className="grid gap-5 xl:grid-cols-[1.25fr_0.75fr]">
             <WorkspacePanel
               title={messages.studentDashboard.panels.nextActions.title}
               description={messages.studentDashboard.panels.nextActions.description}
               variant="muted"
-              contentClassName="grid gap-4 sm:grid-cols-2"
+              contentClassName="grid gap-3 sm:grid-cols-3"
             >
-                {quickActions.map((action, index) => (
-                  <WorkspaceActionTile
-                    key={action.href}
-                    href={action.href}
-                    icon={<action.icon className="h-5 w-5" />}
-                    title={messages.studentDashboard.quickActions[index][0]}
-                    description={messages.studentDashboard.quickActions[index][1]}
-                    toneClassName={action.tone}
-                    ctaLabel={messages.common.actions.openTool}
-                  />
-                ))}
-            </WorkspacePanel>
-
-            <WorkspacePanel
-              title={messages.studentDashboard.panels.currentCourses.title}
-              description={messages.studentDashboard.panels.currentCourses.description}
-              variant="muted"
-            >
-                {highlightedCourses.length === 0 ? (
-                  <EmptyState
-                    icon={BookMarked}
-                    title={messages.studentDashboard.panels.currentCourses.emptyTitle}
-                    description={messages.studentDashboard.panels.currentCourses.emptyDescription}
-                    action={
-                      <LocalizedLink href="/dashboard/register">
-                        <Button>{messages.common.actions.browseSections}</Button>
-                      </LocalizedLink>
-                    }
-                    className="min-h-[280px] border-none bg-transparent px-0 py-0"
-                  />
-                ) : (
-                  <div className="space-y-3">
-                    {highlightedCourses.map((enrollment) => {
-                      const localizedCourseName = getLocalizedName(
-                        locale,
-                        enrollment.section?.course,
-                        enrollment.section?.course?.name ?? '',
-                      );
-
-                      return (
-                      <div
-                        key={enrollment.id}
-                        className="flex items-center gap-4 rounded-lg border border-border/70 bg-card px-4 py-4"
-                      >
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-secondary text-foreground">
-                          <BookMarked className="h-5 w-5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                          <div className="truncate font-medium text-foreground">
-                            {enrollment.section?.course?.code} - {localizedCourseName}
-                          </div>
-                          <div className="text-sm text-muted-foreground">
-                            {messages.studentDashboard.panels.currentCourses.sectionLabel.replace('{section}', enrollment.section?.sectionNumber || '')}
-                          </div>
-                        </div>
-                        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                          {enrollment.status}
-                        </span>
-                      </div>
-                      );
-                    })}
-                  </div>
-                )}
-            </WorkspacePanel>
-          </div>
-
-          <div className="grid gap-6 lg:grid-cols-[1.1fr_0.9fr]">
-            <WorkspacePanel
-              title={messages.studentDashboard.panels.referenceLinks.title}
-              description={messages.studentDashboard.panels.referenceLinks.description}
-              contentClassName="grid gap-4 md:grid-cols-3"
-            >
-                {portalLinks.map((item, index) => (
-                  <WorkspaceActionTile
-                    key={item.href}
-                    href={item.href}
-                    icon={<item.icon className="h-5 w-5" />}
-                    title={messages.studentDashboard.portalLinks[index][0]}
-                    description={messages.studentDashboard.portalLinks[index][1]}
-                    toneClassName={item.tone}
-                    ctaLabel={messages.common.actions.openView}
-                    className="bg-secondary/35 hover:bg-secondary/60"
-                  />
-                ))}
+              {quickActions.map((action, index) => (
+                <WorkspaceActionTile
+                  key={action.href}
+                  href={action.href}
+                  icon={<action.icon className="h-5 w-5" />}
+                  title={messages.studentDashboard.quickActions[index][0]}
+                  description={messages.studentDashboard.quickActions[index][1]}
+                  toneClassName={action.tone}
+                  ctaLabel={messages.common.actions.openTool}
+                  className="portal-action-tile-compact"
+                />
+              ))}
             </WorkspacePanel>
 
             <WorkspacePanel
               title={messages.studentDashboard.panels.currentStatus.title}
               description={messages.studentDashboard.panels.currentStatus.description}
-              contentClassName="space-y-4"
+              contentClassName="space-y-3"
             >
-                <div className="rounded-lg border border-border/70 bg-secondary/30 px-4 py-4">
-                  <div className="text-sm font-semibold text-foreground">
-                    {messages.studentDashboard.panels.currentStatus.semesterSelectionTitle}
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {currentSemester
-                      ? messages.studentDashboard.panels.currentStatus.semesterSelectionActive.replace('{semester}', currentSemesterName)
-                      : messages.studentDashboard.panels.currentStatus.semesterSelectionEmpty}
-                  </p>
-                </div>
-                <div className="rounded-lg border border-border/70 bg-secondary/30 px-4 py-4">
-                  <div className="text-sm font-semibold text-foreground">
-                    {messages.studentDashboard.panels.currentStatus.enrollmentHealthTitle}
-                  </div>
-                  <p className="mt-1 text-sm leading-6 text-muted-foreground">
-                    {pendingCourses.length > 0
-                      ? messages.studentDashboard.panels.currentStatus.enrollmentHealthPending.replace('{count}', formatNumber(pendingCourses.length))
-                      : messages.studentDashboard.panels.currentStatus.enrollmentHealthClear}
-                  </p>
-                </div>
-                <LocalizedLink href="/dashboard/profile">
-                  <Button variant="outline" className="w-full">
-                    {messages.common.actions.reviewProfileSettings}
-                  </Button>
-                </LocalizedLink>
+              <div className="portal-status-row">
+                <span>{messages.studentDashboard.panels.currentStatus.semesterSelectionTitle}</span>
+                <strong>{currentSemesterName}</strong>
+              </div>
+              <div className="portal-status-row">
+                <span>{messages.studentDashboard.panels.currentStatus.enrollmentHealthTitle}</span>
+                <strong>{formatNumber(pendingCourses.length)}</strong>
+              </div>
+              <LocalizedLink href="/dashboard/profile">
+                <Button variant="outline" className="w-full">
+                  {messages.common.actions.reviewProfileSettings}
+                </Button>
+              </LocalizedLink>
             </WorkspacePanel>
           </div>
         </>

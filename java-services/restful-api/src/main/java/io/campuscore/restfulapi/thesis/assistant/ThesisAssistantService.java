@@ -1,22 +1,46 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantKnowledgeRepository.KnowledgeDocument;
+import java.text.Normalizer;
+import java.text.Normalizer.Form;
+import java.util.Arrays;
+import java.util.Comparator;
+import java.util.LinkedHashSet;
 import java.util.Locale;
+import java.util.Optional;
+import java.util.Set;
+import java.util.stream.Collectors;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import org.springframework.dao.DataAccessException;
 import org.springframework.stereotype.Service;
 
 /**
- * Deterministic assistant foundation for the Java monolith.
+ * DB-backed thesis assistant for the Java monolith.
  *
- * <p>This candidate intentionally does not call an external LLM provider. It
- * preserves the web/mobile API shape and gives safe academic guidance until a
- * later provider-backed wave has secrets, evals, canary and rollback evidence.</p>
+ * <p>This candidate intentionally avoids external LLM providers. It retrieves
+ * curated thesis guidance from the local PostgreSQL seed and falls back to a
+ * deterministic answer only when the knowledge table is unavailable.</p>
  */
 @Service
 @ConditionalOnProperty(prefix = "migration.thesis-assistant", name = "enabled", havingValue = "true")
 public class ThesisAssistantService {
 
     static final String LOCAL_MODEL = "campuscore-local-advisor-v1";
+    static final String RAG_MODEL = "campuscore-thesis-rag-v1";
+
+    private static final Set<String> STOP_WORDS = Set.of(
+            "a", "an", "and", "are", "can", "do", "for", "how", "i", "is", "me",
+            "my", "of", "or", "the", "this", "to", "what", "with", "you",
+            "ban", "cho", "co", "cua", "em", "hoc", "khi", "la", "lam",
+            "minh", "mot", "nao", "nen", "sao", "toi", "trong", "va");
+
+    private final ThesisAssistantKnowledgeRepository knowledgeRepository;
+
+    public ThesisAssistantService(ObjectProvider<ThesisAssistantKnowledgeRepository> knowledgeRepository) {
+        this.knowledgeRepository = knowledgeRepository.getIfAvailable();
+    }
 
     public ChatResponse answer(String message, String locale) {
         String normalizedLocale = "vi".equals(locale) ? "vi" : "en";
@@ -28,7 +52,64 @@ public class ThesisAssistantService {
             throw new IllegalArgumentException("message must contain at most 2000 characters");
         }
         String lower = normalizedMessage.toLowerCase(Locale.ROOT);
+        Optional<String> ragAnswer = retrieve(normalizedMessage, normalizedLocale);
+        if (ragAnswer.isPresent()) {
+            return new ChatResponse(ragAnswer.get(), RAG_MODEL, false);
+        }
         return new ChatResponse(response(lower, normalizedLocale), LOCAL_MODEL, true);
+    }
+
+    private Optional<String> retrieve(String message, String locale) {
+        if (knowledgeRepository == null) {
+            return Optional.empty();
+        }
+        Set<String> queryTerms = terms(message);
+        if (queryTerms.isEmpty()) {
+            return Optional.empty();
+        }
+        try {
+            return knowledgeRepository.findForLocale(locale).stream()
+                    .map(document -> score(document, queryTerms, locale))
+                    .filter(score -> score.relevance() > 0)
+                    .max(Comparator.comparingDouble(DocumentScore::weightedScore)
+                            .thenComparing(score -> score.document().slug()))
+                    .map(score -> score.document().content());
+        } catch (DataAccessException ignored) {
+            return Optional.empty();
+        }
+    }
+
+    private static DocumentScore score(
+            KnowledgeDocument document,
+            Set<String> queryTerms,
+            String requestedLocale) {
+        Set<String> documentTerms = terms(document.title() + " " + document.content());
+        long relevance = queryTerms.stream()
+                .filter(documentTerms::contains)
+                .count();
+        double localeBoost = requestedLocale.equals(document.locale()) ? 0.25D : 0D;
+        int boundedPriority = Math.min(Math.max(document.priority(), 1), 1000);
+        double priorityBoost = (1001D - boundedPriority) / 1000D;
+        return new DocumentScore(document, relevance, relevance + localeBoost + priorityBoost);
+    }
+
+    private static Set<String> terms(String value) {
+        String normalized = normalize(value);
+        if (normalized.isBlank()) {
+            return Set.of();
+        }
+        return Arrays.stream(normalized.split("\\s+"))
+                .filter(term -> term.length() >= 2)
+                .filter(term -> !STOP_WORDS.contains(term))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+    }
+
+    private static String normalize(String value) {
+        String lower = value == null ? "" : value.toLowerCase(Locale.ROOT).replace('đ', 'd');
+        return Normalizer.normalize(lower, Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replaceAll("[^\\p{IsAlphabetic}\\p{IsDigit}]+", " ")
+                .trim();
     }
 
     private static String response(String message, String locale) {
@@ -81,5 +162,8 @@ public class ThesisAssistantService {
             }
         }
         return false;
+    }
+
+    private record DocumentScore(KnowledgeDocument document, long relevance, double weightedScore) {
     }
 }

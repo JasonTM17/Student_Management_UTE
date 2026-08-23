@@ -1,6 +1,8 @@
 spring:
   application:
     name: campuscore-restful-api
+  profiles:
+    default: persistence
   main:
     banner-mode: off
   mvc:
@@ -36,41 +38,41 @@ health:
   readiness-key: ${HEALTH_READINESS_KEY:}
 
 migration:
+  # In course mode these feature gates expose the Java API's owned PostgreSQL schema.
+  course-api:
+    enabled: ${COURSE_API_ENABLED:true}
   thesis-read:
-    enabled: ${THESIS_READ_ENABLED:false}
+    enabled: ${THESIS_READ_ENABLED:true}
   notifications-read:
-    enabled: ${NOTIFICATIONS_READ_ENABLED:false}
+    enabled: ${NOTIFICATIONS_READ_ENABLED:true}
   notifications-write:
-    enabled: ${NOTIFICATIONS_WRITE_ENABLED:false}
+    enabled: ${NOTIFICATIONS_WRITE_ENABLED:true}
   engagement-read:
-    enabled: ${ENGAGEMENT_READ_ENABLED:false}
+    enabled: ${ENGAGEMENT_READ_ENABLED:true}
   engagement-write:
-    enabled: ${ENGAGEMENT_WRITE_ENABLED:false}
+    enabled: ${ENGAGEMENT_WRITE_ENABLED:true}
   academic-read:
-    enabled: ${ACADEMIC_READ_ENABLED:false}
+    enabled: ${ACADEMIC_READ_ENABLED:true}
   academic-context:
     enabled: ${ACADEMIC_CONTEXT_ENABLED:false}
   academic-enrollment-read:
-    enabled: ${ACADEMIC_ENROLLMENT_READ_ENABLED:false}
+    enabled: ${ACADEMIC_ENROLLMENT_READ_ENABLED:true}
   academic-schedule-read:
-    enabled: ${ACADEMIC_SCHEDULE_READ_ENABLED:false}
+    enabled: ${ACADEMIC_SCHEDULE_READ_ENABLED:true}
   academic-waitlist-read:
-    enabled: ${ACADEMIC_WAITLIST_READ_ENABLED:false}
+    enabled: ${ACADEMIC_WAITLIST_READ_ENABLED:true}
   academic-attendance-read:
     enabled: ${ACADEMIC_ATTENDANCE_READ_ENABLED:false}
   academic-section-read:
-    enabled: ${ACADEMIC_SECTION_READ_ENABLED:false}
+    enabled: ${ACADEMIC_SECTION_READ_ENABLED:true}
   people-read:
-    enabled: ${PEOPLE_READ_ENABLED:false}
+    enabled: ${PEOPLE_READ_ENABLED:true}
   finance-read:
     enabled: ${FINANCE_READ_ENABLED:false}
   analytics-read:
     enabled: ${ANALYTICS_READ_ENABLED:false}
   thesis-assistant:
-    enabled: ${THESIS_ASSISTANT_ENABLED:false}
-  auth-login:
-    enabled: ${AUTH_LOGIN_ENABLED:false}
-
+    enabled: ${THESIS_ASSISTANT_ENABLED:true}
 internal:
   service-token: ${INTERNAL_SERVICE_TOKEN:}
 

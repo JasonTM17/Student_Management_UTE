@@ -1,6 +1,6 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Calendar, KeyRound, Mail, MapPin, Phone, Save, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
@@ -11,14 +11,8 @@ import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 
-export default function ProfilePage() {
-  const { user, refreshUser } = useAuth();
-  const { messages } = useI18n();
-  const [isLoading, setIsLoading] = useState(false);
-  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
-  const [profileError, setProfileError] = useState('');
-  const [passwordError, setPasswordError] = useState('');
-  const [formData, setFormData] = useState({
+function getProfileFormData(user: ReturnType<typeof useAuth>['user']) {
+  return {
     firstName: user?.firstName || '',
     lastName: user?.lastName || '',
     phone: user?.phone || '',
@@ -26,7 +20,23 @@ export default function ProfilePage() {
       ? new Date(user.dateOfBirth).toISOString().split('T')[0]
       : '',
     address: user?.address || '',
-  });
+  };
+}
+
+export default function ProfilePage() {
+  const { user, refreshUser } = useAuth();
+  const { messages } = useI18n();
+  const [isLoading, setIsLoading] = useState(false);
+  const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
+  const [profileError, setProfileError] = useState('');
+  const [passwordError, setPasswordError] = useState('');
+  const [formData, setFormData] = useState(() => getProfileFormData(user));
+
+  useEffect(() => {
+    if (user) {
+      setFormData(getProfileFormData(user));
+    }
+  }, [user]);
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -89,14 +99,14 @@ export default function ProfilePage() {
   };
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{messages.profile.eyebrow}</SectionEyebrow>}
         title={messages.profile.title}
         description={messages.profile.description}
       />
 
-      <div className="grid gap-6 xl:grid-cols-[1.05fr_0.95fr]">
+      <div className="grid gap-6 2xl:grid-cols-[1.05fr_0.95fr]">
         <WorkspacePanel
           title={messages.profile.profileTitle}
           description={messages.profile.profileDescription}
@@ -126,7 +136,11 @@ export default function ProfilePage() {
             </div>
 
             {profileError ? (
-              <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+              <div
+                role="alert"
+                aria-live="assertive"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+              >
                 {profileError}
               </div>
             ) : null}
@@ -230,7 +244,11 @@ export default function ProfilePage() {
             contentClassName="space-y-4"
           >
               {passwordError ? (
-                <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                <div
+                  role="alert"
+                  aria-live="assertive"
+                  className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+                >
                   {passwordError}
                 </div>
               ) : null}
