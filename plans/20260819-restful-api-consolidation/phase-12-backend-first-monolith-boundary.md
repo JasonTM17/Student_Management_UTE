@@ -9,7 +9,7 @@ image, or start frontend/mobile implementation.
 
 ## Current evidence and decision
 
-At exact current HEAD `ccd6cb81b422aec08d6cf26f42097853802e7c45`, the root
+At exact current HEAD `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`, the root
 Java reactor already names only `restful-api`, and the focused monolith suite
 still passes on a real JDK. The older `ba90cf61e89ac48110a7be680b443513909dd771`
 snapshot in this phase record is now stale for current-head verification.
@@ -18,11 +18,13 @@ Fresh bounded evidence on 2026-08-21:
 
 - `mvn -q -f java-services/pom.xml test`
   - `JAVA_HOME=C:\Program Files\Java\jdk-26.0.1`
+  - result: PASS
+  - Surefire summary: 27 reports / 178 tests / 0 failures / 0 errors / 1
+    skipped
+- `mvn -q -f java-services/restful-api/pom.xml test`
+  - `JAVA_HOME=C:\Program Files\Java\jdk-26.0.1`
   - `MAVEN_OPTS=-Xmx1g -Djava.io.tmpdir=D:/Student_Management/.tmp/java-tmp`
   - result: PASS
-- GitHub Actions run `32484386256` for commit `ccd6cb8` shows
-  `java-restful-api-quality` completed `success` while the release gates were
-  still running.
 
 The legacy Java directories remain in source as rollback/compatibility
 references. They are deliberately not deleted and may still be built directly

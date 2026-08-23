@@ -3,29 +3,59 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
 
 ## Current execution state
 
-- Current branch snapshot before this docs update:
-  `main` / `feature/java-thesis-platform` at
-  `dc56651447372188695cc64f652c496a9aad4c49`
-  (`docs(plan): record current-head checkpoint and runtime blocker`), with
-  `origin/main` still behind and the branch pair now sharing the same exact
-  docs-only checkpoint.
-- Repo state before this docs update: tracked tree is clean; the user-owned
-  untracked `.agents/`, `.codex/` and `.tmp/` remain unstaged.
-- Source gates refreshed on this exact head: `npm test --prefix frontend`
-  29/29, `npm run typecheck --prefix frontend`, `npm run lint --prefix
-  frontend`, `npm test --prefix mobile` 6/6, and
-  `mvn -q -f java-services/pom.xml test` 26 reports / 177 tests / 0 failures /
-  0 errors / 1 skipped.
-- Runtime browser gate assessment: Docker daemon is unreachable
-  (`dockerDesktopLinuxEngine` pipe missing) and `kubectl` has no current
-  context, so exact-source browser/Playwright visual capture remains blocked
-  until a local edge/runtime is restored.
-- Branch integration ruling: continue using `main` as the integration branch
-  for this turn; do not fast-forward or push any other branch unless the user
-  explicitly changes the target.
-- Disk snapshot before this docs update: C: ~13.64 GiB free, D: ~35.31 GiB
-  free. Disposable PostgreSQL clusters observed under `.tmp` on ports `56452`
-  and `56453` were stopped by exact data directory; no broad deletion was run.
+- Current remote integration snapshot:
+  `origin/feature/java-thesis-platform` at
+  `09ae74a83320c24d075e675369f29dcc2735fd94`
+  (`docs(plan): rebind backend review pack to current tip`), ahead of the local
+  feature checkout by 5 commits.
+- Local checkout under audit:
+  `D:\Student_Management` at `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`,
+  with preserved user-owned FE/edge dirty artifacts still present. Do not
+  reset, clean, rebase or stage those files without a fresh exact-scope
+  decision.
+- Backend provenance worktree used for the earlier exact-head checkpoint:
+  `D:\Student_Management-recovery\backend-provenance-4b5e771`, detached at
+  `4b5e7712f4a9fd309f3bc616e314c6c8db6ce8f0`, clean. Treat this as historical
+  evidence only.
+- Current backend gate evidence on the exact monolith head:
+  `mvn -q -f java-services/pom.xml test` PASS with 27 reports / 178 tests / 0
+  failures / 0 errors / 1 skipped, `git diff --check` PASS, and the scoped
+  high-confidence secret marker scan PASS.
+- Fresh exact-head thesis restore smoke on the restored PostgreSQL 18.4
+  cluster: `psql -h 127.0.0.1 -p 55433 -U campuscore_ro_reader -d campuscore_ro`
+  reported `current_user=campuscore_ro_reader`, `default_transaction_read_only=on`,
+  `statement_timeout=5s`, `lock_timeout=1s`; then
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.thesis.ThesisReadOnlyRestoreSmokeTest' '-DforkCount=0' test`
+  passed with 1 test / 0 failures / 0 errors / 0 skipped against
+  `jdbc:postgresql://127.0.0.1:55433/campuscore_ro?currentSchema=thesis`.
+- Fresh exact-head thesis live differential rehearsal on the same restored
+  PostgreSQL 18.4 cluster:
+  `node scripts/run-thesis-differential-rehearsal.mjs` PASS with
+  `THESIS_DIFF_LEGACY_BASE_URL=http://127.0.0.1:54111`,
+  `THESIS_DIFF_JAVA_BASE_URL=http://127.0.0.1:54112`, and
+  `JWT_SECRET=0123456789abcdef0123456789abcdef`; 8/8 corpus comparisons passed
+  and the route sequence
+  `legacy-before -> java-candidate -> legacy-after` stayed stable at 200/200/200
+  with the same body hash.
+- Current frontend source smoke evidence on the same workspace:
+  `npm test --prefix frontend` PASS with 30/30 smoke tests after adding the
+  monolith-transition copy/asset regression. Visual/browser acceptance remains
+  HOLD.
+- The earlier Phase 55 hardening focused gate remains historical evidence
+  only.
+
+## Independent read-only audits — 2026-08-22
+
+- `state_audit` verdict: backend monolith source gate PASS, backend foundation
+  HOLD, FE source smoke PASS, FE visual/browser acceptance HOLD, current docs
+  pack had stale exact-head wording before the sync, and the local feature
+  branch remained behind remote by 5 commits.
+- `readiness_falsify` verdict: the claim that the repo is ready to open Stitch
+  frontend staging or to call the backend foundation gate finished was
+  FALSIFIED. The blocker set remains PostgreSQL parity, rollback/canary,
+  independent exact-head review, and dirty-tree preservation.
+- Disk snapshot after the refresh: C: ~2.63 GiB free, D: ~34.51 GiB free. No
+  manual Codex/IDE/user-data cleanup was performed.
 
 ## Completed evidence carried forward
 
@@ -764,3 +794,56 @@ Active plan: plans/20260819-restful-api-consolidation/plan.md
   and notification summary on real PostgreSQL syntax/types.
 - Limitation: focused PostgreSQL parity only; no restored legacy dataset,
   route canary, rollback or public traffic handoff proof.
+
+## Backend security and canonical monolith refresh — 2026-08-21
+
+- Fast-forwarded the local integration branch from `f8263c9` to
+  `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b` so the working copy includes the
+  latest academic-context hardening from `origin/feature/java-thesis-platform`.
+  The fast-forward did not overlap the pending backend dependency patch or the
+  backend-first phase notes.
+- Pending backend security patch: `backend/package.json` now pins
+  `nodemailer` to `^9.0.5`, and `backend/package-lock.json` is regenerated for
+  that direct dependency update.
+- Verified:
+  `npm audit --prefix backend --audit-level=high --json` returned 0
+  vulnerabilities.
+- Verified:
+  `npm run build --prefix backend` exited 0 after Prisma client generation.
+- Verified:
+  `npm test --prefix backend -- --runInBand` exited 0 with 5 suites / 24 tests
+  passing.
+- Verified:
+  `mvn -q -f java-services/pom.xml test` exited 0 on the fast-forwarded
+  current checkout; canonical RESTful API Surefire summary is 27 reports / 178
+  tests / 0 failures / 0 errors / 1 skipped.
+- Hygiene:
+  `git diff --check` on the pending backend package files and backend-first
+  phase notes exited 0.
+- Limitation: this keeps the backend security/build and canonical Java
+  monolith source gate current, but it still does not clear PostgreSQL
+  restored-dataset parity, route canary, rollback, exact-head review, FE
+  browser capture, Expo typecheck or public cutover gates.
+- Remote drift note: `origin/feature/java-thesis-platform` advanced to
+  `6bb7e50f6c800be6e491df8c2881b4687b25161e` (`docs(plan): refresh backend
+  hardening state`) and overlaps this plan/ledger pair. The local `D:\Student_Management`
+  checkout remains intentionally unmerged so the preserved dirty scope is not
+  overwritten; reconcile this overlap explicitly before any commit or push.
+
+## Auth login PostgreSQL rehearsal refresh — 2026-08-21
+
+- Exact head for the rehearsal: `e9ba1568e7ce14d4dc286f464b3344f6b22fa71b`.
+- Disposable PostgreSQL target: `127.0.0.1:56473`, database `postgres`,
+  `currentSchema=auth`.
+- Verified:
+  `mvn -q -f java-services/restful-api/pom.xml '-Dtest=io.campuscore.restfulapi.auth.AuthLoginPersistenceTest' '-DforkCount=0' test`
+  exited 0 with 9 tests / 0 failures / 0 errors / 0 skipped.
+- The rehearsal covered login, refresh rotation, `/api/v1/auth/me`, profile
+  update, password change, logout and lockout behavior on real PostgreSQL
+  syntax/types.
+- Verified at current head:
+  `mvn -q -f java-services/pom.xml test` exited 0 with 27 reports / 178 tests
+  / 0 failures / 0 errors / 1 skipped.
+- Limitation: this strengthens the auth login/session slice only; it still
+  does not prove public auth route ownership, auth canary routing, rollback or
+  wider client convergence.

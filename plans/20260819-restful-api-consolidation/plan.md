@@ -575,12 +575,14 @@ the retirement gates pass.
   target, but enrollment create/drop/update/delete ownership, CSV export
   parity, restored PostgreSQL read parity, live route wiring, canary routing,
   rollback and public academic route handoff remain open.
-- Phase 55 academic internal-context bridge: complete at
-  `d92ce53e884adcd83b5dd479aebeb584d9a83946`; see
+- Phase 55 academic internal-context bridge: original source complete at
+  `d92ce53e884adcd83b5dd479aebeb584d9a83946`, with security hardening follow-up
+  at `97a9b7e12d70aeb6a55959ea66b593515ede778f`; see
   `phase-55-academic-internal-context-bridge.md`. It adds internal-only
   academic context lookups for curricula, departments and student enrollments
-  behind `X-Service-Token`, keeps the public academic route surface unchanged
-  and does not move public route ownership or Java cutover.
+  behind `X-Service-Token` and a configured `INTERNAL_SERVICE_TOKEN`, keeps the
+  public academic route surface unchanged and does not move public route
+  ownership or Java cutover.
 - Phase 56 academic enrollment PostgreSQL parity rehearsal: source/parity
   verified at `3dbfd19f841dc3e9e98a161c9d03161974c2bce6`; see
   `phase-56-academic-enrollment-postgres-parity.md`. It exercises the existing
@@ -630,7 +632,9 @@ The next Stitch web/mobile implementation wave is blocked until all of the
 following are observed on one exact source HEAD:
 
 1. the canonical Java build executes only `java-services/restful-api` as the
-   modular-monolith target;
+   modular-monolith target; on the current checkout `e9ba156`,
+   `mvn -q -f java-services/pom.xml test` passes for the monolith reactor
+   with 27 reports / 178 tests / 0 failures / 0 errors / 1 skipped;
 2. the security/error/correlation shell and its negative tests remain green;
 3. one low-risk, read-only domain is exercised against an approved disposable
    PostgreSQL restore with a read-only role, Flyway/DDL disabled, and a recorded
@@ -642,14 +646,13 @@ Until then, the existing 22+ web/mobile screen material is design/source
 evidence only. It is not a reason to expand the client or point either client
 at an incomplete Java API.
 
-## Continuation evidence — 2026-08-20, `ba90cf6`
+## Continuation evidence — 2026-08-22, `e9ba156`
 
 The current exact checkout remains on
-`ba90cf61e89ac48110a7be680b443513909dd771` and the branch is still ahead of
-`origin/feature/java-thesis-platform` by 16 commits. The working tree has only
-preserved untracked AgentKit/Codex configuration files plus
-`.agents/skills/ak-use-mcp/scripts/package-lock.json`; none of those were used
-as implementation evidence.
+`e9ba1568e7ce14d4dc286f464b3344f6b22fa71b` and the branch is now behind
+`origin/feature/java-thesis-platform` by 5 commits. The working tree still has
+preserved user-owned dirty/untracked FE, plan and tool artifacts; none of those
+were used as implementation evidence in the backend-first audit.
 
 Observed low-disk-safe gates:
 
@@ -661,7 +664,7 @@ Observed low-disk-safe gates:
   in-memory access/refresh token handling plus one-shot refresh retry for the
   Java mobile auth contract. It is not Expo typecheck, emulator, device, secure
   storage, or live API proof.
-- `npm test --prefix frontend`: PASS, 29/29 frontend smoke tests. This is source
+- `npm test --prefix frontend`: PASS, 30/30 frontend smoke tests. This is source
   and structural coverage only; the added FE Stitch guard proves the visual QA
   harness now covers the ten audit-missing route families, 768px tablet width,
   discovered detail routes, and console/network failure checks. It is not a
