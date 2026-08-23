@@ -2,13 +2,12 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Clock, MapPin } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { Enrollment, Semester } from '@/types/api';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
@@ -131,7 +130,9 @@ export default function SchedulePage() {
     enrollments
       .filter(
         (enrollment) =>
-          enrollment.status === 'CONFIRMED' || enrollment.status === 'PENDING',
+          enrollment.status === 'ENROLLED' ||
+          enrollment.status === 'CONFIRMED' ||
+          enrollment.status === 'PENDING',
       )
       .forEach((enrollment) => {
         const section = enrollment.section;
@@ -266,9 +267,9 @@ export default function SchedulePage() {
                 ]}
               />
             </div>
-            <LocalizedLink href="/dashboard/enrollments">
-              <Button variant="outline">{copy.openCourses}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/enrollments" variant="outline">
+              {copy.openCourses}
+            </LinkButton>
           </div>
         }
       />
@@ -287,9 +288,7 @@ export default function SchedulePage() {
           title={copy.emptyTitle}
           description={copy.emptyDescription}
           action={
-            <LocalizedLink href="/dashboard/register">
-              <Button>{copy.browseSections}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/register">{copy.browseSections}</LinkButton>
           }
         />
       ) : (

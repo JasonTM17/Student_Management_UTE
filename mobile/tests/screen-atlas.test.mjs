@@ -25,36 +25,36 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   ].map((match) => match[1] ?? match[2]);
   const screenCount = registeredRoutes.length;
 
-  assert.equal(screenCount, 23);
+  assert.equal(screenCount, 21);
   assert.equal(new Set(registeredRoutes).size, screenCount);
   assert.deepEqual(componentRoutes.sort(), [...registeredRoutes].sort());
   for (const requiredRoute of [
     'auth.signIn',
     'dashboard.student',
     'thesis.topics',
-    'thesis.evaluation',
     'assistant.chat',
     'admin.dashboard',
     'lecturer.grading',
   ]) {
     assert.match(routes, new RegExp(`name: '${requiredRoute.replace('.', '\\.')}'`));
   }
-  assert.match(readme, /23 navigable screens/);
+  assert.match(readme, /21 navigable screens/);
 });
 
-test('native tokens preserve the Academic Continuity contract', () => {
-  assert.match(tokens, /background: '#F9F9FF'/);
-  assert.match(tokens, /primary: '#003F87'/);
-  assert.match(tokens, /primaryContainer: '#0056B3'/);
+test('native tokens preserve the institutional portal contract', () => {
+  assert.match(tokens, /background: '#F4F6F8'/);
+  assert.match(tokens, /primary: '#0B4A86'/);
+  assert.match(tokens, /primaryContainer: '#0D5AA2'/);
+  assert.match(tokens, /accent: '#E5A900'/);
   assert.match(tokens, /mobileGutter: 16/);
-  assert.match(tokens, /touchTarget: 44/);
-  assert.match(tokens, /family: 'Be Vietnam Pro'/);
+  assert.match(tokens, /touchTarget: 48/);
+  assert.match(tokens, /family: Platform\.select\(/);
 });
 
 test('native API seam fails closed until live mode is explicitly enabled', () => {
   const client = fs.readFileSync(path.join(mobileRoot, 'src/api/client.ts'), 'utf8');
 
-  assert.match(client, /EXPO_PUBLIC_API_MODE === 'live'/);
+  assert.match(client, /EXPO_PUBLIC_API_MODE === 'preview'/);
   assert.match(client, /MOBILE_API_PREVIEW/);
   assert.match(client, /mode: ApiMode/);
   assert.match(client, /setSessionTokens\(accessToken: string \| undefined, refreshToken: string \| undefined\): void/);
@@ -99,14 +99,14 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigationTypes, /completeSignIn\(role: UserRole\): void/);
 });
 
-test('Stitch mobile references stay traceable and preview sign-in does not impersonate live authentication', () => {
+test('Stitch mobile references stay traceable and live sign-in enforces the student-only course scope', () => {
   const stitchReferenceIds = (routes.match(/id: '([0-9a-f]{32})'/g) ?? [])
     .map((match) => match.slice(5, -1));
   const metadataIds = new Set(
     Object.values(stitchMetadata.screens).map((screen) => screen.id),
   );
 
-  assert.equal(stitchReferenceIds.length, 13);
+  assert.equal(stitchReferenceIds.length, 12);
   assert.equal(stitchMetadata.inventory.screenCount, 22);
   assert.equal(stitchMetadata.inventory.mobileCount, 13);
   assert.equal(Object.keys(stitchMetadata.screens).length, 22);
@@ -118,17 +118,21 @@ test('Stitch mobile references stay traceable and preview sign-in does not imper
     assert.ok(metadataIds.has(referenceId), `Missing Stitch metadata for ${referenceId}`);
   }
   assert.match(routes, /export const stitchMobileReferences/);
-  assert.match(routes, /'thesis\.evaluation': \[[\s\S]*?3073bce589eb4d4e97ef9775e921a506/);
+  assert.doesNotMatch(routes, /thesis\.evaluation|3073bce589eb4d4e97ef9775e921a506/);
   assert.match(routes, /'admin\.lecturers': \[[\s\S]*?36c60dec6ed9458a80bc5b1cfe6f82a5/);
   assert.match(signIn, /const isPreview = apiClient\.mode === 'preview'/);
   assert.match(signIn, /label=\{isPreview \? 'Explore preview' : 'Sign in'\}/);
   assert.match(signIn, /navigation\.enterPreview\(\)/);
   assert.match(signIn, /campusApi\.login\(email\.trim\(\), password\)/);
   assert.match(signIn, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
-  assert.match(signIn, /navigation\.completeSignIn\(resolveRole\(response\.user\?\.roles\)\)/);
+  assert.match(signIn, /const role = resolveRole\(response\.user\?\.roles\)/);
+  assert.match(signIn, /if \(role !== 'student'\)/);
+  assert.match(signIn, /await campusApi\.logout\(\)\.catch\(\(\) => undefined\)/);
+  assert.match(signIn, /navigation\.completeSignIn\(role\)/);
   assert.doesNotMatch(signIn, /navigation\.navigate\('dashboard\.student'\)/);
-  assert.match(signIn, /No account is authenticated until the Java auth contract is implemented and verified/);
-  assert.match(signIn, /enters the app only after a bearer token is returned/);
+  assert.match(signIn, /The Java auth response did not include an access token/);
+  assert.match(signIn, /Live sign in could not be completed against the Java auth contract/);
+  assert.match(signIn, /Use the web portal for lecturer or admin work/);
   assert.match(readme, /role-specific bottom bar/);
 });
 
@@ -136,9 +140,10 @@ test('mobile assistant keeps preview local and calls the Java route only in live
   assert.match(assistant, /const isPreview = apiClient\.mode === 'preview'/);
   assert.match(assistant, /if \(isPreview\) \{/);
   assert.match(assistant, /Preview noted\. Live mode will answer through the Java assistant contract after authentication\./);
-  assert.match(assistant, /campusApi\.assistantChat\(trimmedMessage, 'en'\)/);
+  assert.match(assistant, /campusApi\.assistantChat\(trimmedMessage, 'vi'\)/);
   assert.match(assistant, /reply\.degraded/);
-  assert.match(assistant, /Local fallback · \$\{reply\.model\}/);
+  assert.match(assistant, /reply\.citations/);
+  assert.match(assistant, /reply\.reasonCode/);
   assert.match(assistant, /The Java assistant route could not answer yet/);
   assert.match(assistant, /loading=\{isSending\}/);
 });

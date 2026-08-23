@@ -7,11 +7,8 @@ import {
   Check,
   CircleDot,
   FileStack,
-  GraduationCap,
-  Scale,
   UsersRound,
 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -20,14 +17,13 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
   thesisApi,
-  type ThesisCouncil,
   type ThesisGroup,
   type ThesisRound,
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
 function statusClass(status: string) {
-  if (['APPROVED', 'RESULTS_PUBLISHED', 'PROPOSALS_PUBLISHED'].includes(status)) {
+  if (['APPROVED', 'PROPOSALS_PUBLISHED'].includes(status)) {
     return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
   }
   if (['REJECTED', 'CANCELLED'].includes(status)) {
@@ -38,16 +34,13 @@ function statusClass(status: string) {
 
 export default function ThesisRoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>();
-  const { isLecturer, isAdmin } = useAuth();
-  const { formatDateTime, messages } = useI18n();
+  const { messages } = useI18n();
   const [round, setRound] = useState<ThesisRound | null>(null);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
-  const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
-  const canManage = isLecturer || isAdmin;
   const statusLabel = (status: string) =>
     messages.thesis.status[status as keyof typeof messages.thesis.status] ?? status;
 
@@ -58,17 +51,15 @@ export default function ThesisRoundDetailPage() {
       setIsLoading(true);
       setError('');
       try {
-        const [roundsData, topicsData, groupsData, councilsData] = await Promise.all([
+        const [roundsData, topicsData, groupsData] = await Promise.all([
           thesisApi.listRounds(),
           thesisApi.listTopics(roundId),
           thesisApi.listGroups(roundId),
-          thesisApi.listCouncils(roundId),
         ]);
         if (cancelled) return;
         setRound(roundsData.find((r) => r.id === roundId) ?? null);
         setTopics(topicsData);
         setGroups(groupsData);
-        setCouncils(councilsData);
       } catch {
         if (!cancelled) setError(messages.thesis.loadFailed);
       } finally {
@@ -110,14 +101,6 @@ export default function ThesisRoundDetailPage() {
                 {messages.thesis.progress.eyebrow}
               </span>
             </LocalizedLink>
-            {canManage ? (
-              <LocalizedLink href="/dashboard/thesis/reviews">
-                <span className="inline-flex items-center gap-2 rounded-lg border border-border/80 bg-card px-4 py-2 text-sm font-medium text-foreground transition-colors hover:bg-secondary/50">
-                  <Scale className="h-4 w-4" />
-                  {messages.thesis.review.eyebrow}
-                </span>
-              </LocalizedLink>
-            ) : null}
           </div>
         }
       />
@@ -126,7 +109,6 @@ export default function ThesisRoundDetailPage() {
         <MetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warm" />
         <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="cool" />
         <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
-        <MetricCard label={messages.thesis.detail.councils} value={councils.length} icon={<GraduationCap className="h-5 w-5" />} tone="violet" />
       </div>
 
       <div className="grid gap-6 xl:grid-cols-2">
@@ -177,7 +159,7 @@ export default function ThesisRoundDetailPage() {
                       </div>
                       <div>
                         <p className="text-sm font-semibold text-foreground">
-                          {messages.thesis.review.groupLabel} #{idx + 1}
+                          {messages.thesis.groupsTitle} #{idx + 1}
                         </p>
                         <p className="font-mono text-xs text-muted-foreground">{group.memberStudentIds.length} {messages.thesis.detail.members}</p>
                       </div>
@@ -193,43 +175,6 @@ export default function ThesisRoundDetailPage() {
         </Card>
       </div>
 
-      {canManage ? (
-        <Card>
-          <CardHeader>
-            <CardTitle>{messages.thesis.detail.councilsTitle}</CardTitle>
-            <CardDescription>{messages.thesis.detail.councilsDescription}</CardDescription>
-          </CardHeader>
-          <CardContent>
-            {councils.length === 0 ? (
-              <EmptyState icon={GraduationCap} title={messages.thesis.detail.noCouncils} description={messages.thesis.detail.noCouncilsDescription} />
-            ) : (
-              <div className="space-y-3">
-                {councils.map((council) => (
-                  <div key={council.id} className="flex items-center justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
-                    <div className="flex items-center gap-3">
-                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-cyan-500/12 text-cyan-700 dark:text-cyan-300">
-                        <GraduationCap className="h-5 w-5" />
-                      </div>
-                      <div>
-                        <p className="text-sm font-semibold text-foreground">
-                          {council.room ?? council.id.slice(0, 8)}
-                        </p>
-                        <p className="text-xs text-muted-foreground">
-                          {council.members.length} {messages.thesis.review.memberCount}
-                          {council.scheduledAt ? ` · ${formatDateTime(council.scheduledAt)}` : ''}
-                        </p>
-                      </div>
-                    </div>
-                    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(council.status))}>
-                      {council.status}
-                    </span>
-                  </div>
-                ))}
-              </div>
-            )}
-          </CardContent>
-        </Card>
-      ) : null}
     </div>
   );
 }

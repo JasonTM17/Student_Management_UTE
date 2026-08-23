@@ -13,11 +13,10 @@ export function SectionEyebrow({
   return (
     <div
       className={cn(
-        'flex items-center gap-2 text-[11px] font-semibold uppercase tracking-[0.24em] text-muted-foreground',
+        'portal-menu-label',
         className,
       )}
     >
-      <span className="h-2 w-2 rounded-full bg-[hsl(var(--accent-warm))]" />
       <span>{children}</span>
     </div>
   );
@@ -41,25 +40,27 @@ export function PageHeader({
   return (
     <header
       className={cn(
-        'flex flex-col gap-5 border-b border-border/70 pb-6 sm:flex-row sm:items-end sm:justify-between',
+        'min-w-0',
         className,
       )}
     >
-      <div className="space-y-3">
-        {eyebrow ? eyebrow : null}
-        <div className="space-y-2">
-          <h1 className="text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
+      <div className="portal-page-ribbon min-w-0 px-4 py-5 sm:px-6">
+        <div className="min-w-0 space-y-1">
+          {eyebrow ? eyebrow : null}
+          <h1 className="break-words text-xl font-semibold leading-7 text-foreground sm:text-2xl">
             {title}
           </h1>
           {description ? (
-            <p className="max-w-3xl text-sm leading-6 text-muted-foreground sm:text-base">
+            <p className="max-w-4xl text-sm leading-6 text-muted-foreground">
               {description}
             </p>
           ) : null}
         </div>
       </div>
       {actions ? (
-        <div className="flex flex-wrap items-center gap-3">{actions}</div>
+        <div className="portal-page-actions flex flex-wrap items-center justify-start gap-2 px-4 py-3 sm:justify-end sm:px-6">
+          {actions}
+        </div>
       ) : null}
     </header>
   );

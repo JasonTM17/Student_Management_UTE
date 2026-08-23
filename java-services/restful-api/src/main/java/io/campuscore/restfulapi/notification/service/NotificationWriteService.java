@@ -13,17 +13,15 @@ import java.time.Clock;
 import java.time.Instant;
 import java.util.Set;
 import java.util.UUID;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Write candidate for current-user notification self-service routes. */
+/** Current-user notification inbox mutation service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.notifications-write", name = "enabled", havingValue = "true")
 public class NotificationWriteService {
 
     private static final Set<String> TYPES = Set.of("INFO", "WARNING", "ERROR", "SUCCESS");

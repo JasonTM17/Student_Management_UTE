@@ -8,20 +8,18 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SELECT-only adapter for legacy Prisma academic attendance tables. */
+/** JDBC adapter for academic attendance tables. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-attendance-read", name = "enabled", havingValue = "true")
 public class AcademicAttendanceReadRepository {
     private static final String ATTENDANCE = "\"academic\".\"Attendance\"";
     private static final String STUDENT = "\"academic\".\"Student\"";
-    private static final String USER = "\"academic\".\"User\"";
+    private static final String USER = "\"auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String COURSE = "\"academic\".\"Course\"";
 
@@ -141,6 +139,17 @@ public class AcademicAttendanceReadRepository {
                         AcademicAttendanceReadRepository::mapAttendance)
                 .stream()
                 .findFirst();
+    }
+
+    public boolean isSectionOwnedByLecturer(String sectionId, String lecturerId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SECTION
+                        + " WHERE \"id\" = :sectionId AND \"lecturerId\" = :lecturerId",
+                new MapSqlParameterSource()
+                        .addValue("sectionId", sectionId)
+                        .addValue("lecturerId", lecturerId),
+                Long.class);
+        return count != null && count > 0;
     }
 
     private static String attendanceFilters(

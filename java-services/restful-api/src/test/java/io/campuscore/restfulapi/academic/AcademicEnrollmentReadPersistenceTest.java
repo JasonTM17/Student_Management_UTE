@@ -26,17 +26,12 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.academic-enrollment-read.enabled=true",
-        "migration.academic-read.enabled=true",
-        "migration.academic-context.enabled=true",
-        "INTERNAL_SERVICE_TOKEN=academic-internal-token-12345",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:enrollment_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class AcademicEnrollmentReadPersistenceTest {
 
     private static final Instant BASE_TIME = Instant.parse("2026-08-20T00:00:00Z");
-    private static final String SERVICE_TOKEN = "academic-internal-token-12345";
-
     @Autowired
     private JdbcTemplate jdbc;
 
@@ -45,6 +40,7 @@ class AcademicEnrollmentReadPersistenceTest {
 
     @BeforeEach
     void prepareReadOnlyFixture() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
         clearTables();
@@ -111,21 +107,6 @@ class AcademicEnrollmentReadPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.length()").value(0));
-    }
-
-    @Test
-    void internalAcademicContextStudentEnrollmentsRequireServiceToken() throws Exception {
-        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("HTTP_403"));
-
-        mvc.perform(get("/api/v1/internal/academic-context/students/student-1/enrollments")
-                        .header("X-Service-Token", SERVICE_TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2))
-                .andExpect(jsonPath("$[0].id").value("enrollment-2"))
-                .andExpect(jsonPath("$[0].section.course.code").value("SE401"))
-                .andExpect(jsonPath("$[1].id").value("enrollment-1"));
     }
 
     @Test
@@ -286,7 +267,7 @@ class AcademicEnrollmentReadPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "academic"."User" (
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(200) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
@@ -443,7 +424,7 @@ class AcademicEnrollmentReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"AcademicYear\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
-        jdbc.update("DELETE FROM \"academic\".\"User\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
     }
 
     private void insertFixture() {
@@ -536,7 +517,7 @@ class AcademicEnrollmentReadPersistenceTest {
     }
 
     private void insertUser(String id, String email, String firstName, String lastName) {
-        jdbc.update("INSERT INTO \"academic\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
                 id, email, firstName, lastName);
     }
 

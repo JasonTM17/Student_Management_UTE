@@ -5,7 +5,7 @@ import { Bell, RefreshCw } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { announcementsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import {
@@ -112,16 +112,14 @@ export default function LecturerAnnouncementsPage() {
         description={copy.description}
         actions={
           <div className="flex flex-wrap gap-3">
-            <LocalizedLink href="/dashboard/lecturer">
-              <Button
-                type="button"
-                variant="outline"
-                aria-label={copy.backToDashboard}
-                title={copy.backToDashboard}
-              >
-                {copy.backToDashboard}
-              </Button>
-            </LocalizedLink>
+            <LinkButton
+              href="/dashboard/lecturer"
+              variant="outline"
+              aria-label={copy.backToDashboard}
+              title={copy.backToDashboard}
+            >
+              {copy.backToDashboard}
+            </LinkButton>
             <Button
               type="button"
               variant="outline"

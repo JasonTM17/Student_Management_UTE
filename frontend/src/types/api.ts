@@ -114,7 +114,7 @@ export interface Enrollment {
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
   enrolledAt: string;
   droppedAt?: string;
   gradeStatus: 'DRAFT' | 'PUBLISHED' | 'APPEALED';
@@ -126,28 +126,7 @@ export interface Enrollment {
   semester?: Semester;
 }
 
-// Waitlist Types
-export interface WaitlistEntry {
-  id: string;
-  studentId: string;
-  sectionId: string;
-  position: number;
-  status: 'ACTIVE' | 'CONVERTED' | 'EXPIRED' | 'CANCELLED';
-  addedAt: string;
-  convertedAt?: string;
-  student?: Student;
-  section?: Section;
-}
-
-export type EnrollmentActionResult =
-  | {
-      kind: 'enrollment';
-      record: Enrollment;
-    }
-  | {
-      kind: 'waitlist';
-      record: WaitlistEntry;
-    };
+export type EnrollmentActionResult = Enrollment;
 
 // Academic Types
 export interface Semester {

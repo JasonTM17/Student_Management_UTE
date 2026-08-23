@@ -11,7 +11,6 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Transcri
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -23,14 +22,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated academic enrollment reads. Enrollment mutations, waitlist
- * promotion, CSV export, transcript and grade publishing remain with the
- * legacy academic-service in this wave.
- */
+/** Student, lecturer and administrator enrollment and grade read routes. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-enrollment-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1")
 public class AcademicEnrollmentReadController {
 

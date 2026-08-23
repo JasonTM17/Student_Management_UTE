@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   Check,
@@ -8,12 +8,11 @@ import {
   Inbox,
   RefreshCw,
 } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import {
   EmptyState,
@@ -44,6 +43,10 @@ export default function NotificationsCenterPage() {
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const filterRefs = useRef<Record<Filter, HTMLButtonElement | null>>({
+    all: null,
+    unread: null,
+  });
 
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -110,12 +113,30 @@ export default function NotificationsCenterPage() {
     }
   }
 
+  function moveFilterFocus(event: React.KeyboardEvent<HTMLButtonElement>, tab: Filter) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const next: Filter =
+      event.key === 'Home'
+        ? 'all'
+        : event.key === 'End'
+          ? 'unread'
+          : tab === 'all'
+            ? 'unread'
+            : 'all';
+    setFilter(next);
+    filterRefs.current[next]?.focus();
+  }
+
   if (authLoading || !hasAccess) {
     return <LoadingState label={messages.common.states.loadingContent} />;
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.title}</SectionEyebrow>}
         title={copy.title}
@@ -127,11 +148,15 @@ export default function NotificationsCenterPage() {
               variant="outline"
               onClick={() => void fetchNotifications()}
               disabled={isLoading || isMarkingAll}
+              aria-label={copy.refresh}
+              title={copy.refresh}
+              className="w-11 px-0 sm:w-auto sm:px-4"
             >
               <RefreshCw
-                className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')}
+                className={cn('h-4 w-4 sm:mr-2', isLoading && 'animate-spin')}
+                aria-hidden="true"
               />
-              {copy.refresh}
+              <span className="hidden sm:inline">{copy.refresh}</span>
             </Button>
             <Button
               type="button"
@@ -139,14 +164,14 @@ export default function NotificationsCenterPage() {
               onClick={() => void markAllRead()}
               disabled={unreadCount === 0 || isMarkingAll || isLoading}
             >
-              <CheckCheck className="mr-2 h-4 w-4" />
+              <CheckCheck className="mr-2 h-4 w-4" aria-hidden="true" />
               {copy.markAllRead}
             </Button>
           </div>
         }
       />
 
-      <div className="flex flex-col gap-4 rounded-lg border border-border/70 bg-card/70 p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+      <div className="flex flex-col gap-3 border border-border/70 bg-card p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label={copy.title}>
           {(['all', 'unread'] as const).map((tab) => {
             const selected = filter === tab;
@@ -155,12 +180,19 @@ export default function NotificationsCenterPage() {
             return (
               <button
                 key={tab}
+                id={`notifications-tab-${tab}`}
+                ref={(node) => {
+                  filterRefs.current[tab] = node;
+                }}
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-controls={`notifications-panel-${tab}`}
+                tabIndex={selected ? 0 : -1}
                 onClick={() => setFilter(tab)}
+                onKeyDown={(event) => moveFilterFocus(event, tab)}
                 className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'inline-flex min-h-11 items-center gap-2 rounded-md px-3 py-2 text-sm font-semibold transition-colors duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   selected
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -170,7 +202,7 @@ export default function NotificationsCenterPage() {
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-xs',
-                    selected ? 'bg-white/15' : 'bg-secondary text-foreground',
+                    selected ? 'bg-white/20' : 'bg-secondary text-foreground',
                   )}
                 >
                   {count}
@@ -180,7 +212,7 @@ export default function NotificationsCenterPage() {
           })}
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Bell className="h-4 w-4" />
+          <Bell className="h-4 w-4" aria-hidden="true" />
           <span>{unreadCount} {copy.unread.toLowerCase()}</span>
         </div>
       </div>
@@ -188,64 +220,68 @@ export default function NotificationsCenterPage() {
       {status ? (
         <div
           role="status"
-          className="rounded-lg border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+          className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
         >
           {status}
         </div>
       ) : null}
 
-      {error ? (
-        <ErrorState
-          title={copy.title}
-          description={error}
-          onRetry={() => void fetchNotifications()}
-        />
-      ) : isLoading ? (
-        <LoadingState label={copy.loading} />
-      ) : visibleItems.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title={filter === 'unread' ? copy.noUnread : copy.noAll}
-          description={
-            filter === 'unread' ? copy.noUnread : copy.empty
-          }
-          action={
-            <LocalizedLink href="/dashboard">
-              <Button variant="outline">{messages.common.actions.openDashboard}</Button>
-            </LocalizedLink>
-          }
-        />
-      ) : (
-        <Card variant="muted">
-          <CardContent className="space-y-3 p-3 sm:p-5">
-            {visibleItems.map((item) => {
+      <div
+        id={`notifications-panel-${filter}`}
+        role="tabpanel"
+        aria-labelledby={`notifications-tab-${filter}`}
+        tabIndex={0}
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {error ? (
+          <ErrorState
+            title={copy.title}
+            description={error}
+            onRetry={() => void fetchNotifications()}
+          />
+        ) : isLoading ? (
+          <LoadingState label={copy.loading} />
+        ) : visibleItems.length === 0 ? (
+          <EmptyState
+            icon={Inbox}
+            title={filter === 'unread' ? copy.noUnread : copy.noAll}
+            description={filter === 'unread' ? copy.noUnread : copy.empty}
+            action={
+              <LinkButton href="/dashboard" variant="outline">
+                {messages.common.actions.openDashboard}
+              </LinkButton>
+            }
+          />
+        ) : (
+          <div className="divide-y divide-border/70 border border-border/80 bg-card">
+              {visibleItems.map((item) => {
               const title = item.title || copy.fallbackTitle;
               const content = item.content || item.message || copy.fallbackContent;
               const isBusy = busyId === item.id;
 
-              return (
-                <article
+                return (
+                  <article
                   key={item.id}
                   className={cn(
-                    'rounded-lg border bg-card px-4 py-4 transition-colors sm:px-5',
+                    'bg-card px-4 py-4 transition-colors sm:px-5',
                     item.isRead
-                      ? 'border-border/70'
-                      : 'border-primary/35 bg-primary/[0.035] shadow-sm',
+                      ? ''
+                      : 'border-l-2 border-l-primary bg-primary/[0.035]',
                   )}
                 >
                   <div className="flex items-start gap-3 sm:gap-4">
                     <div
                       className={cn(
-                        'mt-0.5 flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                        'mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
                         item.isRead
                           ? 'bg-secondary text-muted-foreground'
                           : 'bg-primary/10 text-primary',
                       )}
                     >
                       {item.isRead ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4" aria-hidden="true" />
                       ) : (
-                        <Bell className="h-4 w-4" />
+                        <Bell className="h-4 w-4" aria-hidden="true" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
@@ -255,7 +291,7 @@ export default function NotificationsCenterPage() {
                             {title}
                           </h2>
                           {!item.isRead ? (
-                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase tracking-[0.14em] text-primary">
+                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase text-primary">
                               {copy.unread}
                             </span>
                           ) : null}
@@ -279,7 +315,7 @@ export default function NotificationsCenterPage() {
                           disabled={isBusy}
                           className="px-0 text-primary hover:bg-transparent hover:text-primary/80"
                         >
-                          <Check className="mr-2 h-4 w-4" />
+                          <Check className="mr-2 h-4 w-4" aria-hidden="true" />
                           {isBusy ? messages.common.states.loading : copy.markRead}
                         </Button>
                       ) : (
@@ -287,12 +323,12 @@ export default function NotificationsCenterPage() {
                       )}
                     </div>
                   </div>
-                </article>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+                  </article>
+                );
+              })}
+          </div>
+        )}
+      </div>
     </div>
   );
 }

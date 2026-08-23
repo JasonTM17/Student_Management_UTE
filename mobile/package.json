@@ -7,10 +7,12 @@
     "start": "expo start",
     "android": "expo start --android",
     "ios": "expo start --ios",
-    "test": "node --test tests/screen-atlas.test.mjs",
+    "test": "node --test tests/screen-atlas.test.mjs tests/phase-six-repair.test.mjs",
     "typecheck": "tsc --noEmit"
   },
   "dependencies": {
+    "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
+    "@expo/vector-icons": "~14.0.4",
     "expo": "~52.0.0",
     "react": "18.3.1",
     "react-native": "0.76.5"

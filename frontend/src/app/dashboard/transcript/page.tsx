@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, FileText, GraduationCap, TrendingUp } from 'lucide-react';
-import { LocalizedLink } from '@/components/LocalizedLink';
+import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
@@ -11,7 +11,6 @@ import {
   StudentGradeRecord,
   StudentTranscriptSemester,
 } from '@/types/api';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
@@ -241,9 +240,9 @@ export default function TranscriptPage() {
                 ]}
               />
             </div>
-            <LocalizedLink href="/dashboard/grades">
-              <Button variant="outline">{copy.openGrades}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/grades" variant="outline">
+              {copy.openGrades}
+            </LinkButton>
           </div>
         }
       />
@@ -262,9 +261,7 @@ export default function TranscriptPage() {
           title={copy.emptyTitle}
           description={copy.emptyDescription}
           action={
-            <LocalizedLink href="/dashboard/grades">
-              <Button>{copy.openGrades}</Button>
-            </LocalizedLink>
+            <LinkButton href="/dashboard/grades">{copy.openGrades}</LinkButton>
           }
         />
       ) : (

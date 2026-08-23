@@ -7,17 +7,18 @@ import io.campuscore.restfulapi.people.web.PeopleReadDtos.PageMeta;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentListResponse;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentResponse;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
+import java.util.Set;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
+import org.springframework.security.core.Authentication;
+import org.springframework.security.core.GrantedAuthority;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-only application service for the people profile strangler slice. */
+/** Student and lecturer profile query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.people-read", name = "enabled", havingValue = "true")
 public class PeopleReadService {
 
     public static final int MAX_PAGE_SIZE = 100;
@@ -39,8 +40,31 @@ public class PeopleReadService {
 
     @Transactional(readOnly = true)
     public StudentResponse findStudent(String id) {
+        return findStudent(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public StudentResponse findStudent(String id, Authentication authentication) {
+        String ownerId = studentOnly(authentication) ? authentication.getName() : null;
+        if (ownerId != null) {
+            return people.findStudentByIdAndUserId(id, ownerId)
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
+        }
         return people.findStudentById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Student not found"));
+    }
+
+    private static boolean studentOnly(Authentication authentication) {
+        if (authentication == null) {
+            return false;
+        }
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
+        return authorities.contains("ROLE_STUDENT")
+                && !authorities.contains("ROLE_ADMIN")
+                && !authorities.contains("ROLE_SUPER_ADMIN")
+                && !authorities.contains("ROLE_LECTURER");
     }
 
     @Transactional(readOnly = true)

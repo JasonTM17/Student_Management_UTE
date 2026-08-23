@@ -72,8 +72,6 @@ export function isBypassedPath(pathname: string) {
     pathname.startsWith('/api') ||
     pathname.startsWith('/_next') ||
     pathname.startsWith('/health') ||
-    pathname.startsWith('/socket.io') ||
-    pathname.startsWith('/notifications') ||
     /\.[a-z0-9]+$/i.test(pathname)
   );
 }

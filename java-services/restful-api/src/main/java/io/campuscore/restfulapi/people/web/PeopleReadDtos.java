@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only people profile candidate. */
+/** DTOs for student and lecturer profiles. */
 public final class PeopleReadDtos {
 
     private PeopleReadDtos() {

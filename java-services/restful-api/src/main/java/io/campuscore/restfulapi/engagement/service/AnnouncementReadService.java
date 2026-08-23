@@ -9,15 +9,13 @@ import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PageMeta;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 
-/** Read-only application service for the engagement strangler candidate. */
+/** Announcement query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.engagement-read", name = "enabled", havingValue = "true")
 public class AnnouncementReadService {
 
     public static final int MAX_PAGE_SIZE = 200;

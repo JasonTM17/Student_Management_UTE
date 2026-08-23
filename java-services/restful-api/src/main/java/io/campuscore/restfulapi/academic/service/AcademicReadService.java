@@ -24,17 +24,15 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-only application service for the academic strangler candidate. */
+/** Academic catalog query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-read", name = "enabled", havingValue = "true")
 public class AcademicReadService {
 
     public static final int MAX_PAGE_SIZE = 200;

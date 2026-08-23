@@ -27,7 +27,7 @@ export function BrandMark({
     <div className={cn('flex items-center gap-3', className)}>
       <div
         className={cn(
-          'flex h-11 w-11 items-center justify-center rounded-lg border border-white/10 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))] shadow-sm',
+          'flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]',
           compact && 'h-9 w-9',
           markClassName,
         )}
@@ -37,12 +37,12 @@ export function BrandMark({
       <div className="min-w-0">
         <div
           className={cn(
-            'text-lg font-semibold tracking-tight text-foreground',
+            'text-lg font-bold text-foreground',
             compact && 'text-base',
             titleClassName,
           )}
         >
-          CampusCore
+          <span translate="no">CampusCore</span>
         </div>
         {subtitle ? (
           <div className={cn('truncate text-sm text-muted-foreground', subtitleClassName)}>

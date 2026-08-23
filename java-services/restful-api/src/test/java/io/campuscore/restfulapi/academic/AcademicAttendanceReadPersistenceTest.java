@@ -25,8 +25,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.academic-attendance-read.enabled=true",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:attendance_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class AcademicAttendanceReadPersistenceTest {
 
@@ -40,6 +40,7 @@ class AcademicAttendanceReadPersistenceTest {
 
     @BeforeEach
     void prepareReadOnlyFixture() {
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
         clearTables();
@@ -143,6 +144,16 @@ class AcademicAttendanceReadPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
 
+        mvc.perform(get("/api/v1/attendance/attendance-1")
+                        .with(studentJwt("student-user-2", "student-2")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
+        mvc.perform(get("/api/v1/attendance/section/section-1")
+                        .with(lecturerJwt("lecturer-2")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
+
         mvc.perform(get("/api/v1/attendance/my"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
@@ -198,7 +209,7 @@ class AcademicAttendanceReadPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "academic"."User" (
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(200) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
@@ -267,7 +278,7 @@ class AcademicAttendanceReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"Section\"");
         jdbc.update("DELETE FROM \"academic\".\"Course\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
-        jdbc.update("DELETE FROM \"academic\".\"User\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
     }
 
     private void insertFixture() {
@@ -295,7 +306,7 @@ class AcademicAttendanceReadPersistenceTest {
 
     private void insertUser(String id, String email, String firstName, String lastName) {
         jdbc.update(
-                "INSERT INTO \"academic\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+                "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
                 id, email, firstName, lastName);
     }
 

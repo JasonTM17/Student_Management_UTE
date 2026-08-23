@@ -2,8 +2,10 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
+import io.campuscore.restfulapi.auth.repository.AuthUserRepository.RegisterCommand;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
+import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
@@ -21,7 +23,6 @@ import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -32,10 +33,9 @@ import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Feature-gated Java auth session candidate for the monolith cutover path. */
+/** Authentication and refresh-session service for the Java API. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.auth-login", name = "enabled", havingValue = "true")
 public class AuthLoginService {
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
@@ -82,23 +82,37 @@ public class AuthLoginService {
             throw new BadCredentialsException("Invalid credentials");
         }
 
-        AuthPrincipal principal = principal(user);
-        IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
-        IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal);
-
         users.recordSuccessfulLogin(user.id(), now);
-        users.replaceRefreshSession(
-                user.id(),
-                UUID.randomUUID().toString(),
-                hash(refreshToken.refreshToken()),
-                ipAddress,
-                userAgent,
-                refreshToken.expiresAt());
+        return issueSession(user, ipAddress, userAgent);
+    }
 
-        return new LoginResult(
-                new LoginResponse(user.toResponse(), accessToken.accessToken(), refreshToken.refreshToken()),
-                accessToken.expiresAt(),
-                refreshToken.expiresAt());
+    @Transactional
+    public LoginResult register(RegisterRequest request, String ipAddress, String userAgent) {
+        if (request == null) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration request is required");
+        }
+        String email = required(request.email(), "email").toLowerCase(java.util.Locale.ROOT);
+        String password = required(request.password(), "password");
+        if (password.length() < 8) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must contain at least 8 characters");
+        }
+        String firstName = required(request.firstName(), "firstName");
+        String lastName = required(request.lastName(), "lastName");
+        if (users.findByEmail(email).isPresent()) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
+        }
+        AuthUserRecord user = users.createUser(new RegisterCommand(
+                email,
+                passwordEncoder.encode(password),
+                firstName,
+                lastName,
+                request.phone(),
+                request.gender(),
+                request.dateOfBirth() == null || request.dateOfBirth().isBlank()
+                        ? null
+                        : parseDate(request.dateOfBirth()),
+                request.address()));
+        return issueSession(user, ipAddress, userAgent);
     }
 
     @Transactional
@@ -214,6 +228,30 @@ public class AuthLoginService {
                 user.studentId(),
                 user.studentYear(),
                 user.lecturerId());
+    }
+
+    private LoginResult issueSession(AuthUserRecord user, String ipAddress, String userAgent) {
+        AuthPrincipal principal = principal(user);
+        IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
+        IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal);
+        users.replaceRefreshSession(
+                user.id(),
+                UUID.randomUUID().toString(),
+                hash(refreshToken.refreshToken()),
+                ipAddress,
+                userAgent,
+                refreshToken.expiresAt());
+        return new LoginResult(
+                new LoginResponse(user.toResponse(), accessToken.accessToken(), refreshToken.refreshToken()),
+                accessToken.expiresAt(),
+                refreshToken.expiresAt());
+    }
+
+    private static String required(String value, String field) {
+        if (value == null || value.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, field + " is required");
+        }
+        return value.trim();
     }
 
     private static String hash(String token) {

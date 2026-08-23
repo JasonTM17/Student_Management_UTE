@@ -29,8 +29,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.thesis-read.enabled=false",
-        "migration.notifications-write.enabled=true",
         "spring.flyway.enabled=false"
 })
 class NotificationWritePersistenceTest {
@@ -127,19 +125,19 @@ class NotificationWritePersistenceTest {
                         .content("""
                                 {
                                   "userId": "student-user-1",
-                                  "title": "Payment posted",
-                                  "message": "Your tuition payment was received.",
+                                  "title": "Grade published",
+                                  "message": "Your course grade is now available.",
                                   "type": "SUCCESS",
-                                  "link": "/finance/invoices/invoice-1"
+                                  "link": "/dashboard/grades"
                                 }
                                 """))
                 .andExpect(status().isCreated())
                 .andExpect(jsonPath("$.id").exists())
                 .andExpect(jsonPath("$.userId").value(STUDENT))
-                .andExpect(jsonPath("$.title").value("Payment posted"))
-                .andExpect(jsonPath("$.message").value("Your tuition payment was received."))
+                .andExpect(jsonPath("$.title").value("Grade published"))
+                .andExpect(jsonPath("$.message").value("Your course grade is now available."))
                 .andExpect(jsonPath("$.type").value("SUCCESS"))
-                .andExpect(jsonPath("$.link").value("/finance/invoices/invoice-1"))
+                .andExpect(jsonPath("$.link").value("/dashboard/grades"))
                 .andExpect(jsonPath("$.isRead").value(false))
                 .andExpect(jsonPath("$.readAt").doesNotExist())
                 .andExpect(jsonPath("$.createdAt").exists())

@@ -22,12 +22,13 @@ export function MobileNavigator() {
   const [role, setRole] = useState<UserRole>('student');
   const [sessionKind, setSessionKind] = useState<SessionKind>('signedOut');
   const [menuOpen, setMenuOpen] = useState(false);
+  const [selectedThesisTopicId, setSelectedThesisTopicId] = useState<string | null>(null);
   const isPreviewSession = sessionKind === 'preview';
   const isAuthenticated = sessionKind === 'authenticated';
   const hasActiveSession = isPreviewSession || isAuthenticated;
 
   const navigation: MobileNavigation = {
-    navigate(nextRoute) {
+    navigate(nextRoute, options) {
       if (!hasActiveSession) {
         return;
       }
@@ -35,6 +36,9 @@ export function MobileNavigator() {
         setRoute(roleHome[role]);
         setMenuOpen(false);
         return;
+      }
+      if (options?.thesisTopicId) {
+        setSelectedThesisTopicId(options.thesisTopicId);
       }
       setRoute(nextRoute);
       setMenuOpen(false);
@@ -44,6 +48,7 @@ export function MobileNavigator() {
         return;
       }
       setSessionKind('preview');
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[role]);
       setMenuOpen(false);
     },
@@ -53,6 +58,7 @@ export function MobileNavigator() {
       }
       setSessionKind('authenticated');
       setRole(nextRole);
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[nextRole]);
       setMenuOpen(false);
     },
@@ -68,6 +74,7 @@ export function MobileNavigator() {
       }
       setSessionKind('signedOut');
       setRole('student');
+      setSelectedThesisTopicId(null);
       setRoute('auth.signIn');
       setMenuOpen(false);
     },
@@ -76,6 +83,7 @@ export function MobileNavigator() {
         return;
       }
       setRole(nextRole);
+      setSelectedThesisTopicId(null);
       setRoute(roleHome[nextRole]);
       setMenuOpen(false);
     },
@@ -87,15 +95,24 @@ export function MobileNavigator() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={tokens.colors.background} />
       <View style={styles.container}>
-        <ScreenComponent navigation={navigation} role={role} />
-        {hasActiveSession ? (
-          <BottomNavigation
-            activeRoute={route}
+        <View
+          importantForAccessibility={menuOpen ? 'no-hide-descendants' : 'auto'}
+          style={styles.content}
+        >
+          <ScreenComponent
+            navigation={navigation}
             role={role}
-            onNavigate={navigation.navigate}
-            onMenu={() => setMenuOpen(true)}
+            selectedThesisTopicId={selectedThesisTopicId}
           />
-        ) : null}
+          {hasActiveSession ? (
+            <BottomNavigation
+              activeRoute={route}
+              role={role}
+              onNavigate={navigation.navigate}
+              onMenu={() => setMenuOpen(true)}
+            />
+          ) : null}
+        </View>
         {menuOpen ? (
           <MenuPanel
             activeRoute={route}
@@ -103,6 +120,7 @@ export function MobileNavigator() {
             onClose={() => setMenuOpen(false)}
             onNavigate={navigation.navigate}
             onSwitchRole={navigation.switchRole}
+            allowRoleSwitch={isPreviewSession}
           />
         ) : null}
       </View>
@@ -113,4 +131,5 @@ export function MobileNavigator() {
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: tokens.colors.background, flex: 1 },
   container: { flex: 1 },
+  content: { flex: 1 },
 });

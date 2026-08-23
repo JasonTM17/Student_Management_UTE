@@ -8,8 +8,8 @@ import { useAuth } from '@/context/AuthContext';
 import {
   coursesApi,
   enrollmentsApi,
+  adminSemestersApi,
   sectionsApi,
-  semestersApi,
 } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
@@ -34,13 +34,14 @@ import {
   getLocalizedCourseLabel,
   getLocalizedName,
 } from '@/lib/academic-content';
+import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
 interface Enrollment {
   id: string;
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED';
   enrolledAt: string;
   droppedAt?: string;
   finalGrade?: number;
@@ -97,6 +98,8 @@ export default function AdminEnrollmentsPage() {
   const [sections, setSections] = useState<Section[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [referenceError, setReferenceError] = useState('');
+  const [sectionReferenceError, setSectionReferenceError] = useState('');
   const [filters, setFilters] = useState({
     semesterId: '',
     courseId: '',
@@ -129,31 +132,50 @@ export default function AdminEnrollmentsPage() {
   }, [href, isAdmin, isSuperAdmin, isAuthLoading, isLoggingOut, router, user]);
 
   const fetchDropdownData = useCallback(async () => {
-    try {
-      const [semestersResponse, coursesResponse] = await Promise.all([
-        semestersApi.getAll(),
-        coursesApi.getAll({ limit: 1000 }),
-      ]);
-      setSemesters(semestersResponse.data || []);
-      setCourses(coursesResponse.data || []);
-    } catch {
-      // Optional filter data.
+    setReferenceError('');
+    const [semestersResult, coursesResult] = await Promise.allSettled([
+      adminSemestersApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT }),
+      coursesApi.getAll({ limit: ACADEMIC_REFERENCE_LIMIT }),
+    ]);
+
+    if (semestersResult.status === 'fulfilled') {
+      setSemesters(semestersResult.value.data || []);
     }
-  }, []);
+    if (coursesResult.status === 'fulfilled') {
+      setCourses(coursesResult.value.data || []);
+    }
+    if (semestersResult.status === 'rejected' || coursesResult.status === 'rejected') {
+      setReferenceError(
+        locale === 'vi'
+          ? 'Bộ lọc học kỳ hoặc môn học chưa tải được đầy đủ.'
+          : 'Semester or course filter options could not be fully loaded.',
+      );
+    }
+  }, [locale]);
 
   const fetchSectionsForCourse = useCallback(async (courseId: string) => {
     if (!courseId) {
       setSections([]);
+      setSectionReferenceError('');
       return;
     }
 
+    setSectionReferenceError('');
     try {
-      const response = await sectionsApi.getAll({ courseId, limit: 100 });
+      const response = await sectionsApi.getAll({
+        courseId,
+        limit: ACADEMIC_REFERENCE_LIMIT,
+      });
       setSections(response.data || []);
     } catch {
       setSections([]);
+      setSectionReferenceError(
+        locale === 'vi'
+          ? 'Hiện chưa thể tải section cho môn học đã chọn.'
+          : 'Sections for the selected course could not be loaded.',
+      );
     }
-  }, []);
+  }, [locale]);
 
   const fetchEnrollments = useCallback(async () => {
     setIsLoading(true);
@@ -531,6 +553,22 @@ export default function AdminEnrollmentsPage() {
               </div>
             </div>
         </AdminToolbarCard>
+
+        {referenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={referenceError}
+            onRetry={() => void fetchDropdownData()}
+          />
+        ) : null}
+
+        {sectionReferenceError ? (
+          <ErrorState
+            title={copy.unavailableTitle}
+            description={sectionReferenceError}
+            onRetry={() => void fetchSectionsForCourse(filters.courseId)}
+          />
+        ) : null}
 
         {error ? (
           <ErrorState

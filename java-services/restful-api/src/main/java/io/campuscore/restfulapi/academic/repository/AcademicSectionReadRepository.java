@@ -9,23 +9,21 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SELECT-only adapter for legacy Prisma academic section tables. */
+/** JDBC adapter for academic section tables. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-section-read", name = "enabled", havingValue = "true")
 public class AcademicSectionReadRepository {
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String COURSE = "\"academic\".\"Course\"";
     private static final String DEPARTMENT = "\"academic\".\"Department\"";
     private static final String SEMESTER = "\"academic\".\"Semester\"";
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
-    private static final String USER = "\"academic\".\"User\"";
+    private static final String USER = "\"auth\".\"User\"";
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SCHEDULE = "\"academic\".\"SectionSchedule\"";
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";

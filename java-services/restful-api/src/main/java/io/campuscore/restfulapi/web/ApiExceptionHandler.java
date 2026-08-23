@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.web;
 import jakarta.servlet.http.HttpServletRequest;
 import java.time.Instant;
 import java.util.LinkedHashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 import org.springframework.http.HttpStatus;
@@ -17,9 +18,14 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 import org.springframework.web.server.ResponseStatusException;
+import org.springframework.dao.DataIntegrityViolationException;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 
 @RestControllerAdvice
 public class ApiExceptionHandler {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(ApiExceptionHandler.class);
 
     @ExceptionHandler(AuthenticationException.class)
     ResponseEntity<ApiError> unauthenticated(
@@ -91,8 +97,28 @@ public class ApiExceptionHandler {
         return error(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", exception.getMessage(), request, Map.of());
     }
 
+    @ExceptionHandler(DomainException.class)
+    ResponseEntity<ApiError> domain(DomainException exception, HttpServletRequest request) {
+        return error(exception.status(), exception.code(), exception.getMessage(), request, Map.of());
+    }
+
+    @ExceptionHandler(DataIntegrityViolationException.class)
+    ResponseEntity<ApiError> conflict(
+            DataIntegrityViolationException exception,
+            HttpServletRequest request) {
+        return error(HttpStatus.CONFLICT, "CONFLICT", "Resource already exists or violates a relationship", request, Map.of());
+    }
+
     @ExceptionHandler(Exception.class)
     ResponseEntity<ApiError> unexpected(Exception exception, HttpServletRequest request) {
+        Object requestId = request.getAttribute(
+                io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
+        LOGGER.error(
+                "Unhandled API exception requestId={} method={} path={}",
+                requestId,
+                request.getMethod(),
+                request.getRequestURI(),
+                exception);
         return error(HttpStatus.INTERNAL_SERVER_ERROR, "INTERNAL_ERROR", "Unexpected server error", request, Map.of());
     }
 
@@ -105,20 +131,29 @@ public class ApiExceptionHandler {
         Object requestId = request.getAttribute(
                 io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
         return ResponseEntity.status(status).body(new ApiError(
+                Instant.now(),
+                status.value(),
                 code,
                 message == null || message.isBlank() ? status.getReasonPhrase() : message,
                 request.getRequestURI(),
                 requestId == null ? null : requestId.toString(),
-                Instant.now(),
+                fields.entrySet().stream()
+                        .map(entry -> new FieldError(entry.getKey(), entry.getValue()))
+                        .toList(),
                 fields));
     }
 
     public record ApiError(
+            Instant timestamp,
+            int status,
             String code,
             String message,
             String path,
             String requestId,
-            Instant timestamp,
+            List<FieldError> fieldErrors,
             Map<String, String> fields) {
+    }
+
+    public record FieldError(String field, String message) {
     }
 }

@@ -1,5 +1,6 @@
 import type { ReactNode } from 'react';
 import {
+  ActivityIndicator,
   Pressable,
   ScrollView,
   StyleProp,
@@ -74,7 +75,7 @@ export function ScreenShell({
                 {eyebrow.toUpperCase()}
               </UiText>
             ) : null}
-            <UiText variant="headlineLarge">{title}</UiText>
+            <UiText accessibilityRole="header" variant="headlineLarge">{title}</UiText>
             {subtitle ? (
               <UiText variant="bodySmall" tone="muted" style={styles.subtitle}>
                 {subtitle}
@@ -102,20 +103,20 @@ export function Card({ children, style, tone = 'card' }: CardProps) {
 export interface ButtonProps {
   label: string;
   onPress: () => void;
+  accessibilityLabel?: string;
   variant?: 'primary' | 'secondary' | 'text';
   disabled?: boolean;
   loading?: boolean;
-  icon?: string;
   style?: StyleProp<ViewStyle>;
 }
 
 export function Button({
   label,
   onPress,
+  accessibilityLabel,
   variant = 'primary',
   disabled = false,
   loading = false,
-  icon,
   style,
 }: ButtonProps) {
   const isDisabled = disabled || loading;
@@ -123,7 +124,8 @@ export function Button({
   return (
     <Pressable
       accessibilityRole="button"
-      accessibilityState={{ disabled: isDisabled }}
+      accessibilityLabel={accessibilityLabel ?? label}
+      accessibilityState={{ busy: loading, disabled: isDisabled }}
       disabled={isDisabled}
       onPress={onPress}
       style={({ pressed }) => [
@@ -135,12 +137,14 @@ export function Button({
       ]}
     >
       {loading ? (
-        <UiText variant="label" tone={variant === 'primary' ? 'onPrimary' : 'primary'}>
-          Loading…
-        </UiText>
+        <View style={styles.buttonContent}>
+          <ActivityIndicator color={variant === 'primary' ? tokens.colors.onPrimary : tokens.colors.primary} size="small" />
+          <UiText variant="label" tone={variant === 'primary' ? 'onPrimary' : 'primary'}>
+            Loading…
+          </UiText>
+        </View>
       ) : (
         <UiText variant="label" tone={variant === 'primary' ? 'onPrimary' : 'primary'}>
-          {icon ? `${icon}  ` : ''}
           {label}
         </UiText>
       )}
@@ -223,7 +227,7 @@ export interface SectionHeadingProps {
 export function SectionHeading({ title, actionLabel, onAction }: SectionHeadingProps) {
   return (
     <View style={styles.sectionHeading}>
-      <UiText variant="headlineSmall">{title}</UiText>
+      <UiText accessibilityRole="header" variant="headlineSmall">{title}</UiText>
       {actionLabel && onAction ? (
         <Button label={actionLabel} onPress={onAction} variant="text" />
       ) : null}
@@ -250,8 +254,18 @@ export function ListRow({
   onPress,
   unread = false,
 }: ListRowProps) {
+  const accessibilityLabel = [
+    unread ? 'Unread' : null,
+    title,
+    subtitle,
+    meta,
+  ].filter(Boolean).join('. ');
   const content = (
-    <View style={styles.listRow}>
+    <View
+      accessible={!onPress}
+      accessibilityLabel={!onPress ? accessibilityLabel : undefined}
+      style={styles.listRow}
+    >
       {leading ? (
         <View style={[styles.leading, unread ? styles.leadingUnread : undefined]}>
           <UiText variant="label" tone={unread ? 'primary' : 'muted'}>
@@ -260,9 +274,16 @@ export function ListRow({
         </View>
       ) : null}
       <View style={styles.listCopy}>
-        <UiText variant="bodyMedium" style={unread ? styles.unreadTitle : undefined}>
-          {title}
-        </UiText>
+        <View style={styles.listTitleRow}>
+          <UiText variant="bodyMedium" style={unread ? styles.unreadTitle : styles.listTitle}>
+            {title}
+          </UiText>
+          {unread ? (
+            <UiText variant="meta" tone="primary" style={styles.unreadLabel}>
+              Unread
+            </UiText>
+          ) : null}
+        </View>
         {subtitle ? (
           <UiText variant="bodySmall" tone="muted" numberOfLines={2}>
             {subtitle}
@@ -284,6 +305,7 @@ export function ListRow({
 
   return (
     <Pressable
+      accessibilityLabel={accessibilityLabel}
       accessibilityRole="button"
       onPress={onPress}
       style={({ pressed }) => [pressed ? styles.rowPressed : undefined]}
@@ -303,7 +325,13 @@ export function ProgressBar({ value, label, tone = 'primary' }: ProgressBarProps
   const boundedValue = Math.max(0, Math.min(100, value));
 
   return (
-    <View style={styles.progressGroup}>
+    <View
+      accessible
+      accessibilityLabel={label ?? 'Progress'}
+      accessibilityRole="progressbar"
+      accessibilityValue={{ min: 0, max: 100, now: Math.round(boundedValue) }}
+      style={styles.progressGroup}
+    >
       {label ? (
         <View style={styles.progressHeader}>
           <UiText variant="bodySmall" tone="muted">
@@ -339,6 +367,47 @@ export function ScreenSpacer({ size = tokens.spacing.md }: { size?: number }) {
   return <View style={{ height: size }} />;
 }
 
+export interface StatePanelProps {
+  kind: 'loading' | 'error' | 'empty';
+  title: string;
+  description?: string;
+  actionLabel?: string;
+  onAction?: () => void;
+}
+
+export function StatePanel({
+  kind,
+  title,
+  description,
+  actionLabel,
+  onAction,
+}: StatePanelProps) {
+  return (
+    <View
+      accessibilityLiveRegion={kind === 'error' ? 'assertive' : 'polite'}
+      accessibilityRole={kind === 'error' ? 'alert' : undefined}
+      style={[styles.statePanel, kind === 'error' ? styles.statePanelError : undefined]}
+    >
+      {kind === 'loading' ? (
+        <ActivityIndicator color={tokens.colors.primary} size="small" />
+      ) : null}
+      <View style={styles.stateCopy}>
+        <UiText variant="label" tone={kind === 'error' ? 'error' : 'default'}>
+          {title}
+        </UiText>
+        {description ? (
+          <UiText variant="bodySmall" tone="muted" style={styles.stateDescription}>
+            {description}
+          </UiText>
+        ) : null}
+      </View>
+      {actionLabel && onAction ? (
+        <Button label={actionLabel} onPress={onAction} variant="secondary" />
+      ) : null}
+    </View>
+  );
+}
+
 export function ScrollSection({ children }: { children: ReactNode }) {
   return <View style={styles.scrollSection}>{children}</View>;
 }
@@ -369,12 +438,12 @@ const styles = StyleSheet.create({
   screen: { flex: 1, backgroundColor: tokens.colors.background },
   scrollContent: {
     paddingHorizontal: tokens.layout.mobileGutter,
-    paddingTop: tokens.spacing.lg,
+    paddingTop: tokens.spacing.md,
     paddingBottom: tokens.spacing.xl + tokens.layout.bottomNavigationHeight,
   },
-  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: tokens.spacing.lg },
+  headerRow: { flexDirection: 'row', alignItems: 'flex-start', marginBottom: tokens.spacing.lg, paddingBottom: tokens.spacing.md, borderBottomColor: tokens.colors.outlineVariant, borderBottomWidth: 1 },
   headerCopy: { flex: 1, paddingRight: tokens.spacing.sm },
-  eyebrow: { letterSpacing: 0.6, marginBottom: tokens.spacing.xs },
+  eyebrow: { letterSpacing: 0, marginBottom: tokens.spacing.xs, textTransform: 'uppercase' },
   subtitle: { marginTop: tokens.spacing.xs },
   card: {
     backgroundColor: tokens.colors.card,
@@ -390,7 +459,8 @@ const styles = StyleSheet.create({
     minHeight: tokens.layout.touchTarget,
     paddingHorizontal: tokens.spacing.md,
   },
-  buttonPressed: { opacity: 0.78 },
+  buttonContent: { alignItems: 'center', flexDirection: 'row', gap: tokens.spacing.sm },
+  buttonPressed: { opacity: 0.88 },
   buttonDisabled: { opacity: 0.48 },
   buttonPrimary: { backgroundColor: tokens.colors.primary },
   buttonSecondary: { backgroundColor: tokens.colors.card, borderColor: tokens.colors.outlineVariant, borderWidth: 1 },
@@ -413,13 +483,16 @@ const styles = StyleSheet.create({
   badge: { alignSelf: 'flex-start', borderRadius: tokens.radii.pill, paddingHorizontal: tokens.spacing.sm, paddingVertical: tokens.spacing.xs },
   metricCard: { flex: 1, minHeight: 108, padding: tokens.spacing.sm + tokens.spacing.xs },
   metricValue: { marginVertical: tokens.spacing.xs },
-  sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.sm },
+  sectionHeading: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.sm, minHeight: tokens.layout.touchTarget },
   listRow: { alignItems: 'center', flexDirection: 'row', minHeight: tokens.layout.touchTarget, paddingVertical: tokens.spacing.sm },
   leading: { alignItems: 'center', backgroundColor: tokens.colors.surfaceLow, borderRadius: tokens.radii.control, height: 36, justifyContent: 'center', marginRight: tokens.spacing.sm, width: 36 },
   leadingUnread: { backgroundColor: tokens.colors.primaryFixed },
   listCopy: { flex: 1, paddingRight: tokens.spacing.sm },
+  listTitle: { flex: 1 },
+  listTitleRow: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', gap: tokens.spacing.xs },
   listMeta: { marginLeft: tokens.spacing.sm },
   unreadTitle: { color: tokens.colors.primary, fontWeight: '600' },
+  unreadLabel: { backgroundColor: tokens.colors.primaryFixed, borderRadius: tokens.radii.pill, paddingHorizontal: tokens.spacing.xs, paddingVertical: 2 },
   rowPressed: { backgroundColor: tokens.colors.surfaceLow, borderRadius: tokens.radii.control },
   progressGroup: { marginTop: tokens.spacing.sm },
   progressHeader: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-between', marginBottom: tokens.spacing.xs },
@@ -428,6 +501,10 @@ const styles = StyleSheet.create({
   divider: { backgroundColor: tokens.colors.outlineVariant, height: 1, marginVertical: tokens.spacing.sm },
   avatar: { alignItems: 'center', backgroundColor: tokens.colors.primaryFixed, justifyContent: 'center' },
   scrollSection: { marginBottom: tokens.spacing.lg },
+  statePanel: { alignItems: 'center', backgroundColor: tokens.colors.card, borderColor: tokens.colors.outlineVariant, borderLeftColor: tokens.colors.primary, borderLeftWidth: 3, borderRadius: tokens.radii.card, borderWidth: 1, flexDirection: 'row', padding: tokens.spacing.md },
+  statePanelError: { borderLeftColor: tokens.colors.error },
+  stateCopy: { flex: 1, marginHorizontal: tokens.spacing.sm },
+  stateDescription: { marginTop: tokens.spacing.xs },
 });
 
 const cardTones = {
