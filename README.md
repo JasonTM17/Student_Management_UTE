@@ -27,8 +27,9 @@ release không thuộc runtime của đồ án.
 
 ```powershell
 docker compose up -d --build postgres restful-api
-curl http://127.0.0.1:4010/api/v1/health/liveness
-curl http://127.0.0.1:4010/v3/api-docs
+curl.exe http://127.0.0.1:4010/api/v1/health/liveness
+curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
+curl.exe http://127.0.0.1:4010/v3/api-docs
 mvn -q -f java-services/pom.xml verify
 npm test --prefix frontend
 npm run typecheck --prefix frontend
@@ -37,6 +38,16 @@ npm run build --prefix frontend
 npm test --prefix mobile
 npm run typecheck --prefix mobile
 ```
+
+## Tài khoản demo
+
+| Role | Email | Mật khẩu |
+| --- | --- | --- |
+| Student | `student@campuscore.edu` | `password123` |
+| Lecturer | `lecturer@campuscore.edu` | `password123` |
+| Admin | `admin@campuscore.edu` | `admin123` |
+
+Các tài khoản này chỉ dành cho database seed local của đồ án.
 
 ## Tài liệu
 

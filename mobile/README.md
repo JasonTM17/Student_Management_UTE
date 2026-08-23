@@ -18,13 +18,10 @@ The UI follows the canonical `Academic Continuity` evidence in
   panel exposes only routes that the active preview role may access. Navigator
   policy also rejects a direct transition to an unauthorized route.
 
-## Run later
-
-Dependencies are intentionally not installed in this worker checkout. When a
-runtime owner is ready to exercise the scaffold:
+## Run
 
 ```powershell
-npm install
+npm ci
 npx expo start
 ```
 
@@ -34,10 +31,9 @@ The dependency-free screen-atlas regression can run now:
 npm test --prefix mobile
 ```
 
-It verifies 21 registered screens and the shared Stitch token anchors. The
-real `npm run typecheck` remains deferred until Expo/React Native dependencies
-are provisioned in a bounded environment; source transpile has been checked,
-but transpile is not a substitute for Expo typechecking.
+It verifies 21 registered screens and the shared Stitch token anchors. Run
+`npm run typecheck --prefix mobile` from the repository root for the complete
+TypeScript gate.
 
 The default mode is `live`: API calls target the Java REST API at
 `EXPO_PUBLIC_API_URL`. Preview mode remains an explicit local-only option for
@@ -56,6 +52,11 @@ login/refresh/logout to avoid auth loops. The navigator keeps `signedOut`,
 `preview`, and `authenticated` as distinct session states; role switching is
 available only inside the explicit preview state and is never an authorization
 substitute.
+
+For live API access, Android Emulator uses `http://10.0.2.2:4010/api/v1`.
+iOS Simulator and Expo web can use `http://127.0.0.1:4010/api/v1`. A physical
+device must set `EXPO_PUBLIC_API_URL` to the development machine's LAN address,
+and the host firewall must allow that development port.
 
 ## API seam
 

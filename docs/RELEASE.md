@@ -17,9 +17,9 @@ mvn -q -f java-services/pom.xml verify
 docker compose config
 docker compose build restful-api
 docker compose up -d postgres restful-api
-curl http://127.0.0.1:4010/api/v1/health/liveness
-curl http://127.0.0.1:4010/api/v1/health/readiness
-curl http://127.0.0.1:4010/v3/api-docs
+curl.exe http://127.0.0.1:4010/api/v1/health/liveness
+curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
+curl.exe http://127.0.0.1:4010/v3/api-docs
 ```
 
 Verify a fresh PostgreSQL database, Flyway versions, deterministic seed
