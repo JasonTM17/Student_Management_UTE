@@ -18,6 +18,7 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
+import java.util.Objects;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -85,15 +86,25 @@ public class AcademicAttendanceReadService {
     }
 
     @Transactional(readOnly = true)
-    public List<AttendanceResponse> findSectionAttendance(String sectionId, String date) {
+    public List<AttendanceResponse> findSectionAttendance(
+            String sectionId,
+            String date,
+            List<String> roles,
+            String lecturerId) {
+        String normalizedSectionId = normalizeRequired("sectionId", sectionId);
+        requireSectionAccess(normalizedSectionId, roles, lecturerId);
         return attendanceResponses(attendance.findSectionAttendance(
-                normalizeRequired("sectionId", sectionId),
+                normalizedSectionId,
                 normalizeDate(date)));
     }
 
     @Transactional(readOnly = true)
-    public SectionAttendanceSummaryResponse findSectionAttendanceSummary(String sectionId) {
+    public SectionAttendanceSummaryResponse findSectionAttendanceSummary(
+            String sectionId,
+            List<String> roles,
+            String lecturerId) {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
+        requireSectionAccess(normalizedSectionId, roles, lecturerId);
         SectionSummaryRow row = attendance.sectionSummary(normalizedSectionId);
         return new SectionAttendanceSummaryResponse(
                 normalizedSectionId,
@@ -107,10 +118,29 @@ public class AcademicAttendanceReadService {
     }
 
     @Transactional(readOnly = true)
-    public AttendanceResponse findOne(String id) {
-        return attendance.findById(normalizeRequired("id", id))
-                .map(AcademicAttendanceReadService::attendanceResponse)
+    public AttendanceResponse findOne(
+            String id,
+            List<String> roles,
+            String studentId,
+            String lecturerId) {
+        AttendanceRow row = attendance.findById(normalizeRequired("id", id))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Attendance record not found"));
+        if (!isAdmin(roles)
+                && !Objects.equals(row.studentId(), studentId)
+                && !attendance.isSectionOwnedByLecturer(row.sectionId(), lecturerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Attendance record is outside the current profile");
+        }
+        return attendanceResponse(row);
+    }
+
+    private void requireSectionAccess(String sectionId, List<String> roles, String lecturerId) {
+        if (!isAdmin(roles) && !attendance.isSectionOwnedByLecturer(sectionId, lecturerId)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Section is not assigned to the current lecturer");
+        }
+    }
+
+    private static boolean isAdmin(List<String> roles) {
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
     private static List<AttendanceResponse> attendanceResponses(List<AttendanceRow> rows) {

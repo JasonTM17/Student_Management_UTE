@@ -8,14 +8,18 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -47,6 +51,23 @@ public class AcademicMutationController {
             @PathVariable String id) {
         mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"));
         return Map.of("message", "Enrollment dropped successfully");
+    }
+
+    @DeleteMapping("enrollments/{id}")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public Map<String, String> deleteEnrollment(@PathVariable String id) {
+        mutations.deleteEnrollment(id);
+        return Map.of("message", "Enrollment deleted successfully");
+    }
+
+    @GetMapping(value = "enrollments/export/csv", produces = "text/csv")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public String exportEnrollments(
+            @RequestParam(required = false) String status,
+            @RequestParam(required = false) String semesterId,
+            @RequestParam(required = false) String studentId,
+            @RequestParam(required = false) String courseId) {
+        return mutations.exportEnrollments(status, semesterId, studentId, courseId);
     }
 
     @PutMapping("sections/{sectionId}/grades")

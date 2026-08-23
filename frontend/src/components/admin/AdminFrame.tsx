@@ -180,11 +180,11 @@ export function AdminFrame({
         aria-hidden={!isDesktopSidebar && !sidebarOpen}
         inert={!isDesktopSidebar && !sidebarOpen ? true : undefined}
         className={cn(
-          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col transition-transform duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
+          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col border-r border-white/10 shadow-xl transition-transform duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
-        <div className="flex min-h-16 items-center justify-between border-b border-white/20 px-5 py-3">
+        <div className="flex min-h-[4.25rem] items-center justify-between border-b border-white/10 px-5 py-3">
           <BrandMark
             href="/admin"
             compact
@@ -209,9 +209,9 @@ export function AdminFrame({
           </Button>
         </div>
 
-        <div className="border-b border-white/20 px-5 py-4">
+        <div className="border-b border-white/10 bg-[var(--portal-sidebar-strong)] px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-[var(--portal-sidebar-text)]">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
               {user?.firstName?.[0]}
               {user?.lastName?.[0]}
             </div>
@@ -232,7 +232,7 @@ export function AdminFrame({
           </div>
         </div>
 
-        <nav className="flex-1 space-y-5 overflow-y-auto overscroll-contain px-4 py-4">
+        <nav className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3">
           {adminMenuSections.map((section) => (
             <div key={section.key} className="space-y-2">
               <div className="portal-menu-label px-3">{section.label}</div>
@@ -249,9 +249,9 @@ export function AdminFrame({
                       href={item.href}
                       aria-current={isActive ? 'page' : undefined}
                       className={cn(
-                        'relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                        'relative flex min-h-11 items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
                         isActive &&
-                          'bg-white/10 font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-1 before:rounded-r before:bg-[var(--portal-yellow)]',
+                          'bg-white/[0.12] font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-0.5 before:bg-[var(--portal-yellow)]',
                       )}
                     >
                       <Icon className="h-5 w-5 shrink-0" aria-hidden="true" />
@@ -264,17 +264,17 @@ export function AdminFrame({
           ))}
         </nav>
 
-        <div className="border-t border-white/20 px-4 py-4">
+        <div className="border-t border-white/10 px-4 py-3">
           <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
             <span className="portal-menu-label">{messages.adminShell.preferences}</span>
-            <div className="flex items-center gap-1 rounded-lg bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
+            <div className="flex items-center gap-1 rounded-md bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
               <LanguageToggle inverse />
               <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-yellow)]" />
             </div>
           </div>
           <button
             type="button"
-            className="flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm font-medium text-[var(--portal-sidebar-text)] transition-[background-color,transform] duration-150 hover:bg-red-500/20 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+            className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--portal-sidebar-text)] transition-colors duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
             onClick={() => void logout()}
           >
             <LogOut className="h-5 w-5" aria-hidden="true" />
@@ -287,8 +287,8 @@ export function AdminFrame({
         className="min-h-screen lg:pl-[var(--portal-sidebar-width)]"
         inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
       >
-        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]">
-          <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--portal-surface)]/90">
+          <div className="flex min-h-[var(--portal-header-height)] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <Button
                 ref={openSidebarButtonRef}
@@ -304,10 +304,10 @@ export function AdminFrame({
                 <Menu className="h-5 w-5" aria-hidden="true" />
               </Button>
               <div className="min-w-0">
-                <div className="hidden text-xs font-semibold text-primary sm:block">
+                <div className="hidden text-sm font-medium text-muted-foreground sm:block">
                   {messages.adminShell.portalTitle}
                 </div>
-                <div className="truncate text-base font-semibold text-foreground sm:text-lg">
+                <div className="truncate text-base font-semibold text-foreground sm:hidden">
                   {title}
                 </div>
               </div>
@@ -338,12 +338,12 @@ export function AdminFrame({
           id="admin-main-content"
           ref={mainRef}
           tabIndex={-1}
-          className="mx-auto min-w-0 max-w-[1280px] px-4 py-6 focus:outline-none sm:px-6 lg:px-8"
+          className="mx-auto min-w-0 max-w-[1440px] px-4 py-5 focus:outline-none sm:px-6 lg:px-8"
         >
           {pathname !== backHref ? (
             <LocalizedLink
               href={backHref}
-              className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-lg px-2 text-sm font-semibold text-primary transition-[background-color,transform] duration-150 hover:bg-primary/5 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="mb-3 inline-flex min-h-11 items-center gap-2 rounded-md px-2 text-sm font-semibold text-primary transition-colors duration-150 hover:bg-primary/5 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
               aria-label={resolvedBackLabel}
             >
               <ArrowLeft className="h-4 w-4" aria-hidden="true" />

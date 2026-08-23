@@ -18,9 +18,8 @@ function getProgressIndex(
   groupStatus?: string,
   roundStatus?: string,
 ) {
-  if (roundStatus === 'RESULTS_PUBLISHED' || groupStatus === 'COMPLETED') return 4;
-  if (roundStatus === 'DEFENSE_SCHEDULED' || roundStatus === 'SCORING_OPEN') return 3;
-  if (groupStatus === 'APPROVED') return 3;
+  if (groupStatus === 'COMPLETED' || roundStatus === 'CLOSED') return 4;
+  if (groupStatus === 'APPROVED' || roundStatus === 'PROPOSALS_PUBLISHED') return 3;
   if (hasTopic) return 2;
   if (hasGroup) return 1;
   return hasRound ? 0 : -1;

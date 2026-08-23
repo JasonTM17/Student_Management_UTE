@@ -90,7 +90,8 @@ async function verifySidebar(page, sidebarId, openButtonName, viewport) {
     assert.equal(await openButton.isVisible(), false);
     const box = await sidebar.boundingBox();
     assert.ok(box && Math.abs(box.x) < 1, `${viewport.name}: desktop sidebar is not fixed at the left edge`);
-    assert.ok(box && box.width >= 280, `${viewport.name}: desktop sidebar is unexpectedly narrow`);
+    assert.ok(box && box.width >= 260, `${viewport.name}: desktop sidebar is unexpectedly narrow`);
+    assert.ok(box && box.width <= 320, `${viewport.name}: desktop sidebar is unexpectedly wide`);
     return;
   }
 

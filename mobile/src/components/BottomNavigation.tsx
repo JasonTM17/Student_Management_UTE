@@ -36,9 +36,9 @@ export function BottomNavigation({ activeRoute, role, onNavigate, onMenu }: Bott
             >
               <View style={[styles.icon, active ? styles.activeIcon : undefined]}>
                 <MaterialCommunityIcons
-                  color={active ? tokens.colors.onPrimary : tokens.colors.textMuted}
+                  color={active ? tokens.colors.primary : tokens.colors.textMuted}
                   name={item.icon}
-                  size={19}
+                  size={20}
                 />
               </View>
               <UiText variant="meta" tone={active ? 'primary' : 'muted'}>
@@ -74,8 +74,8 @@ const styles = StyleSheet.create({
     paddingHorizontal: tokens.spacing.xs,
   },
   navigationInner: { alignItems: 'center', flexDirection: 'row', justifyContent: 'space-around', minHeight: tokens.layout.bottomNavigationHeight },
-  item: { alignItems: 'center', justifyContent: 'center', minHeight: tokens.layout.touchTarget, minWidth: 56, paddingHorizontal: tokens.spacing.xs },
-  icon: { alignItems: 'center', borderRadius: tokens.radii.pill, height: 28, justifyContent: 'center', marginBottom: 2, width: 42 },
-  activeIcon: { backgroundColor: tokens.colors.primary },
-  pressed: { opacity: 0.72 },
+  item: { alignItems: 'center', justifyContent: 'center', minHeight: tokens.layout.touchTarget, minWidth: 60, paddingHorizontal: tokens.spacing.xs },
+  icon: { alignItems: 'center', borderRadius: tokens.radii.control, height: 30, justifyContent: 'center', marginBottom: 2, width: 40 },
+  activeIcon: { backgroundColor: tokens.colors.primaryFixed },
+  pressed: { backgroundColor: tokens.colors.surfaceLow, borderRadius: tokens.radii.control },
 });

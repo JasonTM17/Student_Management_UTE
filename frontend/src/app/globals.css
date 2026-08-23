@@ -5,49 +5,49 @@
 @layer base {
   :root {
     --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --background: 240 100% 98.8%;
-    --foreground: 220 14% 11%;
+    --background: 216 25% 97%;
+    --foreground: 217 34% 16%;
     --card: 0 0% 100%;
     --card-foreground: 220 24% 14%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 24% 14%;
-    --primary: 212 100% 26.5%;
+    --primary: 213 74% 31%;
     --primary-foreground: 0 0% 100%;
-    --secondary: 214 73% 90%;
-    --secondary-foreground: 214 64% 12%;
-    --muted: 236 68% 97%;
-    --muted-foreground: 220 13% 29%;
-    --accent: 212 100% 35%;
+    --secondary: 214 30% 94%;
+    --secondary-foreground: 215 38% 20%;
+    --muted: 216 25% 95%;
+    --muted-foreground: 217 14% 38%;
+    --accent: 213 72% 38%;
     --accent-foreground: 0 0% 100%;
     --destructive: 0 75% 41%;
     --destructive-foreground: 0 0% 100%;
-    --border: 226 17% 80%;
-    --input: 226 17% 80%;
-    --ring: 212 100% 35%;
-    --radius: 0.5rem;
-    --canvas-subtle: 236 68% 97%;
+    --border: 215 22% 83%;
+    --input: 215 22% 76%;
+    --ring: 213 72% 38%;
+    --radius: 0.375rem;
+    --canvas-subtle: 216 25% 95%;
     --surface-raised: 0 0% 100%;
-    --surface-alt: 236 68% 97%;
-    --ink-soft: 220 13% 29%;
-    --accent-warm: 36 88% 48%;
-    --accent-cool: 212 100% 35%;
+    --surface-alt: 216 25% 95%;
+    --ink-soft: 217 14% 38%;
+    --accent-warm: 43 94% 48%;
+    --accent-cool: 213 72% 38%;
     --success: 152 57% 38%;
-    --portal-sidebar: oklch(0.32 0.12 252);
-    --portal-sidebar-strong: oklch(0.245 0.095 252);
-    --portal-sidebar-hover: oklch(0.39 0.115 252);
+    --portal-sidebar: oklch(0.31 0.095 252);
+    --portal-sidebar-strong: oklch(0.235 0.075 252);
+    --portal-sidebar-hover: oklch(0.37 0.09 252);
     --portal-sidebar-text: oklch(0.97 0.01 248);
-    --portal-sidebar-muted: oklch(0.79 0.035 248);
-    --portal-yellow: oklch(0.84 0.17 88);
+    --portal-sidebar-muted: oklch(0.82 0.025 248);
+    --portal-yellow: oklch(0.83 0.17 89);
     --portal-yellow-ink: oklch(0.26 0.055 82);
-    --portal-ribbon: oklch(0.36 0.125 251);
-    --portal-canvas: oklch(0.965 0.007 248);
+    --portal-ribbon: oklch(0.995 0.002 248);
+    --portal-canvas: oklch(0.965 0.006 248);
     --portal-surface: oklch(0.995 0.002 248);
-    --portal-rule: oklch(0.865 0.012 248);
+    --portal-rule: oklch(0.855 0.012 248);
     --portal-scrim: oklch(0.16 0.035 252 / 0.58);
     --portal-ease: cubic-bezier(0.25, 1, 0.5, 1);
-    --portal-sidebar-width: 18rem;
-    --portal-sidebar-collapsed: 5rem;
-    --portal-header-height: 4rem;
+    --portal-sidebar-width: 16.5rem;
+    --portal-sidebar-collapsed: 4.5rem;
+    --portal-header-height: 3.75rem;
   }
 
   .dark {
@@ -129,6 +129,7 @@
   select,
   textarea {
     touch-action: manipulation;
+    -webkit-tap-highlight-color: transparent;
   }
   h1,
   h2,
@@ -167,11 +168,11 @@
   }
 
   .surface-shadow {
-    box-shadow: 0 24px 48px -36px rgba(15, 23, 42, 0.32);
+    box-shadow: 0 8px 20px -18px rgba(15, 23, 42, 0.38);
   }
 
   .panel-shadow {
-    box-shadow: 0 16px 30px -24px rgba(15, 23, 42, 0.35);
+    box-shadow: 0 4px 12px -10px rgba(15, 23, 42, 0.34);
   }
 
   .dark .surface-shadow {
@@ -197,22 +198,28 @@
   }
 
   .portal-menu-label {
-    color: var(--portal-yellow);
-    font-size: 0.6875rem;
+    color: hsl(var(--primary));
+    font-size: 0.75rem;
     font-weight: 700;
-    letter-spacing: 0.08em;
+    letter-spacing: 0;
     line-height: 1rem;
     text-transform: uppercase;
   }
 
+  .portal-sidebar .portal-menu-label {
+    color: var(--portal-sidebar-muted);
+  }
+
   .portal-page-ribbon {
-    border-bottom: 0.25rem solid var(--portal-yellow);
+    border: 1px solid var(--portal-rule);
+    border-left: 0.25rem solid var(--portal-yellow);
     background: var(--portal-ribbon);
-    color: var(--portal-sidebar-text);
+    color: hsl(var(--foreground));
   }
 
   .portal-page-actions {
     border: 1px solid var(--portal-rule);
+    border-left: 0.25rem solid var(--portal-yellow);
     border-top: 0;
     background: var(--portal-surface);
   }
@@ -245,15 +252,14 @@
   }
 
   .portal-shell thead {
-    background: color-mix(in oklch, var(--portal-sidebar) 8%, var(--portal-surface));
+    background: color-mix(in oklch, var(--portal-sidebar) 5%, var(--portal-surface));
   }
 
   .portal-shell th {
-    color: color-mix(in oklch, var(--portal-sidebar) 72%, hsl(var(--foreground)));
+    color: color-mix(in oklch, var(--portal-sidebar) 68%, hsl(var(--foreground)));
     font-size: 0.75rem;
     font-weight: 700;
-    letter-spacing: 0.04em;
-    text-transform: uppercase;
+    letter-spacing: 0;
   }
 
   .portal-shell tbody tr {
@@ -262,7 +268,7 @@
   }
 
   .portal-shell tbody tr:hover {
-    background: color-mix(in oklch, var(--portal-sidebar) 4%, var(--portal-surface));
+    background: color-mix(in oklch, var(--portal-sidebar) 3%, var(--portal-surface));
   }
 
   .orbital-divider {

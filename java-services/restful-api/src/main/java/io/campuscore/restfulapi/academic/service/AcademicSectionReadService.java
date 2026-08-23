@@ -87,9 +87,13 @@ public class AcademicSectionReadService {
     }
 
     @Transactional(readOnly = true)
-    public SectionGradesResponse findSectionGrades(String sectionId) {
+    public SectionGradesResponse findSectionGrades(String sectionId, List<String> roles, String lecturerId) {
         SectionRow section = sections.findSectionById(normalizeRequired("sectionId", sectionId))
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
+        boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        if (!admin && !java.util.Objects.equals(section.lecturerId(), requireProfileId("lecturerId", lecturerId))) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Section is not assigned to the current lecturer");
+        }
         return new SectionGradesResponse(
                 section.id(),
                 section.sectionNumber(),

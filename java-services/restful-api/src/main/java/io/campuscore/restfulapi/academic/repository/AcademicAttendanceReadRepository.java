@@ -19,7 +19,7 @@ import org.springframework.stereotype.Repository;
 public class AcademicAttendanceReadRepository {
     private static final String ATTENDANCE = "\"academic\".\"Attendance\"";
     private static final String STUDENT = "\"academic\".\"Student\"";
-    private static final String USER = "\"academic\".\"User\"";
+    private static final String USER = "\"auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String COURSE = "\"academic\".\"Course\"";
 
@@ -139,6 +139,17 @@ public class AcademicAttendanceReadRepository {
                         AcademicAttendanceReadRepository::mapAttendance)
                 .stream()
                 .findFirst();
+    }
+
+    public boolean isSectionOwnedByLecturer(String sectionId, String lecturerId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SECTION
+                        + " WHERE \"id\" = :sectionId AND \"lecturerId\" = :lecturerId",
+                new MapSqlParameterSource()
+                        .addValue("sectionId", sectionId)
+                        .addValue("lecturerId", lecturerId),
+                Long.class);
+        return count != null && count > 0;
     }
 
     private static String attendanceFilters(

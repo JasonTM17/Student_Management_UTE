@@ -23,7 +23,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "migration.people-read.enabled=true",
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:people_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class PeopleReadPersistenceTest {
 
@@ -37,56 +38,22 @@ class PeopleReadPersistenceTest {
 
     @BeforeEach
     void preparePeopleFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"people\"");
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "people"."Student" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) UNIQUE NOT NULL,
-                    "email" VARCHAR(320) NOT NULL,
-                    "firstName" VARCHAR(120) NOT NULL,
-                    "lastName" VARCHAR(120) NOT NULL,
-                    "studentId" VARCHAR(120) UNIQUE NOT NULL,
-                    "curriculumId" VARCHAR(120) NOT NULL,
-                    "curriculumCode" VARCHAR(80),
-                    "curriculumName" VARCHAR(200),
-                    "departmentId" VARCHAR(120),
-                    "departmentCode" VARCHAR(80),
-                    "departmentName" VARCHAR(200),
-                    "year" INTEGER NOT NULL,
-                    "status" VARCHAR(40) NOT NULL,
-                    "admissionDate" TIMESTAMP NOT NULL,
-                    "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL
-                )
-                """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "people"."Lecturer" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) UNIQUE NOT NULL,
-                    "email" VARCHAR(320) NOT NULL,
-                    "firstName" VARCHAR(120) NOT NULL,
-                    "lastName" VARCHAR(120) NOT NULL,
-                    "departmentId" VARCHAR(120) NOT NULL,
-                    "departmentCode" VARCHAR(80),
-                    "departmentName" VARCHAR(200),
-                    "employeeId" VARCHAR(120) UNIQUE NOT NULL,
-                    "title" VARCHAR(120),
-                    "specialization" VARCHAR(200),
-                    "office" VARCHAR(120),
-                    "phone" VARCHAR(80),
-                    "isActive" BOOLEAN NOT NULL,
-                    "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL
-                )
-                """);
-        jdbc.update("DELETE FROM \"people\".\"Student\"");
-        jdbc.update("DELETE FROM \"people\".\"Lecturer\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        createTables();
+        jdbc.update("DELETE FROM \"academic\".\"Student\"");
+        jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
+        jdbc.update("DELETE FROM \"academic\".\"Curriculum\"");
+        jdbc.update("DELETE FROM \"academic\".\"Department\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
+        insertDepartment("department-se", "SE", "Software Engineering");
+        insertDepartment("department-cs", "CS", "Computer Science");
     }
 
     @Test
-    void studentsPreserveLegacyListEnvelopeOrderingStatusFilterAndHydration() throws Exception {
+    void studentsUseCanonicalAuthAndAcademicIdentityWithStablePaging() throws Exception {
         insertStudent("student-old", "S001", "ACTIVE", 2, BASE_TIME.minusSeconds(60), "department-se");
-        insertStudent("student-new", "S002", "INACTIVE", 3, BASE_TIME, null);
+        insertStudent("student-new", "S002", "INACTIVE", 3, BASE_TIME, "department-se");
         insertStudent("student-other", "S003", "ACTIVE", 4, BASE_TIME.plusSeconds(60), "department-cs");
 
         mvc.perform(get("/api/v1/students")
@@ -99,7 +66,7 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.data[0].user.id").value("user-student-other"))
                 .andExpect(jsonPath("$.data[0].curriculum.department.code").value("CS"))
                 .andExpect(jsonPath("$.data[1].id").value("student-new"))
-                .andExpect(jsonPath("$.data[1].curriculum.department").doesNotExist())
+                .andExpect(jsonPath("$.data[1].curriculum.department.code").value("SE"))
                 .andExpect(jsonPath("$.meta.total").value(3))
                 .andExpect(jsonPath("$.meta.page").value(1))
                 .andExpect(jsonPath("$.meta.limit").value(2))
@@ -120,12 +87,12 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.id").value("student-old"))
                 .andExpect(jsonPath("$.studentId").value("S001"))
                 .andExpect(jsonPath("$.curriculum.id").value("curriculum-student-old"))
-                .andExpect(jsonPath("$.curriculum.department.name").value("Department department-se"))
+                .andExpect(jsonPath("$.curriculum.department.name").value("Software Engineering"))
                 .andExpect(jsonPath("$.admissionDate").value("2025-08-20T00:00:00.000Z"));
     }
 
     @Test
-    void lecturersPreserveLegacyListEnvelopeOrderingAndHydration() throws Exception {
+    void lecturersUseCanonicalAuthAndAcademicIdentityWithStablePaging() throws Exception {
         insertLecturer("lecturer-old", "E001", BASE_TIME.minusSeconds(60));
         insertLecturer("lecturer-new", "E002", BASE_TIME);
 
@@ -182,6 +149,65 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
     }
 
+    private void createTables() {
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(320) NOT NULL,
+                    "firstName" VARCHAR(120) NOT NULL,
+                    "lastName" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Department" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "code" VARCHAR(40) NOT NULL,
+                    "name" VARCHAR(200) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Curriculum" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "code" VARCHAR(40) NOT NULL,
+                    "name" VARCHAR(200) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Student" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) UNIQUE NOT NULL,
+                    "studentId" VARCHAR(120) UNIQUE NOT NULL,
+                    "curriculumId" VARCHAR(120) NOT NULL,
+                    "year" INTEGER NOT NULL,
+                    "status" VARCHAR(40) NOT NULL,
+                    "admissionDate" TIMESTAMP NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) UNIQUE NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "employeeId" VARCHAR(120) UNIQUE NOT NULL,
+                    "title" VARCHAR(120),
+                    "specialization" VARCHAR(200),
+                    "office" VARCHAR(120),
+                    "phone" VARCHAR(80),
+                    "isActive" BOOLEAN NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL
+                )
+                """);
+    }
+
+    private void insertDepartment(String id, String code, String name) {
+        jdbc.update("INSERT INTO \"academic\".\"Department\" (\"id\", \"code\", \"name\") VALUES (?, ?, ?)",
+                id, code, name);
+    }
+
     private void insertStudent(
             String id,
             String studentId,
@@ -189,55 +215,39 @@ class PeopleReadPersistenceTest {
             int year,
             Instant createdAt,
             String departmentId) {
+        String userId = "user-" + id;
+        String curriculumId = "curriculum-" + id;
+        insertUser(userId, id + "@campuscore.edu", "Student", id.substring(id.indexOf('-') + 1));
         jdbc.update(
-                "INSERT INTO \"people\".\"Student\""
-                        + " (\"id\", \"userId\", \"email\", \"firstName\", \"lastName\", \"studentId\","
-                        + " \"curriculumId\", \"curriculumCode\", \"curriculumName\", \"departmentId\","
-                        + " \"departmentCode\", \"departmentName\", \"year\", \"status\", \"admissionDate\","
-                        + " \"createdAt\", \"updatedAt\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id,
-                "user-" + id,
-                id + "@campuscore.edu",
-                "Student",
-                id.substring(id.indexOf('-') + 1),
-                studentId,
-                "curriculum-" + id,
-                "SE",
-                "Software Engineering",
-                departmentId,
-                departmentId == null ? null : departmentCode(departmentId),
-                departmentId == null ? null : "Department " + departmentId,
-                year,
-                status,
+                "INSERT INTO \"academic\".\"Curriculum\" (\"id\", \"code\", \"name\", \"departmentId\")"
+                        + " VALUES (?, ?, ?, ?)",
+                curriculumId, departmentCode(departmentId), "Curriculum " + studentId, departmentId);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Student\""
+                        + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                        + " \"admissionDate\", \"createdAt\", \"updatedAt\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, userId, studentId, curriculumId, year, status,
                 localDateTime(BASE_TIME.minusSeconds(31_536_000)),
-                localDateTime(createdAt),
-                localDateTime(createdAt));
+                localDateTime(createdAt), localDateTime(createdAt));
     }
 
     private void insertLecturer(String id, String employeeId, Instant createdAt) {
+        String userId = "user-" + id;
+        insertUser(userId, id + "@campuscore.edu", "Lecturer", id.substring(id.indexOf('-') + 1));
         jdbc.update(
-                "INSERT INTO \"people\".\"Lecturer\""
-                        + " (\"id\", \"userId\", \"email\", \"firstName\", \"lastName\", \"departmentId\","
-                        + " \"departmentCode\", \"departmentName\", \"employeeId\", \"title\","
+                "INSERT INTO \"academic\".\"Lecturer\""
+                        + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"title\","
                         + " \"specialization\", \"office\", \"phone\", \"isActive\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
-                id,
-                "user-" + id,
-                id + "@campuscore.edu",
-                "Lecturer",
-                id.substring(id.indexOf('-') + 1),
-                "department-se",
-                "SE",
-                "Software Engineering",
-                employeeId,
-                "Dr.",
-                "Distributed Systems",
-                "A-101",
-                "+84123456789",
-                true,
-                localDateTime(createdAt),
-                localDateTime(createdAt));
+                        + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                id, userId, "department-se", employeeId, "Dr.", "Distributed Systems", "A-101",
+                "+84123456789", true, localDateTime(createdAt), localDateTime(createdAt));
+    }
+
+    private void insertUser(String id, String email, String firstName, String lastName) {
+        jdbc.update(
+                "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
+                        + " VALUES (?, ?, ?, ?)",
+                id, email, firstName, lastName);
     }
 
     private static String departmentCode(String departmentId) {

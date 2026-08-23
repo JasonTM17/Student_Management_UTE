@@ -28,7 +28,6 @@ export const en = {
       reviewAdmin: 'Review admin surfaces',
       browseSections: 'Browse sections',
       clearFilters: 'Clear filters',
-      openAnalytics: 'Open analytics',
       addUser: 'Add user',
       createUser: 'Create user',
       search: 'Search',
@@ -402,146 +401,6 @@ export const en = {
     unavailableTitle: 'Admin overview unavailable',
     unavailableDescription: 'Campus overview is not available right now.',
   },
-  adminAnalytics: {
-    title: 'Reports and analytics',
-    description:
-      'Track enrollment volume, grading distribution, and classroom utilization without leaving the same admin grammar used across live record management.',
-    overviewSectionTitle: 'Overview stats',
-    refreshData: 'Refresh data',
-    loading: 'Loading analytics overview',
-    unavailableTitle: 'Analytics unavailable',
-    unavailableDescription: 'Analytics data could not be loaded right now.',
-    stats: [
-      'Students',
-      'Lecturers',
-      'Courses',
-      'Sections',
-      'Enrollments',
-      'Departments',
-      'Faculties',
-      'Classrooms',
-    ],
-    statDetails: [
-      'Active student records in the current analytics snapshot.',
-      'Teaching-facing identities available to academic operations.',
-      'Catalog rows currently feeding sections and registration.',
-      'Live section records currently visible to reporting.',
-      'Enrollment throughput reflected across academic reporting.',
-      'Department records tied to faculty and staffing views.',
-      'Faculty groupings available for academic segmentation.',
-      'Rooms currently available for section occupancy tracking.',
-    ],
-    panels: {
-      enrollmentsBySemester: {
-        title: 'Enrollments by semester',
-        description:
-          'Compare academic terms by current enrollment volume without leaving the reporting workspace.',
-        emptyTitle: 'No semester enrollment data yet',
-        emptyDescription:
-          'Once enrollment rows are available, this panel will show which academic terms are carrying the most volume.',
-      },
-      gradeDistribution: {
-        title: 'Grade distribution',
-        description:
-          'Watch published grades settle across the current academic workload.',
-        emptyTitle: 'No published grades yet',
-        emptyDescription:
-          'This panel becomes more useful as sections publish final grades.',
-      },
-      sectionOccupancy: {
-        title: 'Section occupancy',
-        description:
-          'Surface the sections that are close to capacity before they become an operational problem.',
-        emptyTitle: 'No section occupancy data',
-        emptyDescription:
-          'Section and enrollment counts need to be present before occupancy can be visualized.',
-      },
-      enrollmentTrends: {
-        title: 'Enrollment trends',
-        description:
-          'Review monthly intake, completions, and drop activity in one operational readout.',
-        emptyTitle: 'No recent trend data',
-        emptyDescription:
-          'Trend cards appear when monthly enrollment activity is available.',
-      },
-    },
-    tableHeaders: {
-      course: 'Course',
-      section: 'Section',
-      semester: 'Semester',
-      capacity: 'Capacity',
-      enrolled: 'Enrolled',
-      occupancy: 'Occupancy',
-      students: 'students',
-      grades: {
-        enrolled: 'Enrolled',
-        completed: 'Completed',
-        dropped: 'Dropped',
-      },
-    },
-    cockpit: {
-      kpis: {
-        serviceHealth: 'Service health',
-        serviceHealthDetail: 'Observed service targets in the local operator stack.',
-        registrationPressure: 'Registration pressure',
-        registrationPressureDetail: 'Full or near-full sections that need attention.',
-        paymentRisk: 'Payment risk',
-        paymentRiskDetail: 'Failed, overdue, or pending finance work.',
-        notificationHealth: 'Notification health',
-        notificationHealthDetail: 'Unread or warning-level operational messages.',
-      },
-      labels: {
-        healthy: 'healthy',
-        sectionsAtRisk: 'sections at risk',
-        failedPayments: 'failed payments',
-        unreadNotifications: 'unread',
-        totalInvoiced: 'Invoiced',
-        paidAmount: 'Paid',
-        outstanding: 'Outstanding',
-        waitlist: 'Waitlist',
-        full: 'Full',
-        nearCapacity: 'Near capacity',
-        averageOccupancy: 'Average occupancy',
-        noAttention: 'No immediate operator action is queued.',
-      },
-      panels: {
-        enrollmentFlow: {
-          title: 'Enrollment movement',
-          description:
-            'Twelve-month enrollment, completion, and drop activity with structured buckets for localized reporting.',
-        },
-        registrationPressure: {
-          title: 'Registration pressure',
-          description:
-            'Sections closest to capacity, with active waitlist signals visible before students hit a dead end.',
-        },
-        financeFunnel: {
-          title: 'Finance checkout posture',
-          description:
-            'Invoice exposure and provider payment activity in one reconciliation view.',
-        },
-        notificationDelivery: {
-          title: 'Notification delivery',
-          description:
-            'Unread, warning, and error-level messages that may require an operator follow-up.',
-        },
-        operatorLinks: {
-          title: 'Operator drill-down',
-          description:
-            'Use these internal links for detailed metrics, logs, traces, and alert review.',
-        },
-        actionQueue: {
-          title: 'Attention queue',
-          description:
-            'The highest-value operational follow-ups from enrollment, finance, and notification signals.',
-        },
-      },
-      actions: {
-        open: 'Open',
-        opensInNewTab: 'opens in a new tab',
-      },
-    },
-  },
   dashboardShell: {
     portalTitle: 'Academic information portal',
     identityLabel: 'Signed in as',
@@ -896,7 +755,7 @@ export const en = {
     eyebrow: 'Thesis workspace',
     title: 'Keep the whole thesis journey in one calm timeline.',
     description:
-      'Registration rounds, topic choices, group membership, council reviews, and final results stay connected to your campus identity.',
+      'Registration rounds, topic choices, group membership, and recorded progress stay connected to your campus identity.',
     selectRound: 'Select registration round',
     noRound: 'No thesis registration round is available yet.',
     loading: 'Loading thesis workspace',
@@ -911,7 +770,7 @@ export const en = {
       'Published topics are grouped by department. Topic selection becomes a proposal your coordinator can review.',
     groupsTitle: 'Your group workspace',
     groupsDescription:
-      'Keep membership and topic decisions visible before the round moves into council scheduling.',
+      'Keep membership, topic decisions, and the current group status visible in one place.',
     createGroup: 'Create a thesis group',
     addMember: 'Add member',
     chooseTopic: 'Choose topic',
@@ -927,7 +786,6 @@ export const en = {
     navigation: {
       catalog: 'Topic catalog',
       progress: 'Thesis progress',
-      evaluation: 'Defense and evaluation',
     },
     catalogTitle: 'Published topic catalog',
     catalogDescription:
@@ -945,28 +803,17 @@ export const en = {
       'Thesis group prepared',
       'Topic proposal submitted',
       'Coordinator decision recorded',
-      'Defense and result published',
+      'Latest progress status recorded',
     ],
-    evaluationTitle: 'Defense and evaluation',
-    evaluationDescription:
-      'Keep council scheduling and evaluation readiness visible while scores remain owned by the academic service.',
-    councilsTitle: 'Defense councils',
-    noCouncils: 'No defense council has been scheduled for this round yet.',
-    defenseScheduled: 'Scheduled defense',
-    room: 'Room',
-    councilStatus: 'Council status',
     backToWorkspace: 'Back to thesis workspace',
     lifecycleViewsTitle: 'Thesis lifecycle views',
     lifecycleViewsDescription:
-      'Open a focused screen for topics, recorded progress, or defense readiness.',
+      'Open a focused screen for published topics or the latest recorded group progress.',
     status: {
       DRAFT: 'Draft',
       REGISTRATION_OPEN: 'Registration open',
       REGISTRATION_CLOSED: 'Registration closed',
       PROPOSALS_PUBLISHED: 'Topics published',
-      DEFENSE_SCHEDULED: 'Defense scheduled',
-      SCORING_OPEN: 'Scoring open',
-      RESULTS_PUBLISHED: 'Results published',
       CLOSED: 'Closed',
       CANCELLED: 'Cancelled',
       PENDING: 'Pending review',
@@ -975,60 +822,10 @@ export const en = {
       SUBMITTED: 'Submitted',
       COMPLETED: 'Completed',
     },
-    review: {
-      eyebrow: 'Review & evaluation',
-      title: 'Score thesis defenses with a calm, structured workflow.',
-      description:
-        'Select a council, then submit scores and comments for each defending group. Scores range from 0 to 10.',
-      selectCouncil: 'Select defense council',
-      noCouncil: 'No defense council is available for this round.',
-      noCouncilDescription:
-        'Councils are scheduled by the coordinator once registration closes.',
-      councilReview: 'Council review',
-      room: 'Room',
-      members: 'Council members',
-      memberCount: 'members',
-      groupsTitle: 'Defending groups',
-      groupsDescription: 'Submit a score and comment for each group.',
-      noGroups: 'No groups in this round yet.',
-      noGroupsDescription: 'Groups will appear here once students form and register.',
-      groupLabel: 'Group',
-      score: 'Score (0-10)',
-      comment: 'Comment',
-      commentPlaceholder: 'Strengths, weaknesses, suggestions...',
-      submit: 'Submit review',
-      submitted: 'Review submitted successfully.',
-      invalidScore: 'Please enter a valid score between 0 and 10.',
-      unauthorized: 'Only lecturers and admins can submit reviews.',
-      unauthorizedDescription: 'This workspace is restricted to evaluator roles.',
-    },
     progress: {
       eyebrow: 'Progress tracking',
-      title: 'Follow every milestone from proposal to result.',
-      description:
-        'See where your group stands in the thesis journey — proposal, approval, midterm, defense, and final result.',
-      noRound: 'No thesis registration round is available yet.',
-      noRoundDescription: 'Progress will appear once a round is published.',
-      overall: 'Overall progress',
-      timeline: 'Milestone timeline',
-      timelineDescription: 'Each milestone unlocks as the previous one completes.',
-      proposal: 'Proposal submitted',
-      proposalDescription: 'Your group has formed and chosen a topic.',
-      approval: 'Coordinator approval',
-      approvalDescription: 'Your coordinator reviews and approves the group.',
-      midterm: 'Midterm report',
-      midtermDescription: 'Submit your progress report at the checkpoint.',
-      defense: 'Defense',
-      defenseDescription: 'Present and defend your thesis before the council.',
-      result: 'Final result',
-      resultDescription: 'Scores are finalized and published.',
     },
     detail: {
-      councils: 'Defense councils',
-      councilsTitle: 'Defense councils',
-      councilsDescription: 'Councils scheduled for this round.',
-      noCouncils: 'No councils scheduled yet.',
-      noCouncilsDescription: 'Councils appear here once the coordinator schedules defense sessions.',
       groupsTitle: 'Registered groups',
       groupsDescription: 'Groups formed by students in this round.',
       noGroups: 'No groups registered yet.',
@@ -1036,26 +833,9 @@ export const en = {
       maxGroups: 'Max groups',
       members: 'members',
     },
-    councils: {
-      eyebrow: 'Council management',
-      title: 'Schedule and manage defense councils.',
-      description:
-        'Create councils, assign defense dates and rooms, and open scoring once the council is ready.',
-      empty: 'No councils scheduled for this round.',
-      emptyDescription: 'Councils appear here once the coordinator creates them.',
-      schedule: 'Schedule',
-      scheduleTitle: 'Schedule defense council',
-      room: 'Room',
-      roomPlaceholder: 'e.g. Room A101',
-      date: 'Date & time',
-      scheduledAt: 'Scheduled at',
-      openScoring: 'Open scoring',
-      scoringOpened: 'Scoring is now open for this council.',
-      scheduled: 'Council scheduled successfully.',
-    },
     admin: {
       title: 'Thesis administration',
-      description: 'Create registration rounds, manage their lifecycle, and monitor topics, groups, and councils.',
+      description: 'Create registration rounds, manage their lifecycle, and monitor topics and groups.',
       createRound: 'Create round',
       totalRounds: 'Total rounds',
       openRounds: 'Open for registration',
@@ -1068,7 +848,6 @@ export const en = {
       registrationEnd: 'Registration end',
       proposalPublishAt: 'Proposal publish date',
       reportDate: 'Report date',
-      defenseDate: 'Defense date',
       createIncomplete: 'Please fill in name, registration start, and registration end.',
       created: 'Thesis round created successfully.',
       openRegistration: 'Open registration',
@@ -1131,7 +910,6 @@ export const vi: I18nMessages = {
       reviewAdmin: 'Mở khu quản trị',
       browseSections: 'Xem lớp học phần',
       clearFilters: 'Xóa bộ lọc',
-      openAnalytics: 'Mở phân tích',
       addUser: 'Thêm người dùng',
       createUser: 'Tạo người dùng',
       search: 'Tìm kiếm',
@@ -1504,146 +1282,6 @@ export const vi: I18nMessages = {
     unavailableTitle: 'Tổng quan quản trị chưa sẵn sàng',
     unavailableDescription: 'Hiện chưa thể tải tổng quan campus.',
   },
-  adminAnalytics: {
-    title: 'Báo cáo và phân tích',
-    description:
-      'Theo dõi lưu lượng enrollment, phân bố điểm và sử dụng phòng học mà vẫn ở trong cùng admin grammar dùng cho quản trị dữ liệu sống.',
-    overviewSectionTitle: 'Chỉ số tổng quan',
-    refreshData: 'Làm mới dữ liệu',
-    loading: 'Đang tải tổng quan phân tích',
-    unavailableTitle: 'Phân tích chưa sẵn sàng',
-    unavailableDescription: 'Hiện chưa thể tải dữ liệu phân tích.',
-    stats: [
-      'Sinh viên',
-      'Giảng viên',
-      'Môn học',
-      'Lớp học phần',
-      'Đăng ký học',
-      'Bộ môn',
-      'Khoa',
-      'Phòng học',
-    ],
-    statDetails: [
-      'Bản ghi sinh viên đang hoạt động trong snapshot analytics hiện tại.',
-      'Danh tính hướng giảng dạy hiện sẵn sàng cho vận hành học vụ.',
-      'Các dòng catalog đang cấp dữ liệu cho lớp học phần và đăng ký.',
-      'Các bản ghi lớp học phần trực tiếp hiện hiển thị trong báo cáo.',
-      'Lưu lượng đăng ký học đang được phản ánh xuyên suốt các báo cáo học vụ.',
-      'Bản ghi bộ môn gắn với góc nhìn khoa và nhân sự.',
-      'Các nhóm khoa đang sẵn sàng cho phân đoạn học vụ.',
-      'Các phòng hiện sẵn sàng cho việc theo dõi mức đầy của section.',
-    ],
-    panels: {
-      enrollmentsBySemester: {
-        title: 'Đăng ký theo học kỳ',
-        description:
-          'So sánh các học kỳ theo lưu lượng đăng ký hiện tại mà không rời màn hình báo cáo.',
-        emptyTitle: 'Chưa có dữ liệu đăng ký theo học kỳ',
-        emptyDescription:
-          'Khi có dữ liệu enrollment, khối này sẽ cho biết học kỳ nào đang mang nhiều lưu lượng nhất.',
-      },
-      gradeDistribution: {
-        title: 'Phân bố điểm',
-        description:
-          'Theo dõi cách điểm số đã công bố đang phân bổ theo khối lượng học vụ hiện tại.',
-        emptyTitle: 'Chưa có điểm đã công bố',
-        emptyDescription:
-          'Khối này sẽ hữu ích hơn khi các lớp học phần bắt đầu công bố điểm cuối kỳ.',
-      },
-      sectionOccupancy: {
-        title: 'Mức đầy của lớp học phần',
-        description:
-          'Đưa các lớp học phần gần đầy lên sớm trước khi chúng trở thành vấn đề vận hành.',
-        emptyTitle: 'Chưa có dữ liệu mức đầy',
-        emptyDescription:
-          'Cần có số lượng lớp học phần và đăng ký học trước khi hiển thị được mức đầy.',
-      },
-      enrollmentTrends: {
-        title: 'Xu hướng đăng ký học',
-        description:
-          'Xem lượt vào học, hoàn tất và rút môn theo tháng trong một màn đọc vận hành thống nhất.',
-        emptyTitle: 'Chưa có dữ liệu xu hướng gần đây',
-        emptyDescription:
-          'Các thẻ xu hướng sẽ xuất hiện khi có hoạt động đăng ký học theo tháng.',
-      },
-    },
-    tableHeaders: {
-      course: 'Môn học',
-      section: 'Lớp học phần',
-      semester: 'Học kỳ',
-      capacity: 'Sức chứa',
-      enrolled: 'Đã đăng ký',
-      occupancy: 'Mức đầy',
-      students: 'sinh viên',
-      grades: {
-        enrolled: 'Đăng ký',
-        completed: 'Hoàn tất',
-        dropped: 'Rút môn',
-      },
-    },
-    cockpit: {
-      kpis: {
-        serviceHealth: 'Sức khỏe service',
-        serviceHealthDetail: 'Các service target đang được operator stack theo dõi.',
-        registrationPressure: 'Áp lực đăng ký',
-        registrationPressureDetail: 'Lớp đã đầy hoặc gần đầy cần được chú ý.',
-        paymentRisk: 'Rủi ro thanh toán',
-        paymentRiskDetail: 'Thanh toán lỗi, quá hạn hoặc còn chờ xử lý.',
-        notificationHealth: 'Tình trạng thông báo',
-        notificationHealthDetail: 'Thông báo chưa đọc hoặc cảnh báo cần theo dõi.',
-      },
-      labels: {
-        healthy: 'ổn định',
-        sectionsAtRisk: 'lớp có rủi ro',
-        failedPayments: 'thanh toán lỗi',
-        unreadNotifications: 'chưa đọc',
-        totalInvoiced: 'Đã lập hóa đơn',
-        paidAmount: 'Đã thanh toán',
-        outstanding: 'Còn phải thu',
-        waitlist: 'Danh sách chờ',
-        full: 'Đã đầy',
-        nearCapacity: 'Gần đầy',
-        averageOccupancy: 'Mức đầy trung bình',
-        noAttention: 'Hiện chưa có tác vụ vận hành cần xử lý ngay.',
-      },
-      panels: {
-        enrollmentFlow: {
-          title: 'Dòng đăng ký học',
-          description:
-            'Hoạt động đăng ký, hoàn tất và rút môn trong 12 tháng với bucket có cấu trúc cho báo cáo song ngữ.',
-        },
-        registrationPressure: {
-          title: 'Áp lực đăng ký',
-          description:
-            'Các lớp gần đạt sức chứa nhất, kèm tín hiệu danh sách chờ trước khi sinh viên gặp ngõ cụt.',
-        },
-        financeFunnel: {
-          title: 'Tình trạng checkout học phí',
-          description:
-            'Mức phải thu và hoạt động thanh toán theo provider trong một góc nhìn đối soát.',
-        },
-        notificationDelivery: {
-          title: 'Luồng thông báo',
-          description:
-            'Thông báo chưa đọc, cảnh báo và lỗi có thể cần quản trị viên theo dõi.',
-        },
-        operatorLinks: {
-          title: 'Đi sâu vận hành',
-          description:
-            'Dùng các liên kết nội bộ này để xem metric, log, trace và alert chi tiết.',
-        },
-        actionQueue: {
-          title: 'Hàng đợi cần chú ý',
-          description:
-            'Các việc vận hành đáng xử lý nhất từ tín hiệu đăng ký, tài chính và thông báo.',
-        },
-      },
-      actions: {
-        open: 'Mở',
-        opensInNewTab: 'mở trong tab mới',
-      },
-    },
-  },
   dashboardShell: {
     portalTitle: 'Cổng thông tin học vụ',
     identityLabel: 'Đăng nhập với vai trò',
@@ -1998,7 +1636,7 @@ export const vi: I18nMessages = {
     eyebrow: 'Không gian luận văn',
     title: 'Giữ toàn bộ hành trình đề tài trong một timeline rõ ràng.',
     description:
-      'Đợt đăng ký, lựa chọn đề tài, thành viên nhóm, hội đồng phản biện và kết quả cuối cùng được nối với cùng một danh tính campus.',
+      'Đợt đăng ký, lựa chọn đề tài, thành viên nhóm và tiến độ đã ghi nhận được nối với cùng một danh tính campus.',
     selectRound: 'Chọn đợt đăng ký đề tài',
     noRound: 'Chưa có đợt đăng ký đề tài nào.',
     loading: 'Đang tải không gian luận văn',
@@ -2013,7 +1651,7 @@ export const vi: I18nMessages = {
       'Các đề tài đã công bố được gom theo bộ môn. Lựa chọn của nhóm sẽ trở thành đề xuất để điều phối viên xét duyệt.',
     groupsTitle: 'Không gian nhóm của bạn',
     groupsDescription:
-      'Giữ thành viên và lựa chọn đề tài ở gần nhau trước khi đợt chuyển sang bước lập hội đồng.',
+      'Giữ thành viên, lựa chọn đề tài và trạng thái hiện tại của nhóm ở cùng một nơi.',
     createGroup: 'Tạo nhóm đề tài',
     addMember: 'Thêm thành viên',
     chooseTopic: 'Chọn đề tài',
@@ -2029,7 +1667,6 @@ export const vi: I18nMessages = {
     navigation: {
       catalog: 'Danh mục đề tài',
       progress: 'Tiến độ luận văn',
-      evaluation: 'Bảo vệ và đánh giá',
     },
     catalogTitle: 'Danh mục đề tài đã công bố',
     catalogDescription:
@@ -2047,28 +1684,17 @@ export const vi: I18nMessages = {
       'Đã chuẩn bị nhóm luận văn',
       'Đã gửi đề xuất đề tài',
       'Đã ghi nhận quyết định điều phối',
-      'Đã công bố lịch bảo vệ và kết quả',
+      'Đã ghi nhận trạng thái tiến độ mới nhất',
     ],
-    evaluationTitle: 'Bảo vệ và đánh giá',
-    evaluationDescription:
-      'Giữ lịch hội đồng và trạng thái sẵn sàng đánh giá trong tầm nhìn, còn điểm số vẫn thuộc quyền sở hữu của academic service.',
-    councilsTitle: 'Hội đồng bảo vệ',
-    noCouncils: 'Chưa có hội đồng bảo vệ nào được xếp lịch cho đợt này.',
-    defenseScheduled: 'Lịch bảo vệ',
-    room: 'Phòng',
-    councilStatus: 'Trạng thái hội đồng',
     backToWorkspace: 'Quay lại không gian luận văn',
     lifecycleViewsTitle: 'Các màn hình trong vòng đời luận văn',
     lifecycleViewsDescription:
-      'Mở màn hình tập trung cho đề tài, tiến độ đã ghi nhận hoặc trạng thái sẵn sàng bảo vệ.',
+      'Mở màn hình tập trung cho đề tài đã công bố hoặc tiến độ nhóm mới nhất.',
     status: {
       DRAFT: 'Bản nháp',
       REGISTRATION_OPEN: 'Đang mở đăng ký',
       REGISTRATION_CLOSED: 'Đã đóng đăng ký',
       PROPOSALS_PUBLISHED: 'Đã công bố đề tài',
-      DEFENSE_SCHEDULED: 'Đã xếp lịch bảo vệ',
-      SCORING_OPEN: 'Đang chấm điểm',
-      RESULTS_PUBLISHED: 'Đã công bố kết quả',
       CLOSED: 'Đã đóng',
       CANCELLED: 'Đã hủy',
       PENDING: 'Chờ xét duyệt',
@@ -2077,60 +1703,10 @@ export const vi: I18nMessages = {
       SUBMITTED: 'Đã gửi',
       COMPLETED: 'Đã hoàn thành',
     },
-    review: {
-      eyebrow: 'Chấm điểm & phản biện',
-      title: 'Chấm điểm bảo vệ luận văn bằng quy trình rõ ràng, tinh tế.',
-      description:
-        'Chọn hội đồng, sau đó gửi điểm và nhận xét cho từng nhóm bảo vệ. Thang điểm từ 0 đến 10.',
-      selectCouncil: 'Chọn hội đồng bảo vệ',
-      noCouncil: 'Chưa có hội đồng bảo vệ nào trong đợt này.',
-      noCouncilDescription:
-        'Hội đồng được điều phối viên lập lịch sau khi đóng đăng ký.',
-      councilReview: 'Chấm điểm hội đồng',
-      room: 'Phòng',
-      members: 'Thành viên hội đồng',
-      memberCount: 'thành viên',
-      groupsTitle: 'Nhóm bảo vệ',
-      groupsDescription: 'Gửi điểm và nhận xét cho từng nhóm.',
-      noGroups: 'Chưa có nhóm nào trong đợt này.',
-      noGroupsDescription: 'Các nhóm sẽ xuất hiện tại đây sau khi sinh viên thành lập và đăng ký.',
-      groupLabel: 'Nhóm',
-      score: 'Điểm (0-10)',
-      comment: 'Nhận xét',
-      commentPlaceholder: 'Điểm mạnh, điểm yếu, gợi ý...',
-      submit: 'Gửi đánh giá',
-      submitted: 'Đã gửi đánh giá thành công.',
-      invalidScore: 'Vui lòng nhập điểm hợp lệ từ 0 đến 10.',
-      unauthorized: 'Chỉ giảng viên và quản trị viên mới được chấm điểm.',
-      unauthorizedDescription: 'Không gian này chỉ dành cho vai trò người đánh giá.',
-    },
     progress: {
       eyebrow: 'Theo dõi tiến độ',
-      title: 'Theo dõi từng mốc từ đề xuất đến kết quả.',
-      description:
-        'Xem nhóm đang ở đâu trong hành trình luận văn — đề xuất, phê duyệt, báo cáo giữa kỳ, bảo vệ và kết quả cuối cùng.',
-      noRound: 'Chưa có đợt đăng ký đề tài nào.',
-      noRoundDescription: 'Tiến độ sẽ xuất hiện khi đợt đăng ký được công bố.',
-      overall: 'Tiến độ tổng',
-      timeline: 'Timeline các mốc',
-      timelineDescription: 'Mỗi mốc được mở khóa khi mốc trước hoàn thành.',
-      proposal: 'Đã gửi đề xuất',
-      proposalDescription: 'Nhóm đã thành lập và chọn đề tài.',
-      approval: 'Điều phối viên phê duyệt',
-      approvalDescription: 'Điều phối viên xét duyệt và phê duyệt nhóm.',
-      midterm: 'Báo cáo giữa kỳ',
-      midtermDescription: 'Nộp báo cáo tiến độ tại mốc kiểm tra.',
-      defense: 'Bảo vệ',
-      defenseDescription: 'Trình bày và bảo vệ luận văn trước hội đồng.',
-      result: 'Kết quả cuối cùng',
-      resultDescription: 'Điểm được chốt và công bố.',
     },
     detail: {
-      councils: 'Hội đồng bảo vệ',
-      councilsTitle: 'Hội đồng bảo vệ',
-      councilsDescription: 'Các hội đồng được lập lịch cho đợt này.',
-      noCouncils: 'Chưa có hội đồng nào được lập lịch.',
-      noCouncilsDescription: 'Hội đồng sẽ xuất hiện khi điều phối viên lập lịch bảo vệ.',
       groupsTitle: 'Nhóm đã đăng ký',
       groupsDescription: 'Các nhóm do sinh viên thành lập trong đợt.',
       noGroups: 'Chưa có nhóm nào đăng ký.',
@@ -2138,26 +1714,9 @@ export const vi: I18nMessages = {
       maxGroups: 'Số nhóm tối đa',
       members: 'thành viên',
     },
-    councils: {
-      eyebrow: 'Quản lý hội đồng',
-      title: 'Lập lịch và quản lý hội đồng bảo vệ.',
-      description:
-        'Tạo hội đồng, gán ngày giờ và phòng bảo vệ, và mở chấm điểm khi hội đồng sẵn sàng.',
-      empty: 'Chưa có hội đồng nào được lập lịch cho đợt này.',
-      emptyDescription: 'Hội đồng sẽ xuất hiện khi điều phối viên tạo.',
-      schedule: 'Lập lịch',
-      scheduleTitle: 'Lập lịch hội đồng bảo vệ',
-      room: 'Phòng',
-      roomPlaceholder: 'VD: Phòng A101',
-      date: 'Ngày giờ',
-      scheduledAt: 'Đã lịch',
-      openScoring: 'Mở chấm điểm',
-      scoringOpened: 'Đã mở chấm điểm cho hội đồng này.',
-      scheduled: 'Đã lập lịch hội đồng thành công.',
-    },
     admin: {
       title: 'Quản trị luận văn',
-      description: 'Tạo đợt đăng ký, quản lý vòng đời đợt, và theo dõi đề tài, nhóm, hội đồng.',
+      description: 'Tạo đợt đăng ký, quản lý vòng đời đợt, và theo dõi đề tài cùng nhóm.',
       createRound: 'Tạo đợt',
       totalRounds: 'Tổng số đợt',
       openRounds: 'Đang mở đăng ký',
@@ -2170,7 +1729,6 @@ export const vi: I18nMessages = {
       registrationEnd: 'Kết thúc đăng ký',
       proposalPublishAt: 'Ngày công bố đề tài',
       reportDate: 'Ngày báo cáo',
-      defenseDate: 'Ngày bảo vệ',
       createIncomplete: 'Vui lòng điền tên, thời gian bắt đầu và kết thúc đăng ký.',
       created: 'Đã tạo đợt luận văn thành công.',
       openRegistration: 'Mở đăng ký',

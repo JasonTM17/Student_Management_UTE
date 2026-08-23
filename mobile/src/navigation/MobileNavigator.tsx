@@ -87,15 +87,20 @@ export function MobileNavigator() {
     <SafeAreaView style={styles.safeArea}>
       <StatusBar barStyle="dark-content" backgroundColor={tokens.colors.background} />
       <View style={styles.container}>
-        <ScreenComponent navigation={navigation} role={role} />
-        {hasActiveSession ? (
-          <BottomNavigation
-            activeRoute={route}
-            role={role}
-            onNavigate={navigation.navigate}
-            onMenu={() => setMenuOpen(true)}
-          />
-        ) : null}
+        <View
+          importantForAccessibility={menuOpen ? 'no-hide-descendants' : 'auto'}
+          style={styles.content}
+        >
+          <ScreenComponent navigation={navigation} role={role} />
+          {hasActiveSession ? (
+            <BottomNavigation
+              activeRoute={route}
+              role={role}
+              onNavigate={navigation.navigate}
+              onMenu={() => setMenuOpen(true)}
+            />
+          ) : null}
+        </View>
         {menuOpen ? (
           <MenuPanel
             activeRoute={route}
@@ -114,4 +119,5 @@ export function MobileNavigator() {
 const styles = StyleSheet.create({
   safeArea: { backgroundColor: tokens.colors.background, flex: 1 },
   container: { flex: 1 },
+  content: { flex: 1 },
 });

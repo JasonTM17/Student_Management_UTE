@@ -40,7 +40,7 @@ interface Enrollment {
   studentId: string;
   sectionId: string;
   semesterId: string;
-  status: 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED';
+  status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'COMPLETED' | 'DROPPED' | 'CANCELLED';
   enrolledAt: string;
   droppedAt?: string;
   finalGrade?: number;

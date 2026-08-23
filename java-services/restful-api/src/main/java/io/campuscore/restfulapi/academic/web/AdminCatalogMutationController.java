@@ -27,6 +27,9 @@ public class AdminCatalogMutationController {
     @PostMapping("/departments")
     public Map<String, Object> createDepartment(@RequestBody Map<String, Object> input) { return catalog.createDepartment(input); }
 
+    @PostMapping("/academic-years")
+    public Map<String, Object> createAcademicYear(@RequestBody Map<String, Object> input) { return catalog.createAcademicYear(input); }
+
     @PostMapping("/courses")
     public Map<String, Object> createCourse(@RequestBody Map<String, Object> input) { return catalog.createCourse(input); }
 
@@ -42,6 +45,9 @@ public class AdminCatalogMutationController {
     @PutMapping("/departments/{id}")
     public Map<String, Object> updateDepartment(@PathVariable String id, @RequestBody Map<String, Object> input) { return catalog.update("\"academic\".\"Department\"", id, input); }
 
+    @PutMapping("/academic-years/{id}")
+    public Map<String, Object> updateAcademicYear(@PathVariable String id, @RequestBody Map<String, Object> input) { return catalog.update("\"academic\".\"AcademicYear\"", id, input); }
+
     @PutMapping("/courses/{id}")
     public Map<String, Object> updateCourse(@PathVariable String id, @RequestBody Map<String, Object> input) { return catalog.update("\"academic\".\"Course\"", id, input); }
 
@@ -56,6 +62,9 @@ public class AdminCatalogMutationController {
 
     @DeleteMapping("/departments/{id}")
     public Map<String, String> deleteDepartment(@PathVariable String id) { return delete("\"academic\".\"Department\"", id); }
+
+    @DeleteMapping("/academic-years/{id}")
+    public Map<String, String> deleteAcademicYear(@PathVariable String id) { return delete("\"academic\".\"AcademicYear\"", id); }
 
     @DeleteMapping("/courses/{id}")
     public Map<String, String> deleteCourse(@PathVariable String id) { return delete("\"academic\".\"Course\"", id); }

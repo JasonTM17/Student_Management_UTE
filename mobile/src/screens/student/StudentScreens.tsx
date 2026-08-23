@@ -1,4 +1,4 @@
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -13,6 +13,7 @@ import {
   ScreenShell,
   ScreenSpacer,
   SectionHeading,
+  StatePanel,
   UiText,
 } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
@@ -42,15 +43,64 @@ const previewNotifications = [
   { title: 'Library maintenance notice', subtitle: 'Online renewals pause this weekend.', meta: 'Yesterday', unread: false },
 ];
 
-export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
-  const [liveEnrollments, setLiveEnrollments] = useState<MobileEnrollment[]>([]);
+function useLiveResource<T>(
+  initialValue: T,
+  request: () => Promise<T>,
+  fallbackMessage: string,
+) {
+  const requestRef = useRef(request);
+  requestRef.current = request;
+  const mountedRef = useRef(true);
+  const [data, setData] = useState<T>(initialValue);
+  const [isLoading, setIsLoading] = useState(apiClient.mode === 'live');
   const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.enrollments().then(setLiveEnrollments).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Dashboard data is unavailable.');
-    });
+
+  useEffect(() => () => {
+    mountedRef.current = false;
   }, []);
+
+  const reload = useCallback(async () => {
+    if (apiClient.mode !== 'live') {
+      setIsLoading(false);
+      return;
+    }
+
+    setIsLoading(true);
+    setError(null);
+    try {
+      const nextData = await requestRef.current();
+      if (mountedRef.current) {
+        setData(nextData);
+      }
+    } catch (nextError) {
+      if (mountedRef.current) {
+        setError(nextError instanceof ApiClientError ? nextError.message : fallbackMessage);
+      }
+    } finally {
+      if (mountedRef.current) {
+        setIsLoading(false);
+      }
+    }
+  }, [fallbackMessage]);
+
+  useEffect(() => {
+    void reload();
+  }, [reload]);
+
+  return { data, error, isLoading, reload, setData };
+}
+
+export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
+  const {
+    data: liveEnrollments,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<MobileEnrollment[]>(
+    [],
+    () => campusApi.enrollments(),
+    'Dashboard data is unavailable.',
+  );
   const dashboardClasses = apiClient.mode === 'preview'
     ? upcomingClasses
     : liveEnrollments.slice(0, 3).map((item) => ({
@@ -64,6 +114,21 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
           : 'TBA',
       }));
   const scheduledSessions = liveEnrollments.reduce((total, item) => total + (item.section?.schedules?.length ?? 0), 0);
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Academic dashboard" eyebrow="Student workspace" subtitle="Your current sections and next academic actions.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading dashboard…' : 'Dashboard unavailable'}
+          description={error ?? 'Retrieving your current academic records.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell
       eyebrow={apiClient.mode === 'preview' ? 'Preview workspace' : 'Student workspace'}
@@ -105,8 +170,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
           </View>
         ))}
       </Card>
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
-      {dashboardClasses.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No active sections were found.</UiText></Card> : null}
+      {dashboardClasses.length === 0 ? <StatePanel kind="empty" title="No active sections" description="Published sections will appear here." /> : null}
 
       <ScreenSpacer />
       <SectionHeading title="Quick actions" />
@@ -120,14 +184,17 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
 }
 
 export function ScheduleScreen({ navigation }: MobileScreenProps) {
-  const [liveEnrollments, setLiveEnrollments] = useState<MobileEnrollment[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.enrollments().then(setLiveEnrollments).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Schedule is unavailable.');
-    });
-  }, []);
+  const [weekOffset, setWeekOffset] = useState(0);
+  const {
+    data: liveEnrollments,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<MobileEnrollment[]>(
+    [],
+    () => campusApi.enrollments(),
+    'Schedule is unavailable.',
+  );
   const liveSchedule = liveEnrollments.flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -138,30 +205,58 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
   const visibleSchedule = apiClient.mode === 'preview'
     ? upcomingClasses.map((item) => ({ ...item, day: 2 }))
     : liveSchedule;
+  const today = new Date();
+  const mondayOffset = (today.getDay() + 6) % 7;
+  const weekStart = new Date(today.getFullYear(), today.getMonth(), today.getDate() - mondayOffset + weekOffset * 7);
+  const weekDays = Array.from({ length: 7 }, (_, index) => {
+    const date = new Date(weekStart);
+    date.setDate(weekStart.getDate() + index);
+    return date;
+  });
+  const weekEnd = weekDays[6];
+  const dateFormatter = new Intl.DateTimeFormat('en', { day: 'numeric', month: 'short' });
+  const weekLabel = `${dateFormatter.format(weekStart)} - ${dateFormatter.format(weekEnd)}`;
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Schedule" eyebrow="Current semester" subtitle="Your published class sessions.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading schedule…' : 'Schedule unavailable'}
+          description={error ?? 'Retrieving your published class sessions.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Schedule" eyebrow="Current semester" subtitle="Your published class sessions.">
       <Card tone="low" style={styles.weekCard}>
         <View style={styles.weekHeader}>
-          <Button label="‹" onPress={() => undefined} variant="text" />
+          <Button accessibilityLabel="Previous week" label="‹" onPress={() => setWeekOffset((current) => current - 1)} variant="text" />
           <View style={styles.weekTitle}>
-            <UiText variant="label">18 – 24 August</UiText>
-            <UiText variant="bodySmall" tone="muted">Week 34</UiText>
+            <UiText variant="label">{weekLabel}</UiText>
+            <UiText variant="bodySmall" tone="muted">{weekOffset === 0 ? 'Current week' : weekOffset > 0 ? `${weekOffset} week ahead` : `${Math.abs(weekOffset)} week back`}</UiText>
           </View>
-          <Button label="›" onPress={() => undefined} variant="text" />
+          <Button accessibilityLabel="Next week" label="›" onPress={() => setWeekOffset((current) => current + 1)} variant="text" />
         </View>
         <View style={styles.dayRow}>
-          {['M', 'T', 'W', 'T', 'F', 'S', 'S'].map((day, index) => (
-            <View key={`${day}-${index}`} style={[styles.dayCell, index === 1 ? styles.dayCellActive : undefined]}>
-              <UiText variant="meta" tone={index === 1 ? 'onPrimary' : 'muted'}>{day}</UiText>
-              <UiText variant="label" tone={index === 1 ? 'onPrimary' : 'default'}>{18 + index}</UiText>
+          {weekDays.map((date, index) => {
+            const active = weekOffset === 0 && date.toDateString() === today.toDateString();
+            return (
+            <View key={date.toISOString()} style={[styles.dayCell, active ? styles.dayCellActive : undefined]}>
+              <UiText variant="meta" tone={active ? 'onPrimary' : 'muted'}>{['M', 'T', 'W', 'T', 'F', 'S', 'S'][index]}</UiText>
+              <UiText variant="label" tone={active ? 'onPrimary' : 'default'}>{date.getDate()}</UiText>
             </View>
-          ))}
+            );
+          })}
         </View>
       </Card>
 
       <ScreenSpacer />
       <SectionHeading title="Weekly sessions" actionLabel="Courses" onAction={() => navigation.navigate('courses')} />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
       {visibleSchedule.map((item, index) => (
         <Card key={`${item.code}-${item.time}-${index}`} style={styles.scheduleCard}>
           <View style={styles.scheduleTime}>
@@ -175,7 +270,7 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
           <Badge label="On campus" tone="primary" />
         </Card>
       ))}
-      {visibleSchedule.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No schedule has been published.</UiText></Card> : null}
+      {visibleSchedule.length === 0 ? <StatePanel kind="empty" title="No published sessions" description="Your timetable will appear after sections publish their schedules." /> : null}
       <Card tone="low" style={styles.noteCard}>
         <UiText variant="bodySmall" tone="muted">No classes after 15:00. Use the quiet afternoon for your thesis milestone.</UiText>
       </Card>
@@ -184,14 +279,16 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
 }
 
 export function CoursesScreen({ navigation }: MobileScreenProps) {
-  const [liveEnrollments, setLiveEnrollments] = useState<MobileEnrollment[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.enrollments().then(setLiveEnrollments).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Courses are unavailable.');
-    });
-  }, []);
+  const {
+    data: liveEnrollments,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<MobileEnrollment[]>(
+    [],
+    () => campusApi.enrollments(),
+    'Courses are unavailable.',
+  );
   const visibleCourses = apiClient.mode === 'preview' ? courses : liveEnrollments.map((item) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
@@ -199,6 +296,21 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
     progress: item.gradeStatus === 'PUBLISHED' ? 100 : 50,
     status: item.status,
   }));
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Courses" eyebrow="My learning" subtitle="Your active courses this semester.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading courses…' : 'Courses unavailable'}
+          description={error ?? 'Retrieving your active course records.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Courses" eyebrow="My learning" subtitle={`${visibleCourses.length} active courses this semester.`}>
       <Card tone="primary" style={styles.summaryCard}>
@@ -208,7 +320,6 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
       </Card>
       <ScreenSpacer />
       <SectionHeading title="Active courses" actionLabel="Grades" onAction={() => navigation.navigate('grades')} />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
       {visibleCourses.map((course) => (
         <Card key={course.code} style={styles.courseCard}>
           <View style={styles.courseHeader}>
@@ -222,36 +333,53 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
           <ProgressBar label="Course progress" value={course.progress} />
         </Card>
       ))}
-      {visibleCourses.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No active courses were found.</UiText></Card> : null}
+      {visibleCourses.length === 0 ? <StatePanel kind="empty" title="No active courses" description="Confirmed enrollment records will appear here." /> : null}
       <Button label="Open registration round" onPress={() => navigation.navigate('registration')} variant="secondary" />
     </ScreenShell>
   );
 }
 
 export function GradesScreen({ navigation }: MobileScreenProps) {
-  const [liveGrades, setLiveGrades] = useState<Array<{ code: string; name: string; score: string; letter: string; detail: string }>>([]);
-  const [error, setError] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.grades().then((items) => {
-      setLiveGrades(items.map((item) => ({
+  const {
+    data: liveGrades,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<Array<{ code: string; name: string; score: string; letter: string; detail: string }>>(
+    [],
+    async () => {
+      const items = await campusApi.grades();
+      return items.map((item) => ({
         code: item.courseCode,
         name: item.courseName,
         score: item.finalGrade == null ? '—' : String(item.finalGrade),
         letter: item.letterGrade ?? '—',
         detail: item.gradeStatus,
-      })));
-    }).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Grades are unavailable.');
-    });
-  }, []);
+      }));
+    },
+    'Grades are unavailable.',
+  );
 
   const visibleGrades = apiClient.mode === 'preview' ? grades : liveGrades;
   const numericGrades = liveGrades.map((grade) => Number(grade.score)).filter(Number.isFinite);
   const averageGrade = numericGrades.length > 0
     ? (numericGrades.reduce((sum, grade) => sum + grade, 0) / numericGrades.length).toFixed(2)
     : '—';
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Grades" eyebrow="Academic record" subtitle="Your latest published results.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading grades…' : 'Grades unavailable'}
+          description={error ?? 'Retrieving your published grade records.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Grades" eyebrow="Academic record" subtitle="Your latest published results.">
       <View style={styles.metricGrid}>
@@ -260,8 +388,7 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
       </View>
       <ScreenSpacer />
       <SectionHeading title="Published grades" actionLabel="Courses" onAction={() => navigation.navigate('courses')} />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
-      <Card>
+      {visibleGrades.length > 0 ? <Card>
         {visibleGrades.map((grade, index) => (
           <View key={grade.code}>
             <ListRow
@@ -274,8 +401,8 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
             {index < visibleGrades.length - 1 ? <Divider /> : null}
           </View>
         ))}
-      </Card>
-      {visibleGrades.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No published grades were found.</UiText></Card> : null}
+      </Card> : null}
+      {visibleGrades.length === 0 ? <StatePanel kind="empty" title="No published grades" description="Published results will appear here." /> : null}
       <ScreenSpacer />
       <Card tone="low">
         <UiText variant="label">Need a transcript?</UiText>
@@ -287,14 +414,16 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
 }
 
 export function AttendanceScreen({ navigation }: MobileScreenProps) {
-  const [liveAttendance, setLiveAttendance] = useState<MobileAttendanceSummary[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.attendanceSummary().then(setLiveAttendance).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Attendance is unavailable.');
-    });
-  }, []);
+  const {
+    data: liveAttendance,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<MobileAttendanceSummary[]>(
+    [],
+    () => campusApi.attendanceSummary(),
+    'Attendance is unavailable.',
+  );
   const previewAttendance = [
     { sectionId: 'preview-cs204', courseCode: 'CS204', courseName: 'Software Architecture', total: 16, present: 15, absent: 1, late: 0, excused: 0, attendanceRate: 94 },
     { sectionId: 'preview-ba312', courseCode: 'BA312', courseName: 'Business Analytics', total: 15, present: 14, absent: 1, late: 0, excused: 0, attendanceRate: 93 },
@@ -303,6 +432,21 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
   const overallAttendance = visibleAttendance.length > 0
     ? Math.round(visibleAttendance.reduce((sum, item) => sum + item.attendanceRate, 0) / visibleAttendance.length)
     : 0;
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Attendance" eyebrow="Current semester" subtitle="Your published attendance summary.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading attendance…' : 'Attendance unavailable'}
+          description={error ?? 'Retrieving your attendance records.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Attendance" eyebrow="Spring 2026" subtitle="Stay ahead of participation thresholds.">
       <Card tone="primary" style={styles.attendanceHero}>
@@ -312,7 +456,6 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
       </Card>
       <ScreenSpacer />
       <SectionHeading title="By course" actionLabel="Schedule" onAction={() => navigation.navigate('schedule')} />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
       {visibleAttendance.map((course) => (
         <Card key={course.sectionId} style={styles.attendanceCard}>
           <View style={styles.courseHeader}>
@@ -325,26 +468,33 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
           <ProgressBar value={course.attendanceRate} label={`${course.present} of ${course.total} records present`} tone="success" />
         </Card>
       ))}
-      {visibleAttendance.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No attendance records were found.</UiText></Card> : null}
+      {visibleAttendance.length === 0 ? <StatePanel kind="empty" title="No attendance records" description="Attendance summaries will appear after your lecturer publishes them." /> : null}
     </ScreenShell>
   );
 }
 
 export function RegistrationScreen({ navigation }: MobileScreenProps) {
-  const [liveSections, setLiveSections] = useState<MobileSection[]>([]);
-  const [enrollments, setEnrollments] = useState<MobileEnrollment[]>([]);
-  const [error, setError] = useState<string | null>(null);
   const [pending, setPending] = useState<string | null>(null);
-
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void Promise.all([campusApi.sections(), campusApi.enrollments()]).then(([sectionResponse, enrollmentResponse]) => {
-      setLiveSections(sectionResponse.data);
-      setEnrollments(enrollmentResponse);
-    }).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Registration data is unavailable.');
-    });
-  }, []);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const {
+    data: registrationData,
+    error,
+    isLoading,
+    reload,
+    setData: setRegistrationData,
+  } = useLiveResource<{ sections: MobileSection[]; enrollments: MobileEnrollment[] }>(
+    { sections: [], enrollments: [] },
+    async () => {
+      const [sectionResponse, enrollmentResponse] = await Promise.all([
+        campusApi.sections(),
+        campusApi.enrollments(),
+      ]);
+      return { sections: sectionResponse.data, enrollments: enrollmentResponse };
+    },
+    'Registration data is unavailable.',
+  );
+  const liveSections = registrationData.sections;
+  const enrollments = registrationData.enrollments;
 
   const availableSections = apiClient.mode === 'preview'
     ? [
@@ -368,22 +518,42 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
   const toggleEnrollment = async (sectionId: string) => {
     if (apiClient.mode === 'preview') return;
     setPending(sectionId);
-    setError(null);
+    setMutationError(null);
     try {
       const existing = enrollments.find((item) => item.sectionId === sectionId && item.status !== 'DROPPED');
       if (existing) {
         await campusApi.dropEnrollment(existing.id);
-        setEnrollments((current) => current.filter((item) => item.id !== existing.id));
+        setRegistrationData((current) => ({
+          ...current,
+          enrollments: current.enrollments.filter((item) => item.id !== existing.id),
+        }));
       } else {
         const next = await campusApi.enroll(sectionId);
-        setEnrollments((current) => [...current, next]);
+        setRegistrationData((current) => ({
+          ...current,
+          enrollments: [...current.enrollments, next],
+        }));
       }
     } catch (nextError) {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Enrollment could not be updated.');
+      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Enrollment could not be updated.');
     } finally {
       setPending(null);
     }
   };
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Registration" eyebrow="Course planning" subtitle="Review sections in the current registration round.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading registration…' : 'Registration unavailable'}
+          description={error ?? 'Retrieving sections and current enrollments.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
 
   return (
     <ScreenShell title="Registration" eyebrow="Course planning" subtitle="The next round closes in 4 days.">
@@ -402,7 +572,9 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
       </Card>
       <ScreenSpacer />
       <SectionHeading title="Recommended sections" />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
+      {mutationError ? (
+        <StatePanel kind="error" title="Could not update registration" description={mutationError} />
+      ) : null}
       {availableSections.map((section) => {
         const enrolled = enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
         const isPreview = apiClient.mode === 'preview';
@@ -428,28 +600,74 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         </Card>
         );
       })}
-      {availableSections.length === 0 && !error ? <Card tone="low"><UiText variant="bodySmall" tone="muted">No sections are available for registration.</UiText></Card> : null}
+      {availableSections.length === 0 ? <StatePanel kind="empty" title="No sections available" description="New sections will appear when the academic office publishes them." /> : null}
     </ScreenShell>
   );
 }
 
 export function NotificationsScreen({ navigation }: MobileScreenProps) {
-  const [liveNotifications, setLiveNotifications] = useState<MobileNotification[]>([]);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.notifications().then((response) => setLiveNotifications(response.data)).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Notifications are unavailable.');
-    });
-  }, []);
+  const [busyId, setBusyId] = useState<string | null>(null);
+  const [isMarkingAll, setIsMarkingAll] = useState(false);
+  const [mutationError, setMutationError] = useState<string | null>(null);
+  const {
+    data: liveNotifications,
+    error,
+    isLoading,
+    reload,
+    setData: setLiveNotifications,
+  } = useLiveResource<MobileNotification[]>(
+    [],
+    async () => (await campusApi.notifications()).data,
+    'Notifications are unavailable.',
+  );
   const visibleNotifications = apiClient.mode === 'preview'
     ? previewNotifications.map((item, index) => ({ id: String(index), title: item.title, message: item.subtitle, createdAt: item.meta, isRead: !item.unread }))
     : liveNotifications;
+
+  const markRead = async (id: string) => {
+    if (apiClient.mode === 'preview') return;
+    setBusyId(id);
+    setMutationError(null);
+    try {
+      await campusApi.markNotificationRead(id);
+      setLiveNotifications((current) => current.map((item) => (
+        item.id === id ? { ...item, isRead: true } : item
+      )));
+    } catch (nextError) {
+      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Notification could not be updated.');
+    } finally {
+      setBusyId(null);
+    }
+  };
+
   const markAllRead = async () => {
     if (apiClient.mode === 'preview') return;
-    await campusApi.markAllNotificationsRead();
-    setLiveNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+    setIsMarkingAll(true);
+    setMutationError(null);
+    try {
+      await campusApi.markAllNotificationsRead();
+      setLiveNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
+    } catch (nextError) {
+      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Notifications could not be updated.');
+    } finally {
+      setIsMarkingAll(false);
+    }
   };
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Notifications" eyebrow="Stay informed" subtitle="Account alerts and academic updates.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading notifications…' : 'Notifications unavailable'}
+          description={error ?? 'Retrieving your latest updates.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Notifications" eyebrow="Stay informed" subtitle="Unread items are marked clearly for continuity.">
       <Card tone="low" style={styles.notificationSummary}>
@@ -457,14 +675,18 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
         <UiText variant="bodySmall" tone="muted">Your next action is thesis registration.</UiText>
       </Card>
       <ScreenSpacer />
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
-      <Card>
+      {mutationError ? (
+        <StatePanel kind="error" title="Could not update notifications" description={mutationError} />
+      ) : null}
+      {visibleNotifications.length > 0 ? <Card>
         {visibleNotifications.map((notification, index) => (
-          <View key={notification.title}>
+          <View key={notification.id}>
             <ListRow
               leading={notification.isRead ? '·' : '•'}
               meta={notification.createdAt}
-              onPress={() => void (apiClient.mode === 'live' ? campusApi.markNotificationRead(notification.id) : Promise.resolve())}
+              onPress={apiClient.mode === 'live' && !notification.isRead && busyId !== notification.id
+                ? () => void markRead(notification.id)
+                : undefined}
               subtitle={notification.message}
               title={notification.title}
               unread={!notification.isRead}
@@ -472,27 +694,52 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
             {index < visibleNotifications.length - 1 ? <Divider /> : null}
           </View>
         ))}
-      </Card>
+      </Card> : (
+        <StatePanel kind="empty" title="No notifications" description="New account and academic updates will appear here." />
+      )}
       <ScreenSpacer />
-      <Button label="Mark all as read" onPress={() => void markAllRead()} variant="secondary" disabled={apiClient.mode === 'preview'} />
+      <Button
+        label="Mark all as read"
+        loading={isMarkingAll}
+        onPress={() => void markAllRead()}
+        variant="secondary"
+        disabled={apiClient.mode === 'preview' || visibleNotifications.every((item) => item.isRead)}
+      />
     </ScreenShell>
   );
 }
 
 export function ProfileScreen({ navigation, role }: MobileScreenProps) {
-  const [account, setAccount] = useState<AuthUser | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  useEffect(() => {
-    if (apiClient.mode !== 'live') return;
-    void campusApi.account().then(setAccount).catch((nextError) => {
-      setError(nextError instanceof ApiClientError ? nextError.message : 'Profile is unavailable.');
-    });
-  }, []);
+  const {
+    data: account,
+    error,
+    isLoading,
+    reload,
+  } = useLiveResource<AuthUser | null>(
+    null,
+    () => campusApi.account(),
+    'Profile is unavailable.',
+  );
   const displayName = apiClient.mode === 'preview'
     ? 'Nguyen Duc Minh'
     : [account?.firstName, account?.lastName].filter(Boolean).join(' ') || 'Student';
   const displayEmail = apiClient.mode === 'preview' ? 'minh.nguyen@ute.edu.vn' : account?.email ?? '—';
   const displayStudentId = apiClient.mode === 'preview' ? '2022SE0417' : account?.studentId ?? '—';
+
+  if (isLoading || error) {
+    return (
+      <ScreenShell title="Profile" eyebrow="Account" subtitle="Your identity and academic preferences.">
+        <StatePanel
+          kind={isLoading ? 'loading' : 'error'}
+          title={isLoading ? 'Loading profile…' : 'Profile unavailable'}
+          description={error ?? 'Retrieving your account details.'}
+          actionLabel={error ? 'Try again' : undefined}
+          onAction={error ? () => void reload() : undefined}
+        />
+      </ScreenShell>
+    );
+  }
+
   return (
     <ScreenShell title="Profile" eyebrow="Account" subtitle="Your identity and academic preferences.">
       <Card style={styles.profileHero}>
@@ -514,7 +761,6 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
         <Divider />
         <ListRow title="Account status" subtitle={apiClient.mode === 'preview' ? 'Preview' : 'Authenticated through Java API'} />
       </Card>
-      {error ? <UiText variant="bodySmall" tone="error">{error}</UiText> : null}
       <ScreenSpacer />
       <Card tone="low">
         <UiText variant="label">Need help?</UiText>

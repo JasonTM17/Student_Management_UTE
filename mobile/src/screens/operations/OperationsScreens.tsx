@@ -1,3 +1,4 @@
+import { useState } from 'react';
 import { StyleSheet, View } from 'react-native';
 
 import {
@@ -163,6 +164,8 @@ export function LecturerScheduleScreen({ navigation }: MobileScreenProps) {
 }
 
 export function LecturerGradingScreen({ navigation }: MobileScreenProps) {
+  const [actionStatus, setActionStatus] = useState<string | null>(null);
+
   return (
     <ScreenShell title="Gradebook" eyebrow="CS204 · Software Architecture" subtitle="Keep feedback clear before publishing.">
       <Card tone="primary" style={styles.gradingHero}>
@@ -190,8 +193,13 @@ export function LecturerGradingScreen({ navigation }: MobileScreenProps) {
         ))}
       </Card>
       <ScreenSpacer />
-      <Button label="Save draft grades" onPress={() => undefined} />
-      <Button label="Preview publish" onPress={() => undefined} variant="secondary" style={styles.secondaryButton} />
+      {actionStatus ? (
+        <View accessibilityLiveRegion="polite" style={styles.actionStatus}>
+          <UiText variant="bodySmall" tone="success">{actionStatus}</UiText>
+        </View>
+      ) : null}
+      <Button label="Save preview draft" onPress={() => setActionStatus('Preview draft saved on this device.')} />
+      <Button label="Review publish summary" onPress={() => setActionStatus('Publish summary ready. No academic records were changed.')} variant="secondary" style={styles.secondaryButton} />
     </ScreenShell>
   );
 }
@@ -245,5 +253,6 @@ const styles = StyleSheet.create({
   gradingHero: { padding: tokens.spacing.lg },
   courseHeader: { alignItems: 'flex-start', flexDirection: 'row', justifyContent: 'space-between' },
   secondaryButton: { marginTop: tokens.spacing.sm },
+  actionStatus: { backgroundColor: '#EDF8F1', borderColor: '#B8DEC7', borderLeftColor: tokens.colors.success, borderLeftWidth: 3, borderRadius: tokens.radii.control, borderWidth: 1, marginBottom: tokens.spacing.sm, padding: tokens.spacing.sm },
   attendanceSummary: { padding: tokens.spacing.md },
 });

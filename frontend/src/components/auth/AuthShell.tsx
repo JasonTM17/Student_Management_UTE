@@ -36,40 +36,42 @@ export function AuthShell({
 
   return (
     <div className="min-h-screen bg-background">
-      <div className="grid min-h-screen lg:grid-cols-[1.05fr_0.95fr]">
-        <section className="hidden border-r border-border/80 bg-[hsl(var(--canvas-subtle))] lg:flex">
+      <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
+        <section className="portal-sidebar relative hidden overflow-hidden border-r border-white/10 lg:flex">
           <div className="flex w-full items-center px-10 py-12 xl:px-16">
-            <div className="mx-auto max-w-xl space-y-10">
+            <div className="mx-auto w-full max-w-xl space-y-10">
               <BrandMark
                 href="/"
                 subtitle={messages.authShell.desktopSubtitle}
-                markClassName="bg-[hsl(var(--foreground))] text-[hsl(var(--background))]"
+                markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+                titleClassName="text-[var(--portal-sidebar-text)]"
+                subtitleClassName="text-[var(--portal-sidebar-muted)]"
               />
-              <div className="space-y-4">
-                <SectionEyebrow>{eyebrow}</SectionEyebrow>
-                <h1 className="max-w-lg text-5xl font-semibold tracking-tight text-foreground">
+              <div className="space-y-4 border-l-4 border-[var(--portal-yellow)] pl-6">
+                <SectionEyebrow className="text-[var(--portal-yellow)]">{eyebrow}</SectionEyebrow>
+                <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-[2.75rem]">
                   {title}
                 </h1>
-                <p className="max-w-lg text-base leading-7 text-muted-foreground">
+                <p className="max-w-lg text-base leading-7 text-[var(--portal-sidebar-muted)]">
                   {description}
                 </p>
               </div>
-              <div className="grid gap-4">
+              <div className="divide-y divide-white/10 border-y border-white/10">
                 {features.map((feature, index) => (
                   <div
                     key={feature.label}
-                    className="grid grid-cols-[40px_1fr] gap-4 rounded-lg border border-border/70 bg-card/80 px-5 py-4 shadow-sm"
+                    className="grid grid-cols-[2rem_1fr] gap-4 py-4"
                   >
-                    <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
-                      <span className="text-sm font-semibold">
+                    <div className="flex h-8 w-8 items-center justify-center border border-white/15 text-[var(--portal-yellow)]">
+                      <span className="text-xs font-semibold">
                         {String(index + 1).padStart(2, '0')}
                       </span>
                     </div>
                     <div className="space-y-1">
-                      <h2 className="text-sm font-semibold text-foreground">
+                      <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
                         {feature.label}
                       </h2>
-                      <p className="text-sm leading-6 text-muted-foreground">
+                      <p className="text-sm leading-6 text-[var(--portal-sidebar-muted)]">
                         {feature.description}
                       </p>
                     </div>
@@ -80,13 +82,13 @@ export function AuthShell({
           </div>
         </section>
 
-        <section className="relative flex items-center justify-center px-5 py-10 sm:px-8 lg:px-10">
+        <section className="relative flex items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
           <div className="absolute right-4 top-4 flex items-center gap-2 sm:right-6 sm:top-6">
             <LanguageToggle />
             <ThemeToggle />
           </div>
-          <div className={cn('w-full max-w-lg space-y-8', className)}>
-            <div className="lg:hidden">
+          <div className={cn('w-full max-w-md space-y-8 border-0 bg-transparent p-0 sm:rounded-md sm:border sm:border-border/80 sm:bg-card sm:p-8 sm:panel-shadow', className)}>
+            <div className="border-b border-border/70 pb-6 lg:hidden">
               <BrandMark href="/" subtitle={messages.authShell.mobileSubtitle} />
             </div>
             {children}

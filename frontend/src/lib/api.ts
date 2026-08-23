@@ -417,14 +417,6 @@ export const enrollmentsApi = {
     return response.data;
   },
 
-  update: async (
-    id: string,
-    data: { status?: string; finalGrade?: number; letterGrade?: string },
-  ): Promise<Enrollment> => {
-    const response = await api.put<Enrollment>(`/enrollments/${id}`, data);
-    return response.data;
-  },
-
   delete: async (id: string): Promise<{ message: string }> => {
     const response = await api.delete<{ message: string }>(
       `/enrollments/${id}`,

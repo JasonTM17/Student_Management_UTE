@@ -19,6 +19,7 @@ import org.springframework.transaction.annotation.Transactional;
 public class AdminCatalogMutationService {
 
     private static final String DEPARTMENT = "\"academic\".\"Department\"";
+    private static final String ACADEMIC_YEAR = "\"academic\".\"AcademicYear\"";
     private static final String SEMESTER = "\"academic\".\"Semester\"";
     private static final String COURSE = "\"academic\".\"Course\"";
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
@@ -41,6 +42,23 @@ public class AdminCatalogMutationService {
                         + " VALUES (:id, :name, :nameEn, :nameVi, :code, :description, :facultyId)",
                 params(input, id).addValue("facultyId", facultyId));
         return get(DEPARTMENT, id);
+    }
+
+    @Transactional
+    public Map<String, Object> createAcademicYear(Map<String, Object> input) {
+        String id = id(input);
+        jdbc.update(
+                "INSERT INTO " + ACADEMIC_YEAR
+                        + " (\"id\", \"year\", \"startDate\", \"endDate\", \"isCurrent\")"
+                        + " VALUES (:id, :year, CAST(:startDate AS TIMESTAMPTZ),"
+                        + " CAST(:endDate AS TIMESTAMPTZ), :isCurrent)",
+                new MapSqlParameterSource()
+                        .addValue("id", id)
+                        .addValue("year", number(input, "year", java.time.Year.now().getValue()))
+                        .addValue("startDate", required(input, "startDate"))
+                        .addValue("endDate", required(input, "endDate"))
+                        .addValue("isCurrent", Boolean.parseBoolean(text(input, "isCurrent", "false"))));
+        return get(ACADEMIC_YEAR, id);
     }
 
     @Transactional
@@ -125,7 +143,12 @@ public class AdminCatalogMutationService {
                 sql.append(", ");
             }
             first = false;
-            sql.append(entry.getValue()).append(" = :").append(entry.getKey());
+            sql.append(entry.getValue()).append(" = ");
+            if (isTimestampField(table, entry.getKey())) {
+                sql.append("CAST(:").append(entry.getKey()).append(" AS TIMESTAMPTZ)");
+            } else {
+                sql.append(':').append(entry.getKey());
+            }
             parameters.addValue(entry.getKey(), input.get(entry.getKey()));
         }
         if (first) {
@@ -157,7 +180,10 @@ public class AdminCatalogMutationService {
 
     private static Map<String, String> allowedColumns(String table) {
         Map<String, String> columns = new LinkedHashMap<>();
-        if (DEPARTMENT.equals(table)) {
+        if (ACADEMIC_YEAR.equals(table)) {
+            columns.put("year", "\"year\""); columns.put("startDate", "\"startDate\"");
+            columns.put("endDate", "\"endDate\""); columns.put("isCurrent", "\"isCurrent\"");
+        } else if (DEPARTMENT.equals(table)) {
             columns.put("name", "\"name\""); columns.put("nameEn", "\"nameEn\""); columns.put("nameVi", "\"nameVi\"");
             columns.put("code", "\"code\""); columns.put("description", "\"description\""); columns.put("facultyId", "\"facultyId\"");
         } else if (COURSE.equals(table)) {
@@ -179,6 +205,16 @@ public class AdminCatalogMutationService {
             throw new IllegalArgumentException("Unsupported catalog resource");
         }
         return columns;
+    }
+
+    private static boolean isTimestampField(String table, String field) {
+        if (ACADEMIC_YEAR.equals(table)) {
+            return "startDate".equals(field) || "endDate".equals(field);
+        }
+        return SEMESTER.equals(table) && ("registrationStart".equals(field)
+                || "registrationEnd".equals(field)
+                || "addDropStart".equals(field)
+                || "addDropEnd".equals(field));
     }
 
     private static MapSqlParameterSource params(Map<String, Object> input, String id) {
