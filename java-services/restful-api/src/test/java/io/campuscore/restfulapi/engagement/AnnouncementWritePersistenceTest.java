@@ -24,7 +24,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.engagement-write.enabled=true",
         "spring.flyway.enabled=false"
 })
 class AnnouncementWritePersistenceTest {

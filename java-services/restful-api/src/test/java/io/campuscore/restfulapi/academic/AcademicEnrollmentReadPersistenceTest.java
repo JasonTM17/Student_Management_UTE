@@ -26,8 +26,6 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.academic-enrollment-read.enabled=true",
-        "migration.academic-read.enabled=true",
         "spring.flyway.enabled=false",
         "spring.datasource.url=jdbc:h2:mem:enrollment_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })

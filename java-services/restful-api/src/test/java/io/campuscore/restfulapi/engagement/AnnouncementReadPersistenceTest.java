@@ -26,7 +26,6 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "migration.engagement-read.enabled=true",
         "spring.flyway.enabled=false"
 })
 class AnnouncementReadPersistenceTest {

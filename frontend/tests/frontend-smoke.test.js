@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 
@@ -21,6 +22,16 @@ function walk(relativeDirectory) {
     }
   }
   return files;
+}
+
+function loadTypeScriptModule(relativePath) {
+  const source = read(relativePath);
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const loadedModule = { exports: {} };
+  Function('module', 'exports', output)(loadedModule, loadedModule.exports);
+  return loadedModule.exports;
 }
 
 test('the retained portal surfaces are present', () => {
@@ -45,6 +56,20 @@ test('the web client has one Java API boundary and no removed domain client', ()
   assert.doesNotMatch(apiSource, /forgot-password|reset-password|verify-email|resend-verification/);
   assert.doesNotMatch(nextConfig, /LOCAL_EDGE_ORIGIN|socket\.io|redis|rabbitmq/i);
   assert.match(nextConfig, /JAVA_API_ORIGIN/);
+});
+
+test('the Java API proxy preserves query parameters and encodes path segments', () => {
+  const { buildApiProxyUrl } = loadTypeScriptModule('src/lib/proxy-url.ts');
+  const upstreamUrl = buildApiProxyUrl(
+    'http://127.0.0.1:4010/',
+    ['sections', 'course with spaces'],
+    '?semesterId=semester-demo&page=2&search=REST%20API',
+  );
+
+  assert.equal(
+    upstreamUrl.toString(),
+    'http://127.0.0.1:4010/api/v1/sections/course%20with%20spaces?semesterId=semester-demo&page=2&search=REST%20API',
+  );
 });
 
 test('assistant UI exposes provenance and degraded state', () => {
