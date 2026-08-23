@@ -10,7 +10,7 @@ import org.springframework.beans.factory.annotation.Value;
 import org.springframework.http.ResponseCookie;
 import org.springframework.stereotype.Component;
 
-/** Emits the shared browser cookie contract used by the legacy Nest services. */
+/** Emits the browser cookie contract used by the Java API and Next.js client. */
 @Component
 public class SessionCookieService {
 

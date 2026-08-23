@@ -4,7 +4,6 @@ import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.thesis.service.ThesisRoundReadService;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -13,7 +12,6 @@ import org.springframework.web.bind.annotation.RestController;
 
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.thesis-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/thesis/rounds")
 public class ThesisRoundReadController {
 

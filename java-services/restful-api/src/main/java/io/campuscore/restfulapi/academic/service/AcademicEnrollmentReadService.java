@@ -33,7 +33,6 @@ import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -43,7 +42,6 @@ import org.springframework.web.server.ResponseStatusException;
 /** Read-only service for academic enrollment, grade and transcript views. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-enrollment-read", name = "enabled", havingValue = "true")
 public class AcademicEnrollmentReadService {
     public static final int MAX_PAGE_SIZE = 100;
 

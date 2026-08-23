@@ -30,7 +30,6 @@ import org.springframework.security.web.SecurityFilterChain;
 import org.springframework.security.web.access.AccessDeniedHandler;
 import org.springframework.security.web.AuthenticationEntryPoint;
 import org.springframework.security.oauth2.server.resource.web.authentication.BearerTokenAuthenticationFilter;
-import org.springframework.security.web.util.matcher.AntPathRequestMatcher;
 
 @Configuration
 @EnableMethodSecurity
@@ -74,19 +73,16 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/auth/login",
+                                "/api/v1/auth/register",
                                 "/api/v1/auth/refresh",
+                                "/api/v1/contract",
                                 "/api/v1/health/**",
                                 "/error",
                                 "/actuator/health/**",
-                                "/actuator/prometheus",
                                 "/api/docs/**",
-                                "/api/docs/openapi.json",
+                                "/swagger-ui.html",
+                                "/swagger-ui/**",
                                 "/v3/api-docs/**")
-                        .permitAll()
-                        .requestMatchers(
-                                new AntPathRequestMatcher("/api/v1/internal/academic-context/curricula/**", "GET"),
-                                new AntPathRequestMatcher("/api/v1/internal/academic-context/departments/**", "GET"),
-                                new AntPathRequestMatcher("/api/v1/internal/academic-context/students/*/enrollments", "GET"))
                         .permitAll()
                         .anyRequest()
                         .authenticated())

@@ -1,7 +1,0 @@
-apiVersion: v1
-kind: ConfigMap
-metadata:
-  name: campuscore-shared-env
-data:
-  FRONTEND_URL: https://replace-with-real-prod-host.example.com
-

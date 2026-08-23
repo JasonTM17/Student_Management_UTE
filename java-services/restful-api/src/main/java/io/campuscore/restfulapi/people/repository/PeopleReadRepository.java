@@ -14,23 +14,15 @@ import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Read adapter for the Prisma-owned people schema.
- *
- * <p>This candidate deliberately uses SELECTs only. People create/update/delete
- * operations, enrollment hydration, events and route ownership stay with the
- * legacy Nest people-service until data parity, canary and rollback gates pass.</p>
- */
+/** Read adapter for student and lecturer records in the course database. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.people-read", name = "enabled", havingValue = "true")
 public class PeopleReadRepository {
 
     private static final String STUDENT_TABLE = "\"people\".\"Student\"";

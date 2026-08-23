@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only academic attendance candidate. */
+/** DTOs for academic attendance reads. */
 public final class AcademicAttendanceReadDtos {
     private AcademicAttendanceReadDtos() {
     }

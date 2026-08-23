@@ -1,49 +1,23 @@
 # RESTful API consolidation decision
 
-> Trạng thái: **định hướng đã chốt, chưa cutover**.
+Trạng thái: **course runtime đã thu gọn, còn chờ terminal verification và
+merge vào `main`**.
 
-CampusCore sẽ giảm độ phức tạp backend cho phạm vi môn học bằng một ứng dụng
-Java Spring Boot RESTful API duy nhất. Ứng dụng này là modular monolith: code
-được chia package theo domain để dễ duy trì, nhưng không vận hành thành nhiều
-backend container.
+CampusCore vận hành một Java Spring Boot RESTful API duy nhất. API sở hữu
+toàn bộ `/api/v1`; không còn service sibling, gateway hoặc runtime adapter.
+Next.js và Expo dùng chung OpenAPI contract, còn PostgreSQL local là nguồn dữ
+liệu duy nhất.
 
-Từ wave backend-first, `java-services/pom.xml` là canonical Maven reactor và
-chỉ build `java-services/restful-api`. Các Java service sibling cũ vẫn giữ làm
-nguồn shadow/rollback, nhưng chỉ được build trực tiếp theo child `pom.xml`; chúng
-không phải module canonical, image release, hay route owner mới.
+Phạm vi gồm auth, people, academic catalog, sections, enrollment, grades,
+schedules, announcements, notifications, thesis core và assistant lexical RAG.
+Finance, analytics, support, realtime, external AI, Redis, RabbitMQ, MinIO,
+Nginx và Kubernetes là non-goal của đồ án.
 
-## Mô hình đích
+Schema mới được Flyway sở hữu trên database fresh. Không đọc schema legacy và
+không migrate dữ liệu cũ. Assistant chỉ truy vấn knowledge corpus curated,
+giới hạn top-k, có locale fallback, citation và reason code cho no-match hoặc
+database outage.
 
-- `restful-api`: một JAR/container Java 21 duy nhất, chứa auth, academic,
-  people, enrollment/grades, finance, engagement, notification, analytics,
-  thesis và chatbot adapter.
-- `frontend`: Next.js giữ Stitch design system và gọi `/api/v1`.
-- `mobile`: Expo/React Native dùng chung API; responsive web không được tính là
-  native mobile app.
-- PostgreSQL: một cluster và một migration owner. Logical schema theo domain
-  được giữ trong wave đầu để tránh merge dữ liệu mạo hiểm.
-
-Chatbot không phải một microservice bắt buộc. Nó là module server-side với mock
-provider mặc định, provider thật tùy chọn, timeout/rate limit/fallback/redaction
-và không có quyền truy cập DB trực tiếp.
-
-## Vì sao chưa xoá microservices
-
-Topology hiện tại còn các hợp đồng cần bảo toàn: cookie/CSRF/JWT, Socket.IO,
-Prisma migrations, file storage, payment/idempotency, queue/cache và các schema
-PostgreSQL. Vì vậy service cũ được giữ làm rollback source trong từng wave.
-
-Thứ tự chuyển đổi là: freeze contract → Java shell → thesis/engagement →
-notification REST polling → academic/people/enrollment → analytics → finance →
-auth cuối cùng → canary/rollback → retirement. Mỗi wave chỉ có một canonical
-writer.
-
-## Phạm vi demo tối giản
-
-Profile môn học nên khởi động với API, frontend và PostgreSQL. Redis, MinIO,
-observability và provider AI chỉ bật bằng profile khi flow cụ thể cần chúng.
-Không vì thế mà xóa cấu hình legacy; profile mới phải được kiểm chứng độc lập
-trước khi thay thế topology cũ.
-
-Chi tiết Outcome Contract, acceptance gates và rollback nằm tại
-`plans/20260819-restful-api-consolidation/plan.md`.
+Mọi claim release phải dựa trên một SHA sạch và được Advisor, Kongming, Wukong,
+exact-head reviewer và Stitch kiểm tra lại. Đây là local/course demo
+reproducible, không phải production cutover.

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { Bell, BookMarked, BookOpen, Calendar, ClipboardList, CreditCard, FileText, GraduationCap, TrendingUp } from 'lucide-react';
+import { Bell, BookMarked, BookOpen, Calendar, ClipboardList, FileText, GraduationCap, TrendingUp } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
@@ -50,11 +50,6 @@ const quickActions = [
     href: '/dashboard/grades',
     icon: TrendingUp,
     tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-400',
-  },
-  {
-    href: '/dashboard/invoices',
-    icon: CreditCard,
-    tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
   },
 ];
 

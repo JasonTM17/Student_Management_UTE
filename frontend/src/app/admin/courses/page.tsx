@@ -191,7 +191,7 @@ export default function AdminCoursesPage() {
           unavailableTitle: 'Môn học chưa sẵn sàng',
           emptyTitle: 'Không có môn học phù hợp',
           emptyDescription:
-            'Hãy tạo môn học để section, đăng ký và tài chính cùng dùng một nguồn catalog rõ ràng.',
+            'Hãy tạo môn học để lớp học phần và đăng ký cùng dùng một nguồn catalog rõ ràng.',
           tableTitle: 'Bản ghi môn học',
           headers: {
             code: 'Mã',
@@ -237,7 +237,7 @@ export default function AdminCoursesPage() {
           unavailableTitle: 'Courses unavailable',
           emptyTitle: 'No matching courses',
           emptyDescription:
-            'Create a course so sections, registration, and finance flows inherit a clean catalog source.',
+            'Create a course so sections and registration share a clean catalog source.',
           tableTitle: 'Course records',
           headers: {
             code: 'Code',

@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.academic.web;
 
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only academic schedule candidate. */
+/** DTOs for academic schedule reads. */
 public final class AcademicScheduleReadDtos {
     private AcademicScheduleReadDtos() {
     }

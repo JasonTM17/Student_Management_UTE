@@ -1,69 +1,12 @@
-# Dependencies
-node_modules
-backend/node_modules
-auth-service/node_modules
-frontend/node_modules
-notification-service/node_modules
-finance-service/node_modules
-academic-service/node_modules
-engagement-service/node_modules
-people-service/node_modules
-analytics-service/node_modules
-packages/platform-auth/node_modules
-npm-debug.log
-
-# Build outputs
-dist
-.next
-out
-build
-backend/dist
-auth-service/dist
-auth-service/coverage
-auth-service/test-results
-frontend/.next
-frontend/test-results
-frontend/playwright-report
-notification-service/dist
-notification-service/coverage
-notification-service/test-results
-finance-service/dist
-finance-service/coverage
-finance-service/test-results
-academic-service/dist
-academic-service/coverage
-academic-service/test-results
-engagement-service/dist
-engagement-service/coverage
-engagement-service/test-results
-people-service/dist
-people-service/coverage
-people-service/test-results
-analytics-service/dist
-analytics-service/coverage
-analytics-service/test-results
-
-# Environment files
-.env
-.env.local
-.env.production
-
-# IDE
-.idea
-.vscode
-
-# OS
-.DS_Store
-Thumbs.db
-
-# Logs
-logs
-*.log
-
-# Git
+**/node_modules
+**/.next
+**/dist
+**/target
+**/coverage
+**/test-results
 .git
-.gitignore
-
-# Misc
-README.md
-LICENSE
+.env
+.env.*
+!.env.example
+plans/**/assets
+*.log

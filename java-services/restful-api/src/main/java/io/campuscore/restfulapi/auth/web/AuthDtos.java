@@ -7,7 +7,7 @@ import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible auth DTOs for the Java login candidate. */
+/** Authentication and account DTOs for web and mobile clients. */
 public final class AuthDtos {
 
     private AuthDtos() {
@@ -16,6 +16,17 @@ public final class AuthDtos {
     public record LoginRequest(
             @NotBlank @Email String email,
             @NotBlank String password) {
+    }
+
+    public record RegisterRequest(
+            @NotBlank @Email String email,
+            @NotBlank @Size(min = 8, max = 200) String password,
+            @NotBlank @Size(max = 120) String firstName,
+            @NotBlank @Size(max = 120) String lastName,
+            @Size(max = 80) String phone,
+            @Size(max = 40) String gender,
+            String dateOfBirth,
+            @Size(max = 500) String address) {
     }
 
     public record RefreshRequest(String refreshToken) {

@@ -4,7 +4,6 @@ import io.campuscore.restfulapi.notification.service.NotificationReadService;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationListResponse;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.NotificationResponse;
 import io.campuscore.restfulapi.notification.web.NotificationReadDtos.UnreadCountResponse;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -15,13 +14,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-flagged, read-only notification boundary. Legacy mutation, realtime
- * delivery and public ownership remain owned by the notification service.
- */
+/** Notification inbox query routes owned by the Java API. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.notifications-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/notifications")
 public class NotificationReadController {
 

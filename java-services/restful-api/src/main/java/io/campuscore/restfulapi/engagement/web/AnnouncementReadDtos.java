@@ -4,7 +4,7 @@ import com.fasterxml.jackson.annotation.JsonFormat;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible response records for the read-only announcement candidate. */
+/** Response records for announcements. */
 public final class AnnouncementReadDtos {
 
     private AnnouncementReadDtos() {

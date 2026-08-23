@@ -18,17 +18,15 @@ import java.time.LocalDate;
 import java.time.ZoneOffset;
 import java.time.format.DateTimeParseException;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-only service for the academic attendance strangler slice. */
+/** Academic attendance query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-attendance-read", name = "enabled", havingValue = "true")
 public class AcademicAttendanceReadService {
     public static final int MAX_PAGE_SIZE = 100;
 

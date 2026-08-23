@@ -9,7 +9,7 @@ import jakarta.persistence.Table;
 import java.time.Instant;
 import java.util.UUID;
 
-/** Read model for the legacy-compatible thesis registration-round schema. */
+/** Domain model for a thesis registration round. */
 @Entity
 @Table(name = "thesis_registration_round", schema = "thesis")
 public class ThesisRegistrationRound {

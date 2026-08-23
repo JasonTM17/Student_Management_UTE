@@ -15,23 +15,15 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Read adapter for the Prisma-owned engagement announcement table.
- *
- * <p>This candidate deliberately has no JPA entity, Flyway migration, or
- * mutation statement. Schema ownership and all writes remain with the legacy
- * engagement service.</p>
- */
+/** JDBC read adapter for announcements in the course database. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.engagement-read", name = "enabled", havingValue = "true")
 public class AnnouncementReadRepository {
 
     private static final String TABLE = "\"engagement\".\"Announcement\"";

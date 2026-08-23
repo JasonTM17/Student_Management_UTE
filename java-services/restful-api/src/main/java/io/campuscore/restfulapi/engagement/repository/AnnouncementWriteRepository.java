@@ -17,23 +17,15 @@ import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/**
- * Feature-gated announcement write adapter for the Java monolith.
- *
- * <p>This is a bounded source candidate only. The legacy engagement service
- * remains the public route owner, RabbitMQ publisher and rollback target until
- * PostgreSQL parity, canary and rollback gates pass.</p>
- */
+/** PostgreSQL write adapter for announcements owned by the Java API. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.engagement-write", name = "enabled", havingValue = "true")
 public class AnnouncementWriteRepository {
 
     private static final String TABLE = "\"engagement\".\"Announcement\"";

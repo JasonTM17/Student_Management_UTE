@@ -28,15 +28,11 @@ import org.springframework.test.web.servlet.MockMvc;
 @TestPropertySource(properties = {
         "migration.academic-read.enabled=true",
         "migration.academic-enrollment-read.enabled=true",
-        "migration.academic-context.enabled=true",
-        "INTERNAL_SERVICE_TOKEN=academic-internal-token-12345",
         "spring.flyway.enabled=false"
 })
 class AcademicReadPersistenceTest {
 
     private static final Instant BASE_TIME = Instant.parse("2026-08-20T00:00:00Z");
-    private static final String SERVICE_TOKEN = "academic-internal-token-12345";
-
     @Autowired
     private JdbcTemplate jdbc;
 
@@ -495,26 +491,6 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.courses[1].id").value("curriculum-course-1"))
                 .andExpect(jsonPath("$.courses[1].isMandatory").value(true));
 
-        mvc.perform(get("/api/v1/internal/academic-context/curricula/curriculum-cs"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("HTTP_403"));
-
-        mvc.perform(get("/api/v1/internal/academic-context/curricula/curriculum-cs")
-                        .header("X-Service-Token", "wrong-token"))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("HTTP_403"));
-
-        mvc.perform(get("/api/v1/internal/academic-context/curricula/curriculum-cs")
-                        .header("X-Service-Token", SERVICE_TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("curriculum-cs"))
-                .andExpect(jsonPath("$.department.id").value("department-cs"));
-
-        mvc.perform(get("/api/v1/internal/academic-context/departments/department-cs")
-                        .header("X-Service-Token", SERVICE_TOKEN))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.id").value("department-cs"))
-                .andExpect(jsonPath("$.code").value("CSE"));
     }
 
     @Test

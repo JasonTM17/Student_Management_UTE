@@ -1,4 +1,5 @@
 import { Pressable, ScrollView, StyleSheet, View } from 'react-native';
+import { MaterialCommunityIcons } from '@expo/vector-icons';
 
 import { tokens } from '../design/tokens';
 import {
@@ -16,9 +17,10 @@ interface MenuPanelProps {
   onClose(): void;
   onNavigate(route: ScreenName): void;
   onSwitchRole(role: UserRole): void;
+  allowRoleSwitch: boolean;
 }
 
-export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole }: MenuPanelProps) {
+export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole, allowRoleSwitch }: MenuPanelProps) {
   return (
     <View style={styles.overlay}>
       <Pressable accessibilityLabel="Close menu" onPress={onClose} style={styles.backdrop} />
@@ -33,11 +35,12 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
           <Button label="Close" onPress={onClose} variant="text" />
         </View>
 
-        <UiText variant="label" tone="muted" style={styles.roleLabel}>
-          Preview role
-        </UiText>
-        <View style={styles.roleRow}>
-          {(['student', 'lecturer', 'admin'] as const).map((candidate) => (
+        {allowRoleSwitch ? (
+          <><UiText variant="label" tone="muted" style={styles.roleLabel}>
+            Preview role
+          </UiText>
+          <View style={styles.roleRow}>
+            {(['student', 'lecturer', 'admin'] as const).map((candidate) => (
             <Pressable
               key={candidate}
               accessibilityRole="button"
@@ -49,8 +52,9 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
                 {candidate[0].toUpperCase() + candidate.slice(1)}
               </UiText>
             </Pressable>
-          ))}
-        </View>
+            ))}
+          </View></>
+        ) : null}
 
         <ScrollView showsVerticalScrollIndicator={false} contentContainerStyle={styles.menuContent}>
           {menuSections.map((section) => {
@@ -76,16 +80,16 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
                       style={[styles.menuItem, active ? styles.menuItemActive : undefined]}
                     >
                       <View style={styles.menuIcon}>
-                        <UiText variant="label" tone={active ? 'primary' : 'muted'}>
-                          {screen.icon}
-                        </UiText>
+                        <MaterialCommunityIcons
+                          color={active ? tokens.colors.primary : tokens.colors.textMuted}
+                          name={screen.icon}
+                          size={19}
+                        />
                       </View>
                       <UiText variant="bodySmall" style={styles.menuLabel}>
                         {screen.title}
                       </UiText>
-                      <UiText variant="bodyMedium" tone="muted">
-                        ›
-                      </UiText>
+                      <MaterialCommunityIcons color={tokens.colors.textMuted} name="chevron-right" size={20} />
                     </Pressable>
                   );
                 })}
@@ -94,7 +98,7 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
           })}
           <UiText variant="bodySmall" tone="muted" style={styles.menuNote}>
             {getScreenDefinition(activeRoute)?.family === 'operations'
-              ? 'Operations routes are preview-only in this scaffold.'
+              ? 'Operations screens are available only in explicit preview mode.'
               : 'Choose a screen to continue your academic workflow.'}
           </UiText>
         </ScrollView>

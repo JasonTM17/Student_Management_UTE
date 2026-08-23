@@ -1,15 +1,12 @@
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 
-type StatusVariant = 'default' | 'approval' | 'council';
+type StatusVariant = 'default' | 'approval';
 
 const STATUS_CLASS_MAP: Record<StatusVariant, Record<string, string>> = {
   default: {
     APPROVED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    RESULTS_PUBLISHED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
     PROPOSALS_PUBLISHED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    FINALIZED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    SCHEDULED: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300',
     REJECTED: 'bg-red-500/12 text-red-700 dark:text-red-300',
     CANCELLED: 'bg-red-500/12 text-red-700 dark:text-red-300',
   },
@@ -17,13 +14,6 @@ const STATUS_CLASS_MAP: Record<StatusVariant, Record<string, string>> = {
     APPROVED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
     REJECTED: 'bg-red-500/12 text-red-700 dark:text-red-300',
     PENDING: 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
-  },
-  council: {
-    FINALIZED: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    SCHEDULED: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300',
-    SCORING_OPEN: 'bg-violet-500/12 text-violet-700 dark:text-violet-300',
-    DRAFT: 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
-    CANCELLED: 'bg-red-500/12 text-red-700 dark:text-red-300',
   },
 };
 

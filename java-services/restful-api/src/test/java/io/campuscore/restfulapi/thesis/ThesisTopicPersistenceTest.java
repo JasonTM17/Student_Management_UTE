@@ -2,6 +2,8 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -22,6 +24,8 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 
@@ -30,7 +34,7 @@ import static org.junit.jupiter.api.Assertions.assertEquals;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "migration.thesis-read.enabled=true",
-        "spring.datasource.url=jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
+        "spring.datasource.url=jdbc:h2:mem:restful_api_thesis;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.flyway.enabled=true",
@@ -49,12 +53,12 @@ class ThesisTopicPersistenceTest {
 
     @BeforeEach
     void cleanDatabase() {
-        jdbc.update("DELETE FROM thesis.thesis_council_member");
-        jdbc.update("DELETE FROM thesis.thesis_defense_council");
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
         topics.deleteAll();
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
+        jdbc.update("DELETE FROM auth.\"Student\" WHERE \"id\" LIKE 'test-member-%'");
+        jdbc.update("DELETE FROM auth.\"User\" WHERE \"id\" LIKE 'test-user-%'");
     }
 
     @Test
@@ -132,7 +136,7 @@ class ThesisTopicPersistenceTest {
         insertMember(newerGroup, roundId, secondMember, 2);
         insertMember(newerGroup, roundId, firstMember, 1);
 
-        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(jwt()))
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(newerGroup.toString()))
                 .andExpect(jsonPath("$[0].topicId").doesNotExist())
@@ -141,74 +145,71 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$[0].memberStudentIds[1]").value(secondMember.toString()))
                 .andExpect(jsonPath("$[1].id").value(olderGroup.toString()));
 
-        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", UUID.randomUUID().toString()).with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
-        mvc.perform(get("/api/v1/thesis/groups/{id}", UUID.randomUUID()).with(jwt()))
+        mvc.perform(get("/api/v1/thesis/groups/{id}", UUID.randomUUID()).with(adminJwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Thesis group not found"));
+    }
+
+    @Test
+    void studentGroupReadsAreLimitedToMembershipWhileStaffCanReadTheRound() throws Exception {
+        UUID roundId = insertRound();
+        UUID studentId = UUID.randomUUID();
+        UUID ownGroup = insertGroup(
+                roundId,
+                Instant.parse("2026-01-03T00:00:00Z"),
+                studentId,
+                null,
+                "DRAFT",
+                "PENDING",
+                null);
+        UUID otherGroup = insertGroup(
+                roundId,
+                Instant.parse("2026-01-02T00:00:00Z"),
+                UUID.randomUUID(),
+                null,
+                "DRAFT",
+                "PENDING",
+                null);
+        insertMember(ownGroup, roundId, studentId, 1);
+
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt(studentId.toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(1))
+                .andExpect(jsonPath("$[0].id").value(ownGroup.toString()));
+
+        mvc.perform(get("/api/v1/thesis/groups/{id}", otherGroup)
+                        .with(studentJwt(studentId.toString())))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("THESIS_GROUP_NOT_FOUND"));
+
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(lecturerJwt("lecturer-user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
     void groupsAllowAnEmptyExistingRoundAndRejectMalformedOrAnonymousRequests() throws Exception {
         UUID roundId = insertRound();
 
-        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(jwt()))
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isEmpty());
-        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", "not-a-uuid").with(jwt()))
+        mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", "not-a-uuid").with(adminJwt()))
                 .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.statusCode").value(400))
-                .andExpect(jsonPath("$.message").value("Invalid request parameter"));
+                .andExpect(jsonPath("$.status").value(400))
+                .andExpect(jsonPath("$.message").value("Request could not be parsed"));
         mvc.perform(get("/api/v1/thesis/groups").queryParam("roundId", roundId.toString()))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
-    }
-
-    @Test
-    void councilsPreservePostgresSortMemberOrderNullableFieldsAndReadBoundaries() throws Exception {
-        UUID roundId = insertRound();
-        UUID firstCouncil = insertCouncil(roundId, Instant.parse("2026-05-10T09:00:00Z"), "A-101", "SCHEDULED");
-        UUID secondCouncil = insertCouncil(roundId, Instant.parse("2026-05-11T09:00:00Z"), "A-102", "SCORING_OPEN");
-        UUID unscheduledCouncil = insertCouncil(roundId, null, null, "DRAFT");
-        UUID firstLecturer = UUID.randomUUID();
-        UUID secondLecturer = UUID.randomUUID();
-        insertCouncilMember(firstCouncil, secondLecturer, "SECRETARY", 2);
-        insertCouncilMember(firstCouncil, firstLecturer, "CHAIR", 1);
-
-        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()).with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$[0].id").value(firstCouncil.toString()))
-                .andExpect(jsonPath("$[0].members[0].lecturerId").value(firstLecturer.toString()))
-                .andExpect(jsonPath("$[0].members[0].memberRole").value("CHAIR"))
-                .andExpect(jsonPath("$[0].members[1].lecturerId").value(secondLecturer.toString()))
-                .andExpect(jsonPath("$[1].id").value(secondCouncil.toString()))
-                .andExpect(jsonPath("$[2].id").value(unscheduledCouncil.toString()))
-                .andExpect(jsonPath("$[2].scheduledAt").doesNotExist())
-                .andExpect(jsonPath("$[2].room").doesNotExist());
-
-        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", UUID.randomUUID().toString()).with(jwt()))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.statusCode").value(404))
-                .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
-        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", "not-a-uuid").with(jwt()))
-                .andExpect(status().isBadRequest())
-                .andExpect(jsonPath("$.statusCode").value(400))
-                .andExpect(jsonPath("$.message").value("Invalid request parameter"));
-        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()))
-                .andExpect(status().isUnauthorized())
-                .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
-    }
-
-    @Test
-    void councilsAllowAnExistingRoundWithoutCouncils() throws Exception {
-        UUID roundId = insertRound();
-
-        mvc.perform(get("/api/v1/thesis/councils").queryParam("roundId", roundId.toString()).with(jwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$").isEmpty());
     }
 
     @Test
@@ -225,7 +226,7 @@ class ThesisTopicPersistenceTest {
                         .queryParam("roundId", UUID.randomUUID().toString())
                         .with(jwt()))
                 .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.statusCode").value(404))
+                .andExpect(jsonPath("$.status").value(404))
                 .andExpect(jsonPath("$.message").value("Thesis registration round not found"));
     }
 
@@ -239,6 +240,108 @@ class ThesisTopicPersistenceTest {
                         .with(jwt().jwt(token -> token.claim("roles", List.of(role)))))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$").isArray());
+    }
+
+    @Test
+    void groupMutationsEnforceDuplicateCapacityAndLeaderOwnership() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open round", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("test-member-2", "test-user-2", "member2@campuscore.edu");
+        ensureStudent("test-member-3", "test-user-3", "member3@campuscore.edu");
+        ensureStudent("test-member-4", "test-user-4", "member4@campuscore.edu");
+
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-profile")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.leaderStudentId").value("student-profile"))
+                .andExpect(jsonPath("$.memberStudentIds[0]").value("student-profile"));
+
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ?",
+                UUID.class,
+                roundId);
+
+        addMember(groupId, "test-member-2").andExpect(status().isOk());
+        addMember(groupId, "test-member-3").andExpect(status().isOk());
+        addMember(groupId, "test-member-4")
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_FULL"));
+
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-profile")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("STUDENT_ALREADY_IN_GROUP"));
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"test-member-4\"}")
+                        .with(studentJwt("test-member-2")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_OWNER_REQUIRED"));
+    }
+
+    @Test
+    void roundLifecycleRejectsInvalidTransitionsWithStableConflictCode() throws Exception {
+        String body = "{\"name\":\"2027 Capstone\",\"thesisType\":\"CAPSTONE\"," +
+                "\"registrationStart\":\"2027-01-01T00:00:00Z\"," +
+                "\"registrationEnd\":\"2027-02-01T00:00:00Z\"}";
+        mvc.perform(post("/api/v1/thesis/rounds")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body)
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        UUID roundId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_registration_round WHERE name = '2027 Capstone'",
+                UUID.class);
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ROUND_STATE_CONFLICT"));
+    }
+
+    @Test
+    void topicMutationsEnforceLecturerOwnershipAndDraftState() throws Exception {
+        UUID roundId = insertRound();
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Deterministic RAG\",\"description\":\"A bounded thesis topic\",\"maxGroups\":2}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(lecturerJwt("lecturer-user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.createdBy").value("lecturer-user"));
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Deterministic RAG'",
+                UUID.class);
+        String updateBody = "{\"departmentId\":\"department-demo\",\"title\":\"Updated title\"," +
+                "\"description\":\"Updated description\",\"maxGroups\":2}";
+        mvc.perform(put("/api/v1/thesis/topics/{id}", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody)
+                        .with(lecturerJwt("other-lecturer")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("TOPIC_OWNER_REQUIRED"));
+
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(lecturerJwt("lecturer-user")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PUBLISHED"));
+        mvc.perform(put("/api/v1/thesis/topics/{id}", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(updateBody)
+                        .with(lecturerJwt("lecturer-user")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_STATE_CONFLICT"));
     }
 
     private UUID insertRound() {
@@ -288,24 +391,41 @@ class ThesisTopicPersistenceTest {
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (?, ?, ?, ?, ?, ?)", UUID.randomUUID(), groupId, roundId, studentId, memberOrder, memberOrder == 1);
     }
 
-    private UUID insertCouncil(UUID roundId, Instant scheduledAt, String room, String status) {
-        UUID councilId = UUID.randomUUID();
-        jdbc.update(
-                "INSERT INTO thesis.thesis_defense_council "
-                        + "(id, round_id, department_id, scheduled_at, room, status) VALUES (?, ?, ?, ?, ?, ?)",
-                councilId,
-                roundId,
-                UUID.randomUUID(),
-                scheduledAt == null ? null : Timestamp.from(scheduledAt),
-                room,
-                status);
-        return councilId;
+    private org.springframework.test.web.servlet.request.RequestPostProcessor studentJwt(String studentId) {
+        return jwt().jwt(token -> token
+                .subject("user-" + studentId)
+                .claim("roles", List.of("STUDENT"))
+                .claim("studentId", studentId))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 
-    private void insertCouncilMember(UUID councilId, UUID lecturerId, String memberRole, int memberOrder) {
-        jdbc.update(
-                "INSERT INTO thesis.thesis_council_member "
-                        + "(id, council_id, lecturer_id, member_role, member_order) VALUES (?, ?, ?, ?, ?)",
-                UUID.randomUUID(), councilId, lecturerId, memberRole, memberOrder);
+    private org.springframework.test.web.servlet.request.RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token.subject("admin-user").claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
+
+    private org.springframework.test.web.servlet.request.RequestPostProcessor lecturerJwt(String userId) {
+        return jwt().jwt(token -> token.subject(userId).claim("roles", List.of("LECTURER")))
+                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private org.springframework.test.web.servlet.ResultActions addMember(UUID groupId, String studentId) throws Exception {
+        return mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"studentId\":\"" + studentId + "\"}")
+                .with(studentJwt("student-profile")));
+    }
+
+    private void ensureStudent(String studentId, String userId, String email) {
+        jdbc.update(
+                "INSERT INTO auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") VALUES (?, ?, 'test-password', 'Test', 'Member', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                userId,
+                email);
+        jdbc.update(
+                "INSERT INTO auth.\"Student\" (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"admissionDate\") VALUES (?, ?, ?, 'curriculum-demo', 2, CURRENT_TIMESTAMP)",
+                studentId,
+                userId,
+                "CODE-" + studentId);
+    }
+
 }

@@ -7,7 +7,6 @@ import java.util.Collection;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -20,13 +19,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated announcement reads. Legacy mutation and realtime event routes
- * remain exclusively owned by the engagement service.
- */
+/** Role-aware announcement query routes for the course portal. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.engagement-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/announcements")
 public class AnnouncementReadController {
 
@@ -43,7 +38,7 @@ public class AnnouncementReadController {
             @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
-        List<String> roles = requireLegacyIdentity(jwt);
+        List<String> roles = requireIdentity(jwt);
         String studentId = stringClaim(jwt, "studentId");
         Integer studentYear = studentYear(jwt);
         String lecturerId = stringClaim(jwt, "lecturerId");
@@ -70,12 +65,12 @@ public class AnnouncementReadController {
         requireAllowedQuery(
                 queryParameters,
                 Set.of("page", "limit", "semesterId", "sectionId", "priority"));
-        requireLegacyIdentity(jwt);
+        requireIdentity(jwt);
         return announcements.findAll(
                 page,
                 limit,
-                legacyOptional(semesterId),
-                legacyOptional(sectionId),
+                normalizeOptional(semesterId),
+                normalizeOptional(sectionId),
                 priority);
     }
 
@@ -89,7 +84,7 @@ public class AnnouncementReadController {
         }
     }
 
-    private static List<String> requireLegacyIdentity(Jwt jwt) {
+    private static List<String> requireIdentity(Jwt jwt) {
         String subject = stringClaim(jwt, "sub");
         if (subject == null
                 || subject.isBlank()
@@ -112,7 +107,7 @@ public class AnnouncementReadController {
         }
     }
 
-    private static String legacyOptional(String value) {
+    private static String normalizeOptional(String value) {
         return value == null || value.isEmpty() ? null : value;
     }
 

@@ -5,7 +5,7 @@ export default function manifest(): MetadataRoute.Manifest {
     name: 'CampusCore',
     short_name: 'CampusCore',
     description:
-      'CampusCore is a campus operations workspace for identity, academics, finance, engagement, and analytics.',
+      'CampusCore is a student portal for identity, academics, announcements, notifications, and thesis workflows.',
     id: '/en',
     start_url: '/en',
     display: 'standalone',

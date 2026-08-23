@@ -7,17 +7,15 @@ import io.campuscore.restfulapi.people.web.PeopleReadDtos.PageMeta;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentListResponse;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentResponse;
 import java.util.List;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.server.ResponseStatusException;
 
-/** Read-only application service for the people profile strangler slice. */
+/** Student and lecturer profile query service. */
 @Service
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.people-read", name = "enabled", havingValue = "true")
 public class PeopleReadService {
 
     public static final int MAX_PAGE_SIZE = 100;

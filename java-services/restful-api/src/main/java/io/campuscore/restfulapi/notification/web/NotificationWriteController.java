@@ -7,7 +7,6 @@ import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.CreateNot
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.DeleteNotificationResponse;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.MarkAllReadResponse;
 import io.campuscore.restfulapi.notification.web.NotificationWriteDtos.UpdateNotificationRequest;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -23,16 +22,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-flagged notification self-service writer.
- *
- * <p>The legacy notification service remains the public owner until PostgreSQL
- * parity, event/realtime behavior, canary routing and rollback have been
- * rehearsed.</p>
- */
+/** Notification inbox mutation routes owned by the Java API. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.notifications-write", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1/notifications")
 public class NotificationWriteController {
 

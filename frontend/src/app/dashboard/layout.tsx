@@ -7,7 +7,25 @@ import {
   useState,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Bell, Calendar, ChevronLeft, ChevronRight, ClipboardList, CreditCard, FileText, LayoutDashboard, LogOut, Menu, School, Settings, User, Users, X, BookOpen, DoorOpen, BarChart3, ScrollText } from 'lucide-react';
+import {
+  Bell,
+  BookOpen,
+  Calendar,
+  ChevronLeft,
+  ChevronRight,
+  ClipboardList,
+  DoorOpen,
+  FileText,
+  LayoutDashboard,
+  LogOut,
+  Menu,
+  School,
+  ScrollText,
+  Settings,
+  type LucideIcon,
+  User,
+  X,
+} from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -21,27 +39,86 @@ import { notificationsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 
-const studentMenuItems = [
-  { href: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard' },
-  { href: '/dashboard/register', icon: ClipboardList, labelKey: 'courseRegistration' },
-  { href: '/dashboard/enrollments', icon: BookOpen, labelKey: 'myCourses' },
-  { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
-  { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
-  { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
-  { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
-  { href: '/dashboard/invoices', icon: CreditCard, labelKey: 'invoices' },
-  { href: '/dashboard/announcements', icon: Bell, labelKey: 'announcements' },
-  { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
-];
+type DashboardMenuLabelKey =
+  | 'dashboard'
+  | 'courseRegistration'
+  | 'myCourses'
+  | 'schedule'
+  | 'grades'
+  | 'transcript'
+  | 'thesis'
+  | 'announcements'
+  | 'notifications'
+  | 'teachingSchedule'
+  | 'gradeManagement';
 
-const lecturerMenuItems = [
-  { href: '/dashboard/lecturer', icon: LayoutDashboard, labelKey: 'dashboard' },
-  { href: '/dashboard/lecturer/schedule', icon: Calendar, labelKey: 'teachingSchedule' },
-  { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
-  { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
-  { href: '/dashboard/lecturer/announcements', icon: Bell, labelKey: 'announcements' },
-  { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
-];
+type DashboardMenuSectionKey = 'overview' | 'academic' | 'teaching' | 'campus';
+
+interface DashboardMenuItemConfig {
+  href: string;
+  icon: LucideIcon;
+  labelKey: DashboardMenuLabelKey;
+}
+
+interface DashboardMenuSectionConfig {
+  sectionKey: DashboardMenuSectionKey;
+  items: readonly DashboardMenuItemConfig[];
+}
+
+const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
+  {
+    sectionKey: 'overview',
+    items: [
+      { href: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard' },
+    ],
+  },
+  {
+    sectionKey: 'academic',
+    items: [
+      { href: '/dashboard/register', icon: ClipboardList, labelKey: 'courseRegistration' },
+      { href: '/dashboard/enrollments', icon: BookOpen, labelKey: 'myCourses' },
+      { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
+      { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
+      { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
+    ],
+  },
+  {
+    sectionKey: 'campus',
+    items: [
+      { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+      { href: '/dashboard/announcements', icon: Bell, labelKey: 'announcements' },
+      { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
+    ],
+  },
+] as const;
+
+const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
+  {
+    sectionKey: 'overview',
+    items: [
+      { href: '/dashboard/lecturer', icon: LayoutDashboard, labelKey: 'dashboard' },
+    ],
+  },
+  {
+    sectionKey: 'teaching',
+    items: [
+      { href: '/dashboard/lecturer/schedule', icon: Calendar, labelKey: 'teachingSchedule' },
+      { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
+    ],
+  },
+  {
+    sectionKey: 'campus',
+    items: [
+      { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+      { href: '/dashboard/lecturer/announcements', icon: Bell, labelKey: 'announcements' },
+      { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
+    ],
+  },
+] as const;
+
+const dashboardMenuItems = [...studentMenuSections, ...lecturerMenuSections].flatMap(
+  (section) => section.items,
+);
 
 interface NotificationItem {
   id: string;
@@ -63,6 +140,7 @@ export default function DashboardLayout({
   const pathname = stripLocaleFromPathname(visiblePathname).pathname;
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
   const [studentRailOpen, setStudentRailOpen] = useState(false);
   const [studentRailCollapsed, setStudentRailCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
@@ -71,27 +149,24 @@ export default function DashboardLayout({
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
+  const sidebarRef = useRef<HTMLElement>(null);
+  const sidebarCloseRef = useRef<HTMLButtonElement>(null);
+  const openSidebarButtonRef = useRef<HTMLButtonElement>(null);
+  const mainRef = useRef<HTMLElement>(null);
+  const previousPathnameRef = useRef(pathname);
   const menuLabels = messages.dashboardShell.menu;
+  const menuSectionLabels = messages.dashboardShell.menuSections;
   const showStudentRail = !isAdmin && !isLecturer;
-  const menuItems = isAdmin
+  const menuSections = isAdmin
     ? []
-    : (isLecturer ? lecturerMenuItems : studentMenuItems).map((item) => ({
-        ...item,
-        label: menuLabels[item.labelKey as keyof typeof menuLabels],
+    : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
+        ...section,
+        label: menuSectionLabels[section.sectionKey],
+        items: section.items.map((item) => ({
+          ...item,
+          label: menuLabels[item.labelKey],
+        })),
       }));
-  const mobileMenuItems = isLecturer
-    ? [
-        { href: '/dashboard/lecturer', icon: LayoutDashboard, label: menuLabels.dashboard },
-        { href: '/dashboard/thesis', icon: ScrollText, label: menuLabels.thesis },
-        { href: '/dashboard/notifications', icon: Bell, label: menuLabels.notifications },
-        { href: '/dashboard/profile', icon: User, label: menuLabels.profile },
-      ]
-    : [
-        { href: '/dashboard', icon: LayoutDashboard, label: menuLabels.dashboard },
-        { href: '/dashboard/thesis', icon: ScrollText, label: menuLabels.thesis },
-        { href: '/dashboard/notifications', icon: Bell, label: menuLabels.notifications },
-        { href: '/dashboard/profile', icon: User, label: menuLabels.profile },
-      ];
 
   const pageMetadata = useMemo<Record<string, { title: string; description: string }>>(
     () => ({
@@ -135,22 +210,6 @@ export default function DashboardLayout({
         title: messages.thesis.progressTitle,
         description: messages.thesis.progressDescription,
       },
-      '/dashboard/thesis/evaluation': {
-        title: messages.thesis.evaluationTitle,
-        description: messages.thesis.evaluationDescription,
-      },
-      '/dashboard/thesis/councils': {
-        title: messages.thesis.councils.title,
-        description: messages.thesis.councils.description,
-      },
-      '/dashboard/thesis/reviews': {
-        title: messages.thesis.review.title,
-        description: messages.thesis.review.description,
-      },
-      '/dashboard/invoices': {
-        title: messages.dashboardShell.menu.invoices,
-        description: messages.dashboardShell.routeDescriptions.invoices,
-      },
       '/dashboard/sign-out': {
         title: messages.dashboardShell.signOutPage.title,
         description: messages.dashboardShell.signOutPage.description,
@@ -193,6 +252,68 @@ export default function DashboardLayout({
       router.replace(href('/admin'));
     }
   }, [href, user, isLoading, isLoggingOut, isAdmin, router]);
+
+  useEffect(() => {
+    const media = window.matchMedia('(min-width: 1024px)');
+    const syncDesktopState = () => setIsDesktopSidebar(media.matches);
+
+    syncDesktopState();
+    media.addEventListener('change', syncDesktopState);
+    return () => media.removeEventListener('change', syncDesktopState);
+  }, []);
+
+  useEffect(() => {
+    setSidebarOpen(false);
+    setStudentRailOpen(false);
+    setProfileOpen(false);
+    setNotificationsOpen(false);
+
+    if (previousPathnameRef.current !== pathname) {
+      mainRef.current?.focus({ preventScroll: true });
+      previousPathnameRef.current = pathname;
+    }
+  }, [pathname]);
+
+  useEffect(() => {
+    if (!sidebarOpen || isDesktopSidebar) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => sidebarCloseRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [isDesktopSidebar, sidebarOpen]);
+
+  useEffect(() => {
+    const drawerOpen = sidebarOpen || studentRailOpen;
+    const previousOverflow = document.body.style.overflow;
+
+    if (drawerOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key !== 'Escape') {
+        return;
+      }
+
+      if (profileOpen) {
+        setProfileOpen(false);
+      } else if (notificationsOpen) {
+        setNotificationsOpen(false);
+      } else if (studentRailOpen) {
+        setStudentRailOpen(false);
+      } else if (sidebarOpen) {
+        setSidebarOpen(false);
+        window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [notificationsOpen, profileOpen, sidebarOpen, studentRailOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -294,7 +415,7 @@ export default function DashboardLayout({
       return pageMetadata[pathname];
     }
 
-    const matchingItem = [...studentMenuItems, ...lecturerMenuItems].find(
+    const matchingItem = dashboardMenuItems.find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
 
@@ -313,8 +434,19 @@ export default function DashboardLayout({
 
   if (isLoading) {
     return (
-      <div className="flex min-h-screen items-center justify-center bg-background">
-        <div className="h-10 w-10 animate-spin rounded-full border-2 border-primary/20 border-t-primary" />
+      <div
+        className="portal-shell flex min-h-screen items-center justify-center px-6"
+        role="status"
+        aria-live="polite"
+      >
+        <div className="w-full max-w-sm space-y-3">
+          <div className="h-4 w-2/5 animate-pulse rounded bg-primary/20" />
+          <div className="h-3 w-full animate-pulse rounded bg-secondary" />
+          <div className="h-3 w-4/5 animate-pulse rounded bg-secondary" />
+          <p className="pt-2 text-sm text-muted-foreground">
+            {messages.common.states.loadingContent}
+          </p>
+        </div>
       </div>
     );
   }
@@ -331,26 +463,46 @@ export default function DashboardLayout({
       : messages.dashboardShell.roles.student;
 
   return (
-    <div className="min-h-screen bg-background dark:bg-[hsl(var(--background))]">
+    <div className="portal-shell">
+      <a
+        href="#dashboard-main-content"
+        className="portal-skip-link"
+        tabIndex={!isDesktopSidebar && sidebarOpen ? -1 : undefined}
+      >
+        {messages.dashboardShell.controls.skipToContent}
+      </a>
       {sidebarOpen ? (
         <button
           type="button"
-          className="fixed inset-0 z-40 bg-black/50 lg:hidden"
-          onClick={() => setSidebarOpen(false)}
+          tabIndex={-1}
+          className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden"
+          onClick={() => {
+            setSidebarOpen(false);
+            window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
+          }}
           aria-label={messages.dashboardShell.controls.closeOverlay}
         />
       ) : null}
 
       <aside
+        id="dashboard-sidebar"
+        ref={sidebarRef}
+        aria-label={messages.dashboardShell.controls.sidebarNavigation}
+        role={!isDesktopSidebar ? 'dialog' : undefined}
+        aria-modal={!isDesktopSidebar && sidebarOpen ? true : undefined}
+        aria-hidden={!isDesktopSidebar && !sidebarOpen}
+        inert={!isDesktopSidebar && !sidebarOpen ? true : undefined}
         className={cn(
-          'fixed inset-y-0 left-0 z-50 flex w-72 flex-col border-r border-border/70 bg-[hsl(var(--surface-alt))] transition-[transform,width] duration-200 lg:translate-x-0',
-          sidebarCollapsed ? 'lg:w-20' : 'lg:w-72',
+          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
+          sidebarCollapsed
+            ? 'lg:w-[var(--portal-sidebar-collapsed)]'
+            : 'lg:w-[var(--portal-sidebar-width)]',
           sidebarOpen ? 'translate-x-0' : '-translate-x-full',
         )}
       >
         <div
           className={cn(
-            'flex items-center justify-between border-b border-border/70 py-4',
+            'flex min-h-16 items-center justify-between border-b border-white/20 py-3',
             sidebarCollapsed ? 'px-3' : 'px-5',
           )}
         >
@@ -358,13 +510,22 @@ export default function DashboardLayout({
             href={isLecturer ? '/dashboard/lecturer' : '/dashboard'}
             compact
             className={cn(sidebarCollapsed && 'justify-center gap-0')}
-            titleClassName={cn(sidebarCollapsed && 'hidden')}
+            markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)] shadow-none"
+            titleClassName={cn(
+              'text-[var(--portal-sidebar-text)]',
+              sidebarCollapsed && 'hidden',
+            )}
+            subtitle={messages.dashboardShell.portalTitle}
+            subtitleClassName={cn(
+              'text-[var(--portal-sidebar-muted)]',
+              sidebarCollapsed && 'hidden',
+            )}
           />
           <Button
             type="button"
             variant="ghost"
             size="icon"
-            className="hidden lg:inline-flex"
+            className="hidden text-[var(--portal-sidebar-muted)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:inline-flex"
             onClick={() => setSidebarCollapsed((current) => !current)}
             aria-label={
               sidebarCollapsed
@@ -379,80 +540,127 @@ export default function DashboardLayout({
             aria-expanded={!sidebarCollapsed}
           >
             {sidebarCollapsed ? (
-              <ChevronRight className="h-4 w-4" />
+              <ChevronRight className="h-4 w-4" aria-hidden="true" />
             ) : (
-              <ChevronLeft className="h-4 w-4" />
+              <ChevronLeft className="h-4 w-4" aria-hidden="true" />
             )}
           </Button>
           <Button
+            ref={sidebarCloseRef}
             type="button"
             variant="ghost"
             size="icon"
-            className="lg:hidden"
-            onClick={() => setSidebarOpen(false)}
+            className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:hidden"
+            onClick={() => {
+              setSidebarOpen(false);
+              window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
+            }}
             aria-label={messages.dashboardShell.controls.closeSidebar}
           >
-            <X className="h-5 w-5" />
+            <X className="h-5 w-5" aria-hidden="true" />
           </Button>
         </div>
 
         <div
           className={cn(
-            'border-b border-border/70 py-4',
-            sidebarCollapsed ? 'px-3 text-center' : 'px-5',
+            'border-b border-white/20 py-4',
+            sidebarCollapsed ? 'px-3' : 'px-5',
           )}
         >
-          <div className="text-sm font-semibold text-foreground">
-            {sidebarCollapsed ? roleLabel.slice(0, 2).toUpperCase() : roleLabel}
+          <div
+            className={cn(
+              'flex min-w-0 items-center gap-3',
+              sidebarCollapsed && 'justify-center',
+            )}
+          >
+            <div className="flex h-11 w-11 shrink-0 items-center justify-center rounded-lg bg-white/10 text-sm font-bold text-[var(--portal-sidebar-text)]">
+              {user.firstName?.[0]}
+              {user.lastName?.[0]}
+            </div>
+            {!sidebarCollapsed ? (
+              <div className="min-w-0">
+                <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
+                  {user.firstName} {user.lastName}
+                </div>
+                <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
+                  {user.email}
+                </div>
+              </div>
+            ) : null}
           </div>
           {!sidebarCollapsed ? (
-            <p className="mt-1 text-sm leading-6 text-muted-foreground">
-              {messages.dashboardShell.roleDescription}
-            </p>
+            <div className="mt-3 flex items-center justify-between gap-3">
+              <span className="portal-menu-label">
+                {messages.dashboardShell.identityLabel}
+              </span>
+              <span className="text-xs font-semibold text-[var(--portal-sidebar-text)]">
+                {roleLabel}
+              </span>
+            </div>
           ) : null}
         </div>
 
         <nav
           className={cn(
-            'flex-1 space-y-1 overflow-y-auto py-4',
+            'flex-1 space-y-5 overflow-y-auto overscroll-contain py-4',
             sidebarCollapsed ? 'px-3' : 'px-4',
           )}
         >
-          {menuItems.map((item) => {
-            const isActive =
-              pathname === item.href ||
-              (item.href !== '/dashboard' &&
-                item.href !== '/dashboard/lecturer' &&
-                pathname.startsWith(item.href));
+          {menuSections.map((section) => (
+            <div key={section.sectionKey} className="space-y-2">
+              {!sidebarCollapsed ? (
+                <div className="portal-menu-label px-3">{section.label}</div>
+              ) : null}
+              <div className="space-y-1">
+                {section.items.map((item) => {
+                  const isActive =
+                    pathname === item.href ||
+                    (item.href !== '/dashboard' &&
+                      item.href !== '/dashboard/lecturer' &&
+                      pathname.startsWith(item.href));
 
-            return (
-              <LocalizedLink
-                key={item.href}
-                href={item.href}
-                onClick={() => setSidebarOpen(false)}
-                aria-label={item.label}
-                title={sidebarCollapsed ? item.label : undefined}
-                className={cn(
-                  'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm font-medium transition-colors',
-                  sidebarCollapsed && 'justify-center px-0',
-                  isActive
-                    ? 'bg-primary text-primary-foreground shadow-sm'
-                    : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
-                )}
-              >
-                <item.icon className="h-4.5 w-4.5" />
-                {!sidebarCollapsed ? <span>{item.label}</span> : null}
-              </LocalizedLink>
-            );
-          })}
+                  return (
+                    <LocalizedLink
+                      key={item.href}
+                      href={item.href}
+                      onClick={() => setSidebarOpen(false)}
+                      aria-label={item.label}
+                      aria-current={isActive ? 'page' : undefined}
+                      title={sidebarCollapsed ? item.label : undefined}
+                      className={cn(
+                        'relative flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                        sidebarCollapsed && 'justify-center px-0',
+                        isActive &&
+                          'bg-white/10 font-semibold text-[var(--portal-sidebar-text)] before:absolute before:left-0 before:h-6 before:w-1 before:rounded-r before:bg-[var(--portal-yellow)]',
+                      )}
+                    >
+                      <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                      {!sidebarCollapsed ? <span>{item.label}</span> : null}
+                    </LocalizedLink>
+                  );
+                })}
+              </div>
+            </div>
+          ))}
         </nav>
 
         <div
           className={cn(
-            'border-t border-border/70 py-4',
+            'border-t border-white/20 py-4',
             sidebarCollapsed ? 'px-3' : 'px-4',
           )}
         >
+          {!sidebarCollapsed ? (
+            <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+              <span className="portal-menu-label">
+                {messages.dashboardShell.controls.preferences}
+              </span>
+              <div className="flex items-center gap-1 rounded-lg bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
+                <LanguageToggle inverse />
+                <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-yellow)]" />
+              </div>
+            </div>
+          ) : null}
           <LocalizedLink
             href="/dashboard/profile"
             aria-label={messages.dashboardShell.menu.profileSettings}
@@ -462,11 +670,11 @@ export default function DashboardLayout({
                 : undefined
             }
             className={cn(
-              'flex items-center gap-3 rounded-lg px-3 py-2.5 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground',
+              'flex min-h-11 items-center gap-3 rounded-lg px-3 py-2 text-sm text-[var(--portal-sidebar-muted)] transition-[background-color,color,transform] duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
-            <Settings className="h-4.5 w-4.5" />
+            <Settings className="h-5 w-5" aria-hidden="true" />
             {!sidebarCollapsed ? messages.dashboardShell.menu.profileSettings : null}
           </LocalizedLink>
           <LocalizedLink
@@ -475,21 +683,30 @@ export default function DashboardLayout({
             aria-label={messages.common.actions.signOut}
             title={sidebarCollapsed ? messages.common.actions.signOut : undefined}
             className={cn(
-              'mt-1 flex w-full items-center gap-3 rounded-lg px-3 py-2.5 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10',
+              'mt-1 flex min-h-11 w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-[var(--portal-sidebar-text)] transition-[background-color,color,transform] duration-150 hover:bg-red-500/20 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
               sidebarCollapsed && 'justify-center px-0',
             )}
           >
-            <LogOut className="h-4.5 w-4.5" />
+            <LogOut className="h-5 w-5" aria-hidden="true" />
             {!sidebarCollapsed ? messages.common.actions.signOut : null}
           </LocalizedLink>
         </div>
       </aside>
 
-      <div className={cn(sidebarCollapsed ? 'lg:pl-20' : 'lg:pl-72')}>
-        <header className="sticky top-0 z-30 border-b border-border/70 bg-background/95 backdrop-blur">
-          <div className="flex items-center justify-between gap-4 px-4 py-4 sm:px-6 lg:px-8">
-            <div className="flex min-w-0 items-start gap-3">
+      <div
+        inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
+        className={cn(
+          'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
+          sidebarCollapsed
+            ? 'lg:pl-[var(--portal-sidebar-collapsed)]'
+            : 'lg:pl-[var(--portal-sidebar-width)]',
+        )}
+      >
+        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]">
+          <div className="flex min-h-16 items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
+            <div className="flex min-w-0 items-center gap-3">
               <Button
+                ref={openSidebarButtonRef}
                 type="button"
                 variant="ghost"
                 size="icon"
@@ -497,16 +714,17 @@ export default function DashboardLayout({
                 onClick={() => setSidebarOpen(true)}
                 aria-label={messages.dashboardShell.controls.openSidebar}
                 aria-expanded={sidebarOpen}
+                aria-controls="dashboard-sidebar"
               >
-                <Menu className="h-5 w-5" />
+                <Menu className="h-5 w-5" aria-hidden="true" />
               </Button>
               <div className="min-w-0">
-                <h1 className="truncate text-xl font-semibold tracking-tight text-foreground">
+                <div className="hidden text-xs font-semibold text-primary sm:block">
+                  {messages.dashboardShell.portalTitle}
+                </div>
+                <div className="truncate text-base font-semibold text-foreground sm:text-lg">
                   {currentPage.title}
-                </h1>
-                <p className="hidden text-sm leading-6 text-muted-foreground sm:block">
-                  {currentPage.description}
-                </p>
+                </div>
               </div>
             </div>
 
@@ -516,16 +734,20 @@ export default function DashboardLayout({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="xl:hidden"
+                  className="2xl:hidden"
                   onClick={() => setStudentRailOpen(true)}
                   aria-label={messages.dashboardShell.controls.openStudentRail}
                   aria-expanded={studentRailOpen}
                 >
-                  <DoorOpen className="h-5 w-5" />
+                  <DoorOpen className="h-5 w-5" aria-hidden="true" />
                 </Button>
               ) : null}
-              <LanguageToggle />
-              <ThemeToggle />
+              <div className="hidden sm:block">
+                <LanguageToggle />
+              </div>
+              <div className="hidden sm:block">
+                <ThemeToggle />
+              </div>
 
               <div className="relative" ref={notificationsRef}>
                 <Button
@@ -537,7 +759,7 @@ export default function DashboardLayout({
                   aria-expanded={notificationsOpen}
                   aria-controls="dashboard-notifications-panel"
                 >
-                  <Bell className="h-5 w-5" />
+                  <Bell className="h-5 w-5" aria-hidden="true" />
                   {unreadCount > 0 ? (
                     <span className="absolute right-2 top-2 h-2.5 w-2.5 rounded-full bg-[hsl(var(--accent-warm))]" />
                   ) : null}
@@ -546,7 +768,9 @@ export default function DashboardLayout({
                 {notificationsOpen ? (
                   <div
                     id="dashboard-notifications-panel"
-                    className="absolute right-0 mt-2 w-80 rounded-lg border border-border/80 bg-card shadow-2xl"
+                    role="dialog"
+                    aria-label={messages.dashboardShell.notifications.title}
+                    className="absolute right-0 mt-2 w-[min(20rem,calc(100vw-2rem))] rounded-lg border border-border/80 bg-card shadow-2xl"
                   >
                     <div className="border-b border-border/70 px-4 py-3">
                       <h3 className="text-sm font-semibold text-foreground">
@@ -597,7 +821,7 @@ export default function DashboardLayout({
                 <button
                   type="button"
                   onClick={() => setProfileOpen((current) => !current)}
-                  className="flex items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-2 transition-colors hover:bg-secondary/50"
+                  className="flex min-h-11 items-center gap-3 rounded-lg border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color,transform] duration-150 hover:bg-secondary/50 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
                   aria-label={messages.dashboardShell.controls.toggleProfile}
                   aria-expanded={profileOpen}
                   aria-controls="dashboard-profile-menu"
@@ -620,7 +844,8 @@ export default function DashboardLayout({
                 {profileOpen ? (
                   <div
                     id="dashboard-profile-menu"
-                    className="absolute right-0 mt-2 w-64 rounded-lg border border-border/80 bg-card shadow-2xl"
+                    role="menu"
+                    className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-2rem))] rounded-lg border border-border/80 bg-card shadow-2xl"
                   >
                     <div className="border-b border-border/70 px-4 py-4">
                       <p className="font-semibold text-foreground">
@@ -636,26 +861,29 @@ export default function DashboardLayout({
                     <div className="px-2 py-2">
                       <LocalizedLink
                         href="/dashboard/profile"
+                        role="menuitem"
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
                         onClick={() => setProfileOpen(false)}
                       >
-                        <User className="h-4 w-4" />
+                        <User className="h-4 w-4" aria-hidden="true" />
                         {messages.dashboardShell.menu.profile}
                       </LocalizedLink>
                       <LocalizedLink
                         href="/dashboard/profile"
+                        role="menuitem"
                         className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
                         onClick={() => setProfileOpen(false)}
                       >
-                        <Settings className="h-4 w-4" />
+                        <Settings className="h-4 w-4" aria-hidden="true" />
                         {messages.dashboardShell.menu.settings}
                       </LocalizedLink>
                       <LocalizedLink
                         href="/dashboard/sign-out"
+                        role="menuitem"
                         className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10"
                         onClick={() => setProfileOpen(false)}
                       >
-                        <LogOut className="h-4 w-4" />
+                        <LogOut className="h-4 w-4" aria-hidden="true" />
                         {messages.common.actions.signOut}
                       </LocalizedLink>
                     </div>
@@ -670,11 +898,11 @@ export default function DashboardLayout({
           <>
             <button
               type="button"
-              className="fixed inset-0 z-40 bg-black/45 xl:hidden"
+              className="fixed inset-0 z-40 bg-[var(--portal-scrim)] 2xl:hidden"
               onClick={() => setStudentRailOpen(false)}
               aria-label={messages.dashboardShell.controls.closeStudentRailOverlay}
             />
-            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 xl:hidden">
+            <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 2xl:hidden">
               <StudentContextRail
                 mobile
                 currentPageTitle={currentPage.title}
@@ -688,18 +916,25 @@ export default function DashboardLayout({
           </>
         ) : null}
 
-        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 pb-24 sm:px-6 md:pb-8 lg:px-8">
+        <div className="mx-auto w-full max-w-[1280px] px-4 py-6 sm:px-6 lg:px-8">
           {showStudentRail ? (
             <div
               className={cn(
                 'grid items-start gap-6',
                 studentRailCollapsed
-                  ? 'xl:grid-cols-[minmax(0,1fr)_5.5rem]'
-                  : 'xl:grid-cols-[minmax(0,1fr)_22rem]',
+                  ? '2xl:grid-cols-[minmax(0,1fr)_5.5rem]'
+                  : '2xl:grid-cols-[minmax(0,1fr)_20rem]',
               )}
             >
-              <main className="min-w-0">{children}</main>
-              <div className="hidden xl:block">
+              <main
+                id="dashboard-main-content"
+                ref={mainRef}
+                tabIndex={-1}
+                className="min-w-0 focus:outline-none"
+              >
+                {children}
+              </main>
+              <div className="hidden 2xl:block">
                 <StudentContextRail
                   currentPageTitle={currentPage.title}
                   currentPageDescription={currentPage.description}
@@ -712,56 +947,16 @@ export default function DashboardLayout({
               </div>
             </div>
           ) : (
-            <main>{children}</main>
+            <main
+              id="dashboard-main-content"
+              ref={mainRef}
+              tabIndex={-1}
+              className="min-w-0 focus:outline-none"
+            >
+              {children}
+            </main>
           )}
         </div>
-
-        {!isAdmin ? (
-          <nav
-            className="fixed inset-x-0 bottom-0 z-40 border-t border-border/80 bg-card/95 px-2 pt-2 shadow-[0_-8px_24px_-20px_rgba(15,23,42,0.45)] backdrop-blur md:hidden"
-            style={{ paddingBottom: 'max(0.5rem, env(safe-area-inset-bottom))' }}
-            aria-label={messages.dashboardShell.controls.mobileNavigation}
-          >
-            <div className="mx-auto grid max-w-md grid-cols-4 gap-1">
-              {mobileMenuItems.map((item) => {
-                const isActive =
-                  pathname === item.href ||
-                  (item.href !== '/dashboard' &&
-                    item.href !== '/dashboard/lecturer' &&
-                    pathname.startsWith(item.href));
-                const Icon = item.icon;
-
-                return (
-                  <LocalizedLink
-                    key={item.href}
-                    href={item.href}
-                    onClick={() => setSidebarOpen(false)}
-                    aria-label={item.label}
-                    aria-current={isActive ? 'page' : undefined}
-                    className={cn(
-                      'relative flex min-h-12 flex-col items-center justify-center gap-1 rounded-lg px-2 py-1 text-[11px] font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                      isActive
-                        ? 'bg-primary/10 text-primary'
-                        : 'text-muted-foreground hover:bg-secondary/70 hover:text-foreground',
-                    )}
-                  >
-                    <span className="relative">
-                      <Icon className="h-5 w-5" />
-                      {item.href === '/dashboard/notifications' && unreadCount > 0 ? (
-                        <span className="absolute -right-2 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-[hsl(var(--accent-warm))] px-1 text-[9px] font-bold text-white">
-                          {unreadCount > 9 ? '9+' : unreadCount}
-                        </span>
-                      ) : null}
-                    </span>
-                    <span className="whitespace-nowrap text-center text-[10px] leading-tight">
-                      {item.label}
-                    </span>
-                  </LocalizedLink>
-                );
-              })}
-            </div>
-          </nav>
-        ) : null}
       </div>
       <AssistantPanel />
     </div>

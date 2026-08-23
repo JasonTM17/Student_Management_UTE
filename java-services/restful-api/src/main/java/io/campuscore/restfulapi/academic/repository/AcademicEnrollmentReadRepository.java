@@ -11,16 +11,14 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
-/** SELECT-only adapter for legacy Prisma academic enrollment and grade tables. */
+/** JDBC adapter for academic enrollment and grade tables. */
 @Repository
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.academic-enrollment-read", name = "enabled", havingValue = "true")
 public class AcademicEnrollmentReadRepository {
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
     private static final String SECTION = "\"academic\".\"Section\"";

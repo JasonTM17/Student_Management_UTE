@@ -1,6 +1,6 @@
 'use client';
 
-import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, CreditCard, X } from 'lucide-react';
+import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, X } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
@@ -30,12 +30,6 @@ const quickLinkConfig = [
     labelKey: 'schedule',
   },
   {
-    href: '/dashboard/invoices',
-    icon: CreditCard,
-    tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-300',
-    labelKey: 'billing',
-  },
-  {
     href: '/dashboard/announcements',
     icon: Bell,
     tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-300',
@@ -61,8 +55,11 @@ export function StudentContextRail({
 
   return (
     <aside
+      role={mobile ? 'dialog' : undefined}
+      aria-modal={mobile || undefined}
+      aria-label={copy.title}
       className={cn(
-        'flex h-full min-h-[calc(100vh-8rem)] flex-col rounded-lg border border-border/70 bg-card panel-shadow',
+        'flex h-full min-h-[calc(100dvh-8rem)] flex-col overflow-y-auto overscroll-contain rounded-lg border border-border/70 bg-card panel-shadow',
         collapsed ? 'px-3 py-4' : 'px-4 py-4',
       )}
     >
@@ -91,7 +88,7 @@ export function StudentContextRail({
               onClick={onCloseMobile}
               aria-label={copy.closeDrawer}
             >
-              <X className="h-5 w-5" />
+              <X className="h-5 w-5" aria-hidden="true" />
             </Button>
           ) : null}
           <Button
@@ -103,9 +100,9 @@ export function StudentContextRail({
             title={collapsed ? copy.expand : copy.collapse}
           >
             {collapsed ? (
-              <ChevronLeft className="h-5 w-5" />
+              <ChevronLeft className="h-5 w-5" aria-hidden="true" />
             ) : (
-              <ChevronRight className="h-5 w-5" />
+              <ChevronRight className="h-5 w-5" aria-hidden="true" />
             )}
           </Button>
         </div>
@@ -118,7 +115,7 @@ export function StudentContextRail({
           </div>
           {collapsed ? (
             <div className="mt-2 flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-              <BookOpen className="h-5 w-5" />
+              <BookOpen className="h-5 w-5" aria-hidden="true" />
             </div>
           ) : (
             <>
@@ -179,7 +176,7 @@ export function StudentContextRail({
                 href={item.href}
                 onClick={mobile ? onCloseMobile : undefined}
                 className={cn(
-                  'group flex items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-3 transition-colors hover:bg-secondary/50',
+                  'group flex items-center gap-3 rounded-lg border border-border/70 bg-card px-3 py-3 transition-[background-color,transform] duration-150 hover:bg-secondary/50 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                   collapsed && 'justify-center px-0',
                 )}
                 aria-label={linkCopy.title}
@@ -191,7 +188,7 @@ export function StudentContextRail({
                     item.tone,
                   )}
                 >
-                  <Icon className="h-5 w-5" />
+                  <Icon className="h-5 w-5" aria-hidden="true" />
                 </div>
                 {collapsed ? null : (
                   <div className="min-w-0">

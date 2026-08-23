@@ -35,63 +35,20 @@ security:
 health:
   readiness-key: ${HEALTH_READINESS_KEY:}
 
-migration:
-  thesis-read:
-    enabled: ${THESIS_READ_ENABLED:false}
-  notifications-read:
-    enabled: ${NOTIFICATIONS_READ_ENABLED:false}
-  notifications-write:
-    enabled: ${NOTIFICATIONS_WRITE_ENABLED:false}
-  engagement-read:
-    enabled: ${ENGAGEMENT_READ_ENABLED:false}
-  engagement-write:
-    enabled: ${ENGAGEMENT_WRITE_ENABLED:false}
-  academic-read:
-    enabled: ${ACADEMIC_READ_ENABLED:false}
-  academic-context:
-    enabled: ${ACADEMIC_CONTEXT_ENABLED:false}
-  academic-enrollment-read:
-    enabled: ${ACADEMIC_ENROLLMENT_READ_ENABLED:false}
-  academic-schedule-read:
-    enabled: ${ACADEMIC_SCHEDULE_READ_ENABLED:false}
-  academic-waitlist-read:
-    enabled: ${ACADEMIC_WAITLIST_READ_ENABLED:false}
-  academic-attendance-read:
-    enabled: ${ACADEMIC_ATTENDANCE_READ_ENABLED:false}
-  academic-section-read:
-    enabled: ${ACADEMIC_SECTION_READ_ENABLED:false}
-  people-read:
-    enabled: ${PEOPLE_READ_ENABLED:false}
-  finance-read:
-    enabled: ${FINANCE_READ_ENABLED:false}
-  analytics-read:
-    enabled: ${ANALYTICS_READ_ENABLED:false}
-  thesis-assistant:
-    enabled: ${THESIS_ASSISTANT_ENABLED:false}
-  auth-login:
-    enabled: ${AUTH_LOGIN_ENABLED:false}
-
-internal:
-  service-token: ${INTERNAL_SERVICE_TOKEN:}
-
 management:
   endpoints:
     web:
       exposure:
-        include: health,info,prometheus
+        include: health,info
   endpoint:
     health:
       probes:
         enabled: true
-  metrics:
-    tags:
-      service: ${spring.application.name}
-
 springdoc:
   api-docs:
-    path: /api/docs/openapi.json
+    path: /v3/api-docs
   swagger-ui:
-    path: /api/docs
+    path: /swagger-ui.html
 
 ---
 spring:
@@ -106,7 +63,9 @@ spring:
     password: ${SPRING_DATASOURCE_PASSWORD:}
   jpa:
     hibernate:
-      ddl-auto: validate
+      # Flyway owns the schema; Hibernate must not reject focused fixture tests
+      # that intentionally disable migrations and create only their own tables.
+      ddl-auto: none
     open-in-view: false
     properties:
       hibernate:

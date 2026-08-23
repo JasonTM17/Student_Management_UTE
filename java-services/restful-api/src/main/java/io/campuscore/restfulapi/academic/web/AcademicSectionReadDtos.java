@@ -5,7 +5,7 @@ import java.math.BigDecimal;
 import java.time.Instant;
 import java.util.List;
 
-/** Legacy-compatible DTOs for the read-only academic section candidate. */
+/** DTOs for sections, rosters and grading views. */
 public final class AcademicSectionReadDtos {
     private AcademicSectionReadDtos() {
     }

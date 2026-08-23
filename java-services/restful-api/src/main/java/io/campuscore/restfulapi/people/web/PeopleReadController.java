@@ -8,7 +8,6 @@ import io.campuscore.restfulapi.people.web.PeopleReadDtos.StudentResponse;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.context.annotation.Profile;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -17,13 +16,9 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
-/**
- * Feature-gated people profile reads. People writes, enrollment hydration and
- * event publishing remain owned by the Nest people-service in this wave.
- */
+/** Student and lecturer directory routes owned by the Java API. */
 @RestController
 @Profile("persistence")
-@ConditionalOnProperty(prefix = "migration.people-read", name = "enabled", havingValue = "true")
 @RequestMapping("/api/v1")
 public class PeopleReadController {
 

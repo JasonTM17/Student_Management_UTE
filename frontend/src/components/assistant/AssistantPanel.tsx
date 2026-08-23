@@ -5,12 +5,15 @@ import { Bot, LoaderCircle, MessageCircle, Send, X } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
-import { thesisApi } from '@/lib/thesis-api';
+import { thesisApi, type AssistantCitation } from '@/lib/thesis-api';
 
 interface ChatMessage {
   id: string;
   role: 'assistant' | 'user';
   content: string;
+  citations?: AssistantCitation[];
+  degraded?: boolean;
+  reasonCode?: string;
 }
 
 export function AssistantPanel() {
@@ -36,7 +39,14 @@ export function AssistantPanel() {
       const reply = await thesisApi.chat(message, locale);
       setConversation((current) => [
         ...current,
-        { id: `${Date.now()}-assistant`, role: 'assistant', content: reply.answer },
+        {
+          id: `${Date.now()}-assistant`,
+          role: 'assistant',
+          content: reply.answer,
+          citations: reply.citations,
+          degraded: reply.degraded,
+          reasonCode: reply.reasonCode,
+        },
       ]);
     } catch {
       setConversation((current) => [
@@ -113,7 +123,23 @@ export function AssistantPanel() {
                       : 'rounded-bl-md border border-border/70 bg-card text-foreground',
                   )}
                 >
-                  {message.content}
+                  <p>{message.content}</p>
+                  {message.role === 'assistant' && message.reasonCode ? (
+                    <p className={cn('mt-2 text-[11px] uppercase tracking-[0.08em]', message.degraded ? 'text-amber-700' : 'text-muted-foreground')}>
+                      {message.degraded ? 'DEGRADED' : message.reasonCode}
+                    </p>
+                  ) : null}
+                  {message.citations?.length ? (
+                    <div className="mt-3 space-y-2 border-t border-border/70 pt-2">
+                      {message.citations.map((citation) => (
+                        <div key={citation.id} className="border-l-2 border-primary pl-2 text-xs leading-5">
+                          <p className="font-semibold text-foreground">{citation.title}</p>
+                          <p className="text-muted-foreground">{citation.source} · {citation.locale.toUpperCase()}</p>
+                          <p className="mt-1 text-muted-foreground">{citation.excerpt}</p>
+                        </div>
+                      ))}
+                    </div>
+                  ) : null}
                 </div>
               ))
             )}

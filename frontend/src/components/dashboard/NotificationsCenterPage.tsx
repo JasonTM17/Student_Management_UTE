@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   Bell,
   Check,
@@ -44,6 +44,10 @@ export default function NotificationsCenterPage() {
   const [isMarkingAll, setIsMarkingAll] = useState(false);
   const [error, setError] = useState('');
   const [status, setStatus] = useState('');
+  const filterRefs = useRef<Record<Filter, HTMLButtonElement | null>>({
+    all: null,
+    unread: null,
+  });
 
   const fetchNotifications = useCallback(async () => {
     setIsLoading(true);
@@ -110,6 +114,24 @@ export default function NotificationsCenterPage() {
     }
   }
 
+  function moveFilterFocus(event: React.KeyboardEvent<HTMLButtonElement>, tab: Filter) {
+    if (!['ArrowLeft', 'ArrowRight', 'Home', 'End'].includes(event.key)) {
+      return;
+    }
+
+    event.preventDefault();
+    const next: Filter =
+      event.key === 'Home'
+        ? 'all'
+        : event.key === 'End'
+          ? 'unread'
+          : tab === 'all'
+            ? 'unread'
+            : 'all';
+    setFilter(next);
+    filterRefs.current[next]?.focus();
+  }
+
   if (authLoading || !hasAccess) {
     return <LoadingState label={messages.common.states.loadingContent} />;
   }
@@ -130,6 +152,7 @@ export default function NotificationsCenterPage() {
             >
               <RefreshCw
                 className={cn('mr-2 h-4 w-4', isLoading && 'animate-spin')}
+                aria-hidden="true"
               />
               {copy.refresh}
             </Button>
@@ -139,7 +162,7 @@ export default function NotificationsCenterPage() {
               onClick={() => void markAllRead()}
               disabled={unreadCount === 0 || isMarkingAll || isLoading}
             >
-              <CheckCheck className="mr-2 h-4 w-4" />
+              <CheckCheck className="mr-2 h-4 w-4" aria-hidden="true" />
               {copy.markAllRead}
             </Button>
           </div>
@@ -155,12 +178,19 @@ export default function NotificationsCenterPage() {
             return (
               <button
                 key={tab}
+                id={`notifications-tab-${tab}`}
+                ref={(node) => {
+                  filterRefs.current[tab] = node;
+                }}
                 type="button"
                 role="tab"
                 aria-selected={selected}
+                aria-controls={`notifications-panel-${tab}`}
+                tabIndex={selected ? 0 : -1}
                 onClick={() => setFilter(tab)}
+                onKeyDown={(event) => moveFilterFocus(event, tab)}
                 className={cn(
-                  'inline-flex min-h-10 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'inline-flex min-h-11 items-center gap-2 rounded-lg px-3 py-2 text-sm font-semibold transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   selected
                     ? 'bg-primary text-primary-foreground'
                     : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
@@ -170,7 +200,7 @@ export default function NotificationsCenterPage() {
                 <span
                   className={cn(
                     'rounded-full px-2 py-0.5 text-xs',
-                    selected ? 'bg-white/15' : 'bg-secondary text-foreground',
+                    selected ? 'bg-white/20' : 'bg-secondary text-foreground',
                   )}
                 >
                   {count}
@@ -180,7 +210,7 @@ export default function NotificationsCenterPage() {
           })}
         </div>
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
-          <Bell className="h-4 w-4" />
+          <Bell className="h-4 w-4" aria-hidden="true" />
           <span>{unreadCount} {copy.unread.toLowerCase()}</span>
         </div>
       </div>
@@ -194,37 +224,44 @@ export default function NotificationsCenterPage() {
         </div>
       ) : null}
 
-      {error ? (
-        <ErrorState
-          title={copy.title}
-          description={error}
-          onRetry={() => void fetchNotifications()}
-        />
-      ) : isLoading ? (
-        <LoadingState label={copy.loading} />
-      ) : visibleItems.length === 0 ? (
-        <EmptyState
-          icon={Inbox}
-          title={filter === 'unread' ? copy.noUnread : copy.noAll}
-          description={
-            filter === 'unread' ? copy.noUnread : copy.empty
-          }
-          action={
-            <LocalizedLink href="/dashboard">
-              <Button variant="outline">{messages.common.actions.openDashboard}</Button>
-            </LocalizedLink>
-          }
-        />
-      ) : (
-        <Card variant="muted">
-          <CardContent className="space-y-3 p-3 sm:p-5">
-            {visibleItems.map((item) => {
+      <div
+        id={`notifications-panel-${filter}`}
+        role="tabpanel"
+        aria-labelledby={`notifications-tab-${filter}`}
+        tabIndex={0}
+        className="focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+      >
+        {error ? (
+          <ErrorState
+            title={copy.title}
+            description={error}
+            onRetry={() => void fetchNotifications()}
+          />
+        ) : isLoading ? (
+          <LoadingState label={copy.loading} />
+        ) : visibleItems.length === 0 ? (
+          <EmptyState
+            icon={Inbox}
+            title={filter === 'unread' ? copy.noUnread : copy.noAll}
+            description={filter === 'unread' ? copy.noUnread : copy.empty}
+            action={
+              <Button asChild variant="outline">
+                <LocalizedLink href="/dashboard">
+                  {messages.common.actions.openDashboard}
+                </LocalizedLink>
+              </Button>
+            }
+          />
+        ) : (
+          <Card variant="muted">
+            <CardContent className="space-y-3 p-3 sm:p-5">
+              {visibleItems.map((item) => {
               const title = item.title || copy.fallbackTitle;
               const content = item.content || item.message || copy.fallbackContent;
               const isBusy = busyId === item.id;
 
-              return (
-                <article
+                return (
+                  <article
                   key={item.id}
                   className={cn(
                     'rounded-lg border bg-card px-4 py-4 transition-colors sm:px-5',
@@ -243,9 +280,9 @@ export default function NotificationsCenterPage() {
                       )}
                     >
                       {item.isRead ? (
-                        <Check className="h-4 w-4" />
+                        <Check className="h-4 w-4" aria-hidden="true" />
                       ) : (
-                        <Bell className="h-4 w-4" />
+                        <Bell className="h-4 w-4" aria-hidden="true" />
                       )}
                     </div>
                     <div className="min-w-0 flex-1 space-y-2">
@@ -279,7 +316,7 @@ export default function NotificationsCenterPage() {
                           disabled={isBusy}
                           className="px-0 text-primary hover:bg-transparent hover:text-primary/80"
                         >
-                          <Check className="mr-2 h-4 w-4" />
+                          <Check className="mr-2 h-4 w-4" aria-hidden="true" />
                           {isBusy ? messages.common.states.loading : copy.markRead}
                         </Button>
                       ) : (
@@ -287,12 +324,13 @@ export default function NotificationsCenterPage() {
                       )}
                     </div>
                   </div>
-                </article>
-              );
-            })}
-          </CardContent>
-        </Card>
-      )}
+                  </article>
+                );
+              })}
+            </CardContent>
+          </Card>
+        )}
+      </div>
     </div>
   );
 }

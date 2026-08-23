@@ -45,7 +45,14 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
         throw new Error('The Java auth response did not include an access token.');
       }
       apiClient.setSessionTokens(response.accessToken, response.refreshToken);
-      navigation.completeSignIn(resolveRole(response.user?.roles));
+      const role = resolveRole(response.user?.roles);
+      if (role !== 'student') {
+        await campusApi.logout().catch(() => undefined);
+        apiClient.clearAccessToken();
+        setError('The mobile course demo currently supports the student role. Use the web portal for lecturer or admin work.');
+        return;
+      }
+      navigation.completeSignIn(role);
     } catch (signInError) {
       apiClient.clearAccessToken();
       setError(
@@ -107,7 +114,6 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
           onPress={handleSubmit}
           style={styles.submit}
         />
-        <Button label="Forgot password?" onPress={() => undefined} variant="text" />
         {error ? (
           <UiText variant="bodySmall" tone="error" style={styles.errorText}>
             {error}
@@ -116,7 +122,7 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
         <UiText variant="bodySmall" tone="muted" style={styles.previewNotice}>
           {isPreview
             ? 'Preview data is local. No account is authenticated until the Java auth contract is implemented and verified.'
-            : 'Live mode sends credentials to the Java auth candidate and enters the app only after a bearer token is returned.'}
+            : 'Live mode signs student accounts into the Java REST API. Lecturer and admin work remains in the web portal.'}
         </UiText>
       </Card>
 
