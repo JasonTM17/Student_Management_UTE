@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth.service;
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -22,6 +23,7 @@ public class AdminUserMutationService {
     private static final String USER_ROLE = "\"auth\".\"UserRole\"";
     private static final String STUDENT = "\"auth\".\"Student\"";
     private static final String LECTURER = "\"auth\".\"Lecturer\"";
+    private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
@@ -63,6 +65,11 @@ public class AdminUserMutationService {
 
     @Transactional
     public Map<String, Object> create(Map<String, Object> input) {
+        return create(input, false);
+    }
+
+    @Transactional
+    public Map<String, Object> create(Map<String, Object> input, boolean canManageSuperAdmin) {
         String email = required(input, "email").toLowerCase();
         String password = required(input, "password");
         String id = UUID.randomUUID().toString();
@@ -77,6 +84,7 @@ public class AdminUserMutationService {
                         .addValue("firstName", required(input, "firstName"))
                         .addValue("lastName", required(input, "lastName")));
         String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
+        guardRoleMutation(null, role, canManageSuperAdmin);
         assignRole(id, role);
         ensureProfile(id, role, input);
         return find(id);
@@ -84,6 +92,22 @@ public class AdminUserMutationService {
 
     @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input) {
+        return update(id, input, false);
+    }
+
+    @Transactional
+    public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin) {
+        String requestedRole = input.get("role") == null
+                ? null
+                : text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
+        if (requestedRole != null) {
+            guardRoleMutation(id, requestedRole, canManageSuperAdmin);
+        } else if (!canManageSuperAdmin && hasRole(id, "SUPER_ADMIN")) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can manage super administrator accounts");
+        }
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"firstName\" = COALESCE(:firstName, \"firstName\"),"
                         + " \"lastName\" = COALESCE(:lastName, \"lastName\"), \"phone\" = COALESCE(:phone, \"phone\"),"
@@ -92,10 +116,10 @@ public class AdminUserMutationService {
                         .addValue("lastName", input.get("lastName")).addValue("phone", input.get("phone"))
                         .addValue("status", input.get("status")));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
-        if (input.get("role") != null) {
-            String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
-            replaceSystemRole(id, role);
-            ensureProfile(id, role, input);
+        if (requestedRole != null) {
+            replaceSystemRole(id, requestedRole);
+            removeObsoleteProfiles(id, requestedRole);
+            ensureProfile(id, requestedRole, input);
         }
         return find(id);
     }
@@ -111,7 +135,12 @@ public class AdminUserMutationService {
     }
 
     private Map<String, Object> find(String id) {
-        return jdbc.queryForMap("SELECT \"id\", \"email\", \"firstName\", \"lastName\", \"status\", \"phone\", \"createdAt\" FROM " + USER + " WHERE \"id\" = :id", new MapSqlParameterSource("id", id));
+        return jdbc.queryForMap(
+                "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
+                        + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE
+                        + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
+                        + " FROM " + USER + " u WHERE u.\"id\" = :id",
+                new MapSqlParameterSource("id", id));
     }
 
     private void assignRole(String userId, String roleName) {
@@ -133,6 +162,57 @@ public class AdminUserMutationService {
                         + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
                         + " (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
                 params.addValue("id", UUID.randomUUID().toString()));
+    }
+
+    private void guardRoleMutation(String userId, String roleName, boolean canManageSuperAdmin) {
+        if (roleName == null || roleName.isBlank()) {
+            throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
+        }
+        if (!SYSTEM_ROLES.contains(roleName) && !roleExists(roleName)) {
+            throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
+        }
+        if (!canManageSuperAdmin
+                && ("SUPER_ADMIN".equals(roleName) || (userId != null && hasRole(userId, "SUPER_ADMIN")))) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can manage super administrator accounts");
+        }
+    }
+
+    private boolean roleExists(String roleName) {
+        return !jdbc.queryForList(
+                "SELECT 1 FROM " + ROLE + " WHERE \"name\" = :roleName",
+                new MapSqlParameterSource("roleName", roleName),
+                Integer.class).isEmpty();
+    }
+
+    private boolean hasRole(String userId, String roleName) {
+        return !jdbc.queryForList(
+                "SELECT 1 FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\""
+                        + " WHERE ur.\"userId\" = :userId AND r.\"name\" = :roleName",
+                new MapSqlParameterSource().addValue("userId", userId).addValue("roleName", roleName),
+                Integer.class).isEmpty();
+    }
+
+    private void removeObsoleteProfiles(String userId, String roleName) {
+        try {
+            if (!"STUDENT".equals(roleName)) {
+                jdbc.update(
+                        "DELETE FROM " + STUDENT + " WHERE \"userId\" = :userId",
+                        new MapSqlParameterSource("userId", userId));
+            }
+            if (!"LECTURER".equals(roleName)) {
+                jdbc.update(
+                        "DELETE FROM " + LECTURER + " WHERE \"userId\" = :userId",
+                        new MapSqlParameterSource("userId", userId));
+            }
+        } catch (DataIntegrityViolationException exception) {
+            throw problem(
+                    HttpStatus.CONFLICT,
+                    "PROFILE_IN_USE",
+                    "The existing academic profile is still referenced");
+        }
     }
 
     private String roleId(String roleName) {

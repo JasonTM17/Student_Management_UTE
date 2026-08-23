@@ -17,7 +17,7 @@ project.
 
 The migration ensures `assistant.knowledge_document` has the required `id`,
 `slug`, `title`, `content`, `locale`, `source`, `active`, `visibility`,
-`updated_at`, and `priority` columns, a unique `(slug, locale)` key,
+`updated_at`, and `priority` columns, a globally unique `slug` key,
 active/locale/visibility/priority indexes, and a generated `tsvector` plus GIN
 index for lexical authoring search. It adds no seed rows and does not create a
 second corpus authority.
@@ -40,7 +40,7 @@ exposure setting was not changed automatically.
 
 The dependency-free utility is
 `scripts/supabase/assistant-knowledge.mjs`. It validates required fields,
-UUIDs, locale/visibility values, slug-locale uniqueness, and deterministic
+UUIDs, locale/visibility values, globally unique slugs, and deterministic
 ordering before it makes a request. It never prints environment values or
 response bodies.
 
@@ -61,7 +61,8 @@ node scripts/supabase/assistant-knowledge.mjs import `
 
 For an actual authoring import, set the values only in the server process
 environment and use the service key. Upsert identity is deterministic on
-`slug,locale`; input rows are sorted before batching.
+`slug`; bilingual variants use distinct locale-qualified slugs and input rows
+are sorted before batching.
 
 ```powershell
 $env:SUPABASE_URL = 'https://<project-ref>.supabase.co'
@@ -101,8 +102,8 @@ local PostgreSQL plus Java Flyway remains the runtime authority.
 
 ## Verification
 
-The local validation command above is the seed-count and duplicate
-`slug,locale` invariant. It should pass before import and after export. The
+The local validation command above is the seed-count and duplicate `slug`
+invariant. It should pass before import and after export. The
 configured remote table was verified through Supabase MCP with 10 rows, 10
 active/public rows, RLS enabled, and no remaining security advisor lints after
 the controller revoked an unrelated public `rls_auto_enable()` RPC execute

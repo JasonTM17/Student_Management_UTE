@@ -108,3 +108,18 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(messages, /Hỏi về đăng ký, đề tài, nhóm hoặc tiến độ/);
   assert.doesNotMatch(messages, /nhóm hoặc phản biện|groups, or reviews/i);
 });
+
+test('the mobile student context drawer traps focus and inerts the portal shell', () => {
+  const layout = read('src/app/dashboard/layout.tsx');
+  const rail = read('src/components/dashboard/StudentContextRail.tsx');
+
+  assert.match(layout, /studentRailRef/);
+  assert.match(layout, /studentRailTriggerRef/);
+  assert.match(layout, /studentRailOpen \\|\\| sidebarOpen/);
+  assert.match(layout, /querySelectorAll<HTMLElement>\(focusableSelector\)/);
+  assert.match(layout, /event\.key !== 'Tab'/);
+  assert.match(layout, /aria-controls="student-context-rail"/);
+  assert.match(layout, /containerRef=\{studentRailRef\}/);
+  assert.match(rail, /ref=\{containerRef\}/);
+  assert.match(rail, /id=\{mobile \? 'student-context-rail' : undefined\}/);
+});

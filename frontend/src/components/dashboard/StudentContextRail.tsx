@@ -1,5 +1,6 @@
 'use client';
 
+import type { RefObject } from 'react';
 import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, X } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ interface StudentContextRailProps {
   onToggleCollapsed: () => void;
   mobile?: boolean;
   onCloseMobile?: () => void;
+  containerRef?: RefObject<HTMLElement>;
 }
 
 const quickLinkConfig = [
@@ -45,6 +47,7 @@ export function StudentContextRail({
   onToggleCollapsed,
   mobile = false,
   onCloseMobile,
+  containerRef,
 }: StudentContextRailProps) {
   const { locale, messages } = useI18n();
   const copy = messages.dashboardShell.studentRail;
@@ -55,6 +58,8 @@ export function StudentContextRail({
 
   return (
     <aside
+      ref={containerRef}
+      id={mobile ? 'student-context-rail' : undefined}
       role={mobile ? 'dialog' : undefined}
       aria-modal={mobile || undefined}
       aria-label={copy.title}

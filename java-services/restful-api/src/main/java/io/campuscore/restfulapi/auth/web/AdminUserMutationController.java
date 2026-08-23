@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth.web;
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.Authentication;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -36,14 +37,28 @@ public class AdminUserMutationController {
     }
 
     @PostMapping
-    public Map<String, Object> create(@RequestBody Map<String, Object> input) { return users.create(input); }
+    public Map<String, Object> create(
+            @RequestBody Map<String, Object> input,
+            Authentication authentication) {
+        return users.create(input, isSuperAdmin(authentication));
+    }
 
     @PutMapping("/{id}")
-    public Map<String, Object> update(@PathVariable String id, @RequestBody Map<String, Object> input) { return users.update(id, input); }
+    public Map<String, Object> update(
+            @PathVariable String id,
+            @RequestBody Map<String, Object> input,
+            Authentication authentication) {
+        return users.update(id, input, isSuperAdmin(authentication));
+    }
 
     @DeleteMapping("/{id}")
     public Map<String, String> delete(@PathVariable String id) {
         users.delete(id);
         return Map.of("message", "User deleted successfully");
+    }
+
+    private static boolean isSuperAdmin(Authentication authentication) {
+        return authentication != null && authentication.getAuthorities().stream()
+                .anyMatch(authority -> "ROLE_SUPER_ADMIN".equals(authority.getAuthority()));
     }
 }
