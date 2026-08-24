@@ -50,6 +50,26 @@ springdoc:
   swagger-ui:
     path: /swagger-ui.html
 
+deepseek:
+  enabled: ${DEEPSEEK_ENABLED:false}
+  api-key: ${DEEPSEEK_API_KEY:}
+  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+  timeout-ms: ${DEEPSEEK_TIMEOUT_MS:8000}
+  max-output-tokens: ${DEEPSEEK_MAX_OUTPUT_TOKENS:800}
+  max-response-bytes: ${DEEPSEEK_MAX_RESPONSE_BYTES:512000}
+  max-frame-bytes: ${DEEPSEEK_MAX_FRAME_BYTES:64000}
+  max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
+
+assistant:
+  max-context-chars: ${ASSISTANT_MAX_CONTEXT_CHARS:6000}
+  max-message-chars: ${ASSISTANT_MAX_MESSAGE_CHARS:2000}
+  user-daily-quota: ${ASSISTANT_USER_DAILY_QUOTA:20}
+  global-daily-quota: ${ASSISTANT_GLOBAL_DAILY_QUOTA:200}
+  retention-days: ${ASSISTANT_RETENTION_DAYS:90}
+  recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
+  recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
+
 ---
 spring:
   config:
@@ -66,13 +86,15 @@ spring:
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:1000}
   jpa:
     hibernate:
-      # Flyway owns the schema; Hibernate must not reject focused fixture tests
-      # that intentionally disable migrations and create only their own tables.
-      ddl-auto: none
+      # Flyway owns the schema; validation catches entity/schema drift at startup.
+      ddl-auto: validate
+      naming:
+        physical-strategy: org.hibernate.boot.model.naming.PhysicalNamingStrategyStandardImpl
     open-in-view: false
     properties:
       hibernate:
         default_schema: thesis
+        globally_quoted_identifiers: true
         jdbc:
           time_zone: UTC
   flyway:

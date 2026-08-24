@@ -14,3 +14,7 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration-h2
+  jpa:
+    hibernate:
+      # Focused JDBC fixtures intentionally create only their owned tables.
+      ddl-auto: none

@@ -1,0 +1,141 @@
+-- Forward-only hardening for idempotent assistant turns and immutable provenance.
+-- V11 is intentionally left unchanged; this migration is safe for both fresh and
+-- V11-upgraded databases.
+
+CREATE SCHEMA IF NOT EXISTS assistant;
+
+ALTER TABLE assistant.chat_conversation
+    ADD COLUMN IF NOT EXISTS state VARCHAR(16) NOT NULL DEFAULT 'ACTIVE',
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS archived_by VARCHAR(120);
+ALTER TABLE assistant.chat_conversation
+    DROP CONSTRAINT IF EXISTS assistant_chat_conversation_state_valid;
+ALTER TABLE assistant.chat_conversation
+    ADD CONSTRAINT assistant_chat_conversation_state_valid
+        CHECK (state IN ('PENDING', 'ACTIVE', 'PURGED'));
+CREATE INDEX IF NOT EXISTS assistant_chat_owner_state_updated_idx
+    ON assistant.chat_conversation (owner_id, state, updated_at DESC);
+
+ALTER TABLE assistant.chat_message
+    ADD COLUMN IF NOT EXISTS turn_id UUID,
+    ADD COLUMN IF NOT EXISTS ordinal INTEGER;
+UPDATE assistant.chat_message
+SET turn_id = md5(id::text || ':legacy-turn')::uuid,
+    ordinal = COALESCE(ordinal, 0)
+WHERE turn_id IS NULL;
+CREATE INDEX IF NOT EXISTS assistant_chat_message_turn_idx
+    ON assistant.chat_message (turn_id, role);
+CREATE UNIQUE INDEX IF NOT EXISTS assistant_chat_message_one_role_per_turn_idx
+    ON assistant.chat_message (turn_id, role)
+    WHERE turn_id IS NOT NULL;
+
+ALTER TABLE assistant.chat_citation
+    ALTER COLUMN document_id DROP NOT NULL;
+ALTER TABLE assistant.chat_citation
+    ADD COLUMN IF NOT EXISTS domain VARCHAR(48) NOT NULL DEFAULT 'THESIS',
+    ADD COLUMN IF NOT EXISTS source_kind VARCHAR(24) NOT NULL DEFAULT 'CURATED',
+    ADD COLUMN IF NOT EXISTS source_id VARCHAR(180),
+    ADD COLUMN IF NOT EXISTS revision_id UUID,
+    ADD COLUMN IF NOT EXISTS revision_version INTEGER,
+    ADD COLUMN IF NOT EXISTS catalog_entity_type VARCHAR(48),
+    ADD COLUMN IF NOT EXISTS catalog_entity_id VARCHAR(180),
+    ADD COLUMN IF NOT EXISTS catalog_updated_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS snapshot_hash VARCHAR(64),
+    ADD COLUMN IF NOT EXISTS ordinal INTEGER NOT NULL DEFAULT 0;
+UPDATE assistant.chat_citation
+SET source_id = COALESCE(source_id, document_id::text),
+    snapshot_hash = COALESCE(snapshot_hash, md5(concat_ws('|', document_id::text, slug, title, source, locale, excerpt)))
+WHERE source_id IS NULL OR snapshot_hash IS NULL;
+ALTER TABLE assistant.chat_citation
+    DROP CONSTRAINT IF EXISTS assistant_chat_citation_source_kind_valid;
+ALTER TABLE assistant.chat_citation
+    ADD CONSTRAINT assistant_chat_citation_source_kind_valid
+        CHECK (source_kind IN ('CURATED', 'CATALOG', 'LEGACY_SNAPSHOT'));
+CREATE INDEX IF NOT EXISTS assistant_chat_citation_provenance_idx
+    ON assistant.chat_citation (domain, source_kind, source_id, revision_id, catalog_entity_id);
+
+CREATE TABLE IF NOT EXISTS assistant.chat_turn_ledger (
+    turn_id UUID PRIMARY KEY,
+    owner_id VARCHAR(120) NOT NULL,
+    client_request_id UUID NOT NULL,
+    request_hash VARCHAR(64) NOT NULL,
+    conversation_id UUID REFERENCES assistant.chat_conversation(id) ON DELETE SET NULL,
+    state VARCHAR(24) NOT NULL,
+    lease_owner VARCHAR(160),
+    lease_generation BIGINT NOT NULL DEFAULT 0,
+    lease_expires_at TIMESTAMPTZ,
+    dispatched_at TIMESTAMPTZ,
+    quota_reserved BOOLEAN NOT NULL DEFAULT FALSE,
+    result_message_id UUID REFERENCES assistant.chat_message(id) ON DELETE SET NULL,
+    terminal_reason VARCHAR(48),
+    source_snapshot_hash VARCHAR(64),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    purged_at TIMESTAMPTZ,
+    tombstone_until TIMESTAMPTZ,
+    CONSTRAINT assistant_turn_state_valid CHECK (state IN ('RESERVED', 'SNAPSHOT_READY', 'DISPATCHED', 'COMPLETED', 'CANCELLED', 'FAILED_PRE_DISPATCH', 'FAILED_AMBIGUOUS', 'PURGED')),
+    CONSTRAINT assistant_turn_lease_generation_valid CHECK (lease_generation >= 0),
+    CONSTRAINT assistant_turn_hash_valid CHECK (length(request_hash) = 64)
+);
+ALTER TABLE assistant.chat_turn_ledger
+    ADD COLUMN IF NOT EXISTS created_conversation BOOLEAN NOT NULL DEFAULT FALSE;
+CREATE UNIQUE INDEX IF NOT EXISTS assistant_turn_owner_request_idx
+    ON assistant.chat_turn_ledger (owner_id, client_request_id);
+CREATE UNIQUE INDEX IF NOT EXISTS assistant_turn_active_conversation_idx
+    ON assistant.chat_turn_ledger (owner_id, conversation_id)
+    WHERE conversation_id IS NOT NULL AND state IN ('RESERVED', 'SNAPSHOT_READY', 'DISPATCHED');
+CREATE INDEX IF NOT EXISTS assistant_turn_expiry_idx
+    ON assistant.chat_turn_ledger (state, tombstone_until, updated_at);
+CREATE INDEX IF NOT EXISTS assistant_turn_owner_updated_idx
+    ON assistant.chat_turn_ledger (owner_id, updated_at DESC);
+
+CREATE TABLE IF NOT EXISTS assistant.provider_dispatch_registry (
+    owner_id VARCHAR(120) NOT NULL,
+    client_request_id UUID NOT NULL,
+    lease_generation BIGINT NOT NULL,
+    provider_handle VARCHAR(180),
+    state VARCHAR(24) NOT NULL DEFAULT 'DISPATCHED',
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    cancelled_at TIMESTAMPTZ,
+    PRIMARY KEY (owner_id, client_request_id, lease_generation),
+    CONSTRAINT assistant_provider_dispatch_state_valid CHECK (state IN ('DISPATCHED', 'CANCELLED', 'COMPLETED'))
+);
+
+CREATE INDEX IF NOT EXISTS assistant_usage_bucket_retention_idx
+    ON assistant.usage_bucket (bucket_date, scope);
+
+CREATE TABLE IF NOT EXISTS assistant.chat_message_feedback (
+    message_id UUID NOT NULL REFERENCES assistant.chat_message(id) ON DELETE CASCADE,
+    owner_id VARCHAR(120) NOT NULL,
+    rating VARCHAR(4) NOT NULL,
+    reason VARCHAR(16),
+    created_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    PRIMARY KEY (message_id, owner_id),
+    CONSTRAINT assistant_feedback_rating_valid CHECK (rating IN ('UP', 'DOWN')),
+    CONSTRAINT assistant_feedback_reason_valid CHECK (reason IS NULL OR reason IN ('HELPFUL', 'CLEAR', 'INCORRECT', 'OUTDATED', 'NOT_RELEVANT', 'UNSAFE'))
+);
+
+ALTER TABLE assistant.knowledge_document
+    ADD COLUMN IF NOT EXISTS archived_at TIMESTAMPTZ,
+    ADD COLUMN IF NOT EXISTS archived_by VARCHAR(120);
+CREATE INDEX IF NOT EXISTS assistant_knowledge_archive_idx
+    ON assistant.knowledge_document (active, archived_at, updated_at DESC);
+
+-- Preserve old rows as legacy snapshots without asserting a verified revision.
+UPDATE assistant.chat_citation
+SET revision_version = COALESCE(revision_version, 0)
+WHERE revision_version IS NULL;
+
+-- Legacy history is retained for compatibility but is never presented as a
+-- newly verified source. Mark its provenance and terminal message reason
+-- explicitly so retrieval/replay code can distinguish immutable snapshots from
+-- current published revisions.
+UPDATE assistant.chat_citation
+SET source_kind = 'LEGACY_SNAPSHOT',
+    source_id = COALESCE(source_id, CAST(document_id AS TEXT)),
+    snapshot_hash = COALESCE(snapshot_hash, md5(concat_ws('|', document_id::text, slug, title, source, locale, excerpt)))
+WHERE source_kind = 'CURATED' AND revision_version = 0;
+UPDATE assistant.chat_message
+SET reason_code = 'LEGACY_COMPLETED'
+WHERE role = 'ASSISTANT' AND reason_code <> 'LEGACY_COMPLETED';
