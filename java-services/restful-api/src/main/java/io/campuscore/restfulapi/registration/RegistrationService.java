@@ -22,6 +22,8 @@ import io.campuscore.restfulapi.academic.persistence.EnrollmentAuditEntity;
 import io.campuscore.restfulapi.academic.persistence.EnrollmentAuditRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundEntity;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundRepository;
+import io.campuscore.restfulapi.academic.persistence.RegistrationSlipEntity;
+import io.campuscore.restfulapi.academic.persistence.RegistrationSlipRepository;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.sql.ResultSet;
@@ -45,6 +47,7 @@ import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.orm.ObjectOptimisticLockingFailureException;
 
 /** Registration orchestration. Database locks are acquired in round then section order. */
 @Service
@@ -61,11 +64,12 @@ public class RegistrationService {
     private final EnrollmentRepository enrollmentRepository;
     private final EnrollmentOperationRepository operationRepository;
     private final EnrollmentAuditRepository auditRepository;
+    private final RegistrationSlipRepository slipRepository;
 
     public RegistrationService(NamedParameterJdbcTemplate jdbc, ObjectMapper mapper, Clock clock,
             RegistrationRoundRepository roundRepository, AcademicSectionRepository sectionRepository,
             EnrollmentRepository enrollmentRepository, EnrollmentOperationRepository operationRepository,
-            EnrollmentAuditRepository auditRepository) {
+            EnrollmentAuditRepository auditRepository, RegistrationSlipRepository slipRepository) {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.clock = clock;
@@ -74,6 +78,7 @@ public class RegistrationService {
         this.enrollmentRepository = enrollmentRepository;
         this.operationRepository = operationRepository;
         this.auditRepository = auditRepository;
+        this.slipRepository = slipRepository;
     }
 
     public RoundPage rounds(String semesterId, String cursor, int limit) {
@@ -214,8 +219,45 @@ public class RegistrationService {
         StringBuilder canonical = new StringBuilder("CampusCore Registration Slip\n").append(round.id()).append('\n');
         enrollments.stream().sorted(Comparator.comparing(e -> e.section().courseCode())).forEach(e -> canonical.append(e.id()).append('|').append(e.section().courseCode()).append('|').append(e.section().sectionNumber()).append('|').append(e.section().credits()).append('\n'));
         String hash = sha256(canonical.toString());
-        return SimplePdf.render(canonical + "SHA-256: " + hash + "\n");
+        byte[] pdf = SimplePdf.render(canonical + "SHA-256: " + hash + "\n");
+        String renderedHash = sha256Bytes(pdf);
+        if (slipRepository.findByStudentIdAndRoundId(studentId, roundId).isEmpty()) {
+            slipRepository.save(RegistrationSlipEntity.snapshot(studentId + "-" + roundId, studentId, roundId, renderedHash, clock.instant()));
+        }
+        return pdf;
     }
+
+    @Transactional(readOnly = true)
+    public List<RoundView> adminRounds() { return roundRepository.findAll().stream().sorted(Comparator.comparing(RegistrationRoundEntity::getRegistrationStart).reversed()).map(this::roundView).toList(); }
+
+    @Transactional
+    public RoundView adminCreate(AdminRoundRequest request) {
+        RegistrationRoundEntity round = RegistrationRoundEntity.create(UUID.randomUUID().toString(), request.semesterId(), "DRAFT",
+                request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
+        return roundView(roundRepository.saveAndFlush(round));
+    }
+
+    @Transactional
+    public RoundView adminUpdate(String id, AdminRoundRequest request) {
+        RegistrationRoundEntity round = roundRepository.findLockedById(id).orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "REGISTRATION_ROUND_NOT_FOUND", "Registration round not found"));
+        requireVersion(round, request.version());
+        round.update(round.getStatus(), request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
+        try { return roundView(roundRepository.saveAndFlush(round)); } catch (ObjectOptimisticLockingFailureException e) { throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round was changed by another administrator"); }
+    }
+
+    @Transactional
+    public RoundView adminTransition(String id, String action, Long version) {
+        RegistrationRoundEntity round = roundRepository.findLockedById(id).orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "REGISTRATION_ROUND_NOT_FOUND", "Registration round not found"));
+        requireVersion(round, version);
+        String status = switch (action.toLowerCase()) { case "open" -> "OPEN"; case "close" -> "CLOSED"; case "archive" -> "ARCHIVED"; default -> throw new RegistrationProblemException(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Unsupported round transition"); };
+        round.update(status, round.getRegistrationStart(), round.getRegistrationEnd(), round.getAddDropStart(), round.getAddDropEnd(), round.getMaxCredits(), round.getInstitutionTimeZone());
+        return roundView(roundRepository.saveAndFlush(round));
+    }
+
+    private static void requireVersion(RegistrationRoundEntity round, Long expected) { if (expected != null && expected.longValue() != round.getVersion()) throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round version is stale"); }
+
+    public record AdminRoundRequest(String semesterId, Instant registrationStart, Instant registrationEnd,
+            Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone, Long version) { }
 
     private List<String> validateViolations(String studentId, EnrollmentRequest request) {
         RoundView round = round(request.roundId());
@@ -286,6 +328,7 @@ public class RegistrationService {
     private static String encodeCursor(int n){return Base64.getUrlEncoder().withoutPadding().encodeToString(String.valueOf(n).getBytes(StandardCharsets.UTF_8));}
     private static String canonicalHash(String op,String student,EnrollmentRequest r){return sha256(op+"|"+student+"|"+r.roundId().trim()+"|"+r.sectionId().trim());}
     private static String sha256(String text){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
+    private static String sha256Bytes(byte[] bytes){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(bytes);StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     private static RegistrationProblemException problem(HttpStatus s,String c,String m){return new RegistrationProblemException(s,c,m);}
     private static RegistrationProblemException rejection(String code,List<String> violations){return new RegistrationProblemException(HttpStatus.CONFLICT,code,"Registration rejected",false,violations.stream().map(v->new RegistrationProblemException.Violation(null,null,v)).toList());}
     private record ExistingOperation(String id,String body) { }
