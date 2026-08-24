@@ -188,7 +188,7 @@ public class RegistrationService {
     }
 
     @Transactional
-    public void drop(String studentId, String enrollmentId, UUID key) {
+    public DropResult drop(String studentId, String enrollmentId, UUID key) {
         requireStudent(studentId);
         EnrollmentEntity previewEnrollment = enrollmentRepository.findById(enrollmentId)
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found"));
@@ -199,7 +199,7 @@ public class RegistrationService {
         AcademicSectionEntity lockedSection = lockSection(previewEnrollment.getSectionId());
         lockStudentEnrollments(studentId, previewEnrollment.getSemesterId());
         ExistingOperation existing = operation(studentId, key, hash);
-        if (existing != null) return;
+        if (existing != null) return new DropResult(enrollmentId, true);
         EnrollmentOperationEntity operation = createOperation(studentId, key, hash, "DROP");
         EnrollmentEntity lockedEnrollment = enrollmentRepository.findLockedById(enrollmentId)
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found"));
@@ -211,20 +211,33 @@ public class RegistrationService {
         sectionRepository.saveAndFlush(lockedSection);
         completeOperation(operation, Map.of("dropped", true, "enrollmentId", enrollmentId), 200);
         auditRepository.save(EnrollmentAuditEntity.of(UUID.randomUUID().toString(), operation.getId(), studentId, lockedEnrollment.getSectionId(), "DROP", "DROPPED", now));
+        return new DropResult(enrollmentId, false);
     }
 
-    public byte[] slip(String studentId, String roundId) {
+    @Transactional
+    public SlipResult slip(String studentId, String roundId) {
         RoundView round = round(roundId);
+        var stored = slipRepository.findByStudentIdAndRoundId(studentId, roundId);
+        if (stored.isPresent() && stored.get().getSnapshotPayload() != null && !stored.get().getSnapshotPayload().isBlank()) {
+            return new SlipResult(Base64.getDecoder().decode(stored.get().getSnapshotPayload()), stored.get().getContentHash());
+        }
         List<EnrollmentView> enrollments = enrollments(studentId, round.semesterId(), null, MAX_LIMIT).items();
         StringBuilder canonical = new StringBuilder("CampusCore Registration Slip\n").append(round.id()).append('\n');
         enrollments.stream().sorted(Comparator.comparing(e -> e.section().courseCode())).forEach(e -> canonical.append(e.id()).append('|').append(e.section().courseCode()).append('|').append(e.section().sectionNumber()).append('|').append(e.section().credits()).append('\n'));
-        String hash = sha256(canonical.toString());
-        byte[] pdf = SimplePdf.render(canonical + "SHA-256: " + hash + "\n");
-        String renderedHash = sha256Bytes(pdf);
-        if (slipRepository.findByStudentIdAndRoundId(studentId, roundId).isEmpty()) {
-            slipRepository.save(RegistrationSlipEntity.snapshot(studentId + "-" + roundId, studentId, roundId, renderedHash, clock.instant()));
+        String checksum = sha256(canonical.toString());
+        byte[] pdf = SimplePdf.render(canonical + "SHA-256: " + checksum + "\n");
+        String encodedPdf = Base64.getEncoder().encodeToString(pdf);
+        if (stored.isEmpty()) {
+            slipRepository.saveAndFlush(RegistrationSlipEntity.snapshot(studentId + "-" + roundId, studentId, roundId,
+                    checksum, encodedPdf, clock.instant()));
+        } else {
+            // V17 cannot reconstruct legacy PDF bytes. Backfill the payload only
+            // when the existing canonical checksum proves the regenerated data
+            // is exactly the same; otherwise preserve the old immutable hash.
+            stored.get().storePayload(encodedPdf, checksum);
+            slipRepository.saveAndFlush(stored.get());
         }
-        return pdf;
+        return new SlipResult(pdf, checksum);
     }
 
     @Transactional(readOnly = true)
@@ -258,6 +271,8 @@ public class RegistrationService {
 
     public record AdminRoundRequest(String semesterId, Instant registrationStart, Instant registrationEnd,
             Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone, Long version) { }
+    public record DropResult(String enrollmentId, boolean replayed) { }
+    public record SlipResult(byte[] pdf, String checksum) { }
 
     private List<String> validateViolations(String studentId, EnrollmentRequest request) {
         RoundView round = round(request.roundId());
@@ -328,7 +343,6 @@ public class RegistrationService {
     private static String encodeCursor(int n){return Base64.getUrlEncoder().withoutPadding().encodeToString(String.valueOf(n).getBytes(StandardCharsets.UTF_8));}
     private static String canonicalHash(String op,String student,EnrollmentRequest r){return sha256(op+"|"+student+"|"+r.roundId().trim()+"|"+r.sectionId().trim());}
     private static String sha256(String text){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
-    private static String sha256Bytes(byte[] bytes){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(bytes);StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     private static RegistrationProblemException problem(HttpStatus s,String c,String m){return new RegistrationProblemException(s,c,m);}
     private static RegistrationProblemException rejection(String code,List<String> violations){return new RegistrationProblemException(HttpStatus.CONFLICT,code,"Registration rejected",false,violations.stream().map(v->new RegistrationProblemException.Violation(null,null,v)).toList());}
     private record ExistingOperation(String id,String body) { }
