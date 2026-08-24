@@ -139,6 +139,7 @@ export interface RegistrationRound {
   serverNow: string;
   institutionTimeZone: string;
   maxCredits: number;
+  version?: number;
 }
 
 export interface RegistrationEligibility {
@@ -163,6 +164,11 @@ export interface EnrollmentMutationResponse {
   enrollment: MobileEnrollment;
   replayed: boolean;
   clientRequestId: string;
+}
+
+export interface DropMutationResponse {
+  enrollmentId: string;
+  replayed: boolean;
 }
 
 export interface RegistrationValidationResponse {
@@ -655,7 +661,7 @@ export const campusApi = {
   registrationEnroll: (sectionId: string, roundId: string, idempotencyKey: string) =>
     apiClient.post<EnrollmentMutationResponse>(apiRoutes.registration.enrollments, { sectionId, roundId }, { headers: { 'Idempotency-Key': idempotencyKey } }),
   registrationDrop: (enrollmentId: string, idempotencyKey: string) =>
-    apiClient.delete<void>(`${apiRoutes.registration.enrollments}/${encodeURIComponent(enrollmentId)}`, { headers: { 'Idempotency-Key': idempotencyKey } }),
+    apiClient.delete<DropMutationResponse>(`${apiRoutes.registration.enrollments}/${encodeURIComponent(enrollmentId)}`, { headers: { 'Idempotency-Key': idempotencyKey } }),
   registrationSlip: (roundId: string) =>
     apiClient.requestBytes(`${apiRoutes.registration.slip}?roundId=${encodeURIComponent(roundId)}`),
   grades: (semesterId?: string) =>
