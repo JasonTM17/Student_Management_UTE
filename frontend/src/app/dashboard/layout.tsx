@@ -75,7 +75,7 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
   {
     sectionKey: 'academic',
     items: [
-      { href: '/dashboard/register', icon: ClipboardList, labelKey: 'courseRegistration' },
+      { href: '/dashboard/registration', icon: ClipboardList, labelKey: 'courseRegistration' },
       { href: '/dashboard/enrollments', icon: BookOpen, labelKey: 'myCourses' },
       { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
       { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
@@ -173,6 +173,9 @@ export default function DashboardLayout({
           label: menuLabels[item.labelKey],
         })),
       }));
+  const mobileNavItems = menuSections
+    .flatMap((section) => section.items)
+    .slice(0, 4);
 
   const pageMetadata = useMemo<Record<string, { title: string; description: string }>>(
     () => ({
@@ -184,7 +187,7 @@ export default function DashboardLayout({
         title: messages.profile.title,
         description: messages.dashboardShell.routeDescriptions.profile,
       },
-      '/dashboard/register': {
+      '/dashboard/registration': {
         title: messages.dashboardShell.menu.courseRegistration,
         description: messages.dashboardShell.routeDescriptions.register,
       },
@@ -975,7 +978,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 sm:px-6 lg:px-8">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 pb-24 sm:px-6 lg:px-8 lg:pb-5">
           {showStudentRail ? (
             <div
               className={cn(
@@ -989,7 +992,7 @@ export default function DashboardLayout({
                 id="dashboard-main-content"
                 ref={mainRef}
                 tabIndex={-1}
-                className="min-w-0 focus:outline-none"
+                className="min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
               >
                 {children}
               </main>
@@ -1010,13 +1013,37 @@ export default function DashboardLayout({
               id="dashboard-main-content"
               ref={mainRef}
               tabIndex={-1}
-              className="min-w-0 focus:outline-none"
+              className="min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
             >
               {children}
             </main>
           )}
         </div>
       </div>
+      <nav
+        aria-label={messages.dashboardShell.controls.mobileNavigation}
+        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden"
+      >
+        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 py-2">
+          {mobileNavItems.map((item) => {
+            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
+            return (
+              <LocalizedLink
+                key={item.href}
+                href={item.href}
+                aria-current={isActive ? 'page' : undefined}
+                className={cn(
+                  'flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-[11px] font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  isActive ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                )}
+              >
+                <item.icon className="h-4 w-4" aria-hidden="true" />
+                <span className="max-w-full truncate">{menuLabels[item.labelKey]}</span>
+              </LocalizedLink>
+            );
+          })}
+        </div>
+      </nav>
       <AssistantPanel />
     </div>
   );

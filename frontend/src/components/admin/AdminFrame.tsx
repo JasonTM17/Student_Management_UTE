@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   ArrowLeft,
   Bell,
+  BrainCircuit,
   BookMarked,
   BookOpen,
   Building2,
@@ -50,7 +51,7 @@ export function AdminFrame({
   children,
 }: AdminFrameProps) {
   const { user, logout } = useAuth();
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = React.useState(false);
@@ -88,6 +89,7 @@ export function AdminFrame({
         { href: '/admin/sections', icon: BookMarked, label: messages.admin.menuItems[4]?.[0] },
         { href: '/admin/enrollments', icon: FileText, label: messages.admin.menuItems[5]?.[0] },
         { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
+        { href: '/admin/registration-rounds', icon: CalendarRange, label: locale === 'vi' ? 'Đợt đăng ký' : 'Registration rounds' },
         { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
         { href: '/admin/departments', icon: Building2, label: messages.admin.menuItems[7]?.[0] },
         { href: '/admin/classrooms', icon: DoorOpen, label: messages.admin.menuItems[8]?.[0] },
@@ -99,6 +101,7 @@ export function AdminFrame({
       items: [
         { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
         { href: '/admin/announcements', icon: Bell, label: messages.admin.menuItems[9]?.[0] },
+        { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: locale === 'vi' ? 'Kiến thức trợ lý AI' : 'AI assistant knowledge' },
       ],
     },
   ];
