@@ -95,23 +95,20 @@ public class RegistrationController {
 
     @DeleteMapping("me/enrollments/{id}")
     @PreAuthorize("hasRole('STUDENT')")
-    public ResponseEntity<Void> drop(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
+    public ResponseEntity<RegistrationService.DropResult> drop(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
             @RequestHeader("Idempotency-Key") UUID key) {
-        registration.drop(jwt.getClaimAsString("studentId"), id, key);
-        return ResponseEntity.noContent().build();
+        RegistrationService.DropResult result = registration.drop(jwt.getClaimAsString("studentId"), id, key);
+        return ResponseEntity.ok(result);
     }
 
     @GetMapping(value = "me/registration/slip", produces = MediaType.APPLICATION_PDF_VALUE)
     @PreAuthorize("hasRole('STUDENT')")
     public ResponseEntity<byte[]> slip(@AuthenticationPrincipal Jwt jwt, @RequestParam String roundId) {
-        byte[] pdf = registration.slip(jwt.getClaimAsString("studentId"), roundId);
-        String hash = sha256(pdf);
+        RegistrationService.SlipResult slip = registration.slip(jwt.getClaimAsString("studentId"), roundId);
         HttpHeaders headers = new HttpHeaders();
         headers.setContentType(MediaType.APPLICATION_PDF);
         headers.setContentDisposition(ContentDisposition.attachment().filename("registration-slip.pdf").build());
-        headers.set("X-Registration-Slip-Hash", hash);
-        return new ResponseEntity<>(pdf, headers, org.springframework.http.HttpStatus.OK);
+        headers.set("X-Registration-Slip-Hash", slip.checksum());
+        return new ResponseEntity<>(slip.pdf(), headers, org.springframework.http.HttpStatus.OK);
     }
-
-    private static String sha256(byte[] bytes) { try { byte[] digest = java.security.MessageDigest.getInstance("SHA-256").digest(bytes); StringBuilder b = new StringBuilder(); for (byte value : digest) b.append(String.format("%02x", value)); return b.toString(); } catch (Exception e) { throw new IllegalStateException(e); } }
 }

@@ -40,7 +40,10 @@ class RegistrationPersistenceSchemaTest {
         assertThat(operations).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT MAX(CAST(VERSION AS INT)) FROM thesis.flyway_schema_history WHERE SUCCESS = TRUE",
-                Integer.class)).isEqualTo(10);
+                Integer.class)).isEqualTo(11);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_SCHEMA) = 'academic' AND LOWER(TABLE_NAME) = 'registrationslip' AND LOWER(COLUMN_NAME) = 'snapshotpayload'",
+                Integer.class)).isEqualTo(1);
     }
 
     @Test
