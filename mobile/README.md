@@ -64,11 +64,15 @@ and the host firewall must allow that development port.
 `src/api/client.ts` targets the Java REST API at `/api/v1`. It exposes generic
 GET/POST/PATCH/PUT/DELETE helpers plus named probes for auth, identity, health,
 notifications, thesis topics, and the assistant route. The assistant seam sends
-`{ message, locale }` and expects the Java/web-compatible
-`{ answer, model, degraded, reasonCode, citations }` shape. The assistant
-screen renders provenance in live mode and only uses local responses in the
-explicit preview state. Retained role routes must show an explicit
-not-available state when their Java contract is not yet present.
+`{ message, locale, conversationId? }` to the buffered JSON contract and expects
+`{ answer, model, degraded, reasonCode, locale, citations, conversationId?, messageId? }`.
+Owner-scoped conversation list, message history, and delete helpers are available
+for live sessions. Native intentionally uses this buffered JSON fallback instead
+of SSE; the web client owns streaming. The assistant screen renders provenance,
+model, quota/error/retry states, and localised Vietnamese/English copy in live
+mode, and only uses local responses in the explicit preview state. Retained role
+routes must show an explicit not-available state when their Java contract is not
+yet present.
 
 ## Screen atlas
 
