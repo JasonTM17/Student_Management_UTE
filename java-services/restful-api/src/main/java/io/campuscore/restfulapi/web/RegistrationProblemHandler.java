@@ -1,0 +1,28 @@
+package io.campuscore.restfulapi.web;
+
+import io.campuscore.restfulapi.registration.RegistrationProblemException;
+import jakarta.servlet.http.HttpServletRequest;
+import java.net.URI;
+import java.util.List;
+import org.springframework.core.annotation.Order;
+import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
+import org.springframework.web.bind.annotation.ExceptionHandler;
+import org.springframework.web.bind.annotation.RestControllerAdvice;
+
+/** RFC 7807-compatible registration errors while preserving the legacy ApiError contract elsewhere. */
+@RestControllerAdvice
+@Order(-10)
+public class RegistrationProblemHandler {
+    @ExceptionHandler(RegistrationProblemException.class)
+    ResponseEntity<Problem> registration(RegistrationProblemException exception, HttpServletRequest request) {
+        Object requestId = request.getAttribute(io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
+        Problem body = new Problem(URI.create("https://campuscore.edu/problems/registration"), "Registration rejected",
+                exception.status().value(), exception.getMessage(), exception.code(), requestId == null ? null : requestId.toString(),
+                exception.retryable(), exception.violations());
+        return ResponseEntity.status(exception.status()).contentType(MediaType.valueOf("application/problem+json")).body(body);
+    }
+
+    public record Problem(URI type, String title, int status, String detail, String code, String requestId,
+            boolean retryable, List<RegistrationProblemException.Violation> violations) { }
+}
