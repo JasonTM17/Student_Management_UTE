@@ -10,6 +10,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import java.util.UUID;
@@ -126,5 +127,20 @@ public class ThesisMutationController {
             @RequestBody ProgressRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.updateProgress(id, request, actor);
+    }
+
+    @PostMapping("/groups/{id}/approve")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
+    public GroupResponse approveGroup(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+        return mutations.approveGroup(id, actor);
+    }
+
+    @PostMapping("/groups/{id}/reject")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
+    public GroupResponse rejectGroup(
+            @PathVariable UUID id,
+            @RequestBody GroupRejectionRequest request,
+            @AuthenticationPrincipal Jwt actor) {
+        return mutations.rejectGroup(id, request, actor);
     }
 }

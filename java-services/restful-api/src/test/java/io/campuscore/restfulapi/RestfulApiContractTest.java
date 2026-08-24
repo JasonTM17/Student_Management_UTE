@@ -1,9 +1,13 @@
 package io.campuscore.restfulapi;
 
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.springframework.http.MediaType.APPLICATION_JSON;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -67,5 +71,16 @@ class RestfulApiContractTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.openapi").exists())
                 .andExpect(jsonPath("$.paths['/api/v1/health/liveness']").exists());
+    }
+
+    @Test
+    void enrollmentMutationWithoutIdempotencyKeyUsesProblemDetails() throws Exception {
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
+                .with(csrf())
+                        .contentType(APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-1\",\"roundId\":\"round-1\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("IDEMPOTENCY_KEY_REQUIRED"));
     }
 }
