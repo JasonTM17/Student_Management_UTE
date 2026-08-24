@@ -20,7 +20,9 @@ public class RegistrationProblemHandler {
         Problem body = new Problem(URI.create("https://campuscore.edu/problems/registration"), "Registration rejected",
                 exception.status().value(), exception.getMessage(), exception.code(), requestId == null ? null : requestId.toString(),
                 exception.retryable(), exception.violations());
-        return ResponseEntity.status(exception.status()).contentType(MediaType.valueOf("application/problem+json")).body(body);
+        ResponseEntity.BodyBuilder builder = ResponseEntity.status(exception.status()).contentType(MediaType.valueOf("application/problem+json"));
+        if (exception.retryable()) builder.header("Retry-After", "1");
+        return builder.body(body);
     }
 
     public record Problem(URI type, String title, int status, String detail, String code, String requestId,
