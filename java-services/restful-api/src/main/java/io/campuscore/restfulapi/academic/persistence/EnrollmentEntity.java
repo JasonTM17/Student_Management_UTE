@@ -30,14 +30,26 @@ public class EnrollmentEntity {
 
     public static EnrollmentEntity active(String id, String studentId, String sectionId,
                                            String semesterId, Instant now) {
+        return create(id, studentId, sectionId, semesterId, now, "ACTIVE", "PENDING");
+    }
+
+    /** Legacy academic schema contract used by the enrollment API. */
+    public static EnrollmentEntity enrolled(String id, String studentId, String sectionId,
+                                             String semesterId, Instant now) {
+        return create(id, studentId, sectionId, semesterId, now, "ENROLLED", "NOT_GRADED");
+    }
+
+    private static EnrollmentEntity create(String id, String studentId, String sectionId,
+                                            String semesterId, Instant now, String status,
+                                            String gradeStatus) {
         EnrollmentEntity entity = new EnrollmentEntity();
         entity.id = require(id, "id");
         entity.studentId = require(studentId, "studentId");
         entity.sectionId = require(sectionId, "sectionId");
         entity.semesterId = require(semesterId, "semesterId");
-        entity.status = "ACTIVE";
+        entity.status = status;
         entity.enrolledAt = now;
-        entity.gradeStatus = "PENDING";
+        entity.gradeStatus = gradeStatus;
         entity.createdAt = now;
         entity.updatedAt = now;
         return entity;
