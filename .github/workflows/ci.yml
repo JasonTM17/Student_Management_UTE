@@ -17,6 +17,27 @@ jobs:
   java-api:
     name: Java REST API
     runs-on: ubuntu-latest
+    env:
+      # Provider tests are stubbed/no-network; a runtime key is never required in CI.
+      DEEPSEEK_ENABLED: 'false'
+      DEEPSEEK_API_KEY: ''
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '25'
+          cache: maven
+          cache-dependency-path: java-services/pom.xml
+      - name: Verify Java API
+        run: ./mvnw -q -f java-services/pom.xml verify
+
+  java-api-baseline:
+    name: Java 21 compatibility baseline
+    runs-on: ubuntu-latest
+    env:
+      DEEPSEEK_ENABLED: 'false'
+      DEEPSEEK_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-java@v4
@@ -25,8 +46,8 @@ jobs:
           java-version: '21'
           cache: maven
           cache-dependency-path: java-services/pom.xml
-      - name: Verify Java API
-        run: mvn -q -f java-services/pom.xml verify
+      - name: Verify Java 21 baseline
+        run: ./mvnw -q -f java-services/pom.xml -Dcampuscore.java-baseline=true verify
 
   frontend:
     name: Next.js web
@@ -77,29 +98,41 @@ jobs:
   compose:
     name: PostgreSQL and Compose runtime
     runs-on: ubuntu-latest
+    env:
+      # Keep the course stack deterministic and credential-free.
+      DEEPSEEK_ENABLED: 'false'
+      DEEPSEEK_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
       - name: Validate Compose
         run: docker compose config
+      - name: Secret hygiene
+        shell: bash
+        run: |
+          if git grep -nE 'sk-[A-Za-z0-9]{20,}' -- . ':!plans' ':!scripts/run-course-e2e.mjs'; then
+            echo 'A provider-looking secret is tracked; refusing CI.'
+            exit 1
+          fi
+          node scripts/check-assistant-secrets.mjs
       - name: Build and start fresh course stack
         run: docker compose up -d --build --wait
       - name: Verify Flyway, health, OpenAPI, login and RAG
         shell: bash
         run: |
           version="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc 'SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1')"
-          test "$version" = "9"
+          test "$version" = "12"
           curl --fail --silent --show-error http://127.0.0.1:4010/api/v1/health/liveness
           curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
           curl --fail --silent --show-error http://127.0.0.1:4010/v3/api-docs > openapi.json
-          python3 -c 'import json; paths=json.load(open("openapi.json", encoding="utf-8"))["paths"]; required={"/api/v1/auth/login", "/api/v1/students", "/api/v1/lecturers", "/api/v1/sections", "/api/v1/enrollments", "/api/v1/sections/{sectionId}/grades", "/api/v1/announcements", "/api/v1/notifications", "/api/v1/thesis/assistant/chat", "/api/v1/health/readiness"}; assert len(paths) >= 86 and not required.difference(paths)'
+          python3 -c 'import json; paths=json.load(open("openapi.json", encoding="utf-8"))["paths"]; required={"/api/v1/auth/login", "/api/v1/students", "/api/v1/lecturers", "/api/v1/sections", "/api/v1/enrollments", "/api/v1/sections/{sectionId}/grades", "/api/v1/announcements", "/api/v1/notifications", "/api/v1/thesis/assistant/chat", "/api/v1/thesis/assistant/chat/stream", "/api/v1/thesis/assistant/conversations", "/api/v1/health/readiness"}; assert len(paths) >= 89 and not required.difference(paths)'
           login="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -d '{"email":"student@campuscore.edu","password":"password123"}' http://127.0.0.1:4010/api/v1/auth/login)"
           token="$(LOGIN="$login" python3 -c 'import json, os; print(json.loads(os.environ["LOGIN"])["accessToken"])')"
-          assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
-          ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "ANSWERED" and data["degraded"] is False and len(data["citations"]) > 0'
+          assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000001"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
+          ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "PROVIDER_DISABLED" and data["degraded"] is True and len(data["citations"]) > 0'
           docker compose stop postgres
           readiness_code="$(curl --max-time 8 --silent --output /dev/null --write-out '%{http_code}' -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness)"
           test "$readiness_code" = "503"
-          outage="$(curl --max-time 8 --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
+          outage="$(curl --max-time 8 --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000002"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
           OUTAGE="$outage" python3 -c 'import json, os; data=json.loads(os.environ["OUTAGE"]); assert data["reasonCode"] == "KNOWLEDGE_UNAVAILABLE" and data["degraded"] is True and data["citations"] == []'
           docker compose start postgres
           docker compose up -d --wait
