@@ -104,7 +104,74 @@ isolation finding, not a suppressed failure. It is carried into Phase 2.
 
 ## Next resume point
 
-Phase 1 is complete in the candidate container runtime. Begin the single DB/JPA
-writer wave from the candidate branch state; do not begin JPA/enrollment edits
-on dirty `main` and do not let the worker touch controllers, clients, or
-assistant provider code.
+Phase 1 is complete in the candidate container runtime. The DB/JPA writer wave
+delivered a foundation checkpoint in candidate commit `94e85c3`; Phase 2 remains
+active for PostgreSQL concurrency/upgraded-copy evidence and JDBC writer parity.
+The next resume point is the backend/API registration wave only after this
+checkpoint is recorded. Do not begin edits on dirty `main` and do not let later
+workers overwrite the persistence owner's files.
+
+## Phase 2 foundation checkpoint
+
+- [x] Worker reviewed read-only at source SHA `06a54aa3d955f6658dc8d3431d666414c7b655f7`.
+- [x] Integrated as `94e85c3` after excluding dirty assistant config from the
+  cherry-pick and applying the minimal persistence profile changes manually.
+- [x] V13-V16 PostgreSQL and V7-V10 H2 migrations added; V11/V12 preserved.
+- [x] Typed entities/repositories and lock declarations added.
+- [x] Java 25 focused suite: 4 tests PASS; ephemeral PostgreSQL 15 SQL
+  rehearsal: PASS.
+- [ ] PostgreSQL Flyway/Testcontainers concurrency and owner-isolation suite.
+- [ ] V10/V12 upgraded-copy rehearsal and invalid-data preflight report.
+- [ ] JDBC academic writer parity/cutover inventory.
+
+Phase 2 status is `FOUNDATION_CHECKPOINT`, not `completed`; no downstream agent
+may call the JPA migration fully complete from this evidence alone.
+
+## Phase 3-6 implementation checkpoint (2026-08-24)
+
+- [x] Added canonical registration API hardening: status/window gates, typed
+  drop replay, RFC7807 missing/invalid idempotency errors, round version and
+  deterministic slip snapshot body/hash.
+- [x] Added PostgreSQL V18 active-status uniqueness preflight/index and the
+  isolated `RegistrationPostgresConcurrencyIT`; real PostgreSQL 15.19 + Java
+  25 run passed (two active-status/capacity tests, exact container cleanup).
+- [x] Rehearsed Flyway upgrades from clean V10 and clean V12 copies to V18 on
+  disposable PostgreSQL 15 containers; both paths passed. Injected duplicate
+  active enrollment and invalid section capacity into V12 copies; V13 stopped
+  with the documented preflight markers in both cases.
+- [x] Added asynchronous assistant SSE executor/controller lifecycle, source
+  validation/fallback/privacy guard regression, and stable malformed-query
+  handling in `RegistrationProblemHandler`.
+- [x] Added web assistant/admin/registration surfaces, guarded disposable E2E
+  Compose config, mobile JSON parity and phase reports.
+- [x] Java 25 focused gate: 69 tests, 0 failures, 0 errors, 2 skipped PG ITs
+  without environment. Full reactor: 180 tests, 0 failures, 0 errors, 2
+  skipped PG ITs without environment.
+- [x] Frontend local gates: 24 tests, typecheck, lint and Next build pass.
+- [x] Mobile local gates: 17 tests and typecheck pass.
+- [x] Static hygiene/secret/encoding/docs and normal/disposable Compose config
+  checks pass.
+
+## Current phase rulings
+
+- Phase 2 remains `FOUNDATION_CHECKPOINT`: upgraded-copy rehearsal and complete
+  academic JDBC-writer cutover are still open; H2 does not prove PostgreSQL
+  academic locking.
+- Phase 3 remains `in-progress`: canonical local API and PostgreSQL capacity
+  evidence pass, while legacy alias parity, operation-first lock order and a
+  Unicode-capable pinned PDF renderer need review/follow-up.
+- Phase 4 remains `in-progress`: authenticated Playwright at 390/768/1440 and
+  independent accessibility review are `NOT_RUN`.
+- Phase 5 is locally complete; native device/simulator is `NOT_RUN`.
+- Phase 6 is source/config pass but remains `in-progress` until exact-head
+  docs/review identity is frozen. Physical Docker/nginx/ignored-artifact
+  cleanup is deferred and no destructive action was taken.
+
+## Next resume point
+
+Freeze the candidate after the report/docs edits, create split Conventional
+Commits with explicit paths, then run the required read-only Kongming, Wukong,
+FE reviewer, tester/debugger and code-reviewer lanes against that exact SHA.
+Only cause-aligned repairs may follow; push the feature branch only after the
+review/gate circuit. Production, remote CI, live provider and device claims
+remain separate.

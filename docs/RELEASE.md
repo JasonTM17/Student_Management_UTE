@@ -22,12 +22,13 @@ curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1
 curl.exe http://127.0.0.1:4010/v3/api-docs
 ```
 
-Verify a fresh PostgreSQL database, Flyway versions, deterministic seed
-counts, login, role isolation, enrollment transaction rules, grade publishing,
+Verify a fresh PostgreSQL database, Flyway versions through the actual latest
+V18 migration, deterministic seed counts, login, role isolation, registration
+round/window/eligibility rules, enrollment transaction rules, grade publishing,
 thesis group limits and assistant citations/locale fallback/outage behavior.
-Also verify the forward-only V12 assistant migration, conversation ownership,
-idempotency ledger, quota buckets, terminal CAS/cancel race and knowledge
-revision workflow. Provider tests must use a no-network fake by default; a live
+Also verify the forward-only V13-V18 registration/assistant migrations,
+conversation ownership, idempotency ledger, quota buckets, terminal CAS/cancel
+race and knowledge revision workflow. Provider tests must use a no-network fake by default; a live
 DeepSeek smoke is optional, chargeable and only allowed after a rotated runtime
 key is injected explicitly. Java 25 is the release runtime authority; Java 21
 is a separately recorded compatibility baseline using
@@ -61,5 +62,7 @@ login, refresh, logout and core student flows on an emulator or device.
   screenshots and a provider stub do not prove production readiness.
 - Remove obsolete branches only with `git branch -d` after containment proof.
 - Remove only exact old local microservice image tags after runtime proof.
-- Never run `docker system prune`, `docker volume prune` or
-  `docker compose down -v`.
+- Never run `docker system prune` or `docker volume prune`. The disposable
+  `scripts/run-course-e2e.mjs` runner may use `down -v` only with its generated
+  `campuscore-course-e2e-*` project after collision/port preflight; never use it
+  against the default developer project.

@@ -1,6 +1,6 @@
 ---
 title: "Phase 4: Web registration, admin and chatbot workspace"
-status: pending
+status: in-progress
 ---
 
 # Phase 4: Web registration, admin and chatbot workspace

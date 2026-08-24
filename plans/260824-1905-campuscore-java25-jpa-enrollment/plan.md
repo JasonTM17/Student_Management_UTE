@@ -53,10 +53,10 @@ destructive cleanup without an exact authorized target.
 | 0 | Freeze and successor artifacts | New plan validates, exact snapshot/ownership ledger exists, isolated feature worktree is created, no data deletion | completed |
 | 1 | Java 21 baseline and Java 25 toolchain | Reproducible Java 21 baseline plus real Java 25 build/test evidence | completed |
 | 2 | JPA foundation and forward migrations | Fresh and upgraded DBs migrate without data loss; JPA parity and negative constraints pass | in-progress |
-| 3 | Registration domain/API/PDF | Round, eligibility, locking, idempotency, problem codes, pagination and PDF contract pass | pending |
-| 4 | Web registration, admin and chatbot | 390/768/1440 browser flows, accessibility and SSE states pass | pending |
-| 5 | Mobile parity | JSON registration, retry/offline/session states and typecheck pass; device status honest | pending |
-| 6 | Consolidation and docs | Runtime scan shows one API + PostgreSQL; docs/OpenAPI/CI match implementation | pending |
+| 3 | Registration domain/API/PDF | Round, eligibility, locking, idempotency, problem codes, pagination and PDF contract pass | in-progress |
+| 4 | Web registration, admin and chatbot | 390/768/1440 browser flows, accessibility and SSE states pass | in-progress |
+| 5 | Mobile parity | JSON registration, retry/offline/session states and typecheck pass; device status honest | completed |
+| 6 | Consolidation and docs | Runtime scan shows one API + PostgreSQL; docs/OpenAPI/CI match implementation | in-progress |
 | 7 | Independent review and handoff | Exact-head reviews, focused/full gates, split commits and branch push complete | pending |
 
 ## Public contract

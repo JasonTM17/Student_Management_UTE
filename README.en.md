@@ -5,13 +5,19 @@ RESTful API, one Next.js web app, one Expo mobile app, and one PostgreSQL
 database.
 
 The retained scope covers authentication, role-based student/lecturer/admin
-flows, academic catalog, enrollment, schedules, grades, announcements,
-notifications, thesis core, and a PostgreSQL-backed curated lexical thesis
-assistant with citations.
+flows, academic catalog, HCMUTE-style registration rounds and enrollment,
+schedules, grades, announcements, notifications, thesis core, and a
+PostgreSQL-backed curated lexical thesis assistant with citations and an
+optional server-only DeepSeek streaming adapter.
 
-Finance, analytics, support tickets, external AI providers, vector search,
-Redis, RabbitMQ, MinIO, Nginx, Kubernetes, Cloudflare Tunnel, and multi-image
-production release are intentionally excluded.
+Finance, analytics, support tickets, client-side/provider-unbounded AI, vector
+search, Redis, RabbitMQ, MinIO, Nginx, Kubernetes, Cloudflare Tunnel, and
+multi-image production release are intentionally excluded. DeepSeek is disabled
+by default and lexical fallback works without a key.
+
+The handoff target is Java 25 LTS with Spring Boot 3.5.16, Maven 3.9.x and
+Flyway-owned PostgreSQL 15. Java 21 is retained as a separately recorded
+compatibility baseline; host JDK 24/26 output is not Java 25 evidence.
 
 Run the stack with:
 
