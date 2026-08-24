@@ -75,3 +75,47 @@ test('npm test runs the atlas and Phase 6 regressions explicitly', () => {
   assert.match(packageJson.scripts.test, /screen-atlas\.test\.mjs/);
   assert.match(packageJson.scripts.test, /phase-six-repair\.test\.mjs/);
 });
+
+test('mobile assistant keeps native transport buffered and owner-history operations explicit', () => {
+  const client = read('src/api/client.ts');
+  const assistant = read('src/screens/assistant/AssistantScreen.tsx');
+
+  assert.match(client, /assistantConversations: '\/thesis\/assistant\/conversations'/);
+  assert.match(client, /\/messages/);
+  assert.match(client, /deleteAssistantConversation/);
+  assert.match(client, /signal\?: AbortSignal|RequestInit/);
+  assert.match(assistant, /conversationId/);
+  assert.match(assistant, /deleteConversation/);
+  assert.match(assistant, /lastFailedPrompt/);
+  assert.match(assistant, /citation\.excerpt/);
+  assert.doesNotMatch(assistant, /EventSource|text\/event-stream/);
+  assert.doesNotMatch(client, /DEEPSEEK_API_KEY|sk-[A-Za-z0-9]/);
+});
+
+test('mobile assistant preserves idempotency, server cancellation, pagination, and fixed feedback reasons', () => {
+  const client = read('src/api/client.ts');
+  const assistant = read('src/screens/assistant/AssistantScreen.tsx');
+
+  assert.match(client, /createAssistantClientRequestId/);
+  assert.match(client, /clientRequestId:/);
+  assert.match(client, /X-Next-Cursor/);
+  assert.match(client, /assistantCancel: '\/thesis\/assistant\/requests'/);
+  assert.match(client, /cancelAssistantRequest/);
+  assert.match(client, /AssistantFeedbackReason/);
+  assert.match(client, /putAssistantFeedback/);
+  assert.match(assistant, /lastFailedClientRequestId/);
+  assert.match(assistant, /cancelAssistantRequest\(clientRequestId\)/);
+  assert.match(assistant, /finally \{ abortRef\.current\?\.abort\(\)/);
+  assert.match(assistant, /pendingDeleteId/);
+  assert.match(assistant, /sessionExpired/);
+  assert.match(assistant, /offline/);
+});
+
+test('mobile never replays a terminal or fenced request key', () => {
+  const assistant = read('src/screens/assistant/AssistantScreen.tsx');
+
+  assert.match(assistant, /const NON_REPLAYABLE_TERMINAL_CODES = new Set\(\[[\s\S]*'FAILED_AMBIGUOUS'[\s\S]*'TURN_TERMINAL_RACE'[\s\S]*'TURN_NOT_ACTIVE'/);
+  assert.match(assistant, /!NON_REPLAYABLE_TERMINAL_CODES\.has\(requestError\?\.code \?\? ''\)/);
+  assert.match(assistant, /'TURN_CANCELLED'/);
+  assert.match(assistant, /'TURN_PURGED'/);
+});

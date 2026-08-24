@@ -42,9 +42,9 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
 });
 
 test('native tokens preserve the institutional portal contract', () => {
-  assert.match(tokens, /background: '#F4F6F8'/);
-  assert.match(tokens, /primary: '#0B4A86'/);
-  assert.match(tokens, /primaryContainer: '#0D5AA2'/);
+  assert.match(tokens, /background: '#F9F9FF'/);
+  assert.match(tokens, /primary: '#003F87'/);
+  assert.match(tokens, /primaryContainer: '#0056B3'/);
   assert.match(tokens, /accent: '#E5A900'/);
   assert.match(tokens, /mobileGutter: 16/);
   assert.match(tokens, /touchTarget: 48/);
@@ -72,8 +72,12 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
   assert.match(client, /apiRoutes\.auth\.logout, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /export type AssistantLocale = 'en' \| 'vi'/);
-  assert.match(client, /assistantChat: \(message: string, locale: AssistantLocale = 'en'\)/);
-  assert.match(client, /apiClient\.post<AssistantReply>\(apiRoutes\.thesis\.assistantChat, \{ message, locale \}\)/);
+  assert.match(client, /assistantChat: \(/);
+  assert.match(client, /conversationId\?: string/);
+  assert.match(client, /assistantConversations: async \(\)/);
+  assert.match(client, /assistantConversationMessages: async \(conversationId: string\)/);
+  assert.match(client, /deleteAssistantConversation: \(conversationId: string\)/);
+  assert.match(client, /apiClient\.post<AssistantReply>\(/);
 });
 
 test('mobile role navigation rejects unauthorized routes and uses role-specific primary navigation', () => {
@@ -139,11 +143,17 @@ test('Stitch mobile references stay traceable and live sign-in enforces the stud
 test('mobile assistant keeps preview local and calls the Java route only in live mode', () => {
   assert.match(assistant, /const isPreview = apiClient\.mode === 'preview'/);
   assert.match(assistant, /if \(isPreview\) \{/);
-  assert.match(assistant, /Preview noted\. Live mode will answer through the Java assistant contract after authentication\./);
-  assert.match(assistant, /campusApi\.assistantChat\(trimmedMessage, 'vi'\)/);
+  assert.match(assistant, /Preview noted\. Live mode will answer through the Java assistant API after sign-in\./);
+  assert.match(assistant, /campusApi\.assistantChat\(trimmedMessage, locale, (?:conversationId|requestedConversationId)/);
+  assert.match(assistant, /const requestedConversationId = clientRequestIdOverride/);
   assert.match(assistant, /reply\.degraded/);
   assert.match(assistant, /reply\.citations/);
   assert.match(assistant, /reply\.reasonCode/);
-  assert.match(assistant, /The Java assistant route could not answer yet/);
+  assert.match(assistant, /The assistant could not answer/);
   assert.match(assistant, /loading=\{isSending\}/);
+  assert.match(assistant, /AbortController/);
+  assert.match(assistant, /stopSending/);
+  assert.match(assistant, /QUOTA_EXCEEDED/);
+  assert.match(assistant, /safeText/);
+  assert.match(assistant, /accessibilityRole="tablist"/);
 });
