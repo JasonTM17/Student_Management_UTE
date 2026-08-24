@@ -26,7 +26,7 @@ import {
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 
-const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
 type ApiObject = Record<string, unknown>;
 type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRefresh?: boolean;
@@ -174,6 +174,26 @@ const api = axios.create({
   },
 });
 
+// All browser transports share one refresh promise. This prevents concurrent
+// SSE/JSON requests from rotating the refresh token independently and racing
+// before the first stream byte is received.
+let sessionRefreshPromise: Promise<LoginResponse> | null = null;
+
+export function refreshSessionSingleFlight(): Promise<LoginResponse> {
+  if (sessionRefreshPromise) return sessionRefreshPromise;
+  sessionRefreshPromise = api
+    .post<LoginResponse>(
+      '/auth/refresh',
+      {},
+      { skipAuthRefresh: true, skipAuthRedirect: true } as AuthRequestConfig,
+    )
+    .then((response) => response.data)
+    .finally(() => {
+      sessionRefreshPromise = null;
+    });
+  return sessionRefreshPromise;
+}
+
 api.interceptors.request.use((config) => {
   return applyCsrfHeader(config as AuthInternalRequestConfig);
 });
@@ -194,14 +214,7 @@ api.interceptors.response.use(
       originalConfig._retry = true;
 
       try {
-        await api.post<LoginResponse>(
-          '/auth/refresh',
-          {},
-          {
-            skipAuthRefresh: true,
-            skipAuthRedirect: true,
-          } as AuthRequestConfig,
-        );
+        await refreshSessionSingleFlight();
 
         return api(originalConfig);
       } catch (refreshError) {
@@ -281,15 +294,7 @@ export const authApi = {
   },
 
   refresh: async (): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>(
-      '/auth/refresh',
-      {},
-      {
-        skipAuthRefresh: true,
-        skipAuthRedirect: true,
-      } as AuthRequestConfig,
-    );
-    return response.data;
+    return refreshSessionSingleFlight();
   },
 
   changePassword: async (

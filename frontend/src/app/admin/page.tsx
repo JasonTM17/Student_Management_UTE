@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Bell, BookMarked, BookOpen, Building2, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, DoorOpen, FileText, GraduationCap, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
@@ -91,11 +91,18 @@ const menuItems = [
     description: 'Publish updates that flow out to the rest of the campus.',
     tone: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
   },
+  {
+    href: '/admin/assistant-knowledge',
+    icon: BrainCircuit,
+    label: 'AI assistant knowledge',
+    description: 'Review public academic sources and the curated retrieval boundary.',
+    tone: 'bg-sky-500/12 text-sky-600 dark:text-sky-400',
+  },
 ];
 
 export default function AdminDashboardPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
-  const { formatNumber, href, messages } = useI18n();
+  const { formatNumber, href, locale, messages } = useI18n();
   const router = useRouter();
   const [stats, setStats] = useState<QuickStats>({
     totalStudents: 0,
@@ -239,10 +246,10 @@ export default function AdminDashboardPage() {
             </div>
             <div className="grid overflow-hidden border border-border/80 bg-card md:grid-cols-2">
               {menuItems.map((item, index) => {
-                const localizedItem = messages.admin.menuItems[index] ?? [
-                  item.label,
-                  item.description,
-                ];
+                const localizedItem = messages.admin.menuItems[index] ??
+                  (locale === 'vi'
+                    ? ['Kiến thức trợ lý AI', 'Quản lý nguồn học thuật công khai và ranh giới truy xuất đã kiểm duyệt.']
+                    : [item.label, item.description]);
 
                 return (
                   <LocalizedLink

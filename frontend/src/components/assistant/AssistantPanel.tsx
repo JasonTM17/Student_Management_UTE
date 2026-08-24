@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
@@ -245,6 +246,7 @@ function fromHistoryMessage(message: {
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
@@ -390,14 +392,14 @@ export function AssistantPanel() {
 
   const deleteConversation = async (conversationId: string) => {
     if (isSending || deletingConversationId) return;
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(
+    const confirmed = await confirm({
+      title: messages.assistant.deleteConversation,
+      message:
         messages.assistant.deleteConversationConfirm ??
-          messages.assistant.deleteConversation,
-      )
-    )
-      return;
+        messages.assistant.deleteConversation,
+      variant: 'destructive',
+    });
+    if (!confirmed) return;
     setDeletingConversationId(conversationId);
     try {
       await thesisApi.deleteConversation(conversationId);
@@ -724,7 +726,7 @@ export function AssistantPanel() {
           aria-modal="false"
           aria-labelledby="assistant-panel-title"
           aria-describedby="assistant-panel-description"
-          className="flex h-[min(100dvh,42rem)] max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] max-h-[100dvh] flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl sm:rounded-lg md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))]"
+          className="flex h-[min(100dvh,42rem)] max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl sm:rounded-lg md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))]"
         >
           <header className="flex items-start justify-between gap-4 border-b border-border/70 bg-foreground px-4 py-4 text-background">
             <div className="flex min-w-0 items-start gap-3">
@@ -1060,6 +1062,7 @@ export function AssistantPanel() {
               {input.length}/2000
             </p>
           </form>
+          {confirmationDialog}
         </section>
       )}
     </div>

@@ -20,6 +20,7 @@ export interface RegistrationRound {
   serverNow?: string | null;
   institutionTimeZone?: string | null;
   maxCredits?: number | null;
+  version?: number | null;
   eligibilityState?: 'ELIGIBLE' | 'INELIGIBLE' | 'PENDING' | string;
   priorityRank?: number | null;
   reasonCode?: string | null;

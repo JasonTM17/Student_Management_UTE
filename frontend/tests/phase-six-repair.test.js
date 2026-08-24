@@ -95,6 +95,10 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /fixed bottom-\[/);
   assert.match(assistant, /right-4/);
   assert.match(assistant, /role="dialog"/);
+  assert.match(assistant, /useConfirmationDialog/);
+  assert.doesNotMatch(assistant, /window\.confirm/);
+  assert.match(assistant, /max-h-\[min\(42rem,calc\(100dvh-6\.5rem-env\(safe-area-inset-bottom\)\)\)\]/);
+  assert.match(assistant, /md:max-h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/);
   assert.match(assistant, /role="log"/);
   assert.match(assistant, /aria-live="polite"/);
   assert.match(assistant, /event\.key !== 'Escape'/);
