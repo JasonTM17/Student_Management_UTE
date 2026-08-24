@@ -4,6 +4,8 @@ import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import java.time.Instant;
+import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -41,17 +43,18 @@ public class ThesisAssistantKnowledgeRepository {
         for (int index = 0; index < usableTerms.size(); index++) {
             String parameter = "term" + index;
             params.addValue(parameter, "%" + usableTerms.get(index) + "%");
-            predicates.add("(LOWER(title) LIKE :" + parameter
-                    + " OR LOWER(content) LIKE :" + parameter + ")");
+            predicates.add("(LOWER(r.title) LIKE :" + parameter
+                    + " OR LOWER(r.content) LIKE :" + parameter + ")");
         }
 
-        String sql = "SELECT CAST(id AS VARCHAR) AS id, slug, locale, title, content, source "
-                + "FROM assistant.knowledge_document "
-                + "WHERE active = TRUE AND visibility = 'PUBLIC' "
-                + "AND locale IN (:locale, 'both') "
+        String sql = "SELECT CAST(d.id AS VARCHAR) AS id, d.slug, r.locale, r.title, r.content, r.source, r.id AS revision_id, r.version AS revision_version "
+                + "FROM assistant.knowledge_document d "
+                + "JOIN assistant.knowledge_document_revision r ON r.document_id = d.id AND r.state = 'PUBLISHED' "
+                + "WHERE d.active = TRUE AND d.visibility = 'PUBLIC' "
+                + "AND r.locale IN (:locale, 'both') "
                 + "AND (" + String.join(" OR ", predicates) + ") "
-                + "ORDER BY CASE WHEN locale = :locale THEN 0 ELSE 1 END, "
-                + "priority ASC, updated_at DESC, slug ASC LIMIT :limit";
+                + "ORDER BY CASE WHEN r.locale = :locale THEN 0 ELSE 1 END, "
+                + "r.priority ASC, r.published_at DESC, d.slug ASC LIMIT :limit";
         return jdbc.query(sql, params, ROW_MAPPER);
     }
 
@@ -63,7 +66,12 @@ public class ThesisAssistantKnowledgeRepository {
                 resultSet.getString("locale"),
                 resultSet.getString("title"),
                 resultSet.getString("content"),
-                resultSet.getString("source"));
+                resultSet.getString("source"),
+                null,
+                null,
+                null,
+                resultSet.getObject("revision_id", UUID.class),
+                resultSet.getInt("revision_version"));
     }
 
     public record KnowledgeDocument(
@@ -72,6 +80,19 @@ public class ThesisAssistantKnowledgeRepository {
             String locale,
             String title,
             String content,
-            String source) {
+            String source,
+            String catalogEntityType,
+            String catalogEntityId,
+            Instant catalogUpdatedAt,
+            UUID revisionId,
+            Integer revisionVersion) {
+        public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source) {
+            this(id, slug, locale, title, content, source, null, null, null, null, null);
+        }
+
+        public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source,
+                String catalogEntityType, String catalogEntityId, Instant catalogUpdatedAt) {
+            this(id, slug, locale, title, content, source, catalogEntityType, catalogEntityId, catalogUpdatedAt, null, null);
+        }
     }
 }

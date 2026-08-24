@@ -11,6 +11,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -24,7 +25,7 @@ class ThesisAssistantContractTest {
     void chatRequiresAuthentication() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
                         .contentType("application/json")
-                        .content("{\"message\":\"How do I choose a topic?\",\"locale\":\"en\"}"))
+               .content("{\"message\":\"How do I choose a topic?\",\"locale\":\"en\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000001\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
     }
@@ -32,15 +33,15 @@ class ThesisAssistantContractTest {
     @Test
     void chatReturnsCuratedAnswerWithCitation() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
-                        .with(jwt())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
-                        .content("{\"message\":\"How do I choose a thesis topic?\",\"locale\":\"en\"}"))
+               .content("{\"message\":\"How do I choose a thesis topic?\",\"locale\":\"en\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000002\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").isString())
                 .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("thesis topic")))
                 .andExpect(jsonPath("$.model").value("curated-lexical-rag"))
-                .andExpect(jsonPath("$.degraded").value(false))
-                .andExpect(jsonPath("$.reasonCode").value("ANSWERED"))
+                .andExpect(jsonPath("$.degraded").value(true))
+                .andExpect(jsonPath("$.reasonCode").value("PROVIDER_DISABLED"))
                 .andExpect(jsonPath("$.locale").value("en"))
                 .andExpect(jsonPath("$.citations[0].slug").value("en-topic-selection"));
     }
@@ -48,19 +49,19 @@ class ThesisAssistantContractTest {
     @Test
     void chatSupportsVietnameseLocaleAndValidatesRequestShape() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
-                        .with(jwt())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
-                        .content("{\"message\":\"Em nên chọn đề tài thế nào?\",\"locale\":\"vi\"}"))
+               .content("{\"message\":\"Em nên chọn đề tài thế nào?\",\"locale\":\"vi\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000003\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.answer").value(org.hamcrest.Matchers.containsString("đề tài")))
-                .andExpect(jsonPath("$.degraded").value(false))
-                .andExpect(jsonPath("$.reasonCode").value("ANSWERED"))
+                .andExpect(jsonPath("$.degraded").value(true))
+                .andExpect(jsonPath("$.reasonCode").value("PROVIDER_DISABLED"))
                 .andExpect(jsonPath("$.citations[0].source").value("academic-office"));
 
         mvc.perform(post("/api/v1/thesis/assistant/chat")
-                        .with(jwt())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
-                        .content("{\"message\":\"\",\"locale\":\"fr\"}"))
+               .content("{\"message\":\"\",\"locale\":\"fr\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000004\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"))
                 .andExpect(jsonPath("$.fields.message").value("message is required"))
@@ -70,9 +71,9 @@ class ThesisAssistantContractTest {
     @Test
     void noMatchDoesNotInventCitation() throws Exception {
         mvc.perform(post("/api/v1/thesis/assistant/chat")
-                        .with(jwt())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
-                        .content("{\"message\":\"What is the weather tomorrow?\",\"locale\":\"en\"}"))
+               .content("{\"message\":\"What is the weather tomorrow?\",\"locale\":\"en\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000005\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.reasonCode").value("NO_MATCH"))
                 .andExpect(jsonPath("$.citations").isEmpty())

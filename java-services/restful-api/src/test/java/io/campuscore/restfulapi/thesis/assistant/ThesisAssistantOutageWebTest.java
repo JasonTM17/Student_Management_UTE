@@ -17,6 +17,7 @@ import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.bean.override.mockito.MockitoBean;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -35,9 +36,9 @@ class ThesisAssistantOutageWebTest {
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
 
         mvc.perform(post("/api/v1/thesis/assistant/chat")
-                        .with(jwt())
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
-                        .content("{\"message\":\"Điều kiện đăng ký đề tài là gì?\",\"locale\":\"vi\"}"))
+                        .content("{\"message\":\"Điều kiện đăng ký đề tài là gì?\",\"locale\":\"vi\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000011\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.model").value("curated-lexical-rag"))
                 .andExpect(jsonPath("$.degraded").value(true))
