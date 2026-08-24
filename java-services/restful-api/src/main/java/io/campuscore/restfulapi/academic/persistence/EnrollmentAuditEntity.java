@@ -17,6 +17,29 @@ public class EnrollmentAuditEntity {
     @Column(name = "reasonCode") private String reasonCode;
     @Column(name = "createdAt") private Instant createdAt;
     protected EnrollmentAuditEntity() { }
+    public static EnrollmentAuditEntity record(String id, String operationId, String studentId,
+                                               String sectionId, String action, String reasonCode,
+                                               Instant now) {
+        EnrollmentAuditEntity entity = new EnrollmentAuditEntity();
+        entity.id = required(id, "id");
+        entity.operationId = operationId;
+        entity.studentId = required(studentId, "studentId");
+        entity.sectionId = required(sectionId, "sectionId");
+        entity.action = required(action, "action");
+        entity.reasonCode = reasonCode;
+        entity.createdAt = now;
+        return entity;
+    }
+    /** Alias kept for service code that treats audit entries as immutable values. */
+    public static EnrollmentAuditEntity of(String id, String operationId, String studentId,
+                                           String sectionId, String action, String reasonCode,
+                                           Instant now) {
+        return record(id, operationId, studentId, sectionId, action, reasonCode, now);
+    }
+    private static String required(String value, String field) {
+        if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
+        return value;
+    }
     public String getId() { return id; }
     public String getOperationId() { return operationId; }
     public String getStudentId() { return studentId; }
