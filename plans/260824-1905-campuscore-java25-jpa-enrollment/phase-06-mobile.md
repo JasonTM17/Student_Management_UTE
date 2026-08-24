@@ -1,6 +1,6 @@
 ---
 title: "Phase 5: Mobile JSON parity"
-status: pending
+status: completed
 ---
 
 # Phase 5: Mobile JSON parity

@@ -1,18 +1,21 @@
 # CampusCore Java RESTful API
 
 This is the only backend runtime for the course project. It is a Spring Boot
-3.5 / Java 21 modular monolith that owns `/api/v1`, persists to one PostgreSQL
-database, and publishes its contract through OpenAPI.
+3.5.16 / Java 25 modular monolith that owns `/api/v1`, persists to one
+PostgreSQL database, and publishes its contract through OpenAPI. Java 21 is a
+separately tested compatibility baseline.
 
 ## Included modules
 
 - authentication, refresh sessions, logout, profile and password change;
 - students, lecturers and administrative user management;
 - faculties, departments, semesters, courses, classrooms and sections;
-- enrollment, schedules, attendance, grades and transcript reads;
+- HCMUTE-style registration rounds, idempotent enrollment/drop, schedules,
+  attendance, grades, transcript reads and SHA-256 registration-slip PDFs;
 - announcements and notification inbox;
 - thesis rounds, topics, groups, members and progress status;
-- curated PostgreSQL lexical RAG with citations and explicit degraded states;
+- curated PostgreSQL lexical RAG with citations, privacy guards, explicit
+  degraded states and an optional server-only DeepSeek SSE adapter;
 - liveness, readiness, `/api/v1/contract` and `/v3/api-docs`.
 
 There is no Node backend, service gateway, event broker, cache server,
@@ -25,7 +28,7 @@ workflows are outside the course scope.
 From the repository root:
 
 ```powershell
-mvn -q -f java-services/pom.xml verify
+.\mvnw.cmd -q -f java-services/pom.xml verify
 docker compose up --build postgres restful-api
 ```
 
@@ -43,5 +46,8 @@ for the reproducible student demo. Configure non-empty values for
 `HEALTH_READINESS_KEY`; never commit real secrets.
 
 Flyway is the only schema owner. The `persistence` profile is enabled by the
-Compose service and starts from an empty PostgreSQL database with deterministic
-course seed data.
+Compose service; PostgreSQL V13-V18 are forward-only registration/assistant
+hardening migrations and must be rehearsed on an isolated copy before any
+upgrade. `ddl-auto=validate` and `open-in-view=false` keep JPA at the typed
+persistence boundary. The Compose service starts from an empty PostgreSQL
+database with deterministic course seed data.

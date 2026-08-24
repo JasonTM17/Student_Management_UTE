@@ -14,7 +14,10 @@ for (const relative of files) {
   }
 
   const source = fs.readFileSync(full, 'utf8');
-  if (/\uFFFD|Ã|Â|â€/u.test(source)) {
+  // Match the characteristic multi-character sequences produced when UTF-8
+  // bytes are decoded as Latin-1/Windows-1252.  A bare Vietnamese letter is
+  // valid text, so it must not be treated as corruption on its own.
+  if (/\uFFFD|(?:\u00C3|\u00C2)[\u0080-\u00BF]|\u00E2[\u0080-\u00BF\u20AC\u2122\u0153\u017E]/u.test(source)) {
     errors.push(`${relative} contains likely mojibake`);
   }
 }

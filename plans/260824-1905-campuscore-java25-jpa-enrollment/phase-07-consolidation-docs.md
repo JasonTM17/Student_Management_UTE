@@ -1,6 +1,6 @@
 ---
 title: "Phase 6: Runtime consolidation and documentation"
-status: pending
+status: in-progress
 ---
 
 # Phase 6: Runtime consolidation and documentation

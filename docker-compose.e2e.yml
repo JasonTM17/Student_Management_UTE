@@ -1,0 +1,54 @@
+# Disposable authenticated browser stack.  The runner supplies a unique
+# Compose project and host ports; no fixed container names or developer volume
+# names are allowed here.
+services:
+  postgres:
+    image: postgres:15-alpine
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-campuscore_e2e}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_e2e_password}
+      POSTGRES_DB: ${POSTGRES_DB:-campuscore_e2e}
+    ports:
+      - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
+    volumes:
+      - e2e_postgres_data:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
+      interval: 3s
+      timeout: 3s
+      retries: 30
+    restart: "no"
+
+  restful-api:
+    build:
+      context: .
+      dockerfile: java-services/restful-api/Dockerfile
+    environment:
+      SPRING_PROFILES_ACTIVE: persistence
+      SERVER_PORT: 4010
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_e2e}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore_e2e}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_e2e_password}
+      JWT_SECRET: ${JWT_SECRET:-local-course-e2e-jwt-secret}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-e2e-refresh-secret}
+      HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-e2e-health-key}
+      COOKIE_SECURE: "false"
+      FLYWAY_ENABLED: "true"
+      DEEPSEEK_ENABLED: "false"
+      DEEPSEEK_API_KEY: ""
+      ASSISTANT_RETENTION_ENABLED: "false"
+    ports:
+      - "127.0.0.1:${E2E_API_HOST_PORT:-4100}:4010"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4010/api/v1/health/readiness >/dev/null"]
+      interval: 5s
+      timeout: 5s
+      retries: 30
+      start_period: 20s
+    restart: "no"
+
+volumes:
+  e2e_postgres_data:

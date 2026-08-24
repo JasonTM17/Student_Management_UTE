@@ -8,15 +8,18 @@ toàn bộ `/api/v1`; không còn service sibling, gateway hoặc runtime adapte
 Next.js và Expo dùng chung OpenAPI contract, còn PostgreSQL local là nguồn dữ
 liệu duy nhất.
 
-Phạm vi gồm auth, people, academic catalog, sections, enrollment, grades,
-schedules, announcements, notifications, thesis core và assistant lexical RAG.
-Finance, analytics, support, realtime, external AI, Redis, RabbitMQ, MinIO,
-Nginx và Kubernetes là non-goal của đồ án.
+Phạm vi gồm auth, people, academic catalog, registration rounds, sections,
+enrollment, grades, schedules, announcements, notifications, thesis core và
+assistant lexical RAG với tùy chọn DeepSeek server-only. Finance, analytics,
+support, realtime, client-side/provider-unbounded AI, vector search, Redis,
+RabbitMQ, MinIO, Nginx và Kubernetes là non-goal của đồ án.
 
-Schema mới được Flyway sở hữu trên database fresh. Không đọc schema legacy và
-không migrate dữ liệu cũ. Assistant chỉ truy vấn knowledge corpus curated,
-giới hạn top-k, có locale fallback, citation và reason code cho no-match hoặc
-database outage.
+Flyway là schema authority duy nhất. V13-V18 là migration forward-only, có
+preflight duplicate/invalid-data stop và rehearsal từ V10/V12; không
+down-migrate hoặc tự động sửa dữ liệu mơ hồ. Assistant chỉ truy vấn knowledge
+curated và academic-catalog projection công khai, giới hạn top-k, có locale
+fallback, citation snapshot và reason code cho no-match, privacy, provider
+hoặc database outage.
 
 Mọi claim release phải dựa trên một SHA sạch và được Advisor, Kongming, Wukong,
 exact-head reviewer và Stitch kiểm tra lại. Đây là local/course demo

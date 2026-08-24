@@ -1,6 +1,6 @@
 ---
 title: "Phase 2: JPA foundation and forward migrations"
-status: pending
+status: in-progress
 ---
 
 # Phase 2: JPA foundation and forward migrations
@@ -40,3 +40,12 @@ and ownership tests pass, and the JDBC writer inventory is updated.
 
 Focused repository parity and migration tests first; PostgreSQL concurrency is
 the authority. H2 is a parity oracle, not a substitute for PostgreSQL locking.
+
+## Checkpoint result (2026-08-24)
+
+The persistence foundation is implemented in candidate commit `94e85c3` and
+passes the focused Java 25/H2 suite plus an ephemeral PostgreSQL 15 SQL
+rehearsal. The phase remains in progress because no PostgreSQL concurrency or
+upgraded-copy rehearsal has yet falsified the locking and preflight claims,
+and academic JDBC writers still exist. See
+`reports/phase-2-jpa-foundation.md` for the exact boundary.

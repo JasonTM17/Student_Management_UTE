@@ -1,6 +1,6 @@
 ---
 title: "Phase 3: Registration domain, API, idempotency and PDF slip"
-status: pending
+status: in-progress
 ---
 
 # Phase 3: Registration domain, API, idempotency and PDF slip
