@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -37,7 +38,9 @@ public class AcademicMutationController {
     @PreAuthorize("hasRole('STUDENT')")
     public EnrollmentResponse enroll(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody EnrollRequest request) {
+            @Valid @RequestBody EnrollRequest request,
+            HttpServletResponse response) {
+        markDeprecated(response, "/api/v1/me/enrollments");
         return mutations.enroll(
                 jwt.getClaimAsString("studentId"),
                 request.sectionId(),
@@ -48,7 +51,9 @@ public class AcademicMutationController {
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN')")
     public Map<String, String> drop(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String id) {
+            @PathVariable String id,
+            HttpServletResponse response) {
+        markDeprecated(response, "/api/v1/me/enrollments/" + id);
         mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"));
         return Map.of("message", "Enrollment dropped successfully");
     }
@@ -93,5 +98,10 @@ public class AcademicMutationController {
 
     private static boolean isAdmin(List<String> roles) {
         return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+    }
+
+    private static void markDeprecated(HttpServletResponse response, String successor) {
+        response.setHeader("Deprecation", "true");
+        response.setHeader("Link", "<" + successor + ">; rel=\"successor-version\"");
     }
 }

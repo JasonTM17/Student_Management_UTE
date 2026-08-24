@@ -44,4 +44,7 @@ public final class ThesisMutationDtos {
 
     public record ProgressRequest(GroupStatus status) {
     }
+
+    public record GroupRejectionRequest(String reason) {
+    }
 }

@@ -11,7 +11,7 @@ public final class RegistrationDtos {
 
     public record RoundView(String id, String semesterId, String status, Instant registrationStart,
             Instant registrationEnd, Instant addDropStart, Instant addDropEnd, Instant serverNow,
-            String institutionTimeZone, int maxCredits) { }
+            String institutionTimeZone, int maxCredits, long version) { }
 
     public record RoundPage(List<RoundView> items, String nextCursor) { }
 

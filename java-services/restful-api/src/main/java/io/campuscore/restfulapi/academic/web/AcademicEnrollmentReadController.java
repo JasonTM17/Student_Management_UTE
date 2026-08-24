@@ -11,6 +11,7 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Transcri
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -39,8 +40,10 @@ public class AcademicEnrollmentReadController {
     public List<EnrollmentResponse> getMyEnrollments(
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String semesterId,
-            @RequestParam MultiValueMap<String, String> queryParameters) {
+            @RequestParam MultiValueMap<String, String> queryParameters,
+            HttpServletResponse response) {
         requireAllowedQuery(queryParameters, Set.of("semesterId"));
+        markDeprecated(response, "/api/v1/me/enrollments");
         return academic.findStudentEnrollments(jwt.getClaimAsString("studentId"), semesterId);
     }
 
@@ -146,5 +149,10 @@ public class AcademicEnrollmentReadController {
                 throw new IllegalArgumentException("Unexpected or repeated query parameter: " + entry.getKey());
             }
         }
+    }
+
+    private static void markDeprecated(HttpServletResponse response, String successor) {
+        response.setHeader("Deprecation", "true");
+        response.setHeader("Link", "<" + successor + ">; rel=\"successor-version\"");
     }
 }

@@ -86,7 +86,7 @@ public class RegistrationService {
         int offset = decodeCursor(cursor);
         MapSqlParameterSource p = new MapSqlParameterSource().addValue("limit", safeLimit + 1).addValue("offset", offset);
         String sql = "SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\","
-                + "r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\" "
+                + "r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" "
                 + "FROM academic.\"RegistrationRound\" r" + (semesterId == null ? "" : " WHERE r.\"semesterId\"=:semesterId")
                 + " ORDER BY r.\"registrationStart\" DESC,r.\"id\" LIMIT :limit OFFSET :offset";
         if (semesterId != null) p.addValue("semesterId", semesterId.trim());
@@ -97,7 +97,7 @@ public class RegistrationService {
 
     public RoundView round(String id) {
         return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\","
-                + "r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\" FROM academic.\"RegistrationRound\" r WHERE r.\"id\"=:id",
+                + "r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"RegistrationRound\" r WHERE r.\"id\"=:id",
                 new MapSqlParameterSource("id", required(id, "roundId")), roundMapper()).stream().findFirst()
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "REGISTRATION_ROUND_NOT_FOUND", "Registration round not found"));
     }
@@ -178,7 +178,11 @@ public class RegistrationService {
         Instant now = clock.instant();
         String enrollmentId = UUID.randomUUID().toString();
         enrollmentRepository.save(EnrollmentEntity.enrolled(enrollmentId, studentId, request.sectionId(), round.semesterId(), now));
-        lockedSection.incrementEnrollment();
+        try {
+            lockedSection.incrementEnrollment();
+        } catch (IllegalStateException capacityFailure) {
+            throw capacityProblem(capacityFailure.getMessage());
+        }
         sectionRepository.saveAndFlush(lockedSection);
         EnrollmentView persisted = enrollment(Map.of("id", enrollmentId, "sectionId", request.sectionId(), "semesterId", round.semesterId(), "status", "ENROLLED", "enrolledAt", now), studentId);
         EnrollmentView response = new EnrollmentView(persisted.id(), persisted.sectionId(), request.roundId(), persisted.status(), persisted.enrolledAt(), persisted.section());
@@ -200,14 +204,30 @@ public class RegistrationService {
         lockStudentEnrollments(studentId, previewEnrollment.getSemesterId());
         ExistingOperation existing = operation(studentId, key, hash);
         if (existing != null) return new DropResult(enrollmentId, true);
+        Instant now = clock.instant();
+        if (!"OPEN".equalsIgnoreCase(round.status()) || now.isAfter(round.addDropEnd()) || now.isBefore(round.addDropStart())) {
+            throw problem(HttpStatus.CONFLICT, "ADD_DROP_CLOSED", "Add/drop window is closed");
+        }
         EnrollmentOperationEntity operation = createOperation(studentId, key, hash, "DROP");
         EnrollmentEntity lockedEnrollment = enrollmentRepository.findLockedById(enrollmentId)
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found"));
-        Instant now = clock.instant();
-        if (now.isAfter(round.addDropEnd()) || now.isBefore(round.addDropStart())) throw problem(HttpStatus.CONFLICT, "ADD_DROP_CLOSED", "Add/drop window is closed");
+        if (!studentId.equals(lockedEnrollment.getStudentId())) {
+            throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_NOT_OWNER", "Enrollment does not belong to the current student");
+        }
+        String currentStatus = lockedEnrollment.getStatus() == null ? "" : lockedEnrollment.getStatus().toUpperCase(java.util.Locale.ROOT);
+        if ("COMPLETED".equals(currentStatus)) {
+            throw problem(HttpStatus.CONFLICT, "ALREADY_COMPLETED", "Completed enrollments cannot be dropped");
+        }
+        if (!isActiveEnrollmentStatus(currentStatus)) {
+            throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment is not active");
+        }
         lockedEnrollment.markDropped(now);
         enrollmentRepository.save(lockedEnrollment);
-        lockedSection.decrementEnrollment();
+        try {
+            lockedSection.decrementEnrollment();
+        } catch (IllegalStateException countFailure) {
+            throw capacityProblem(countFailure.getMessage());
+        }
         sectionRepository.saveAndFlush(lockedSection);
         completeOperation(operation, Map.of("dropped", true, "enrollmentId", enrollmentId), 200);
         auditRepository.save(EnrollmentAuditEntity.of(UUID.randomUUID().toString(), operation.getId(), studentId, lockedEnrollment.getSectionId(), "DROP", "DROPPED", now));
@@ -219,17 +239,23 @@ public class RegistrationService {
         RoundView round = round(roundId);
         var stored = slipRepository.findByStudentIdAndRoundId(studentId, roundId);
         if (stored.isPresent() && stored.get().getSnapshotPayload() != null && !stored.get().getSnapshotPayload().isBlank()) {
-            return new SlipResult(Base64.getDecoder().decode(stored.get().getSnapshotPayload()), stored.get().getContentHash());
+            try {
+                return new SlipResult(Base64.getDecoder().decode(stored.get().getSnapshotPayload()), stored.get().getContentHash());
+            } catch (IllegalArgumentException malformedSnapshot) {
+                throw problem(HttpStatus.CONFLICT, "REGISTRATION_SLIP_SNAPSHOT_INVALID", "Stored registration slip snapshot is invalid");
+            }
         }
-        List<EnrollmentView> enrollments = enrollments(studentId, round.semesterId(), null, MAX_LIMIT).items();
-        StringBuilder canonical = new StringBuilder("CampusCore Registration Slip\n").append(round.id()).append('\n');
-        enrollments.stream().sorted(Comparator.comparing(e -> e.section().courseCode())).forEach(e -> canonical.append(e.id()).append('|').append(e.section().courseCode()).append('|').append(e.section().sectionNumber()).append('|').append(e.section().credits()).append('\n'));
-        String checksum = sha256(canonical.toString());
+        Instant generatedAt = clock.instant();
+        List<EnrollmentView> enrollments = enrollments(studentId, round.semesterId(), null, MAX_LIMIT).items().stream()
+                .filter(enrollment -> isActiveEnrollmentStatus(enrollment.status()))
+                .toList();
+        String canonical = canonicalSlip(studentId, round, enrollments, generatedAt);
+        String checksum = sha256(canonical);
         byte[] pdf = SimplePdf.render(canonical + "SHA-256: " + checksum + "\n");
         String encodedPdf = Base64.getEncoder().encodeToString(pdf);
         if (stored.isEmpty()) {
             slipRepository.saveAndFlush(RegistrationSlipEntity.snapshot(studentId + "-" + roundId, studentId, roundId,
-                    checksum, encodedPdf, clock.instant()));
+                    checksum, encodedPdf, generatedAt));
         } else {
             // V17 cannot reconstruct legacy PDF bytes. Backfill the payload only
             // when the existing canonical checksum proves the regenerated data
@@ -238,6 +264,49 @@ public class RegistrationService {
             slipRepository.saveAndFlush(stored.get());
         }
         return new SlipResult(pdf, checksum);
+    }
+
+    /** Canonical, human-readable slip body. Ordering and field labels are part of the hash contract. */
+    static String canonicalSlip(String studentId, RoundView round, List<EnrollmentView> enrollments, Instant generatedAt) {
+        StringBuilder body = new StringBuilder("CampusCore Registration Slip\n")
+                .append("Student: ").append(slipValue(studentId)).append('\n')
+                .append("Semester: ").append(slipValue(round.semesterId())).append('\n')
+                .append("Registration round: ").append(slipValue(round.id())).append('\n')
+                .append("Generated at: ").append(generatedAt).append('\n')
+                .append("\nEnrollments\n");
+        enrollments.stream()
+                .sorted(Comparator.comparing((EnrollmentView e) -> slipValue(e.section().courseCode()))
+                        .thenComparing(e -> slipValue(e.section().sectionNumber()))
+                        .thenComparing(EnrollmentView::id))
+                .forEach(enrollment -> appendEnrollment(body, enrollment));
+        return body.toString();
+    }
+
+    private static void appendEnrollment(StringBuilder body, EnrollmentView enrollment) {
+        SectionView section = enrollment.section();
+        body.append("Course: ").append(slipValue(section.courseCode())).append(" - ")
+                .append(slipValue(section.courseName())).append('\n')
+                .append("Section: ").append(slipValue(section.sectionNumber())).append('\n')
+                .append("Credits: ").append(section.credits()).append('\n')
+                .append("Lecturer: ").append(slipValue(section.lecturerName())).append('\n')
+                .append("Classroom: ").append(slipValue(section.classroom())).append('\n');
+        section.schedules().stream()
+                .sorted(Comparator.comparingInt(ScheduleView::dayOfWeek)
+                        .thenComparing(ScheduleView::startTime, Comparator.nullsFirst(Comparator.naturalOrder()))
+                        .thenComparing(ScheduleView::id))
+                .forEach(schedule -> body.append("Schedule: day=").append(schedule.dayOfWeek())
+                        .append(' ').append(schedule.startTime()).append('-').append(schedule.endTime())
+                        .append(" room=").append(slipValue(schedule.building())).append(' ')
+                        .append(slipValue(schedule.roomNumber())).append('\n'));
+        body.append("Enrollment id: ").append(slipValue(enrollment.id())).append("\n\n");
+    }
+
+    private static boolean isActiveEnrollmentStatus(String status) {
+        return status != null && Set.of("ACTIVE", "ENROLLED", "PENDING", "CONFIRMED").contains(status.toUpperCase(java.util.Locale.ROOT));
+    }
+
+    private static String slipValue(String value) {
+        return value == null ? "" : value.replace('\r', ' ').replace('\n', ' ').replace('|', '/').trim();
     }
 
     @Transactional(readOnly = true)
@@ -320,30 +389,34 @@ public class RegistrationService {
         return new EnrollmentView(String.valueOf(row.get("id")), String.valueOf(row.get("sectionId")), String.valueOf(row.get("semesterId")), String.valueOf(row.get("status")), enrolledAt, section);
     }
 
-    private SectionView sectionsForId(String id, String studentId) { return jdbc.query("SELECT s.\"id\",s.\"courseId\",c.\"code\",c.\"name\",c.\"credits\",s.\"sectionNumber\",s.\"capacity\",s.\"enrolledCount\",s.\"status\",'' lecturer_name,'' classroom FROM academic.\"Section\" s JOIN academic.\"Course\" c ON c.\"id\"=s.\"courseId\" WHERE s.\"id\"=:id", new MapSqlParameterSource("id", id), (rs,n)->section(rs,true)).stream().findFirst().orElseThrow(); }
+    private SectionView sectionsForId(String id, String studentId) { return jdbc.query("SELECT s.\"id\",s.\"courseId\",c.\"code\",c.\"name\",c.\"credits\",s.\"sectionNumber\",s.\"capacity\",s.\"enrolledCount\",s.\"status\",coalesce(trim(u.\"firstName\"||' '||u.\"lastName\"),'') lecturer_name,coalesce(cl.\"building\"||' '||cl.\"roomNumber\",'') classroom FROM academic.\"Section\" s JOIN academic.\"Course\" c ON c.\"id\"=s.\"courseId\" LEFT JOIN academic.\"Lecturer\" l ON l.\"id\"=s.\"lecturerId\" LEFT JOIN auth.\"User\" u ON u.\"id\"=l.\"userId\" LEFT JOIN academic.\"Classroom\" cl ON cl.\"id\"=s.\"classroomId\" WHERE s.\"id\"=:id", new MapSqlParameterSource("id", id), (rs,n)->section(rs,true)).stream().findFirst().orElseThrow(); }
     private SectionView section(ResultSet rs, boolean selected) throws java.sql.SQLException {
         String id = rs.getString("id");
-        List<ScheduleView> schedules = jdbc.query("SELECT ss.\"id\",ss.\"dayOfWeek\",ss.\"startTimeValue\",ss.\"endTimeValue\",ss.\"classroomId\",cl.\"building\",cl.\"roomNumber\" FROM academic.\"SectionSchedule\" ss JOIN academic.\"Classroom\" cl ON cl.\"id\"=ss.\"classroomId\" WHERE ss.\"sectionId\"=:id ORDER BY ss.\"dayOfWeek\",ss.\"startTimeValue\"", new MapSqlParameterSource("id", id), (r,n)->new ScheduleView(r.getString("id"),r.getInt("dayOfWeek"),r.getObject("startTimeValue",LocalTime.class),r.getObject("endTimeValue",LocalTime.class),r.getString("classroomId"),r.getString("building"),r.getString("roomNumber")));
+        List<ScheduleView> schedules = jdbc.query("SELECT ss.\"id\",ss.\"dayOfWeek\",ss.\"startTimeValue\",ss.\"endTimeValue\",ss.\"classroomId\",cl.\"building\",cl.\"roomNumber\" FROM academic.\"SectionSchedule\" ss LEFT JOIN academic.\"Classroom\" cl ON cl.\"id\"=ss.\"classroomId\" WHERE ss.\"sectionId\"=:id ORDER BY ss.\"dayOfWeek\",ss.\"startTimeValue\"", new MapSqlParameterSource("id", id), (r,n)->new ScheduleView(r.getString("id"),r.getInt("dayOfWeek"),r.getObject("startTimeValue",LocalTime.class),r.getObject("endTimeValue",LocalTime.class),r.getString("classroomId"),r.getString("building"),r.getString("roomNumber")));
         int capacity = rs.getInt("capacity"), count = rs.getInt("enrolledCount");
         return new SectionView(id, rs.getString("courseId"), rs.getString("code"), rs.getString("name"), rs.getInt("credits"), rs.getString("sectionNumber"), rs.getString("lecturer_name"), rs.getString("classroom"), capacity, count, Math.max(0, capacity-count), rs.getString("status"), selected, schedules, List.of());
     }
     private RoundView lockRoundForMutation(String id) { RegistrationRoundEntity r = roundRepository.findLockedById(id).orElseThrow(() -> problem(HttpStatus.NOT_FOUND,"REGISTRATION_ROUND_NOT_FOUND","Registration round not found")); return roundView(r); }
     private AcademicSectionEntity lockSection(String id) { return sectionRepository.findLockedById(id).orElseThrow(() -> problem(HttpStatus.NOT_FOUND,"SECTION_NOT_OPEN","Section not found")); }
-    private RoundView roundView(RegistrationRoundEntity r) { return new RoundView(r.getId(), r.getSemesterId(), r.getStatus(), r.getRegistrationStart(), r.getRegistrationEnd(), r.getAddDropStart(), r.getAddDropEnd(), clock.instant(), r.getInstitutionTimeZone(), r.getMaxCredits()); }
-    private RoundView roundForSemester(String semester) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\" FROM academic.\"RegistrationRound\" r WHERE r.\"semesterId\"=:semester ORDER BY r.\"registrationStart\" DESC", new MapSqlParameterSource("semester", semester), roundMapper()).stream().findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found")); }
+    private RoundView roundView(RegistrationRoundEntity r) { return new RoundView(r.getId(), r.getSemesterId(), r.getStatus(), r.getRegistrationStart(), r.getRegistrationEnd(), r.getAddDropStart(), r.getAddDropEnd(), clock.instant(), r.getInstitutionTimeZone(), r.getMaxCredits(), r.getVersion()); }
+    private RoundView roundForSemester(String semester) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"RegistrationRound\" r WHERE r.\"semesterId\"=:semester ORDER BY r.\"registrationStart\" DESC", new MapSqlParameterSource("semester", semester), roundMapper()).stream().findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found")); }
     private void requireStudent(String id) { if (id == null || id.isBlank()) throw problem(HttpStatus.FORBIDDEN,"STUDENT_PROFILE_REQUIRED","Student profile is required"); }
     private ExistingOperation operation(String studentId, UUID key, String hash) { EnrollmentOperationEntity op = operationRepository.findLockedByStudentIdAndIdempotencyKey(studentId, key.toString()).orElse(null); if(op==null)return null; if(!hash.equals(op.getCanonicalRequestHash()))throw problem(HttpStatus.CONFLICT,"IDEMPOTENCY_KEY_REUSED","Idempotency-Key was used with a different payload"); if("COMPLETED".equals(op.getState()))return new ExistingOperation(op.getId(),op.getResponseBody()); throw new RegistrationProblemException(HttpStatus.CONFLICT,"REQUEST_IN_PROGRESS","Request is still processing",true,List.of()); }
     private EnrollmentOperationEntity createOperation(String studentId, UUID key, String hash, String type) { try { EnrollmentOperationEntity op = EnrollmentOperationEntity.processing(UUID.randomUUID().toString(), studentId, key.toString(), hash, type, clock.instant()); operationRepository.saveAndFlush(op); return op; } catch(DataIntegrityViolationException e){ throw new RegistrationProblemException(HttpStatus.CONFLICT,"REQUEST_IN_PROGRESS","Request is still processing",true,List.of()); } }
     private void completeOperation(EnrollmentOperationEntity operation, Object body, int status) { try { operation.complete(status, mapper.writeValueAsString(body), clock.instant()); operationRepository.save(operation); } catch(JsonProcessingException e){ throw new IllegalStateException(e); } }
     private void lockStudentEnrollments(String studentId, String semesterId) { enrollmentRepository.findLockedStudentEnrollments(studentId, semesterId, List.of("ACTIVE", "ENROLLED", "PENDING", "CONFIRMED")); }
     private EnrollmentView replay(ExistingOperation existing, String studentId) { try { return mapper.readValue(existing.body(), EnrollmentView.class); } catch(Exception e){ throw new RegistrationProblemException(HttpStatus.CONFLICT,"REQUEST_IN_PROGRESS","Stored result could not be replayed",true,List.of()); } }
-    private org.springframework.jdbc.core.RowMapper<RoundView> roundMapper() { return (rs,n)->new RoundView(rs.getString("id"),rs.getString("semesterId"),rs.getString("status"),rs.getTimestamp("registrationStart").toInstant(),rs.getTimestamp("registrationEnd").toInstant(),rs.getTimestamp("addDropStart").toInstant(),rs.getTimestamp("addDropEnd").toInstant(),clock.instant(),rs.getString("institutionTimeZone"),rs.getInt("maxCredits")); }
+    private org.springframework.jdbc.core.RowMapper<RoundView> roundMapper() { return (rs,n)->new RoundView(rs.getString("id"),rs.getString("semesterId"),rs.getString("status"),rs.getTimestamp("registrationStart").toInstant(),rs.getTimestamp("registrationEnd").toInstant(),rs.getTimestamp("addDropStart").toInstant(),rs.getTimestamp("addDropEnd").toInstant(),clock.instant(),rs.getString("institutionTimeZone"),rs.getInt("maxCredits"),rs.getLong("version")); }
     private static String required(String value,String name){if(value==null||value.isBlank())throw new IllegalArgumentException(name+" is required");return value.trim();}
     private static int decodeCursor(String c){if(c==null||c.isBlank())return 0;try{return Integer.parseInt(new String(Base64.getUrlDecoder().decode(c),StandardCharsets.UTF_8));}catch(Exception e){throw new IllegalArgumentException("cursor is invalid");}}
     private static String encodeCursor(int n){return Base64.getUrlEncoder().withoutPadding().encodeToString(String.valueOf(n).getBytes(StandardCharsets.UTF_8));}
     private static String canonicalHash(String op,String student,EnrollmentRequest r){return sha256(op+"|"+student+"|"+r.roundId().trim()+"|"+r.sectionId().trim());}
     private static String sha256(String text){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     private static RegistrationProblemException problem(HttpStatus s,String c,String m){return new RegistrationProblemException(s,c,m);}
+    private static RegistrationProblemException capacityProblem(String message) {
+        String code = "SECTION_FULL".equals(message) ? "SECTION_FULL" : "SECTION_COUNT_INVARIANT";
+        return new RegistrationProblemException(HttpStatus.CONFLICT, code, "Section capacity invariant rejected the mutation");
+    }
     private static RegistrationProblemException rejection(String code,List<String> violations){return new RegistrationProblemException(HttpStatus.CONFLICT,code,"Registration rejected",false,violations.stream().map(v->new RegistrationProblemException.Violation(null,null,v)).toList());}
     private record ExistingOperation(String id,String body) { }
     public record MutationResult(EnrollmentView enrollment, boolean replayed) { }

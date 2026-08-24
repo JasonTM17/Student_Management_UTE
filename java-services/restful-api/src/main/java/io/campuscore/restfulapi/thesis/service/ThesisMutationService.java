@@ -17,6 +17,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import io.campuscore.restfulapi.web.DomainException;
@@ -234,6 +235,34 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    @Transactional
+    public GroupResponse approveGroup(UUID groupId, Jwt actor) {
+        GroupRow group = lockGroup(groupId);
+        authorizeReviewer(group, actor);
+        if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
+        }
+        int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                params().addValue("id", groupId).addValue("actor", subject(actor)));
+        if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be approved");
+        return groups.findById(groupId);
+    }
+
+    @Transactional
+    public GroupResponse rejectGroup(UUID groupId, GroupRejectionRequest request, Jwt actor) {
+        GroupRow group = lockGroup(groupId);
+        authorizeReviewer(group, actor);
+        if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
+            throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be rejected");
+        }
+        String reason = normalize(request == null ? null : request.reason());
+        if (reason.isBlank() || reason.length() > 500) throw invalid("reason is required and must contain at most 500 characters");
+        int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='REJECTED', approved_by=NULL, approved_at=NULL, rejection_reason=:reason, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
+                params().addValue("id", groupId).addValue("reason", reason));
+        if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be rejected");
+        return groups.findById(groupId);
+    }
+
     private GroupRow lockGroup(UUID id) {
         Map<String, Object> row = one("SELECT id, round_id, leader_student_id, topic_id, status FROM thesis.thesis_group WHERE id = :id FOR UPDATE", params().addValue("id", id), "GROUP_NOT_FOUND", "Thesis group not found");
         return new GroupRow((UUID) row.get("id"), (UUID) row.get("round_id"), (String) row.get("leader_student_id"), (UUID) row.get("topic_id"), GroupStatus.valueOf((String) row.get("status")));
@@ -248,6 +277,15 @@ public class ThesisMutationService {
         }
         if (group.status() != GroupStatus.DRAFT && group.status() != GroupStatus.SUBMITTED) {
             throw conflict("GROUP_STATE_CONFLICT", "The group is no longer editable");
+        }
+    }
+
+    private void authorizeReviewer(GroupRow group, Jwt actor) {
+        if (isAdmin(actor)) return;
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (lecturerId.isBlank() || group.topicId() == null
+                || count("SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId", group.topicId(), lecturerId) == 0) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
         }
     }
 
@@ -284,11 +322,12 @@ public class ThesisMutationService {
             parameters.addValue(sql.contains("group_id") ? "groupId" : sql.contains("round_id") ? "roundId" : "topicId", first);
         }
         if (second != null) {
-            parameters.addValue("studentId", second);
+            parameters.addValue(sql.contains("lecturer_id") ? "lecturerId" : "studentId", second);
         }
         Integer result = jdbc.queryForObject(sql, parameters, Integer.class);
         return result == null ? 0 : result;
     }
+
 
     private int count(String sql, UUID first) {
         return count(sql, first, null);
