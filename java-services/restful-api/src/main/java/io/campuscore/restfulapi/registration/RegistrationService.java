@@ -263,7 +263,7 @@ public class RegistrationService {
         RoundView round = round(request.roundId());
         Instant now = clock.instant();
         List<String> v = new ArrayList<>();
-        if (now.isBefore(round.registrationStart()) || now.isAfter(round.registrationEnd())) v.add("REGISTRATION_ROUND_CLOSED");
+        if (!"OPEN".equalsIgnoreCase(round.status()) || now.isBefore(round.registrationStart()) || now.isAfter(round.registrationEnd())) v.add("REGISTRATION_ROUND_CLOSED");
         Map<String, Object> section;
         try { section = jdbc.queryForMap("SELECT s.\"id\",s.\"courseId\",s.\"semesterId\",s.\"capacity\",s.\"enrolledCount\",s.\"status\" FROM academic.\"Section\" s WHERE s.\"id\"=:id", new MapSqlParameterSource("id", request.sectionId())); }
         catch (Exception e) { v.add("SECTION_NOT_OPEN"); return v; }
