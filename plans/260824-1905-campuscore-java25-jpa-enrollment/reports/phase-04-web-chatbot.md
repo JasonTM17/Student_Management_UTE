@@ -30,14 +30,16 @@
 
 ## Honest limits
 
-Authenticated Playwright against a live stack was **NOT_RUN**: the available
-environment does not provide a verified login/session and seeded runtime for
-that browser gate. The checked-in Playwright spec is a test plan/evidence
-target, not proof of an authenticated browser pass. Device/native, remote CI,
-live DeepSeek and production evidence are also not claimed.
+The authenticated Playwright suite is now **PASS (5/5 scenarios)** with the
+installed Chrome runtime: assistant stream/citation/feedback, admin knowledge,
+responsive launcher/panel, registration → Mailpit verify/reset → fresh login,
+and 390/768/1440 auth route/keyboard/locale/no-referrer coverage. Device/native,
+remote CI, live DeepSeek and production evidence remain separate and are not
+claimed. A standalone third-party accessibility audit is also not claimed;
+the browser suite covers the implemented keyboard/focus/landmark assertions.
 
 ## Exit ruling
 
-Static/component web gates are **PASS**. Phase 4 remains **in-progress** until
-authenticated 390/768/1440 browser evidence and an independent accessibility
-review are available.
+Static/component and authenticated browser gates are **PASS** for the bounded
+web contract. Independent native-device and third-party accessibility review
+remain explicit follow-up evidence, not hidden release claims.
