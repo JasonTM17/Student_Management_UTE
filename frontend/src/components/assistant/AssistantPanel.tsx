@@ -78,7 +78,7 @@ type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' }
+  | { type: 'feedback'; messageId: string; rating?: 'UP' | 'DOWN' }
   | { type: 'clear-error' };
 
 const TRANSIENT_TERMINAL_CODES = new Set([
@@ -258,11 +258,16 @@ export function AssistantPanel() {
   >('idle');
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
+  const [feedbackPendingMessageId, setFeedbackPendingMessageId] =
+    useState<string>();
+  const [feedbackErrorMessageId, setFeedbackErrorMessageId] =
+    useState<string>();
   const [lastPrompt, setLastPrompt] = useState<string>();
   const [state, dispatch] = useReducer(assistantReducer, initialState);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
+  const historyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
   const activeRequestIdRef = useRef<string>();
@@ -312,7 +317,7 @@ export function AssistantPanel() {
       top: node.scrollHeight,
       behavior: isSending ? 'smooth' : 'auto',
     });
-  }, [state.messages, isSending]);
+  }, [state.messages, isSending, open]);
 
   const handleLogScroll = () => {
     const node = logRef.current;
@@ -322,6 +327,10 @@ export function AssistantPanel() {
   };
 
   const closePanel = useCallback(() => {
+    const requestId = activeRequestIdRef.current;
+    if (requestId) {
+      void thesisApi.cancelRequest(requestId).catch(() => undefined);
+    }
     requestGenerationRef.current += 1;
     abortRef.current?.abort();
     setIsSending(false);
@@ -334,18 +343,39 @@ export function AssistantPanel() {
     activePromptRef.current = undefined;
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
+    userScrolledRef.current = false;
     setHistoryStatus('idle');
     requestAnimationFrame(() => launcherRef.current?.focus());
   }, []);
 
+  const closeHistory = useCallback(() => {
+    setShowHistory(false);
+    requestAnimationFrame(() => inputRef.current?.focus());
+  }, []);
+
+  const openPanel = useCallback(() => {
+    userScrolledRef.current = false;
+    setOpen(true);
+  }, []);
+
+  const toggleHistory = useCallback(() => {
+    setShowHistory((current) => {
+      const next = !current;
+      requestAnimationFrame(() => {
+        if (next) historyRef.current?.focus();
+        else inputRef.current?.focus();
+      });
+      return next;
+    });
+  }, []);
+
   const handlePanelEscape = useCallback(() => {
     if (showHistory) {
-      setShowHistory(false);
-      requestAnimationFrame(() => inputRef.current?.focus());
+      closeHistory();
       return;
     }
     closePanel();
-  }, [closePanel, showHistory]);
+  }, [closeHistory, closePanel, showHistory]);
 
   // The shared trap owns the previous `event.key !== 'Escape'` guard while
   // adding Tab containment, scroll locking and nested-dialog coordination.
@@ -369,7 +399,8 @@ export function AssistantPanel() {
         conversationId: conversation.id,
         messages: loaded.map(fromHistoryMessage),
       });
-      setShowHistory(false);
+      userScrolledRef.current = false;
+      closeHistory();
       setHistoryStatus('loaded');
     } catch {
       setHistoryStatus('error');
@@ -385,7 +416,8 @@ export function AssistantPanel() {
       // locally so the next send can target it without showing an empty row.
       selectedHistoryRef.current = true;
       dispatch({ type: 'reset', conversationId: conversation.id });
-      setShowHistory(false);
+      userScrolledRef.current = false;
+      closeHistory();
     } catch {
       dispatch({ type: 'error', kind: 'unavailable' });
     }
@@ -660,11 +692,18 @@ export function AssistantPanel() {
   };
 
   const setFeedback = async (messageId: string, rating: 'UP' | 'DOWN') => {
+    if (feedbackPendingMessageId) return;
+    const previous = state.messages.find((message) => message.id === messageId)?.feedback;
+    setFeedbackPendingMessageId(messageId);
+    setFeedbackErrorMessageId(undefined);
     dispatch({ type: 'feedback', messageId, rating });
     try {
       await thesisApi.setMessageFeedback(messageId, rating);
     } catch {
-      /* feedback is best effort and never changes answer state */
+      dispatch({ type: 'feedback', messageId, rating: previous });
+      setFeedbackErrorMessageId(messageId);
+    } finally {
+      setFeedbackPendingMessageId(undefined);
     }
   };
 
@@ -707,7 +746,7 @@ export function AssistantPanel() {
           size="icon"
           data-assistant-launcher="thesis-mark"
           className="group ml-auto min-h-14 min-w-14 rounded-xl border border-primary-foreground/20 bg-primary text-primary-foreground shadow-xl transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
-          onClick={() => setOpen(true)}
+          onClick={openPanel}
           aria-label={messages.assistant.open}
           aria-expanded={open}
           title={messages.assistant.open}
@@ -754,9 +793,10 @@ export function AssistantPanel() {
                 variant="ghost"
                 size="icon"
                 className="text-background hover:bg-white/10 hover:text-background"
-                onClick={() => setShowHistory((current) => !current)}
+                onClick={toggleHistory}
                 aria-label={messages.assistant.history}
                 aria-expanded={showHistory}
+                aria-controls="assistant-history"
               >
                 <History className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -780,8 +820,13 @@ export function AssistantPanel() {
           </p>
           {showHistory ? (
             <div
+              id="assistant-history"
+              ref={historyRef}
+              role="region"
+              tabIndex={-1}
               className="border-b border-border/70 bg-secondary/30 px-3 py-3"
               aria-label={messages.assistant.history}
+              aria-busy={historyStatus === 'loading'}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <Button
@@ -789,7 +834,7 @@ export function AssistantPanel() {
                   variant="ghost"
                   size="sm"
                   className="min-h-11 gap-1"
-                  onClick={() => setShowHistory(false)}
+                  onClick={closeHistory}
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                   {messages.assistant.backToChat}
@@ -829,7 +874,7 @@ export function AssistantPanel() {
                   </Button>
                 </div>
               ) : null}
-              {historyStatus !== 'loading' && !history.length ? (
+              {historyStatus === 'loaded' && !history.length ? (
                 <p className="px-2 py-4 text-sm text-muted-foreground">
                   {messages.assistant.historyEmpty}
                 </p>
@@ -947,38 +992,46 @@ export function AssistantPanel() {
                   !message.id.startsWith('local-') ? (
                     <div
                       data-assistant-feedback={message.id}
-                      className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-1"
+                      className="mt-2 border-t border-border/50 pt-1"
+                      aria-busy={feedbackPendingMessageId === message.id}
                     >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'min-h-10 min-w-10',
-                          message.feedback === 'UP' &&
-                            'bg-secondary text-primary',
-                        )}
-                        aria-label={messages.assistant.feedbackUp}
-                        aria-pressed={message.feedback === 'UP'}
-                        onClick={() => void setFeedback(message.id, 'UP')}
-                      >
-                        <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'min-h-10 min-w-10',
-                          message.feedback === 'DOWN' &&
-                            'bg-secondary text-destructive',
-                        )}
-                        aria-label={messages.assistant.feedbackDown}
-                        aria-pressed={message.feedback === 'DOWN'}
-                        onClick={() => void setFeedback(message.id, 'DOWN')}
-                      >
-                        <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={feedbackPendingMessageId === message.id}
+                          className={cn(
+                            message.feedback === 'UP' &&
+                              'bg-secondary text-primary',
+                          )}
+                          aria-label={messages.assistant.feedbackUp}
+                          aria-pressed={message.feedback === 'UP'}
+                          onClick={() => void setFeedback(message.id, 'UP')}
+                        >
+                          <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          disabled={feedbackPendingMessageId === message.id}
+                          className={cn(
+                            message.feedback === 'DOWN' &&
+                              'bg-secondary text-destructive',
+                          )}
+                          aria-label={messages.assistant.feedbackDown}
+                          aria-pressed={message.feedback === 'DOWN'}
+                          onClick={() => void setFeedback(message.id, 'DOWN')}
+                        >
+                          <ThumbsDown className="h-4 w-4" aria-hidden="true" />
+                        </Button>
+                      </div>
+                      {feedbackErrorMessageId === message.id ? (
+                        <p className="pb-1 text-xs text-destructive" role="alert">
+                          {messages.assistant.feedbackUnavailable}
+                        </p>
+                      ) : null}
                     </div>
                   ) : null}
                 </div>

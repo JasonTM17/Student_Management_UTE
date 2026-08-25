@@ -93,6 +93,18 @@ test('assistant launcher has a thesis-specific icon mark and full interaction st
   assert.match(source, /aria-modal="true"/);
 });
 
+test('assistant history and feedback states recover focus and avoid contradictory empty output', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(source, /const closeHistory = useCallback/);
+  assert.match(source, /historyRef\.current\?\.focus/);
+  assert.match(source, /historyStatus === 'loaded' && !history\.length/);
+  assert.match(source, /feedbackPendingMessageId/);
+  assert.match(source, /feedbackErrorMessageId/);
+  assert.match(source, /rating: previous/);
+  assert.match(source, /messages\.assistant\.feedbackUnavailable/);
+  assert.match(source, /thesisApi\.cancelRequest\(requestId\)/);
+});
+
 test('admin knowledge action errors remain visible inside active dialogs', () => {
   const page = fs.readFileSync(path.join(root, 'src/app/admin/assistant-knowledge/page.tsx'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'src/components/ui/modal.tsx'), 'utf8');

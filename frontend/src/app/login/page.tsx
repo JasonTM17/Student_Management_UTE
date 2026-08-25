@@ -133,7 +133,7 @@ export default function LoginPage() {
     >
       <div className="space-y-6">
         <div className="space-y-3">
-          <SectionEyebrow>{messages.login.sectionEyebrow}</SectionEyebrow>
+          <SectionEyebrow className="lg:hidden">{messages.login.sectionEyebrow}</SectionEyebrow>
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold leading-8 text-foreground">
               {messages.login.heading}
@@ -193,14 +193,13 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <div className="flex items-center justify-between gap-4">
+            <div>
               <label
                 htmlFor="password"
                 className="text-sm font-medium text-foreground"
               >
                 {messages.login.passwordLabel}
               </label>
-              <span className="text-xs text-muted-foreground">Academic office support</span>
             </div>
             <div className="relative">
               <Input
@@ -232,10 +231,10 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading || !isClientReady}>
+          <Button type="submit" className="w-full" disabled={isLoading || !isClientReady} aria-busy={isLoading}>
             {isLoading ? (
               <span className="inline-flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground motion-reduce:animate-none" aria-hidden="true" />
                 {messages.login.signingIn}
               </span>
             ) : (
@@ -248,11 +247,11 @@ export default function LoginPage() {
         </form>
 
         <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <LocalizedLink href="/forgot-password" className="font-medium text-primary hover:underline">
+          <LocalizedLink href="/forgot-password" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
             {messages.login.forgotPassword}
           </LocalizedLink>
-          <LocalizedLink href="/register" className="font-medium text-primary hover:underline">
-            Create an account
+          <LocalizedLink href="/register" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
+            {messages.register.heading}
           </LocalizedLink>
         </div>
 
@@ -274,7 +273,7 @@ export default function LoginPage() {
 
         <p className="text-sm text-muted-foreground">
           {messages.login.returnHomeLead}{' '}
-          <LocalizedLink href="/" className="font-medium text-primary hover:underline">
+          <LocalizedLink href="/" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
             {messages.common.actions.returnHome}
           </LocalizedLink>
           .
