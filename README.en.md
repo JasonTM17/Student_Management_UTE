@@ -23,7 +23,7 @@ compatibility baseline; host JDK 24/26 output is not Java 25 evidence.
 Run the stack with:
 
 ```powershell
-docker compose up -d --build postgres mailpit restful-api
+docker compose up -d --build postgres mailpit restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
@@ -36,7 +36,8 @@ environment variables; see [auth-mail.md](docs/integrations/auth-mail.md).
 CampusCore application identities live in the private `campuscore_auth`
 schema; the Supabase-managed `auth` schema is never created or modified by the
 application migrations. A new reviewed Supabase database uses the schema-only
-B20 baseline, while local and existing CampusCore databases follow V1-V20. See
+B20 baseline plus the reviewed V21 successor, while local and existing
+CampusCore databases follow V1-V21. See
 [supabase-database.md](docs/integrations/supabase-database.md).
 
 Local seed accounts:

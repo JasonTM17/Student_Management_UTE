@@ -219,11 +219,12 @@ public class AuthUserRepository {
                         .addValue("loggedInAt", localDateTime(loggedInAt)));
     }
 
-    public void markEmailVerified(String userId, Instant verifiedAt) {
-        jdbc.update(
+    public int markEmailVerified(String userId, Instant verifiedAt) {
+        return jdbc.update(
                 "UPDATE " + USER_TABLE
                         + " SET \"emailVerified\" = TRUE, \"status\" = 'ACTIVE', \"updatedAt\" = :verifiedAt"
-                        + " WHERE \"id\" = :userId AND \"emailVerified\" = FALSE",
+                        + " WHERE \"id\" = :userId AND \"emailVerified\" = FALSE"
+                        + " AND \"status\" = 'PENDING_VERIFICATION'",
                 new MapSqlParameterSource()
                         .addValue("userId", userId)
                         .addValue("verifiedAt", localDateTime(verifiedAt)));

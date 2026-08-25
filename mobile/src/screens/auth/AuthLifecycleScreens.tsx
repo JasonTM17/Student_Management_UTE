@@ -16,10 +16,17 @@ function errorMessage(error: unknown, fallback: string) {
   return fallback;
 }
 
-function challengeFailure(error: unknown) {
-  if (error instanceof ApiClientError && error.code === 'AUTH_CHALLENGE_EXPIRED') return 'expired' as const;
-  if (error instanceof ApiClientError && error.code === 'AUTH_CHALLENGE_ATTEMPTS_EXCEEDED') return 'attemptsExceeded' as const;
-  return 'invalid' as const;
+type ChallengeFailureState = 'invalid' | 'expired' | 'attemptsExceeded' | 'unavailable';
+
+function challengeFailure(error: unknown): ChallengeFailureState {
+  if (!(error instanceof ApiClientError)) return 'unavailable';
+  if (error.code === 'AUTH_CHALLENGE_EXPIRED') return 'expired';
+  if (error.code === 'AUTH_CHALLENGE_ATTEMPTS_EXCEEDED') return 'attemptsExceeded';
+  if (error.code === 'AUTH_CHALLENGE_INVALID') return 'invalid';
+  // Network failures, retryable responses, and server errors are outages, not
+  // proof that a one-time token is malformed. Keep the recovery path truthful.
+  if (error.status === 0 || error.status >= 500 || error.retryable || !error.code) return 'unavailable';
+  return 'invalid';
 }
 
 function AuthLinks({ navigation }: MobileScreenProps) {
@@ -79,7 +86,7 @@ export function RegisterScreen({ navigation }: MobileScreenProps) {
 export function VerifyEmailScreen({ navigation, authToken }: MobileScreenProps) {
   const [token, setToken] = useState(authToken ?? '');
   const [email, setEmail] = useState('');
-  const [state, setState] = useState<'idle' | 'checking' | 'success' | 'invalid' | 'expired' | 'attemptsExceeded'>('idle');
+  const [state, setState] = useState<'idle' | 'checking' | 'success' | ChallengeFailureState>('idle');
   const [resendState, setResendState] = useState<'idle' | 'resending' | 'success' | 'throttled' | 'unavailable'>('idle');
   const submittedToken = useRef<string | null>(null);
 
@@ -119,9 +126,10 @@ export function VerifyEmailScreen({ navigation, authToken }: MobileScreenProps) 
         {state === 'invalid' ? <StatePanel kind="error" title="This verification link is invalid" description="Request the latest link below." /> : null}
         {state === 'expired' ? <StatePanel kind="error" title="This verification link has expired" description="Links expire after 24 hours. Request a fresh one below." /> : null}
         {state === 'attemptsExceeded' ? <StatePanel kind="error" title="This verification link was disabled" description="Too many invalid attempts were made. Request a fresh link." /> : null}
+        {state === 'unavailable' ? <StatePanel kind="error" title="Verification is temporarily unavailable" description="Try again in a moment. If the link already succeeded, return to sign in." /> : null}
         <View style={styles.divider} />
         <Field label="Email for a new link" autoCapitalize="none" autoComplete="email" keyboardType="email-address" onChangeText={setEmail} value={email} />
-        <Button label={resendState === 'resending' ? 'Sending…' : 'Resend verification'} loading={resendState === 'resending'} onPress={() => void resend()} variant="secondary" />
+        <Button label={resendState === 'resending' ? 'Sending…' : 'Resend verification'} disabled={!email.trim() || resendState === 'resending'} loading={resendState === 'resending'} onPress={() => void resend()} variant="secondary" />
         {resendState === 'success' ? <StatePanel kind="empty" title="Request accepted" description="If the account is eligible, the latest verification email is on the way." /> : null}
         {resendState === 'throttled' ? <StatePanel kind="error" title="Please wait before requesting another email" /> : null}
         {resendState === 'unavailable' ? <StatePanel kind="error" title="Email delivery is temporarily unavailable" description="Try again in a moment." /> : null}
@@ -152,7 +160,7 @@ export function ResetPasswordScreen({ navigation, authToken }: MobileScreenProps
   const [token, setToken] = useState(authToken ?? '');
   const [password, setPassword] = useState('');
   const [confirm, setConfirm] = useState('');
-  const [state, setState] = useState<'ready' | 'saving' | 'success' | 'invalid' | 'expired' | 'attemptsExceeded'>('ready');
+  const [state, setState] = useState<'ready' | 'saving' | 'success' | ChallengeFailureState>('ready');
   useEffect(() => { if (authToken) setToken(authToken); }, [authToken]);
   const submit = async () => {
     if (!token.trim() || password.length < 8 || password !== confirm) { setState('invalid'); return; }
@@ -161,7 +169,7 @@ export function ResetPasswordScreen({ navigation, authToken }: MobileScreenProps
     catch (requestError) { setState(challengeFailure(requestError)); }
   };
   return <ScreenShell eyebrow="Password recovery" title="Reset password" subtitle="Use a fresh password, then sign in again." contentStyle={styles.content}>
-    <Card style={styles.card}>{state === 'success' ? <StatePanel kind="empty" title="Password reset complete" description="All refresh sessions were revoked. Sign in again on this device." actionLabel="Sign in" onAction={() => navigation.navigate('auth.signIn')} /> : <><Field label="Reset token" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setToken(value); setState('ready'); }} placeholder="Paste token from email" secureTextEntry value={token} /><Field label="New password" autoCapitalize="none" autoComplete="password-new" onChangeText={setPassword} secureTextEntry value={password} /><Field label="Confirm password" autoCapitalize="none" autoComplete="password-new" onChangeText={setConfirm} secureTextEntry value={confirm} /><Button label={state === 'saving' ? 'Saving…' : 'Reset password'} loading={state === 'saving'} onPress={() => void submit()} />{state === 'invalid' ? <StatePanel kind="error" title="The reset token is invalid or the passwords do not match" /> : null}{state === 'expired' ? <StatePanel kind="error" title="The reset link has expired" description="Request a fresh link; reset links expire after 30 minutes." /> : null}{state === 'attemptsExceeded' ? <StatePanel kind="error" title="The reset link was disabled" description="Too many invalid attempts were made. Request a fresh link." /> : null}</>}</Card>
+    <Card style={styles.card}>{state === 'success' ? <StatePanel kind="empty" title="Password reset complete" description="All refresh sessions were revoked. Sign in again on this device." actionLabel="Sign in" onAction={() => navigation.navigate('auth.signIn')} /> : <><Field label="Reset token" autoCapitalize="none" autoCorrect={false} onChangeText={(value) => { setToken(value); setState('ready'); }} placeholder="Paste token from email" secureTextEntry value={token} /><Field label="New password" autoCapitalize="none" autoComplete="password-new" onChangeText={setPassword} secureTextEntry value={password} /><Field label="Confirm password" autoCapitalize="none" autoComplete="password-new" onChangeText={setConfirm} secureTextEntry value={confirm} /><Button label={state === 'saving' ? 'Saving…' : 'Reset password'} disabled={state === 'saving'} loading={state === 'saving'} onPress={() => void submit()} />{state === 'invalid' ? <StatePanel kind="error" title="The reset token is invalid or the passwords do not match" /> : null}{state === 'expired' ? <StatePanel kind="error" title="The reset link has expired" description="Request a fresh link; reset links expire after 30 minutes." /> : null}{state === 'attemptsExceeded' ? <StatePanel kind="error" title="The reset link was disabled" description="Too many invalid attempts were made. Request a fresh link." /> : null}{state === 'unavailable' ? <StatePanel kind="error" title="Password reset is temporarily unavailable" description="Try again in a moment. Your current password is unchanged." /> : null}</>}</Card>
     <AuthLinks navigation={navigation} role="student" selectedThesisTopicId={null} />
   </ScreenShell>;
 }

@@ -132,6 +132,30 @@ class AuthLifecyclePersistenceTest {
     }
 
     @Test
+    void verificationCannotReactivateAnAdminDisabledPendingAccount() throws Exception {
+        String email = "disabled-verification.lifecycle@campuscore.test";
+        AuthMailEvent verification = registerAndCapture(email);
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'DISABLED' WHERE \"email\" = ?",
+                email);
+
+        mvc.perform(post("/api/v1/auth/email-verifications/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenBody(verification.rawToken())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_CHALLENGE_INVALID"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
+                String.class,
+                email)).isEqualTo("DISABLED");
+        assertThat(jdbc.queryForObject(
+                "SELECT \"emailVerified\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
+                Boolean.class,
+                email)).isFalse();
+    }
+
+    @Test
     void resendCooldownDoesNotRevealWhetherTheAddressExists() throws Exception {
         String email = "cooldown.lifecycle@campuscore.test";
         registerAndCapture(email);

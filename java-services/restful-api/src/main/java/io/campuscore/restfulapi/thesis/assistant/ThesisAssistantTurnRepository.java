@@ -387,7 +387,10 @@ public class ThesisAssistantTurnRepository {
     public CancelResult cancelBeforeReservation(String ownerId, UUID clientRequestId, String requestHash,
             Consumer<DispatchHandle> fence) {
         TurnRow existing = findForUpdate(ownerId, clientRequestId);
-        if (existing != null) return cancel(existing.turnId(), ownerId, clientRequestId, fence);
+        if (existing != null) {
+            ensureRequestHash(existing, requestHash);
+            return cancel(existing.turnId(), ownerId, clientRequestId, fence);
+        }
         int inserted = jpa.update("INSERT INTO assistant.chat_turn_ledger "
                 + "(turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,terminal_reason,created_at,updated_at,tombstone_until) "
                 + "VALUES (:turn,:owner,:request,:hash,NULL,FALSE,'CANCELLED',0,FALSE,'CANCELLED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,:tombstone)"
@@ -398,7 +401,13 @@ public class ThesisAssistantTurnRepository {
         if (inserted == 1) return new CancelResult(true, "CANCELLED");
         existing = findForUpdate(ownerId, clientRequestId);
         return existing == null ? new CancelResult(false, "TURN_NOT_FOUND")
-                : cancel(existing.turnId(), ownerId, clientRequestId, fence);
+                : cancelAfterHashCheck(existing, ownerId, clientRequestId, requestHash, fence);
+    }
+
+    private CancelResult cancelAfterHashCheck(TurnRow existing, String ownerId, UUID clientRequestId,
+            String requestHash, Consumer<DispatchHandle> fence) {
+        ensureRequestHash(existing, requestHash);
+        return cancel(existing.turnId(), ownerId, clientRequestId, fence);
     }
 
     /** Moves a reserved pre-dispatch turn to a retryable terminal state. */
@@ -563,6 +572,12 @@ public class ThesisAssistantTurnRepository {
             case "FAILED_PRE_DISPATCH" -> reacquireFailedPreDispatch(row, leaseOwner);
             default -> new Reservation(ReservationStatus.ACTIVE, row.turnId(), row.conversationId(), row.leaseGeneration(), row.createdConversation(), null, row.state(), false);
         };
+    }
+
+    private static void ensureRequestHash(TurnRow row, String requestHash) {
+        if (!row.requestHash().equals(requestHash)) {
+            throw problem(409, "IDEMPOTENCY_CONFLICT", "Request key was already used with a different payload");
+        }
     }
 
     private Reservation reacquireFailedPreDispatch(TurnRow row, String leaseOwner) {

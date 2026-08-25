@@ -7,6 +7,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation;
+import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
 import java.util.UUID;
 import java.sql.Timestamp;
@@ -108,6 +109,23 @@ class ThesisAssistantTurnLedgerH2Test {
                 () -> turns.reserve(owner, key, hash, null, "en", "worker-after-disconnect", 90));
         assertEquals(0, count("SELECT COUNT(*) FROM assistant.usage_bucket WHERE owner_id=:owner AND request_count>0",
                 p("owner", owner)));
+    }
+
+    @Test
+    void disconnectWithReusedRequestKeyAndDifferentPayloadCannotCancelOriginalTurn() {
+        String owner = "cancel-hash-" + UUID.randomUUID();
+        UUID key = UUID.randomUUID();
+        String originalHash = reservationHash("original", "en");
+        ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(
+                owner, key, originalHash, null, "en", "lease", 90);
+
+        DomainException conflict = assertThrows(DomainException.class,
+                () -> turns.cancelBeforeReservation(owner, key, reservationHash("different", "en")));
+
+        assertEquals("IDEMPOTENCY_CONFLICT", conflict.code());
+        assertEquals("RESERVED", jdbc.queryForObject(
+                "SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn",
+                p("turn", reservation.turnId()), String.class));
     }
 
     @Test

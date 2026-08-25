@@ -52,7 +52,7 @@ provider, inject `SPRING_MAIL_*`, `MAIL_FROM` and `AUTH_FRONTEND_BASE_URL` only
 at server runtime. See `docs/integrations/auth-mail.md`.
 
 Flyway is the only schema owner. The `persistence` profile is enabled by the
-Compose service; PostgreSQL V13-V20 are forward-only registration/assistant/
+Compose service; PostgreSQL V13-V21 are forward-only registration/assistant/
 auth-lifecycle and Supabase-compatibility
 hardening migrations and must be rehearsed on an isolated copy before any
 upgrade. `ddl-auto=validate` and `open-in-view=false` keep JPA at the typed

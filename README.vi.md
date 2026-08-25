@@ -28,8 +28,8 @@ trường mà không commit credential.
 
 Identity của CampusCore nằm trong schema riêng `campuscore_auth`; các migration
 không tạo hoặc sửa schema `auth` do Supabase quản lý. Database Supabase mới chỉ
-dùng baseline schema-only B20 sau khi kiểm tra đúng project, backup và drift;
-database local/cũ tiếp tục chạy V1-V20. Xem
+dùng baseline schema-only B20 rồi successor V21 sau khi kiểm tra đúng project,
+backup và drift; database local/cũ tiếp tục chạy V1-V21. Xem
 [supabase-database.md](docs/integrations/supabase-database.md).
 
 ### Toolchain Java
