@@ -30,6 +30,7 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 import { cn } from '@/lib/utils';
+import { useDialogFocusTrap } from '@/components/ui/use-dialog-focus-trap';
 
 interface AdminFrameProps {
   title: string;
@@ -59,6 +60,15 @@ export function AdminFrame({
   const openSidebarButtonRef = React.useRef<HTMLButtonElement>(null);
   const mainRef = React.useRef<HTMLElement>(null);
   const previousPathnameRef = React.useRef(pathname);
+  const closeSidebar = React.useCallback(() => {
+    setSidebarOpen(false);
+  }, []);
+  const sidebarRef = useDialogFocusTrap<HTMLElement>({
+    open: sidebarOpen && !isDesktopSidebar,
+    onClose: closeSidebar,
+    initialFocusRef: sidebarCloseRef,
+    restoreFocusRef: openSidebarButtonRef,
+  });
 
   const resolvedEyebrow = eyebrow || messages.adminShell.eyebrow;
   const resolvedBackLabel = backLabel || messages.adminShell.backToDashboard;
@@ -123,35 +133,6 @@ export function AdminFrame({
     }
   }, [pathname]);
 
-  React.useEffect(() => {
-    if (!sidebarOpen || isDesktopSidebar) {
-      return;
-    }
-
-    const frame = window.requestAnimationFrame(() => sidebarCloseRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
-  }, [isDesktopSidebar, sidebarOpen]);
-
-  React.useEffect(() => {
-    const previousOverflow = document.body.style.overflow;
-    if (sidebarOpen) {
-      document.body.style.overflow = 'hidden';
-    }
-
-    const handleEscape = (event: KeyboardEvent) => {
-      if (event.key === 'Escape' && sidebarOpen) {
-        setSidebarOpen(false);
-        window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
-      }
-    };
-
-    document.addEventListener('keydown', handleEscape);
-    return () => {
-      document.body.style.overflow = previousOverflow;
-      document.removeEventListener('keydown', handleEscape);
-    };
-  }, [sidebarOpen]);
-
   return (
     <div className="portal-shell">
       <a
@@ -167,15 +148,16 @@ export function AdminFrame({
           type="button"
           tabIndex={-1}
           className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden"
-          onClick={() => {
-            setSidebarOpen(false);
-            window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
-          }}
+          onClick={closeSidebar}
           aria-label={messages.adminShell.closeOverlay}
+          onKeyDown={(event) => {
+            if (event.key === 'Escape') closeSidebar();
+          }}
         />
       ) : null}
 
       <aside
+        ref={sidebarRef}
         id="admin-sidebar"
         aria-label={messages.adminShell.sidebarNavigation}
         role={!isDesktopSidebar ? 'dialog' : undefined}
@@ -202,10 +184,7 @@ export function AdminFrame({
             variant="ghost"
             size="icon"
             className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:hidden"
-            onClick={() => {
-              setSidebarOpen(false);
-              window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
-            }}
+            onClick={closeSidebar}
             aria-label={messages.adminShell.closeSidebar}
           >
             <X className="h-5 w-5" aria-hidden="true" />

@@ -32,7 +32,7 @@ The dependency-free screen-atlas regression can run now:
 npm test --prefix mobile
 ```
 
-It verifies 21 registered screens and the shared Stitch token anchors. Run
+It verifies 25 registered screens and the shared Stitch token anchors. Run
 `npm run typecheck --prefix mobile` from the repository root for the complete
 TypeScript gate.
 
@@ -76,7 +76,7 @@ yet present.
 
 ## Screen atlas
 
-The registry contains 21 navigable screens:
+The registry contains 25 navigable screens:
 
 - Auth: sign in.
 - Student: dashboard, schedule, courses, grades, attendance, registration,

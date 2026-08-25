@@ -5,6 +5,8 @@ import axios, {
 } from 'axios';
 import {
   LoginResponse,
+  RegistrationPendingResponse,
+  AuthActionResponse,
   ApiResponse,
   User,
   Section,
@@ -27,6 +29,13 @@ import {
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 
 export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+function createIdempotencyKey() {
+  if (typeof globalThis.crypto?.randomUUID === 'function') return globalThis.crypto.randomUUID();
+  return 'xxxxxxxx-xxxx-4xxx-yxxx-xxxxxxxxxxxx'.replace(/[xy]/g, (character) => {
+    const random = Math.floor(Math.random() * 16);
+    return (character === 'x' ? random : (random & 0x3) | 0x8).toString(16);
+  });
+}
 type ApiObject = Record<string, unknown>;
 type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRefresh?: boolean;
@@ -70,7 +79,7 @@ type SectionDetail = Section & {
 
 const CSRF_COOKIE_NAME = 'cc_csrf';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
-const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout)(?:\/|$)/;
+const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout|email-verifications(?:\/.*)?|password-reset(?:\/.*)?|password-reset-requests(?:\/.*)?)(?:\/|$)/;
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 function isBrowser() {
@@ -256,8 +265,40 @@ export const authApi = {
     password: string;
     firstName: string;
     lastName: string;
-  }): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/auth/register', data, {
+  }): Promise<RegistrationPendingResponse> => {
+    const response = await api.post<RegistrationPendingResponse>('/auth/register', data, {
+      skipAuthRefresh: true,
+      skipAuthRedirect: true,
+    } as AuthRequestConfig);
+    return response.data;
+  },
+
+  confirmEmail: async (token: string): Promise<AuthActionResponse> => {
+    const response = await api.post<AuthActionResponse>('/auth/email-verifications/confirm', { token }, {
+      skipAuthRefresh: true,
+      skipAuthRedirect: true,
+    } as AuthRequestConfig);
+    return response.data;
+  },
+
+  resendVerification: async (email: string): Promise<AuthActionResponse> => {
+    const response = await api.post<AuthActionResponse>('/auth/email-verifications/resend', { email }, {
+      skipAuthRefresh: true,
+      skipAuthRedirect: true,
+    } as AuthRequestConfig);
+    return response.data;
+  },
+
+  requestPasswordReset: async (email: string): Promise<AuthActionResponse> => {
+    const response = await api.post<AuthActionResponse>('/auth/password-reset-requests', { email }, {
+      skipAuthRefresh: true,
+      skipAuthRedirect: true,
+    } as AuthRequestConfig);
+    return response.data;
+  },
+
+  confirmPasswordReset: async (token: string, newPassword: string): Promise<AuthActionResponse> => {
+    const response = await api.post<AuthActionResponse>('/auth/password-reset/confirm', { token, newPassword }, {
       skipAuthRefresh: true,
       skipAuthRedirect: true,
     } as AuthRequestConfig);
@@ -379,18 +420,24 @@ export const enrollmentsApi = {
   enroll: async (
     sectionId: string,
     locale?: 'en' | 'vi',
+    idempotencyKey = createIdempotencyKey(),
   ): Promise<EnrollmentActionResult> => {
     const response = await api.post<EnrollmentActionResult>(
       '/enrollments/enroll',
       { sectionId, locale },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
     return response.data;
   },
 
-  drop: async (enrollmentId: string): Promise<{ message: string }> => {
+  drop: async (
+    enrollmentId: string,
+    idempotencyKey = createIdempotencyKey(),
+  ): Promise<{ message: string }> => {
     const response = await api.post<{ message: string }>(
       `/enrollments/${enrollmentId}/drop`,
       {},
+      { headers: { 'Idempotency-Key': idempotencyKey } },
     );
     return response.data;
   },

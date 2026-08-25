@@ -17,6 +17,14 @@ services:
       retries: 12
     restart: unless-stopped
 
+  mailpit:
+    image: axllent/mailpit:v1.21
+    container_name: campuscore-mailpit
+    ports:
+      - "127.0.0.1:${MAILPIT_SMTP_HOST_PORT:-1025}:1025"
+      - "127.0.0.1:${MAILPIT_UI_HOST_PORT:-8025}:8025"
+    restart: unless-stopped
+
   restful-api:
     build:
       context: .
@@ -47,11 +55,22 @@ services:
       ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
       ASSISTANT_GLOBAL_DAILY_QUOTA: ${ASSISTANT_GLOBAL_DAILY_QUOTA:-200}
       ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-90}
+      MAIL_ENABLED: ${MAIL_ENABLED:-true}
+      SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
+      SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
+      SPRING_MAIL_USERNAME: ${SPRING_MAIL_USERNAME:-}
+      SPRING_MAIL_PASSWORD: ${SPRING_MAIL_PASSWORD:-}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-false}
+      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-false}
+      MAIL_FROM: ${MAIL_FROM:-no-reply@campuscore.local}
+      AUTH_FRONTEND_BASE_URL: ${AUTH_FRONTEND_BASE_URL:-http://localhost:3000}
     ports:
       - "127.0.0.1:${RESTFUL_API_HOST_PORT:-4010}:4010"
     depends_on:
       postgres:
         condition: service_healthy
+      mailpit:
+        condition: service_started
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4010/api/v1/health/readiness >/dev/null"]
       interval: 10s

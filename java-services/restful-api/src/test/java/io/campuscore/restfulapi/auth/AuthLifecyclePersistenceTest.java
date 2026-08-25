@@ -56,7 +56,7 @@ class AuthLifecyclePersistenceTest {
         assertThat(verification.purpose()).isEqualTo(Purpose.EMAIL_VERIFICATION);
         assertThat(verification.locale()).isEqualTo("vi");
         String storedHash = jdbc.queryForObject(
-                "SELECT \"tokenHash\" FROM \"auth\".\"AuthChallenge\" WHERE \"id\" = ?",
+                "SELECT \"tokenHash\" FROM \"campuscore_auth\".\"AuthChallenge\" WHERE \"id\" = ?",
                 String.class,
                 AuthChallengeTokenService.challengeId(verification.rawToken()).orElseThrow());
         assertThat(storedHash)
@@ -80,11 +80,11 @@ class AuthLifecyclePersistenceTest {
                 .andExpect(cookie().doesNotExist("cc_refresh_token"));
 
         assertThat(jdbc.queryForObject(
-                "SELECT \"emailVerified\" FROM \"auth\".\"User\" WHERE \"email\" = ?",
+                "SELECT \"emailVerified\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
                 Boolean.class,
                 email)).isTrue();
         assertThat(jdbc.queryForObject(
-                "SELECT \"status\" FROM \"auth\".\"User\" WHERE \"email\" = ?",
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
                 String.class,
                 email)).isEqualTo("ACTIVE");
 
@@ -106,7 +106,7 @@ class AuthLifecyclePersistenceTest {
         String email = "resend.lifecycle@campuscore.test";
         AuthMailEvent first = registerAndCapture(email);
         jdbc.update(
-                "UPDATE \"auth\".\"AuthChallenge\" SET \"lastSentAt\" = DATEADD('MINUTE', -2, CURRENT_TIMESTAMP)"
+                "UPDATE \"campuscore_auth\".\"AuthChallenge\" SET \"lastSentAt\" = DATEADD('MINUTE', -2, CURRENT_TIMESTAMP)"
                         + " WHERE \"id\" = ?",
                 AuthChallengeTokenService.challengeId(first.rawToken()).orElseThrow());
         clearInvocations(mailDelivery);
@@ -144,11 +144,11 @@ class AuthLifecyclePersistenceTest {
         }
 
         assertThat(jdbc.queryForObject(
-                "SELECT \"attemptCount\" FROM \"auth\".\"AuthChallenge\" WHERE \"id\" = ?",
+                "SELECT \"attemptCount\" FROM \"campuscore_auth\".\"AuthChallenge\" WHERE \"id\" = ?",
                 Integer.class,
                 challengeId)).isEqualTo(5);
         assertThat(jdbc.queryForObject(
-                "SELECT \"consumedAt\" FROM \"auth\".\"AuthChallenge\" WHERE \"id\" = ?",
+                "SELECT \"consumedAt\" FROM \"campuscore_auth\".\"AuthChallenge\" WHERE \"id\" = ?",
                 LocalDateTime.class,
                 challengeId)).isNotNull();
         mvc.perform(post("/api/v1/auth/email-verifications/confirm")
@@ -163,7 +163,7 @@ class AuthLifecyclePersistenceTest {
         AuthMailEvent event = registerAndCapture("expired.lifecycle@campuscore.test");
         String challengeId = AuthChallengeTokenService.challengeId(event.rawToken()).orElseThrow();
         jdbc.update(
-                "UPDATE \"auth\".\"AuthChallenge\" SET \"expiresAt\" = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP)"
+                "UPDATE \"campuscore_auth\".\"AuthChallenge\" SET \"expiresAt\" = DATEADD('MINUTE', -1, CURRENT_TIMESTAMP)"
                         + " WHERE \"id\" = ?",
                 challengeId);
 
@@ -173,7 +173,7 @@ class AuthLifecyclePersistenceTest {
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("AUTH_CHALLENGE_EXPIRED"));
         assertThat(jdbc.queryForObject(
-                "SELECT \"consumedAt\" FROM \"auth\".\"AuthChallenge\" WHERE \"id\" = ?",
+                "SELECT \"consumedAt\" FROM \"campuscore_auth\".\"AuthChallenge\" WHERE \"id\" = ?",
                 LocalDateTime.class,
                 challengeId)).isNotNull();
     }
@@ -208,7 +208,7 @@ class AuthLifecyclePersistenceTest {
                 .andReturn().getResponse().getContentAsString());
         String refreshToken = login.path("refreshToken").asText();
         jdbc.update(
-                "UPDATE \"auth\".\"User\" SET \"failedLoginAttempts\" = 5,"
+                "UPDATE \"campuscore_auth\".\"User\" SET \"failedLoginAttempts\" = 5,"
                         + " \"lockedUntil\" = DATEADD('MINUTE', 30, CURRENT_TIMESTAMP) WHERE \"email\" = ?",
                 email);
 
@@ -220,16 +220,16 @@ class AuthLifecyclePersistenceTest {
                 .andExpect(status().isOk());
 
         assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"auth\".\"Session\" s JOIN \"auth\".\"User\" u"
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" s JOIN \"campuscore_auth\".\"User\" u"
                         + " ON u.\"id\" = s.\"userId\" WHERE u.\"email\" = ?",
                 Integer.class,
                 email)).isZero();
         assertThat(jdbc.queryForObject(
-                "SELECT \"failedLoginAttempts\" FROM \"auth\".\"User\" WHERE \"email\" = ?",
+                "SELECT \"failedLoginAttempts\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
                 Integer.class,
                 email)).isZero();
         assertThat(jdbc.queryForObject(
-                "SELECT \"lockedUntil\" FROM \"auth\".\"User\" WHERE \"email\" = ?",
+                "SELECT \"lockedUntil\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
                 LocalDateTime.class,
                 email)).isNull();
 

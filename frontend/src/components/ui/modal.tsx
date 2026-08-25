@@ -147,6 +147,7 @@ interface ConfirmModalProps {
   cancelText?: string;
   variant?: 'default' | 'destructive';
   isLoading?: boolean;
+  error?: string;
 }
 
 export function ConfirmModal({
@@ -159,12 +160,18 @@ export function ConfirmModal({
   cancelText,
   variant = 'default',
   isLoading = false,
+  error,
 }: ConfirmModalProps) {
   const { messages } = useI18n();
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-4">
+        {error ? (
+          <div role="alert" className="border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
+            {error}
+          </div>
+        ) : null}
         <p className="text-sm leading-6 text-muted-foreground">{message}</p>
         <div className="flex justify-end gap-2">
           <Button

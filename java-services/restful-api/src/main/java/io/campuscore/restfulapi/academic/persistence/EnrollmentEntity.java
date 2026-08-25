@@ -61,6 +61,21 @@ public class EnrollmentEntity {
         this.updatedAt = now;
     }
 
+    public void updateGrade(BigDecimal finalGrade, String letterGrade, Instant now) {
+        this.finalGrade = finalGrade;
+        this.letterGrade = require(letterGrade, "letterGrade").trim().toUpperCase(java.util.Locale.ROOT);
+        this.gradeStatus = "DRAFT";
+        this.updatedAt = now;
+    }
+
+    public boolean publishGrade(Instant now) {
+        if (finalGrade == null || letterGrade == null || letterGrade.isBlank()) return false;
+        this.gradeStatus = "PUBLISHED";
+        this.status = "COMPLETED";
+        this.updatedAt = now;
+        return true;
+    }
+
     private static String require(String value, String field) {
         if (value == null || value.isBlank()) throw new IllegalArgumentException(field + " is required");
         return value;

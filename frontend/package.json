@@ -12,7 +12,7 @@
     "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "node --test tests/frontend-smoke.test.js tests/portal-shell.test.js tests/phase-six-repair.test.js tests/assistant-contract.test.js"
+    "test": "node --test tests/frontend-smoke.test.js tests/portal-shell.test.js tests/phase-six-repair.test.js tests/assistant-contract.test.js tests/registration-contract.test.js tests/auth-lifecycle-contract.test.js"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "5.3.0",

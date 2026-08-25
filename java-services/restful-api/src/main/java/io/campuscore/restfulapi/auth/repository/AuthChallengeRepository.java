@@ -15,7 +15,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class AuthChallengeRepository {
 
-    private static final String TABLE = "\"auth\".\"AuthChallenge\"";
+    private static final String TABLE = "\"campuscore_auth\".\"AuthChallenge\"";
 
     private final NamedParameterJdbcTemplate jdbc;
 

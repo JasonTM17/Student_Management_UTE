@@ -25,7 +25,7 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   ].map((match) => match[1] ?? match[2]);
   const screenCount = registeredRoutes.length;
 
-  assert.equal(screenCount, 21);
+  assert.equal(screenCount, 25);
   assert.equal(new Set(registeredRoutes).size, screenCount);
   assert.deepEqual(componentRoutes.sort(), [...registeredRoutes].sort());
   for (const requiredRoute of [
@@ -38,7 +38,7 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   ]) {
     assert.match(routes, new RegExp(`name: '${requiredRoute.replace('.', '\\.')}'`));
   }
-  assert.match(readme, /21 navigable screens/);
+  assert.match(readme, /25 navigable screens/);
 });
 
 test('native tokens preserve the institutional portal contract', () => {
@@ -89,7 +89,7 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /<BottomNavigation[\s\S]*?role=\{role\}/);
   assert.match(bottomNavigation, /getBottomNavigation\(role\)/);
   assert.match(bottomNavigation, /role: UserRole/);
-  assert.match(navigator, /if \(!hasActiveSession\) \{\s*return;/);
+  assert.match(navigator, /if \(!hasActiveSession && !nextRoute\.startsWith\('auth\.'\)\) \{\s*return;/);
   assert.match(navigator, /if \(!isPreviewSession\) \{\s*return;/);
   assert.match(navigator, /type SessionKind = 'signedOut' \| 'preview' \| 'authenticated'/);
   assert.match(navigator, /const isAuthenticated = sessionKind === 'authenticated'/);

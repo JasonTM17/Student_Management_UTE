@@ -20,7 +20,7 @@ class AuthMailTemplateRendererTest {
                 "opaque-token",
                 Instant.now().plusSeconds(3600));
 
-        var content = renderer.render(event, "https://campuscore.test/verify-email?token=a&next=b");
+        var content = renderer.render(event, "https://campuscore.test/verify-email#token=a&next=b");
 
         assertThat(content.subject()).contains("Xác minh");
         assertThat(content.text()).contains("<script>alert(1)</script>");
@@ -40,10 +40,29 @@ class AuthMailTemplateRendererTest {
                 "opaque-token",
                 Instant.now().plusSeconds(1800));
 
-        var content = renderer.render(event, "https://campuscore.test/reset-password?token=opaque-token");
+        var content = renderer.render(event, "https://campuscore.test/reset-password#token=opaque-token");
 
         assertThat(content.subject()).isEqualTo("Reset your CampusCore password");
         assertThat(content.text()).contains("can be used only once");
         assertThat(content.html()).contains("Reset password");
+    }
+
+    @Test
+    void actionLinksKeepRawChallengesInTheBrowserFragment() {
+        String verify = SmtpAuthMailDelivery.actionUrl(
+                "https://campuscore.test/",
+                Purpose.EMAIL_VERIFICATION,
+                "opaque token");
+        String reset = SmtpAuthMailDelivery.actionUrl(
+                "https://campuscore.test",
+                Purpose.PASSWORD_RESET,
+                "opaque token");
+
+        assertThat(verify)
+                .isEqualTo("https://campuscore.test/verify-email#token=opaque+token")
+                .doesNotContain("?token=");
+        assertThat(reset)
+                .isEqualTo("https://campuscore.test/reset-password#token=opaque+token")
+                .doesNotContain("?token=");
     }
 }

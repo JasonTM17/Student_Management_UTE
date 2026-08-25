@@ -86,6 +86,7 @@ public class AuthTokenService {
                 .expiresAt(expiresAt)
                 .subject(principal.id())
                 .claim("email", principal.email())
+                .claim("emailVerified", principal.emailVerified())
                 .claim("roles", roles)
                 .claim("permissions", permissions);
 

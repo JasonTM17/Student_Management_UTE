@@ -26,6 +26,7 @@ import {
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
+import { useDialogFocusTrap } from '@/components/ui/use-dialog-focus-trap';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
@@ -276,24 +277,6 @@ export function AssistantPanel() {
   const historyFetchedRef = useRef(false);
   const userScrolledRef = useRef(false);
 
-  useEffect(() => {
-    if (!open) return undefined;
-    const handleEscape = (event: globalThis.KeyboardEvent) => {
-      if (event.key !== 'Escape') return;
-      event.preventDefault();
-      if (showHistory) {
-        setShowHistory(false);
-        requestAnimationFrame(() => inputRef.current?.focus());
-      } else {
-        setOpen(false);
-        requestAnimationFrame(() => launcherRef.current?.focus());
-      }
-    };
-    document.addEventListener('keydown', handleEscape);
-    requestAnimationFrame(() => inputRef.current?.focus());
-    return () => document.removeEventListener('keydown', handleEscape);
-  }, [open, showHistory]);
-
   const loadHistory = useCallback(() => {
     if (historyStatus === 'loading') return;
     setHistoryStatus('loading');
@@ -338,7 +321,7 @@ export function AssistantPanel() {
       node.scrollHeight - node.scrollTop - node.clientHeight > 48;
   };
 
-  const closePanel = () => {
+  const closePanel = useCallback(() => {
     requestGenerationRef.current += 1;
     abortRef.current?.abort();
     setIsSending(false);
@@ -353,7 +336,25 @@ export function AssistantPanel() {
     historyFetchedRef.current = false;
     setHistoryStatus('idle');
     requestAnimationFrame(() => launcherRef.current?.focus());
-  };
+  }, []);
+
+  const handlePanelEscape = useCallback(() => {
+    if (showHistory) {
+      setShowHistory(false);
+      requestAnimationFrame(() => inputRef.current?.focus());
+      return;
+    }
+    closePanel();
+  }, [closePanel, showHistory]);
+
+  // The shared trap owns the previous `event.key !== 'Escape'` guard while
+  // adding Tab containment, scroll locking and nested-dialog coordination.
+  const panelRef = useDialogFocusTrap<HTMLElement>({
+    open,
+    onClose: handlePanelEscape,
+    initialFocusRef: inputRef,
+    restoreFocusRef: launcherRef,
+  });
 
   const selectConversation = async (conversation: AssistantConversation) => {
     if (isSending) return;
@@ -722,10 +723,12 @@ export function AssistantPanel() {
         </Button>
       ) : (
         <section
+          ref={panelRef}
           role="dialog"
-          aria-modal="false"
+          aria-modal="true"
           aria-labelledby="assistant-panel-title"
           aria-describedby="assistant-panel-description"
+          tabIndex={-1}
           className="flex h-[min(100dvh,42rem)] max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl sm:rounded-lg md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))]"
         >
           <header className="flex items-start justify-between gap-4 border-b border-border/70 bg-foreground px-4 py-4 text-background">

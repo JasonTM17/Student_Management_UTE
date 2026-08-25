@@ -7,6 +7,7 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -16,6 +17,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import io.campuscore.restfulapi.registration.RegistrationDtos.EnrollmentRequest;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -43,6 +45,9 @@ class RegistrationPostgresConcurrencyIT {
 
     @Autowired
     private DataSource dataSource;
+
+    @Autowired
+    private RegistrationService registration;
 
     private final List<Fixture> fixtures = new ArrayList<>();
     private final List<String> createdStudentIds = new ArrayList<>();
@@ -128,6 +133,126 @@ class RegistrationPostgresConcurrencyIT {
         }
     }
 
+    @Test
+    void serviceSameIdempotencyKeyCreatesOneEnrollmentAndReplaysTheWinner() throws Exception {
+        Fixture fixture = fixture("service-idempotency", 2);
+        fixtures.add(fixture);
+        String studentId = id("student-service-idempotency");
+        insertStudent(dataSource, studentId);
+        UUID key = UUID.randomUUID();
+        EnrollmentRequest request = new EnrollmentRequest(fixture.sectionId(), fixture.roundId());
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<RegistrationService.MutationResult>> calls = List.of(
+                    pool.submit(() -> serviceEnroll(studentId, request, key, ready, start)),
+                    pool.submit(() -> serviceEnroll(studentId, request, key, ready, start)));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            RegistrationService.MutationResult first = calls.get(0).get(20, TimeUnit.SECONDS);
+            RegistrationService.MutationResult second = calls.get(1).get(20, TimeUnit.SECONDS);
+            assertEquals(first.enrollment().id(), second.enrollment().id());
+            assertEquals(1, (first.replayed() ? 1 : 0) + (second.replayed() ? 1 : 0));
+            assertEquals(1, scalarInt("SELECT count(*) FROM academic.\"Enrollment\" WHERE \"sectionId\" = ?",
+                    fixture.sectionId()));
+            assertEquals(1, scalarInt("SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\" = ?",
+                    fixture.sectionId()));
+            assertEquals(1, scalarInt("SELECT count(*) FROM academic.\"EnrollmentOperation\" WHERE \"studentId\" = ?",
+                    studentId));
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void serviceCapacityRaceHasOneWinnerAndRollsBackTheRejectedOperation() throws Exception {
+        Fixture fixture = fixture("service-capacity", 1);
+        fixtures.add(fixture);
+        String firstStudent = id("student-service-first");
+        String secondStudent = id("student-service-second");
+        insertStudent(dataSource, firstStudent);
+        insertStudent(dataSource, secondStudent);
+        EnrollmentRequest request = new EnrollmentRequest(fixture.sectionId(), fixture.roundId());
+
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            Future<Boolean> first = pool.submit(() -> serviceSeatClaim(firstStudent, request, ready, start));
+            Future<Boolean> second = pool.submit(() -> serviceSeatClaim(secondStudent, request, ready, start));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            assertEquals(1, (first.get(20, TimeUnit.SECONDS) ? 1 : 0)
+                    + (second.get(20, TimeUnit.SECONDS) ? 1 : 0));
+            assertEquals(1, scalarInt("SELECT count(*) FROM academic.\"Enrollment\" WHERE \"sectionId\" = ?",
+                    fixture.sectionId()));
+            assertEquals(1, scalarInt("SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\" = ?",
+                    fixture.sectionId()));
+            assertEquals(1, scalarInt("SELECT count(*) FROM academic.\"EnrollmentOperation\" WHERE \"studentId\" IN (?, ?)",
+                    firstStudent, secondStudent));
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
+    void serviceDropIsIdempotentAndDecrementsCapacityOnce() throws Exception {
+        Fixture fixture = fixture("service-drop", 1);
+        fixtures.add(fixture);
+        String studentId = id("student-service-drop");
+        insertStudent(dataSource, studentId);
+        RegistrationService.MutationResult enrollment = registration.enroll(
+                studentId,
+                new EnrollmentRequest(fixture.sectionId(), fixture.roundId()),
+                UUID.randomUUID());
+        UUID dropKey = UUID.randomUUID();
+
+        RegistrationService.DropResult first = registration.drop(studentId, enrollment.enrollment().id(), dropKey);
+        RegistrationService.DropResult replay = registration.drop(studentId, enrollment.enrollment().id(), dropKey);
+
+        assertTrue(!first.replayed());
+        assertTrue(replay.replayed());
+        assertEquals(0, scalarInt("SELECT \"enrolledCount\" FROM academic.\"Section\" WHERE \"id\" = ?",
+                fixture.sectionId()));
+        assertEquals(1, scalarInt("SELECT count(*) FROM academic.\"EnrollmentAudit\" WHERE \"sectionId\" = ? AND \"action\" = 'DROP'",
+                fixture.sectionId()));
+    }
+
+    private RegistrationService.MutationResult serviceEnroll(
+            String studentId,
+            EnrollmentRequest request,
+            UUID key,
+            CountDownLatch ready,
+            CountDownLatch start) throws Exception {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS));
+        return registration.enroll(studentId, request, key);
+    }
+
+    private boolean serviceSeatClaim(
+            String studentId,
+            EnrollmentRequest request,
+            CountDownLatch ready,
+            CountDownLatch start) throws Exception {
+        ready.countDown();
+        assertTrue(start.await(10, TimeUnit.SECONDS));
+        try {
+            registration.enroll(studentId, request, UUID.randomUUID());
+            return true;
+        } catch (RegistrationProblemException rejected) {
+            assertEquals("SECTION_FULL", rejected.code());
+            return false;
+        }
+    }
+
     private boolean claimSeat(String sectionId, String studentId,
                               CountDownLatch ready, CountDownLatch start) throws Exception {
         ready.countDown();
@@ -178,18 +303,31 @@ class RegistrationPostgresConcurrencyIT {
 
     private Fixture fixture(String label, int capacity) throws SQLException {
         String sectionId = id("section-" + label);
+        String roundId = id("round-" + label);
         try (Connection connection = dataSource.getConnection();
-             PreparedStatement insert = connection.prepareStatement(
+             PreparedStatement insertSection = connection.prepareStatement(
                      "INSERT INTO academic.\"Section\" "
                              + "(\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\", "
                              + "\"classroomId\", \"capacity\", \"enrolledCount\", \"status\") "
-                             + "VALUES (?, ?, 'course-java-demo', 'semester-demo', 'lecturer-profile', 'classroom-a101', ?, 0, 'OPEN')")) {
-            insert.setString(1, sectionId);
-            insert.setString(2, "IT-" + UUID.randomUUID());
-            insert.setInt(3, capacity);
-            insert.executeUpdate();
+                             + "VALUES (?, ?, 'course-java-demo', 'semester-demo', 'lecturer-profile', 'classroom-a101', ?, 0, 'OPEN')");
+             PreparedStatement insertRound = connection.prepareStatement(
+                     "INSERT INTO academic.\"RegistrationRound\" "
+                             + "(\"id\", \"semesterId\", \"status\", \"registrationStart\", \"registrationEnd\", "
+                             + "\"addDropStart\", \"addDropEnd\", \"maxCredits\", \"institutionTimeZone\") "
+                             + "VALUES (?, 'semester-demo', 'OPEN', ?, ?, ?, ?, 28, 'Asia/Ho_Chi_Minh')")) {
+            insertSection.setString(1, sectionId);
+            insertSection.setString(2, "IT-" + UUID.randomUUID());
+            insertSection.setInt(3, capacity);
+            insertSection.executeUpdate();
+            Instant now = Instant.now();
+            insertRound.setString(1, roundId);
+            insertRound.setTimestamp(2, Timestamp.from(now.minusSeconds(3600)));
+            insertRound.setTimestamp(3, Timestamp.from(now.plusSeconds(3600)));
+            insertRound.setTimestamp(4, Timestamp.from(now.minusSeconds(3600)));
+            insertRound.setTimestamp(5, Timestamp.from(now.plusSeconds(3600)));
+            insertRound.executeUpdate();
         }
-        return new Fixture(sectionId);
+        return new Fixture(sectionId, roundId);
     }
 
     private void insertStudent(DataSource source, String studentId) throws SQLException {
@@ -201,7 +339,7 @@ class RegistrationPostgresConcurrencyIT {
     private void insertStudent(Connection connection, String studentId) throws SQLException {
         String userId = "user-" + studentId;
         try (PreparedStatement user = connection.prepareStatement(
-                "INSERT INTO auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\") "
+                "INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\") "
                         + "VALUES (?, ?, 'test-only-password-hash', 'Postgres', 'Race', 'ACTIVE')")) {
             user.setString(1, userId);
             user.setString(2, userId + "@test.invalid");
@@ -242,6 +380,17 @@ class RegistrationPostgresConcurrencyIT {
     }
 
     private void deleteFixture(Connection connection, Fixture fixture) throws SQLException {
+        try (PreparedStatement audit = connection.prepareStatement(
+                "DELETE FROM academic.\"EnrollmentAudit\" WHERE \"sectionId\" = ?")) {
+            audit.setString(1, fixture.sectionId());
+            audit.executeUpdate();
+        }
+        try (PreparedStatement slip = connection.prepareStatement(
+                "DELETE FROM academic.\"RegistrationSlip\" WHERE \"roundId\" = ?")) {
+            slip.setString(1, fixture.roundId());
+            slip.executeUpdate();
+        }
+        deleteByIds(connection, "academic.\"EnrollmentOperation\"", createdStudentIds, "studentId");
         try (PreparedStatement enrollment = connection.prepareStatement(
                 "DELETE FROM academic.\"Enrollment\" WHERE \"sectionId\" = ?")) {
             enrollment.setString(1, fixture.sectionId());
@@ -252,17 +401,26 @@ class RegistrationPostgresConcurrencyIT {
             section.setString(1, fixture.sectionId());
             section.executeUpdate();
         }
+        try (PreparedStatement round = connection.prepareStatement(
+                "DELETE FROM academic.\"RegistrationRound\" WHERE \"id\" = ?")) {
+            round.setString(1, fixture.roundId());
+            round.executeUpdate();
+        }
         deleteByIds(connection, "academic.\"Student\"", createdStudentIds);
-        deleteByIds(connection, "auth.\"User\"", createdUserIds);
+        deleteByIds(connection, "campuscore_auth.\"User\"", createdUserIds);
     }
 
     private void deleteByIds(Connection connection, String table, List<String> ids) throws SQLException {
+        deleteByIds(connection, table, ids, "id");
+    }
+
+    private void deleteByIds(Connection connection, String table, List<String> ids, String column) throws SQLException {
         if (ids.isEmpty()) {
             return;
         }
         String placeholders = String.join(",", java.util.Collections.nCopies(ids.size(), "?"));
         try (PreparedStatement delete = connection.prepareStatement(
-                "DELETE FROM " + table + " WHERE \"id\" IN (" + placeholders + ")")) {
+                "DELETE FROM " + table + " WHERE \"" + column + "\" IN (" + placeholders + ")")) {
             for (int index = 0; index < ids.size(); index++) {
                 delete.setString(index + 1, ids.get(index));
             }
@@ -273,6 +431,18 @@ class RegistrationPostgresConcurrencyIT {
     private int scalarInt(String sql, String value) throws SQLException {
         try (Connection connection = dataSource.getConnection()) {
             return scalarInt(connection, sql, value);
+        }
+    }
+
+    private int scalarInt(String sql, String first, String second) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement query = connection.prepareStatement(sql)) {
+            query.setString(1, first);
+            query.setString(2, second);
+            try (ResultSet rows = query.executeQuery()) {
+                assertTrue(rows.next());
+                return rows.getInt(1);
+            }
         }
     }
 
@@ -304,7 +474,7 @@ class RegistrationPostgresConcurrencyIT {
         return value == null || value.isBlank() ? fallback : value;
     }
 
-    private record Fixture(String sectionId) { }
+    private record Fixture(String sectionId, String roundId) { }
 
     @FunctionalInterface
     private interface SqlSupplier {

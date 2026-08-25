@@ -16,17 +16,18 @@ authorize production deployment.
 .\mvnw.cmd -q -f java-services/pom.xml verify
 docker compose config
 docker compose build restful-api
-docker compose up -d postgres restful-api
+docker compose up -d postgres mailpit restful-api
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
 ```
 
 Verify a fresh PostgreSQL database, Flyway versions through the actual latest
-V18 migration, deterministic seed counts, login, role isolation, registration
+V20 migration, deterministic seed counts, pending registration, email
+verification, login, refresh/logout, forgot/reset, role isolation, registration
 round/window/eligibility rules, enrollment transaction rules, grade publishing,
 thesis group limits and assistant citations/locale fallback/outage behavior.
-Also verify the forward-only V13-V18 registration/assistant migrations,
+Also verify the forward-only V13-V20 registration/assistant/auth migrations,
 conversation ownership, idempotency ledger, quota buckets, terminal CAS/cancel
 race and knowledge revision workflow. Provider tests must use a no-network fake by default; a live
 DeepSeek smoke is optional, chargeable and only allowed after a rotated runtime
@@ -35,6 +36,28 @@ is a separately recorded compatibility baseline using
 `-Dcampuscore.java-baseline=true`. A local run on JDK 24/26 is recorded as
 NOT_RUN for both gates. Always use `.\mvnw.cmd`/`./mvnw` so Maven 3.9.x is
 enforced by the build.
+
+Capture a real local lifecycle in Mailpit: pending register -> verification
+mail (HTML and text) -> verify -> login -> refresh -> logout -> forgot/reset
+mail -> reset -> login with the new password. Prove challenge values are
+SHA-256 hashes in PostgreSQL, single-use, expired/invalid-safe and absent from
+application logs. Do not substitute an SMTP configuration check for captured
+mail evidence.
+
+Supabase synchronization is a separate remote database gate. Apply no remote
+migration until the exact project, current migration/schema drift, backup or
+rollback path, and compatibility with Supabase-managed schemas have been
+verified. Never upload local Mailpit messages, challenge rows, session rows,
+test tokens or credentials.
+
+For a new Supabase target, first prove the B20 schema-only baseline against a
+fresh Flyway V1-V20 PostgreSQL database with
+`CampusCoreSupabaseBaselinePostgresIT`. The test is local-only because it
+creates sentinel schemas; never point its environment variables at a hosted
+database. The hosted apply must use Flyway 11.7.2 with both migration locations,
+must leave `auth`, `storage`, `realtime` and `supabase_migrations` unchanged,
+and must be followed by schema/history/zero-row queries documented in
+`docs/integrations/supabase-database.md`.
 
 ## Clients
 

@@ -24,8 +24,24 @@ test('registration workspace exposes canonical and compatibility routes', () => 
   assert.match(workspace, /registrationStart/);
   assert.match(workspace, /serverOffset/);
   assert.match(workspace, /useConfirmationDialog/);
+  assert.match(workspace, /useDialogFocusTrap/);
+  assert.match(workspace, /data-registration-validation-layer/);
+  assert.match(workspace, /z-\[60\]/);
+  assert.match(workspace, /safe-area-inset-bottom/);
   assert.match(alias, /router\.replace\(href\('\/dashboard\/registration'\)\)/);
   assert.ok(fs.existsSync(path.join(root, 'src/app/admin/registration-rounds/page.tsx')));
+});
+
+test('custom dialogs trap focus, own Escape, lock scroll and restore the trigger', () => {
+  const hook = read('src/components/ui/use-dialog-focus-trap.ts');
+  const adminFrame = read('src/components/admin/AdminFrame.tsx');
+  assert.match(hook, /event\.key === 'Escape'/);
+  assert.match(hook, /event\.key !== 'Tab'/);
+  assert.match(hook, /document\.body\.style\.overflow = 'hidden'/);
+  assert.match(hook, /restoreFocusRefValue\?\.current \?\? previousFocus/);
+  assert.match(hook, /activeDialog && activeDialog !== dialog/);
+  assert.match(adminFrame, /open: sidebarOpen && !isDesktopSidebar/);
+  assert.match(adminFrame, /ref=\{sidebarRef\}/);
 });
 
 test('assistant launcher carries status, privacy and safe-area semantics', () => {

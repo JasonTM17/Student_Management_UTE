@@ -82,7 +82,7 @@ export function AuthShell({
           </div>
         </section>
 
-        <section className="relative flex items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
+        <main className="relative flex items-center justify-center px-5 py-20 sm:px-8 lg:px-12">
           <div className="absolute right-4 top-4 flex items-center gap-2 sm:right-6 sm:top-6">
             <LanguageToggle />
             <ThemeToggle />
@@ -94,7 +94,7 @@ export function AuthShell({
             {children}
             {footer ? <div>{footer}</div> : null}
           </div>
-        </section>
+        </main>
       </div>
     </div>
   );

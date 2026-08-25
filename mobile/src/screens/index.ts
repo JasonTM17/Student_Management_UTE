@@ -1,6 +1,12 @@
 import type { ComponentType } from 'react';
 
 import { SignInScreen } from './auth/SignInScreen';
+import {
+  ForgotPasswordScreen,
+  RegisterScreen,
+  ResetPasswordScreen,
+  VerifyEmailScreen,
+} from './auth/AuthLifecycleScreens';
 import { AssistantChatScreen } from './assistant/AssistantScreen';
 import {
   AdminDashboardScreen,
@@ -32,6 +38,10 @@ import type { MobileScreenProps } from '../navigation/types';
 
 export const screenComponents: Record<ScreenName, ComponentType<MobileScreenProps>> = {
   'auth.signIn': SignInScreen,
+  'auth.register': RegisterScreen,
+  'auth.verifyEmail': VerifyEmailScreen,
+  'auth.forgotPassword': ForgotPasswordScreen,
+  'auth.resetPassword': ResetPasswordScreen,
   'dashboard.student': StudentDashboardScreen,
   schedule: ScheduleScreen,
   courses: CoursesScreen,

@@ -89,12 +89,24 @@ export interface AuthUser {
   permissions?: string[];
   studentId?: string | null;
   lecturerId?: string | null;
+  emailVerified?: boolean;
 }
 
 export interface LoginResponse {
   user: AuthUser;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface RegistrationPendingResponse {
+  email: string;
+  verificationRequired: boolean;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+}
+
+export interface AuthActionResponse {
+  message: string;
 }
 
 export interface MobileSection {
@@ -346,7 +358,11 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     status === 401 &&
     !normalizedPath.startsWith('/auth/login') &&
     !normalizedPath.startsWith('/auth/refresh') &&
-    !normalizedPath.startsWith('/auth/logout')
+    !normalizedPath.startsWith('/auth/logout') &&
+    !normalizedPath.startsWith('/auth/register') &&
+    !normalizedPath.startsWith('/auth/email-verifications') &&
+    !normalizedPath.startsWith('/auth/password-reset') &&
+    !normalizedPath.startsWith('/auth/password-reset-requests')
   );
 }
 
@@ -551,9 +567,14 @@ export const apiClient = createApiClient();
 export const apiRoutes = {
   auth: {
     login: '/auth/login',
+    register: '/auth/register',
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
+    verifyEmail: '/auth/email-verifications/confirm',
+    resendVerification: '/auth/email-verifications/resend',
+    requestPasswordReset: '/auth/password-reset-requests',
+    resetPassword: '/auth/password-reset/confirm',
   },
   identity: '/me',
   health: '/health/liveness',
@@ -598,6 +619,16 @@ export const campusApi = {
   account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
+  register: (payload: { email: string; password: string; firstName: string; lastName: string }) =>
+    apiClient.post<RegistrationPendingResponse>(apiRoutes.auth.register, payload),
+  verifyEmail: (token: string) =>
+    apiClient.post<AuthActionResponse>(apiRoutes.auth.verifyEmail, { token }),
+  resendVerification: (email: string) =>
+    apiClient.post<AuthActionResponse>(apiRoutes.auth.resendVerification, { email }),
+  requestPasswordReset: (email: string) =>
+    apiClient.post<AuthActionResponse>(apiRoutes.auth.requestPasswordReset, { email }),
+  resetPassword: (token: string, password: string) =>
+    apiClient.post<AuthActionResponse>(apiRoutes.auth.resetPassword, { token, newPassword: password }),
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>(
       apiRoutes.auth.refresh,
@@ -616,10 +647,10 @@ export const campusApi = {
     apiClient.get<MobileEnrollment[]>(
       apiRoutes.enrollments + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  enroll: (sectionId: string, locale: AssistantLocale = 'vi') =>
-    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }),
-  dropEnrollment: (enrollmentId: string) =>
-    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}),
+  enroll: (sectionId: string, locale: AssistantLocale = 'vi', idempotencyKey = createIdempotencyKey()) =>
+    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  dropEnrollment: (enrollmentId: string, idempotencyKey = createIdempotencyKey()) =>
+    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}, { headers: { 'Idempotency-Key': idempotencyKey } }),
   registrationRounds: async (semesterId?: string) => {
     const query = semesterId ? `?semesterId=${encodeURIComponent(semesterId)}&limit=20` : '?limit=20';
     const page = await apiClient.get<{ items: RegistrationRound[]; nextCursor?: string | null }>(`${apiRoutes.registration.rounds}${query}`);

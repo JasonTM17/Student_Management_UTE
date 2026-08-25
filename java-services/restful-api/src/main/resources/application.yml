@@ -125,4 +125,4 @@ spring:
     create-schemas: true
     default-schema: thesis
     schemas: thesis
-    locations: classpath:db/migration
+    locations: ${FLYWAY_LOCATIONS:classpath:db/migration}

@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
 
 import java.util.List;
+import java.time.Instant;
 import jakarta.persistence.LockModeType;
 import org.springframework.data.jpa.repository.Lock;
 import org.junit.jupiter.api.Test;
@@ -12,6 +13,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.transaction.annotation.Transactional;
 
 @SpringBootTest
 @ActiveProfiles({"test", "persistence"})
@@ -28,6 +30,12 @@ class RegistrationPersistenceSchemaTest {
     @Autowired
     private RegistrationRoundRepository roundRepository;
 
+    @Autowired
+    private RegistrationJpaMutationGateway mutationGateway;
+
+    @Autowired
+    private EnrollmentOperationRepository operationRepository;
+
     @Test
     void forwardMigrationsInstallRegistrationFoundation() {
         Integer rounds = jdbc.queryForObject(
@@ -40,7 +48,7 @@ class RegistrationPersistenceSchemaTest {
         assertThat(operations).isEqualTo(1);
         assertThat(jdbc.queryForObject(
                 "SELECT MAX(CAST(VERSION AS INT)) FROM thesis.flyway_schema_history WHERE SUCCESS = TRUE",
-                Integer.class)).isEqualTo(11);
+                Integer.class)).isEqualTo(12);
         assertThat(jdbc.queryForObject(
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.COLUMNS WHERE LOWER(TABLE_SCHEMA) = 'academic' AND LOWER(TABLE_NAME) = 'registrationslip' AND LOWER(COLUMN_NAME) = 'snapshotpayload'",
                 Integer.class)).isEqualTo(1);
@@ -75,5 +83,22 @@ class RegistrationPersistenceSchemaTest {
         assertThat(EnrollmentOperationRepository.class
                 .getMethod("findLockedByStudentIdAndIdempotencyKey", String.class, String.class)
                 .getAnnotation(Lock.class).value()).isEqualTo(LockModeType.PESSIMISTIC_WRITE);
+    }
+
+    @Test
+    @Transactional
+    void jpaGatewayReservesAnIdempotencyOperationOnlyOnceOnH2() {
+        String hash = "abcdef0123456789abcdef0123456789abcdef0123456789abcdef0123456789";
+        Instant now = Instant.parse("2026-08-25T00:00:00Z");
+        assertThat(mutationGateway.insertOperationIfAbsent(
+                "op-gateway-1", "student-gateway", "key-gateway", hash, "ENROLL", now)).isTrue();
+        assertThat(mutationGateway.insertOperationIfAbsent(
+                "op-gateway-2", "student-gateway", "key-gateway", hash, "ENROLL", now)).isFalse();
+        assertThat(operationRepository.findLockedByStudentIdAndIdempotencyKey(
+                "student-gateway", "key-gateway")).get()
+                .extracting(EnrollmentOperationEntity::getId,
+                        EnrollmentOperationEntity::getCanonicalRequestHash,
+                        EnrollmentOperationEntity::getState)
+                .containsExactly("op-gateway-1", hash, "PROCESSING");
     }
 }

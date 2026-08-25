@@ -48,6 +48,18 @@ test('assistant stream contract rejects out-of-order and duplicate delta sequenc
   assert.throws(() => new AssistantStreamOrder().accept(parseAssistantStreamEvent({ type: 'done' })), /missing meta/);
 });
 
+test('assistant stream contract rejects incomplete citation frames before render', () => {
+  const { parseAssistantStreamEvent } = load('src/lib/assistant-stream.ts');
+  assert.throws(
+    () => parseAssistantStreamEvent({ type: 'citation', citation: {} }),
+    /citation id is required/,
+  );
+  assert.throws(
+    () => parseAssistantStreamEvent({ type: 'citation', citation: [] }),
+    /assistant event must be an object/,
+  );
+});
+
 test('assistant parser reports malformed JSON through opt-in invalid callback', () => {
   const { createAssistantSseParser } = load('src/lib/assistant-stream.ts');
   const invalid = [];
@@ -77,6 +89,17 @@ test('assistant launcher has a thesis-specific icon mark and full interaction st
   assert.match(source, /hover:-translate-y-0\.5/);
   assert.match(source, /focus-visible:ring-2/);
   assert.match(source, /motion-reduce:transition-none/);
+  assert.match(source, /useDialogFocusTrap/);
+  assert.match(source, /aria-modal="true"/);
+});
+
+test('admin knowledge action errors remain visible inside active dialogs', () => {
+  const page = fs.readFileSync(path.join(root, 'src/app/admin/assistant-knowledge/page.tsx'), 'utf8');
+  const modal = fs.readFileSync(path.join(root, 'src/components/ui/modal.tsx'), 'utf8');
+  assert.match(page, /role="alert"/);
+  assert.match(page, /error=\{archiveTarget \? error : undefined\}/);
+  assert.match(modal, /error\?: string/);
+  assert.match(modal, /\{error\}/);
 });
 
 test('assistant history routes URI-encode owner-scoped identifiers', () => {

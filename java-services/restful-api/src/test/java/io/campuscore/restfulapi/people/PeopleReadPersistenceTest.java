@@ -38,14 +38,14 @@ class PeopleReadPersistenceTest {
 
     @BeforeEach
     void preparePeopleFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Curriculum\"");
         jdbc.update("DELETE FROM \"academic\".\"Department\"");
-        jdbc.update("DELETE FROM \"auth\".\"User\"");
+        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
         insertDepartment("department-se", "SE", "Software Engineering");
         insertDepartment("department-cs", "CS", "Computer Science");
     }
@@ -156,7 +156,7 @@ class PeopleReadPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "auth"."User" (
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(320) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
@@ -250,7 +250,7 @@ class PeopleReadPersistenceTest {
 
     private void insertUser(String id, String email, String firstName, String lastName) {
         jdbc.update(
-                "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
+                "INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
                         + " VALUES (?, ?, ?, ?)",
                 id, email, firstName, lastName);
     }

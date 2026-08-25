@@ -12,7 +12,8 @@ Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và m�
 
 ## Chức năng lõi
 
-- Đăng ký, đăng nhập, refresh, logout, profile và đổi mật khẩu.
+- Đăng ký chờ xác minh email, đăng nhập, refresh, logout, profile, đổi mật
+  khẩu và quên/đặt lại mật khẩu bằng challenge băm dùng một lần.
 - Student, lecturer, admin; học kỳ, khoa, ngành, môn học, phòng học, lớp học phần.
 - Đăng ký/hủy học phần, lịch học, điểm và bảng điểm.
 - Announcement và notification inbox.
@@ -28,7 +29,7 @@ local lexical fallback.
 ## Chạy local
 
 ```powershell
-docker compose up -d --build postgres restful-api
+docker compose up -d --build postgres mailpit restful-api
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
@@ -40,6 +41,17 @@ npm run build --prefix frontend
 npm test --prefix mobile
 npm run typecheck --prefix mobile
 ```
+
+Mailpit nhận mail HTML và plain-text local tại `http://127.0.0.1:8025`.
+SMTP thật chỉ được cấu hình bằng biến môi trường server; không ghi username,
+password hoặc token vào repository. Xem
+[docs/integrations/auth-mail.md](docs/integrations/auth-mail.md).
+
+Auth của ứng dụng nằm trong schema riêng `campuscore_auth`; schema Supabase
+`auth` không bị CampusCore tạo hoặc sửa. Database Supabase mới chỉ dùng baseline
+schema-only `B20` sau khi đã xác minh đúng project, backup và drift; database
+local/cũ tiếp tục chạy chuỗi V1-V20. Xem
+[docs/integrations/supabase-database.md](docs/integrations/supabase-database.md).
 
 ### Java toolchain
 
@@ -77,5 +89,7 @@ Các tài khoản này chỉ dành cho database seed local của đồ án.
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
 - [docs/RELEASE.md](docs/RELEASE.md)
 - [docs/RESTFUL_API_CONSOLIDATION.md](docs/RESTFUL_API_CONSOLIDATION.md)
+- [docs/integrations/auth-mail.md](docs/integrations/auth-mail.md)
+- [docs/integrations/supabase-database.md](docs/integrations/supabase-database.md)
 
 Đây là local/course demo reproducible, không phải production deployment.
