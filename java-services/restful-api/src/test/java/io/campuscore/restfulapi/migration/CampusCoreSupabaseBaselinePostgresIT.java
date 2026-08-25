@@ -54,7 +54,6 @@ class CampusCoreSupabaseBaselinePostgresIT {
                 baselineUrl,
                 user,
                 password,
-                "classpath:db/migration",
                 "classpath:db/supabase-baseline");
         baseline.migrate();
         assertTrue(baseline.validateWithResult().validationSuccessful);
