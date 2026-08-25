@@ -8,6 +8,8 @@ import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService;
 import io.campuscore.restfulapi.auth.service.AuthLifecycleService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.web.AuthDtos.EmailRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
+import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.util.ArrayList;
 import java.util.List;
@@ -150,6 +152,39 @@ class AuthConcurrencyPostgresIT {
                 userId));
     }
 
+    @Test
+    void concurrentRegistrationForTheSameEmailReturnsOnePendingAccountAndOneStableConflict() throws Exception {
+        String email = "register-race-" + UUID.randomUUID() + "@auth-race.invalid";
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<RegistrationAttempt>> calls = List.of(
+                    pool.submit(() -> register(email, "10.0.2.1", ready, start)),
+                    pool.submit(() -> register(email, "10.0.2.2", ready, start)));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+
+            List<RegistrationAttempt> outcomes = new ArrayList<>();
+            for (Future<RegistrationAttempt> call : calls) {
+                outcomes.add(call.get(20, TimeUnit.SECONDS));
+            }
+            assertEquals(1, outcomes.stream().filter(RegistrationAttempt::accepted).count());
+            assertEquals(1, outcomes.stream().filter(outcome -> "EMAIL_ALREADY_EXISTS".equals(outcome.code())).count());
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(10, TimeUnit.SECONDS));
+        }
+
+        List<String> userIds = jdbc.queryForList(
+                "SELECT id FROM campuscore_auth.\"User\" WHERE email = ?",
+                String.class,
+                email);
+        assertEquals(1, userIds.size());
+        createdUserIds.add(userIds.getFirst());
+    }
+
     private void resend(String email, String ip, CountDownLatch ready, CountDownLatch start) {
         ready.countDown();
         await(start);
@@ -164,6 +199,19 @@ class AuthConcurrencyPostgresIT {
         } catch (BadCredentialsException expected) {
             // Every call is intentionally invalid; the database counter is
             // the assertion made after all transactions have committed.
+        }
+    }
+
+    private RegistrationAttempt register(String email, String ip, CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        try {
+            login.register(new RegisterRequest(email, "correct-password", "Race", "User", null, null, null, null),
+                    ip,
+                    "auth-race-test");
+            return new RegistrationAttempt(true, null);
+        } catch (DomainException exception) {
+            return new RegistrationAttempt(false, exception.code());
         }
     }
 
@@ -198,5 +246,8 @@ class AuthConcurrencyPostgresIT {
     private static String valueOr(String name, String fallback) {
         String value = System.getenv(name);
         return value == null || value.isBlank() ? fallback : value;
+    }
+
+    private record RegistrationAttempt(boolean accepted, String code) {
     }
 }
