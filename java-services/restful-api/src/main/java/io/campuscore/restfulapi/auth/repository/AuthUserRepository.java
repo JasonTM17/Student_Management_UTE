@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth.repository;
 
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.StudentContext;
+import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -12,6 +13,7 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
+import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -35,9 +37,28 @@ public class AuthUserRepository {
     private static final RowMapper<AuthUserRecord> USER_MAPPER = AuthUserRepository::mapUser;
 
     private final NamedParameterJdbcTemplate jdbc;
+    private final boolean postgres;
 
     public AuthUserRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
+        this.postgres = isPostgres(jdbc.getJdbcTemplate().getDataSource());
+    }
+
+    /**
+     * Serializes public registration attempts for one normalized address before
+     * the read-then-insert sequence. A unique index remains the integrity
+     * boundary; this transaction-scoped PostgreSQL lock makes a duplicate
+     * request deterministically return the public EMAIL_ALREADY_EXISTS contract
+     * instead of surfacing a database constraint race.
+     */
+    public void lockEmailForRegistration(String normalizedEmail) {
+        if (!postgres) {
+            return;
+        }
+        jdbc.query(
+                "SELECT pg_advisory_xact_lock(hashtextextended(CAST(:email AS TEXT), 0))",
+                new MapSqlParameterSource("email", normalizedEmail),
+                (resultSet, ignored) -> null);
     }
 
     public Optional<AuthUserRecord> findByEmail(String email) {
@@ -357,6 +378,19 @@ public class AuthUserRepository {
                 resultSet.getString("lecturer_id"),
                 List.of(),
                 List.of());
+    }
+
+    private static boolean isPostgres(DataSource dataSource) {
+        if (dataSource == null) {
+            return false;
+        }
+        try (Connection connection = dataSource.getConnection()) {
+            return connection.getMetaData().getDatabaseProductName()
+                    .toLowerCase(java.util.Locale.ROOT)
+                    .contains("postgres");
+        } catch (SQLException exception) {
+            throw new IllegalStateException("Unable to identify auth user database", exception);
+        }
     }
 
     private static Integer nullableInteger(ResultSet resultSet, String column) throws SQLException {

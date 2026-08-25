@@ -141,6 +141,7 @@ public class AuthLoginService {
             throw new IllegalStateException("Auth lifecycle dependencies are unavailable");
         }
         rateLimiter.check("register", email, ipAddress);
+        users.lockEmailForRegistration(email);
         if (users.findByEmail(email).isPresent()) {
             throw new DomainException(
                     HttpStatus.CONFLICT,
