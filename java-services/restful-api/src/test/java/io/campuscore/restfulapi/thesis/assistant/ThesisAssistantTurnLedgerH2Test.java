@@ -90,6 +90,27 @@ class ThesisAssistantTurnLedgerH2Test {
     }
 
     @Test
+    void disconnectBeforeWorkerReservationLeavesDurableTombstoneAndBlocksLaterWorker() {
+        String owner = "cancel-before-reserve-" + UUID.randomUUID();
+        UUID key = UUID.randomUUID();
+        String hash = reservationHash("cancel-before-reserve", "en");
+
+        ThesisAssistantTurnRepository.CancelResult cancelled = turns.cancelBeforeReservation(owner, key, hash);
+
+        assertTrue(cancelled.cancelled());
+        assertEquals("CANCELLED", jdbc.queryForObject(
+                "SELECT state FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:key",
+                p("owner", owner).addValue("key", key), String.class));
+        assertEquals(0, count("SELECT COUNT(*) FROM assistant.chat_message WHERE turn_id IN (SELECT turn_id FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:key)",
+                p("owner", owner).addValue("key", key)));
+
+        assertThrows(RuntimeException.class,
+                () -> turns.reserve(owner, key, hash, null, "en", "worker-after-disconnect", 90));
+        assertEquals(0, count("SELECT COUNT(*) FROM assistant.usage_bucket WHERE owner_id=:owner AND request_count>0",
+                p("owner", owner)));
+    }
+
+    @Test
     void ownerAndPayloadArePartOfTheIdempotencyFence() {
         String owner = "owner-a-" + UUID.randomUUID();
         String other = "owner-b-" + UUID.randomUUID();

@@ -117,6 +117,33 @@ public class ThesisAssistantService {
                 handle -> { if (cancellations != null) cancellations.fence(ownerId, handle.clientRequestId(), handle.leaseGeneration()); });
     }
 
+    /**
+     * Disconnect path used by the SSE controller.  It is intentionally
+     * separate from the public cancel endpoint: a browser can close the
+     * emitter before the bounded worker has even entered {@link #execute},
+     * so there may be no turn row to CAS yet.  Install a durable tombstone
+     * keyed by the idempotency request before the worker is allowed to run.
+     */
+    public ThesisAssistantTurnRepository.CancelResult cancelBeforeStart(UUID clientRequestId, String ownerId,
+            String message, String locale, String conversationId) {
+        if (turns == null) return new ThesisAssistantTurnRepository.CancelResult(false, "TURN_NOT_FOUND");
+        if (cancellations != null) cancellations.preCancel(ownerId, clientRequestId);
+        AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(message);
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        UUID requestedConversation = parseConversation(conversationId);
+        String hash = AssistantInputGuard.canonicalHash(guard.normalizedMessage(), normalizedLocale, requestedConversation);
+        try {
+            return turns.cancelBeforeReservation(ownerId, clientRequestId, hash,
+                    handle -> { if (cancellations != null) cancellations.fence(ownerId, handle.clientRequestId(), handle.leaseGeneration()); });
+        } finally {
+            // The repository transaction has committed (or failed) before
+            // this method returns.  The durable ledger row is now the fence;
+            // release the short-lived in-process generation-zero marker so a
+            // completed/replayed request cannot be poisoned by a stale map key.
+            if (cancellations != null) cancellations.clearPreCancel(ownerId, clientRequestId);
+        }
+    }
+
     public int setFeedback(UUID messageId, String ownerId, String rating, String reason) {
         if (turns == null) throw problem(503, "ASSISTANT_UNAVAILABLE", "Assistant persistence is unavailable");
         return turns.setFeedback(messageId, ownerId, rating, reason);
@@ -169,6 +196,12 @@ public class ThesisAssistantService {
             UUID clientRequestId, Consumer<StreamEvent> sink) {
         if (clientRequestId == null) throw problem(400, "CLIENT_REQUEST_ID_REQUIRED", "clientRequestId is required");
         if (ownerId == null || ownerId.isBlank()) throw problem(401, "UNAUTHENTICATED", "Authentication is required");
+        if (cancellations != null && cancellations.isPreCancelled(ownerId, clientRequestId)) {
+            // The database tombstone is the durable authority; do not retain
+            // a generation-zero marker in the singleton registry forever.
+            cancellations.clearPreCancel(ownerId, clientRequestId);
+            throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
+        }
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(message);
         UUID requestId = UUID.randomUUID();
         if (!guard.allowed()) {
@@ -182,13 +215,6 @@ public class ThesisAssistantService {
         String normalized = guard.normalizedMessage();
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         UUID requestedConversation = parseConversation(conversationId);
-        LexicalResult lexical = retrieve(normalized, normalizedLocale);
-        if (lexical.error()) {
-            emit(sink, new StreamError("KNOWLEDGE_UNAVAILABLE", true));
-            return new ChatResponse(lexical.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", normalizedLocale,
-                    List.of(), requestId, clientRequestId, null, false, "FAILED_PRE_DISPATCH", null, null);
-        }
-
         String hash = AssistantInputGuard.canonicalHash(normalized, normalizedLocale, requestedConversation);
         String leaseOwner = "assistant-" + UUID.randomUUID();
         ThesisAssistantTurnRepository.Reservation reservation = cancellations == null
@@ -207,6 +233,21 @@ public class ThesisAssistantService {
         if (reservation.status() == ThesisAssistantTurnRepository.ReservationStatus.AMBIGUOUS) {
             throw problem(409, "FAILED_AMBIGUOUS", "The provider outcome is ambiguous; automatic redispatch is disabled");
         }
+        AtomicBoolean cancelToken = cancellations == null ? new AtomicBoolean(false)
+                : cancellations.register(ownerId, clientRequestId, reservation.leaseGeneration());
+        if (cancelToken.get()) throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
+        LexicalResult lexical = retrieve(normalized, normalizedLocale);
+        // A disconnect may win while retrieval is in flight.  Do not allow a
+        // cancelled generation to advance into snapshot, quota, provider, or
+        // message persistence once the retrieval boundary returns.
+        if (cancelToken.get()) throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
+        if (lexical.error()) {
+            turns.failPreDispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(), "KNOWLEDGE_UNAVAILABLE");
+            emit(sink, new StreamError("KNOWLEDGE_UNAVAILABLE", true));
+            return new ChatResponse(lexical.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", normalizedLocale,
+                    List.of(), requestId, clientRequestId, reservation.turnId(), false, "FAILED_PRE_DISPATCH",
+                    reservation.conversationId() == null ? null : reservation.conversationId().toString(), null);
+        }
         boolean snapshotReady = cancellations == null
                 ? turns.markSnapshotReady(reservation.turnId(), ownerId, reservation.leaseGeneration(), lexical.snapshotHash())
                 : turns.markSnapshotReady(reservation.turnId(), ownerId, reservation.leaseGeneration(), lexical.snapshotHash(), this::fenceExpired);
@@ -222,8 +263,6 @@ public class ThesisAssistantService {
         List<ProviderSegment> emittedSegments = new ArrayList<>();
         StringBuilder providerAnswer = new StringBuilder();
         int[] expectedSequence = { 0 };
-        AtomicBoolean cancelToken = cancellations == null ? new AtomicBoolean(false)
-                : cancellations.register(ownerId, clientRequestId, reservation.leaseGeneration());
         try {
             if (!lexical.documents().isEmpty() && deepSeek != null && deepSeek.usable()) {
                 ThesisAssistantTurnRepository.DispatchDecision dispatch = cancellations == null

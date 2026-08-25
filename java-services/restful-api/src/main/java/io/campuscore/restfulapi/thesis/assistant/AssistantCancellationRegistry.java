@@ -10,7 +10,23 @@ import org.springframework.stereotype.Component;
 @Component
 @Profile("persistence")
 public class AssistantCancellationRegistry {
+    /** Generation zero is reserved for the pre-reservation disconnect fence. */
+    static final long PRE_RESERVATION_GENERATION = 0L;
     private final ConcurrentHashMap<Key, Handle> handles = new ConcurrentHashMap<>();
+
+    public void preCancel(String ownerId, UUID clientRequestId) {
+        fence(ownerId, clientRequestId, PRE_RESERVATION_GENERATION);
+    }
+
+    public boolean isPreCancelled(String ownerId, UUID clientRequestId) {
+        Handle handle = handles.get(new Key(ownerId, clientRequestId, PRE_RESERVATION_GENERATION));
+        return handle != null && handle.cancelled.get();
+    }
+
+    /** Clears the in-process marker after the durable ledger tombstone wins. */
+    public void clearPreCancel(String ownerId, UUID clientRequestId) {
+        handles.remove(new Key(ownerId, clientRequestId, PRE_RESERVATION_GENERATION));
+    }
 
     public AtomicBoolean register(String ownerId, UUID clientRequestId, long leaseGeneration) {
         // Keep a cancellation fence even when the cancel CAS wins in the small
@@ -56,6 +72,9 @@ public class AssistantCancellationRegistry {
         synchronized (handle) {
             handle.cancelled.set(true);
             handles.remove(key, handle);
+            // A worker that reached terminal cleanup also clears the
+            // generation-zero marker installed by an earlier disconnect.
+            handles.remove(new Key(ownerId, clientRequestId, PRE_RESERVATION_GENERATION));
         }
     }
 

@@ -6,6 +6,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
@@ -55,5 +56,49 @@ class ThesisAssistantSseControllerTest {
         verify(service).stream(anyString(), anyString(), any(), anyString(), any(UUID.class), any(Consumer.class));
         Thread running = worker.get();
         if (running != null) running.join(2_000L);
+    }
+
+    @Test
+    void disconnectBeforeQueuedWorkerStartsInstallsRequestKeyTombstone() {
+        ThesisAssistantService service = mock(ThesisAssistantService.class);
+        TaskExecutor queued = command -> { /* deliberately paused until after disconnect */ };
+        UUID clientRequestId = UUID.randomUUID();
+        when(service.cancelBeforeStart(clientRequestId, "owner-a", "How?", "vi", null))
+                .thenReturn(new ThesisAssistantTurnRepository.CancelResult(true, "CANCELLED"));
+        Jwt actor = Jwt.withTokenValue("fixture-token").header("alg", "none").subject("owner-a").build();
+
+        CapturingController controller = new CapturingController(service, queued);
+        controller.stream(new ChatRequest("How?", "vi", clientRequestId, null), actor, null);
+        controller.emitter.triggerCompletion();
+
+        verify(service).cancelBeforeStart(clientRequestId, "owner-a", "How?", "vi", null);
+    }
+
+    private static final class CapturingController extends ThesisAssistantController {
+        private final CapturingEmitter emitter = new CapturingEmitter();
+
+        private CapturingController(ThesisAssistantService service, TaskExecutor executor) {
+            super(service, executor);
+        }
+
+        @Override
+        protected SseEmitter createEmitter() {
+            return emitter;
+        }
+    }
+
+    private static final class CapturingEmitter extends SseEmitter {
+        private Runnable completion;
+
+        @Override
+        public void onCompletion(Runnable callback) {
+            this.completion = callback;
+            super.onCompletion(callback);
+        }
+
+        private void triggerCompletion() {
+            if (completion == null) throw new AssertionError("completion callback was not registered");
+            completion.run();
+        }
     }
 }

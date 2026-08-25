@@ -371,6 +371,44 @@ public class ThesisAssistantTurnRepository {
     }
 
     /**
+     * Installs a durable cancellation tombstone for a disconnect that wins
+     * before the bounded stream worker has reserved its turn.  The request key
+     * is still the idempotency authority: a later worker observes CANCELLED
+     * from {@link #reserve} and cannot retrieve knowledge or dispatch a
+     * provider generation.  If a worker already won the reservation, fall
+     * through to the normal row CAS so the same terminal rules apply.
+     */
+    @Transactional
+    public CancelResult cancelBeforeReservation(String ownerId, UUID clientRequestId, String requestHash) {
+        return cancelBeforeReservation(ownerId, clientRequestId, requestHash, ignored -> { });
+    }
+
+    @Transactional
+    public CancelResult cancelBeforeReservation(String ownerId, UUID clientRequestId, String requestHash,
+            Consumer<DispatchHandle> fence) {
+        TurnRow existing = findForUpdate(ownerId, clientRequestId);
+        if (existing != null) return cancel(existing.turnId(), ownerId, clientRequestId, fence);
+        int inserted = jpa.update("INSERT INTO assistant.chat_turn_ledger "
+                + "(turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,terminal_reason,created_at,updated_at,tombstone_until) "
+                + "VALUES (:turn,:owner,:request,:hash,NULL,FALSE,'CANCELLED',0,FALSE,'CANCELLED',CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,:tombstone)"
+                + (postgres ? " ON CONFLICT (owner_id,client_request_id) DO NOTHING" : ""),
+                p().addValue("turn", UUID.randomUUID()).addValue("owner", ownerId)
+                        .addValue("request", clientRequestId).addValue("hash", requestHash)
+                        .addValue("tombstone", timestampAfterDays(TOMBSTONE_DAYS)));
+        if (inserted == 1) return new CancelResult(true, "CANCELLED");
+        existing = findForUpdate(ownerId, clientRequestId);
+        return existing == null ? new CancelResult(false, "TURN_NOT_FOUND")
+                : cancel(existing.turnId(), ownerId, clientRequestId, fence);
+    }
+
+    /** Moves a reserved pre-dispatch turn to a retryable terminal state. */
+    @Transactional
+    public boolean failPreDispatch(UUID turnId, String ownerId, long generation, String reason) {
+        return jpa.update("UPDATE assistant.chat_turn_ledger SET state='FAILED_PRE_DISPATCH',terminal_reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='RESERVED'",
+                p().addValue("turn", turnId).addValue("owner", ownerId).addValue("generation", generation).addValue("reason", reason)) == 1;
+    }
+
+    /**
      * Converts expired leases into explicit terminal states. Pre-dispatch work
      * is retryable without refunding anything; a dispatched provider attempt is
      * permanently ambiguous and is never automatically re-dispatched. The

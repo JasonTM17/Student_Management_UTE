@@ -105,6 +105,13 @@ test('assistant history and feedback states recover focus and avoid contradictor
   assert.match(source, /thesisApi\.cancelRequest\(requestId\)/);
 });
 
+test('closing an active assistant stream removes its optimistic pending bubble', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(source, /type: 'discard-pending'/);
+  assert.match(source, /message\.role === 'assistant' && message\.pending/);
+  assert.match(source, /const closePanel = useCallback\(\(\) => \{[\s\S]*?dispatch\(\{ type: 'discard-pending' \}\)/);
+});
+
 test('admin knowledge action errors remain visible inside active dialogs', () => {
   const page = fs.readFileSync(path.join(root, 'src/app/admin/assistant-knowledge/page.tsx'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'src/components/ui/modal.tsx'), 'utf8');
