@@ -282,6 +282,7 @@ public class AuthLoginService {
                 user.firstName(),
                 user.lastName(),
                 user.status(),
+                user.emailVerified(),
                 user.roles(),
                 user.permissions(),
                 user.studentId(),

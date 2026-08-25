@@ -13,6 +13,7 @@ const playwrightCli = path.join(frontendDir, 'node_modules', 'playwright', 'cli.
 const projectName = resolveProjectName();
 const apiBaseURL = process.env.E2E_API_URL ?? 'http://127.0.0.1:4100/api/v1';
 const frontendBaseURL = process.env.E2E_BASE_URL ?? 'http://127.0.0.1:3101';
+const mailpitBaseURL = process.env.E2E_MAILPIT_URL ?? 'http://127.0.0.1:8125';
 const frontendPort = new URL(frontendBaseURL).port || '3101';
 
 async function main() {
@@ -20,14 +21,17 @@ async function main() {
   await assertPortAvailable(new URL(apiBaseURL).port || '4100', 'API');
   await assertPortAvailable(process.env.POSTGRES_HOST_PORT ?? '5433', 'PostgreSQL');
   await assertPortAvailable(new URL(frontendBaseURL).port || '3101', 'Frontend');
+  await assertPortAvailable(process.env.MAILPIT_E2E_SMTP_HOST_PORT ?? '1125', 'Mailpit SMTP');
+  await assertPortAvailable(new URL(mailpitBaseURL).port || '8125', 'Mailpit UI');
   const frontend = await startFrontend();
   let stackStarted = false;
   try {
     // Mark the exact, preflighted project before `up`: Compose can create a
     // subset of resources before reporting a build failure.
     stackStarted = true;
-    await compose(['up', '-d', '--build', 'postgres', 'restful-api']);
+    await compose(['up', '-d', '--build', 'postgres', 'mailpit', 'restful-api']);
     await waitForResponse(`${apiBaseURL}/health/liveness`, (_, response) => response.ok);
+    await waitForResponse(`${mailpitBaseURL}/api/v1/messages`, (_, response) => response.ok);
     await waitForResponse(frontendBaseURL, (_, response) => response.ok, {
       parseJson: false,
     });
@@ -45,6 +49,7 @@ async function main() {
         E2E_EXTERNAL_STACK: '1',
         E2E_API_URL: apiBaseURL,
         E2E_BASE_URL: frontendBaseURL,
+        E2E_MAILPIT_URL: mailpitBaseURL,
       },
     });
   } finally {
@@ -173,6 +178,9 @@ async function compose(args, options = {}) {
       ...process.env,
       E2E_API_HOST_PORT: new URL(apiBaseURL).port || '4100',
       POSTGRES_HOST_PORT: process.env.POSTGRES_HOST_PORT ?? '5433',
+      MAILPIT_E2E_SMTP_HOST_PORT: process.env.MAILPIT_E2E_SMTP_HOST_PORT ?? '1125',
+      MAILPIT_E2E_UI_HOST_PORT: new URL(mailpitBaseURL).port || '8125',
+      AUTH_FRONTEND_BASE_URL: frontendBaseURL,
     },
     allowFailure: options.allowFailure ?? false,
   });

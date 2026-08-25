@@ -28,10 +28,7 @@ final class SmtpAuthMailDelivery implements AuthMailDelivery {
 
     @Override
     public void send(AuthMailEvent event) {
-        String actionPath = event.purpose() == Purpose.EMAIL_VERIFICATION
-                ? "/verify-email"
-                : "/reset-password";
-        String actionUrl = frontendBaseUrl + actionPath + "?token=" + encode(event.rawToken());
+        String actionUrl = actionUrl(frontendBaseUrl, event.purpose(), event.rawToken());
         MailContent content = templates.render(event, actionUrl);
         var message = sender.createMimeMessage();
         try {
@@ -48,5 +45,14 @@ final class SmtpAuthMailDelivery implements AuthMailDelivery {
 
     private static String encode(String value) {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
+    }
+
+    static String actionUrl(String frontendBaseUrl, Purpose purpose, String rawToken) {
+        String actionPath = purpose == Purpose.EMAIL_VERIFICATION
+                ? "/verify-email"
+                : "/reset-password";
+        // URL fragments stay client-side and therefore keep raw challenges out
+        // of reverse-proxy, servlet and frontend access logs.
+        return frontendBaseUrl.replaceAll("/+$", "") + actionPath + "#token=" + encode(rawToken);
     }
 }

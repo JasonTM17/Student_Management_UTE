@@ -24,6 +24,17 @@ const nextConfig = {
       },
     ];
   },
+  async headers() {
+    const noReferrer = [
+      { key: 'Referrer-Policy', value: 'no-referrer' },
+    ];
+    return [
+      { source: '/verify-email', headers: noReferrer },
+      { source: '/reset-password', headers: noReferrer },
+      { source: '/:locale(en|vi)/verify-email', headers: noReferrer },
+      { source: '/:locale(en|vi)/reset-password', headers: noReferrer },
+    ];
+  },
 };
 
 export default nextConfig;

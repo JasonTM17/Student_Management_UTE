@@ -91,10 +91,13 @@ test('assistant UI exposes provenance and degraded state', () => {
   assert.match(assistantSource, /messages\.assistant\.degraded/);
 });
 
-test('frontend source contains no removed route or runtime reference', () => {
+test('frontend source contains only retained routes and the auth lifecycle contract', () => {
   const source = walk('src')
     .map((relativePath) => read(relativePath))
     .join('\n');
   assert.doesNotMatch(source, /\/admin\/analytics|\/dashboard\/invoices|financeApi|analyticsApi|waitlistApi|socket\.io/);
-  assert.doesNotMatch(source, /href=["']\/forgot-password|authApi\.(forgotPassword|resetPassword|verifyEmail|resendVerification)/);
+  assert.match(source, /\/forgot-password/);
+  assert.match(source, /\/verify-email/);
+  assert.match(source, /confirmPasswordReset/);
+  assert.match(source, /resendVerification/);
 });

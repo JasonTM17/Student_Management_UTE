@@ -20,6 +20,7 @@ export interface User {
   dateOfBirth?: string;
   address?: string;
   status: string;
+  emailVerified?: boolean;
   role?: 'ADMIN' | 'SUPER_ADMIN' | 'LECTURER' | 'STUDENT';
   roles?: string[];
   createdAt: string;
@@ -37,6 +38,17 @@ export interface LoginResponse {
   user: User;
   accessToken: string;
   refreshToken: string;
+}
+
+export interface RegistrationPendingResponse {
+  email: string;
+  verificationRequired: boolean;
+  expiresInSeconds: number;
+  resendAfterSeconds: number;
+}
+
+export interface AuthActionResponse {
+  message: string;
 }
 
 // Student Types

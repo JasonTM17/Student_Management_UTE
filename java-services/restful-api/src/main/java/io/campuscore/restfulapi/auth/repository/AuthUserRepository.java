@@ -23,7 +23,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class AuthUserRepository {
 
-    private static final String SCHEMA = "\"auth\".";
+    private static final String SCHEMA = "\"campuscore_auth\".";
     private static final String USER_TABLE = SCHEMA + "\"User\"";
     private static final String STUDENT_TABLE = SCHEMA + "\"Student\"";
     private static final String LECTURER_TABLE = SCHEMA + "\"Lecturer\"";

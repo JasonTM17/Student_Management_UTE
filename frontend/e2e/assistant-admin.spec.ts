@@ -164,6 +164,10 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     await launcher.click();
     const panel = page.getByRole('dialog');
     await expect(panel).toBeVisible();
+    for (let step = 0; step < 12; step += 1) {
+      await page.keyboard.press('Tab');
+      expect(await panel.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
+    }
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
     expect(panelBox!.x).toBeGreaterThanOrEqual(0);
@@ -177,6 +181,8 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       expect(navBox).not.toBeNull();
       expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navBox!.y);
     }
-    await page.getByRole('button', { name: 'Close thesis assistant' }).click();
+    await page.keyboard.press('Escape');
+    await expect(panel).toHaveCount(0);
+    await expect(launcher).toBeFocused();
   }
 });

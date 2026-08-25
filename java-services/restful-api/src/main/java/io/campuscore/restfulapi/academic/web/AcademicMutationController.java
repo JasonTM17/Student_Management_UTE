@@ -1,12 +1,15 @@
 package io.campuscore.restfulapi.academic.web;
 
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
+import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.EnrollRequest;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdateRequest;
+import io.campuscore.restfulapi.registration.RegistrationService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
 import jakarta.servlet.http.HttpServletResponse;
@@ -19,6 +22,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -29,32 +33,44 @@ import org.springframework.web.bind.annotation.RestController;
 public class AcademicMutationController {
 
     private final AcademicMutationService mutations;
+    private final AcademicEnrollmentReadService enrollmentReads;
+    private final RegistrationService registration;
 
-    public AcademicMutationController(AcademicMutationService mutations) {
+    public AcademicMutationController(AcademicMutationService mutations,
+                                      AcademicEnrollmentReadService enrollmentReads,
+                                      RegistrationService registration) {
         this.mutations = mutations;
+        this.enrollmentReads = enrollmentReads;
+        this.registration = registration;
     }
 
     @PostMapping("enrollments/enroll")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize("hasRole('STUDENT') and principal.claims['emailVerified'] == true")
     public EnrollmentResponse enroll(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody EnrollRequest request,
+            @RequestHeader("Idempotency-Key") UUID key,
             HttpServletResponse response) {
         markDeprecated(response, "/api/v1/me/enrollments");
-        return mutations.enroll(
-                jwt.getClaimAsString("studentId"),
-                request.sectionId(),
-                jwt.getClaimAsStringList("roles"));
+        RegistrationService.MutationResult result = registration.enrollBySection(
+                jwt.getClaimAsString("studentId"), request.sectionId(), key);
+        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
+        return enrollmentReads.findEnrollment(result.enrollment().id(), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("studentId"));
     }
 
     @PostMapping("enrollments/{id}/drop")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN') and principal.claims['emailVerified'] == true")
     public Map<String, String> drop(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String id,
+            @RequestHeader("Idempotency-Key") UUID key,
             HttpServletResponse response) {
         markDeprecated(response, "/api/v1/me/enrollments/" + id);
-        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"));
+        RegistrationService.DropResult result = isAdmin(jwt.getClaimAsStringList("roles"))
+                ? registration.dropAsAdmin(id, key)
+                : registration.drop(jwt.getClaimAsString("studentId"), id, key);
+        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
         return Map.of("message", "Enrollment dropped successfully");
     }
 

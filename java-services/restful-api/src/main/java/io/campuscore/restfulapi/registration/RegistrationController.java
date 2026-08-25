@@ -36,42 +36,44 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("persistence")
 @RequestMapping("/api/v1")
 public class RegistrationController {
+    private static final String VERIFIED_STUDENT =
+            "hasRole('STUDENT') and principal.claims['emailVerified'] == true";
     private final RegistrationService registration;
 
     public RegistrationController(RegistrationService registration) { this.registration = registration; }
 
     @GetMapping("registration/rounds")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public RoundPage rounds(@RequestParam(required = false) String semesterId,
             @RequestParam(required = false) String cursor, @RequestParam(defaultValue = "20") int limit) {
         return registration.rounds(semesterId, cursor, limit);
     }
 
     @GetMapping("registration/rounds/{roundId}")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public RoundView round(@PathVariable String roundId) { return registration.round(roundId); }
 
     @GetMapping("registration/rounds/{roundId}/sections")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public List<SectionView> sections(@AuthenticationPrincipal Jwt jwt, @PathVariable String roundId) {
         return registration.sections(roundId, jwt.getClaimAsString("studentId"));
     }
 
     @GetMapping("me/registration/eligibility")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public EligibilityView eligibility(@AuthenticationPrincipal Jwt jwt, @RequestParam String roundId) {
         Number year = jwt.getClaim("studentYear");
         return registration.eligibility(jwt.getClaimAsString("studentId"), roundId, year == null ? null : year.intValue());
     }
 
     @GetMapping("me/registration/summary")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public SummaryView summary(@AuthenticationPrincipal Jwt jwt, @RequestParam String roundId) {
         return registration.summary(jwt.getClaimAsString("studentId"), roundId);
     }
 
     @GetMapping("me/enrollments")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public ResponseEntity<EnrollmentPage> enrollments(@AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String semesterId, @RequestParam(required = false) String cursor,
             @RequestParam(defaultValue = "50") int limit) {
@@ -80,13 +82,13 @@ public class RegistrationController {
     }
 
     @PostMapping("me/enrollments/validate")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public ValidationResponse validate(@AuthenticationPrincipal Jwt jwt, @Valid @RequestBody ValidationRequest request) {
         return registration.validate(jwt.getClaimAsString("studentId"), new EnrollmentRequest(request.sectionId(), request.roundId()));
     }
 
     @PostMapping("me/enrollments")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public MutationResponse enroll(@AuthenticationPrincipal Jwt jwt, @RequestHeader("Idempotency-Key") UUID key,
             @Valid @RequestBody EnrollmentRequest request) {
         RegistrationService.MutationResult result = registration.enroll(jwt.getClaimAsString("studentId"), request, key);
@@ -94,7 +96,7 @@ public class RegistrationController {
     }
 
     @DeleteMapping("me/enrollments/{id}")
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public ResponseEntity<RegistrationService.DropResult> drop(@AuthenticationPrincipal Jwt jwt, @PathVariable String id,
             @RequestHeader("Idempotency-Key") UUID key) {
         RegistrationService.DropResult result = registration.drop(jwt.getClaimAsString("studentId"), id, key);
@@ -102,7 +104,7 @@ public class RegistrationController {
     }
 
     @GetMapping(value = "me/registration/slip", produces = MediaType.APPLICATION_PDF_VALUE)
-    @PreAuthorize("hasRole('STUDENT')")
+    @PreAuthorize(VERIFIED_STUDENT)
     public ResponseEntity<byte[]> slip(@AuthenticationPrincipal Jwt jwt, @RequestParam String roundId) {
         RegistrationService.SlipResult slip = registration.slip(jwt.getClaimAsString("studentId"), roundId);
         HttpHeaders headers = new HttpHeaders();

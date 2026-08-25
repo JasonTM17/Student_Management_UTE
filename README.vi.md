@@ -3,7 +3,8 @@
 CampusCore là đồ án môn học dạng RESTful API tầm trung, chạy bằng một Java
 Spring Boot API, một Next.js web, một Expo mobile và một PostgreSQL.
 
-Phạm vi giữ lại gồm auth, phân quyền student/lecturer/admin, danh mục học vụ,
+Phạm vi giữ lại gồm auth với xác minh email và quên/đặt lại mật khẩu, phân
+quyền student/lecturer/admin, danh mục học vụ,
 đăng ký học phần, lịch, điểm, thông báo, thesis core và thesis assistant dùng
 thesis-grounded RAG trong PostgreSQL có citation, lexical fallback và tùy chọn
 DeepSeek V4 Flash chỉ ở backend.
@@ -13,12 +14,23 @@ Nginx, Kubernetes, Cloudflare Tunnel và release multi-image được loại kh�
 án. DeepSeek là tùy chọn, mặc định tắt; lexical fallback không cần key.
 
 ```powershell
-docker compose up -d --build postgres restful-api
+docker compose up -d --build postgres mailpit restful-api
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
 .\mvnw.cmd -q -f java-services/pom.xml verify
 ```
+
+Mail local được gửi vào Mailpit tại `http://127.0.0.1:8025`; template HTML và
+plain-text có cả tiếng Việt/Anh. Xem
+[auth-mail.md](docs/integrations/auth-mail.md) để cấu hình SMTP bằng biến môi
+trường mà không commit credential.
+
+Identity của CampusCore nằm trong schema riêng `campuscore_auth`; các migration
+không tạo hoặc sửa schema `auth` do Supabase quản lý. Database Supabase mới chỉ
+dùng baseline schema-only B20 sau khi kiểm tra đúng project, backup và drift;
+database local/cũ tiếp tục chạy V1-V20. Xem
+[supabase-database.md](docs/integrations/supabase-database.md).
 
 ### Toolchain Java
 

@@ -79,6 +79,12 @@ export default function LoginPage() {
       return messages.login.errors.backendUnavailable;
     }
 
+    const code = (error.response.data as { code?: string } | undefined)?.code;
+
+    if (code === 'EMAIL_VERIFICATION_REQUIRED') {
+      return messages.login.errors.emailVerificationRequired;
+    }
+
     if (error.response.status === 401) {
       return messages.login.errors.invalidCredentials;
     }
@@ -240,6 +246,15 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
+
+        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
+          <LocalizedLink href="/forgot-password" className="font-medium text-primary hover:underline">
+            {messages.login.forgotPassword}
+          </LocalizedLink>
+          <LocalizedLink href="/register" className="font-medium text-primary hover:underline">
+            Create an account
+          </LocalizedLink>
+        </div>
 
         <div className="border-l-2 border-primary bg-secondary/35 px-4 py-3">
           <div className="flex items-start gap-3">

@@ -27,7 +27,7 @@ public class PeopleReadRepository {
 
     private static final String STUDENT_TABLE = "\"academic\".\"Student\"";
     private static final String LECTURER_TABLE = "\"academic\".\"Lecturer\"";
-    private static final String USER_TABLE = "\"auth\".\"User\"";
+    private static final String USER_TABLE = "\"campuscore_auth\".\"User\"";
     private static final String CURRICULUM_TABLE = "\"academic\".\"Curriculum\"";
     private static final String DEPARTMENT_TABLE = "\"academic\".\"Department\"";
     private static final RowMapper<StudentResponse> STUDENT_MAPPER = PeopleReadRepository::mapStudent;

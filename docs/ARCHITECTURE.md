@@ -25,6 +25,17 @@ with roles, demo users, academic catalog, sections, announcements,
 notifications, thesis data and curated assistant knowledge. No legacy service
 schema is read at runtime and no old data migration is required.
 
+Authentication lifecycle data is also Flyway-owned. Student self-registration
+creates a pending account and a hashed, single-use email-verification challenge;
+admin-created staff accounts are pre-verified. Password-reset challenges are
+hashed, time-limited and generic at the public boundary. SMTP delivery is
+performed after commit through the internal mail template adapter; Mailpit is
+the local/e2e sink and raw tokens never enter logs or persistent columns.
+Application-owned users, roles, sessions, challenges and rate buckets live in
+`campuscore_auth`. V20 moves legacy CampusCore objects out of `auth`, so a
+hosted Supabase database retains exclusive control of its managed `auth`
+schema.
+
 ## Assistant
 
 The thesis assistant performs bounded retrieval over published thesis knowledge
@@ -58,10 +69,26 @@ page titles, tab strips, dense information layout and explicit loading/error/
 empty/forbidden states. The implementation uses project-owned assets and does
 not copy credentials, cookies, HTML or proprietary source code.
 
+## Persistence boundary
+
+Assistant conversations, messages, citations, usage buckets, turn leases,
+provider dispatch fences, feedback and knowledge revision/audit records are
+mapped through JPA repositories. Flyway remains the schema authority and
+Hibernate is validation-only (`ddl-auto=validate`); provider I/O stays outside
+the short database transactions.
+
+For a brand-new Supabase target, Flyway can add the opt-in schema-only B20
+baseline location. B20 creates only `campuscore_auth`, `academic`, `thesis`,
+`assistant`, `engagement` and `notifications`; it contains no seed, identity,
+session, challenge, assistant-history or test rows. Existing CampusCore
+databases keep their V-history and apply V20 normally. Remote synchronization
+is a separate guarded operation, not a change of runtime authority or a
+production cutover.
+
 ## Non-goals
 
-Finance, analytics, support tickets, realtime sockets, email verification,
-email password reset, thesis council/review/evaluation, unbounded/client-side
+Finance, analytics, support tickets, realtime sockets, thesis
+council/review/evaluation, unbounded/client-side
 external AI, vector search, Redis,
 RabbitMQ, MinIO, Nginx, Kubernetes, observability stack and production
 cutover are outside the course runtime.

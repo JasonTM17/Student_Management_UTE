@@ -6,6 +6,10 @@ export type UserRole = 'student' | 'lecturer' | 'admin';
 
 export type ScreenName =
   | 'auth.signIn'
+  | 'auth.register'
+  | 'auth.verifyEmail'
+  | 'auth.forgotPassword'
+  | 'auth.resetPassword'
   | 'dashboard.student'
   | 'schedule'
   | 'courses'
@@ -60,6 +64,10 @@ const adminRoles: readonly UserRole[] = ['admin'];
 
 export const screenRegistry: readonly ScreenDefinition[] = [
   { name: 'auth.signIn', title: 'Sign in', family: 'auth', roles: allRoles, icon: 'login' },
+  { name: 'auth.register', title: 'Create account', family: 'auth', roles: allRoles, icon: 'account-plus-outline' },
+  { name: 'auth.verifyEmail', title: 'Verify email', family: 'auth', roles: allRoles, icon: 'email-check-outline' },
+  { name: 'auth.forgotPassword', title: 'Forgot password', family: 'auth', roles: allRoles, icon: 'lock-reset' },
+  { name: 'auth.resetPassword', title: 'Reset password', family: 'auth', roles: allRoles, icon: 'form-textbox-password' },
   { name: 'dashboard.student', title: 'Dashboard', family: 'student', roles: studentRoles, icon: 'home-variant' },
   { name: 'schedule', title: 'Schedule', family: 'student', roles: studentRoles, icon: 'calendar-week' },
   { name: 'courses', title: 'Courses', family: 'student', roles: studentRoles, icon: 'book-open-page-variant' },

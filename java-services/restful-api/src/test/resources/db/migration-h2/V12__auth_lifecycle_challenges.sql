@@ -1,4 +1,4 @@
-CREATE TABLE IF NOT EXISTS auth."AuthChallenge" (
+CREATE TABLE IF NOT EXISTS campuscore_auth."AuthChallenge" (
     "id" VARCHAR(120) PRIMARY KEY,
     "userId" VARCHAR(120) NOT NULL,
     "purpose" VARCHAR(40) NOT NULL,
@@ -13,11 +13,11 @@ CREATE TABLE IF NOT EXISTS auth."AuthChallenge" (
 );
 
 CREATE UNIQUE INDEX IF NOT EXISTS auth_challenge_token_hash_uq
-    ON auth."AuthChallenge" ("tokenHash");
+    ON campuscore_auth."AuthChallenge" ("tokenHash");
 CREATE INDEX IF NOT EXISTS auth_challenge_user_purpose_idx
-    ON auth."AuthChallenge" ("userId", "purpose", "createdAt");
+    ON campuscore_auth."AuthChallenge" ("userId", "purpose", "createdAt");
 
-CREATE TABLE IF NOT EXISTS auth."AuthRateLimitBucket" (
+CREATE TABLE IF NOT EXISTS campuscore_auth."AuthRateLimitBucket" (
     "scope" VARCHAR(80) NOT NULL,
     "bucketKeyHash" VARCHAR(64) NOT NULL,
     "windowStart" TIMESTAMP NOT NULL,
@@ -28,11 +28,11 @@ CREATE TABLE IF NOT EXISTS auth."AuthRateLimitBucket" (
 );
 
 CREATE INDEX IF NOT EXISTS auth_rate_limit_updated_idx
-    ON auth."AuthRateLimitBucket" ("updatedAt");
+    ON campuscore_auth."AuthRateLimitBucket" ("updatedAt");
 
 -- Accounts created before lifecycle enforcement are trusted demo/admin-managed
 -- accounts. New self-registration explicitly uses PENDING_VERIFICATION.
-UPDATE auth."User"
+UPDATE campuscore_auth."User"
 SET "emailVerified" = TRUE,
     "updatedAt" = CURRENT_TIMESTAMP
 WHERE "status" = 'ACTIVE' AND "emailVerified" = FALSE;

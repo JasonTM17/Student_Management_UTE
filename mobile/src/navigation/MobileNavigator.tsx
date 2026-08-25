@@ -1,5 +1,5 @@
-import { useState } from 'react';
-import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
+import { useEffect, useState } from 'react';
+import { Linking, SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 
 import { apiClient, campusApi } from '../api/client';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -23,13 +23,14 @@ export function MobileNavigator() {
   const [sessionKind, setSessionKind] = useState<SessionKind>('signedOut');
   const [menuOpen, setMenuOpen] = useState(false);
   const [selectedThesisTopicId, setSelectedThesisTopicId] = useState<string | null>(null);
+  const [authToken, setAuthToken] = useState<string | null>(null);
   const isPreviewSession = sessionKind === 'preview';
   const isAuthenticated = sessionKind === 'authenticated';
   const hasActiveSession = isPreviewSession || isAuthenticated;
 
   const navigation: MobileNavigation = {
     navigate(nextRoute, options) {
-      if (!hasActiveSession) {
+      if (!hasActiveSession && !nextRoute.startsWith('auth.')) {
         return;
       }
       if (!canAccessScreen(role, nextRoute)) {
@@ -39,6 +40,9 @@ export function MobileNavigator() {
       }
       if (options?.thesisTopicId) {
         setSelectedThesisTopicId(options.thesisTopicId);
+      }
+      if (nextRoute !== 'auth.verifyEmail' && nextRoute !== 'auth.resetPassword') {
+        setAuthToken(null);
       }
       setRoute(nextRoute);
       setMenuOpen(false);
@@ -75,6 +79,7 @@ export function MobileNavigator() {
       setSessionKind('signedOut');
       setRole('student');
       setSelectedThesisTopicId(null);
+      setAuthToken(null);
       setRoute('auth.signIn');
       setMenuOpen(false);
     },
@@ -88,6 +93,29 @@ export function MobileNavigator() {
       setMenuOpen(false);
     },
   };
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      try {
+        const [rawPath, rawQuery = ''] = url.split('?', 2);
+        const path = rawPath.toLowerCase();
+        const tokenPart = rawQuery.split('&').find((part) => part.startsWith('token='));
+        const token = tokenPart ? decodeURIComponent(tokenPart.slice('token='.length)) : null;
+        if (token) setAuthToken(token);
+        if (path.includes('reset')) {
+          setRoute('auth.resetPassword');
+        } else if (path.includes('verify') || path.includes('confirm')) {
+          setRoute('auth.verifyEmail');
+        }
+      } catch {
+        // A malformed deep link falls back to manual token entry.
+      }
+    };
+    void Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, []);
 
   const ScreenComponent = screenComponents[route];
 
@@ -103,6 +131,7 @@ export function MobileNavigator() {
             navigation={navigation}
             role={role}
             selectedThesisTopicId={selectedThesisTopicId}
+            authToken={authToken}
           />
           {hasActiveSession ? (
             <BottomNavigation

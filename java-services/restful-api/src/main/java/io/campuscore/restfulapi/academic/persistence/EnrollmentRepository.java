@@ -19,6 +19,10 @@ public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, St
     Optional<EnrollmentEntity> findLockedById(String id);
 
     @Lock(LockModeType.PESSIMISTIC_WRITE)
+    @Query("select e from EnrollmentEntity e where e.sectionId = :sectionId order by e.id")
+    List<EnrollmentEntity> findLockedBySectionId(@Param("sectionId") String sectionId);
+
+    @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select e from EnrollmentEntity e where e.studentId = :studentId and e.semesterId = :semesterId and e.status in :statuses order by e.id")
     List<EnrollmentEntity> findLockedStudentEnrollments(@Param("studentId") String studentId,
                                                          @Param("semesterId") String semesterId,

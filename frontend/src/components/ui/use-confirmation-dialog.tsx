@@ -51,5 +51,6 @@ export function useConfirmationDialog() {
   return {
     confirm,
     confirmationDialog: dialog,
+    isOpen: Boolean(options),
   };
 }

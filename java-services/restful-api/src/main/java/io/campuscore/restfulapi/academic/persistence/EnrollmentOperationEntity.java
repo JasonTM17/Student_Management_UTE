@@ -6,6 +6,8 @@ import jakarta.persistence.Id;
 import jakarta.persistence.Table;
 import jakarta.persistence.Version;
 import java.time.Instant;
+import org.hibernate.annotations.JdbcTypeCode;
+import org.hibernate.type.SqlTypes;
 
 @Entity
 @Table(name = "EnrollmentOperation", schema = "academic")
@@ -13,7 +15,9 @@ public class EnrollmentOperationEntity {
     @Id private String id;
     @Column(name = "studentId", nullable = false) private String studentId;
     @Column(name = "idempotencyKey", nullable = false) private String idempotencyKey;
-    @Column(name = "canonicalRequestHash", nullable = false, length = 64) private String canonicalRequestHash;
+    @Column(name = "canonicalRequestHash", nullable = false, columnDefinition = "char(64)")
+    @JdbcTypeCode(SqlTypes.CHAR)
+    private String canonicalRequestHash;
     @Column(name = "operationType", nullable = false, length = 20) private String operationType;
     @Column(name = "state", nullable = false, length = 40) private String state;
     @Column(name = "responseStatus") private Integer responseStatus;

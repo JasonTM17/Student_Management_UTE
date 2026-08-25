@@ -18,7 +18,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class AuthRateLimitRepository {
 
-    private static final String TABLE = "\"auth\".\"AuthRateLimitBucket\"";
+    private static final String TABLE = "\"campuscore_auth\".\"AuthRateLimitBucket\"";
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean postgres;
     private final ConcurrentHashMap<String, Object> localLocks = new ConcurrentHashMap<>();

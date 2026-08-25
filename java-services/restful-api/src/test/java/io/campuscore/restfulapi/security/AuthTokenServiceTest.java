@@ -39,6 +39,7 @@ class AuthTokenServiceTest {
                 "Student",
                 "One",
                 "ACTIVE",
+                true,
                 List.of("STUDENT"),
                 List.of("thesis:read"),
                 "student-1",
@@ -48,6 +49,7 @@ class AuthTokenServiceTest {
         Jwt decoded = config.jwtDecoder(SECRET).decode(issued.accessToken());
         assertEquals("user-1", decoded.getSubject());
         assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
+        assertEquals(true, decoded.getClaim("emailVerified"));
         assertEquals(List.of("STUDENT"), decoded.getClaimAsStringList("roles"));
         assertEquals(List.of("thesis:read"), decoded.getClaimAsStringList("permissions"));
         assertEquals("student-1", decoded.getClaimAsString("studentId"));
@@ -77,6 +79,7 @@ class AuthTokenServiceTest {
                 "Student",
                 "One",
                 "ACTIVE",
+                true,
                 List.of("STUDENT"),
                 List.of("thesis:read"),
                 "student-1",
@@ -110,6 +113,7 @@ class AuthTokenServiceTest {
                 null,
                 null,
                 "ACTIVE",
+                true,
                 List.of("STUDENT"),
                 List.of(),
                 null,
@@ -122,6 +126,7 @@ class AuthTokenServiceTest {
                 null,
                 null,
                 "ACTIVE",
+                true,
                 List.of("STUDENT", " "),
                 List.of(),
                 null,
