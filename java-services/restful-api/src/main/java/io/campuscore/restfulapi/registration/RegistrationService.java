@@ -153,7 +153,7 @@ public class RegistrationService {
     public EnrollmentPage enrollments(String studentId, String semesterId, String cursor, int limit) {
         int safeLimit = Math.min(Math.max(limit <= 0 ? 50 : limit, 1), MAX_LIMIT);
         int offset = decodeCursor(cursor);
-        List<Map<String, Object>> rows = jdbc.queryForList("SELECT e.\"id\",e.\"sectionId\",e.\"semesterId\",e.\"status\",e.\"enrolledAt\" FROM academic.\"Enrollment\" e WHERE e.\"studentId\"=:studentId"
+        List<Map<String, Object>> rows = jdbc.queryForList("SELECT e.\"id\",e.\"sectionId\",e.\"semesterId\",e.\"roundId\",e.\"status\",e.\"enrolledAt\" FROM academic.\"Enrollment\" e WHERE e.\"studentId\"=:studentId"
                 + (semesterId == null ? "" : " AND e.\"semesterId\"=:semesterId") + " ORDER BY e.\"enrolledAt\" DESC,e.\"id\" LIMIT :limit OFFSET :offset",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("limit", safeLimit + 1).addValue("offset", offset)
                         .addValue("semesterId", semesterId));
@@ -182,15 +182,15 @@ public class RegistrationService {
         if (!violations.isEmpty()) throw rejection(violations.get(0), violations);
         Instant now = clock.instant();
         String enrollmentId = UUID.randomUUID().toString();
-        enrollmentRepository.save(EnrollmentEntity.enrolled(enrollmentId, studentId, request.sectionId(), round.semesterId(), now));
+        enrollmentRepository.save(EnrollmentEntity.enrolled(enrollmentId, studentId, request.sectionId(), round.semesterId(), round.id(), now));
         try {
             lockedSection.incrementEnrollment();
         } catch (IllegalStateException capacityFailure) {
             throw capacityProblem(capacityFailure.getMessage());
         }
         sectionRepository.saveAndFlush(lockedSection);
-        EnrollmentView persisted = enrollment(Map.of("id", enrollmentId, "sectionId", request.sectionId(), "semesterId", round.semesterId(), "status", "ENROLLED", "enrolledAt", now), studentId);
-        EnrollmentView response = new EnrollmentView(persisted.id(), persisted.sectionId(), request.roundId(), persisted.status(), persisted.enrolledAt(), persisted.section());
+        EnrollmentView persisted = enrollment(Map.of("id", enrollmentId, "sectionId", request.sectionId(), "semesterId", round.semesterId(), "roundId", round.id(), "status", "ENROLLED", "enrolledAt", now), studentId);
+        EnrollmentView response = new EnrollmentView(persisted.id(), persisted.sectionId(), round.id(), persisted.status(), persisted.enrolledAt(), persisted.section());
         completeOperation(operation, response, 201);
         auditRepository.save(EnrollmentAuditEntity.of(UUID.randomUUID().toString(), operation.getId(), studentId, request.sectionId(), "ENROLL", "ENROLLED", now));
         return new MutationResult(response, false);
@@ -209,7 +209,7 @@ public class RegistrationService {
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found"));
         if (!studentId.equals(previewEnrollment.getStudentId())) throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_NOT_OWNER", "Enrollment does not belong to the current student");
         String hash = sha256("DROP|" + studentId + "|" + enrollmentId);
-        RoundView candidateRound = roundForSemester(previewEnrollment.getSemesterId());
+        RoundView candidateRound = round(previewEnrollment.getRoundId());
         OperationReservation reservation = reserveOperation(studentId, key, hash, "DROP");
         if (reservation.replay() != null) return new DropResult(enrollmentId, true);
         MutationLocks locks = lockMutation(candidateRound.id(), previewEnrollment.getSectionId(), studentId);
@@ -251,7 +251,7 @@ public class RegistrationService {
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found"));
         String studentId = previewEnrollment.getStudentId();
         String hash = sha256("DROP_ADMIN|" + studentId + "|" + enrollmentId);
-        RoundView candidateRound = roundForSemester(previewEnrollment.getSemesterId());
+        RoundView candidateRound = round(previewEnrollment.getRoundId());
         OperationReservation reservation = reserveOperation(studentId, key, hash, "DROP");
         if (reservation.replay() != null) return new DropResult(enrollmentId, true);
         MutationLocks locks = lockMutation(candidateRound.id(), previewEnrollment.getSectionId(), studentId);
@@ -290,7 +290,12 @@ public class RegistrationService {
             return storedSlip(stored.get());
         }
         Instant generatedAt = clock.instant();
-        List<EnrollmentView> enrollments = enrollments(studentId, round.semesterId(), null, MAX_LIMIT).items().stream()
+        List<Map<String, Object>> roundRows = jdbc.queryForList(
+                "SELECT e.\"id\",e.\"sectionId\",e.\"semesterId\",e.\"roundId\",e.\"status\",e.\"enrolledAt\" "
+                        + "FROM academic.\"Enrollment\" e WHERE e.\"studentId\"=:studentId AND e.\"roundId\"=:roundId "
+                        + "ORDER BY e.\"enrolledAt\" DESC,e.\"id\" LIMIT :limit",
+                new MapSqlParameterSource().addValue("studentId", studentId).addValue("roundId", round.id()).addValue("limit", MAX_LIMIT));
+        List<EnrollmentView> enrollments = roundRows.stream().map(row -> enrollment(row, studentId))
                 .filter(enrollment -> isActiveEnrollmentStatus(enrollment.status()))
                 .toList();
         String canonical = canonicalSlip(studentId, round, enrollments, generatedAt);
@@ -298,7 +303,11 @@ public class RegistrationService {
         String checksum = sha256(pdf);
         String encodedPdf = Base64.getEncoder().encodeToString(pdf);
         if (stored.isEmpty()) {
-            mutationGateway.insertSlipIfAbsent(studentId + "-" + roundId, studentId, roundId,
+            // The natural key can be longer than the schema's bounded id column
+            // (both student and round identifiers are user/seed controlled).
+            // Keep idempotency on (studentId, roundId), but use a deterministic
+            // fixed-width surrogate for the physical primary key.
+            mutationGateway.insertSlipIfAbsent(slipId(studentId, roundId), studentId, roundId,
                     checksum, encodedPdf, generatedAt);
             RegistrationSlipEntity winner = slipRepository.findLockedByStudentIdAndRoundId(studentId, roundId)
                     .orElseThrow(() -> new IllegalStateException("Registration slip insert was not visible"));
@@ -442,7 +451,7 @@ public class RegistrationService {
         SectionView section = sectionsForId(String.valueOf(row.get("sectionId")), studentId);
         Object at = row.get("enrolledAt");
         Instant enrolledAt = at instanceof Timestamp t ? t.toInstant() : at instanceof Instant i ? i : clock.instant();
-        return new EnrollmentView(String.valueOf(row.get("id")), String.valueOf(row.get("sectionId")), String.valueOf(row.get("semesterId")), String.valueOf(row.get("status")), enrolledAt, section);
+        return new EnrollmentView(String.valueOf(row.get("id")), String.valueOf(row.get("sectionId")), String.valueOf(row.get("roundId")), String.valueOf(row.get("status")), enrolledAt, section);
     }
 
     private SectionView sectionsForId(String id, String studentId) { return jdbc.query("SELECT s.\"id\",s.\"courseId\",c.\"code\",c.\"name\",c.\"credits\",s.\"sectionNumber\",s.\"capacity\",s.\"enrolledCount\",s.\"status\",coalesce(trim(u.\"firstName\"||' '||u.\"lastName\"),'') lecturer_name,coalesce(cl.\"building\"||' '||cl.\"roomNumber\",'') classroom FROM academic.\"Section\" s JOIN academic.\"Course\" c ON c.\"id\"=s.\"courseId\" LEFT JOIN academic.\"Lecturer\" l ON l.\"id\"=s.\"lecturerId\" LEFT JOIN campuscore_auth.\"User\" u ON u.\"id\"=l.\"userId\" LEFT JOIN academic.\"Classroom\" cl ON cl.\"id\"=s.\"classroomId\" WHERE s.\"id\"=:id", new MapSqlParameterSource("id", id), (rs,n)->section(rs,true)).stream().findFirst().orElseThrow(); }
@@ -461,7 +470,6 @@ public class RegistrationService {
         return new MutationLocks(round, section);
     }
     private RoundView roundView(RegistrationRoundEntity r) { return new RoundView(r.getId(), r.getSemesterId(), r.getStatus(), r.getRegistrationStart(), r.getRegistrationEnd(), r.getAddDropStart(), r.getAddDropEnd(), clock.instant(), r.getInstitutionTimeZone(), r.getMaxCredits(), r.getVersion()); }
-    private RoundView roundForSemester(String semester) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"RegistrationRound\" r WHERE r.\"semesterId\"=:semester ORDER BY r.\"registrationStart\" DESC", new MapSqlParameterSource("semester", semester), roundMapper()).stream().findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found")); }
     private RoundView roundForSection(String sectionId) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"Section\" s JOIN academic.\"RegistrationRound\" r ON r.\"semesterId\"=s.\"semesterId\" WHERE s.\"id\"=:sectionId ORDER BY CASE WHEN upper(r.\"status\")='OPEN' THEN 0 ELSE 1 END,r.\"registrationStart\" DESC,r.\"id\"", new MapSqlParameterSource("sectionId", sectionId), roundMapper()).stream().findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found for section")); }
     private void requireStudent(String id) { if (id == null || id.isBlank()) throw problem(HttpStatus.FORBIDDEN,"STUDENT_PROFILE_REQUIRED","Student profile is required"); }
     private OperationReservation reserveOperation(String studentId, UUID key, String hash, String type) {
@@ -482,13 +490,23 @@ public class RegistrationService {
         return new OperationReservation(operation, null);
     }
     private void completeOperation(EnrollmentOperationEntity operation, Object body, int status) { try { operation.complete(status, mapper.writeValueAsString(body), clock.instant()); operationRepository.save(operation); } catch(JsonProcessingException e){ throw new IllegalStateException(e); } }
-    private void lockStudentEnrollments(String studentId, String semesterId) { enrollmentRepository.findLockedStudentEnrollments(studentId, semesterId, List.of("ACTIVE", "ENROLLED", "PENDING", "CONFIRMED")); }
+    private void lockStudentEnrollments(String studentId, String semesterId) {
+        List<String> lockedStudents = enrollmentRepository.findLockedStudent(studentId);
+        if (lockedStudents == null || lockedStudents.isEmpty()) {
+            throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
+        }
+        enrollmentRepository.findLockedStudentEnrollments(studentId, semesterId,
+                List.of("ACTIVE", "ENROLLED", "PENDING", "CONFIRMED"));
+    }
     private EnrollmentView replay(ExistingOperation existing, String studentId) { try { return mapper.readValue(existing.body(), EnrollmentView.class); } catch(Exception e){ throw new RegistrationProblemException(HttpStatus.CONFLICT,"REQUEST_IN_PROGRESS","Stored result could not be replayed",true,List.of()); } }
     private org.springframework.jdbc.core.RowMapper<RoundView> roundMapper() { return (rs,n)->new RoundView(rs.getString("id"),rs.getString("semesterId"),rs.getString("status"),rs.getTimestamp("registrationStart").toInstant(),rs.getTimestamp("registrationEnd").toInstant(),rs.getTimestamp("addDropStart").toInstant(),rs.getTimestamp("addDropEnd").toInstant(),clock.instant(),rs.getString("institutionTimeZone"),rs.getInt("maxCredits"),rs.getLong("version")); }
     private static String required(String value,String name){if(value==null||value.isBlank())throw new IllegalArgumentException(name+" is required");return value.trim();}
     private static int decodeCursor(String c){if(c==null||c.isBlank())return 0;try{return Integer.parseInt(new String(Base64.getUrlDecoder().decode(c),StandardCharsets.UTF_8));}catch(Exception e){throw new IllegalArgumentException("cursor is invalid");}}
     private static String encodeCursor(int n){return Base64.getUrlEncoder().withoutPadding().encodeToString(String.valueOf(n).getBytes(StandardCharsets.UTF_8));}
     private static String canonicalHash(String op,String student,EnrollmentRequest r){return sha256(op+"|"+student+"|"+r.roundId().trim()+"|"+r.sectionId().trim());}
+    private static String slipId(String studentId, String roundId) {
+        return sha256("REGISTRATION_SLIP|" + studentId + "|" + roundId);
+    }
     private static String sha256(String text){try{byte[] d=MessageDigest.getInstance("SHA-256").digest(text.getBytes(StandardCharsets.UTF_8));StringBuilder s=new StringBuilder();for(byte b:d)s.append(String.format("%02x",b));return s.toString();}catch(Exception e){throw new IllegalStateException(e);}}
     private static String sha256(byte[] value){try{return java.util.HexFormat.of().formatHex(MessageDigest.getInstance("SHA-256").digest(value));}catch(Exception e){throw new IllegalStateException(e);}}
     private static RegistrationProblemException problem(HttpStatus s,String c,String m){return new RegistrationProblemException(s,c,m);}

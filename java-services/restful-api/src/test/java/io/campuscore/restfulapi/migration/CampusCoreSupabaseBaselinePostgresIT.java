@@ -14,7 +14,7 @@ import org.flywaydb.core.Flyway;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 
-/** PostgreSQL proof that the hosted baseline is V20-equivalent and data-minimal. */
+/** PostgreSQL proof that the hosted baseline is V21-equivalent and data-minimal. */
 class CampusCoreSupabaseBaselinePostgresIT {
 
     private static final String APPLICATION_SCHEMAS =
@@ -26,7 +26,7 @@ class CampusCoreSupabaseBaselinePostgresIT {
     @EnabledIfEnvironmentVariable(
             named = "CAMPUSCORE_SUPABASE_SOURCE_POSTGRES_URL",
             matches = "jdbc:postgresql:.+")
-    void baselineMatchesFreshV20WithoutTouchingManagedSchemasOrCopyingRows() throws Exception {
+    void baselineMatchesFreshV21WithoutTouchingManagedSchemasOrCopyingRows() throws Exception {
         String sourceUrl = System.getenv("CAMPUSCORE_SUPABASE_SOURCE_POSTGRES_URL");
         String baselineUrl = required("CAMPUSCORE_SUPABASE_BASELINE_POSTGRES_URL");
         String user = valueOr("CAMPUSCORE_SUPABASE_POSTGRES_USER", "postgres");
@@ -39,7 +39,7 @@ class CampusCoreSupabaseBaselinePostgresIT {
         List<String> sourceSignature;
         try (Connection connection = DriverManager.getConnection(sourceUrl, user, password)) {
             sourceSignature = signature(connection, APPLICATION_SCHEMAS);
-            assertEquals("20", scalar(connection,
+            assertEquals("21", scalar(connection,
                     "SELECT version FROM thesis.flyway_schema_history"
                             + " WHERE success ORDER BY installed_rank DESC LIMIT 1"));
         }
@@ -66,9 +66,12 @@ class CampusCoreSupabaseBaselinePostgresIT {
             assertEquals("1", scalar(connection,
                     "SELECT COUNT(*)::text FROM thesis.flyway_schema_history"
                             + " WHERE version='20' AND type='SQL_BASELINE' AND success"));
+            assertEquals("1", scalar(connection,
+                    "SELECT COUNT(*)::text FROM thesis.flyway_schema_history"
+                            + " WHERE version='21' AND type='SQL' AND success"));
             assertEquals("0", scalar(connection,
                     "SELECT COUNT(*)::text FROM thesis.flyway_schema_history"
-                            + " WHERE version IS NOT NULL AND version <> '20'"));
+                            + " WHERE version IS NOT NULL AND version NOT IN ('20','21')"));
             assertEquals(0L, totalApplicationRows(connection));
             assertEquals("0", scalar(connection,
                     "SELECT COUNT(*)::text FROM information_schema.tables"

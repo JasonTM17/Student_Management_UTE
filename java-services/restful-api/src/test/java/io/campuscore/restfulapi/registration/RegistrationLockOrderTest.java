@@ -57,6 +57,7 @@ class RegistrationLockOrderTest {
                 .thenReturn(Optional.of(operation));
         when(rounds.findLockedById("round-1")).thenReturn(Optional.of(round));
         when(sections.findLockedById("section-1")).thenReturn(Optional.of(section));
+        when(enrollments.findLockedStudent("student-1")).thenReturn(List.of("student-1"));
         when(enrollments.findLockedStudentEnrollments(eq("student-1"), eq("semester-1"), any()))
                 .thenReturn(List.of());
 

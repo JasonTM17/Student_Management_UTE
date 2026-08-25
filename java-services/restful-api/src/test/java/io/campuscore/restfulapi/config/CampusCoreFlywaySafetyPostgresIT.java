@@ -26,7 +26,7 @@ class CampusCoreFlywaySafetyPostgresIT {
 
     private static final List<String> SCHEMAS = List.of(
             "auth", "storage", "realtime", "supabase_migrations", "campuscore_auth",
-            "academic", "assistant", "engagement", "notifications", "thesis");
+            "academic", "assistant", "engagement", "notifications", "shadow_history", "thesis");
 
     @BeforeEach
     void prepareDisposableDatabase() throws Exception {
@@ -89,10 +89,10 @@ class CampusCoreFlywaySafetyPostgresIT {
         resetSchemas();
         Flyway local = configuredFlyway();
         local.migrate();
-        assertThat(local.info().current().getVersion().getVersion()).isEqualTo("20");
+        assertThat(local.info().current().getVersion().getVersion()).isEqualTo("21");
         assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
         assertThatThrownBy(() -> configuredBaseline().migrate())
-                .hasMessageContaining("only valid for a new target");
+                .hasMessageContaining("exact Flyway schema marker and B20 history");
 
         // A marker introduced after an existing V20 history is still blocked
         // before validation; no lower-version V0 migration is required.
@@ -112,6 +112,52 @@ class CampusCoreFlywaySafetyPostgresIT {
         assertThat(existing.validateWithResult().validationSuccessful).isTrue();
     }
 
+    @Test
+    void versionlessRepeatableHistoryIsRejectedBeforeBaselineEvenWhenValidationIsDisabled() throws Exception {
+        configuredRepeatable().migrate();
+
+        assertThat(CampusCoreFlywaySafetyConfiguration.inspectHostedHistory(dataSource()))
+                .isEqualTo(CampusCoreFlywaySafetyConfiguration.HostedHistoryState.INCOMPATIBLE);
+        assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
+        assertThatThrownBy(() -> configuredBaseline(false).migrate())
+                .hasMessageContaining("exact Flyway schema marker and B20 history");
+        assertThat(schemaExists("academic")).isFalse();
+        assertThat(schemaExists("assistant")).isFalse();
+    }
+
+    @Test
+    void checksumMismatchAndPreExistingApplicationObjectsAreRejectedFailClosed() throws Exception {
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("CREATE SCHEMA academic");
+            statement.execute("CREATE TABLE academic.preexisting_marker (id INTEGER PRIMARY KEY)");
+        }
+        assertThatThrownBy(() -> configuredBaseline(false).migrate())
+                .hasMessageContaining("pre-existing application objects");
+
+        resetSchemas();
+        configuredBaseline().migrate();
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("UPDATE thesis.flyway_schema_history SET checksum = 7 WHERE version = '20'");
+        }
+        assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
+        assertThatThrownBy(() -> configuredBaseline(false).migrate())
+                .hasMessageContaining("exact Flyway schema marker and B20 history");
+    }
+
+    @Test
+    void duplicateFlywayHistoryTablesAreRejectedBeforeBaselineValidation() throws Exception {
+        configuredBaseline(false).migrate();
+        try (Connection connection = connection(); Statement statement = connection.createStatement()) {
+            statement.execute("CREATE SCHEMA shadow_history");
+            statement.execute("CREATE TABLE shadow_history.flyway_schema_history (LIKE thesis.flyway_schema_history INCLUDING ALL)");
+        }
+
+        assertThat(CampusCoreFlywaySafetyConfiguration.inspectHostedHistory(dataSource()))
+                .isEqualTo(CampusCoreFlywaySafetyConfiguration.HostedHistoryState.INCOMPATIBLE);
+        assertThatThrownBy(() -> configuredBaseline(false).migrate())
+                .hasMessageContaining("exactly one Flyway history table");
+    }
+
     private static Flyway configuredFlyway() {
         return Flyway.configure()
                 .dataSource(dataSource())
@@ -124,6 +170,10 @@ class CampusCoreFlywaySafetyPostgresIT {
     }
 
     private static Flyway configuredBaseline() {
+        return configuredBaseline(true);
+    }
+
+    private static Flyway configuredBaseline(boolean validateOnMigrate) {
         return Flyway.configure()
                 .dataSource(dataSource())
                 .locations("classpath:db/supabase-baseline")
@@ -131,7 +181,29 @@ class CampusCoreFlywaySafetyPostgresIT {
                 .defaultSchema("thesis")
                 .schemas("thesis")
                 .cleanDisabled(true)
+                .validateOnMigrate(validateOnMigrate)
                 .load();
+    }
+
+    private static Flyway configuredRepeatable() {
+        return Flyway.configure()
+                .dataSource(dataSource())
+                .locations("classpath:db/flyway-safety-repeatable")
+                .createSchemas(true)
+                .defaultSchema("thesis")
+                .schemas("thesis")
+                .cleanDisabled(true)
+                .load();
+    }
+
+    private static boolean schemaExists(String schema) throws Exception {
+        try (Connection connection = connection(); var statement = connection.prepareStatement(
+                "SELECT EXISTS (SELECT 1 FROM pg_namespace WHERE nspname = ?)")) {
+            statement.setString(1, schema);
+            try (var result = statement.executeQuery()) {
+                return result.next() && result.getBoolean(1);
+            }
+        }
     }
 
     private static DriverManagerDataSource dataSource() {

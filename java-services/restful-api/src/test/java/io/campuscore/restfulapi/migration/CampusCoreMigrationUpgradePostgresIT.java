@@ -22,7 +22,7 @@ class CampusCoreMigrationUpgradePostgresIT {
 
     @Test
     @EnabledIfEnvironmentVariable(named = "CAMPUSCORE_UPGRADE_V12_POSTGRES_URL", matches = "jdbc:postgresql:.+")
-    void recordedV12UpgradesToV20AndPreservesAssistantData() throws Exception {
+    void recordedV12UpgradesToV21AndPreservesAssistantData() throws Exception {
         String url = System.getenv("CAMPUSCORE_UPGRADE_V12_POSTGRES_URL");
         String user = valueOr("CAMPUSCORE_UPGRADE_POSTGRES_USER", "postgres");
         String password = valueOr("CAMPUSCORE_UPGRADE_POSTGRES_PASSWORD", "postgres");
@@ -52,7 +52,7 @@ class CampusCoreMigrationUpgradePostgresIT {
         assertTrue(latest.validateWithResult().validationSuccessful);
 
         try (Connection connection = DriverManager.getConnection(url, user, password)) {
-            assertEquals("20", currentVersion(connection));
+            assertEquals("21", currentVersion(connection));
             assertEquals(v12Checksum, checksum(connection, "12"));
             assertEquals("1", scalar(connection,
                     "SELECT COUNT(*)::text FROM assistant.chat_conversation WHERE id='" + conversationId + "'"));
@@ -62,7 +62,7 @@ class CampusCoreMigrationUpgradePostgresIT {
 
     @Test
     @EnabledIfEnvironmentVariable(named = "CAMPUSCORE_UPGRADE_V18_POSTGRES_URL", matches = "jdbc:postgresql:.+")
-    void recordedV18UpgradesToV20AndBackfillsTrustedActiveAccounts() throws Exception {
+    void recordedV18UpgradesToV21AndBackfillsTrustedActiveAccounts() throws Exception {
         String url = System.getenv("CAMPUSCORE_UPGRADE_V18_POSTGRES_URL");
         String user = valueOr("CAMPUSCORE_UPGRADE_POSTGRES_USER", "postgres");
         String password = valueOr("CAMPUSCORE_UPGRADE_POSTGRES_PASSWORD", "postgres");
@@ -83,7 +83,7 @@ class CampusCoreMigrationUpgradePostgresIT {
         assertTrue(latest.validateWithResult().validationSuccessful);
 
         try (Connection connection = DriverManager.getConnection(url, user, password)) {
-            assertEquals("20", currentVersion(connection));
+            assertEquals("21", currentVersion(connection));
             assertEquals(v18Checksum, checksum(connection, "18"));
             assertEquals("true", scalar(connection,
                     "SELECT \"emailVerified\"::text FROM campuscore_auth.\"User\" WHERE \"id\"='student-user'"));
