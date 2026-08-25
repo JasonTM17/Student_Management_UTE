@@ -95,6 +95,7 @@ destructive cleanup without an exact authorized target.
 | 6 | Consolidation and docs | Runtime scan shows one API + PostgreSQL; docs/OpenAPI/CI match implementation | completed |
 | 6A | Supabase `Student_Management` synchronization | Exact project and remote backup/drift are verified; compatible reviewed migrations/data are applied and queried without copying volatile/security data | completed |
 | 7 | Independent review and handoff | Exact-head reviews, focused/full gates, split commits and branch push complete | pending |
+| 8 | Container/package and repository publication | Immutable Docker Hub images, verified digests, GitHub About/Release/package links, safe merge and branch cleanup complete | pending |
 
 ## Public contract
 
@@ -170,5 +171,29 @@ create, alter or grant against managed `auth`, `storage`, `realtime` or
 `supabase_migrations`. Remote rollback requires a verified backup/restore point
 and migration manifest. B20 is schema-only and a separate reference-data
 allowlist defaults to empty; Spring remains the authentication authority.
+
+## User extension: container, GitHub metadata, merge and cleanup (2026-08-25)
+
+After every mandatory local, remote and review gate above is PASS, the
+integration owner will:
+
+1. Build backend and frontend images from the final exact SHA with immutable
+   version tags (never rely on a `latest`-only publication), run container
+   health/smoke checks, and push only the explicitly authorized Docker Hub
+   repositories.
+2. Verify Docker Hub login presence without printing credentials, record pushed
+   tag digests, and distinguish registry publication from deployment.
+3. Update GitHub About metadata, create a release tied to the final archive tag
+   and SHA, and attach/link the published Docker packages. If repository-admin
+   credentials are unavailable, record `NOT_RUN` rather than fabricating a
+   release.
+4. Create an archive tag, preserve dirty `main` on a named WIP branch, merge the
+   candidate through a clean integration worktree, and compare dirty-content
+   and index identities before and after. Never merge directly into the dirty
+   checkout.
+5. Delete only the merged local candidate branch and its disposable worktree
+   after the archive tag, clean status, exact merge proof and no active owner
+   are confirmed. Do not delete remote branches, user WIP, Docker volumes,
+   credentials or unrelated containers/images.
 
 <!-- slug: campuscore-java25-jpa-enrollment -->
