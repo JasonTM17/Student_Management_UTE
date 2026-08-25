@@ -58,3 +58,9 @@ available.
 See the operator runbook at
 `docs/integrations/supabase-database.md` for the guarded procedure and
 secret-handling rules.
+
+The hosted apply was executed from the sync SHA recorded in `manifest.json`.
+That manifest also records the later auth-hardening SHA and confirms that the
+V20/B20 schema artifact and external hashes are unchanged. The commit carrying
+this evidence update is a documentation-only descendant of that hardening
+SHA; verify the ancestry with `git merge-base` before relying on the bundle.
