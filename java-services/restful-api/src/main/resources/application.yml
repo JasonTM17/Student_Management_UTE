@@ -1,10 +1,20 @@
 spring:
   application:
     name: campuscore-restful-api
+  mail:
+    host: ${SPRING_MAIL_HOST:localhost}
+    port: ${SPRING_MAIL_PORT:1025}
+    username: ${SPRING_MAIL_USERNAME:}
+    password: ${SPRING_MAIL_PASSWORD:}
+    properties:
+      mail.smtp.auth: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:false}
+      mail.smtp.starttls.enable: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:false}
   main:
     banner-mode: off
   mvc:
     throw-exception-if-no-handler-found: true
+  web:
+    locale: vi
   autoconfigure:
     exclude:
       - org.springframework.boot.autoconfigure.jdbc.DataSourceAutoConfiguration
@@ -31,6 +41,19 @@ security:
   csrf-cookie: ${CSRF_COOKIE:cc_csrf}
   csrf-header: ${CSRF_HEADER:X-CSRF-Token}
   cookie-secure: ${COOKIE_SECURE:false}
+
+mail:
+  enabled: ${MAIL_ENABLED:false}
+  from: ${MAIL_FROM:no-reply@campuscore.local}
+
+auth:
+  frontend-base-url: ${AUTH_FRONTEND_BASE_URL:http://localhost:3000}
+  lifecycle:
+    verification-ttl-seconds: ${AUTH_VERIFICATION_TTL_SECONDS:86400}
+    password-reset-ttl-seconds: ${AUTH_PASSWORD_RESET_TTL_SECONDS:1800}
+    resend-cooldown-seconds: ${AUTH_RESEND_COOLDOWN_SECONDS:60}
+    max-challenge-attempts: ${AUTH_MAX_CHALLENGE_ATTEMPTS:5}
+    max-requests-per-day: ${AUTH_MAX_REQUESTS_PER_DAY:5}
 
 health:
   readiness-key: ${HEALTH_READINESS_KEY:}

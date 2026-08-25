@@ -25,6 +25,9 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
         if (bearerToken != null) {
             return bearerToken;
         }
+        if (isPublicLifecycleRequest(request)) {
+            return null;
+        }
 
         Cookie[] cookies = request.getCookies();
         if (cookies == null) {
@@ -37,5 +40,20 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
             }
         }
         return null;
+    }
+
+    private static boolean isPublicLifecycleRequest(HttpServletRequest request) {
+        if (!"POST".equals(request.getMethod())) {
+            return false;
+        }
+        String path = request.getRequestURI();
+        return path.equals("/api/v1/auth/register")
+                || path.startsWith("/api/v1/auth/email-verifications/")
+                || path.equals("/api/v1/auth/password-reset-requests")
+                || path.equals("/api/v1/auth/password-reset/confirm")
+                || path.equals("/api/v1/auth/verify-email")
+                || path.equals("/api/v1/auth/resend-verification")
+                || path.equals("/api/v1/auth/forgot-password")
+                || path.equals("/api/v1/auth/reset-password");
     }
 }

@@ -44,7 +44,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -62,7 +62,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -94,7 +94,8 @@ public class AuthUserRepository {
                         + " \"phone\", \"gender\", \"dateOfBirth\", \"address\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (:id, :email, :password, :firstName, :lastName, :phone, :gender,"
-                        + " :dateOfBirth, :address, 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " :dateOfBirth, :address, 'PENDING_VERIFICATION', FALSE, FALSE, 0,"
+                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 parameters);
 
         String roleId = jdbc.query(
@@ -144,7 +145,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + SESSION_TABLE + " se"
@@ -181,6 +182,16 @@ public class AuthUserRepository {
                 new MapSqlParameterSource()
                         .addValue("id", userId)
                         .addValue("loggedInAt", localDateTime(loggedInAt)));
+    }
+
+    public void markEmailVerified(String userId, Instant verifiedAt) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE
+                        + " SET \"emailVerified\" = TRUE, \"status\" = 'ACTIVE', \"updatedAt\" = :verifiedAt"
+                        + " WHERE \"id\" = :userId AND \"emailVerified\" = FALSE",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("verifiedAt", localDateTime(verifiedAt)));
     }
 
     public void replaceRefreshSession(
@@ -270,6 +281,22 @@ public class AuthUserRepository {
                         .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
     }
 
+    public void resetPassword(String userId, String passwordHash, Instant passwordChangedAt) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE
+                        + " SET \"password\" = :password,"
+                        + " \"passwordChangedAt\" = :passwordChangedAt,"
+                        + " \"refreshToken\" = NULL,"
+                        + " \"failedLoginAttempts\" = 0,"
+                        + " \"lockedUntil\" = NULL,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                new MapSqlParameterSource()
+                        .addValue("userId", userId)
+                        .addValue("password", passwordHash)
+                        .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
+    }
+
     private List<String> findRoles(String userId) {
         return jdbc.queryForList(
                 "SELECT r.\"name\""
@@ -307,6 +334,7 @@ public class AuthUserRepository {
                 resultSet.getString("address"),
                 resultSet.getString("avatar"),
                 resultSet.getString("status"),
+                resultSet.getBoolean("emailVerified"),
                 resultSet.getInt("failedLoginAttempts"),
                 instant(resultSet.getTimestamp("lockedUntil")),
                 instant(resultSet.getTimestamp("createdAt")),
@@ -346,6 +374,7 @@ public class AuthUserRepository {
             String address,
             String avatar,
             String status,
+            boolean emailVerified,
             int failedLoginAttempts,
             Instant lockedUntil,
             Instant createdAt,
@@ -368,6 +397,7 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
+                    emailVerified,
                     failedLoginAttempts,
                     lockedUntil,
                     createdAt,
@@ -391,6 +421,7 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
+                    emailVerified,
                     createdAt,
                     roles,
                     permissions,
