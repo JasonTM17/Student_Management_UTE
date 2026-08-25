@@ -85,7 +85,11 @@ public class AuthLifecycleService {
         String token = required(request == null ? null : request.token(), "token");
         Challenge challenge = consumeValidChallenge(Purpose.EMAIL_VERIFICATION, token);
         AuthUserRecord user = users.findById(challenge.userId()).orElseThrow(this::invalidChallenge);
-        users.markEmailVerified(user.id(), clock.instant());
+        if (users.markEmailVerified(user.id(), clock.instant()) != 1) {
+            // A valid token must never reactivate an account disabled by an
+            // administrator (or transition an unexpected status).
+            throw invalidChallenge();
+        }
         return new MessageResponse(VERIFIED_MESSAGE);
     }
 

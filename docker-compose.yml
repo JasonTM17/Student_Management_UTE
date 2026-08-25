@@ -79,5 +79,29 @@ services:
       start_period: 20s
     restart: unless-stopped
 
+  web:
+    build:
+      context: .
+      dockerfile: frontend/Dockerfile
+    image: campuscore-frontend:local
+    environment:
+      NODE_ENV: production
+      PORT: 3000
+      HOSTNAME: 0.0.0.0
+      JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+    ports:
+      - "127.0.0.1:${FRONTEND_HOST_PORT:-3000}:3000"
+    depends_on:
+      restful-api:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O- http://localhost:3000/ >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 15s
+    restart: unless-stopped
+
 volumes:
   campuscore_restful_postgres_data:

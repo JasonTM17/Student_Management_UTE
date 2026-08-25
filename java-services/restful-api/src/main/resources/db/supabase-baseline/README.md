@@ -7,9 +7,9 @@ FLYWAY_LOCATIONS=classpath:db/supabase-baseline
 ```
 
 `B20__campuscore_supabase_baseline.sql` represents the schema after the normal
-V1 through V20 chain. On an empty hosted environment, Flyway resolves and
-applies only B20. Existing installations keep their V-history and use only
-`db/migration` to apply V20 normally.
+V1 through V20 chain. On an empty hosted environment, Flyway resolves B20 and
+then the explicitly reviewed V21 successor. Existing installations keep their
+V-history and use only `db/migration` to apply V21 normally.
 
 The application has a fail-closed safety strategy. Profile-independent
 `beforeValidate` and `beforeMigrate` callbacks reject any managed platform

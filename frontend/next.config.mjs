@@ -1,5 +1,3 @@
-const javaApiOrigin = (process.env.JAVA_API_ORIGIN || 'http://127.0.0.1:4010').replace(/\/$/, '');
-
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   reactStrictMode: true,
@@ -12,18 +10,10 @@ const nextConfig = {
   images: {
     unoptimized: true,
   },
-  async rewrites() {
-    return [
-      {
-        source: '/api/v1/:path*',
-        destination: `${javaApiOrigin}/api/v1/:path*`,
-      },
-      {
-        source: '/api/docs',
-        destination: `${javaApiOrigin}/api/docs`,
-      },
-    ];
-  },
+  // The `/api/v1` and `/api/docs` route handlers read JAVA_API_ORIGIN at
+  // request time. Keeping the origin out of build-time rewrites makes the
+  // standalone image portable across local, staging, and hosted networks.
+  // JAVA_API_ORIGIN is intentionally runtime-configured by the container.
   async headers() {
     const noReferrer = [
       { key: 'Referrer-Policy', value: 'no-referrer' },

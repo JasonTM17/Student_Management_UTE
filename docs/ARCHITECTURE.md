@@ -82,10 +82,11 @@ remain JDBC by deliberate compatibility scope; this plan does not claim a
 whole-domain JDBC removal.
 
 For a brand-new Supabase target, Flyway can add the opt-in schema-only B20
-baseline location. B20 creates only `campuscore_auth`, `academic`, `thesis`,
-`assistant`, `engagement` and `notifications`; it contains no seed, identity,
-session, challenge, assistant-history or test rows. Existing CampusCore
-databases keep their V-history and apply V20 normally. Remote synchronization
+baseline location followed by the reviewed V21 successor. B20 creates only
+`campuscore_auth`, `academic`, `thesis`, `assistant`, `engagement` and
+`notifications`; it contains no seed, identity, session, challenge,
+assistant-history or test rows. Existing CampusCore databases keep their
+V-history and apply V21 normally. Remote synchronization
 is a separate guarded operation, not a change of runtime authority or a
 production cutover.
 

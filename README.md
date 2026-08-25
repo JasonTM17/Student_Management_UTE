@@ -22,14 +22,15 @@ Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và m�
   lexical fallback và tùy chọn DeepSeek V4 Flash chỉ ở backend.
 
 Finance, analytics, support ticket, vector database, Redis, RabbitMQ, MinIO,
-Nginx, Kubernetes, Cloudflare tunnel và multi-image release không thuộc runtime
-của đồ án. DeepSeek là tích hợp tùy chọn, mặc định tắt và không cần để chạy
-local lexical fallback.
+Nginx, Kubernetes và Cloudflare tunnel không thuộc runtime của đồ án. Bản phát
+hành có thể đóng gói API và web thành hai image immutable; publication không
+đồng nghĩa production cutover. DeepSeek là tích hợp tùy chọn, mặc định tắt và
+không cần để chạy local lexical fallback.
 
 ## Chạy local
 
 ```powershell
-docker compose up -d --build postgres mailpit restful-api
+docker compose up -d --build postgres mailpit restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
@@ -48,9 +49,9 @@ password hoặc token vào repository. Xem
 [docs/integrations/auth-mail.md](docs/integrations/auth-mail.md).
 
 Auth của ứng dụng nằm trong schema riêng `campuscore_auth`; schema Supabase
-`auth` không bị CampusCore tạo hoặc sửa. Database Supabase mới chỉ dùng baseline
-schema-only `B20` sau khi đã xác minh đúng project, backup và drift; database
-local/cũ tiếp tục chạy chuỗi V1-V20. Xem
+`auth` không bị CampusCore tạo hoặc sửa. Database Supabase mới dùng baseline
+schema-only `B20` rồi successor `V21` sau khi đã xác minh đúng project, backup
+và drift; database local/cũ tiếp tục chạy chuỗi V1-V21. Xem
 [docs/integrations/supabase-database.md](docs/integrations/supabase-database.md).
 
 ### Java toolchain

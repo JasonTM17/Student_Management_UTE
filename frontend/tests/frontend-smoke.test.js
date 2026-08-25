@@ -56,6 +56,8 @@ test('the web client has one Java API boundary and no removed domain client', ()
   assert.match(apiSource, /AUTH_REFRESH_ROUTE_PATTERN[\s\S]*forgot-password[\s\S]*reset-password/);
   assert.doesNotMatch(nextConfig, /LOCAL_EDGE_ORIGIN|socket\.io|redis|rabbitmq/i);
   assert.match(nextConfig, /JAVA_API_ORIGIN/);
+  assert.doesNotMatch(nextConfig, /destination:\s*`\$\{javaApiOrigin\}/);
+  assert.match(read('src/app/api/v1/[...path]/route.ts'), /process\.env\.JAVA_API_ORIGIN/);
 });
 
 test('the Java API proxy preserves query parameters and encodes path segments', () => {

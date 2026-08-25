@@ -34,6 +34,11 @@ test('mobile lifecycle supports deep links, manual fallback and stable errors', 
   assert.match(navigator, /setRoute\('auth\.resetPassword'\)/);
   assert.match(navigator, /setRoute\('auth\.verifyEmail'\)/);
   assert.match(screens, /placeholder="Paste token from email" secureTextEntry/);
+  assert.match(screens, /type ChallengeFailureState = 'invalid' \| 'expired' \| 'attemptsExceeded' \| 'unavailable'/);
+  assert.match(screens, /error\.status === 0 \|\| error\.status >= 500 \|\| error\.retryable \|\| !error\.code/);
+  assert.match(screens, /disabled=\{!email\.trim\(\) \|\| resendState === 'resending'\}/);
+  assert.match(screens, /Verification is temporarily unavailable/);
+  assert.match(screens, /Password reset is temporarily unavailable/);
   for (const code of [
     'EMAIL_ALREADY_EXISTS',
     'AUTH_CHALLENGE_EXPIRED',

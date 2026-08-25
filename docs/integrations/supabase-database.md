@@ -25,7 +25,8 @@ CampusCore owns only:
 
 V20 moves legacy application-owned auth objects to `campuscore_auth`. The
 opt-in `B20__campuscore_supabase_baseline.sql` creates the six CampusCore
-schemas without rows, grants, role changes or Supabase-managed objects.
+schemas without rows, grants, role changes or Supabase-managed objects; the
+forward-only V21 successor adds persisted registration-round identity.
 
 ## Local proof before a hosted write
 
@@ -44,7 +45,7 @@ $env:CAMPUSCORE_SUPABASE_POSTGRES_PASSWORD = '<local-password>'
 ```
 
 The gate compares the complete application object signature against fresh
-V1-V20, preserves the sentinel schemas, proves the B20 Flyway history and
+V1-V21, preserves the sentinel schemas, proves the B20+V21 Flyway history and
 asserts zero application rows.
 
 ## Hosted preflight
@@ -61,7 +62,7 @@ Stop before migration unless every item is true:
 4. Read-only inventory proves the six CampusCore schemas are absent or empty.
 5. A before snapshot of objects and owners in `auth`, `storage`, `realtime` and
    `supabase_migrations` is retained for a post-apply comparison.
-6. The exact B20 checksum, candidate commit and Flyway version are frozen.
+6. The exact B20/V21 checksums, candidate commit and Flyway version are frozen.
 
 Use the Supabase CLI only after confirming the project ref. Keep database URLs,
 passwords and access tokens in an approved secret environment; never echo them,
@@ -90,23 +91,24 @@ docker run --rm `
   -baselineOnMigrate=false -validateMigrationNaming=true info
 ```
 
-The `info` result must resolve B20 as the selected baseline, followed only by
-forward-only successor migrations that have an explicit review entry and
-checksum. Never combine the hosted baseline with `db/migration`: the
+The `info` result must resolve B20 as the selected baseline followed by the
+reviewed V21 forward-only successor. Every successor must have an explicit
+review entry and checksum. Never combine the hosted baseline with
+`db/migration`: the
 application accepts only the exact baseline location, and the legacy location
 contains profile-independent `beforeValidate`/`beforeMigrate` managed-schema
 guards.
 Only then run the same command with `migrate`, followed by `validate` and
 `info`. Do not run `clean`, `repair`, `baseline`, or an unreviewed SQL editor
 paste. Existing CampusCore V-history databases must use only
-`classpath:db/migration` and apply V20 normally; they must not opt into B20.
+`classpath:db/migration` and apply V21 normally; they must not opt into B20.
 
 ## Post-apply acceptance
 
 The hosted synchronization is a PASS only when read-only evidence proves:
 
-- Flyway history contains one successful `SQL_BASELINE` at version 20 and no
-  other versioned CampusCore migration;
+- Flyway history contains the successful `SQL_BASELINE` at version 20 and the
+  reviewed V21 successor (three history rows including the schema marker);
 - all expected application tables, views, constraints and indexes exist;
 - all application base tables have zero rows;
 - no CampusCore table/view exists in managed `auth`;
