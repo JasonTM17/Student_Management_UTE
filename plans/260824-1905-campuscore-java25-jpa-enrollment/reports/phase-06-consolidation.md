@@ -28,10 +28,11 @@
 
 The physical inventory and removal of ignored/host Docker artifacts is
 **DEFERRED** by the accepted safety contract. Source/runtime scans and live
-deployment/remote-CI evidence still need the final exact-head review.
+deployment/remote-CI evidence remain separate gates; only task-owned temporary
+containers may be closed during terminal handoff.
 
 ## Exit ruling
 
-Source/config consolidation is **PASS** for the local candidate. Phase 6 stays
-**in-progress** until docs/review artifacts are frozen with the final commit
-identity and the remaining runtime inventory is explicitly recorded.
+Source/config consolidation is **PASS** for the local candidate. The report is
+closed for implementation; final exact-head review/merge identity is tracked
+in Phase 7 and is not inferred from this report.

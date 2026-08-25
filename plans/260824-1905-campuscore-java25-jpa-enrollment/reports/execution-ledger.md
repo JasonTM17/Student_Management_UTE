@@ -368,10 +368,11 @@ are recorded in the section below.
 
 ## Next resume point
 
-Freeze the candidate after the final local diff/secret checks, obtain fresh
-exact-head Kongming/Wukong/FE/test/debug/code-reviewer evidence on that SHA,
-then commit, tag and merge through a clean integration worktree while
-preserving dirty `main`. Remote database synchronization is complete; app
+Stage only the reviewed candidate paths and create the final Conventional
+Commits after the terminal local diff/secret checks. Obtain fresh exact-head
+Kongming/Wukong/FE/test/debug/code-reviewer evidence on that clean commit, then
+make no further source changes before tag/merge through a clean integration
+worktree while preserving dirty `main`. Remote database synchronization is complete; app
 traffic cutover, remote CI, live provider billing and native-device evidence
 remain separate gates.
 
@@ -392,3 +393,54 @@ remain separate gates.
 - [x] Hosted schema synchronization is structurally PASS for the empty B20
   baseline. It is infrastructure-only; application readiness, hosted restore
   rehearsal and production traffic remain `HOLD/NOT_PROVEN`.
+
+## Flyway safety repair checkpoint (2026-08-25)
+
+- [x] Independent Kongming/Wukong review of `70e0971` found and falsified the
+  old fail-open `auth AND storage AND realtime` predicate and the unreleased
+  lower-version V0 validation drift on existing V12/V18/V20 histories.
+- [x] Replaced the unreleased V0 versioned guard with profile-independent
+  `beforeValidate.sql` and `beforeMigrate.sql` callbacks. The callbacks fail
+  closed on any managed/unknown platform schema or `supabase_*` role, alternate
+  `auth` owner, unknown auth relations/functions, and untrusted partial private
+  signatures. Existing local historical auth relation subsets remain allowed so
+  V12/V18 upgrades can reach V20.
+- [x] Hosted baseline selection is now an exact single-location allowlist:
+  `classpath:db/supabase-baseline`. The baseline callbacks reject non-empty
+  legacy/incompatible Flyway history while allowing the one exact B20
+  `SQL_BASELINE` record on later validation/restart; the Java persistence
+  strategy applies the same check. The legacy and baseline locations are
+  never combined.
+- [x] PostgreSQL disposable safety matrix passes: auth-only/empty marker,
+  managed auth relation with storage/realtime absent, alternate owner, trusted
+  legacy signature, trusted post-V20 private signature, direct-style callback
+  refusal, existing-history callback refusal and no-V0 validation drift.
+- [ ] Fresh exact-head Kongming/Wukong/code-reviewer evidence after this repair;
+  the previous `70e0971` verdicts remain historical and cannot approve merge.
+
+## Artifact portability ruling
+
+The Supabase evidence manifest retains hashes and portable artifact IDs only;
+developer `%TEMP%` paths are intentionally redacted. The external backup and
+before/after snapshots remain outside the repository under operator-controlled
+retention. Hosted rollback remains `HOLD/NOT_PROVEN` because PITR/restore
+evidence was unavailable; no application traffic cutover is authorized.
+
+## Terminal local verification checkpoint (2026-08-25)
+
+- [x] Java 25 full Maven reactor verification: 205 fresh tests, zero failures
+  or errors. PostgreSQL 15.19 authority matrix: 25/25 across auth registration
+  race, registration capacity/idempotency/drop, assistant ownership/lease/
+  recovery, V12/V18 upgrade, B20 parity and Flyway safety.
+- [x] Frontend: 36/36 tests, typecheck, zero-warning lint and production build.
+  Mobile: 19/19 tests and typecheck. Both Compose configurations validate.
+- [x] Authenticated Chrome Playwright: 5/5 scenarios, including Mailpit
+  register/verify/login/logout/forgot/reset/fresh-login, assistant streaming/
+  citations/feedback, admin knowledge and 390/768/1440 responsive keyboard/
+  referrer coverage. The first build attempt stopped before app startup on a
+  transient Docker Hub 502; the disposable project was proven empty, the base
+  image was pulled by digest and the bounded retry passed.
+- [x] Git diff, secret, documentation hygiene and text encoding checks pass.
+  Fresh exact-head independent review remains the next gate; live DeepSeek,
+  native-device, remote CI, hosted restore and production traffic stay
+  `NOT_RUN/HOLD`.

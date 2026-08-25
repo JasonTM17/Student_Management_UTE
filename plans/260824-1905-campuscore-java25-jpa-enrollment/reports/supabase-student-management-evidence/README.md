@@ -5,7 +5,9 @@ schema-only synchronization. It contains no access token, database password,
 database URL, user data, session, challenge token, Mailpit message, or local
 `.env` content. The Git commit containing this directory is the immutable
 provenance boundary; the source SQL backup and JSON snapshots remain outside
-the repository at the paths recorded in `manifest.json`.
+the repository under an operator-controlled retention directory. The manifest
+records portable artifact IDs and hashes only; machine-specific paths are
+intentionally redacted.
 
 ## Target identity
 

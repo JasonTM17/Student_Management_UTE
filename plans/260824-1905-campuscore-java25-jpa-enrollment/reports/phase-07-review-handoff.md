@@ -3,10 +3,11 @@
 ## Current state
 
 Writer waves have delivered Java 25/JPA, registration, assistant, web and
-mobile slices in the isolated feature worktree. Local focused/full gates and an
-isolated PostgreSQL 15 concurrency rehearsal are green. The candidate is not
-yet frozen for independent review because the latest problem-details repair and
-reports are still being committed.
+mobile slices in the isolated feature worktree. Local focused/full gates,
+Mailpit/browser flows and PostgreSQL concurrency rehearsals are green. The
+Flyway fail-closed repair and FE/BE terminal defect pass are verified; the
+candidate is ready to be committed and frozen for exact-head review. This
+handoff must not be read as merge approval before those reviews finish.
 
 ## Required read-only lanes
 
@@ -21,7 +22,10 @@ reports are still being committed.
 
 ## Open gates
 
-- authenticated Playwright and native device runtime: `NOT_RUN`;
+- authenticated Playwright: `PASS (5/5)`; native device runtime: `NOT_RUN`;
+- final Flyway guard matrix: `PASS (25/25 PostgreSQL authority matrix in total)`;
+- fresh exact-head Kongming/Wukong/FE/test/debug/code review: `PENDING` until
+  the clean candidate commit is frozen;
 - live DeepSeek, remote CI, push/PR and production: separate gates;
 - whole-domain academic/catalog/admin/thesis JDBC writer conversion and
   compatibility-alias parity: `DEFERRED/FOLLOW-UP` (outside the bounded
@@ -31,7 +35,9 @@ reports are still being committed.
 
 ## Handoff rule
 
-Only after the exact SHA is frozen and reviewers return evidence-backed
-verdicts may the integration owner stage explicit paths, create Conventional
-Commits and push `feature/campuscore-java25-jpa-enrollment`. No direct push to
-`main` and no production claim is permitted by this report.
+The integration owner first stages only the reviewed paths, creates the final
+Conventional Commits and proves the candidate clean. Reviewers then inspect
+that exact SHA read-only. Only evidence-backed verdicts on the unchanged SHA
+authorize tag/merge through a clean integration worktree and image push. No
+direct write to dirty `main` and no production claim is permitted by this
+report.

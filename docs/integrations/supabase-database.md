@@ -85,12 +85,15 @@ docker run --rm `
   -e FLYWAY_URL -e FLYWAY_USER -e FLYWAY_PASSWORD `
   -v "${dbMigrations}:/flyway/sql:ro" `
   redgate/flyway:11.7.2 `
-  -locations='filesystem:/flyway/sql/migration,filesystem:/flyway/sql/supabase-baseline' `
+  -locations='filesystem:/flyway/sql/supabase-baseline' `
   -defaultSchema=thesis -schemas=thesis -cleanDisabled=true `
   -baselineOnMigrate=false -validateMigrationNaming=true info
 ```
 
-The `info` result must show B20 as the selected baseline and V1-V20 ignored.
+The `info` result must resolve only B20 as the selected baseline. Never combine
+the hosted baseline with `db/migration`: the application accepts only the exact
+baseline location, and the legacy location contains profile-independent
+`beforeValidate`/`beforeMigrate` managed-schema guards.
 Only then run the same command with `migrate`, followed by `validate` and
 `info`. Do not run `clean`, `repair`, `baseline`, or an unreviewed SQL editor
 paste. Existing CampusCore V-history databases must use only
