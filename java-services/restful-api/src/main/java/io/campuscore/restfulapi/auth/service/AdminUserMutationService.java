@@ -78,7 +78,7 @@ public class AdminUserMutationService {
                         + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE',"
-                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 new MapSqlParameterSource().addValue("id", id).addValue("email", email)
                         .addValue("password", passwordEncoder.encode(password))
                         .addValue("firstName", required(input, "firstName"))

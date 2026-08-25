@@ -94,4 +94,18 @@ class CsrfCookieFilterTest {
         assertEquals(200, response.getStatus());
         verify(chain).doFilter(request, response);
     }
+
+    @Test
+    void staleSessionCookieDoesNotBlockPublicLifecycleRequest() throws Exception {
+        MockHttpServletRequest request =
+                new MockHttpServletRequest("POST", "/api/v1/auth/email-verifications/confirm");
+        request.setCookies(new jakarta.servlet.http.Cookie("cc_access_token", "stale"));
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+    }
 }

@@ -159,6 +159,31 @@ class AuthLoginPersistenceTest {
                     "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "auth"."AuthChallenge" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "purpose" VARCHAR(40) NOT NULL,
+                    "tokenHash" VARCHAR(64) NOT NULL UNIQUE,
+                    "expiresAt" TIMESTAMP NOT NULL,
+                    "consumedAt" TIMESTAMP,
+                    "attemptCount" INTEGER NOT NULL,
+                    "lastSentAt" TIMESTAMP NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "auth"."AuthRateLimitBucket" (
+                    "scope" VARCHAR(80) NOT NULL,
+                    "bucketKeyHash" VARCHAR(64) NOT NULL,
+                    "windowStart" TIMESTAMP NOT NULL,
+                    "requestCount" INTEGER NOT NULL,
+                    "updatedAt" TIMESTAMP NOT NULL,
+                    PRIMARY KEY ("scope", "bucketKeyHash", "windowStart")
+                )
+                """);
+        jdbc.update("DELETE FROM \"auth\".\"AuthRateLimitBucket\"");
+        jdbc.update("DELETE FROM \"auth\".\"AuthChallenge\"");
         jdbc.update("DELETE FROM \"auth\".\"Session\"");
         jdbc.update("DELETE FROM \"auth\".\"Student\"");
         jdbc.update("DELETE FROM \"auth\".\"Lecturer\"");
@@ -171,8 +196,8 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
-    void registrationCreatesAnImmediatelyUsableStudentProfile() throws Exception {
-        MvcResult result = mvc.perform(post("/api/v1/auth/register")
+    void registrationCreatesAPendingStudentWithoutIssuingASession() throws Exception {
+        mvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -182,20 +207,41 @@ class AuthLoginPersistenceTest {
                                   "lastName":"Student"
                                 }
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.email").value("new.student@campuscore.edu"))
-                .andExpect(jsonPath("$.user.roles[0]").value("STUDENT"))
-                .andExpect(jsonPath("$.user.studentId", notNullValue()))
-                .andReturn();
+                .andExpect(status().isAccepted())
+                .andExpect(jsonPath("$.email").value("new.student@campuscore.edu"))
+                .andExpect(jsonPath("$.verificationRequired").value(true))
+                .andExpect(jsonPath("$.expiresInSeconds").value(86400))
+                .andExpect(jsonPath("$.accessToken").doesNotExist())
+                .andExpect(jsonPath("$.refreshToken").doesNotExist())
+                .andExpect(cookie().doesNotExist("cc_access_token"))
+                .andExpect(cookie().doesNotExist("cc_refresh_token"));
 
-        String userId = objectMapper.readTree(result.getResponse().getContentAsString())
-                .path("user").path("id").asText();
+        String userId = jdbc.queryForObject(
+                "SELECT \"id\" FROM \"auth\".\"User\" WHERE \"email\" = ?",
+                String.class,
+                "new.student@campuscore.edu");
         Integer profiles = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?"
                         + " AND \"curriculumId\" = 'curriculum-demo' AND \"status\" = 'ACTIVE'",
                 Integer.class,
                 userId);
+        String status = jdbc.queryForObject(
+                "SELECT \"status\" FROM \"auth\".\"User\" WHERE \"id\" = ?",
+                String.class,
+                userId);
+        Boolean emailVerified = jdbc.queryForObject(
+                "SELECT \"emailVerified\" FROM \"auth\".\"User\" WHERE \"id\" = ?",
+                Boolean.class,
+                userId);
+        Integer challenges = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"auth\".\"AuthChallenge\" WHERE \"userId\" = ?"
+                        + " AND \"purpose\" = 'EMAIL_VERIFICATION' AND LENGTH(\"tokenHash\") = 64",
+                Integer.class,
+                userId);
         org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
+        org.junit.jupiter.api.Assertions.assertEquals("PENDING_VERIFICATION", status);
+        org.junit.jupiter.api.Assertions.assertEquals(false, emailVerified);
+        org.junit.jupiter.api.Assertions.assertEquals(1, challenges);
     }
 
     @Test
