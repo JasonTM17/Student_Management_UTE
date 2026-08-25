@@ -90,10 +90,12 @@ docker run --rm `
   -baselineOnMigrate=false -validateMigrationNaming=true info
 ```
 
-The `info` result must resolve only B20 as the selected baseline. Never combine
-the hosted baseline with `db/migration`: the application accepts only the exact
-baseline location, and the legacy location contains profile-independent
-`beforeValidate`/`beforeMigrate` managed-schema guards.
+The `info` result must resolve B20 as the selected baseline, followed only by
+forward-only successor migrations that have an explicit review entry and
+checksum. Never combine the hosted baseline with `db/migration`: the
+application accepts only the exact baseline location, and the legacy location
+contains profile-independent `beforeValidate`/`beforeMigrate` managed-schema
+guards.
 Only then run the same command with `migrate`, followed by `validate` and
 `info`. Do not run `clean`, `repair`, `baseline`, or an unreviewed SQL editor
 paste. Existing CampusCore V-history databases must use only
@@ -123,7 +125,7 @@ part of repository cleanup.
 
 ## Completed Student_Management synchronization (2026-08-25)
 
-The guarded hosted run was completed only after the local B20 parity gate,
+The guarded hosted run was completed only after the local B20/V21 parity gate,
 exact project identity and a schema-only logical backup were proven. The
 verified target is `Student_Management` (`kbptwmwitojjjwvwckom`) in
 `ap-south-1`, PostgreSQL 17.6. The before-backup and metadata snapshots are
@@ -137,15 +139,20 @@ the JIT feature were revoked/disabled immediately after migration. SSL
 enforcement remains enabled as the safer project setting. The PAT itself was
 never placed in a URL, file, log, migration or committed example.
 
-Flyway 11.7.2 applied `B20__campuscore_supabase_baseline.sql` as the only
-remote migration. Postflight evidence shows six CampusCore schemas, 48
+Flyway 11.7.2 applied `B20__campuscore_supabase_baseline.sql`, followed by the
+reviewed `V21__persist_enrollment_registration_round.sql` (checksum
+`-249127582`). Postflight evidence shows six CampusCore schemas, 48
 application tables, two private-auth compatibility views, zero rows in every
-application table except the two expected Flyway history rows, and no
+application table except the three expected Flyway history rows, and no
 CampusCore object in managed `auth`. A before/after comparison found the 36
-managed relations and owners unchanged. Supabase security advisors returned
-zero lints; the 66 performance notices are INFO-only empty-database
-unindexed-FK/unused-index observations and are deferred until workload data
-exists. Do not copy local demo users, sessions, challenges, Mailpit messages,
+managed relations and owners unchanged. Supabase returned zero SQL lints, but
+the current advisor reports a critical RLS-disabled finding for all 48
+CampusCore tables. Because the API uses a trusted Spring database connection,
+no blanket RLS change was applied; enabling RLS without a reviewed policy set
+would block access. RLS/policy design is therefore an explicit user decision
+and a production HOLD. The 66 performance notices are INFO-only
+empty-database unindexed-FK/unused-index observations and are deferred until
+workload data exists. Do not copy local demo users, sessions, challenges, Mailpit messages,
 tokens or credentials in a later seed wave without a separate allowlist and
 review.
 

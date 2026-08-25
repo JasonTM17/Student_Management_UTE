@@ -376,6 +376,70 @@ worktree while preserving dirty `main`. Remote database synchronization is compl
 traffic cutover, remote CI, live provider billing and native-device evidence
 remain separate gates.
 
+## Successor repair and terminal verification continuation (2026-08-25)
+
+- [x] The candidate repair set was reverified from the dirty successor worktree
+  at `24ed5028c8a3fa285c072f7925dd91ecb38eef38`. The Java 25 Maven reactor
+  `verify` command exited 0; the refreshed `restful-api` Surefire report set
+  contains 237 tests with zero failures, errors or skips. This is current
+  candidate evidence, not the earlier historical report count.
+- [x] Registration PostgreSQL concurrency on disposable PostgreSQL 15.19
+  passed all 6 tests after fixing the production slip identifier to a fixed
+  64-character SHA-256 value and tightening test-only fixture cleanup. The
+  database was `cc_terminal_20260825_registration` in task container
+  `ccv20pg`; no unrelated container or database was targeted.
+- [x] V12/V18 upgrade, source-to-baseline parity and Flyway safety matrix passed
+  on disposable PostgreSQL databases. After the SQL callback hardening, the
+  safety matrix was rerun against `cc_wave2_flyway_safety_20260825` and passed
+  5/5, including duplicate history-table rejection, repeatable-history
+  rejection, checksum drift and pre-existing-object refusal. The only failed
+  attempt was a fixture-cleanup leak; the `shadow_history` schema is now part
+  of the test cleanup list and the rerun is green.
+- [x] Web tests/typecheck/lint/build (38 tests), mobile tests/typecheck (19
+  tests), both Compose config checks and authenticated Chrome E2E (6/6) remain
+  green after the repair set. The first E2E invocation was `NOT_RUN` because
+  Playwright ffmpeg was absent; after installing the local test dependency, the
+  same disposable stack passed and was removed by the runner.
+- [x] Flyway SQL callbacks now reject more than one `flyway_schema_history`
+  table before evaluating individual rows; Java's hosted-history inspection and
+  the SQL callback path therefore share the same single-location boundary.
+
+The next incomplete step is still a clean exact-head review cycle. No commit,
+tag, merge, push, Docker Hub upload or candidate-worktree deletion is approved
+by this evidence alone. At the time of this checkpoint, hosted
+Student_Management was still recorded as the B20-only schema baseline; the
+later exact-project V21 synchronization is recorded below.
+
+## Supabase V21 successor synchronization (2026-08-25)
+
+- [x] Exact-project MCP preflight re-checked `Student_Management`
+  (`kbptwmwitojjjwvwckom`): history marker + B20 checksum `1841726166`, no V21,
+  36 managed `auth`/`storage`/`realtime` relations, zero application rows,
+  zero ambiguous registration-round semesters and no `Enrollment.roundId`.
+- [x] Current Supabase migration documentation was read through the project-
+  scoped docs search before the write. The reviewed V21 SQL was applied only to
+  the Student_Management connector with migration name
+  `persist_enrollment_registration_round`; no Healthcare connector or generic
+  project was used.
+- [x] Remote postflight is structurally PASS: Supabase migration record
+  `20260825155849`; `thesis.flyway_schema_history` has exactly marker, B20 and
+  V21 (`-249127582`) rows; `Enrollment.roundId` is non-null; the composite FK,
+  round uniqueness constraint and student/round/status index exist; managed
+  relation count remains 36; all CampusCore application row counts remain 0.
+- [ ] Supabase advisor reports a current critical `rls_disabled` finding for
+  all 48 CampusCore tables. No blanket remediation was applied because RLS
+  without a policy design would block access. Public Supabase Data API use and
+  production cutover remain HOLD pending an explicit least-privilege policy
+  decision; Spring direct-server traffic is not a substitute for that proof.
+- [ ] Hosted PITR/restore remains `HOLD_NOT_PROVEN`; the external schema-only
+  backup hash predates V21 and is retained outside the repository. The remote
+  migration is forward-only and no destructive rollback was attempted.
+
+The hosted schema synchronization is complete for the empty schema-only target,
+but it does not authorize public traffic, seed data, RLS policy changes or
+production release. The next implementation gate is the clean exact-head review
+cycle on the candidate after this documentation/evidence update.
+
 ## Scope ruling and hosted evidence bundle (2026-08-25)
 
 - [x] Independent review finding about remaining JDBC writers was reconciled
@@ -444,3 +508,31 @@ evidence was unavailable; no application traffic cutover is authorized.
   Fresh exact-head independent review remains the next gate; live DeepSeek,
   native-device, remote CI, hosted restore and production traffic stay
   `NOT_RUN/HOLD`.
+
+## Resume checkpoint after exact-head review (2026-08-25)
+
+- Active phase: repair the release-blocking findings from the exact clean
+  candidate `24ed5028c8a3fa285c072f7925dd91ecb38eef38`, then freeze a successor
+  SHA and repeat every required independent review before any tag, merge or
+  push.
+- Required repairs: complete Flyway history allowlist (schema marker, exact
+  B20 checksum and successor migrations; reject repeatable/checksum drift and
+  pre-existing application objects), durable assistant cancellation before
+  asynchronous reservation, FE close/reopen reconciliation and non-committal
+  verification outage copy, registration-round ownership plus stable student
+  locking, release-document wording/whitespace drift.
+- Active disjoint specialists: FE (`/root/fe_review_repairs`), registration
+  (`/root/registration_round_repairs`) and assistant cancellation
+  (`/root/assistant_cancel_repairs`). They may edit only their assigned slices;
+  integration remains owned by `/root`.
+- Safe boundary: candidate and task PostgreSQL containers remain available for
+  focused regressions; dirty `D:\Student_Management` must not be reset,
+  stashed, overwritten or merged directly. Before merge, recompute the actual
+  tracked/untracked content and index identities, move the dirty checkout to a
+  named WIP branch without changing files, and merge through a clean
+  integration worktree only if the before/after identities match.
+- Next resume action after context/usage interruption: read this section,
+  inspect each specialist return and current candidate status, integrate only
+  evidence-backed repairs, run focused regressions, update this checkpoint with
+  exact commands/results, then continue to fresh exact-head reviews. Do not
+  repeat already evidenced terminal gates or create a second plan.
