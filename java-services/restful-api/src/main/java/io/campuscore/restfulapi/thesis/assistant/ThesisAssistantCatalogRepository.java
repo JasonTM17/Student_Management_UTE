@@ -1,29 +1,27 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
-import java.sql.ResultSet;
-import java.sql.SQLException;
 import java.util.ArrayList;
 import java.util.List;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway.JpaRow;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway.Parameters;
 import org.springframework.context.annotation.Profile;
-import org.springframework.dao.DataAccessException;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 
 /** Fixed public catalog projection; never reuses personal academic DTOs. */
 @Repository
 @Profile("persistence")
 public class ThesisAssistantCatalogRepository {
-    private final NamedParameterJdbcTemplate jdbc;
+    private final AssistantJpaGateway jpa;
 
-    public ThesisAssistantCatalogRepository(NamedParameterJdbcTemplate jdbc) {
-        this.jdbc = jdbc;
+    public ThesisAssistantCatalogRepository(AssistantJpaGateway jpa) {
+        this.jpa = jpa;
     }
 
     public List<CatalogDocument> search(String locale, List<String> terms, int limit) {
         List<String> usable = terms.stream().filter(term -> term.length() >= 2).distinct().limit(8).toList();
         if (usable.isEmpty()) return List.of();
-        MapSqlParameterSource params = new MapSqlParameterSource().addValue("locale", locale).addValue("limit", limit);
+        Parameters params = new Parameters().addValue("locale", locale).addValue("limit", limit);
         List<String> clauses = new ArrayList<>();
         for (int i = 0; i < usable.size(); i++) {
             String key = "term" + i;
@@ -43,15 +41,15 @@ public class ThesisAssistantCatalogRepository {
                 + ") catalog WHERE " + String.join(" OR ", clauses)
                 + " ORDER BY entity_type, entity_id LIMIT :limit";
         try {
-            return jdbc.query(sql, params, this::map);
-        } catch (DataAccessException unavailable) {
+            return jpa.query(sql, params, this::map);
+        } catch (RuntimeException unavailable) {
             // Catalog coverage is optional on legacy/test schemas. Fail closed and
             // let curated retrieval continue; never surface SQL details to clients.
             return List.of();
         }
     }
 
-    private CatalogDocument map(ResultSet rs, int ignored) throws SQLException {
+    private CatalogDocument map(JpaRow rs, int ignored) {
         return new CatalogDocument(rs.getString("entity_type"), rs.getString("entity_id"), rs.getString("title"),
                 rs.getString("public_text"), rs.getTimestamp("updated_at"));
     }

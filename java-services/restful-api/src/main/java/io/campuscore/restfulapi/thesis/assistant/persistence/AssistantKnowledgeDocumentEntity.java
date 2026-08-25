@@ -42,9 +42,14 @@ public class AssistantKnowledgeDocumentEntity {
     @Column(name = "created_at", nullable = false, updatable = false)
     private Instant createdAt;
 
-    /** The existing updated_at timestamp is the optimistic version column. */
     @Column(name = "updated_at", nullable = false)
     private Instant updatedAt;
+
+    @Column(name = "archived_at")
+    private Instant archivedAt;
+
+    @Column(name = "archived_by", length = 120)
+    private String archivedBy;
 
     protected AssistantKnowledgeDocumentEntity() {
     }
@@ -77,8 +82,10 @@ public class AssistantKnowledgeDocumentEntity {
         this.updatedAt = now;
     }
 
-    public void archive(Instant now) {
+    public void archive(String actor, Instant now) {
         this.active = false;
+        this.archivedAt = now;
+        this.archivedBy = requireText(actor, "archivedBy");
         this.updatedAt = now;
     }
 
@@ -93,6 +100,8 @@ public class AssistantKnowledgeDocumentEntity {
     public String getVisibility() { return visibility; }
     public Instant getCreatedAt() { return createdAt; }
     public Instant getUpdatedAt() { return updatedAt; }
+    public Instant getArchivedAt() { return archivedAt; }
+    public String getArchivedBy() { return archivedBy; }
 
     private static UUID require(UUID value, String field) {
         if (value == null) throw new IllegalArgumentException(field + " is required");
