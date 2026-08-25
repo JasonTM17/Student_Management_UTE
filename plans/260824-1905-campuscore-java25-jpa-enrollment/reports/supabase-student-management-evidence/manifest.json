@@ -74,7 +74,8 @@
     "applied_version": 21,
     "successful_baseline_count": 1,
     "successful_successor_count": 1,
-    "validate_migrations": 23,
+    "hosted_location_migrations": 2,
+    "legacy_catalog_migrations": 21,
     "ssl_enforcement": "enabled",
     "jit_mapping_after": "revoked",
     "jit_feature_after": "disabled"
