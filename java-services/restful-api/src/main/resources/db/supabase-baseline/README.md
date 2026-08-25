@@ -3,20 +3,21 @@
 This location is opt-in. A hosted Supabase runtime must set:
 
 ```text
-FLYWAY_LOCATIONS=classpath:db/migration,classpath:db/supabase-baseline
+FLYWAY_LOCATIONS=classpath:db/supabase-baseline
 ```
 
 `B20__campuscore_supabase_baseline.sql` represents the schema after the normal
-V1 through V20 chain. On an empty CampusCore environment, Flyway applies B20
-and ignores V1 through V20. Existing installations keep their V-history and
-apply V20 normally.
+V1 through V20 chain. On an empty hosted environment, Flyway resolves and
+applies only B20. Existing installations keep their V-history and use only
+`db/migration` to apply V20 normally.
 
-The application has a fail-closed safety strategy and the V0 SQL guard. If a
-PostgreSQL database exposes Supabase-managed `auth`, `storage` and `realtime`
-schemas, a configuration without this baseline location is refused before any
-legacy migration can run. The combined location above is intentional: Flyway
-selects B20 for an empty hosted target and reports the older V-files as
-ignored.
+The application has a fail-closed safety strategy. Profile-independent
+`beforeValidate` and `beforeMigrate` callbacks reject any managed platform
+schema/role marker and any `auth` schema outside the reviewed historical local
+signatures. The hosted safety switch accepts exactly the single allowlisted
+baseline location above; a combined legacy+baseline location is rejected.
+This avoids both managed-schema mutation and lower-version validation drift on
+existing V12/V18/V20 histories.
 
 The baseline contains schema only. It never creates or changes Supabase-owned
 `auth`, `storage`, `realtime`, or `supabase_migrations` objects and contains no
