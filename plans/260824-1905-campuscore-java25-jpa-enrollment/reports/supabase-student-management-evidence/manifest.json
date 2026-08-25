@@ -1,5 +1,5 @@
 {
-  "evidence_version": 1,
+  "evidence_version": 2,
   "observed_at": "2026-08-25",
   "target": {
     "name": "Student_Management",
@@ -18,7 +18,9 @@
     "provenance_note": "The hosted schema apply was executed from candidate_sha_at_sync. Later candidate changes harden auth concurrency, Flyway safety, and clients without changing V20/B20; the recorded baseline and external-artifact hashes remain the immutable hosted-apply provenance.",
     "flyway_version": "11.7.2",
     "baseline": "B20__campuscore_supabase_baseline.sql",
-    "baseline_sha256": "B465E08D9DEAE7AC5D7CA74028699E94EEFB949415F5C767758A7EC63F7D9CDF"
+    "baseline_sha256": "B465E08D9DEAE7AC5D7CA74028699E94EEFB949415F5C767758A7EC63F7D9CDF",
+    "successor_migration": "V21__persist_enrollment_registration_round.sql",
+    "successor_checksum": -249127582
   },
   "external_artifacts": [
     {
@@ -68,10 +70,11 @@
     "backup_status": "schema_only_external_artifact"
   },
   "apply": {
-    "selected_migration": "B20",
-    "applied_version": 20,
+    "selected_migration": "B20 plus V21",
+    "applied_version": 21,
     "successful_baseline_count": 1,
-    "validate_migrations": 22,
+    "successful_successor_count": 1,
+    "validate_migrations": 23,
     "ssl_enforcement": "enabled",
     "jit_mapping_after": "revoked",
     "jit_feature_after": "disabled"
@@ -86,7 +89,8 @@
     "managed_snapshot_unchanged": true,
     "security_advisor_lints": 0,
     "performance_advisor_info_notices": 66,
-    "performance_notices_are_empty_db_info_only": true
+    "performance_notices_are_empty_db_info_only": true,
+    "rls_advisor": "CRITICAL_HOLD_48_TABLES_DISABLED"
   },
   "rollback": {
     "pitr_enabled": false,

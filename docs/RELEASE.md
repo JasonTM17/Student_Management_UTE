@@ -54,7 +54,9 @@ For a new Supabase target, first prove the B20 schema-only baseline against a
 fresh Flyway V1-V20 PostgreSQL database with
 `CampusCoreSupabaseBaselinePostgresIT`. The test is local-only because it
 creates sentinel schemas; never point its environment variables at a hosted
-database. The hosted apply must use Flyway 11.7.2 with both migration locations,
+database. The hosted apply must use Flyway 11.7.2 with the exact reviewed
+`classpath:db/supabase-baseline` location (and only explicitly reviewed
+forward-only successor migrations),
 must leave `auth`, `storage`, `realtime` and `supabase_migrations` unchanged,
 and must be followed by schema/history/zero-row queries documented in
 `docs/integrations/supabase-database.md`.

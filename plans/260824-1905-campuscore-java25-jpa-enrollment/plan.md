@@ -71,6 +71,14 @@ destructive cleanup without an exact authorized target.
   uses an opt-in schema-only B20 for a brand-new Supabase target. Local
   PostgreSQL 15.19 proves V1/V12/V18 -> V20 plus B20 parity without mutating
   managed-schema sentinels or copying application rows.
+- On 2026-08-25, after the local V21 migration/concurrency and terminal gates,
+  the exact Student_Management target was rechecked and received the reviewed
+  V21 successor. Remote history now has the schema marker, B20 and V21
+  checksum `-249127582`; all application tables remain empty and managed
+  schemas are unchanged. Supabase's current advisor reports critical RLS
+  disabled on the 48 direct-server tables; no blanket RLS change was applied,
+  so public Data API access and production cutover remain HOLD pending a
+  policy decision and restore evidence.
 
 ## Ordered phases
 

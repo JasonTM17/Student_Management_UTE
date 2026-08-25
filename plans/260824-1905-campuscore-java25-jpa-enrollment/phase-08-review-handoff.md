@@ -22,6 +22,9 @@ DeepSeek and production remain separately reported.
 
 The root integration owner stages explicit paths and creates the planned
 Conventional Commits. Push only
-`feature/campuscore-java25-jpa-enrollment`; do not force-push or merge `main`.
-The final handoff must include exact SHA, commit/push/CI status, unresolved
-blockers, rollback path, and the next safe action.
+`feature/campuscore-java25-jpa-enrollment`; do not force-push. If all gates
+pass, preserve the dirty `main` checkout on a named WIP branch, merge the
+candidate through a clean integration worktree, and update `main` only after
+the before/after dirty-content and index identities match. The final handoff
+must include exact SHA, commit/push/CI status, unresolved blockers, rollback
+path, and the next safe action.
