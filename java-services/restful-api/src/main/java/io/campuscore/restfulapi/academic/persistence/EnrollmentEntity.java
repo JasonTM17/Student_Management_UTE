@@ -16,6 +16,7 @@ public class EnrollmentEntity {
     @Column(name = "studentId", nullable = false) private String studentId;
     @Column(name = "sectionId", nullable = false) private String sectionId;
     @Column(name = "semesterId", nullable = false) private String semesterId;
+    @Column(name = "roundId", nullable = false) private String roundId;
     @Column(name = "status", nullable = false, length = 40) private String status;
     @Column(name = "enrolledAt", nullable = false) private Instant enrolledAt;
     @Column(name = "droppedAt") private Instant droppedAt;
@@ -29,24 +30,24 @@ public class EnrollmentEntity {
     protected EnrollmentEntity() { }
 
     public static EnrollmentEntity active(String id, String studentId, String sectionId,
-                                           String semesterId, Instant now) {
-        return create(id, studentId, sectionId, semesterId, now, "ACTIVE", "PENDING");
+                                           String semesterId, String roundId, Instant now) {
+        return create(id, studentId, sectionId, semesterId, roundId, now, "ACTIVE", "PENDING");
     }
 
-    /** Legacy academic schema contract used by the enrollment API. */
     public static EnrollmentEntity enrolled(String id, String studentId, String sectionId,
-                                             String semesterId, Instant now) {
-        return create(id, studentId, sectionId, semesterId, now, "ENROLLED", "NOT_GRADED");
+                                             String semesterId, String roundId, Instant now) {
+        return create(id, studentId, sectionId, semesterId, roundId, now, "ENROLLED", "NOT_GRADED");
     }
 
     private static EnrollmentEntity create(String id, String studentId, String sectionId,
-                                            String semesterId, Instant now, String status,
+                                            String semesterId, String roundId, Instant now, String status,
                                             String gradeStatus) {
         EnrollmentEntity entity = new EnrollmentEntity();
         entity.id = require(id, "id");
         entity.studentId = require(studentId, "studentId");
         entity.sectionId = require(sectionId, "sectionId");
         entity.semesterId = require(semesterId, "semesterId");
+        entity.roundId = require(roundId, "roundId");
         entity.status = status;
         entity.enrolledAt = now;
         entity.gradeStatus = gradeStatus;
@@ -85,6 +86,7 @@ public class EnrollmentEntity {
     public String getStudentId() { return studentId; }
     public String getSectionId() { return sectionId; }
     public String getSemesterId() { return semesterId; }
+    public String getRoundId() { return roundId; }
     public String getStatus() { return status; }
     public Instant getEnrolledAt() { return enrolledAt; }
     public Instant getDroppedAt() { return droppedAt; }

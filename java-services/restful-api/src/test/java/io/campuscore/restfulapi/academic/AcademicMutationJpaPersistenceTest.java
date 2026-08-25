@@ -54,6 +54,7 @@ class AcademicMutationJpaPersistenceTest {
                     "studentId" VARCHAR(120) NOT NULL,
                     "sectionId" VARCHAR(120) NOT NULL,
                     "semesterId" VARCHAR(120) NOT NULL,
+                    "roundId" VARCHAR(120) NOT NULL,
                     "status" VARCHAR(40) NOT NULL,
                     "enrolledAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "droppedAt" TIMESTAMP WITH TIME ZONE,
@@ -136,10 +137,10 @@ class AcademicMutationJpaPersistenceTest {
 
     private void insertEnrollment(String id, String studentId, String sectionId) {
         jdbc.update("""
-                        INSERT INTO "academic"."Enrollment"
-                            ("id", "studentId", "sectionId", "semesterId", "status", "enrolledAt",
+                            INSERT INTO "academic"."Enrollment"
+                            ("id", "studentId", "sectionId", "semesterId", "roundId", "status", "enrolledAt",
                              "gradeStatus", "createdAt", "updatedAt", "version")
-                        VALUES (?, ?, ?, 'semester-a', 'ENROLLED', ?, 'NOT_GRADED', ?, ?, 0)
+                        VALUES (?, ?, ?, 'semester-a', 'round-a', 'ENROLLED', ?, 'NOT_GRADED', ?, ?, 0)
                         """,
                 id, studentId, sectionId, FIXED_NOW, FIXED_NOW, FIXED_NOW);
     }

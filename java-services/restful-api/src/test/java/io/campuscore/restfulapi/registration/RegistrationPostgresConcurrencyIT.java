@@ -18,6 +18,8 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import io.campuscore.restfulapi.registration.RegistrationDtos.EnrollmentRequest;
+import org.apache.pdfbox.Loader;
+import org.apache.pdfbox.text.PDFTextStripper;
 import javax.sql.DataSource;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
@@ -69,6 +71,13 @@ class RegistrationPostgresConcurrencyIT {
                 for (Fixture fixture : fixtures) {
                     deleteFixture(connection, fixture);
                 }
+                // Shared student/operation rows can span multiple fixtures;
+                // remove their dependents only after every fixture's section
+                // and enrollment rows have been removed.
+                deleteByIds(connection, "academic.\"EnrollmentAudit\"", createdStudentIds, "studentId");
+                deleteByIds(connection, "academic.\"EnrollmentOperation\"", createdStudentIds, "studentId");
+                deleteByIds(connection, "academic.\"Student\"", createdStudentIds);
+                deleteByIds(connection, "campuscore_auth.\"User\"", createdUserIds);
                 connection.commit();
             } catch (SQLException failure) {
                 connection.rollback();
@@ -90,11 +99,11 @@ class RegistrationPostgresConcurrencyIT {
             String studentId = id("student-" + incumbentStatus.toLowerCase());
             insertStudent(dataSource, studentId);
             String incumbentId = id("incumbent-" + incumbentStatus.toLowerCase());
-            insertEnrollment(dataSource, incumbentId, studentId, fixture.sectionId(), incumbentStatus);
+            insertEnrollment(dataSource, incumbentId, studentId, fixture.sectionId(), fixture.roundId(), incumbentStatus);
 
             String duplicateId = id("duplicate-" + incumbentStatus.toLowerCase());
             SQLException violation = assertThrowsSqlState(() ->
-                    insertEnrollment(dataSource, duplicateId, studentId, fixture.sectionId(), "ACTIVE"));
+                    insertEnrollment(dataSource, duplicateId, studentId, fixture.sectionId(), fixture.roundId(), "ACTIVE"));
             assertEquals("23505", violation.getSQLState(),
                     "status " + incumbentStatus + " must participate in active-enrollment uniqueness");
         }
@@ -113,8 +122,8 @@ class RegistrationPostgresConcurrencyIT {
         CountDownLatch start = new CountDownLatch(1);
         ExecutorService pool = Executors.newFixedThreadPool(2);
         try {
-            Future<Boolean> first = pool.submit(() -> claimSeat(fixture.sectionId(), firstStudent, ready, start));
-            Future<Boolean> second = pool.submit(() -> claimSeat(fixture.sectionId(), secondStudent, ready, start));
+            Future<Boolean> first = pool.submit(() -> claimSeat(fixture.sectionId(), fixture.roundId(), firstStudent, ready, start));
+            Future<Boolean> second = pool.submit(() -> claimSeat(fixture.sectionId(), fixture.roundId(), secondStudent, ready, start));
             assertTrue(ready.await(10, TimeUnit.SECONDS), "workers did not reach the deterministic barrier");
             start.countDown();
 
@@ -226,6 +235,34 @@ class RegistrationPostgresConcurrencyIT {
                 fixture.sectionId()));
     }
 
+    @Test
+    void enrollmentDropAndSlipUseTheExactRoundWhenTwoRoundsShareASemester() throws Exception {
+        Fixture firstRound = fixture("round-association-first", 2);
+        Fixture secondRound = fixture("round-association-second", 2);
+        fixtures.add(firstRound);
+        fixtures.add(secondRound);
+        String studentId = id("student-round-association");
+        insertStudent(dataSource, studentId);
+
+        RegistrationService.MutationResult first = registration.enroll(studentId,
+                new EnrollmentRequest(firstRound.sectionId(), firstRound.roundId()), UUID.randomUUID());
+        RegistrationService.MutationResult second = registration.enroll(studentId,
+                new EnrollmentRequest(secondRound.sectionId(), secondRound.roundId()), UUID.randomUUID());
+
+        assertEquals(firstRound.roundId(), scalarString("SELECT \"roundId\" FROM academic.\"Enrollment\" WHERE \"id\" = ?", first.enrollment().id()));
+        assertEquals(secondRound.roundId(), scalarString("SELECT \"roundId\" FROM academic.\"Enrollment\" WHERE \"id\" = ?", second.enrollment().id()));
+
+        RegistrationService.DropResult dropped = registration.drop(studentId, first.enrollment().id(), UUID.randomUUID());
+        assertTrue(!dropped.replayed());
+        assertEquals("DROPPED", scalarString("SELECT \"status\" FROM academic.\"Enrollment\" WHERE \"id\" = ?", first.enrollment().id()));
+
+        RegistrationService.SlipResult slip = registration.slip(studentId, secondRound.roundId());
+        String text = new PDFTextStripper().getText(Loader.loadPDF(slip.pdf()));
+        assertTrue(text.contains("Registration round: " + secondRound.roundId()));
+        assertTrue(text.contains("Enrollment id: " + second.enrollment().id()));
+        assertTrue(!text.contains("Enrollment id: " + first.enrollment().id()));
+    }
+
     private RegistrationService.MutationResult serviceEnroll(
             String studentId,
             EnrollmentRequest request,
@@ -253,7 +290,7 @@ class RegistrationPostgresConcurrencyIT {
         }
     }
 
-    private boolean claimSeat(String sectionId, String studentId,
+    private boolean claimSeat(String sectionId, String roundId, String studentId,
                               CountDownLatch ready, CountDownLatch start) throws Exception {
         ready.countDown();
         assertTrue(start.await(10, TimeUnit.SECONDS));
@@ -268,7 +305,7 @@ class RegistrationPostgresConcurrencyIT {
                     connection.rollback();
                     return false;
                 }
-                insertEnrollment(connection, id("enrollment-" + studentId), studentId, sectionId, "ACTIVE");
+                insertEnrollment(connection, id("enrollment-" + studentId), studentId, sectionId, roundId, "ACTIVE");
                 try (PreparedStatement update = connection.prepareStatement(
                         "UPDATE academic.\"Section\" SET \"enrolledCount\" = \"enrolledCount\" + 1 "
                                 + "WHERE \"id\" = ? AND \"enrolledCount\" < \"capacity\"")) {
@@ -359,22 +396,23 @@ class RegistrationPostgresConcurrencyIT {
     }
 
     private void insertEnrollment(DataSource source, String enrollmentId, String studentId,
-                                  String sectionId, String status) throws SQLException {
+                                  String sectionId, String roundId, String status) throws SQLException {
         try (Connection connection = source.getConnection()) {
-            insertEnrollment(connection, enrollmentId, studentId, sectionId, status);
+            insertEnrollment(connection, enrollmentId, studentId, sectionId, roundId, status);
         }
     }
 
     private void insertEnrollment(Connection connection, String enrollmentId, String studentId,
-                                  String sectionId, String status) throws SQLException {
+                                  String sectionId, String roundId, String status) throws SQLException {
         try (PreparedStatement insert = connection.prepareStatement(
                 "INSERT INTO academic.\"Enrollment\" "
-                        + "(\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"gradeStatus\") "
-                        + "VALUES (?, ?, ?, 'semester-demo', ?, CURRENT_TIMESTAMP, 'NOT_GRADED')")) {
+                        + "(\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"roundId\", \"status\", \"enrolledAt\", \"gradeStatus\") "
+                        + "VALUES (?, ?, ?, 'semester-demo', ?, ?, CURRENT_TIMESTAMP, 'NOT_GRADED')")) {
             insert.setString(1, enrollmentId);
             insert.setString(2, studentId);
             insert.setString(3, sectionId);
-            insert.setString(4, status);
+            insert.setString(4, roundId);
+            insert.setString(5, status);
             insert.executeUpdate();
         }
     }
@@ -390,7 +428,6 @@ class RegistrationPostgresConcurrencyIT {
             slip.setString(1, fixture.roundId());
             slip.executeUpdate();
         }
-        deleteByIds(connection, "academic.\"EnrollmentOperation\"", createdStudentIds, "studentId");
         try (PreparedStatement enrollment = connection.prepareStatement(
                 "DELETE FROM academic.\"Enrollment\" WHERE \"sectionId\" = ?")) {
             enrollment.setString(1, fixture.sectionId());
@@ -406,8 +443,6 @@ class RegistrationPostgresConcurrencyIT {
             round.setString(1, fixture.roundId());
             round.executeUpdate();
         }
-        deleteByIds(connection, "academic.\"Student\"", createdStudentIds);
-        deleteByIds(connection, "campuscore_auth.\"User\"", createdUserIds);
     }
 
     private void deleteByIds(Connection connection, String table, List<String> ids) throws SQLException {
@@ -442,6 +477,17 @@ class RegistrationPostgresConcurrencyIT {
             try (ResultSet rows = query.executeQuery()) {
                 assertTrue(rows.next());
                 return rows.getInt(1);
+            }
+        }
+    }
+
+    private String scalarString(String sql, String value) throws SQLException {
+        try (Connection connection = dataSource.getConnection();
+             PreparedStatement query = connection.prepareStatement(sql)) {
+            query.setString(1, value);
+            try (ResultSet rows = query.executeQuery()) {
+                assertTrue(rows.next());
+                return rows.getString(1);
             }
         }
     }

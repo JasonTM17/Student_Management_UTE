@@ -13,7 +13,7 @@ class EnrollmentJpaBoundaryTest {
     @Test
     void activeFactoryAndDropMutationPreserveDeterministicState() {
         Instant now = Instant.parse("2026-08-24T00:00:00Z");
-        EnrollmentEntity entity = EnrollmentEntity.active("enroll-1", "student-1", "section-1", "semester-1", now);
+        EnrollmentEntity entity = EnrollmentEntity.active("enroll-1", "student-1", "section-1", "semester-1", "round-1", now);
         assertThat(entity.getStatus()).isEqualTo("ACTIVE");
         assertThat(entity.getGradeStatus()).isEqualTo("PENDING");
         entity.markDropped(now.plusSeconds(30));
@@ -21,15 +21,15 @@ class EnrollmentJpaBoundaryTest {
         assertThat(entity.getDroppedAt()).isEqualTo(now.plusSeconds(30));
         assertThat(entity.getUpdatedAt()).isEqualTo(now.plusSeconds(30));
 
-        EnrollmentEntity legacy = EnrollmentEntity.enrolled("enroll-2", "student-1", "section-1", "semester-1", now);
-        assertThat(legacy.getStatus()).isEqualTo("ENROLLED");
-        assertThat(legacy.getGradeStatus()).isEqualTo("NOT_GRADED");
+        EnrollmentEntity enrolled = EnrollmentEntity.enrolled("enroll-2", "student-1", "section-1", "semester-1", "round-1", now);
+        assertThat(enrolled.getStatus()).isEqualTo("ENROLLED");
+        assertThat(enrolled.getGradeStatus()).isEqualTo("NOT_GRADED");
     }
 
     @Test
     void factoryRejectsMissingIdentityAndRepositoryDeclaresLock() throws Exception {
         Instant now = Instant.parse("2026-08-24T00:00:00Z");
-        assertThatThrownBy(() -> EnrollmentEntity.active("", "student-1", "section-1", "semester-1", now))
+        assertThatThrownBy(() -> EnrollmentEntity.active("", "student-1", "section-1", "semester-1", "round-1", now))
                 .isInstanceOf(IllegalArgumentException.class);
         Lock lock = EnrollmentRepository.class
                 .getMethod("findLockedStudentEnrollments", String.class, String.class, java.util.Collection.class)

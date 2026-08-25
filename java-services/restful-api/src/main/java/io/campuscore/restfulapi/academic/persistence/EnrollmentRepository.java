@@ -10,6 +10,10 @@ import org.springframework.data.jpa.repository.Query;
 import org.springframework.data.repository.query.Param;
 
 public interface EnrollmentRepository extends JpaRepository<EnrollmentEntity, String> {
+    /** Stable student-row lock used even when the student has no enrollments yet. */
+    @Query(value = "select s.id from academic.\"Student\" s where s.id = :studentId for update", nativeQuery = true)
+    List<String> findLockedStudent(@Param("studentId") String studentId);
+
     List<EnrollmentEntity> findByStudentIdAndSemesterIdOrderByEnrolledAtAsc(String studentId, String semesterId);
 
     Optional<EnrollmentEntity> findByStudentIdAndSectionIdAndStatusIn(String studentId, String sectionId,
