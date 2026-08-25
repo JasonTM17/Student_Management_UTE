@@ -56,3 +56,16 @@ test('web lifecycle maps stable verification, reset and throttle codes', () => {
   assert.match(login, /EMAIL_VERIFICATION_REQUIRED/);
   assert.match(login, /messages\.login\.errors\.emailVerificationRequired/);
 });
+
+test('web lifecycle distinguishes invalid challenges from service outages and focuses errors', () => {
+  const pages = read('src/components/auth/AuthLifecyclePages.tsx');
+
+  assert.match(pages, /function challengeFailureState/);
+  assert.match(pages, /AUTH_CHALLENGE_INVALID/);
+  assert.match(pages, /return 'unavailable'/);
+  assert.match(pages, /verificationUnavailable/);
+  assert.match(pages, /unavailableTitle/);
+  assert.match(pages, /function useAlertFocus/);
+  assert.match(pages, /copy\.errors\.required/);
+  assert.match(pages, /copy\.errors\.tooShort/);
+});

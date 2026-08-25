@@ -98,7 +98,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
       <div
-        className="absolute inset-0 bg-black/55"
+        className="absolute inset-0 bg-[var(--portal-scrim)]"
         onClick={onClose}
         aria-hidden="true"
       />

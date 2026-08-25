@@ -266,7 +266,7 @@ export function AdminFrame({
       </aside>
 
       <div
-        className="min-h-screen lg:pl-[var(--portal-sidebar-width)]"
+        className="min-h-[100dvh] lg:pl-[var(--portal-sidebar-width)]"
         inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
       >
         <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--portal-surface)]/90">

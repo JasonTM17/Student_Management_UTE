@@ -494,7 +494,7 @@ export default function DashboardLayout({
   if (isLoading) {
     return (
       <div
-        className="portal-shell flex min-h-screen items-center justify-center px-6"
+        className="portal-shell flex min-h-[100dvh] items-center justify-center px-6"
         role="status"
         aria-live="polite"
       >
@@ -778,7 +778,7 @@ export default function DashboardLayout({
       <div
         inert={!isDesktopSidebar && (sidebarOpen || studentRailOpen) ? true : undefined}
         className={cn(
-          'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
+          'min-h-[100dvh] transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
           sidebarCollapsed
             ? 'lg:pl-[var(--portal-sidebar-collapsed)]'
             : 'lg:pl-[var(--portal-sidebar-width)]',

@@ -35,8 +35,8 @@ export function AuthShell({
   const { messages } = useI18n();
 
   return (
-    <div className="min-h-screen bg-background">
-      <div className="grid min-h-screen lg:grid-cols-[0.9fr_1.1fr]">
+    <div className="min-h-[100dvh] bg-background">
+      <div className="grid min-h-[100dvh] lg:grid-cols-[0.9fr_1.1fr]">
         <section className="portal-sidebar relative hidden overflow-hidden border-r border-white/10 lg:flex">
           <div className="flex w-full items-center px-10 py-12 xl:px-16">
             <div className="mx-auto w-full max-w-xl space-y-10">
@@ -49,7 +49,7 @@ export function AuthShell({
               />
               <div className="space-y-4 border-l-4 border-[var(--portal-yellow)] pl-6">
                 <SectionEyebrow className="text-[var(--portal-yellow)]">{eyebrow}</SectionEyebrow>
-                <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-[2.75rem]">
+                <h1 className="max-w-lg text-[2.75rem] font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-5xl">
                   {title}
                 </h1>
                 <p className="max-w-lg text-base leading-7 text-[var(--portal-sidebar-muted)]">
