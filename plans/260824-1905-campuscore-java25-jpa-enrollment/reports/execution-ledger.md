@@ -440,6 +440,33 @@ but it does not authorize public traffic, seed data, RLS policy changes or
 production release. The next implementation gate is the clean exact-head review
 cycle on the candidate after this documentation/evidence update.
 
+## Successor repair checkpoint c717d288 (2026-08-25)
+
+- [x] The candidate is clean at exact SHA
+  `c717d2883aa9abc10627b9c34c37ea8801c2c8b7` after the independent review
+  findings were repaired. Verification cannot use the earlier `be5cc934` review
+  identities because that snapshot is now historical.
+- [x] Auth lifecycle regression: `AuthLifecyclePersistenceTest` 7/7 passed.
+  Email verification now updates only `PENDING_VERIFICATION` users and refuses
+  to reactivate an administrator-disabled account; the challenge is consumed
+  and the stable invalid code is returned.
+- [x] Assistant ledger regression: `ThesisAssistantTurnLedgerH2Test` 16/16
+  passed. Disconnect cancellation now compares the existing request hash before
+  changing a row, returning `IDEMPOTENCY_CONFLICT` for a reused key with a
+  different payload.
+- [x] Frontend tests 38/38, typecheck, zero-warning lint and production build
+  passed. Mobile tests 19/19 and typecheck passed. The Next route handlers now
+  read `JAVA_API_ORIGIN` at request time; the local Compose stack includes the
+  production web service and runtime API origin wiring.
+- [x] Compose configuration and secret/text-encoding checks passed. The
+  frontend Docker image must still receive an authenticated API smoke test after
+  the final image is built; the prior `be5cc934` browser E2E 6/6 result is not
+  final-head evidence for this successor.
+- [ ] Fresh exact-head Kongming, Wukong and FE/code-reviewer evidence is still
+  required on the final clean SHA. No archive tag, Docker push, GitHub release,
+  merge or branch cleanup is authorized until that review cycle and terminal
+  browser/image gates pass.
+
 ## Scope ruling and hosted evidence bundle (2026-08-25)
 
 - [x] Independent review finding about remaining JDBC writers was reconciled
