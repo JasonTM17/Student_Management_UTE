@@ -3,7 +3,7 @@ package io.campuscore.restfulapi.thesis.assistant.persistence;
 import java.time.Instant;
 import java.util.List;
 import java.util.UUID;
-import java.util.regex.Pattern;
+import io.campuscore.restfulapi.thesis.assistant.AssistantInputGuard;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
@@ -19,11 +19,6 @@ import org.springframework.transaction.annotation.Transactional;
 @Service
 @Profile("persistence")
 public class AssistantKnowledgeJpaWriter {
-
-    private static final Pattern EMAIL = Pattern.compile("[\\w.+-]+@[\\w.-]+\\.[A-Za-z]{2,}");
-    private static final Pattern LONG_NUMBER = Pattern.compile("(?<!\\d)\\d{8,}(?!\\d)");
-    private static final Pattern INJECTION = Pattern.compile(
-            "(?i)(ignore\\s+(all\\s+)?previous|system\\s+prompt|developer\\s+message|api[- ]?key|password)");
 
     private final AssistantKnowledgeDocumentJpaRepository documents;
     private final AssistantKnowledgeRevisionJpaRepository revisions;
@@ -105,6 +100,10 @@ public class AssistantKnowledgeJpaWriter {
             published.archive();
             audit(published, "ARCHIVE", reviewer, now);
         }
+        // The database enforces one PUBLISHED revision per document. Flush the
+        // archived predecessor before marking its replacement as PUBLISHED so
+        // Hibernate statement ordering cannot transiently violate that index.
+        revisions.flush();
         selected.publish(reviewer, now);
         document.replace(selected.getSlug(), selected.getLocale(), selected.getTitle(),
                 selected.getContent(), selected.getSource(), selected.getPriority(), now);
@@ -119,7 +118,7 @@ public class AssistantKnowledgeJpaWriter {
         AssistantKnowledgeDocumentEntity document = lockDocument(documentId);
         String owner = requireActor(actor);
         Instant now = Instant.now();
-        document.archive(now);
+        document.archive(owner, now);
         revisions.findFirstByDocumentIdOrderByVersionDesc(documentId)
                 .ifPresent(revision -> audit(revision, "ARCHIVE", owner, now));
     }
@@ -164,7 +163,7 @@ public class AssistantKnowledgeJpaWriter {
 
     static void validatePublic(String... values) {
         for (String value : values) {
-            if (EMAIL.matcher(value).find() || LONG_NUMBER.matcher(value).find() || INJECTION.matcher(value).find()) {
+            if (!AssistantInputGuard.inspectPublicKnowledge(value).allowed()) {
                 throw new KnowledgePersistenceException("KNOWLEDGE_PRIVACY_REJECTED");
             }
         }

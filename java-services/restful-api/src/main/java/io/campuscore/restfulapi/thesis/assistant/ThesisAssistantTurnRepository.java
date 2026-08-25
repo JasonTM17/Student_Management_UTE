@@ -1,8 +1,10 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway.JpaRow;
+import io.campuscore.restfulapi.thesis.assistant.persistence.AssistantJpaGateway.Parameters;
 import io.campuscore.restfulapi.web.DomainException;
-import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
@@ -14,10 +16,7 @@ import java.util.function.BiConsumer;
 import java.util.function.Consumer;
 import java.util.function.Supplier;
 import org.springframework.context.annotation.Profile;
-import org.springframework.dao.DataAccessException;
 import org.springframework.dao.DuplicateKeyException;
-import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
-import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
 import org.springframework.transaction.support.TransactionSynchronization;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
@@ -31,12 +30,12 @@ public class ThesisAssistantTurnRepository {
     private static final long DISPATCH_LEASE_SECONDS = 90L;
     private static final long TOMBSTONE_DAYS = 97L;
     private static final long COMPLETED_RETENTION_DAYS = 90L;
-    private final NamedParameterJdbcTemplate jdbc;
+    private final AssistantJpaGateway jpa;
     private final boolean postgres;
 
-    public ThesisAssistantTurnRepository(NamedParameterJdbcTemplate jdbc) {
-        this.jdbc = jdbc;
-        this.postgres = databaseIsPostgres(jdbc);
+    public ThesisAssistantTurnRepository(AssistantJpaGateway jpa) {
+        this.jpa = jpa;
+        this.postgres = jpa.isPostgres();
     }
 
     @Transactional
@@ -65,15 +64,15 @@ public class ThesisAssistantTurnRepository {
         boolean createdConversation = requestedConversationId == null;
         if (requestedConversationId == null) {
             conversationId = UUID.randomUUID();
-            jdbc.update("INSERT INTO assistant.chat_conversation (id,owner_id,locale,state,expires_at) VALUES (:id,:owner,:locale,'PENDING',:expires)",
+            jpa.update("INSERT INTO assistant.chat_conversation (id,owner_id,locale,state,expires_at) VALUES (:id,:owner,:locale,'PENDING',:expires)",
                     p().addValue("id", conversationId).addValue("owner", ownerId)
                             .addValue("locale", normalizeLocale(locale))
                             .addValue("expires", Timestamp.from(Instant.now().plusSeconds(Math.max(1, retentionDays) * 86_400L))));
         } else {
-            List<UUID> owned = jdbc.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner AND state <> 'PURGED' AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",
+            List<UUID> owned = jpa.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner AND state <> 'PURGED' AND expires_at>CURRENT_TIMESTAMP FOR UPDATE",
                     p().addValue("id", requestedConversationId).addValue("owner", ownerId), (rs, ignored) -> rs.getObject("id", UUID.class));
             if (owned.isEmpty()) throw problem(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
-            Integer active = jdbc.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
+            Integer active = jpa.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
                     p().addValue("owner", ownerId).addValue("conversation", requestedConversationId), Integer.class);
             if (active != null && active > 0) throw problem(409, "TURN_IN_PROGRESS", "Conversation already has an active turn");
             conversationId = requestedConversationId;
@@ -83,25 +82,25 @@ public class ThesisAssistantTurnRepository {
         String insertLedger = "INSERT INTO assistant.chat_turn_ledger (turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_owner,lease_generation,lease_expires_at,created_at,updated_at,tombstone_until) VALUES (:turn,:owner,:request,:hash,:conversation,:createdConversation,'RESERVED',:lease,1,:leaseExpires,CURRENT_TIMESTAMP,CURRENT_TIMESTAMP,:tombstoneUntil)"
                 + (postgres ? " ON CONFLICT DO NOTHING" : "");
         try {
-            int inserted = jdbc.update(insertLedger,
+            int inserted = jpa.update(insertLedger,
                     p().addValue("turn", turnId).addValue("owner", ownerId).addValue("request", clientRequestId)
                             .addValue("hash", requestHash).addValue("conversation", conversationId).addValue("createdConversation", createdConversation).addValue("lease", leaseOwner)
                             .addValue("leaseExpires", timestampAfterSeconds(PRE_DISPATCH_LEASE_SECONDS))
                             .addValue("tombstoneUntil", timestampAfterDays(TOMBSTONE_DAYS)));
             if (inserted == 0) {
-                if (createdConversation) jdbc.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND state='PENDING'", p().addValue("id", conversationId));
+                if (createdConversation) jpa.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND state='PENDING'", p().addValue("id", conversationId));
                 TurnRow winner = findForUpdate(ownerId, clientRequestId);
                 if (winner != null) return existingReservation(winner, requestHash, leaseOwner);
-                Integer active = jdbc.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
+                Integer active = jpa.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
                         p().addValue("owner", ownerId).addValue("conversation", conversationId), Integer.class);
                 if (active != null && active > 0) throw problem(409, "TURN_IN_PROGRESS", "Conversation already has an active turn");
                 throw problem(409, "TURN_RESERVATION_CONFLICT", "Turn reservation conflicted with another request");
             }
         } catch (DuplicateKeyException duplicate) {
-            if (createdConversation) jdbc.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND state='PENDING'", p().addValue("id", conversationId));
+            if (createdConversation) jpa.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND state='PENDING'", p().addValue("id", conversationId));
             TurnRow winner = findForUpdate(ownerId, clientRequestId);
             if (winner != null) return existingReservation(winner, requestHash, leaseOwner);
-            Integer active = jdbc.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
+            Integer active = jpa.queryForObject("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED')",
                     p().addValue("owner", ownerId).addValue("conversation", conversationId), Integer.class);
             if (active != null && active > 0) throw problem(409, "TURN_IN_PROGRESS", "Conversation already has an active turn");
             throw duplicate;
@@ -117,7 +116,7 @@ public class ThesisAssistantTurnRepository {
     @Transactional
     public boolean markSnapshotReady(UUID turnId, String ownerId, long generation, String snapshotHash,
             Consumer<ExpiredLease> fence) {
-        int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='SNAPSHOT_READY',source_snapshot_hash=:snapshot,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='RESERVED' AND lease_expires_at>CURRENT_TIMESTAMP",
+        int changed = jpa.update("UPDATE assistant.chat_turn_ledger SET state='SNAPSHOT_READY',source_snapshot_hash=:snapshot,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='RESERVED' AND lease_expires_at>CURRENT_TIMESTAMP",
                 p().addValue("turn", turnId).addValue("owner", ownerId).addValue("generation", generation).addValue("snapshot", snapshotHash)
                         .addValue("leaseExpires", timestampAfterSeconds(PRE_DISPATCH_LEASE_SECONDS)));
         if (changed == 1) return true;
@@ -154,11 +153,11 @@ public class ThesisAssistantTurnRepository {
         Integer user = lockedCount(date, ownerId, "USER");
         Integer global = lockedCount(date, "*", "GLOBAL");
         if (user == null || global == null || user >= Math.max(1, userLimit) || global >= Math.max(1, globalLimit)) {
-            jdbc.update("UPDATE assistant.chat_turn_ledger SET state='FAILED_PRE_DISPATCH',terminal_reason='QUOTA_EXCEEDED',updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND state='SNAPSHOT_READY'",
+            jpa.update("UPDATE assistant.chat_turn_ledger SET state='FAILED_PRE_DISPATCH',terminal_reason='QUOTA_EXCEEDED',updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND state='SNAPSHOT_READY'",
                     p().addValue("turn", turnId).addValue("owner", ownerId));
             return new DispatchDecision(false, false, "QUOTA_EXCEEDED");
         }
-        int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='DISPATCHED',dispatched_at=CURRENT_TIMESTAMP,quota_reserved=TRUE,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='SNAPSHOT_READY' AND lease_expires_at>CURRENT_TIMESTAMP",
+        int changed = jpa.update("UPDATE assistant.chat_turn_ledger SET state='DISPATCHED',dispatched_at=CURRENT_TIMESTAMP,quota_reserved=TRUE,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='SNAPSHOT_READY' AND lease_expires_at>CURRENT_TIMESTAMP",
                 p().addValue("turn", turnId).addValue("owner", ownerId).addValue("generation", generation)
                         .addValue("leaseExpires", timestampAfterSeconds(DISPATCH_LEASE_SECONDS)));
         if (changed != 1) {
@@ -174,7 +173,7 @@ public class ThesisAssistantTurnRepository {
         try {
             String insertRegistry = "INSERT INTO assistant.provider_dispatch_registry(owner_id,client_request_id,lease_generation,state) SELECT owner_id,client_request_id,lease_generation,'DISPATCHED' FROM assistant.chat_turn_ledger WHERE turn_id=:turn"
                     + (postgres ? " ON CONFLICT (owner_id,client_request_id,lease_generation) DO NOTHING" : "");
-            jdbc.update(insertRegistry,
+            jpa.update(insertRegistry,
                     p().addValue("turn", turnId));
         } catch (DuplicateKeyException ignored) {
             // A retried dispatch may already have published the same fenced handle.
@@ -207,7 +206,7 @@ public class ThesisAssistantTurnRepository {
         if (!"DISPATCHED".equals(row.state()) && !"SNAPSHOT_READY".equals(row.state())) {
             throw problem(409, "TURN_NOT_ACTIVE", "Turn is no longer active");
         }
-        int claimed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='COMPLETED',terminal_reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state IN ('DISPATCHED','SNAPSHOT_READY') AND lease_expires_at>CURRENT_TIMESTAMP",
+        int claimed = jpa.update("UPDATE assistant.chat_turn_ledger SET state='COMPLETED',terminal_reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state IN ('DISPATCHED','SNAPSHOT_READY') AND lease_expires_at>CURRENT_TIMESTAMP",
                 p().addValue("turn", turnId).addValue("owner", ownerId).addValue("generation", generation).addValue("reason", reasonCode));
         if (claimed != 1) {
             ExpiredLease expired = recoverExpiredByTurn(turnId, ownerId, generation);
@@ -219,25 +218,25 @@ public class ThesisAssistantTurnRepository {
         }
         UUID userMessage = UUID.randomUUID();
         UUID assistantMessage = UUID.randomUUID();
-        jdbc.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,ordinal,role,content,model,degraded,reason_code) VALUES (:id,:conversation,:turn,0,'USER',:content,:model,FALSE,'RECEIVED')",
+        jpa.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,ordinal,role,content,model,degraded,reason_code) VALUES (:id,:conversation,:turn,0,'USER',:content,:model,FALSE,'RECEIVED')",
                 p().addValue("id", userMessage).addValue("conversation", row.conversationId()).addValue("turn", turnId)
                         .addValue("content", AssistantInputGuard.normalizeMessage(prompt)).addValue("model", model));
-        jdbc.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,ordinal,role,content,model,degraded,reason_code) VALUES (:id,:conversation,:turn,1,'ASSISTANT',:content,:model,:degraded,:reason)",
+        jpa.update("INSERT INTO assistant.chat_message(id,conversation_id,turn_id,ordinal,role,content,model,degraded,reason_code) VALUES (:id,:conversation,:turn,1,'ASSISTANT',:content,:model,:degraded,:reason)",
                 p().addValue("id", assistantMessage).addValue("conversation", row.conversationId()).addValue("turn", turnId)
                         .addValue("content", answer).addValue("model", model).addValue("degraded", degraded).addValue("reason", reasonCode));
         int ordinal = 0;
         for (Citation citation : citations == null ? List.<Citation>of() : citations) {
-            jdbc.update("INSERT INTO assistant.chat_citation(id,message_id,document_id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,catalog_updated_at,ordinal) VALUES (:id,:message,:document,:slug,:title,:source,:locale,:excerpt,:domain,:kind,:sourceId,:revision,:version,:hash,:entityType,:entityId,:updated,:ordinal)",
+            jpa.update("INSERT INTO assistant.chat_citation(id,message_id,document_id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,catalog_updated_at,ordinal) VALUES (:id,:message,:document,:slug,:title,:source,:locale,:excerpt,:domain,:kind,:sourceId,:revision,:version,:hash,:entityType,:entityId,:updated,:ordinal)",
                     citationParams(citation, assistantMessage).addValue("ordinal", ordinal++));
         }
         String title = title(prompt);
-        jdbc.update("UPDATE assistant.chat_conversation SET state='ACTIVE',title=COALESCE(NULLIF(title,''),:title),updated_at=CURRENT_TIMESTAMP,expires_at=:expires WHERE id=:id AND owner_id=:owner",
+        jpa.update("UPDATE assistant.chat_conversation SET state='ACTIVE',title=COALESCE(NULLIF(title,''),:title),updated_at=CURRENT_TIMESTAMP,expires_at=:expires WHERE id=:id AND owner_id=:owner",
                 p().addValue("id", row.conversationId()).addValue("owner", ownerId).addValue("title", title)
                         .addValue("expires", timestampAfterDays(COMPLETED_RETENTION_DAYS)));
-        jdbc.update("UPDATE assistant.chat_turn_ledger SET result_message_id=:message,updated_at=CURRENT_TIMESTAMP,tombstone_until=:tombstoneUntil WHERE turn_id=:turn AND owner_id=:owner",
+        jpa.update("UPDATE assistant.chat_turn_ledger SET result_message_id=:message,updated_at=CURRENT_TIMESTAMP,tombstone_until=:tombstoneUntil WHERE turn_id=:turn AND owner_id=:owner",
                 p().addValue("message", assistantMessage).addValue("turn", turnId).addValue("owner", ownerId)
                         .addValue("tombstoneUntil", timestampAfterDays(TOMBSTONE_DAYS)));
-        jdbc.update("UPDATE assistant.provider_dispatch_registry SET state='COMPLETED' WHERE owner_id=:owner AND client_request_id=:request AND lease_generation=:generation",
+        jpa.update("UPDATE assistant.provider_dispatch_registry SET state='COMPLETED' WHERE owner_id=:owner AND client_request_id=:request AND lease_generation=:generation",
                 p().addValue("owner", ownerId).addValue("request", row.clientRequestId()).addValue("generation", generation));
         return new TerminalResult(row.conversationId(), assistantMessage, answer, model, degraded, reasonCode,
                 citations == null ? List.of() : List.copyOf(citations), false, "COMPLETED");
@@ -269,16 +268,16 @@ public class ThesisAssistantTurnRepository {
             notifyHandleFence(fence, new DispatchHandle(expired.clientRequestId(), expired.leaseGeneration()));
             return new CancelResult(false, expired.terminalState());
         }
-        int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='CANCELLED',terminal_reason='CANCELLED',updated_at=CURRENT_TIMESTAMP,tombstone_until=:tombstoneUntil WHERE turn_id=:turn AND owner_id=:owner AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED','FAILED_PRE_DISPATCH')",
+        int changed = jpa.update("UPDATE assistant.chat_turn_ledger SET state='CANCELLED',terminal_reason='CANCELLED',updated_at=CURRENT_TIMESTAMP,tombstone_until=:tombstoneUntil WHERE turn_id=:turn AND owner_id=:owner AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED','FAILED_PRE_DISPATCH')",
                 p().addValue("turn", turnId).addValue("owner", ownerId).addValue("tombstoneUntil", timestampAfterDays(TOMBSTONE_DAYS)));
         if (changed != 1) return new CancelResult(false, "TERMINAL_RACE");
         // Keep the provider registry fence generation-scoped.  A late cancel
         // for an older lease must never cancel a newer retry that reused the
         // same client request key.
-        jdbc.update("UPDATE assistant.provider_dispatch_registry SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE owner_id=:owner AND client_request_id=:request AND lease_generation=:generation AND state='DISPATCHED'",
+        jpa.update("UPDATE assistant.provider_dispatch_registry SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE owner_id=:owner AND client_request_id=:request AND lease_generation=:generation AND state='DISPATCHED'",
                 p().addValue("owner", ownerId).addValue("request", row.clientRequestId()).addValue("generation", row.leaseGeneration()));
         if (row.conversationId() != null) {
-            jdbc.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner AND state='PENDING' AND NOT EXISTS (SELECT 1 FROM assistant.chat_message WHERE conversation_id=:id)",
+            jpa.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner AND state='PENDING' AND NOT EXISTS (SELECT 1 FROM assistant.chat_message WHERE conversation_id=:id)",
                     p().addValue("id", row.conversationId()).addValue("owner", ownerId));
         }
         notifyHandleFence(fence, new DispatchHandle(row.clientRequestId(), row.leaseGeneration()));
@@ -325,7 +324,7 @@ public class ThesisAssistantTurnRepository {
 
     @Transactional
     public List<PurgedConversation> purgeExpiredConversations(BiConsumer<String, DispatchHandle> fence) {
-        List<ExpiredConversation> expired = jdbc.query(
+        List<ExpiredConversation> expired = jpa.query(
                 "SELECT id,owner_id FROM assistant.chat_conversation WHERE expires_at<=CURRENT_TIMESTAMP AND state<>'PURGED' ORDER BY expires_at LIMIT 100 FOR UPDATE",
                 p(), (rs, ignored) -> new ExpiredConversation(rs.getObject("id", UUID.class), rs.getString("owner_id")));
         List<PurgedConversation> deleted = new ArrayList<>();
@@ -338,22 +337,22 @@ public class ThesisAssistantTurnRepository {
 
     private List<DispatchHandle> purgeConversationInternal(UUID conversation, String ownerId, boolean deleteConversation,
             BiConsumer<String, DispatchHandle> fence) {
-        List<UUID> ownedConversation = jdbc.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner FOR UPDATE",
+        List<UUID> ownedConversation = jpa.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner FOR UPDATE",
                 p().addValue("id", conversation).addValue("owner", ownerId),
                 (rs, ignored) -> rs.getObject("id", UUID.class));
         if (ownedConversation.isEmpty() && deleteConversation) {
             throw problem(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
         }
-        List<DispatchHandle> handles = jdbc.query(
+        List<DispatchHandle> handles = jpa.query(
                 "SELECT client_request_id,lease_generation FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED') FOR UPDATE",
                 p().addValue("owner", ownerId).addValue("conversation", conversation),
                 (rs, ignored) -> new DispatchHandle(rs.getObject("client_request_id", UUID.class), rs.getLong("lease_generation")));
-        jdbc.update("UPDATE assistant.chat_turn_ledger SET state='PURGED',terminal_reason='PURGED',purged_at=CURRENT_TIMESTAMP,tombstone_until=:tombstone WHERE owner_id=:owner AND conversation_id=:conversation AND state<>'PURGED'",
+        jpa.update("UPDATE assistant.chat_turn_ledger SET state='PURGED',terminal_reason='PURGED',purged_at=CURRENT_TIMESTAMP,tombstone_until=:tombstone WHERE owner_id=:owner AND conversation_id=:conversation AND state<>'PURGED'",
                 p().addValue("owner", ownerId).addValue("conversation", conversation).addValue("tombstone", timestampAfterSeconds(7L * 86_400L)));
-        jdbc.update("UPDATE assistant.provider_dispatch_registry r SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE r.owner_id=:owner AND EXISTS (SELECT 1 FROM assistant.chat_turn_ledger l WHERE l.owner_id=r.owner_id AND l.client_request_id=r.client_request_id AND l.conversation_id=:conversation)",
+        jpa.update("UPDATE assistant.provider_dispatch_registry r SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP WHERE r.owner_id=:owner AND EXISTS (SELECT 1 FROM assistant.chat_turn_ledger l WHERE l.owner_id=r.owner_id AND l.client_request_id=r.client_request_id AND l.conversation_id=:conversation)",
                 p().addValue("owner", ownerId).addValue("conversation", conversation));
         if (deleteConversation) {
-            int deleted = jdbc.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner",
+            int deleted = jpa.update("DELETE FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner",
                     p().addValue("id", conversation).addValue("owner", ownerId));
             if (deleted != 1) throw problem(404, "CONVERSATION_NOT_FOUND", "Conversation not found");
         }
@@ -384,7 +383,7 @@ public class ThesisAssistantTurnRepository {
 
     @Transactional
     public List<ExpiredLease> recoverExpiredLeases(Consumer<ExpiredLease> fence) {
-        List<LeaseRow> rows = jdbc.query(
+        List<LeaseRow> rows = jpa.query(
                 "SELECT owner_id,client_request_id,turn_id,lease_generation,state FROM assistant.chat_turn_ledger "
                         + "WHERE state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED') AND lease_expires_at IS NOT NULL "
                         + "AND lease_expires_at<=CURRENT_TIMESTAMP ORDER BY lease_expires_at LIMIT 100 FOR UPDATE",
@@ -403,7 +402,7 @@ public class ThesisAssistantTurnRepository {
 
     private ExpiredLease recoverExpiredByRequest(String ownerId, UUID clientRequestId) {
         if (ownerId == null || clientRequestId == null) return null;
-        List<LeaseRow> rows = jdbc.query(
+        List<LeaseRow> rows = jpa.query(
                 "SELECT owner_id,client_request_id,turn_id,lease_generation,state FROM assistant.chat_turn_ledger "
                         + "WHERE owner_id=:owner AND client_request_id=:request AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED') "
                         + "AND lease_expires_at IS NOT NULL FOR UPDATE",
@@ -415,7 +414,7 @@ public class ThesisAssistantTurnRepository {
 
     private ExpiredLease recoverExpiredByTurn(UUID turnId, String ownerId, long generation) {
         if (turnId == null || ownerId == null) return null;
-        List<LeaseRow> rows = jdbc.query(
+        List<LeaseRow> rows = jpa.query(
                 "SELECT owner_id,client_request_id,turn_id,lease_generation,state FROM assistant.chat_turn_ledger "
                         + "WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation "
                         + "AND state IN ('RESERVED','SNAPSHOT_READY','DISPATCHED') AND lease_expires_at IS NOT NULL FOR UPDATE",
@@ -465,7 +464,7 @@ public class ThesisAssistantTurnRepository {
 
     private ExpiredLease recoverIfExpired(LeaseRow row) {
         String terminalState = "DISPATCHED".equals(row.state()) ? "FAILED_AMBIGUOUS" : "FAILED_PRE_DISPATCH";
-        int changed = jdbc.update(
+        int changed = jpa.update(
                 "UPDATE assistant.chat_turn_ledger SET state=:state,terminal_reason='LEASE_EXPIRED',lease_owner=NULL,"
                         + "lease_generation=lease_generation+:generationBump,lease_expires_at=NULL,updated_at=CURRENT_TIMESTAMP,"
                         + "tombstone_until=:tombstone WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation "
@@ -478,7 +477,7 @@ public class ThesisAssistantTurnRepository {
         // Mark the old provider registry key terminal. The in-memory
         // cancellation registry is fenced by the scheduled caller using the
         // returned old generation, while the DB CAS rejects that worker.
-        jdbc.update("UPDATE assistant.provider_dispatch_registry SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP "
+        jpa.update("UPDATE assistant.provider_dispatch_registry SET state='CANCELLED',cancelled_at=CURRENT_TIMESTAMP "
                         + "WHERE owner_id=:owner AND client_request_id=:request AND lease_generation=:generation AND state='DISPATCHED'",
                 p().addValue("owner", row.ownerId()).addValue("request", row.clientRequestId())
                         .addValue("generation", row.generation()));
@@ -490,19 +489,19 @@ public class ThesisAssistantTurnRepository {
         if (!List.of("UP", "DOWN").contains(rating) || (reason != null && !List.of("HELPFUL", "CLEAR", "INCORRECT", "OUTDATED", "NOT_RELEVANT", "UNSAFE").contains(reason))) {
             throw problem(400, "INVALID_FEEDBACK", "Feedback rating or reason is not supported");
         }
-        Integer owned = jdbc.queryForObject("SELECT COUNT(*) FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE m.id=:message AND c.owner_id=:owner AND m.role='ASSISTANT'",
+        Integer owned = jpa.queryForObject("SELECT COUNT(*) FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE m.id=:message AND c.owner_id=:owner AND m.role='ASSISTANT'",
                 p().addValue("message", messageId).addValue("owner", ownerId), Integer.class);
         if (owned == null || owned != 1) throw problem(404, "MESSAGE_NOT_FOUND", "Assistant message not found");
-        int changed = jdbc.update("UPDATE assistant.chat_message_feedback SET rating=:rating,reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE message_id=:message AND owner_id=:owner",
+        int changed = jpa.update("UPDATE assistant.chat_message_feedback SET rating=:rating,reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE message_id=:message AND owner_id=:owner",
                 p().addValue("message", messageId).addValue("owner", ownerId).addValue("rating", rating).addValue("reason", reason));
         if (changed == 0) {
             try {
                 String insertFeedback = "INSERT INTO assistant.chat_message_feedback(message_id,owner_id,rating,reason) VALUES (:message,:owner,:rating,:reason)"
                         + (postgres ? " ON CONFLICT (message_id,owner_id) DO NOTHING" : "");
-                changed = jdbc.update(insertFeedback,
+                changed = jpa.update(insertFeedback,
                         p().addValue("message", messageId).addValue("owner", ownerId).addValue("rating", rating).addValue("reason", reason));
             } catch (DuplicateKeyException duplicate) {
-                changed = jdbc.update("UPDATE assistant.chat_message_feedback SET rating=:rating,reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE message_id=:message AND owner_id=:owner",
+                changed = jpa.update("UPDATE assistant.chat_message_feedback SET rating=:rating,reason=:reason,updated_at=CURRENT_TIMESTAMP WHERE message_id=:message AND owner_id=:owner",
                         p().addValue("message", messageId).addValue("owner", ownerId).addValue("rating", rating).addValue("reason", reason));
             }
         }
@@ -511,7 +510,7 @@ public class ThesisAssistantTurnRepository {
 
     @Transactional
     public int deleteFeedback(UUID messageId, String ownerId) {
-        int changed = jdbc.update("DELETE FROM assistant.chat_message_feedback WHERE message_id=:message AND owner_id=:owner AND :message IN (SELECT m.id FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE c.owner_id=:owner AND m.role='ASSISTANT')",
+        int changed = jpa.update("DELETE FROM assistant.chat_message_feedback WHERE message_id=:message AND owner_id=:owner AND :message IN (SELECT m.id FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE c.owner_id=:owner AND m.role='ASSISTANT')",
                 p().addValue("message", messageId).addValue("owner", ownerId));
         if (changed == 0) throw problem(404, "FEEDBACK_NOT_FOUND", "Feedback not found");
         return changed;
@@ -530,7 +529,7 @@ public class ThesisAssistantTurnRepository {
 
     private Reservation reacquireFailedPreDispatch(TurnRow row, String leaseOwner) {
         long nextGeneration = row.leaseGeneration() + 1;
-        int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='RESERVED',lease_owner=:lease,lease_generation=:generation,lease_expires_at=:leaseExpires,terminal_reason=NULL,source_snapshot_hash=NULL,quota_reserved=FALSE,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:previous AND state='FAILED_PRE_DISPATCH'",
+        int changed = jpa.update("UPDATE assistant.chat_turn_ledger SET state='RESERVED',lease_owner=:lease,lease_generation=:generation,lease_expires_at=:leaseExpires,terminal_reason=NULL,source_snapshot_hash=NULL,quota_reserved=FALSE,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:previous AND state='FAILED_PRE_DISPATCH'",
                 p().addValue("turn", row.turnId()).addValue("owner", row.ownerId()).addValue("previous", row.leaseGeneration())
                         .addValue("lease", leaseOwner).addValue("generation", nextGeneration)
                         .addValue("leaseExpires", timestampAfterSeconds(PRE_DISPATCH_LEASE_SECONDS)));
@@ -539,19 +538,19 @@ public class ThesisAssistantTurnRepository {
     }
 
     private TurnRow findForUpdate(String ownerId, UUID requestId) {
-        List<TurnRow> rows = jdbc.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:request FOR UPDATE",
+        List<TurnRow> rows = jpa.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:request FOR UPDATE",
                 p().addValue("owner", ownerId).addValue("request", requestId), (rs, row) -> mapTurn(rs, row));
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     private TurnRow findForUpdate(UUID turnId, String ownerId) {
-        List<TurnRow> rows = jdbc.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE turn_id=:turn AND owner_id=:owner FOR UPDATE",
+        List<TurnRow> rows = jpa.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE turn_id=:turn AND owner_id=:owner FOR UPDATE",
                 p().addValue("turn", turnId).addValue("owner", ownerId), (rs, row) -> mapTurn(rs, row));
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     private TurnRow findForUpdateRead(String ownerId, UUID requestId) {
-        List<TurnRow> rows = jdbc.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:request",
+        List<TurnRow> rows = jpa.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND client_request_id=:request",
                 p().addValue("owner", ownerId).addValue("request", requestId), (rs, row) -> mapTurn(rs, row));
         return rows.isEmpty() ? null : rows.get(0);
     }
@@ -559,21 +558,21 @@ public class ThesisAssistantTurnRepository {
     private TurnRow find(UUID turnId, String ownerId) { return findForUpdateReadByTurn(turnId, ownerId); }
 
     private TurnRow findForUpdateReadByTurn(UUID turnId, String ownerId) {
-        List<TurnRow> rows = jdbc.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE turn_id=:turn AND owner_id=:owner",
+        List<TurnRow> rows = jpa.query("SELECT turn_id,owner_id,client_request_id,request_hash,conversation_id,created_conversation,state,lease_generation,quota_reserved,result_message_id FROM assistant.chat_turn_ledger WHERE turn_id=:turn AND owner_id=:owner",
                 p().addValue("turn", turnId).addValue("owner", ownerId), (rs, row) -> mapTurn(rs, row));
         return rows.isEmpty() ? null : rows.get(0);
     }
 
     private void lockConversation(UUID conversationId, String ownerId) {
         if (conversationId == null) return;
-        jdbc.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner FOR UPDATE",
+        jpa.query("SELECT id FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner FOR UPDATE",
                 p().addValue("id", conversationId).addValue("owner", ownerId),
                 (rs, ignored) -> rs.getObject("id", UUID.class));
     }
 
     private ReplayResult loadResult(UUID messageId, String ownerId, boolean replayed) {
         if (messageId == null) throw problem(409, "TURN_RESULT_UNAVAILABLE", "Turn result is not available");
-        List<ReplayResult> rows = jdbc.query("SELECT m.id,m.content,m.model,m.degraded,m.reason_code,m.conversation_id FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE m.id=:message AND c.owner_id=:owner AND m.role='ASSISTANT'",
+        List<ReplayResult> rows = jpa.query("SELECT m.id,m.content,m.model,m.degraded,m.reason_code,m.conversation_id FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE m.id=:message AND c.owner_id=:owner AND m.role='ASSISTANT'",
                 p().addValue("message", messageId).addValue("owner", ownerId), (rs, ignored) -> new ReplayResult(
                         rs.getObject("conversation_id", UUID.class), rs.getObject("id", UUID.class), rs.getString("content"), rs.getString("model"), rs.getBoolean("degraded"), rs.getString("reason_code"), citations(messageId), replayed, "COMPLETED"));
         if (rows.isEmpty()) throw problem(410, "TURN_PURGED", "Turn result has been purged");
@@ -581,11 +580,11 @@ public class ThesisAssistantTurnRepository {
     }
 
     private List<Citation> citations(UUID messageId) {
-        return jdbc.query("SELECT CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at FROM assistant.chat_citation WHERE message_id=:message ORDER BY ordinal,id",
+        return jpa.query("SELECT CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at FROM assistant.chat_citation WHERE message_id=:message ORDER BY ordinal,id",
                 p().addValue("message", messageId), (rs, ignored) -> new Citation(rs.getString("id"), rs.getString("slug"), rs.getString("title"), rs.getString("source"), rs.getString("locale"), rs.getString("excerpt"), rs.getString("domain"), rs.getString("source_kind"), rs.getString("source_id"), uuid(rs.getString("revision_id")), integer(rs, "revision_version"), rs.getString("snapshot_hash"), rs.getString("catalog_entity_type"), rs.getString("catalog_entity_id"), rs.getString("updated_at")));
     }
 
-    private MapSqlParameterSource citationParams(Citation citation, UUID messageId) {
+    private Parameters citationParams(Citation citation, UUID messageId) {
         return p().addValue("id", UUID.randomUUID()).addValue("message", messageId)
                 .addValue("document", uuid(citation.id())).addValue("slug", safe(citation.slug()))
                 .addValue("title", safe(citation.title())).addValue("source", safe(citation.source()))
@@ -598,27 +597,24 @@ public class ThesisAssistantTurnRepository {
     }
 
     private void ensureBucket(LocalDate date, String owner, String scope) {
-        try {
-            String insertBucket = "INSERT INTO assistant.usage_bucket(bucket_date,owner_id,scope,request_count) VALUES (:date,:owner,:scope,0)"
-                    + (postgres ? " ON CONFLICT (bucket_date,owner_id,scope) DO NOTHING" : "");
-            jdbc.update(insertBucket,
-                    p().addValue("date", date).addValue("owner", owner).addValue("scope", scope));
-        } catch (DuplicateKeyException ignored) {
-            // Another transaction created the bucket; the caller locks it next.
-        }
+        String insertBucket = postgres
+                ? "INSERT INTO assistant.usage_bucket(bucket_date,owner_id,scope,request_count) VALUES (:date,:owner,:scope,0) ON CONFLICT (bucket_date,owner_id,scope) DO NOTHING"
+                : "MERGE INTO assistant.usage_bucket AS target USING (VALUES (:date,:owner,:scope)) AS source(bucket_date,owner_id,scope) ON target.bucket_date=source.bucket_date AND target.owner_id=source.owner_id AND target.scope=source.scope WHEN NOT MATCHED THEN INSERT (bucket_date,owner_id,scope,request_count) VALUES (source.bucket_date,source.owner_id,source.scope,0)";
+        jpa.update(insertBucket,
+                p().addValue("date", date).addValue("owner", owner).addValue("scope", scope));
     }
 
     private Integer lockedCount(LocalDate date, String owner, String scope) {
-        return jdbc.queryForObject("SELECT request_count FROM assistant.usage_bucket WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope FOR UPDATE",
+        return jpa.queryForObject("SELECT request_count FROM assistant.usage_bucket WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope FOR UPDATE",
                 p().addValue("date", date).addValue("owner", owner).addValue("scope", scope), Integer.class);
     }
 
     private void incrementBucket(LocalDate date, String owner, String scope) {
-        jdbc.update("UPDATE assistant.usage_bucket SET request_count=request_count+1 WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope",
+        jpa.update("UPDATE assistant.usage_bucket SET request_count=request_count+1 WHERE bucket_date=:date AND owner_id=:owner AND scope=:scope",
                 p().addValue("date", date).addValue("owner", owner).addValue("scope", scope));
     }
 
-    private static TurnRow mapTurn(ResultSet rs, int ignored) throws java.sql.SQLException {
+    private static TurnRow mapTurn(JpaRow rs, int ignored) {
         return new TurnRow(rs.getObject("turn_id", UUID.class), rs.getString("owner_id"), rs.getObject("client_request_id", UUID.class), rs.getString("request_hash"), rs.getObject("conversation_id", UUID.class), rs.getBoolean("created_conversation"), rs.getString("state"), rs.getLong("lease_generation"), rs.getBoolean("quota_reserved"), rs.getObject("result_message_id", UUID.class));
     }
 
@@ -627,24 +623,14 @@ public class ThesisAssistantTurnRepository {
                 replay.degraded(), replay.reasonCode(), replay.citations(), true, replay.terminalStatus());
     }
 
-    private static int integer(ResultSet rs, String column) throws java.sql.SQLException { int value = rs.getInt(column); return rs.wasNull() ? 0 : value; }
+    private static int integer(JpaRow rs, String column) { int value = rs.getInt(column); return rs.wasNull() ? 0 : value; }
     private static UUID uuid(String value) { try { return value == null || value.isBlank() ? null : UUID.fromString(value); } catch (IllegalArgumentException ignored) { return null; } }
     private static String safe(String value) { return value == null ? "" : value; }
     private static Timestamp timestampAfterSeconds(long seconds) { return Timestamp.from(Instant.now().plusSeconds(seconds)); }
     private static Timestamp timestampAfterDays(long days) { return Timestamp.from(Instant.now().plusSeconds(days * 86_400L)); }
     private static String normalizeLocale(String locale) { return "en".equalsIgnoreCase(locale) ? "en" : "vi"; }
-    private static boolean databaseIsPostgres(NamedParameterJdbcTemplate jdbc) {
-        try {
-            org.springframework.jdbc.core.JdbcTemplate template = jdbc.getJdbcTemplate();
-            if (template == null) return false;
-            String name = template.execute((org.springframework.jdbc.core.ConnectionCallback<String>) connection -> connection.getMetaData().getDatabaseProductName());
-            return name != null && name.toLowerCase(java.util.Locale.ROOT).contains("postgres");
-        } catch (DataAccessException ignored) {
-            return false;
-        }
-    }
     private static String title(String prompt) { String value = AssistantInputGuard.normalizeMessage(prompt).replaceAll("\\s+", " "); return value.length() <= 80 ? value : value.substring(0, 77) + "..."; }
-    private static MapSqlParameterSource p() { return new MapSqlParameterSource(); }
+    private static Parameters p() { return new Parameters(); }
     private static DomainException problem(int status, String code, String message) { return new DomainException(org.springframework.http.HttpStatus.valueOf(status), code, message); }
 
     public enum ReservationStatus { NEW, REPLAY, ACTIVE, RETRYABLE, AMBIGUOUS }
