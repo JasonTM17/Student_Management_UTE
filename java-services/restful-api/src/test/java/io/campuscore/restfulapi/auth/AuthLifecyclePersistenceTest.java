@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.auth;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.mockito.Mockito.clearInvocations;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.cookie;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -32,7 +33,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:auth_lifecycle;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
-        "mail.enabled=false"
+        "mail.enabled=false",
+        "auth.lifecycle.max-requests-per-day=100"
 })
 class AuthLifecyclePersistenceTest {
 
@@ -127,6 +129,38 @@ class AuthLifecyclePersistenceTest {
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(tokenBody(second.rawToken())))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void resendCooldownDoesNotRevealWhetherTheAddressExists() throws Exception {
+        String email = "cooldown.lifecycle@campuscore.test";
+        registerAndCapture(email);
+        clearInvocations(mailDelivery);
+
+        String knownResponse = mvc.perform(post("/api/v1/auth/email-verifications/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emailBody(email)))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+        String unknownResponse = mvc.perform(post("/api/v1/auth/email-verifications/resend")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emailBody("missing.cooldown.lifecycle@campuscore.test")))
+                .andExpect(status().isAccepted())
+                .andReturn()
+                .getResponse()
+                .getContentAsString();
+
+        assertThat(unknownResponse).isEqualTo(knownResponse);
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"AuthChallenge\" c"
+                        + " JOIN \"campuscore_auth\".\"User\" u ON u.\"id\" = c.\"userId\""
+                        + " WHERE u.\"email\" = ? AND c.\"purpose\" = 'EMAIL_VERIFICATION'"
+                        + " AND c.\"consumedAt\" IS NULL",
+                Integer.class,
+                email)).isEqualTo(1);
+        verifyNoInteractions(mailDelivery);
     }
 
     @Test

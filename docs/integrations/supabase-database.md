@@ -145,3 +145,10 @@ unindexed-FK/unused-index observations and are deferred until workload data
 exists. Do not copy local demo users, sessions, challenges, Mailpit messages,
 tokens or credentials in a later seed wave without a separate allowlist and
 review.
+
+The redacted, commit-bound manifest and external-artifact hashes are recorded
+under `plans/260824-1905-campuscore-java25-jpa-enrollment/reports/supabase-student-management-evidence/`.
+The result is infrastructure-only. The current project has no plan-supported
+PITR/restore point, so hosted rollback/restoreability remains
+`HOLD/NOT_PROVEN`; application traffic must remain local until that gate is
+separately proven.

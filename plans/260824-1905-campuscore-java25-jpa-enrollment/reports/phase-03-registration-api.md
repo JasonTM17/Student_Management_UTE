@@ -38,22 +38,24 @@ for `main` or for a production deployment.
 | Problem-details regression | Java 25, `ThesisTopicPersistenceTest` | PASS |
 | PDF snapshot/canonical-order regression | Java 25, `RegistrationSlipSnapshotTest` | PASS |
 
-## Remaining boundary
+## Compatibility and persistence boundary
 
-- The legacy `/enrollments/*` aliases still invoke the older JDBC service; they
-  carry `Deprecation`/`Link` headers but are not yet a parity proof for the
-  canonical idempotent writer.
-- The slip renderer is a small dependency-free ASCII Helvetica writer. It is a
-  valid deterministic PDF for the current contract, but a Unicode-capable,
-  pinned PDF library/font and license scan remain a handoff follow-up.
-- The service lock order is currently round → section → student → operation;
-  the accepted target order puts the operation row first. PostgreSQL evidence
-  covers the section capacity race, not every cross-operation deadlock shape.
-- V10/V12 upgraded-copy rehearsal, full JPA writer cutover and authenticated
-  API/browser evidence remain open in Phase 2/4/7.
+- The legacy `/enrollments/*` aliases deliberately point to the same
+  `RegistrationService` mutation writer and return deprecation/successor
+  headers. Read/export compatibility endpoints remain JDBC adapters; no
+  duplicate enrollment writer exists.
+- Registration slips use pinned PDFBox 3.0.8 and the embedded OFL Noto Sans
+  Vietnamese subset. `SimplePdfTest` and `RegistrationSlipSnapshotTest`
+  prove deterministic bytes, Unicode extraction and pagination.
+- The mutation lock order is operation reservation → round row → section row →
+  student enrollment rows. `RegistrationLockOrderTest` and the PostgreSQL
+  concurrency suite cover the ordering and capacity/idempotency race.
+- V10/V12 upgraded-copy rehearsal and authenticated browser evidence are
+  recorded in the terminal/review checkpoints; whole-domain catalog/admin
+  JPA conversion is outside this registration writer boundary.
 
 ## Exit ruling
 
-Canonical local API and PostgreSQL capacity evidence are **PASS**. Phase 3 is
-kept **in-progress** until the alias parity/lock-order and Unicode-PDF follow-up
-are independently reviewed; no production readiness is inferred.
+The canonical and compatibility mutation phase is **PASS**. No production
+readiness is inferred; remote CI, device and production cutover remain separate
+gates.

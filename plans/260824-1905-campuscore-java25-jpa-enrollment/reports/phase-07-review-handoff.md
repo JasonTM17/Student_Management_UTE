@@ -23,9 +23,11 @@ reports are still being committed.
 
 - authenticated Playwright and native device runtime: `NOT_RUN`;
 - live DeepSeek, remote CI, push/PR and production: separate gates;
-- upgraded-copy/JPA writer-cutover proof and Unicode-capable PDF renderer:
-  `DEFERRED/OPEN`;
-- old JDBC alias parity and operation-first lock-order proof: `OPEN`.
+- whole-domain academic/catalog/admin/thesis JDBC writer conversion and
+  compatibility-alias parity: `DEFERRED/FOLLOW-UP` (outside the bounded
+  assistant/auth delivery; not silently treated as PASS);
+- hosted Supabase restore rehearsal: `HOLD/NOT_PROVEN` because the current
+  project plan exposes no PITR/restore point.
 
 ## Handoff rule
 

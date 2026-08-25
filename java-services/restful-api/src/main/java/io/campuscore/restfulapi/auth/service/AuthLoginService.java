@@ -96,7 +96,7 @@ public class AuthLoginService {
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
     public LoginResult login(String email, String password, String ipAddress, String userAgent) {
-        AuthUserRecord user = users.findByEmail(email)
+        AuthUserRecord user = users.findByEmailForUpdate(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
 

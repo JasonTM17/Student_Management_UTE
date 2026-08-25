@@ -28,6 +28,8 @@ test('mobile lifecycle supports deep links, manual fallback and stable errors', 
   assert.match(app, /"scheme": "campuscore"/);
   assert.match(navigator, /Linking\.getInitialURL\(\)/);
   assert.match(navigator, /Linking\.addEventListener\('url'/);
+  assert.match(navigator, /rawFragment/);
+  assert.match(navigator, /SMTP mail uses a fragment/);
   assert.match(navigator, /setAuthToken\(token\)/);
   assert.match(navigator, /setRoute\('auth\.resetPassword'\)/);
   assert.match(navigator, /setRoute\('auth\.verifyEmail'\)/);

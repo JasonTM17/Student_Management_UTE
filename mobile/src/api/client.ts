@@ -362,7 +362,11 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     !normalizedPath.startsWith('/auth/register') &&
     !normalizedPath.startsWith('/auth/email-verifications') &&
     !normalizedPath.startsWith('/auth/password-reset') &&
-    !normalizedPath.startsWith('/auth/password-reset-requests')
+    !normalizedPath.startsWith('/auth/password-reset-requests') &&
+    !normalizedPath.startsWith('/auth/verify-email') &&
+    !normalizedPath.startsWith('/auth/resend-verification') &&
+    !normalizedPath.startsWith('/auth/forgot-password') &&
+    !normalizedPath.startsWith('/auth/reset-password')
   );
 }
 

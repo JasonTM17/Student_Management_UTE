@@ -11,6 +11,13 @@ V1 through V20 chain. On an empty CampusCore environment, Flyway applies B20
 and ignores V1 through V20. Existing installations keep their V-history and
 apply V20 normally.
 
+The application has a fail-closed safety strategy and the V0 SQL guard. If a
+PostgreSQL database exposes Supabase-managed `auth`, `storage` and `realtime`
+schemas, a configuration without this baseline location is refused before any
+legacy migration can run. The combined location above is intentional: Flyway
+selects B20 for an empty hosted target and reports the older V-files as
+ignored.
+
 The baseline contains schema only. It never creates or changes Supabase-owned
 `auth`, `storage`, `realtime`, or `supabase_migrations` objects and contains no
 users, password hashes, sessions, challenges, rate buckets, chat history,

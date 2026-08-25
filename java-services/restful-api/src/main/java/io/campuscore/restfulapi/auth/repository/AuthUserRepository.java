@@ -41,6 +41,19 @@ public class AuthUserRepository {
     }
 
     public Optional<AuthUserRecord> findByEmail(String email) {
+        return findByEmail(email, false);
+    }
+
+    /**
+     * Loads an account while holding its row lock for the surrounding
+     * transaction.  Login failure counters are stateful security controls;
+     * they must be read from the same serialized stream that updates them.
+     */
+    public Optional<AuthUserRecord> findByEmailForUpdate(String email) {
+        return findByEmail(email, true);
+    }
+
+    private Optional<AuthUserRecord> findByEmail(String email, boolean lock) {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
@@ -50,7 +63,8 @@ public class AuthUserRepository {
                         + " FROM " + USER_TABLE + " u"
                         + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\" = u.\"id\""
                         + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
-                        + " WHERE u.\"email\" = :email",
+                        + " WHERE u.\"email\" = :email"
+                        + (lock ? " FOR UPDATE OF u" : ""),
                 new MapSqlParameterSource("email", email),
                 USER_MAPPER);
         return matches.stream().findFirst().map(user -> user.withAuthorities(
