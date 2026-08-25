@@ -13,6 +13,9 @@
   "source": {
     "candidate_branch": "feature/campuscore-java25-jpa-enrollment",
     "candidate_sha_at_sync": "b5ee38320bfdc30ab6e6e960039d03b643c6cb62",
+    "source_sha_after_auth_hardening": "0964467759f18e4b251cb2b4ea880aa8371a986e",
+    "schema_artifact_unchanged_after_hardening": true,
+    "provenance_note": "The hosted schema apply was executed from candidate_sha_at_sync. The later hardening commit changed auth concurrency guards, Flyway fail-closed protection, and client compatibility only; V20/B20 and all recorded external artifact hashes are unchanged. The commit containing this manifest is a documentation-only descendant of source_sha_after_auth_hardening.",
     "flyway_version": "11.7.2",
     "baseline": "B20__campuscore_supabase_baseline.sql",
     "baseline_sha256": "B465E08D9DEAE7AC5D7CA74028699E94EEFB949415F5C767758A7EC63F7D9CDF"
