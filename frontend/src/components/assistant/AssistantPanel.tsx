@@ -79,6 +79,7 @@ type AssistantAction =
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
   | { type: 'feedback'; messageId: string; rating?: 'UP' | 'DOWN' }
+  | { type: 'discard-pending' }
   | { type: 'clear-error' };
 
 const TRANSIENT_TERMINAL_CODES = new Set([
@@ -205,6 +206,16 @@ export function assistantReducer(
       );
       return { ...state, messages };
     }
+    case 'discard-pending':
+      // Closing the panel fences the active stream. Drop its optimistic bubble
+      // so a late/aborted reader cannot leave a permanent thinking state after
+      // the panel is reopened. The user prompt remains visible as context.
+      return {
+        ...state,
+        messages: state.messages.filter(
+          (message) => !(message.role === 'assistant' && message.pending),
+        ),
+      };
     default:
       return state;
   }
@@ -333,6 +344,7 @@ export function AssistantPanel() {
     }
     requestGenerationRef.current += 1;
     abortRef.current?.abort();
+    dispatch({ type: 'discard-pending' });
     setIsSending(false);
     setOpen(false);
     setShowHistory(false);

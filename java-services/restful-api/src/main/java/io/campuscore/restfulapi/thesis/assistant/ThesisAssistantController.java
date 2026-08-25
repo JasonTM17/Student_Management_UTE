@@ -75,16 +75,23 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
-        SseEmitter emitter = new SseEmitter(120_000L);
+        SseEmitter emitter = createEmitter();
         String owner = subject(actor);
         AtomicBoolean terminal = new AtomicBoolean(false);
         Runnable cancelOnDisconnect = () -> {
             if (terminal.get()) return;
             try {
-                assistant.cancel(request.clientRequestId(), owner);
+                // The emitter can close before the bounded worker starts.  In
+                // that window there is no turn row yet; install the durable
+                // request-key tombstone so the later worker cannot retrieve,
+                // dispatch, charge quota, or commit an uncancelled answer.
+                assistant.cancelBeforeStart(request.clientRequestId(), owner, request.message(),
+                        request.locale(), request.conversationId());
             } catch (Exception ignored) {
-                // The turn may not have reserved yet, or a terminal CAS may
-                // already have won. Either outcome fences provider work safely.
+                // Disconnect cleanup must never turn into a transport error.
+                // The worker still observes the durable row when cancellation
+                // won before reservation; terminal races are handled by the
+                // normal turn CAS.
             }
         };
         emitter.onTimeout(cancelOnDisconnect);
@@ -127,6 +134,11 @@ public class ThesisAssistantController {
             emitter.complete();
         }
         return emitter;
+    }
+
+    /** Small protected seam for lifecycle callback tests; production uses the default emitter. */
+    protected SseEmitter createEmitter() {
+        return new SseEmitter(120_000L);
     }
 
     @PostMapping("/requests/{clientRequestId}/cancel")

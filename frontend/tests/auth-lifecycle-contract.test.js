@@ -69,3 +69,10 @@ test('web lifecycle distinguishes invalid challenges from service outages and fo
   assert.match(pages, /copy\.errors\.required/);
   assert.match(pages, /copy\.errors\.tooShort/);
 });
+
+test('verification outage copy does not claim whether a token was consumed', () => {
+  const messages = read('src/i18n/messages.ts');
+  assert.match(messages, /verificationUnavailable: 'Verification is temporarily unavailable\.[^']*if it already succeeded, sign in instead\.'/);
+  assert.match(messages, /verificationUnavailable: 'Dịch vụ xác minh tạm thời chưa sẵn sàng\.[^']*nếu đã xác minh thành công, hãy đăng nhập\.'/);
+  assert.doesNotMatch(messages, /has not been consumed|chưa bị sử dụng/);
+});

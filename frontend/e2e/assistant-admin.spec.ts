@@ -82,6 +82,60 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await expect.poll(() => feedbackCalls).toBe(1);
 });
 
+test('closing an active assistant stream does not restore a stale thinking bubble', async ({ page }) => {
+  await page.route('**/api/v1/semesters**', (route) =>
+    route.fulfill(jsonResponse({ data: [{ id: 'semester-1', name: '2026 Spring', status: 'ACTIVE' }] })),
+  );
+  await page.route('**/api/v1/enrollments/my**', (route) => route.fulfill(jsonResponse([])));
+  await page.route('**/api/v1/thesis/assistant/conversations**', (route) =>
+    route.fulfill(jsonResponse([])),
+  );
+  await page.route('**/api/v1/thesis/assistant/requests/**', (route) =>
+    route.fulfill(jsonResponse({}, 204)),
+  );
+
+  let releaseFallback!: () => void;
+  const fallbackBlocked = new Promise<void>((resolve) => {
+    releaseFallback = resolve;
+  });
+  await page.route('**/api/v1/thesis/assistant/chat', async (route) => {
+    await fallbackBlocked;
+    await route.fulfill(jsonResponse({ answer: 'late response should be ignored', messageId: 'late' }));
+  });
+  await page.route('**/api/v1/thesis/assistant/chat/stream', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
+      body: [
+        'event: meta\n',
+        'data: {"requestId":"11111111-1111-4111-8111-111111111111","clientRequestId":"22222222-2222-4222-8222-222222222222","turnId":"33333333-3333-4333-8333-333333333333","conversationId":"44444444-4444-4444-8444-444444444444","model":"lexical-fallback","locale":"en"}\n\n',
+        'event: delta\n',
+        'data: {"sequence":0,"text":"Still working"}\n\n',
+      ].join(''),
+    }),
+  );
+
+  try {
+    await login(page, student);
+    await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
+    await page.getByRole('button', { name: 'Open thesis assistant' }).click();
+    const panel = page.getByRole('dialog');
+    const composer = page.getByRole('textbox', { name: 'Ask about registration, topics, groups, or progress...' });
+    await composer.fill('Keep this request open');
+    await page.getByRole('button', { name: 'Send message' }).click();
+    await expect(panel.getByRole('article', { name: 'AI assistant' })).toContainText('Still working');
+
+    await panel.getByRole('button', { name: 'Close thesis assistant' }).click();
+    await expect(panel).toHaveCount(0);
+    await page.getByRole('button', { name: 'Open thesis assistant' }).click();
+    const reopened = page.getByRole('dialog');
+    await expect(reopened.getByText('Checking the authorized thesis context...', { exact: true })).toHaveCount(0);
+    await expect(reopened.getByRole('status')).toHaveCount(0);
+  } finally {
+    releaseFallback();
+  }
+});
+
 test('authenticated admin can inspect curated sources and the public catalog coverage surface', async ({ page }) => {
   const source = {
     documentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
