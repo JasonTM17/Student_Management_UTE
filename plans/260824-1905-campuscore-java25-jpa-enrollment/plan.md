@@ -1,6 +1,6 @@
 ---
 title: "CampusCore Professional Successor - Java 25 JPA Enrollment"
-description: "Consolidate CampusCore on one Java REST API with verified auth and mail, JPA persistence, chatbot governance, and HCMUTE-style registration across web and mobile."
+description: "Consolidate CampusCore on one Java REST API with verified auth and mail, JPA-backed assistant/registration mutation state, chatbot governance, and HCMUTE-style registration across web and mobile."
 status: in-progress
 priority: P1
 effort: ""
@@ -14,7 +14,11 @@ created: 2026-08-24
 
 CampusCore is handed off as one Java Spring Boot 3.5.16 REST API, PostgreSQL
 15/Flyway, Next.js web, and Expo mobile. Java 25 LTS is the target runtime and
-JPA is the primary persistence boundary. Account lifecycle includes pending
+JPA is the primary persistence boundary for assistant state/knowledge and
+registration mutation tables. Existing academic/auth/admin read and management
+slices outside this chatbot/auth delivery remain explicit JDBC compatibility
+boundaries and are not claimed as a completed whole-domain JPA rewrite.
+Account lifecycle includes pending
 student registration, verified-email login, refresh/logout, profile/password,
 forgot/reset with one-use hashed challenges, lock recovery, and bilingual
 HTML/text transactional mail through `spring.mail.*`. Registration is a first-class,
@@ -26,7 +30,8 @@ source-bound, privacy-guarded, SSE on web, and JSON on mobile.
 
 ## Scope guard
 
-In scope: Java 25 toolchain, JPA migration, additive Flyway V13+, registration
+In scope: Java 25 toolchain, bounded JPA migration for assistant and
+registration mutation state, additive Flyway V13+, registration
 domain/API, problem-details errors, PDF slip, web registration/admin/chatbot UX,
 student auth lifecycle, SMTP/Mailpit templates, web/mobile auth routes, mobile
 JSON parity, tests, docs, safe runtime consolidation, split commits, safe merge
@@ -73,9 +78,9 @@ destructive cleanup without an exact authorized target.
 |---|---|---|---|
 | 0 | Freeze and successor artifacts | New plan validates, exact snapshot/ownership ledger exists, isolated feature worktree is created, no data deletion | completed |
 | 1 | Java 21 baseline and Java 25 toolchain | Reproducible Java 21 baseline plus real Java 25 build/test evidence | completed |
-| 2 | JPA foundation and forward migrations | Fresh and upgraded DBs migrate without data loss; JPA parity and negative constraints pass | completed |
+| 2 | JPA foundation and forward migrations | Fresh and upgraded DBs migrate without data loss; assistant and registration-mutation JPA parity plus negative constraints pass | completed |
 | 2A | Auth database, mail and lifecycle API | Hashed one-use challenges, generic enumeration-safe APIs, session revocation and bilingual mail pass H2/PostgreSQL/Mailpit gates | completed |
-| 3 | Registration domain/API/PDF | Round, eligibility, locking, idempotency, problem codes, pagination and PDF contract pass | completed |
+| 3 | Registration domain/API/PDF | Canonical and compatibility mutation routes share the idempotent writer; round, eligibility, locking, problem codes, pagination and deterministic PDF contract pass | completed |
 | 4 | Web registration, admin and chatbot | 390/768/1440 browser flows, accessibility and SSE states pass | completed |
 | 4A | Web and mobile auth | Register/verify/resend/forgot/reset routes, URL-token scrubbing, deep links and state/error coverage pass | completed |
 | 5 | Mobile parity | JSON registration/auth, retry/offline/session states and typecheck pass; device status honest | completed |
@@ -122,6 +127,18 @@ Focused checks run at each phase; full Maven, PostgreSQL, web, mobile,
 authenticated Playwright, Mailpit capture, secret, encoding, docs, Compose and
 diff gates run at phase/terminal checkpoints. Java 24/26 host runs are not Java 25 proof. Local/source/runtime
 PASS is separate from CI, push, device, provider and production evidence.
+
+## Scope ruling recorded after independent architecture review (2026-08-25)
+
+Kongming identified that a whole-domain JPA claim would be inaccurate because
+catalog administration, some academic reads/management paths, thesis-group
+management and the Spring auth compatibility boundary still use JDBC. The
+minimal safe ruling is to close this plan on the delivered assistant JPA
+cutover, registration mutation JPA writers, and auth/mail lifecycle; retain
+those other JDBC paths as a separately owned follow-up migration. This ruling
+does not alter the public API or hosted schema contract and prevents a false
+release claim. The follow-up must add dual-read/parity evidence before any
+remaining writer is switched.
 
 ## Risks and rollback
 

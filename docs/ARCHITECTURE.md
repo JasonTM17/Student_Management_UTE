@@ -73,9 +73,13 @@ not copy credentials, cookies, HTML or proprietary source code.
 
 Assistant conversations, messages, citations, usage buckets, turn leases,
 provider dispatch fences, feedback and knowledge revision/audit records are
-mapped through JPA repositories. Flyway remains the schema authority and
-Hibernate is validation-only (`ddl-auto=validate`); provider I/O stays outside
-the short database transactions.
+mapped through JPA repositories. Registration mutation state uses the same JPA
+writer boundary. Flyway remains the schema authority and Hibernate is
+validation-only (`ddl-auto=validate`); provider I/O stays outside the short
+database transactions. Some legacy catalog/academic read and administration
+paths, the Spring auth compatibility repositories, and thesis-group management
+remain JDBC by deliberate compatibility scope; this plan does not claim a
+whole-domain JDBC removal.
 
 For a brand-new Supabase target, Flyway can add the opt-in schema-only B20
 baseline location. B20 creates only `campuscore_auth`, `academic`, `thesis`,

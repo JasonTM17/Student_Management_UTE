@@ -98,9 +98,15 @@ export function MobileNavigator() {
     const handleUrl = (url: string | null) => {
       if (!url) return;
       try {
-        const [rawPath, rawQuery = ''] = url.split('?', 2);
+        // SMTP mail uses a fragment so the raw challenge never reaches
+        // intermediary access logs; accept query tokens as a manual/deep-link
+        // fallback too.
+        const [urlWithoutFragment, rawFragment = ''] = url.split('#', 2);
+        const [rawPath, rawQuery = ''] = urlWithoutFragment.split('?', 2);
         const path = rawPath.toLowerCase();
-        const tokenPart = rawQuery.split('&').find((part) => part.startsWith('token='));
+        const tokenPart = `${rawQuery}&${rawFragment}`
+          .split('&')
+          .find((part) => part.startsWith('token='));
         const token = tokenPart ? decodeURIComponent(tokenPart.slice('token='.length)) : null;
         if (token) setAuthToken(token);
         if (path.includes('reset')) {

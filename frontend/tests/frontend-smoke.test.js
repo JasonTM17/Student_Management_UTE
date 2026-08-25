@@ -53,7 +53,7 @@ test('the web client has one Java API boundary and no removed domain client', ()
   const apiSource = read('src/lib/api.ts');
   const nextConfig = read('next.config.mjs');
   assert.doesNotMatch(apiSource, /analyticsApi|financeApi|waitlistApi|socket\.io/);
-  assert.doesNotMatch(apiSource, /forgot-password|reset-password|verify-email|resend-verification/);
+  assert.match(apiSource, /AUTH_REFRESH_ROUTE_PATTERN[\s\S]*forgot-password[\s\S]*reset-password/);
   assert.doesNotMatch(nextConfig, /LOCAL_EDGE_ORIGIN|socket\.io|redis|rabbitmq/i);
   assert.match(nextConfig, /JAVA_API_ORIGIN/);
 });

@@ -92,22 +92,31 @@ public class AuthLifecycleService {
     @Transactional(noRollbackFor = DomainException.class)
     public MessageResponse resendVerification(EmailRequest request, String ipAddress) {
         String email = normalize(required(request == null ? null : request.email(), "email"));
-        rateLimiter.check("verification-resend", email, ipAddress);
+        try {
+            rateLimiter.check("verification-resend", email, ipAddress);
+        } catch (DomainException throttled) {
+            if (isEnumerationSafeThrottle(throttled)) {
+                return new MessageResponse(VERIFICATION_MESSAGE);
+            }
+            throw throttled;
+        }
         Optional<AuthUserRecord> userResult = users.findByEmail(email);
         if (userResult.isEmpty() || userResult.get().emailVerified()) {
             return new MessageResponse(VERIFICATION_MESSAGE);
         }
 
         AuthUserRecord user = userResult.get();
+        lockChallengeStream(user.id());
         Instant now = clock.instant();
         Optional<Challenge> latest = challenges.findLatestForUser(user.id(), Purpose.EMAIL_VERIFICATION, true);
         if (latest.isPresent()
                 && latest.get().consumedAt() == null
                 && latest.get().lastSentAt().plusSeconds(resendCooldownSeconds).isAfter(now)) {
-            throw new DomainException(
-                    HttpStatus.TOO_MANY_REQUESTS,
-                    "AUTH_RESEND_THROTTLED",
-                    "Please wait before requesting another verification email");
+            // Keep the public response indistinguishable from an unknown or
+            // already-verified address.  The cooldown remains enforced by
+            // refusing to issue a new challenge, but account state is never
+            // disclosed through a distinct status or error code.
+            return new MessageResponse(VERIFICATION_MESSAGE);
         }
         issueAndQueue(user, Purpose.EMAIL_VERIFICATION, verificationTtlSeconds, now);
         return new MessageResponse(VERIFICATION_MESSAGE);
@@ -116,13 +125,21 @@ public class AuthLifecycleService {
     @Transactional(noRollbackFor = DomainException.class)
     public MessageResponse requestPasswordReset(PasswordResetRequest request, String ipAddress) {
         String email = normalize(required(request == null ? null : request.email(), "email"));
-        rateLimiter.check("password-reset-request", email, ipAddress);
+        try {
+            rateLimiter.check("password-reset-request", email, ipAddress);
+        } catch (DomainException throttled) {
+            if (isEnumerationSafeThrottle(throttled)) {
+                return new MessageResponse(RESET_MESSAGE);
+            }
+            throw throttled;
+        }
         Optional<AuthUserRecord> userResult = users.findByEmail(email);
         if (userResult.isEmpty() || !"ACTIVE".equals(userResult.get().status())) {
             return new MessageResponse(RESET_MESSAGE);
         }
 
         AuthUserRecord user = userResult.get();
+        lockChallengeStream(user.id());
         Instant now = clock.instant();
         Optional<Challenge> latest = challenges.findLatestForUser(user.id(), Purpose.PASSWORD_RESET, true);
         if (latest.isPresent()
@@ -166,6 +183,9 @@ public class AuthLifecycleService {
     private Challenge consumeValidChallenge(Purpose purpose, String rawToken) {
         String challengeId = AuthChallengeTokenService.challengeId(rawToken)
                 .orElseThrow(this::invalidChallenge);
+        String userId = challenges.findUserId(challengeId, purpose)
+                .orElseThrow(this::invalidChallenge);
+        lockChallengeStream(userId);
         Challenge challenge = challenges.findByIdForUpdate(challengeId, purpose)
                 .orElseThrow(this::invalidChallenge);
         Instant now = clock.instant();
@@ -199,6 +219,12 @@ public class AuthLifecycleService {
         return challenge;
     }
 
+    private void lockChallengeStream(String userId) {
+        if (!challenges.lockUser(userId)) {
+            throw invalidChallenge();
+        }
+    }
+
     private DomainException invalidChallenge() {
         return new DomainException(
                 HttpStatus.BAD_REQUEST,
@@ -211,6 +237,11 @@ public class AuthLifecycleService {
                 HttpStatus.TOO_MANY_REQUESTS,
                 "AUTH_CHALLENGE_ATTEMPTS_EXCEEDED",
                 "Too many authentication challenge attempts");
+    }
+
+    private static boolean isEnumerationSafeThrottle(DomainException exception) {
+        return "AUTH_RATE_LIMITED".equals(exception.code())
+                || "AUTH_RESEND_THROTTLED".equals(exception.code());
     }
 
     private static String normalize(String email) {

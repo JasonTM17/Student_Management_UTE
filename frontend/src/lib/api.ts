@@ -79,7 +79,7 @@ type SectionDetail = Section & {
 
 const CSRF_COOKIE_NAME = 'cc_csrf';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
-const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout|email-verifications(?:\/.*)?|password-reset(?:\/.*)?|password-reset-requests(?:\/.*)?)(?:\/|$)/;
+const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout|email-verifications(?:\/.*)?|password-reset(?:\/.*)?|password-reset-requests(?:\/.*)?|verify-email|resend-verification|forgot-password|reset-password)(?:\/|$)/;
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 function isBrowser() {

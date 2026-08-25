@@ -374,3 +374,21 @@ then commit, tag and merge through a clean integration worktree while
 preserving dirty `main`. Remote database synchronization is complete; app
 traffic cutover, remote CI, live provider billing and native-device evidence
 remain separate gates.
+
+## Scope ruling and hosted evidence bundle (2026-08-25)
+
+- [x] Independent review finding about remaining JDBC writers was reconciled
+  explicitly: this plan claims JPA cutover for assistant state/knowledge and
+  registration mutation writers, not a whole-domain conversion. Catalog/admin,
+  academic-read, thesis-group and auth compatibility JDBC paths are a named
+  follow-up wave requiring their own parity proof.
+- [x] The resend cooldown enumeration finding was repaired and covered by an
+  H2 regression; known and unknown addresses now receive the same accepted
+  response and no mail is sent during cooldown.
+- [x] Redacted, commit-bound Supabase evidence was added under
+  `reports/supabase-student-management-evidence/`. It records target identity,
+  external artifact hashes, Flyway output summary, before/after managed-schema
+  counts, row counts, advisor results, SSL/JIT state and the rollback boundary.
+- [x] Hosted schema synchronization is structurally PASS for the empty B20
+  baseline. It is infrastructure-only; application readiness, hosted restore
+  rehearsal and production traffic remain `HOLD/NOT_PROVEN`.

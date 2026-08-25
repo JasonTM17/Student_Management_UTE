@@ -16,6 +16,7 @@ import org.springframework.stereotype.Repository;
 public class AuthChallengeRepository {
 
     private static final String TABLE = "\"campuscore_auth\".\"AuthChallenge\"";
+    private static final String USER_TABLE = "\"campuscore_auth\".\"User\"";
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -30,6 +31,13 @@ public class AuthChallengeRepository {
             String tokenHash,
             Instant expiresAt,
             Instant createdAt) {
+        // The parent user row is the serialization point for the
+        // (userId,purpose) challenge stream.  Locking it even when no
+        // challenge row exists closes the phantom-row race between the
+        // invalidate and insert statements under PostgreSQL READ COMMITTED.
+        if (!lockUser(userId)) {
+            throw new IllegalStateException("Cannot create a challenge for a missing user");
+        }
         invalidateActive(userId, purpose, createdAt);
         jdbc.update(
                 "INSERT INTO " + TABLE
@@ -44,6 +52,32 @@ public class AuthChallengeRepository {
                         .addValue("expiresAt", localDateTime(expiresAt))
                         .addValue("sentAt", localDateTime(createdAt))
                         .addValue("createdAt", localDateTime(createdAt)));
+    }
+
+    /**
+     * Serializes all lifecycle challenge writers and consumers for one user.
+     * Callers keep this lock until their surrounding transaction commits.
+     */
+    public boolean lockUser(String userId) {
+        return jdbc.query(
+                        "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :userId FOR UPDATE",
+                        new MapSqlParameterSource("userId", userId),
+                        (rs, ignored) -> rs.getString("id"))
+                .stream()
+                .findFirst()
+                .isPresent();
+    }
+
+    public Optional<String> findUserId(String challengeId, Purpose purpose) {
+        return jdbc.query(
+                        "SELECT \"userId\" FROM " + TABLE
+                                + " WHERE \"id\" = :id AND \"purpose\" = :purpose",
+                        new MapSqlParameterSource()
+                                .addValue("id", challengeId)
+                                .addValue("purpose", purpose.name()),
+                        (rs, ignored) -> rs.getString("userId"))
+                .stream()
+                .findFirst();
     }
 
     public void invalidateActive(String userId, Purpose purpose, Instant at) {

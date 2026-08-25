@@ -1,0 +1,94 @@
+{
+  "evidence_version": 1,
+  "observed_at": "2026-08-25",
+  "target": {
+    "name": "Student_Management",
+    "project_ref": "kbptwmwitojjjwvwckom",
+    "region": "ap-south-1",
+    "status": "ACTIVE_HEALTHY",
+    "postgres": "17.6",
+    "healthcare_project_ref": "awaknzhadjglbfkhigck",
+    "healthcare_write_performed": false
+  },
+  "source": {
+    "candidate_branch": "feature/campuscore-java25-jpa-enrollment",
+    "candidate_sha_at_sync": "b5ee38320bfdc30ab6e6e960039d03b643c6cb62",
+    "flyway_version": "11.7.2",
+    "baseline": "B20__campuscore_supabase_baseline.sql",
+    "baseline_sha256": "B465E08D9DEAE7AC5D7CA74028699E94EEFB949415F5C767758A7EC63F7D9CDF"
+  },
+  "external_artifacts": [
+    {
+      "purpose": "schema_only_pre_write_backup",
+      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\campuscore-supabase-preflight-20260825\\student_management-schema-before.sql",
+      "sha256": "F42192E9C5951A8302F072A1184C58A509FF6900D4EA3017EFF0348837240E55",
+      "retained_outside_repository": true,
+      "contains_application_rows": false
+    },
+    {
+      "purpose": "managed_schema_before_snapshot",
+      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\campuscore-supabase-preflight-20260825\\student_management-before-snapshot.json",
+      "sha256": "FCD6A2F65BD2D1F8BEDEE8D16FF1F8D5C1F66D47B4B057BBD2364A2648F23026",
+      "retained_outside_repository": true
+    },
+    {
+      "purpose": "managed_schema_after_snapshot",
+      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\campuscore-supabase-preflight-20260825\\student_management-after-snapshot.json",
+      "sha256": "5E300A42F71C56B334B19F22196A038830C4C56B6C194B35310ECD2F15121664",
+      "retained_outside_repository": true
+    },
+    {
+      "purpose": "post_apply_row_counts",
+      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\campuscore-supabase-preflight-20260825\\student_management-after-row-counts.json",
+      "sha256": "E87613012383C29B5C2D214D84E717B110234FC1B53B6B7EC967E5C24D58CEDE",
+      "retained_outside_repository": true
+    },
+    {
+      "purpose": "post_apply_acceptance",
+      "path": "C:\\Users\\Admin\\AppData\\Local\\Temp\\campuscore-supabase-preflight-20260825\\student_management-post-apply-acceptance.json",
+      "sha256": "57CBDFE1BA9A39179D2BC20D495449153C8EA8EEFF74C766AB6E9B9EB0465788",
+      "retained_outside_repository": true
+    }
+  ],
+  "preflight": {
+    "application_schemas_before": 0,
+    "application_tables_before": 0,
+    "application_rows_before": 0,
+    "managed_relations_before": 36,
+    "managed_owner_changed": false,
+    "flyway_history_before": 0,
+    "backup_status": "schema_only_external_artifact"
+  },
+  "apply": {
+    "selected_migration": "B20",
+    "applied_version": 20,
+    "successful_baseline_count": 1,
+    "validate_migrations": 22,
+    "ssl_enforcement": "enabled",
+    "jit_mapping_after": "revoked",
+    "jit_feature_after": "disabled"
+  },
+  "postflight": {
+    "campuscore_schemas": 6,
+    "application_tables": 48,
+    "private_auth_views": 2,
+    "non_history_application_tables_with_rows": 0,
+    "flyway_history_rows": 2,
+    "managed_relations_after": 36,
+    "managed_snapshot_unchanged": true,
+    "security_advisor_lints": 0,
+    "performance_advisor_info_notices": 66,
+    "performance_notices_are_empty_db_info_only": true
+  },
+  "rollback": {
+    "pitr_enabled": false,
+    "restore_point_available": false,
+    "hosted_restore_rehearsal": "HOLD_NOT_PROVEN",
+    "traffic_cutover": "NOT_AUTHORIZED"
+  },
+  "secret_scan": {
+    "raw_access_token_in_repository": false,
+    "raw_password_in_repository": false,
+    "raw_challenge_token_in_repository": false
+  }
+}
