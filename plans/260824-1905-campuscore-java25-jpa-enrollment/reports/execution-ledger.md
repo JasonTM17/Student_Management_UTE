@@ -762,4 +762,47 @@ evidence was unavailable; no application traffic cutover is authorized.
 - Resume point: collect focused regression results, complete the minimal
   User-before-Session and registration-validator repairs, then update this
   ledger and freeze a successor. No archive tag, push, release, merge or branch
-  deletion has occurred; all publication and cleanup gates remain pending.
+ deletion has occurred; all publication and cleanup gates remain pending.
+
+## Registration contract repair and terminal matrix (2026-08-26)
+
+- [x] Reviewer findings on the prior clean successor were repaired narrowly:
+  `RegistrationWorkspace.tsx` and `types.ts` now consume the backend's
+  `eligibilityState` field, with a source regression rejecting the stale
+  `eligibility?.state` access. The legacy admin
+  `DELETE /api/v1/enrollments/{id}` compatibility route now requires a UUID
+  `Idempotency-Key`, delegates to `RegistrationService.dropAsAdmin`, emits
+  deprecation/successor and replay headers, and no longer calls the physical
+  `AcademicMutationService.deleteEnrollment` writer. A Mockito controller
+  regression proves the delegation and headers.
+- [x] Focused post-repair evidence: frontend registration contract suite is
+  included in `npm test` (45/45), frontend typecheck, zero-warning lint and
+  production build pass. Mobile tests/typecheck pass 23/23. Java 25 focused
+  tests pass `AcademicMutationControllerContractTest` 1/1,
+  `RegistrationEligibilityPolicyPersistenceTest` 8/8 and
+  `RestfulApiContractTest` 8/8.
+- [x] Java 25 terminal reactor on this source passed 48 Surefire suites,
+  229 tests, zero failures/errors/skips. Fresh PostgreSQL 15.19 authority
+  databases in task-owned container `campuscore-pg-e25d` passed
+  `AuthConcurrencyPostgresIT` 10/10 on
+  `campuscore_final_auth_20260826`, `RegistrationPostgresConcurrencyIT`
+  6/6 on `campuscore_final_registration_20260826`, and
+  `ThesisAssistantTurnLedgerPostgresIT` 12/12 on
+  `campuscore_final_assistant_20260826`; Flyway reached V21 in each.
+- [x] Authenticated Chrome-channel Playwright/Mailpit E2E was first `NOT_RUN`
+  because the host lacked Playwright ffmpeg; the exact local runtime binary
+  was installed and the same disposable runner was rerun. Project
+  `campuscore-course-e2e-final-20260826` passed all 6 scenarios in 1.3
+  minutes, with `frontend/test-results/playwright/.last-run.json` reporting
+  `status: passed` and an empty `failedTests` array. The runner removed only
+  that project's containers, volume and network.
+- [x] Current-source hygiene gates pass: assistant secret scan (559
+  git-visible files, values redacted), text-encoding, documentation hygiene,
+  normal/E2E Compose config, `git diff --check`, and
+  `git fsck --connectivity-only --no-progress`. The fsck output contains
+  pre-existing dangling objects but no connectivity error.
+- [ ] Fresh exact-head Kongming, Wukong and code-review evidence is still
+  required on the next clean commit. No archive tag, push, merge, release,
+  publication or branch/worktree cleanup is authorized before those reviews
+  and dirty-main identity checks pass. Live DeepSeek/provider billing, remote
+  CI and production cutover remain unobserved/HOLD.
