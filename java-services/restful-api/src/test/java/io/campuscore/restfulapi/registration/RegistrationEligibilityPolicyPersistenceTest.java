@@ -2,6 +2,10 @@ package io.campuscore.restfulapi.registration;
 
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.assertj.core.api.Assertions.assertThatThrownBy;
+import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.campuscore.restfulapi.registration.RegistrationDtos.EnrollmentRequest;
 import java.sql.Time;
@@ -11,8 +15,12 @@ import java.util.UUID;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.http.MediaType;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
+import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 
@@ -22,6 +30,7 @@ import org.springframework.test.context.TestPropertySource;
  * semester data when deciding a mutation.
  */
 @SpringBootTest
+@AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
         "spring.datasource.url=jdbc:h2:mem:registration_eligibility_policy;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1",
@@ -41,6 +50,9 @@ class RegistrationEligibilityPolicyPersistenceTest {
 
     @Autowired
     private RegistrationService registration;
+
+    @Autowired
+    private MockMvc mvc;
 
     @BeforeEach
     void prepareFixture() {
@@ -158,6 +170,42 @@ class RegistrationEligibilityPolicyPersistenceTest {
                 .extracting(error -> ((RegistrationProblemException) error).code())
                 .isEqualTo("COHORT_NOT_ELIGIBLE");
         assertUnchangedAfterRejectedEnrollment();
+
+        RegistrationDtos.RoundView afterUpdate = registration.round(ROUND);
+        RegistrationDtos.RoundView preserved = registration.adminUpdate(ROUND,
+                new AdminRegistrationController.AdminRoundRequest(
+                        afterUpdate.semesterId(), afterUpdate.registrationStart(), afterUpdate.registrationEnd(),
+                        afterUpdate.addDropStart(), afterUpdate.addDropEnd(), afterUpdate.maxCredits(),
+                        afterUpdate.institutionTimeZone(), afterUpdate.version(), null).toService());
+        assertThat(preserved.cohortYears()).containsExactly(1);
+        assertThat(jdbc.queryForList(
+                "SELECT \"cohortCode\" FROM academic.\"RegistrationCohortWindow\" WHERE \"roundId\" = ? ORDER BY \"priorityRank\"",
+                String.class, ROUND)).containsExactly("1");
+    }
+
+    @Test
+    void adminHttpUpdateReturnsAndPersistsStudyYearAllowlist() throws Exception {
+        RegistrationDtos.RoundView current = registration.round(ROUND);
+        String body = """
+                {"semesterId":"%s","registrationStart":"%s","registrationEnd":"%s",
+                 "addDropStart":"%s","addDropEnd":"%s","maxCredits":28,
+                 "institutionTimeZone":"Asia/Ho_Chi_Minh","version":%d,"cohortYears":[1,2]}
+                """.formatted(SEMESTER, current.registrationStart(), current.registrationEnd(),
+                current.addDropStart(), current.addDropEnd(), current.version());
+
+        mvc.perform(put("/api/v1/admin/registration/rounds/{roundId}", ROUND)
+                        .with(jwt().jwt(token -> token.subject("admin-user").claim("roles", java.util.List.of("ADMIN")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(body))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.cohortYears[0]").value(1))
+                .andExpect(jsonPath("$.cohortYears[1]").value(2));
+
+        assertThat(registration.round(ROUND).cohortYears()).containsExactly(1, 2);
+        assertThat(jdbc.queryForList(
+                "SELECT \"cohortCode\" FROM academic.\"RegistrationCohortWindow\" WHERE \"roundId\" = ? ORDER BY \"priorityRank\"",
+                String.class, ROUND)).containsExactly("1", "2");
     }
 
     private void assertUnchangedAfterRejectedEnrollment() {

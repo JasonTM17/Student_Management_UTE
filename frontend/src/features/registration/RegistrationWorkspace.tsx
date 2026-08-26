@@ -144,8 +144,9 @@ export default function RegistrationWorkspace() {
       const active = nextRoundId || roundId || nextRounds.find((item) => ['OPEN', 'REGISTRATION_OPEN', 'ADD_DROP_OPEN'].includes(item.status))?.id || nextRounds[0]?.id;
       if (!active) { setRound(null); setSections([]); setLoading(false); return; }
       setRoundId(active);
-      const [roundDetail, sectionPage, nextEligibility, nextSummary, enrollmentPage] = await Promise.all([
-        registrationApi.getRound(active), registrationApi.getSections(active), registrationApi.getEligibility(active), registrationApi.getSummary(active), registrationApi.getEnrollments(),
+      const roundDetail = await registrationApi.getRound(active);
+      const [sectionPage, nextEligibility, nextSummary, enrollmentPage] = await Promise.all([
+        registrationApi.getSections(active), registrationApi.getEligibility(active), registrationApi.getSummary(active), registrationApi.getEnrollments(roundDetail.semesterId ?? undefined),
       ]);
       setRound(roundDetail); setServerOffset(roundDetail.serverNow ? new Date(roundDetail.serverNow).getTime() - Date.now() : 0); setSections(sectionPage.items.map((item) => normalizeSection(item))); setEligibility(nextEligibility); setSummary(nextSummary); setEnrollments(enrollmentPage.items.map((item) => normalizeEnrollment(item))); setSelected([]);
     } catch (error) {
