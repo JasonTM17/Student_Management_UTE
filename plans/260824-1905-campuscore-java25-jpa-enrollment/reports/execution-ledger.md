@@ -913,3 +913,36 @@ evidence was unavailable; no application traffic cutover is authorized.
   billing, remote CI, native device execution and production cutover remain
   unobserved/HOLD. Preserve the dirty main checkout and task-owned PostgreSQL
   container/DBs until the final safe-boundary decision.
+
+## Merge, image smoke and publication boundary (2026-08-26)
+
+- [x] Feature branch `feature/campuscore-java25-jpa-enrollment` was pushed
+  fast-forward to `d4a0076da6ee7abbac4bb799f5144b567460ba5f`; remote
+  `refs/heads/feature/campuscore-java25-jpa-enrollment` resolves to that SHA.
+  Archive tag `archive/campuscore-java25-jpa-enrollment-20260826` was created
+  and pushed; its annotated tag object resolves to the same commit.
+- [x] A clean detached integration worktree was fast-forwarded from base
+  `38c7447974f93553596d30e4cbb15d5ce626fa28` to the candidate. Local `main`
+  was then atomically advanced to the integration SHA without touching its
+  working files. The root had 68 dirty paths; their content hash remained
+  `c61d351b73aad2a0744fd4528f6f0e6a14696294a2cdd5b73990109a2cd5711a` and
+  index tree `b021e25ba4a07dcfda7c802ac165ef4115ba694e` before and after. A
+  named `wip/campuscore-main-20260826` ref preserves the pre-merge main SHA.
+- [x] Immutable local images were built from the integration tree with full
+  revision labels and SHA tags: `campuscore-restful-api:d4a0076d`
+  (`sha256:721488c58991093f93564750791ef9c02c701478668d3dab498865a07e1e5210`)
+  and `campuscore-frontend:d4a0076d`
+  (`sha256:4c23f6a369e7fd6be3018a16298538607075155bdff5de4b686bf72fafdbb6b2`).
+  API smoke returned liveness/readiness 200; a rerun of the web smoke returned
+  HTTP 200 and Docker health `healthy`. Smoke containers were disposable and
+  removed by exact name; no default container or volume was touched.
+- [ ] Docker Hub/GitHub package publication is `NOT_RUN`: Docker credentials
+  are present, but the plan does not name authorized destination repositories,
+  so no new public repository or image push was invented. Live DeepSeek,
+  remote CI, native device, production deployment and Supabase application
+  data writes remain unobserved/HOLD.
+- Resume point: commit this ledger/phase closure, fast-forward the clean
+  integration worktree and local `main` to that final docs SHA, rerun the
+  exact-head review wave, then delete only the merged candidate branch and
+  disposable worktrees after the final identity check. Keep the pushed feature
+  branch and archive tag unless the user separately requests remote deletion.
