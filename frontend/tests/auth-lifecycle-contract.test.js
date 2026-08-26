@@ -76,3 +76,17 @@ test('verification outage copy does not claim whether a token was consumed', () 
   assert.match(messages, /verificationUnavailable: 'Dịch vụ xác minh tạm thời chưa sẵn sàng\.[^']*nếu đã xác minh thành công, hãy đăng nhập\.'/);
   assert.doesNotMatch(messages, /has not been consumed|chưa bị sử dụng/);
 });
+
+test('explicit auth state transitions reject stale background refresh commits', () => {
+  const { AuthStateFence } = require('../src/context/auth-state-fence.ts');
+  const fence = new AuthStateFence();
+  let user = null;
+
+  const staleRefresh = fence.capture();
+  fence.invalidate();
+  user = { email: 'student@example.test' };
+  assert.equal(staleRefresh.commit(() => {
+    user = null;
+  }), false);
+  assert.deepEqual(user, { email: 'student@example.test' });
+});

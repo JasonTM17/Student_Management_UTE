@@ -60,7 +60,18 @@ async function login(page: Page, email: string, password: string) {
   await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
 }
 
+async function refreshBrowserSession(page: Page) {
+  const csrfCookie = (await page.context().cookies()).find((cookie) => cookie.name === 'cc_csrf');
+  expect(csrfCookie, 'login must create the CSRF cookie used by cookie-authenticated refresh').toBeDefined();
+  const response = await page.request.post('/api/v1/auth/refresh', {
+    data: {},
+    headers: { 'X-CSRF-Token': csrfCookie!.value },
+  });
+  expect(response.status()).toBe(200);
+}
+
 test('student completes browser registration, verification, reset, and fresh login through captured mail', async ({ page, request }) => {
+  test.setTimeout(60_000);
   const suffix = `${Date.now()}-${test.info().workerIndex}`;
   const email = `browser-auth-${suffix}@example.test`;
   const firstPassword = 'CampusCore!234';
@@ -88,8 +99,15 @@ test('student completes browser registration, verification, reset, and fresh log
   await expect(page.getByRole('status')).toContainText('Email verified');
 
   await login(page, email, firstPassword);
+  await refreshBrowserSession(page);
   await page.goto(`${localePrefix}/dashboard/sign-out`);
   await expect(page).toHaveURL(/\/login(?:$|[/?#])/);
+  await expect.poll(async () => {
+    const names = (await page.context().cookies()).map((cookie) => cookie.name);
+    return ['cc_access_token', 'cc_refresh_token', 'cc_csrf'].filter((name) => names.includes(name));
+  }).toEqual([]);
+  const rejectedRefresh = await page.request.post('/api/v1/auth/refresh', { data: {} });
+  expect([400, 401]).toContain(rejectedRefresh.status());
 
   await page.goto(`${localePrefix}/forgot-password`);
   await page.getByLabel('Email address').fill(email);

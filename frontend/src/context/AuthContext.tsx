@@ -7,12 +7,14 @@ import React, {
   useContext,
   useEffect,
   useMemo,
+  useRef,
   useState,
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/i18n';
 import { User } from '@/types/api';
 import { authApi } from '@/lib/api';
+import { AuthStateFence } from '@/context/auth-state-fence';
 
 interface AuthContextType {
   user: User | null;
@@ -35,13 +37,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [user, setUser] = useState<User | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isLoggingOut, setIsLoggingOut] = useState(false);
+  const authStateFenceRef = useRef(new AuthStateFence());
 
   const refreshUser = useCallback(async () => {
+    const snapshot = authStateFenceRef.current.capture();
+
     try {
       const userData = await authApi.me();
-      setUser(userData);
+      snapshot.commit(() => setUser(userData));
     } catch {
-      setUser(null);
+      snapshot.commit(() => setUser(null));
     }
   }, []);
 
@@ -58,6 +63,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, [refreshUser]);
 
   const login = useCallback(async (email: string, password: string) => {
+    authStateFenceRef.current.invalidate();
     const response = await authApi.login(email, password);
     setIsLoggingOut(false);
     setUser(response.user);
@@ -65,6 +71,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   }, []);
 
   const logout = useCallback(async () => {
+    authStateFenceRef.current.invalidate();
     setIsLoggingOut(true);
     try {
       await authApi.logout();
