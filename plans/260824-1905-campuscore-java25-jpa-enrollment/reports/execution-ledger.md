@@ -855,3 +855,24 @@ evidence was unavailable; no application traffic cutover is authorized.
 - [ ] Independent exact-head Kongming, Wukong and code review remain required
   after this evidence-only ledger update. Push, merge, publication, archive
   tag and cleanup remain behind that review and dirty-main identity gate.
+
+## Mobile registration contract repair (2026-08-26)
+
+- [x] Fresh reviewer evidence identified a mobile/backend mismatch: the
+  deprecated `campusApi.enroll` helper expected a flat enrollment while the
+  compatibility route now returns the canonical `EnrollmentMutationResponse`
+  wrapper, and `MobileEnrollment` required `semesterId` that the canonical
+  `SectionView` does not carry.
+- [x] `mobile/src/api/client.ts` now models `roundId`, optional semester
+  context and nullable enrollment timestamps, normalizes canonical enrollment
+  views with explicit round/semester hints, unwraps the legacy helper without
+  changing its flat caller-facing shape, and normalizes registration list and
+  mutation responses. New runtime assertions cover wrapper unwrapping,
+  idempotency forwarding and context preservation.
+- [x] Mobile source-contract and runtime suites pass 24/24 with zero failures;
+  `npm run typecheck` passes on the repaired client. `git diff --check` passes.
+- [ ] The repaired successor still needs a fresh exact-head Kongming, Wukong
+  and code-review wave before phase 7 can close. No push, merge, publication,
+  archive tag or cleanup has occurred.
+- Resume point: commit this bounded mobile repair, then rerun the required
+  exact-source focused/runtime checks and freeze the review snapshot.

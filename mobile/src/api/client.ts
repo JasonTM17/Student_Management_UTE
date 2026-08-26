@@ -116,7 +116,8 @@ export interface MobileSection {
   courseName?: string;
   credits?: number;
   sectionNumber: string;
-  semesterId: string;
+  /** Registration SectionView carries round context outside the DTO. */
+  semesterId?: string;
   capacity: number;
   enrolledCount: number;
   status: string;
@@ -132,8 +133,11 @@ export interface MobileSection {
 export interface MobileEnrollment {
   id: string;
   sectionId: string;
-  semesterId: string;
+  roundId?: string;
+  /** Legacy academic reads include this; canonical registration views do not. */
+  semesterId?: string;
   status: string;
+  enrolledAt?: string | null;
   finalGrade?: number | null;
   letterGrade?: string | null;
   gradeStatus?: string;
@@ -680,6 +684,44 @@ type RegistrationSnapshot = {
 let registrationSnapshot: RegistrationSnapshot = {};
 export function getRegistrationSnapshot() { return registrationSnapshot; }
 
+/**
+ * Normalize the canonical Java EnrollmentView into the mobile read model.
+ * Registration SectionView intentionally omits semesterId because the round
+ * endpoint supplies that context; callers pass the known round/semester as a
+ * hint so mobile cards retain stable filtering metadata without inventing it.
+ */
+export function normalizeRegistrationEnrollment(
+  enrollment: MobileEnrollment,
+  roundIdHint?: string,
+  semesterIdHint?: string,
+): MobileEnrollment {
+  const roundId = enrollment.roundId ?? roundIdHint;
+  const semesterId = enrollment.semesterId ?? semesterIdHint;
+  const section = enrollment.section
+    ? {
+      ...enrollment.section,
+      ...(semesterId ? { semesterId } : {}),
+    }
+    : undefined;
+  return {
+    ...enrollment,
+    ...(roundId ? { roundId } : {}),
+    ...(semesterId ? { semesterId } : {}),
+    ...(section ? { section } : {}),
+  };
+}
+
+function normalizeRegistrationMutation(
+  response: EnrollmentMutationResponse,
+  roundIdHint?: string,
+  semesterIdHint?: string,
+): EnrollmentMutationResponse {
+  return {
+    ...response,
+    enrollment: normalizeRegistrationEnrollment(response.enrollment, roundIdHint, semesterIdHint),
+  };
+}
+
 export const campusApi = {
   health: () => apiClient.get<JsonObject>(apiRoutes.health),
   contract: () => apiClient.get<JsonObject>(apiRoutes.contract),
@@ -715,8 +757,20 @@ export const campusApi = {
     apiClient.get<MobileEnrollment[]>(
       apiRoutes.enrollments + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  enroll: (sectionId: string, locale: AssistantLocale = 'vi', idempotencyKey = createIdempotencyKey()) =>
-    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  enroll: async (sectionId: string, locale: AssistantLocale = 'vi', idempotencyKey = createIdempotencyKey()) => {
+    const response = await apiClient.post<EnrollmentMutationResponse>(
+      '/enrollments/enroll',
+      { sectionId, locale },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+    // The deprecated route now shares the canonical MutationResponse wrapper;
+    // keep this legacy helper flat for existing mobile callers.
+    return normalizeRegistrationEnrollment(
+      response.enrollment,
+      response.enrollment.roundId,
+      registrationSnapshot.round?.semesterId,
+    );
+  },
   dropEnrollment: (enrollmentId: string, idempotencyKey = createIdempotencyKey()) =>
     apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}, { headers: { 'Idempotency-Key': idempotencyKey } }),
   registrationRounds: async (semesterId?: string) => {
@@ -732,7 +786,11 @@ export const campusApi = {
     return round;
   },
   registrationSections: async (roundId: string) => {
-    const sections = await apiClient.get<MobileSection[]>(`${apiRoutes.registration.rounds}/${encodeURIComponent(roundId)}/sections`);
+    const sections = (await apiClient.get<MobileSection[]>(`${apiRoutes.registration.rounds}/${encodeURIComponent(roundId)}/sections`))
+      .map((section) => ({
+        ...section,
+        ...(registrationSnapshot.round?.semesterId ? { semesterId: registrationSnapshot.round.semesterId } : {}),
+      }));
     registrationSnapshot = { ...registrationSnapshot, sections };
     return sections;
   },
@@ -751,14 +809,25 @@ export const campusApi = {
     if (semesterId) query.set('semesterId', semesterId);
     if (cursor) query.set('cursor', cursor);
     const response = await apiClient.requestWithMeta<{ items: MobileEnrollment[]; nextCursor?: string | null } | MobileEnrollment[]>(`${apiRoutes.registration.enrollments}?${query.toString()}`, { method: 'GET' });
-    const payload = Array.isArray(response.data) ? response.data : response.data.items ?? [];
+    const payload = (Array.isArray(response.data) ? response.data : response.data.items ?? [])
+      .map((enrollment) => normalizeRegistrationEnrollment(
+        enrollment,
+        enrollment.roundId,
+        semesterId ?? registrationSnapshot.round?.semesterId,
+      ));
     registrationSnapshot = { ...registrationSnapshot, enrollments: payload };
     return { items: payload, nextCursor: response.headers.get('X-Next-Cursor') || (Array.isArray(response.data) ? null : response.data.nextCursor) };
   },
   validateEnrollment: (sectionId: string, roundId: string) =>
     apiClient.post<RegistrationValidationResponse>(apiRoutes.registration.validate, { sectionId, roundId }),
-  registrationEnroll: (sectionId: string, roundId: string, idempotencyKey: string) =>
-    apiClient.post<EnrollmentMutationResponse>(apiRoutes.registration.enrollments, { sectionId, roundId }, { headers: { 'Idempotency-Key': idempotencyKey } }),
+  registrationEnroll: async (sectionId: string, roundId: string, idempotencyKey: string) => {
+    const response = await apiClient.post<EnrollmentMutationResponse>(
+      apiRoutes.registration.enrollments,
+      { sectionId, roundId },
+      { headers: { 'Idempotency-Key': idempotencyKey } },
+    );
+    return normalizeRegistrationMutation(response, roundId, registrationSnapshot.round?.semesterId);
+  },
   registrationDrop: (enrollmentId: string, idempotencyKey: string) =>
     apiClient.delete<DropMutationResponse>(`${apiRoutes.registration.enrollments}/${encodeURIComponent(enrollmentId)}`, { headers: { 'Idempotency-Key': idempotencyKey } }),
   registrationSlip: (roundId: string) =>
