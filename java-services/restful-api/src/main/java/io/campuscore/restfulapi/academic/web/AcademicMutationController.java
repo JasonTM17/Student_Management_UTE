@@ -1,10 +1,9 @@
 package io.campuscore.restfulapi.academic.web;
 
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
-import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.EnrollRequest;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdateRequest;
+import io.campuscore.restfulapi.registration.RegistrationDtos.MutationResponse;
 import io.campuscore.restfulapi.registration.RegistrationService;
 import jakarta.validation.Valid;
 import java.util.List;
@@ -33,20 +32,17 @@ import org.springframework.web.bind.annotation.RestController;
 public class AcademicMutationController {
 
     private final AcademicMutationService mutations;
-    private final AcademicEnrollmentReadService enrollmentReads;
     private final RegistrationService registration;
 
     public AcademicMutationController(AcademicMutationService mutations,
-                                      AcademicEnrollmentReadService enrollmentReads,
                                       RegistrationService registration) {
         this.mutations = mutations;
-        this.enrollmentReads = enrollmentReads;
         this.registration = registration;
     }
 
     @PostMapping("enrollments/enroll")
     @PreAuthorize("hasRole('STUDENT') and principal.claims['emailVerified'] == true")
-    public EnrollmentResponse enroll(
+    public MutationResponse enroll(
             @AuthenticationPrincipal Jwt jwt,
             @Valid @RequestBody EnrollRequest request,
             @RequestHeader("Idempotency-Key") UUID key,
@@ -55,8 +51,7 @@ public class AcademicMutationController {
         RegistrationService.MutationResult result = registration.enrollBySection(
                 jwt.getClaimAsString("studentId"), request.sectionId(), key);
         response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
-        return enrollmentReads.findEnrollment(result.enrollment().id(), jwt.getClaimAsStringList("roles"),
-                jwt.getClaimAsString("studentId"));
+        return new MutationResponse(result.enrollment(), result.replayed(), key.toString());
     }
 
     @PostMapping("enrollments/{id}/drop")

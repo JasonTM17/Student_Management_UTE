@@ -806,3 +806,29 @@ evidence was unavailable; no application traffic cutover is authorized.
   publication or branch/worktree cleanup is authorized before those reviews
   and dirty-main identity checks pass. Live DeepSeek/provider billing, remote
   CI and production cutover remain unobserved/HOLD.
+
+## Compatibility replay and knowledge-domain repair (2026-08-26)
+
+- [x] Fresh exact-head review at `bcc021f` found two actionable contract gaps:
+  the deprecated compatibility enrollment route reread mutable enrollment state
+  after an idempotent replay, and the thesis knowledge admin endpoint accepted
+  `domain=ACADEMIC` without applying a domain boundary. Both findings were
+  treated as `NOW` because they could return a post-drop payload or expose the
+  wrong curated surface.
+- [x] The compatibility enrollment route now returns the immutable
+  `RegistrationDtos.MutationResponse` produced by `RegistrationService`, with
+  the replay flag and client request id, and no longer depends on the JDBC
+  enrollment read adapter. A two-call Mockito regression proves the first and
+  replayed calls return the same writer payload.
+- [x] The curated admin knowledge list is explicitly thesis-scoped: omitted or
+  `THESIS` domain reads the repository, while any other domain (including
+  `ACADEMIC`) returns an empty result before repository access. A controller
+  regression proves the non-thesis request cannot read thesis documents.
+- [x] Java 25 focused Maven tests on this dirty successor pass 4/4 with zero
+  failures/errors/skips: `AcademicMutationControllerContractTest` 2/2 and
+  `ThesisAssistantKnowledgeAdminControllerContractTest` 2/2. Full terminal,
+  PostgreSQL authority, FE/mobile, browser/Mailpit, hygiene and fresh
+  exact-head review gates must be rerun after this source change.
+- Resume point: commit this bounded repair, then run the terminal matrix and
+  freeze a successor for independent Kongming/Wukong/code review. No push,
+  merge, publication or cleanup has occurred.

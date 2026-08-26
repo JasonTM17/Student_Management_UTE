@@ -53,10 +53,13 @@ public class ThesisAssistantKnowledgeAdminController {
     public List<KnowledgeDocumentView> list(
             @RequestParam(required = false) String domain,
             @RequestParam(required = false) String state) {
-        if (domain != null
-                && !domain.isBlank()
-                && !"THESIS".equalsIgnoreCase(domain)
-                && !"ACADEMIC".equalsIgnoreCase(domain)) {
+        // This curated repository is the thesis-assistant source of truth. The
+        // academic catalog is a separate, read-only coverage boundary, so an
+        // explicit non-thesis domain must never receive thesis documents.
+        String requestedDomain = domain == null || domain.isBlank()
+                ? "THESIS"
+                : domain.trim().toUpperCase(java.util.Locale.ROOT);
+        if (!"THESIS".equals(requestedDomain)) {
             return List.of();
         }
         String requestedState = state == null || state.isBlank()
