@@ -3,11 +3,12 @@
 ## Current state
 
 Writer waves have delivered Java 25/JPA, registration, assistant, web and
-mobile slices in the isolated feature worktree. Local focused/full gates,
-Mailpit/browser flows and PostgreSQL concurrency rehearsals are green. The
-Flyway fail-closed repair and FE/BE terminal defect pass are verified; the
-candidate is ready to be committed and frozen for exact-head review. This
-handoff must not be read as merge approval before those reviews finish.
+mobile slices in the isolated feature worktree. The fresh review of clean
+`42a32ddf6fa46c1dd07c8abd4844ff3481cb75f6` found auth lock-order and
+registration-policy defects. Phase 7 is repairing these findings with focused
+regressions; historical green suites are not approval of the repaired source.
+See the active plan's execution ledger for the exact resume point. Merge,
+publication and cleanup remain on hold until the successor gates pass.
 
 ## Required read-only lanes
 
@@ -22,10 +23,13 @@ handoff must not be read as merge approval before those reviews finish.
 
 ## Open gates
 
-- authenticated Playwright: `PASS (5/5)`; native device runtime: `NOT_RUN`;
+- authenticated Playwright: previous full matrix `PASS (6/6)` plus the later
+  focused Mailpit/refresh/logout lifecycle `PASS`; affected successor checks
+  remain pending; native device runtime: `NOT_RUN`;
 - final Flyway guard matrix: `PASS (25/25 PostgreSQL authority matrix in total)`;
-- fresh exact-head Kongming/Wukong/FE/test/debug/code review: `PENDING` until
-  the clean candidate commit is frozen;
+- fresh exact-head review: Kongming `FAIL` at `42a32dd`; Wukong
+  `BLOCKED_CAPABILITY` before a final verdict; successor
+  Kongming/Wukong/FE/test/debug/code reviews remain required;
 - live DeepSeek, remote CI, push/PR and production: separate gates;
 - whole-domain academic/catalog/admin/thesis JDBC writer conversion and
   compatibility-alias parity: `DEFERRED/FOLLOW-UP` (outside the bounded

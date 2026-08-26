@@ -94,7 +94,7 @@ destructive cleanup without an exact authorized target.
 | 5 | Mobile parity | JSON registration/auth, retry/offline/session states and typecheck pass; device status honest | completed |
 | 6 | Consolidation and docs | Runtime scan shows one API + PostgreSQL; docs/OpenAPI/CI match implementation | completed |
 | 6A | Supabase `Student_Management` synchronization | Exact project and remote backup/drift are verified; compatible reviewed migrations/data are applied and queried without copying volatile/security data | completed |
-| 7 | Independent review and handoff | Exact-head reviews, focused/full gates, split commits and branch push complete | pending |
+| 7 | Independent review and handoff | Exact-head reviews, focused/full gates, split commits and branch push complete | in-progress |
 | 8 | Container/package and repository publication | Immutable Docker Hub images, verified digests, GitHub About/Release/package links, safe merge and branch cleanup complete | pending |
 
 ## Public contract
