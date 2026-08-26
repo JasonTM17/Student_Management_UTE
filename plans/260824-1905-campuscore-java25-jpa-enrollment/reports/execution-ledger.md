@@ -603,6 +603,36 @@ evidence was unavailable; no application traffic cutover is authorized.
   archive tag, Docker push, GitHub release, merge or branch cleanup is
   authorized before those gates.
 
+## Successor exact-head terminal matrix (2026-08-26)
+
+- [x] Frozen candidate `e25d9aee16c2e82427b772b4909fa2ca98ed3499` remained clean
+  during the terminal matrix. The three repair commits are `b6bcbb1c`
+  (auth token/hash scrubbing), `917a3333` (FE assistant unmount/registration
+  scope), `aa4dd65b` (knowledge archive and H2 ledger parity), and `e25d9aee`
+  (early cancellation-handle cleanup).
+- [x] Frontend exact-head gates: `npm test` 44/44, `npm run typecheck`,
+  `npm run lint -- --max-warnings=0`, and `npm run build` all passed. Mobile
+  gates remain 23/23 tests plus typecheck from the same clean source checkpoint.
+- [x] Java 25 Docker `clean verify` passed 47 Surefire suites, 227 tests,
+  zero failures/errors/skips. Focused assistant regressions passed Service 6/6,
+  H2 ledger 17/17, and archived knowledge JPA writer 4/4.
+- [x] Fresh PostgreSQL 15.19 authority databases inside task-owned
+  `campuscore-pg-e25d` passed assistant ledger 12/12, registration concurrency
+  6/6, and auth concurrency 10/10. URLs were explicit and no hosted or
+  developer database was selected.
+- [x] Disposable Playwright/Mailpit runtime on the exact source passed all 6
+  scenarios (`frontend/test-results/playwright/.last-run.json` status `passed`,
+  empty `failedTests`). The runner removed only project
+  `campuscore-course-e2e-e25d-r2` containers, volume and network afterward.
+- [x] Secret scan (558 git-visible files, values redacted), text-encoding,
+  documentation hygiene, normal/E2E Compose config and `git diff --check`
+  passed. Live DeepSeek/provider billing, remote CI, production cutover and
+  registry publication remain unobserved and therefore HOLD.
+- [ ] Fresh exact-head Kongming, Wukong and code-review evidence is still
+  required after this ledger commit; no merge, push, archive tag, release or
+  branch/worktree cleanup is authorized before those reviews and safe-boundary
+  identity checks pass.
+
 ## Auth-mail locale and frontend session-race checkpoint (2026-08-26)
 
 - [x] Commit `fdabcd321671ab27f9a55c2e9e001a7361dd30b5` preserves the
