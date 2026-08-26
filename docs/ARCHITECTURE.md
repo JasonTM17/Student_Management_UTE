@@ -4,8 +4,9 @@
 
 ```text
 Next.js web ─────┐
-                 ├── Java Spring Boot REST API ─── PostgreSQL
-Expo mobile ─────┘
+                 ├── Java Spring Boot REST API ──┐
+Expo mobile ─────┘                               ├── PostgreSQL
+                                                 └── internal RAG service
 ```
 
 The Java application is the only public backend owner of `/api/v1`. Web uses
@@ -46,15 +47,19 @@ schema.
 The thesis assistant performs bounded retrieval over published thesis knowledge
 revisions plus a fixed public academic-catalog projection in PostgreSQL.
 Lexical ranking, locale fallback, immutable source snapshots and server-owned
-citations remain the deterministic baseline. When `DEEPSEEK_ENABLED=true` and a
-server-only `DEEPSEEK_API_KEY` exists, Java may send only the current question
-and filtered snapshot context to the allowlisted DeepSeek chat endpoint using
-`deepseek-v4-flash` with thinking disabled. Provider I/O runs outside the short
-reservation/quota transactions; completion and cancellation compete on one
-terminal CAS. The provider is never called from a client, never receives raw
-history/profile data, and never becomes the source of citations. Timeout,
-quota, circuit, missing-key, no-match, provider, privacy, or database failures
-return a truthful lexical/degraded response.
+citations remain the deterministic baseline. In Docker Compose the public REST
+API keeps the `/api/v1/thesis/assistant` contract and proxies authenticated
+student/lecturer requests to the internal `rag-service` over
+`/internal/rag/thesis/assistant` with a shared service token. When
+`DEEPSEEK_ENABLED=true` and a server-only `DEEPSEEK_API_KEY` exists, the RAG
+service may send only the current question and filtered snapshot context to the
+allowlisted DeepSeek chat endpoint using `deepseek-v4-flash` with thinking
+disabled. Provider I/O runs outside the short reservation/quota transactions;
+completion and cancellation compete on one terminal CAS. The provider is never
+called from a client, never receives raw history/profile data, and never
+becomes the source of citations. Timeout, quota, circuit, missing-key, no-match,
+provider, privacy, or database failures return a truthful lexical/degraded
+response.
 
 The API exposes backward-compatible JSON and an SSE stream. Conversations and
 messages are owner-scoped to students/lecturers, expire after 90 days, and can

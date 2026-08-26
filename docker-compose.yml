@@ -25,6 +25,48 @@ services:
       - "127.0.0.1:${MAILPIT_UI_HOST_PORT:-8025}:8025"
     restart: unless-stopped
 
+  rag-service:
+    build:
+      context: .
+      dockerfile: java-services/restful-api/Dockerfile
+    image: campuscore-rag-service:local
+    container_name: campuscore-rag-service
+    environment:
+      SPRING_PROFILES_ACTIVE: persistence
+      SERVER_PORT: 4011
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-3000}
+      DB_VALIDATION_TIMEOUT_MS: ${DB_VALIDATION_TIMEOUT_MS:-1000}
+      HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
+      FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      ASSISTANT_RAG_SERVICE_MODE: "true"
+      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
+      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-8000}
+      DEEPSEEK_MAX_OUTPUT_TOKENS: ${DEEPSEEK_MAX_OUTPUT_TOKENS:-800}
+      ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
+      ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
+      ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
+      ASSISTANT_GLOBAL_DAILY_QUOTA: ${ASSISTANT_GLOBAL_DAILY_QUOTA:-200}
+      ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-90}
+    expose:
+      - "4011"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4011/api/v1/health/readiness >/dev/null"]
+      interval: 10s
+      timeout: 5s
+      retries: 12
+      start_period: 20s
+    restart: unless-stopped
+
   restful-api:
     build:
       context: .
@@ -44,17 +86,9 @@ services:
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
-      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
-      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
-      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
-      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
-      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-8000}
-      DEEPSEEK_MAX_OUTPUT_TOKENS: ${DEEPSEEK_MAX_OUTPUT_TOKENS:-800}
-      ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
-      ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
-      ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
-      ASSISTANT_GLOBAL_DAILY_QUOTA: ${ASSISTANT_GLOBAL_DAILY_QUOTA:-200}
-      ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-90}
+      ASSISTANT_RAG_BASE_URL: http://rag-service:4011/internal/rag/thesis/assistant
+      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
+      ASSISTANT_RETENTION_ENABLED: "false"
       MAIL_ENABLED: ${MAIL_ENABLED:-true}
       SPRING_MAIL_HOST: ${SPRING_MAIL_HOST:-mailpit}
       SPRING_MAIL_PORT: ${SPRING_MAIL_PORT:-1025}
@@ -71,6 +105,8 @@ services:
         condition: service_healthy
       mailpit:
         condition: service_started
+      rag-service:
+        condition: service_healthy
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4010/api/v1/health/readiness >/dev/null"]
       interval: 10s

@@ -8,7 +8,7 @@ import org.springframework.scheduling.concurrent.ThreadPoolTaskExecutor;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({DeepSeekProperties.class, AssistantProperties.class})
+@EnableConfigurationProperties({DeepSeekProperties.class, AssistantProperties.class, AssistantRagProperties.class})
 public class AssistantConfiguration {
 
     /**

@@ -16,8 +16,8 @@ authorize production deployment.
 ```powershell
 .\mvnw.cmd -q -f java-services/pom.xml verify
 docker compose config
-docker compose build restful-api web
-docker compose up -d postgres mailpit restful-api web
+docker compose build rag-service restful-api web
+docker compose up -d postgres mailpit rag-service restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
@@ -93,10 +93,10 @@ login, refresh, logout and core student flows on an emulator or device.
   screenshots and a provider stub do not prove production readiness.
 - Remove obsolete branches only with `git branch -d` after containment proof.
 - Remove only exact old local microservice image tags after runtime proof.
-- Build API and frontend images with an immutable release tag and full commit
-  tag. Set `JAVA_API_ORIGIN` at container runtime for the frontend proxy, run
-  authenticated API/health smoke checks, push only after `docker login` is
-  verified, and record the resulting Docker Hub digests. Never rely on a
+- Build API, RAG service and frontend images with an immutable release tag and
+  full commit tag. Set `JAVA_API_ORIGIN` at container runtime for the frontend
+  proxy, run authenticated API/health/RAG smoke checks, push only after
+  `docker login` is verified, and record the resulting Docker Hub digests. Never rely on a
   `latest`-only tag.
 - Never run `docker system prune` or `docker volume prune`. The disposable
   `scripts/run-course-e2e.mjs` runner may use `down -v` only with its generated

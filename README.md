@@ -1,11 +1,13 @@
 # CampusCore
 
 CampusCore là đồ án quản lý sinh viên dạng RESTful API tầm trung, gồm một
-Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và một PostgreSQL.
+Spring Boot Java API, một RAG service nội bộ, một ứng dụng Next.js, một ứng
+dụng Expo và một PostgreSQL.
 
 ## Thành phần
 
 - API: `java-services/restful-api`
+- RAG service: `java-services/restful-api` chạy với `ASSISTANT_RAG_SERVICE_MODE=true`
 - Web: `frontend`
 - Mobile: `mobile`
 - Database: PostgreSQL qua Flyway
@@ -18,19 +20,19 @@ Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và m�
 - Đăng ký/hủy học phần, lịch học, điểm và bảng điểm.
 - Announcement và notification inbox.
 - Thesis core: round, topic, group, member, progress/status.
-- Thesis assistant dùng thesis-grounded RAG trong PostgreSQL, có citation,
-  lexical fallback và tùy chọn DeepSeek V4 Flash chỉ ở backend.
+- Thesis assistant dùng `rag-service` nội bộ để thực hiện thesis-grounded RAG
+  trong PostgreSQL, có citation, lexical fallback và tùy chọn DeepSeek V4 Flash.
 
 Finance, analytics, support ticket, vector database, Redis, RabbitMQ, MinIO,
 Nginx, Kubernetes và Cloudflare tunnel không thuộc runtime của đồ án. Bản phát
-hành có thể đóng gói API và web thành hai image immutable; publication không
-đồng nghĩa production cutover. DeepSeek là tích hợp tùy chọn, mặc định tắt và
-không cần để chạy local lexical fallback.
+hành có thể đóng gói API, RAG service và web thành các image immutable;
+publication không đồng nghĩa production cutover. DeepSeek là tích hợp tùy
+chọn, mặc định tắt và không cần để chạy local lexical fallback.
 
 ## Chạy local
 
 ```powershell
-docker compose up -d --build postgres mailpit restful-api web
+docker compose up -d --build postgres mailpit rag-service restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs
@@ -68,10 +70,12 @@ does not satisfy either release gate.
 Chỉ inject secret ở process/server runtime sau khi đã revoke và rotate key bị
 lộ. Không đặt key trong `NEXT_PUBLIC_*`, Expo, git, ticket, screenshot hoặc
 log. Copy `.env.example` thành `.env`, thay placeholder bằng secret mới rồi
-bật `DEEPSEEK_ENABLED=true`; nếu thiếu key, provider lỗi, hết quota hoặc không
-có tài liệu phù hợp, API tự trả lexical fallback. Model mặc định là
-`deepseek-v4-flash`, non-thinking, context tối đa 6.000 ký tự và output tối đa
-800 tokens. Xem [docs/integrations/deepseek-assistant.md](docs/integrations/deepseek-assistant.md).
+bật `DEEPSEEK_ENABLED=true` cho `rag-service`; API public chỉ proxy request đã
+xác thực sang `rag-service` bằng `ASSISTANT_RAG_SERVICE_TOKEN`. Nếu thiếu key,
+provider lỗi, hết quota hoặc không có tài liệu phù hợp, RAG service tự trả
+lexical fallback. Model mặc định là `deepseek-v4-flash`, non-thinking, context
+tối đa 6.000 ký tự và output tối đa 800 tokens. Xem
+[docs/integrations/deepseek-assistant.md](docs/integrations/deepseek-assistant.md).
 
 ## Tài khoản demo
 
