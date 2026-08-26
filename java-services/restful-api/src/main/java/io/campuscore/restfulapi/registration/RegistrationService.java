@@ -22,6 +22,8 @@ import io.campuscore.restfulapi.academic.persistence.EnrollmentAuditEntity;
 import io.campuscore.restfulapi.academic.persistence.EnrollmentAuditRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundEntity;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundRepository;
+import io.campuscore.restfulapi.academic.persistence.RegistrationCohortWindowEntity;
+import io.campuscore.restfulapi.academic.persistence.RegistrationCohortWindowRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationSlipEntity;
 import io.campuscore.restfulapi.academic.persistence.RegistrationSlipRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationJpaMutationGateway;
@@ -36,6 +38,7 @@ import java.util.ArrayList;
 import java.util.Base64;
 import java.util.Comparator;
 import java.util.HashSet;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -66,12 +69,14 @@ public class RegistrationService {
     private final EnrollmentAuditRepository auditRepository;
     private final RegistrationSlipRepository slipRepository;
     private final RegistrationJpaMutationGateway mutationGateway;
+    private final RegistrationCohortWindowRepository cohortWindowRepository;
 
     public RegistrationService(NamedParameterJdbcTemplate jdbc, ObjectMapper mapper, Clock clock,
             RegistrationRoundRepository roundRepository, AcademicSectionRepository sectionRepository,
             EnrollmentRepository enrollmentRepository, EnrollmentOperationRepository operationRepository,
             EnrollmentAuditRepository auditRepository, RegistrationSlipRepository slipRepository,
-            RegistrationJpaMutationGateway mutationGateway) {
+            RegistrationJpaMutationGateway mutationGateway,
+            RegistrationCohortWindowRepository cohortWindowRepository) {
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.clock = clock;
@@ -82,6 +87,7 @@ public class RegistrationService {
         this.auditRepository = auditRepository;
         this.slipRepository = slipRepository;
         this.mutationGateway = mutationGateway;
+        this.cohortWindowRepository = cohortWindowRepository;
     }
 
     public RoundPage rounds(String semesterId, String cursor, int limit) {
@@ -93,7 +99,7 @@ public class RegistrationService {
                 + "FROM academic.\"RegistrationRound\" r" + (semesterId == null ? "" : " WHERE r.\"semesterId\"=:semesterId")
                 + " ORDER BY r.\"registrationStart\" DESC,r.\"id\" LIMIT :limit OFFSET :offset";
         if (semesterId != null) p.addValue("semesterId", semesterId.trim());
-        List<RoundView> rows = jdbc.query(sql, p, roundMapper());
+        List<RoundView> rows = jdbc.query(sql, p, roundMapper()).stream().map(this::withCohortYears).toList();
         String next = rows.size() > safeLimit ? encodeCursor(offset + safeLimit) : null;
         return new RoundPage(rows.subList(0, Math.min(rows.size(), safeLimit)), next);
     }
@@ -101,7 +107,7 @@ public class RegistrationService {
     public RoundView round(String id) {
         return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\","
                 + "r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"RegistrationRound\" r WHERE r.\"id\"=:id",
-                new MapSqlParameterSource("id", required(id, "roundId")), roundMapper()).stream().findFirst()
+                new MapSqlParameterSource("id", required(id, "roundId")), roundMapper()).stream().map(this::withCohortYears).findFirst()
                 .orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "REGISTRATION_ROUND_NOT_FOUND", "Registration round not found"));
     }
 
@@ -374,7 +380,9 @@ public class RegistrationService {
     public RoundView adminCreate(AdminRoundRequest request) {
         RegistrationRoundEntity round = RegistrationRoundEntity.create(UUID.randomUUID().toString(), request.semesterId(), "DRAFT",
                 request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
-        return roundView(roundRepository.saveAndFlush(round));
+        roundRepository.saveAndFlush(round);
+        replaceCohortWindows(round, request.cohortYears());
+        return roundView(round);
     }
 
     @Transactional
@@ -382,7 +390,13 @@ public class RegistrationService {
         RegistrationRoundEntity round = roundRepository.findLockedById(id).orElseThrow(() -> problem(HttpStatus.NOT_FOUND, "REGISTRATION_ROUND_NOT_FOUND", "Registration round not found"));
         requireVersion(round, request.version());
         round.update(round.getStatus(), request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
-        try { return roundView(roundRepository.saveAndFlush(round)); } catch (ObjectOptimisticLockingFailureException e) { throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round was changed by another administrator"); }
+        try {
+            roundRepository.saveAndFlush(round);
+            replaceCohortWindows(round, request.cohortYears());
+            return roundView(round);
+        } catch (ObjectOptimisticLockingFailureException e) {
+            throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round was changed by another administrator");
+        }
     }
 
     @Transactional
@@ -397,7 +411,12 @@ public class RegistrationService {
     private static void requireVersion(RegistrationRoundEntity round, Long expected) { if (expected != null && expected.longValue() != round.getVersion()) throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round version is stale"); }
 
     public record AdminRoundRequest(String semesterId, Instant registrationStart, Instant registrationEnd,
-            Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone, Long version) { }
+            Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone,
+            Long version, List<Integer> cohortYears) {
+        public AdminRoundRequest {
+            cohortYears = cohortYears == null ? List.of() : List.copyOf(cohortYears);
+        }
+    }
     public record DropResult(String enrollmentId, boolean replayed) { }
     public record SlipResult(byte[] pdf, String checksum) { }
 
@@ -447,17 +466,18 @@ public class RegistrationService {
                 "SELECT s.\"year\" FROM academic.\"Student\" s WHERE s.\"id\"=:studentId",
                 new MapSqlParameterSource("studentId", studentId), Integer.class);
         if (years.isEmpty()) return new CohortDecision(null, true, false);
+        List<CohortWindow> windows = jdbc.query(
+                "SELECT w.\"cohortCode\",w.\"priorityRank\",w.\"windowStart\",w.\"windowEnd\" FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId ORDER BY w.\"priorityRank\",w.\"cohortCode\"",
+                new MapSqlParameterSource("roundId", roundId),
+                (rs, row) -> new CohortWindow(rs.getString("cohortCode"), rs.getInt("priorityRank"),
+                        rs.getTimestamp("windowStart").toInstant(), rs.getTimestamp("windowEnd").toInstant()));
+        if (windows.isEmpty()) return new CohortDecision(null, true, false);
         String cohort = String.valueOf(years.get(0));
-        MapSqlParameterSource params = new MapSqlParameterSource()
-                .addValue("roundId", roundId).addValue("cohort", cohort);
-        List<Integer> ranks = jdbc.queryForList(
-                "SELECT w.\"priorityRank\" FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort",
-                params, Integer.class);
-        if (ranks.isEmpty()) return new CohortDecision(null, true, false);
-        Long inWindow = jdbc.queryForObject(
-                "SELECT count(*) FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort AND :now BETWEEN w.\"windowStart\" AND w.\"windowEnd\"",
-                params.addValue("now", Timestamp.from(clock.instant())), Long.class);
-        return new CohortDecision(ranks.get(0), inWindow != null && inWindow > 0, true);
+        Instant now = clock.instant();
+        return windows.stream().filter(window -> window.cohortCode().equals(cohort)).findFirst()
+                .map(window -> new CohortDecision(window.priorityRank(),
+                        !now.isBefore(window.windowStart()) && !now.isAfter(window.windowEnd()), true))
+                .orElseGet(() -> new CohortDecision(null, false, true));
     }
 
     private EnrollmentView enrollment(Map<String, Object> row, String studentId) {
@@ -482,8 +502,27 @@ public class RegistrationService {
         lockStudentEnrollments(studentId, round.semesterId());
         return new MutationLocks(round, section);
     }
-    private RoundView roundView(RegistrationRoundEntity r) { return new RoundView(r.getId(), r.getSemesterId(), r.getStatus(), r.getRegistrationStart(), r.getRegistrationEnd(), r.getAddDropStart(), r.getAddDropEnd(), clock.instant(), r.getInstitutionTimeZone(), r.getMaxCredits(), r.getVersion()); }
-    private RoundView roundForSection(String sectionId) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"Section\" s JOIN academic.\"RegistrationRound\" r ON r.\"semesterId\"=s.\"semesterId\" WHERE s.\"id\"=:sectionId ORDER BY CASE WHEN upper(r.\"status\")='OPEN' THEN 0 ELSE 1 END,r.\"registrationStart\" DESC,r.\"id\"", new MapSqlParameterSource("sectionId", sectionId), roundMapper()).stream().findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found for section")); }
+    private RoundView roundView(RegistrationRoundEntity r) { return new RoundView(r.getId(), r.getSemesterId(), r.getStatus(), r.getRegistrationStart(), r.getRegistrationEnd(), r.getAddDropStart(), r.getAddDropEnd(), clock.instant(), r.getInstitutionTimeZone(), r.getMaxCredits(), r.getVersion(), cohortYears(r.getId())); }
+    private RoundView withCohortYears(RoundView round) { return new RoundView(round.id(), round.semesterId(), round.status(), round.registrationStart(), round.registrationEnd(), round.addDropStart(), round.addDropEnd(), round.serverNow(), round.institutionTimeZone(), round.maxCredits(), round.version(), cohortYears(round.id())); }
+    private List<Integer> cohortYears(String roundId) { return cohortWindowRepository.findByRoundIdOrderByPriorityRankAscWindowStartAsc(roundId).stream().map(window -> Integer.valueOf(window.getCohortCode())).toList(); }
+    private void replaceCohortWindows(RegistrationRoundEntity round, List<Integer> requestedYears) {
+        LinkedHashSet<Integer> uniqueYears = new LinkedHashSet<>();
+        for (Integer year : requestedYears == null ? List.<Integer>of() : requestedYears) {
+            if (year == null || year < 1 || year > 20 || !uniqueYears.add(year)) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_REQUEST", "Cohort study years must be unique values from 1 to 20");
+            }
+        }
+        List<RegistrationCohortWindowEntity> existing = cohortWindowRepository.findByRoundIdOrderByPriorityRankAscWindowStartAsc(round.getId());
+        cohortWindowRepository.deleteAll(existing);
+        cohortWindowRepository.flush();
+        int priority = 1;
+        for (Integer year : uniqueYears) {
+            cohortWindowRepository.save(RegistrationCohortWindowEntity.create(UUID.randomUUID().toString(),
+                    round.getId(), String.valueOf(year), priority++, round.getRegistrationStart(), round.getRegistrationEnd()));
+        }
+        cohortWindowRepository.flush();
+    }
+    private RoundView roundForSection(String sectionId) { return jdbc.query("SELECT r.\"id\",r.\"semesterId\",r.\"status\",r.\"registrationStart\",r.\"registrationEnd\",r.\"addDropStart\",r.\"addDropEnd\",r.\"maxCredits\",r.\"institutionTimeZone\",r.\"version\" FROM academic.\"Section\" s JOIN academic.\"RegistrationRound\" r ON r.\"semesterId\"=s.\"semesterId\" WHERE s.\"id\"=:sectionId ORDER BY CASE WHEN upper(r.\"status\")='OPEN' THEN 0 ELSE 1 END,r.\"registrationStart\" DESC,r.\"id\"", new MapSqlParameterSource("sectionId", sectionId), roundMapper()).stream().map(this::withCohortYears).findFirst().orElseThrow(() -> problem(HttpStatus.CONFLICT,"REGISTRATION_ROUND_CLOSED","No registration round found for section")); }
     private void requireStudent(String id) { if (id == null || id.isBlank()) throw problem(HttpStatus.FORBIDDEN,"STUDENT_PROFILE_REQUIRED","Student profile is required"); }
     private OperationReservation reserveOperation(String studentId, UUID key, String hash, String type) {
         boolean created = mutationGateway.insertOperationIfAbsent(UUID.randomUUID().toString(), studentId,
@@ -532,5 +571,6 @@ public class RegistrationService {
     private record OperationReservation(EnrollmentOperationEntity operation, ExistingOperation replay) { }
     private record MutationLocks(RoundView round, AcademicSectionEntity section) { }
     private record CohortDecision(Integer priority, boolean allowed, boolean constrained) { }
+    private record CohortWindow(String cohortCode, int priorityRank, Instant windowStart, Instant windowEnd) { }
     public record MutationResult(EnrollmentView enrollment, boolean replayed) { }
 }

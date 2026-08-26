@@ -169,6 +169,15 @@ test('authenticated admin can inspect curated sources and the public catalog cov
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
 
+  await page.getByRole('button', { name: 'Create source' }).click();
+  const slugInput = page.getByLabel('Slug');
+  await slugInput.fill('campuscore-thesis-guide');
+  await expect(slugInput).toBeFocused();
+  await slugInput.pressSequentially('-updated');
+  await expect(slugInput).toHaveValue('campuscore-thesis-guide-updated');
+  await expect(slugInput).toBeFocused();
+  await page.getByRole('button', { name: 'Cancel' }).click();
+
   await page.getByLabel('Filter state').selectOption('PUBLISHED');
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await page.getByRole('button', { name: 'Archive' }).first().click();
