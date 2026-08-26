@@ -51,18 +51,31 @@ class AuthMailTemplateRendererTest {
     void actionLinksKeepRawChallengesInTheBrowserFragment() {
         String verify = SmtpAuthMailDelivery.actionUrl(
                 "https://campuscore.test/",
+                "en",
                 Purpose.EMAIL_VERIFICATION,
                 "opaque token");
         String reset = SmtpAuthMailDelivery.actionUrl(
                 "https://campuscore.test",
+                "vi",
                 Purpose.PASSWORD_RESET,
                 "opaque token");
 
         assertThat(verify)
-                .isEqualTo("https://campuscore.test/verify-email#token=opaque+token")
+                .isEqualTo("https://campuscore.test/en/verify-email#token=opaque+token")
                 .doesNotContain("?token=");
         assertThat(reset)
-                .isEqualTo("https://campuscore.test/reset-password#token=opaque+token")
+                .isEqualTo("https://campuscore.test/vi/reset-password#token=opaque+token")
                 .doesNotContain("?token=");
+    }
+
+    @Test
+    void actionLinksFallBackToVietnameseForUnsupportedLocales() {
+        String verify = SmtpAuthMailDelivery.actionUrl(
+                "https://campuscore.test",
+                "fr",
+                Purpose.EMAIL_VERIFICATION,
+                "opaque-token");
+
+        assertThat(verify).isEqualTo("https://campuscore.test/vi/verify-email#token=opaque-token");
     }
 }

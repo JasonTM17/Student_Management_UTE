@@ -28,7 +28,7 @@ final class SmtpAuthMailDelivery implements AuthMailDelivery {
 
     @Override
     public void send(AuthMailEvent event) {
-        String actionUrl = actionUrl(frontendBaseUrl, event.purpose(), event.rawToken());
+        String actionUrl = actionUrl(frontendBaseUrl, event.locale(), event.purpose(), event.rawToken());
         MailContent content = templates.render(event, actionUrl);
         var message = sender.createMimeMessage();
         try {
@@ -47,12 +47,13 @@ final class SmtpAuthMailDelivery implements AuthMailDelivery {
         return URLEncoder.encode(value, StandardCharsets.UTF_8);
     }
 
-    static String actionUrl(String frontendBaseUrl, Purpose purpose, String rawToken) {
+    static String actionUrl(String frontendBaseUrl, String locale, Purpose purpose, String rawToken) {
+        String localePath = "en".equalsIgnoreCase(locale) ? "/en" : "/vi";
         String actionPath = purpose == Purpose.EMAIL_VERIFICATION
                 ? "/verify-email"
                 : "/reset-password";
         // URL fragments stay client-side and therefore keep raw challenges out
         // of reverse-proxy, servlet and frontend access logs.
-        return frontendBaseUrl.replaceAll("/+$", "") + actionPath + "#token=" + encode(rawToken);
+        return frontendBaseUrl.replaceAll("/+$", "") + localePath + actionPath + "#token=" + encode(rawToken);
     }
 }

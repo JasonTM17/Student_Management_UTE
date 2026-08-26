@@ -45,11 +45,11 @@ async function waitForMail(
   throw new Error(`Timed out waiting for the ${purpose} message`);
 }
 
-function challengeToken(message: MailDetail): string {
-  const body = `${message.Text ?? ''}\n${message.HTML ?? ''}`.replaceAll('&amp;', '&');
-  const match = body.match(/[#?&]token=([A-Za-z0-9._~%+-]+)/);
-  if (!match) throw new Error('Mail challenge link was missing its token parameter');
-  return decodeURIComponent(match[1]);
+function challengeLink(message: MailDetail): string {
+  const body = `${message.HTML ?? ''}\n${message.Text ?? ''}`.replaceAll('&amp;', '&');
+  const match = body.match(/https?:\/\/[^\s"'<>]+\/(?:en|vi)\/(?:verify-email|reset-password)#token=[A-Za-z0-9._~%+-]+/i);
+  if (!match) throw new Error('Mail challenge link was missing its localized token URL');
+  return match[0];
 }
 
 async function login(page: Page, email: string, password: string) {
@@ -79,9 +79,10 @@ test('student completes browser registration, verification, reset, and fresh log
   const verificationMail = await waitForMail(request, email, 'verify');
   expect((verificationMail.Text ?? '').length).toBeGreaterThan(100);
   expect((verificationMail.HTML ?? '').length).toBeGreaterThan(100);
-  const verificationToken = challengeToken(verificationMail);
+  const verificationLink = challengeLink(verificationMail);
+  expect(new URL(verificationLink).pathname).toBe(`${localePrefix}/verify-email`);
 
-  const verificationResponse = await page.goto(`${localePrefix}/verify-email?email=${encodeURIComponent(email)}#token=${encodeURIComponent(verificationToken)}`);
+  const verificationResponse = await page.goto(verificationLink);
   expect(verificationResponse?.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page).not.toHaveURL(/(?:\?|&)token=/);
   await expect(page.getByRole('status')).toContainText('Email verified');
@@ -98,9 +99,10 @@ test('student completes browser registration, verification, reset, and fresh log
   const resetMail = await waitForMail(request, email, 'reset');
   expect((resetMail.Text ?? '').length).toBeGreaterThan(100);
   expect((resetMail.HTML ?? '').length).toBeGreaterThan(100);
-  const resetToken = challengeToken(resetMail);
+  const resetLink = challengeLink(resetMail);
+  expect(new URL(resetLink).pathname).toBe(`${localePrefix}/reset-password`);
 
-  const resetResponse = await page.goto(`${localePrefix}/reset-password#token=${encodeURIComponent(resetToken)}`);
+  const resetResponse = await page.goto(resetLink);
   expect(resetResponse?.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page).not.toHaveURL(/(?:\?|&)token=/);
   await page.getByLabel('New password').fill(secondPassword);
