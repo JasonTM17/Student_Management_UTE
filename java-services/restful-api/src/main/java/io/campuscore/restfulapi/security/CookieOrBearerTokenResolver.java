@@ -21,12 +21,13 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
 
     @Override
     public String resolve(HttpServletRequest request) {
+        if (isPublicLifecycleRequest(request)) {
+            return null;
+        }
+
         String bearerToken = bearerTokenResolver.resolve(request);
         if (bearerToken != null) {
             return bearerToken;
-        }
-        if (isPublicLifecycleRequest(request)) {
-            return null;
         }
 
         Cookie[] cookies = request.getCookies();
@@ -47,7 +48,9 @@ public class CookieOrBearerTokenResolver implements BearerTokenResolver {
             return false;
         }
         String path = request.getRequestURI();
-        return path.equals("/api/v1/auth/register")
+        return path.equals("/api/v1/auth/login")
+                || path.equals("/api/v1/auth/refresh")
+                || path.equals("/api/v1/auth/register")
                 || path.startsWith("/api/v1/auth/email-verifications/")
                 || path.equals("/api/v1/auth/password-reset-requests")
                 || path.equals("/api/v1/auth/password-reset/confirm")

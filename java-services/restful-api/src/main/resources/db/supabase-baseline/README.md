@@ -12,10 +12,12 @@ then the explicitly reviewed V21 successor. Existing installations keep their
 V-history and use only `db/migration` to apply V21 normally.
 
 The application has a fail-closed safety strategy. Profile-independent
-`beforeValidate` and `beforeMigrate` callbacks reject any managed platform
-schema/role marker and any `auth` schema outside the reviewed historical local
-signatures. The hosted safety switch accepts exactly the single allowlisted
-baseline location above; a combined legacy+baseline location is rejected.
+`beforeValidate` and `beforeMigrate` callbacks reject unknown managed-platform
+schema/role markers and any `auth` schema outside the reviewed historical local
+signatures. The callbacks accept only the reviewed Flyway history states:
+marker-only, marker+B20, or marker+B20+V21. The hosted safety switch accepts
+exactly the single allowlisted baseline location above; a combined
+legacy+baseline location is rejected.
 This avoids both managed-schema mutation and lower-version validation drift on
 existing V12/V18/V20 histories.
 

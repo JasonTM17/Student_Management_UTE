@@ -53,4 +53,21 @@ class AssistantKnowledgeJpaWriterPersistenceTest {
         writer.archive(draft.documentId(), "admin-b");
         assertThat(documents.findById(draft.documentId()).orElseThrow().isActive()).isFalse();
     }
+
+    @Test
+    void updateRejectsSlugOwnedByAnotherDocumentWithStableConflict() {
+        String firstSlug = "jpa-slug-first-" + UUID.randomUUID();
+        String secondSlug = "jpa-slug-second-" + UUID.randomUUID();
+        AssistantKnowledgeJpaWriter.RevisionSnapshot first = writer.create(
+                new AssistantKnowledgeJpaWriter.KnowledgeCommand(
+                        firstSlug, "en", "First", "Public first", "academic-office", 20, null), "admin-a");
+        writer.create(new AssistantKnowledgeJpaWriter.KnowledgeCommand(
+                secondSlug, "en", "Second", "Public second", "academic-office", 20, null), "admin-a");
+
+        assertThatThrownBy(() -> writer.update(first.documentId(),
+                new AssistantKnowledgeJpaWriter.KnowledgeCommand(
+                        secondSlug, "en", "Changed", "Public changed", "academic-office", 20, null), "admin-a"))
+                .isInstanceOf(AssistantKnowledgeJpaWriter.KnowledgePersistenceException.class)
+                .extracting("code").isEqualTo("KNOWLEDGE_SLUG_CONFLICT");
+    }
 }

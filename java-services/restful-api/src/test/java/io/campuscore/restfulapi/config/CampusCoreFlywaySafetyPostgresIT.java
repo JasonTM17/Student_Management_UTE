@@ -92,7 +92,7 @@ class CampusCoreFlywaySafetyPostgresIT {
         assertThat(local.info().current().getVersion().getVersion()).isEqualTo("21");
         assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
         assertThatThrownBy(() -> configuredBaseline().migrate())
-                .hasMessageContaining("exact Flyway schema marker and B20 history");
+                .hasMessageContaining("allowlisted Flyway histories");
 
         // A marker introduced after an existing V20 history is still blocked
         // before validation; no lower-version V0 migration is required.
@@ -120,7 +120,7 @@ class CampusCoreFlywaySafetyPostgresIT {
                 .isEqualTo(CampusCoreFlywaySafetyConfiguration.HostedHistoryState.INCOMPATIBLE);
         assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
         assertThatThrownBy(() -> configuredBaseline(false).migrate())
-                .hasMessageContaining("exact Flyway schema marker and B20 history");
+                .hasMessageContaining("allowlisted Flyway histories");
         assertThat(schemaExists("academic")).isFalse();
         assertThat(schemaExists("assistant")).isFalse();
     }
@@ -141,7 +141,7 @@ class CampusCoreFlywaySafetyPostgresIT {
         }
         assertThat(CampusCoreFlywaySafetyConfiguration.hasIncompatibleFlywayHistory(dataSource())).isTrue();
         assertThatThrownBy(() -> configuredBaseline(false).migrate())
-                .hasMessageContaining("exact Flyway schema marker and B20 history");
+                .hasMessageContaining("allowlisted Flyway histories");
     }
 
     @Test

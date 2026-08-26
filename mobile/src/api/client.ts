@@ -370,60 +370,155 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
   );
 }
 
+function isPublicLifecyclePath(path: string) {
+  const normalizedPath = normalizePath(path);
+  return normalizedPath.startsWith('/auth/login')
+    || normalizedPath.startsWith('/auth/refresh')
+    || normalizedPath.startsWith('/auth/register')
+    || normalizedPath.startsWith('/auth/email-verifications')
+    || normalizedPath.startsWith('/auth/password-reset')
+    || normalizedPath.startsWith('/auth/password-reset-requests')
+    || normalizedPath.startsWith('/auth/verify-email')
+    || normalizedPath.startsWith('/auth/resend-verification')
+    || normalizedPath.startsWith('/auth/forgot-password')
+    || normalizedPath.startsWith('/auth/reset-password');
+}
+
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   const baseUrl = normalizeBaseUrl(
     options.baseUrl ?? configuredApiBaseUrl ?? DEFAULT_API_BASE_URL,
   );
   const mode = options.mode ?? configuredApiMode;
   let accessToken: string | undefined;
+  let hasLocalAccessToken = false;
   let refreshToken: string | undefined;
+  let sessionGeneration = 0;
+  let refreshInFlight: Promise<boolean> | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
+
+  function currentAccessToken() {
+    return hasLocalAccessToken ? accessToken : getAccessToken();
+  }
+
+  function clearSessionIfCurrent(refreshAtStart: string, generationAtStart: number) {
+    if (refreshToken !== refreshAtStart || sessionGeneration !== generationAtStart) return;
+    accessToken = undefined;
+    hasLocalAccessToken = true;
+    refreshToken = undefined;
+    sessionGeneration += 1;
+  }
 
   async function refreshMobileSession(requestId: string) {
     if (!refreshToken) {
       return false;
     }
 
-    const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
-      method: 'POST',
-      headers: {
-        Accept: 'application/json',
-        'Content-Type': 'application/json',
-        'X-Request-Id': `${requestId}-refresh`,
-      },
-      body: JSON.stringify({ refreshToken }),
-    });
-    const body = await readResponseBody(response);
+    // All requests that observe the same expired access token share one
+    // refresh request. Java rotates the refresh token and invalidates the old
+    // row, so concurrent independent refreshes would otherwise revoke the
+    // winner's session for the losing waiter.
+    if (refreshInFlight) return refreshInFlight;
 
-    if (!response.ok) {
-      accessToken = undefined;
-      refreshToken = undefined;
-      const details = getErrorDetails(body);
-      throw new ApiClientError(
-        details.message,
-        response.status,
-        requestId,
-        details.code ?? (response.status === 401 ? 'SESSION_EXPIRED' : response.status === 403 ? 'FORBIDDEN' : undefined),
-        details.retryable,
-        details.violations,
-      );
+    const refreshAtStart = refreshToken;
+    const generationAtStart = sessionGeneration;
+    const flight = (async () => {
+      const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
+        method: 'POST',
+        headers: {
+          Accept: 'application/json',
+          'Content-Type': 'application/json',
+          'X-Request-Id': `${requestId}-refresh`,
+        },
+        body: JSON.stringify({ refreshToken: refreshAtStart }),
+      });
+      const body = await readResponseBody(response);
+
+      if (!response.ok) {
+        clearSessionIfCurrent(refreshAtStart, generationAtStart);
+        const details = getErrorDetails(body);
+        throw new ApiClientError(
+          details.message,
+          response.status,
+          requestId,
+          details.code ?? (response.status === 401 ? 'SESSION_EXPIRED' : response.status === 403 ? 'FORBIDDEN' : undefined),
+          details.retryable,
+          details.violations,
+        );
+      }
+
+      const nextSession = body as LoginResponse;
+      if (!nextSession?.accessToken || !nextSession.refreshToken) {
+        clearSessionIfCurrent(refreshAtStart, generationAtStart);
+        throw new ApiClientError(
+          'The Java auth refresh response did not include rotated tokens',
+          401,
+          requestId,
+          'INVALID_REFRESH_RESPONSE',
+        );
+      }
+
+      // A logout or a newer login may have changed the session while the
+      // network request was in flight. Never let that stale response overwrite
+      // the newer generation.
+      if (refreshToken === refreshAtStart && sessionGeneration === generationAtStart) {
+        accessToken = nextSession.accessToken;
+        hasLocalAccessToken = true;
+        refreshToken = nextSession.refreshToken;
+        sessionGeneration += 1;
+      }
+      return Boolean(currentAccessToken());
+    })();
+
+    refreshInFlight = flight;
+    void flight.then(
+      () => { if (refreshInFlight === flight) refreshInFlight = undefined; },
+      () => { if (refreshInFlight === flight) refreshInFlight = undefined; },
+    );
+    return flight;
+  }
+
+  async function fetchWithAuthRetry(path: string, init: RequestInit, accept: string, requestId: string) {
+    const url = `${baseUrl}${normalizePath(path)}`;
+    const requestGeneration = sessionGeneration;
+    const attachAccessToken = !isPublicLifecyclePath(path);
+    const makeHeaders = () => {
+      const headers = new Headers(init.headers);
+      const token = attachAccessToken ? currentAccessToken() : undefined;
+      headers.set('Accept', accept);
+      headers.set('X-Request-Id', requestId);
+      if (init.body && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      if (token) headers.set('Authorization', `Bearer ${token}`);
+      else headers.delete('Authorization');
+      return headers;
+    };
+
+    let response: Response;
+    try {
+      response = await fetch(url, { ...init, headers: makeHeaders() });
+    } catch (error) {
+      throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
     }
 
-    const nextSession = body as LoginResponse;
-    if (!nextSession?.accessToken || !nextSession.refreshToken) {
-      accessToken = undefined;
-      refreshToken = undefined;
-      throw new ApiClientError(
-        'The Java auth refresh response did not include rotated tokens',
-        401,
-        requestId,
-        'INVALID_REFRESH_RESPONSE',
-      );
+    if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
+      // A late 401 can arrive after another request has already completed the
+      // refresh flight. Reuse that newer generation instead of rotating the
+      // refresh token a second time.
+      const refreshed = sessionGeneration !== requestGeneration
+        ? Boolean(currentAccessToken())
+        : await refreshMobileSession(requestId);
+      if (refreshed && currentAccessToken()) {
+        try {
+          // Build a fresh header object so a retry can never reuse the expired
+          // Authorization value captured by the first attempt.
+          response = await fetch(url, { ...init, headers: makeHeaders() });
+        } catch (error) {
+          throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
+        }
+      }
     }
-
-    accessToken = nextSession.accessToken;
-    refreshToken = nextSession.refreshToken;
-    return true;
+    return response;
   }
 
   const client: ApiClient = {
@@ -432,11 +527,15 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     setAccessToken(token) {
       accessToken = token;
+      hasLocalAccessToken = true;
+      sessionGeneration += 1;
     },
 
     setSessionTokens(nextAccessToken, nextRefreshToken) {
       accessToken = nextAccessToken;
+      hasLocalAccessToken = true;
       refreshToken = nextRefreshToken;
+      sessionGeneration += 1;
     },
 
     getRefreshToken() {
@@ -445,7 +544,9 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     clearAccessToken() {
       accessToken = undefined;
+      hasLocalAccessToken = true;
       refreshToken = undefined;
+      sessionGeneration += 1;
     },
 
     async requestWithMeta<TResponse>(path: string, init: RequestInit = {}) {
@@ -458,38 +559,8 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           'MOBILE_API_PREVIEW',
         );
       }
-      const headers = new Headers(init.headers);
-      const token = getAccessToken();
-
-      headers.set('Accept', 'application/json');
-      headers.set('X-Request-Id', requestId);
-      if (init.body && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
-      }
-      if (token) {
-        headers.set('Authorization', `Bearer ${token}`);
-      }
-
-      let response: Response;
-      try {
-        response = await fetch(`${baseUrl}${normalizePath(path)}`, { ...init, headers });
-      } catch (error) {
-        throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
-      }
+      let response = await fetchWithAuthRetry(path, init, 'application/json', requestId);
       let body = await readResponseBody(response);
-
-      if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
-        const refreshed = await refreshMobileSession(requestId);
-        if (refreshed && accessToken) {
-          headers.set('Authorization', `Bearer ${accessToken}`);
-          try {
-            response = await fetch(`${baseUrl}${normalizePath(path)}`, { ...init, headers });
-          } catch (error) {
-            throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
-          }
-          body = await readResponseBody(response);
-        }
-      }
 
       if (!response.ok) {
         const details = getErrorDetails(body);
@@ -509,14 +580,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     async requestBytes(path: string, init: RequestInit = {}) {
       const requestId = createRequestId();
       if (mode !== 'live') throw new ApiClientError('Live mobile API mode is disabled for this preview build', 0, requestId, 'MOBILE_API_PREVIEW');
-      const headers = new Headers(init.headers);
-      const token = getAccessToken();
-      headers.set('Accept', 'application/pdf,application/octet-stream');
-      headers.set('X-Request-Id', requestId);
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      let response: Response;
-      try { response = await fetch(`${baseUrl}${normalizePath(path)}`, { ...init, headers }); }
-      catch (error) { throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true); }
+      const response = await fetchWithAuthRetry(path, init, 'application/pdf,application/octet-stream', requestId);
       if (!response.ok) {
         const body = await readResponseBody(response);
         const details = getErrorDetails(body);

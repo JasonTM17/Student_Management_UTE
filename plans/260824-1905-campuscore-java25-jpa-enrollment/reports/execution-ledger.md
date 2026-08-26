@@ -563,3 +563,32 @@ evidence was unavailable; no application traffic cutover is authorized.
   evidence-backed repairs, run focused regressions, update this checkpoint with
   exact commands/results, then continue to fresh exact-head reviews. Do not
   repeat already evidenced terminal gates or create a second plan.
+
+## Successor repair and terminal local gates (2026-08-26)
+
+- [x] Candidate repair slice is complete on pre-commit
+  `81cdac1e4b6d2e682dcad2c9d5a1ec3c304093ad`: disabled-account reset races now
+  serialize on the user row and the password update is status-guarded;
+  assistant pre-reservation cancellation enters the conversation-first lock
+  order; mobile refresh is single-flight and generation-fenced for JSON and
+  binary requests; stale lifecycle cookies are ignored while cookie refresh
+  still requires CSRF; knowledge slug conflicts return a stable code; the
+  frontend default locale is Vietnamese and E2E JWT defaults satisfy the
+  runtime minimum.
+- [x] Focused Java persistence regressions: 38 tests, zero failures/errors
+  (`AuthLifecyclePersistenceTest`, token resolver/CSRF, knowledge writer and
+  assistant H2 ledger).
+- [x] FE/mobile static gates: frontend 38/38 tests, typecheck, lint with
+  `--max-warnings=0`, production build; mobile 23/23 tests and typecheck.
+  Compose config, assistant-secret scan (554 files) and text-encoding guard
+  pass. The one failed typecheck invocation was a parallel `.next` generation
+  race; the sequential rerun passed and is the accepted evidence.
+- [x] Full Java 25 Maven reactor: 244 tests, 53 suites, zero failures/errors/
+  skipped. Isolated PostgreSQL 15.19 container
+  `campuscore-final-postgres-20260826` ran auth (4), registration (6) and
+  assistant ledger (12) concurrency/ownership/recovery tests: 22/22 passed.
+  The container is task-owned and must be stopped/removed only at the final
+  disposable-container cleanup gate.
+- [ ] Browser/mail authenticated E2E and exact-head independent reviews still
+  require a clean successor SHA. No archive tag, Docker push, GitHub release,
+  merge or branch cleanup is authorized before those gates.

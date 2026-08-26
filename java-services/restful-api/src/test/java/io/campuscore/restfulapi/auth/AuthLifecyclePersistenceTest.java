@@ -97,10 +97,16 @@ class AuthLifecyclePersistenceTest {
                 .andExpect(jsonPath("$.code").value("AUTH_CHALLENGE_INVALID"));
 
         mvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(email, "password123")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(loginBody(email, "password123")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.emailVerified").value(true));
+    }
+
+    @Test
+    void missingAcceptLanguageUsesVietnameseMailLocale() throws Exception {
+        AuthMailEvent event = registerAndCaptureWithoutLocale("default-locale.lifecycle@campuscore.test");
+        assertThat(event.locale()).isEqualTo("vi");
     }
 
     @Test
@@ -302,9 +308,57 @@ class AuthLifecyclePersistenceTest {
                         .content(loginBody(email, "password123")))
                 .andExpect(status().isUnauthorized());
         mvc.perform(post("/api/v1/auth/login")
-                        .contentType(MediaType.APPLICATION_JSON)
-                        .content(loginBody(email, "new-password-123")))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content(loginBody(email, "new-password-123")))
                 .andExpect(status().isOk());
+    }
+
+    @Test
+    void disabledAccountCannotRequestOrConfirmPasswordResetChallenge() throws Exception {
+        String email = "disabled-reset.lifecycle@campuscore.test";
+        AuthMailEvent verification = registerAndCapture(email);
+        mvc.perform(post("/api/v1/auth/email-verifications/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(tokenBody(verification.rawToken())))
+                .andExpect(status().isOk());
+
+        clearInvocations(mailDelivery);
+        mvc.perform(post("/api/v1/auth/password-reset-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emailBody(email)))
+                .andExpect(status().isAccepted());
+        AuthMailEvent reset = captureMail();
+        String oldHash = jdbc.queryForObject(
+                "SELECT \"password\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
+                String.class,
+                email);
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"User\" SET \"status\" = 'DISABLED' WHERE \"email\" = ?",
+                email);
+
+        clearInvocations(mailDelivery);
+        mvc.perform(post("/api/v1/auth/password-reset-requests")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(emailBody(email)))
+                .andExpect(status().isAccepted());
+        verifyNoInteractions(mailDelivery);
+
+        mvc.perform(post("/api/v1/auth/password-reset/confirm")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"token":"%s","newPassword":"disabled-reset-123"}
+                                """.formatted(reset.rawToken())))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("AUTH_CHALLENGE_INVALID"));
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"password\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
+                String.class,
+                email)).isEqualTo(oldHash);
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
+                String.class,
+                email)).isEqualTo("DISABLED");
     }
 
     private AuthMailEvent registerAndCapture(String email) throws Exception {
@@ -324,6 +378,22 @@ class AuthLifecyclePersistenceTest {
                 .andExpect(jsonPath("$.verificationRequired").value(true))
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
                 .andExpect(cookie().doesNotExist("cc_access_token"));
+        return captureMail();
+    }
+
+    private AuthMailEvent registerAndCaptureWithoutLocale(String email) throws Exception {
+        clearInvocations(mailDelivery);
+        mvc.perform(post("/api/v1/auth/register")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"%s",
+                                  "password":"password123",
+                                  "firstName":"Locale",
+                                  "lastName":"Student"
+                                }
+                                """.formatted(email)))
+                .andExpect(status().isAccepted());
         return captureMail();
     }
 

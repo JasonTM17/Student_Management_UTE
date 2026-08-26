@@ -74,6 +74,7 @@ test('npm test runs the atlas and Phase 6 regressions explicitly', () => {
 
   assert.match(packageJson.scripts.test, /screen-atlas\.test\.mjs/);
   assert.match(packageJson.scripts.test, /phase-six-repair\.test\.mjs/);
+  assert.match(packageJson.scripts.test, /api-client-runtime\.test\.mjs/);
 });
 
 test('mobile assistant keeps native transport buffered and owner-history operations explicit', () => {
@@ -109,6 +110,24 @@ test('mobile assistant preserves idempotency, server cancellation, pagination, a
   assert.match(assistant, /pendingDeleteId/);
   assert.match(assistant, /sessionExpired/);
   assert.match(assistant, /offline/);
+});
+
+test('mobile auth refresh is single-flight, generation-fenced, and shared by binary downloads', () => {
+  const client = read('src/api/client.ts');
+
+  assert.match(client, /let refreshInFlight: Promise<boolean> \| undefined/);
+  assert.match(client, /if \(refreshInFlight\) return refreshInFlight/);
+  assert.match(client, /const refreshAtStart = refreshToken/);
+  assert.match(client, /sessionGeneration/);
+  assert.match(client, /function isPublicLifecyclePath\(path: string\)/);
+  assert.match(client, /const attachAccessToken = !isPublicLifecyclePath\(path\)/);
+  assert.match(client, /const requestGeneration = sessionGeneration/);
+  assert.match(client, /sessionGeneration !== requestGeneration/);
+  assert.match(client, /clearSessionIfCurrent\(refreshAtStart, generationAtStart\)/);
+  assert.match(client, /async function fetchWithAuthRetry\(/);
+  assert.match(client, /fetchWithAuthRetry\(path, init, 'application\/pdf,application\/octet-stream', requestId\)/);
+  assert.match(client, /headers: makeHeaders\(\)/);
+  assert.match(client, /fresh header object/);
 });
 
 test('mobile never replays a terminal or fenced request key', () => {

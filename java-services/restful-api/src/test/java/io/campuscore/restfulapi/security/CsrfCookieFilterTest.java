@@ -108,4 +108,21 @@ class CsrfCookieFilterTest {
         assertEquals(200, response.getStatus());
         verify(chain).doFilter(request, response);
     }
+
+    @Test
+    void staleAccessAndRefreshCookiesStillRequireCsrfForRefreshRecovery() throws Exception {
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/refresh");
+        request.setCookies(
+                new jakarta.servlet.http.Cookie("cc_access_token", "stale"),
+                new jakarta.servlet.http.Cookie("cc_refresh_token", "refresh"),
+                new jakarta.servlet.http.Cookie("cc_csrf", "expected"));
+        request.addHeader("X-CSRF-Token", "expected");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+    }
 }
