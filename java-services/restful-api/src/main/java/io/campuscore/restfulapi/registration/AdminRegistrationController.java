@@ -57,7 +57,7 @@ public class AdminRegistrationController {
             return new RegistrationService.AdminRoundRequest(semesterId, registrationStart, registrationEnd,
                     addDropStart, addDropEnd, maxCredits <= 0 ? 28 : maxCredits,
                     institutionTimeZone == null || institutionTimeZone.isBlank() ? "Asia/Ho_Chi_Minh" : institutionTimeZone,
-                    version, cohortYears == null ? List.of() : cohortYears);
+                    version, cohortYears);
         }
     }
     public record TransitionRequest(Long version) { }

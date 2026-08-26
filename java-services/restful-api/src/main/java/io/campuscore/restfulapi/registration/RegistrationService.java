@@ -381,7 +381,7 @@ public class RegistrationService {
         RegistrationRoundEntity round = RegistrationRoundEntity.create(UUID.randomUUID().toString(), request.semesterId(), "DRAFT",
                 request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
         roundRepository.saveAndFlush(round);
-        replaceCohortWindows(round, request.cohortYears());
+        replaceCohortWindows(round, request.cohortYears() == null ? List.of() : request.cohortYears());
         return roundView(round);
     }
 
@@ -392,7 +392,9 @@ public class RegistrationService {
         round.update(round.getStatus(), request.registrationStart(), request.registrationEnd(), request.addDropStart(), request.addDropEnd(), request.maxCredits(), request.institutionTimeZone());
         try {
             roundRepository.saveAndFlush(round);
-            replaceCohortWindows(round, request.cohortYears());
+            if (request.cohortYears() != null) {
+                replaceCohortWindows(round, request.cohortYears());
+            }
             return roundView(round);
         } catch (ObjectOptimisticLockingFailureException e) {
             throw problem(HttpStatus.CONFLICT, "VERSION_CONFLICT", "Registration round was changed by another administrator");
@@ -414,7 +416,7 @@ public class RegistrationService {
             Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone,
             Long version, List<Integer> cohortYears) {
         public AdminRoundRequest {
-            cohortYears = cohortYears == null ? List.of() : List.copyOf(cohortYears);
+            cohortYears = cohortYears == null ? null : List.copyOf(cohortYears);
         }
     }
     public record DropResult(String enrollmentId, boolean replayed) { }

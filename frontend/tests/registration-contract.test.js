@@ -32,6 +32,20 @@ test('registration workspace exposes canonical and compatibility routes', () => 
   assert.ok(fs.existsSync(path.join(root, 'src/app/admin/registration-rounds/page.tsx')));
 });
 
+test('admin registration round form serializes instants and keeps save errors in the modal', () => {
+  const source = read('src/app/admin/registration-rounds/page.tsx');
+  assert.match(source, /function toDatetimeLocal\(value\?: string \| null\)/);
+  assert.match(source, /registrationStart: toInstant\(form\.registrationStart\)/);
+  assert.match(source, /addDropEnd: toInstant\(form\.addDropEnd\)/);
+  assert.match(source, /role="alert" aria-live="polite"/);
+  assert.match(source, /value=\{toDatetimeLocal\(form\.registrationStart\)\}/);
+});
+
+test('registration workspace scopes enrollments to the selected round semester', () => {
+  const workspace = read('src/features/registration/RegistrationWorkspace.tsx');
+  assert.match(workspace, /registrationApi\.getEnrollments\(roundDetail\.semesterId\)/);
+});
+
 test('custom dialogs trap focus, own Escape, lock scroll and restore the trigger', () => {
   const hook = read('src/components/ui/use-dialog-focus-trap.ts');
   const adminFrame = read('src/components/admin/AdminFrame.tsx');
