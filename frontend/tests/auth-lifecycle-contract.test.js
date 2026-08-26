@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 const read = (relativePath) => fs.readFileSync(path.join(root, relativePath), 'utf8');
@@ -78,7 +79,12 @@ test('verification outage copy does not claim whether a token was consumed', () 
 });
 
 test('explicit auth state transitions reject stale background refresh commits', () => {
-  const { AuthStateFence } = require('../src/context/auth-state-fence.ts');
+  const output = ts.transpileModule(read('src/context/auth-state-fence.ts'), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  const { AuthStateFence } = moduleRecord.exports;
   const fence = new AuthStateFence();
   let user = null;
 
