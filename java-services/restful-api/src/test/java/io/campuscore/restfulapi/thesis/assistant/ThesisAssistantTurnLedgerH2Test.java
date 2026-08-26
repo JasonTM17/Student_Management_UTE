@@ -66,6 +66,25 @@ class ThesisAssistantTurnLedgerH2Test {
     }
 
     @Test
+    void h2GeneratedActiveConversationKeyMatchesPostgresFilteredIndex() {
+        String owner = "active-conversation-index-" + UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        jdbc.update("INSERT INTO assistant.chat_conversation (id,owner_id,locale,state,expires_at) "
+                        + "VALUES (:id,:owner,'en','ACTIVE',CURRENT_TIMESTAMP + INTERVAL '1' DAY)",
+                p("id", conversation).addValue("owner", owner));
+
+        insertLedger(owner, conversation, UUID.randomUUID(), "RESERVED");
+        assertThrows(RuntimeException.class,
+                () -> insertLedger(owner, conversation, UUID.randomUUID(), "DISPATCHED"));
+
+        // Terminal rows do not contribute to the nullable generated key and
+        // therefore remain valid historical rows for the same conversation.
+        insertLedger(owner, conversation, UUID.randomUUID(), "COMPLETED");
+        assertEquals(2, count("SELECT COUNT(*) FROM assistant.chat_turn_ledger WHERE owner_id=:owner AND conversation_id=:conversation",
+                p("owner", owner).addValue("conversation", conversation)));
+    }
+
+    @Test
     void failedPreDispatchCanBeReacquiredWithFencedGeneration() {
         String owner = "quota-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
@@ -326,5 +345,13 @@ class ThesisAssistantTurnLedgerH2Test {
     }
 
     private static MapSqlParameterSource p(String key, Object value) { return new MapSqlParameterSource().addValue(key, value); }
+    private void insertLedger(String owner, UUID conversation, UUID request, String state) {
+        jdbc.update("INSERT INTO assistant.chat_turn_ledger "
+                        + "(turn_id,owner_id,client_request_id,request_hash,conversation_id,state,created_conversation,lease_owner) "
+                        + "VALUES (:turn,:owner,:request,:hash,:conversation,:state,FALSE,'h2-index-test')",
+                p("turn", UUID.randomUUID()).addValue("owner", owner).addValue("request", request)
+                        .addValue("hash", "a".repeat(64)).addValue("conversation", conversation).addValue("state", state));
+    }
+
     private int count(String sql, MapSqlParameterSource params) { return jdbc.queryForObject(sql, params, Integer.class); }
 }

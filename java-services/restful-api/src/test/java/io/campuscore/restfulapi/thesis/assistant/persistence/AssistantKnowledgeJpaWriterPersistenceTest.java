@@ -55,6 +55,22 @@ class AssistantKnowledgeJpaWriterPersistenceTest {
     }
 
     @Test
+    void archivedDocumentCannotBeRepublishedByAStalePendingRevision() {
+        String slug = "jpa-archive-publish-" + UUID.randomUUID();
+        AssistantKnowledgeJpaWriter.RevisionSnapshot draft = writer.create(
+                new AssistantKnowledgeJpaWriter.KnowledgeCommand(
+                        slug, "en", "Archived source", "Grounded content", "academic-office", 30, null), "admin-a");
+        assertThat(writer.submit(draft.documentId(), "admin-a").state()).isEqualTo("PENDING_REVIEW");
+
+        writer.archive(draft.documentId(), "admin-b");
+
+        assertThatThrownBy(() -> writer.publish(draft.documentId(), "admin-c"))
+                .isInstanceOf(AssistantKnowledgeJpaWriter.KnowledgePersistenceException.class)
+                .extracting("code").isEqualTo("KNOWLEDGE_ARCHIVED");
+        assertThat(documents.findById(draft.documentId()).orElseThrow().isActive()).isFalse();
+    }
+
+    @Test
     void updateRejectsSlugOwnedByAnotherDocumentWithStableConflict() {
         String firstSlug = "jpa-slug-first-" + UUID.randomUUID();
         String secondSlug = "jpa-slug-second-" + UUID.randomUUID();
