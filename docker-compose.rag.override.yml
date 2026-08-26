@@ -1,5 +1,5 @@
 # Additive local override for the dedicated thesis RAG service.
-# Use with: docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d
+# Use with: docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
 # Images are intentionally pinned to the locally verified split-service build;
 # no provider credentials belong in this file.
 
