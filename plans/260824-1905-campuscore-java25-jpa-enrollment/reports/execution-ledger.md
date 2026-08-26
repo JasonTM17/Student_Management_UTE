@@ -832,3 +832,26 @@ evidence was unavailable; no application traffic cutover is authorized.
 - Resume point: commit this bounded repair, then run the terminal matrix and
   freeze a successor for independent Kongming/Wukong/code review. No push,
   merge, publication or cleanup has occurred.
+
+## Terminal evidence after compatibility repair (2026-08-26)
+
+- [x] Java 25 Docker `clean verify` on `ed42edfb` passed 49 Surefire suites,
+  232 tests, zero failures/errors/skips. The focused compatibility additions
+  are included in that reactor result.
+- [x] Frontend gates on the same source passed 45/45 Node tests, Next typecheck,
+  zero-warning ESLint and production build. Mobile gates passed 23/23 tests
+  and TypeScript typecheck.
+- [x] Fresh PostgreSQL 15.19 authority DBs in `campuscore-pg-e25d` passed
+  `AuthConcurrencyPostgresIT` 10/10, `RegistrationPostgresConcurrencyIT`
+  6/6 and `ThesisAssistantTurnLedgerPostgresIT` 12/12; each Flyway history
+  reached V21. DB names end in `_20260826_r2` and are task-owned.
+- [x] Authenticated Chrome-channel Playwright/Mailpit E2E on disposable
+  project `campuscore-course-e2e-final-20260826-r2` passed all 6 scenarios;
+  the runner removed only that project's containers, volume and network.
+- [x] Secret scan (560 git-visible files, redacted), text encoding,
+  documentation hygiene, normal/E2E Compose config and `git diff --check`
+  passed. `git fsck --connectivity-only --no-progress` returned exit 0 with
+  pre-existing dangling objects only; no cleanup was attempted.
+- [ ] Independent exact-head Kongming, Wukong and code review remain required
+  after this evidence-only ledger update. Push, merge, publication, archive
+  tag and cleanup remain behind that review and dirty-main identity gate.
