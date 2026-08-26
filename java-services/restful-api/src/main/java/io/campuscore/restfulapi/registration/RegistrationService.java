@@ -128,17 +128,10 @@ public class RegistrationService {
         String reason = null;
         if (studentId == null || studentId.isBlank()) {
             reason = "STUDENT_PROFILE_REQUIRED";
-        } else if (studentYear != null) {
-            String cohort = String.valueOf(studentYear);
-            List<Integer> ranks = jdbc.queryForList("SELECT w.\"priorityRank\" FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort",
-                    new MapSqlParameterSource().addValue("roundId", roundId).addValue("cohort", cohort), Integer.class);
-            if (!ranks.isEmpty()) {
-                priority = ranks.get(0);
-                Instant now = clock.instant();
-                Long inWindow = jdbc.queryForObject("SELECT count(*) FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort AND :now BETWEEN w.\"windowStart\" AND w.\"windowEnd\"",
-                        new MapSqlParameterSource().addValue("roundId", roundId).addValue("cohort", cohort).addValue("now", Timestamp.from(now)), Long.class);
-                if (inWindow != null && inWindow == 0) reason = "COHORT_NOT_ELIGIBLE";
-            }
+        } else {
+            CohortDecision cohort = cohortDecision(studentId, roundId);
+            priority = cohort.priority();
+            if (cohort.constrained() && !cohort.allowed()) reason = "COHORT_NOT_ELIGIBLE";
         }
         return new EligibilityView(roundId, reason == null ? "ELIGIBLE" : "INELIGIBLE", priority,
                 round.maxCredits(), selected, reason, clock.instant());
@@ -419,6 +412,8 @@ public class RegistrationService {
         if (!round.semesterId().equals(section.get("semesterId"))) v.add("SECTION_NOT_OPEN");
         if (!"OPEN".equalsIgnoreCase(String.valueOf(section.get("status")))) v.add("SECTION_NOT_OPEN");
         if (((Number) section.get("enrolledCount")).intValue() >= ((Number) section.get("capacity")).intValue()) v.add("SECTION_FULL");
+        CohortDecision cohort = cohortDecision(studentId, request.roundId());
+        if (cohort.constrained() && !cohort.allowed()) v.add("COHORT_NOT_ELIGIBLE");
         Long duplicate = jdbc.queryForObject("SELECT count(*) FROM academic.\"Enrollment\" e WHERE e.\"studentId\"=:studentId AND e.\"sectionId\"=:sectionId AND " + ACTIVE,
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("sectionId", request.sectionId()), Long.class);
         if (duplicate != null && duplicate > 0) v.add("ALREADY_ENROLLED");
@@ -426,17 +421,17 @@ public class RegistrationService {
         if (selectedCredits(studentId, round.semesterId()) + credits > round.maxCredits()) v.add("CREDIT_LIMIT_EXCEEDED");
         List<String> required = jdbc.queryForList("SELECT r.\"requiredCourseId\" FROM academic.\"CourseRequirement\" r WHERE r.\"courseId\"=:courseId AND r.\"requirementType\"='PREREQUISITE'", new MapSqlParameterSource("courseId", section.get("courseId")), String.class);
         if (!required.isEmpty()) {
-            Long completed = jdbc.queryForObject("SELECT count(*) FROM academic.\"Enrollment\" e JOIN academic.\"Section\" s ON s.\"id\"=e.\"sectionId\" WHERE e.\"studentId\"=:studentId AND s.\"courseId\" IN (:required) AND lower(e.\"status\")='completed'", new MapSqlParameterSource().addValue("studentId", studentId).addValue("required", required), Long.class);
+            Long completed = jdbc.queryForObject("SELECT count(DISTINCT s.\"courseId\") FROM academic.\"Enrollment\" e JOIN academic.\"Section\" s ON s.\"id\"=e.\"sectionId\" WHERE e.\"studentId\"=:studentId AND s.\"courseId\" IN (:required) AND lower(e.\"status\")='completed'", new MapSqlParameterSource().addValue("studentId", studentId).addValue("required", required), Long.class);
             if (completed == null || completed < required.size()) v.add("PREREQUISITE_NOT_MET");
         }
         List<String> coreq = jdbc.queryForList("SELECT r.\"requiredCourseId\" FROM academic.\"CourseRequirement\" r WHERE r.\"courseId\"=:courseId AND r.\"requirementType\"='COREQUISITE'", new MapSqlParameterSource("courseId", section.get("courseId")), String.class);
         if (!coreq.isEmpty()) {
-            Long present = jdbc.queryForObject("SELECT count(DISTINCT s.\"courseId\") FROM academic.\"Enrollment\" e JOIN academic.\"Section\" s ON s.\"id\"=e.\"sectionId\" WHERE e.\"studentId\"=:studentId AND s.\"courseId\" IN (:coreq) AND " + ACTIVE,
-                    new MapSqlParameterSource().addValue("studentId", studentId).addValue("coreq", coreq), Long.class);
+            Long present = jdbc.queryForObject("SELECT count(DISTINCT s.\"courseId\") FROM academic.\"Enrollment\" e JOIN academic.\"Section\" s ON s.\"id\"=e.\"sectionId\" WHERE e.\"studentId\"=:studentId AND e.\"semesterId\"=:semesterId AND s.\"courseId\" IN (:coreq) AND " + ACTIVE,
+                    new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", round.semesterId()).addValue("coreq", coreq), Long.class);
             if (present == null || present < coreq.size()) v.add("COREQUISITE_NOT_MET");
         }
-        Long scheduleConflict = jdbc.queryForObject("SELECT count(*) FROM academic.\"SectionSchedule\" requested JOIN academic.\"SectionSchedule\" chosen ON chosen.\"dayOfWeek\"=requested.\"dayOfWeek\" AND requested.\"startTimeValue\" < chosen.\"endTimeValue\" AND chosen.\"startTimeValue\" < requested.\"endTimeValue\" JOIN academic.\"Enrollment\" e ON e.\"sectionId\"=chosen.\"sectionId\" WHERE requested.\"sectionId\"=:sectionId AND e.\"studentId\"=:studentId AND " + ACTIVE,
-                new MapSqlParameterSource().addValue("sectionId", request.sectionId()).addValue("studentId", studentId), Long.class);
+        Long scheduleConflict = jdbc.queryForObject("SELECT count(*) FROM academic.\"SectionSchedule\" requested JOIN academic.\"SectionSchedule\" chosen ON chosen.\"dayOfWeek\"=requested.\"dayOfWeek\" AND requested.\"startTimeValue\" < chosen.\"endTimeValue\" AND chosen.\"startTimeValue\" < requested.\"endTimeValue\" JOIN academic.\"Enrollment\" e ON e.\"sectionId\"=chosen.\"sectionId\" WHERE requested.\"sectionId\"=:sectionId AND e.\"studentId\"=:studentId AND e.\"semesterId\"=:semesterId AND " + ACTIVE,
+                new MapSqlParameterSource().addValue("sectionId", request.sectionId()).addValue("studentId", studentId).addValue("semesterId", round.semesterId()), Long.class);
         if (scheduleConflict != null && scheduleConflict > 0) v.add("SCHEDULE_CONFLICT");
         return v;
     }
@@ -445,6 +440,24 @@ public class RegistrationService {
         Integer value = jdbc.queryForObject("SELECT coalesce(sum(c.\"credits\"),0) FROM academic.\"Enrollment\" e JOIN academic.\"Section\" s ON s.\"id\"=e.\"sectionId\" JOIN academic.\"Course\" c ON c.\"id\"=s.\"courseId\" WHERE e.\"studentId\"=:studentId AND e.\"semesterId\"=:semesterId AND " + ACTIVE,
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId), Integer.class);
         return value == null ? 0 : value;
+    }
+
+    private CohortDecision cohortDecision(String studentId, String roundId) {
+        List<Integer> years = jdbc.queryForList(
+                "SELECT s.\"year\" FROM academic.\"Student\" s WHERE s.\"id\"=:studentId",
+                new MapSqlParameterSource("studentId", studentId), Integer.class);
+        if (years.isEmpty()) return new CohortDecision(null, true, false);
+        String cohort = String.valueOf(years.get(0));
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("roundId", roundId).addValue("cohort", cohort);
+        List<Integer> ranks = jdbc.queryForList(
+                "SELECT w.\"priorityRank\" FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort",
+                params, Integer.class);
+        if (ranks.isEmpty()) return new CohortDecision(null, true, false);
+        Long inWindow = jdbc.queryForObject(
+                "SELECT count(*) FROM academic.\"RegistrationCohortWindow\" w WHERE w.\"roundId\"=:roundId AND w.\"cohortCode\"=:cohort AND :now BETWEEN w.\"windowStart\" AND w.\"windowEnd\"",
+                params.addValue("now", Timestamp.from(clock.instant())), Long.class);
+        return new CohortDecision(ranks.get(0), inWindow != null && inWindow > 0, true);
     }
 
     private EnrollmentView enrollment(Map<String, Object> row, String studentId) {
@@ -518,5 +531,6 @@ public class RegistrationService {
     private record ExistingOperation(String id,String body) { }
     private record OperationReservation(EnrollmentOperationEntity operation, ExistingOperation replay) { }
     private record MutationLocks(RoundView round, AcademicSectionEntity section) { }
+    private record CohortDecision(Integer priority, boolean allowed, boolean constrained) { }
     public record MutationResult(EnrollmentView enrollment, boolean replayed) { }
 }

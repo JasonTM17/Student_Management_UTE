@@ -2,18 +2,22 @@ package io.campuscore.restfulapi.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService;
+import io.campuscore.restfulapi.auth.repository.AuthChallengeRepository.Purpose;
 import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService.IssuedChallengeToken;
 import io.campuscore.restfulapi.auth.service.AuthLifecycleService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.web.AuthDtos.EmailRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.ChallengeTokenRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.PasswordResetConfirmRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.time.Instant;
+import java.time.Duration;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -22,9 +26,14 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
+import org.awaitility.Awaitility;
 import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
+import org.junit.jupiter.params.ParameterizedTest;
+import org.junit.jupiter.params.provider.EnumSource;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -34,6 +43,7 @@ import org.springframework.security.crypto.password.PasswordEncoder;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.DynamicPropertyRegistry;
 import org.springframework.test.context.DynamicPropertySource;
+import org.springframework.web.server.ResponseStatusException;
 
 /**
  * PostgreSQL-only auth race regressions. The URL must point at an isolated
@@ -200,13 +210,7 @@ class AuthConcurrencyPostgresIT {
                 "SELECT password FROM campuscore_auth.\"User\" WHERE id = ?",
                 String.class,
                 userId);
-        IssuedChallengeToken issued = AuthChallengeTokenService.issue();
-        Instant now = Instant.now();
-        jdbc.update("INSERT INTO campuscore_auth.\"AuthChallenge\""
-                        + " (id, \"userId\", purpose, \"tokenHash\", \"expiresAt\", \"attemptCount\", \"lastSentAt\", \"createdAt\")"
-                        + " VALUES (?, ?, 'PASSWORD_RESET', ?, ?, 0, ?, ?)",
-                issued.challengeId(), userId, issued.tokenHash(),
-                Timestamp.from(now.plusSeconds(1_800)), Timestamp.from(now), Timestamp.from(now));
+        IssuedChallengeToken issued = insertChallenge(userId, Purpose.PASSWORD_RESET);
 
         CountDownLatch disableLocked = new CountDownLatch(1);
         CountDownLatch allowDisableCommit = new CountDownLatch(1);
@@ -240,6 +244,188 @@ class AuthConcurrencyPostgresIT {
                 "SELECT status FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId));
         assertEquals(oldHash, jdbc.queryForObject(
                 "SELECT password FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId));
+    }
+
+    @ParameterizedTest
+    @EnumSource(SessionMutation.class)
+    void passwordResetSerializesWithWaitingSessionMutations(SessionMutation mutation) throws Exception {
+        String userId = insertUser("ACTIVE");
+        String refreshToken = login.login(userId + "@auth-race.invalid", "correct-password",
+                "127.0.0.1", "auth-reset-race").response().refreshToken();
+        IssuedChallengeToken issued = AuthChallengeTokenService.issue();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO campuscore_auth.\"AuthChallenge\""
+                        + " (id, \"userId\", purpose, \"tokenHash\", \"expiresAt\", \"attemptCount\", \"lastSentAt\", \"createdAt\")"
+                        + " VALUES (?, ?, 'PASSWORD_RESET', ?, ?, 0, ?, ?)",
+                issued.challengeId(), userId, issued.tokenHash(),
+                Timestamp.from(now.plusSeconds(1_800)), Timestamp.from(now), Timestamp.from(now));
+        PasswordResetConfirmRequest resetRequest =
+                new PasswordResetConfirmRequest(issued.rawToken(), "reset-wins-password");
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        AtomicInteger mutationPid = new AtomicInteger();
+        AtomicReference<Future<String>> pending = new AtomicReference<>();
+        CountDownLatch mutationStarted = new CountDownLatch(1);
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                jdbc.execute("SET LOCAL statement_timeout = '10s'");
+                int resetPid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+                // This is the first lock taken by consumeValidChallenge. Hold
+                // it before scheduling the competing real service call.
+                jdbc.queryForObject("SELECT id FROM campuscore_auth.\"User\" WHERE id = ? FOR UPDATE",
+                        String.class, userId);
+                pending.set(pool.submit(() -> {
+                    try {
+                        return new TransactionTemplate(transactionManager).execute(other -> {
+                            jdbc.execute("SET LOCAL statement_timeout = '10s'");
+                            mutationPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                            mutationStarted.countDown();
+                            switch (mutation) {
+                                case REFRESH -> login.refresh(refreshToken, "127.0.0.1", "auth-reset-race");
+                                case LOGOUT -> login.logout(userId, refreshToken);
+                                case CHANGE_PASSWORD -> login.changePassword(userId, "correct-password", "stale-password-change");
+                            }
+                            return "SUCCESS";
+                        });
+                    } catch (BadCredentialsException invalidated) {
+                        return "INVALID_REFRESH";
+                    } catch (ResponseStatusException invalidated) {
+                        if (mutation == SessionMutation.CHANGE_PASSWORD && invalidated.getStatusCode().value() == 400) {
+                            return "INVALID_OLD_PASSWORD";
+                        }
+                        throw invalidated;
+                    }
+                }));
+                await(mutationStarted);
+                // Observe an actual PostgreSQL wait edge, not a timed guess.
+                // Before the repair, refresh/logout already own Session here
+                // and reset's DELETE closes a deadlock cycle.
+                Awaitility.await().atMost(Duration.ofSeconds(8)).until(() -> Boolean.TRUE.equals(
+                        jdbc.queryForObject("SELECT ? = ANY(pg_blocking_pids(?))", Boolean.class,
+                                resetPid, mutationPid.get())));
+                lifecycle.confirmPasswordReset(resetRequest);
+            });
+            String expected = switch (mutation) {
+                case REFRESH -> "INVALID_REFRESH";
+                case LOGOUT -> "SUCCESS";
+                case CHANGE_PASSWORD -> "INVALID_OLD_PASSWORD";
+            };
+            assertEquals(expected, pending.get().get(15, TimeUnit.SECONDS));
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(15, TimeUnit.SECONDS));
+        }
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\" = ?", Integer.class, userId));
+        assertTrue(passwordEncoder.matches("reset-wins-password", jdbc.queryForObject(
+                "SELECT password FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId)));
+        assertNotNull(jdbc.queryForObject(
+                "SELECT \"consumedAt\" FROM campuscore_auth.\"AuthChallenge\" WHERE id = ?", Timestamp.class,
+                issued.challengeId()));
+        assertEquals("AUTH_CHALLENGE_INVALID", assertThrows(DomainException.class,
+                () -> lifecycle.confirmPasswordReset(resetRequest)).code());
+    }
+
+    private enum SessionMutation {
+        REFRESH, LOGOUT, CHANGE_PASSWORD
+    }
+
+    @Test
+    void passwordResetRevokesTheRotatedSessionWhenRefreshCommitsFirst() throws Exception {
+        String userId = insertUser("ACTIVE");
+        String refreshToken = login.login(userId + "@auth-race.invalid", "correct-password",
+                "127.0.0.1", "auth-refresh-first").response().refreshToken();
+        IssuedChallengeToken issued = insertChallenge(userId, Purpose.PASSWORD_RESET);
+        ExecutorService pool = Executors.newSingleThreadExecutor();
+        AtomicInteger resetPid = new AtomicInteger();
+        AtomicReference<Future<?>> pendingReset = new AtomicReference<>();
+        AtomicReference<String> rotatedToken = new AtomicReference<>();
+        CountDownLatch resetStarted = new CountDownLatch(1);
+        try {
+            new TransactionTemplate(transactionManager).executeWithoutResult(status -> {
+                jdbc.execute("SET LOCAL statement_timeout = '10s'");
+                int refreshPid = jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class);
+                rotatedToken.set(login.refresh(refreshToken, "127.0.0.1", "auth-refresh-first")
+                        .response().refreshToken());
+                pendingReset.set(pool.submit(() -> new TransactionTemplate(transactionManager).execute(other -> {
+                    jdbc.execute("SET LOCAL statement_timeout = '10s'");
+                    resetPid.set(jdbc.queryForObject("SELECT pg_backend_pid()", Integer.class));
+                    resetStarted.countDown();
+                    return lifecycle.confirmPasswordReset(
+                            new PasswordResetConfirmRequest(issued.rawToken(), "reset-after-refresh"));
+                })));
+                await(resetStarted);
+                Awaitility.await().atMost(Duration.ofSeconds(8)).until(() -> Boolean.TRUE.equals(
+                        jdbc.queryForObject("SELECT ? = ANY(pg_blocking_pids(?))", Boolean.class,
+                                refreshPid, resetPid.get())));
+            });
+            pendingReset.get().get(15, TimeUnit.SECONDS);
+        } finally {
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(15, TimeUnit.SECONDS));
+        }
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT count(*) FROM campuscore_auth.\"Session\" WHERE \"userId\" = ?", Integer.class, userId));
+        assertThrows(BadCredentialsException.class,
+                () -> login.refresh(rotatedToken.get(), "127.0.0.1", "auth-refresh-first"));
+    }
+
+    @ParameterizedTest
+    @EnumSource(Purpose.class)
+    void concurrentChallengeConsumptionSucceedsExactlyOnce(Purpose purpose) throws Exception {
+        String userId = insertUser(purpose == Purpose.EMAIL_VERIFICATION ? "PENDING_VERIFICATION" : "ACTIVE");
+        IssuedChallengeToken issued = insertChallenge(userId, purpose);
+        CountDownLatch ready = new CountDownLatch(2);
+        CountDownLatch start = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        try {
+            List<Future<String>> calls = List.of(
+                    pool.submit(() -> consumeChallenge(purpose, issued, ready, start)),
+                    pool.submit(() -> consumeChallenge(purpose, issued, ready, start)));
+            assertTrue(ready.await(10, TimeUnit.SECONDS));
+            start.countDown();
+            List<String> outcomes = new ArrayList<>();
+            for (Future<String> call : calls) {
+                outcomes.add(call.get(15, TimeUnit.SECONDS));
+            }
+            assertEquals(1, outcomes.stream().filter("SUCCESS"::equals).count());
+            assertEquals(1, outcomes.stream().filter("AUTH_CHALLENGE_INVALID"::equals).count());
+        } finally {
+            start.countDown();
+            pool.shutdownNow();
+            assertTrue(pool.awaitTermination(15, TimeUnit.SECONDS));
+        }
+        assertNotNull(jdbc.queryForObject(
+                "SELECT \"consumedAt\" FROM campuscore_auth.\"AuthChallenge\" WHERE id = ?", Timestamp.class,
+                issued.challengeId()));
+        assertEquals("ACTIVE", jdbc.queryForObject(
+                "SELECT status FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId));
+    }
+
+    private String consumeChallenge(Purpose purpose, IssuedChallengeToken issued,
+            CountDownLatch ready, CountDownLatch start) {
+        ready.countDown();
+        await(start);
+        try {
+            if (purpose == Purpose.EMAIL_VERIFICATION) {
+                lifecycle.confirmEmail(new ChallengeTokenRequest(issued.rawToken()));
+            } else {
+                lifecycle.confirmPasswordReset(new PasswordResetConfirmRequest(issued.rawToken(), "single-use-password"));
+            }
+            return "SUCCESS";
+        } catch (DomainException rejected) {
+            return rejected.code();
+        }
+    }
+
+    private IssuedChallengeToken insertChallenge(String userId, Purpose purpose) {
+        IssuedChallengeToken issued = AuthChallengeTokenService.issue();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO campuscore_auth.\"AuthChallenge\""
+                        + " (id, \"userId\", purpose, \"tokenHash\", \"expiresAt\", \"attemptCount\", \"lastSentAt\", \"createdAt\")"
+                        + " VALUES (?, ?, ?, ?, ?, 0, ?, ?)",
+                issued.challengeId(), userId, purpose.name(), issued.tokenHash(),
+                Timestamp.from(now.plusSeconds(1_800)), Timestamp.from(now), Timestamp.from(now));
+        return issued;
     }
 
     private void resend(String email, String ip, CountDownLatch ready, CountDownLatch start) {

@@ -111,6 +111,18 @@ public class AuthUserRepository {
                 findPermissions(user.id())));
     }
 
+    /**
+     * Account mutations acquire User before Session, matching challenge
+     * consumption and password reset. Keep this lock through the surrounding
+     * transaction and re-read credentials/session state after acquiring it.
+     */
+    public boolean lockUser(String userId) {
+        return !jdbc.query(
+                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :id FOR UPDATE",
+                new MapSqlParameterSource("id", userId),
+                (resultSet, ignored) -> resultSet.getString("id")).isEmpty();
+    }
+
     public AuthUserRecord createUser(RegisterCommand command) {
         String userId = UUID.randomUUID().toString();
         MapSqlParameterSource parameters = new MapSqlParameterSource()

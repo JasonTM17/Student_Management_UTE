@@ -181,6 +181,12 @@ public class AuthLoginService {
 
         Jwt decoded = decodeRefresh(refreshTokenValue);
         String refreshTokenHash = hash(refreshTokenValue);
+        // The verified JWT identifies the parent row before a Session lock is
+        // taken. Re-query the session after waiting: reset/logout may have
+        // revoked it while this transaction was acquiring the User lock.
+        if (!users.lockUser(decoded.getSubject())) {
+            throw new BadCredentialsException("Invalid refresh token");
+        }
         AuthUserRecord user = users.findByActiveRefreshSession(refreshTokenHash, clock.instant())
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
         if (!user.id().equals(decoded.getSubject())
@@ -226,6 +232,9 @@ public class AuthLoginService {
 
     @Transactional
     public void changePassword(String userId, String oldPassword, String newPassword) {
+        if (!users.lockUser(userId)) {
+            throw new BadCredentialsException("Invalid session");
+        }
         AuthUserRecord user = requireActiveUser(userId);
         if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password fields are required");
@@ -243,6 +252,9 @@ public class AuthLoginService {
 
     @Transactional
     public void logout(String userId, String refreshTokenValue) {
+        if (!users.lockUser(userId)) {
+            return;
+        }
         if (refreshTokenValue != null && !refreshTokenValue.isBlank()) {
             users.deleteRefreshSession(userId, hash(refreshTokenValue));
         } else {
