@@ -7,4 +7,3 @@ Liên kết có hiệu lực trong {{expiresMinutes}} phút và chỉ dùng đư
 Nếu bạn không tạo tài khoản này, hãy bỏ qua email. Không chuyển tiếp liên kết cho người khác.
 
 CampusCore
-
