@@ -121,6 +121,14 @@ test('admin knowledge action errors remain visible inside active dialogs', () =>
   assert.match(modal, /\{error\}/);
 });
 
+test('admin knowledge is available through the localized route tree', () => {
+  const localizedPage = fs.readFileSync(
+    path.join(root, 'src/app/[locale]/admin/assistant-knowledge/page.tsx'),
+    'utf8',
+  );
+  assert.match(localizedPage, /admin\/assistant-knowledge\/page/);
+});
+
 test('assistant history routes URI-encode owner-scoped identifiers', () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
   assert.match(source, /conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);

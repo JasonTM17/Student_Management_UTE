@@ -2,9 +2,10 @@ import { test, expect, type Page } from '@playwright/test';
 
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
+const localePrefix = '/en';
 
 async function login(page: Page, account: typeof student) {
-  await page.goto('/login');
+  await page.goto(`${localePrefix}/login`);
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -161,7 +162,7 @@ test('authenticated admin can inspect curated sources and the public catalog cov
 
   await login(page, admin);
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
-  await page.goto('/admin/assistant-knowledge');
+  await page.goto(`${localePrefix}/admin/assistant-knowledge`);
 
   await expect(page.getByRole('heading', { name: 'AI assistant knowledge' })).toBeVisible();
   await expect(page.getByText('Public catalog coverage')).toBeVisible();
@@ -195,7 +196,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     { width: 1440, height: 900 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto('/dashboard');
+    await page.goto(`${localePrefix}/dashboard`);
     const launcher = page.getByRole('button', { name: 'Open thesis assistant' });
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
