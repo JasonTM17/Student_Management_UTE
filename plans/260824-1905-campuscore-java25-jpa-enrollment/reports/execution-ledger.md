@@ -946,3 +946,20 @@ evidence was unavailable; no application traffic cutover is authorized.
   exact-head review wave, then delete only the merged candidate branch and
   disposable worktrees after the final identity check. Keep the pushed feature
   branch and archive tag unless the user separately requests remote deletion.
+
+## Publication and release checkpoint (2026-08-26)
+
+- [x] Exact-head Docker images were rebuilt from `d01465ed70694aa346f37c95db529e8dbbaa3f91` in clean release worktree `D:\worktrees\Student_Management-publish-20260826` and tagged
+  `nguyenson1710/campuscore-backend:d01465ed`,
+  `nguyenson1710/campuscore-backend:2026.08.26-d01465ed`,
+  `nguyenson1710/campuscore-frontend:d01465ed`, and
+  `nguyenson1710/campuscore-frontend:2026.08.26-d01465ed`.
+- [x] Remote Docker Hub manifests resolve to the pushed OCI indices:
+  backend `sha256:9f77fa193d5f35185228ddbe0a393791488c060d1c6dacc9ddcb581264fa557c`
+  and frontend `sha256:5e67f5e1694e435d8af8d638a6212b4f961cd6c9b64f58cc74cac45f637ed548`.
+- [x] GitHub release
+  `archive/campuscore-java25-jpa-enrollment-final-20260826` was created for
+  the final archive tag, and repo About metadata now points at that release.
+- [ ] Remaining cleanup is limited to the disposable publish worktree and any
+  ref updates the controller still chooses to record; no additional source
+  repair is required by the publication gate.
