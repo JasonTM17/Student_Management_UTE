@@ -54,6 +54,7 @@ public class AssistantKnowledgeJpaWriter {
     public RevisionSnapshot update(UUID documentId, KnowledgeCommand command, String actor) {
         KnowledgeCommand clean = validate(command, actor);
         AssistantKnowledgeDocumentEntity document = lockDocument(documentId);
+        requireActive(document);
         if (documents.existsBySlugAndIdNot(clean.slug(), documentId)) {
             throw conflict("KNOWLEDGE_SLUG_CONFLICT");
         }
@@ -81,6 +82,7 @@ public class AssistantKnowledgeJpaWriter {
     @Transactional
     public RevisionSnapshot submit(UUID documentId, String actor) {
         AssistantKnowledgeDocumentEntity document = lockDocument(documentId);
+        requireActive(document);
         List<AssistantKnowledgeRevisionEntity> drafts = revisions.findOwnDraftsForUpdate(documentId, requireActor(actor));
         if (drafts.isEmpty()) throw conflict("KNOWLEDGE_STATE_CONFLICT");
         AssistantKnowledgeRevisionEntity revision = drafts.get(0);
@@ -92,6 +94,7 @@ public class AssistantKnowledgeJpaWriter {
     @Transactional
     public RevisionSnapshot publish(UUID documentId, String actor) {
         AssistantKnowledgeDocumentEntity document = lockDocument(documentId);
+        requireActive(document);
         String reviewer = requireActor(actor);
         List<AssistantKnowledgeRevisionEntity> pending = revisions.findPendingForOtherReviewer(documentId, reviewer);
         if (pending.isEmpty()) throw conflict("KNOWLEDGE_SECOND_REVIEW_REQUIRED");
@@ -132,6 +135,10 @@ public class AssistantKnowledgeJpaWriter {
     private AssistantKnowledgeDocumentEntity lockDocument(UUID documentId) {
         if (documentId == null) throw notFound();
         return documents.findLockedById(documentId).orElseThrow(this::notFound);
+    }
+
+    private static void requireActive(AssistantKnowledgeDocumentEntity document) {
+        if (!document.isActive()) throw conflict("KNOWLEDGE_ARCHIVED");
     }
 
     private void audit(AssistantKnowledgeRevisionEntity revision, String action, String actor, Instant now) {

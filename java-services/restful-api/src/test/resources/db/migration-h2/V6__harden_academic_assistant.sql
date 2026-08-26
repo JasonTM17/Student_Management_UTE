@@ -49,6 +49,19 @@ CREATE TABLE IF NOT EXISTS assistant.chat_turn_ledger (
     CONSTRAINT assistant_turn_hash_valid CHECK (LENGTH(request_hash) = 64)
 );
 ALTER TABLE assistant.chat_turn_ledger ADD COLUMN IF NOT EXISTS created_conversation BOOLEAN NOT NULL DEFAULT FALSE;
+ALTER TABLE assistant.chat_turn_ledger ADD CONSTRAINT IF NOT EXISTS assistant_turn_conversation_fk
+    FOREIGN KEY (conversation_id) REFERENCES assistant.chat_conversation(id) ON DELETE SET NULL;
+ALTER TABLE assistant.chat_turn_ledger ADD CONSTRAINT IF NOT EXISTS assistant_turn_result_message_fk
+    FOREIGN KEY (result_message_id) REFERENCES assistant.chat_message(id) ON DELETE SET NULL;
+-- H2 has no PostgreSQL-style filtered indexes. Nullable generated columns keep
+-- the same invariant: only an in-flight state contributes to the unique key,
+-- while terminal/purged rows remain replayable for the same conversation.
+ALTER TABLE assistant.chat_turn_ledger ADD COLUMN IF NOT EXISTS active_owner_id VARCHAR(120)
+    AS (CASE WHEN conversation_id IS NOT NULL AND state IN ('RESERVED', 'SNAPSHOT_READY', 'DISPATCHED') THEN owner_id ELSE NULL END);
+ALTER TABLE assistant.chat_turn_ledger ADD COLUMN IF NOT EXISTS active_conversation_id UUID
+    AS (CASE WHEN conversation_id IS NOT NULL AND state IN ('RESERVED', 'SNAPSHOT_READY', 'DISPATCHED') THEN conversation_id ELSE NULL END);
+CREATE UNIQUE INDEX IF NOT EXISTS assistant_turn_active_conversation_idx
+    ON assistant.chat_turn_ledger (active_owner_id, active_conversation_id);
 CREATE INDEX IF NOT EXISTS assistant_turn_owner_updated_idx ON assistant.chat_turn_ledger (owner_id, updated_at DESC);
 CREATE INDEX IF NOT EXISTS assistant_turn_expiry_idx ON assistant.chat_turn_ledger (state, tombstone_until, updated_at);
 CREATE INDEX IF NOT EXISTS assistant_usage_bucket_retention_idx ON assistant.usage_bucket (bucket_date, scope);
