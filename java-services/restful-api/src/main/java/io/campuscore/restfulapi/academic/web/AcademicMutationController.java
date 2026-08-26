@@ -75,9 +75,14 @@ public class AcademicMutationController {
     }
 
     @DeleteMapping("enrollments/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
-    public Map<String, String> deleteEnrollment(@PathVariable String id) {
-        mutations.deleteEnrollment(id);
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN') and principal.claims['emailVerified'] == true")
+    public Map<String, String> deleteEnrollment(
+            @PathVariable String id,
+            @RequestHeader("Idempotency-Key") UUID key,
+            HttpServletResponse response) {
+        markDeprecated(response, "/api/v1/me/enrollments/" + id);
+        RegistrationService.DropResult result = registration.dropAsAdmin(id, key);
+        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
         return Map.of("message", "Enrollment deleted successfully");
     }
 

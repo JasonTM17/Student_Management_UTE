@@ -46,6 +46,12 @@ test('registration workspace scopes enrollments to the selected round semester',
   assert.match(workspace, /registrationApi\.getEnrollments\(roundDetail\.semesterId\)/);
 });
 
+test('registration workspace reads the canonical eligibilityState DTO field', () => {
+  const workspace = read('src/features/registration/RegistrationWorkspace.tsx');
+  assert.match(workspace, /eligibility\?\.eligibilityState === 'ELIGIBLE'/);
+  assert.doesNotMatch(workspace, /eligibility\?\.state/);
+});
+
 test('custom dialogs trap focus, own Escape, lock scroll and restore the trigger', () => {
   const hook = read('src/components/ui/use-dialog-focus-trap.ts');
   const adminFrame = read('src/components/admin/AdminFrame.tsx');

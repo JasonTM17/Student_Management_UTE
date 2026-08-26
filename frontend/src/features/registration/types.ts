@@ -69,7 +69,7 @@ export interface RegistrationViolation {
 }
 
 export interface RegistrationEligibility {
-  state: 'ELIGIBLE' | 'INELIGIBLE' | 'PENDING' | string;
+  eligibilityState: 'ELIGIBLE' | 'INELIGIBLE' | 'PENDING' | string;
   priorityRank?: number | null;
   reasonCode?: string | null;
   message?: string | null;
