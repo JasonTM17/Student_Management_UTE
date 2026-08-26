@@ -26,6 +26,7 @@ import io.campuscore.restfulapi.web.DomainException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
+import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -74,6 +75,39 @@ class ThesisAssistantServiceTest {
 
         assertThrows(DomainException.class,
                 () -> service.stream("topic", "en", null, "owner-disconnect", request, ignored -> { }));
+        verifyNoInteractions(knowledge, provider, catalog, history);
+    }
+
+    @Test
+    void cancelledGenerationIsRemovedWhenCancellationWinsImmediatelyAfterRegistration() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        AssistantCancellationRegistry cancellations = new AssistantCancellationRegistry();
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        // Model the cancel CAS winning before the worker's first cancellation
+        // check. The service must not leave the generation handle resident.
+        cancellations.fence("owner-immediate-cancel", request, 1L);
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                cancellations,
+                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90));
+
+        DomainException cancelled = assertThrows(DomainException.class,
+                () -> service.stream("topic", "en", null, "owner-immediate-cancel", request, ignored -> { }));
+        assertEquals("TURN_CANCELLED", cancelled.code());
+        AtomicBoolean replacement = cancellations.register("owner-immediate-cancel", request, 1L);
+        assertTrue(!replacement.get(), "the cancelled generation handle must have been removed");
+        cancellations.remove("owner-immediate-cancel", request, 1L);
         verifyNoInteractions(knowledge, provider, catalog, history);
     }
 

@@ -235,8 +235,10 @@ public class ThesisAssistantService {
         }
         AtomicBoolean cancelToken = cancellations == null ? new AtomicBoolean(false)
                 : cancellations.register(ownerId, clientRequestId, reservation.leaseGeneration());
-        if (cancelToken.get()) throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
-        LexicalResult lexical = retrieve(normalized, normalizedLocale);
+        boolean streamStarted = false;
+        try {
+            if (cancelToken.get()) throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
+            LexicalResult lexical = retrieve(normalized, normalizedLocale);
         // A disconnect may win while retrieval is in flight.  Do not allow a
         // cancelled generation to advance into snapshot, quota, provider, or
         // message persistence once the retrieval boundary returns.
@@ -254,6 +256,7 @@ public class ThesisAssistantService {
         if (!snapshotReady) {
             throw problem(409, "STALE_LEASE", "Turn lease is no longer current");
         }
+        streamStarted = true;
         emit(sink, new StreamMeta(requestId, clientRequestId, reservation.turnId(), reservation.conversationId(), MODEL, normalizedLocale));
 
         boolean providerAttempt = false;
@@ -263,7 +266,6 @@ public class ThesisAssistantService {
         List<ProviderSegment> emittedSegments = new ArrayList<>();
         StringBuilder providerAnswer = new StringBuilder();
         int[] expectedSequence = { 0 };
-        try {
             if (!lexical.documents().isEmpty() && deepSeek != null && deepSeek.usable()) {
                 ThesisAssistantTurnRepository.DispatchDecision dispatch = cancellations == null
                         ? turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
@@ -348,7 +350,7 @@ public class ThesisAssistantService {
                     terminal.citations(), requestId, clientRequestId, reservation.turnId(), false, terminal.terminalStatus(),
                     terminal.conversationId().toString(), terminal.messageId().toString());
         } catch (DomainException exception) {
-            if (isTransientTerminalRace(exception.code())) {
+            if (streamStarted && isTransientTerminalRace(exception.code())) {
                 // A cancel, purge, or lease fence can win after one provider
                 // delta crossed the transport boundary. Clear that transient
                 // text before the stable error frame; the terminal CAS means
