@@ -1,19 +1,20 @@
 # CampusCore
 
 CampusCore is a medium-sized course project built as one Java Spring Boot
-RESTful API, one Next.js web app, one Expo mobile app, and one PostgreSQL
-database.
+RESTful API, one internal RAG service, one Next.js web app, one Expo mobile
+app, and one PostgreSQL database.
 
 The retained scope covers pending registration, email verification, password
 reset, role-based student/lecturer/admin
 flows, academic catalog, HCMUTE-style registration rounds and enrollment,
 schedules, grades, announcements, notifications, thesis core, and a
-PostgreSQL-backed curated lexical thesis assistant with citations and an
-optional server-only DeepSeek streaming adapter.
+PostgreSQL-backed curated lexical thesis assistant served by the internal
+`rag-service` container, with citations and an optional server-only DeepSeek
+streaming adapter.
 
 Finance, analytics, support tickets, client-side/provider-unbounded AI, vector
 search, Redis, RabbitMQ, MinIO, Nginx, Kubernetes, Cloudflare Tunnel, and
-multi-image production release are intentionally excluded. DeepSeek is disabled
+multi-image production cutover are intentionally excluded. DeepSeek is disabled
 by default and lexical fallback works without a key.
 
 The handoff target is Java 25 LTS with Spring Boot 3.5.16, Maven 3.9.x and
@@ -23,7 +24,7 @@ compatibility baseline; host JDK 24/26 output is not Java 25 evidence.
 Run the stack with:
 
 ```powershell
-docker compose up -d --build postgres mailpit restful-api web
+docker compose up -d --build postgres mailpit rag-service restful-api web
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
 curl.exe -H "X-Health-Key: local-course-health-key" http://127.0.0.1:4010/api/v1/health/readiness
 curl.exe http://127.0.0.1:4010/v3/api-docs

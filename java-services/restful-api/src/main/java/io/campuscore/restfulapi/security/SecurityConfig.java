@@ -84,6 +84,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/reset-password",
                                 "/api/v1/contract",
                                 "/api/v1/health/**",
+                                "/internal/rag/**",
                                 "/error",
                                 "/actuator/health/**",
                                 "/api/docs/**",
