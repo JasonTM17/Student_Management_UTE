@@ -1,6 +1,7 @@
 import { expect, test, type APIRequestContext, type Page } from '@playwright/test';
 
 const mailpitBaseURL = process.env.E2E_MAILPIT_URL ?? 'http://127.0.0.1:8125';
+const localePrefix = '/en';
 
 type MailSummary = {
   ID?: string;
@@ -52,7 +53,7 @@ function challengeToken(message: MailDetail): string {
 }
 
 async function login(page: Page, email: string, password: string) {
-  await page.goto('/login');
+  await page.goto(`${localePrefix}/login`);
   await page.locator('#email').fill(email);
   await page.locator('#password').fill(password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -66,7 +67,7 @@ test('student completes browser registration, verification, reset, and fresh log
   const secondPassword = 'CampusCore!567';
 
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.goto('/register');
+  await page.goto(`${localePrefix}/register`);
   await page.getByLabel('First name').fill('Browser');
   await page.getByLabel('Last name').fill('Student');
   await page.getByLabel('Email address').fill(email);
@@ -80,16 +81,16 @@ test('student completes browser registration, verification, reset, and fresh log
   expect((verificationMail.HTML ?? '').length).toBeGreaterThan(100);
   const verificationToken = challengeToken(verificationMail);
 
-  const verificationResponse = await page.goto(`/verify-email?email=${encodeURIComponent(email)}#token=${encodeURIComponent(verificationToken)}`);
+  const verificationResponse = await page.goto(`${localePrefix}/verify-email?email=${encodeURIComponent(email)}#token=${encodeURIComponent(verificationToken)}`);
   expect(verificationResponse?.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page).not.toHaveURL(/(?:\?|&)token=/);
   await expect(page.getByRole('status')).toContainText('Email verified');
 
   await login(page, email, firstPassword);
-  await page.goto('/dashboard/sign-out');
+  await page.goto(`${localePrefix}/dashboard/sign-out`);
   await expect(page).toHaveURL(/\/login(?:$|[/?#])/);
 
-  await page.goto('/forgot-password');
+  await page.goto(`${localePrefix}/forgot-password`);
   await page.getByLabel('Email address').fill(email);
   await page.getByRole('button', { name: 'Send reset link' }).click();
   await expect(page.getByRole('status')).toContainText('reset link is on the way');
@@ -99,7 +100,7 @@ test('student completes browser registration, verification, reset, and fresh log
   expect((resetMail.HTML ?? '').length).toBeGreaterThan(100);
   const resetToken = challengeToken(resetMail);
 
-  const resetResponse = await page.goto(`/reset-password#token=${encodeURIComponent(resetToken)}`);
+  const resetResponse = await page.goto(`${localePrefix}/reset-password#token=${encodeURIComponent(resetToken)}`);
   expect(resetResponse?.headers()['referrer-policy']).toBe('no-referrer');
   await expect(page).not.toHaveURL(/(?:\?|&)token=/);
   await page.getByLabel('New password').fill(secondPassword);
@@ -111,7 +112,7 @@ test('student completes browser registration, verification, reset, and fresh log
 });
 
 test('auth lifecycle pages are responsive, keyboard reachable, localized, and no-referrer protected', async ({ page, request }) => {
-  for (const route of ['/verify-email', '/reset-password']) {
+  for (const route of [`${localePrefix}/verify-email`, `${localePrefix}/reset-password`]) {
     const response = await request.get(route);
     expect(response.headers()['referrer-policy']).toBe('no-referrer');
   }
@@ -122,7 +123,7 @@ test('auth lifecycle pages are responsive, keyboard reachable, localized, and no
     { width: 1440, height: 900 },
   ]) {
     await page.setViewportSize(viewport);
-    for (const route of ['/register', '/verify-email', '/forgot-password', '/reset-password']) {
+    for (const route of [`${localePrefix}/register`, `${localePrefix}/verify-email`, `${localePrefix}/forgot-password`, `${localePrefix}/reset-password`]) {
       await page.goto(route);
       await expect(page.locator('main')).toBeVisible();
       expect(await page.evaluate(() => document.documentElement.scrollWidth <= window.innerWidth + 1)).toBe(true);

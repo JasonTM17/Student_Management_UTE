@@ -578,17 +578,27 @@ evidence was unavailable; no application traffic cutover is authorized.
 - [x] Focused Java persistence regressions: 38 tests, zero failures/errors
   (`AuthLifecyclePersistenceTest`, token resolver/CSRF, knowledge writer and
   assistant H2 ledger).
-- [x] FE/mobile static gates: frontend 38/38 tests, typecheck, lint with
+- [x] FE/mobile static gates: frontend 39/39 tests, typecheck, lint with
   `--max-warnings=0`, production build; mobile 23/23 tests and typecheck.
-  Compose config, assistant-secret scan (554 files) and text-encoding guard
+  Compose config, assistant-secret scan (556 files) and text-encoding guard
   pass. The one failed typecheck invocation was a parallel `.next` generation
   race; the sequential rerun passed and is the accepted evidence.
-- [x] Full Java 25 Maven reactor: 244 tests, 53 suites, zero failures/errors/
-  skipped. Isolated PostgreSQL 15.19 container
+- [x] Fresh Java 25 Maven `clean verify`: 215 tests across 46 freshly generated
+  Surefire suites, zero failures/errors/skipped. Isolated PostgreSQL 15.19 container
   `campuscore-final-postgres-20260826` ran auth (4), registration (6) and
   assistant ledger (12) concurrency/ownership/recovery tests: 22/22 passed.
   The container is task-owned and must be stopped/removed only at the final
   disposable-container cleanup gate.
-- [ ] Browser/mail authenticated E2E and exact-head independent reviews still
-  require a clean successor SHA. No archive tag, Docker push, GitHub release,
-  merge or branch cleanup is authorized before those gates.
+- [x] Authenticated Chrome/Playwright and Mailpit E2E: 6/6 passed. The flow
+  proved student register (202), HTML/text verification mail, token confirm,
+  login/logout, password-reset mail, reset and fresh login; it also exercised
+  assistant SSE/citation/feedback, cancel/reopen, localized admin knowledge,
+  keyboard focus and responsive layouts at 390/768/1440. The first run exposed
+  English assertions against the new Vietnamese default; the bounded repair
+  made English routes explicit. The second run then exposed the genuinely
+  missing localized admin-knowledge route; its wrapper and regression were
+  added without weakening assertions. The final run passed and removed its
+  exact disposable containers, network and volume.
+- [ ] Exact-head independent reviews still require a clean successor SHA. No
+  archive tag, Docker push, GitHub release, merge or branch cleanup is
+  authorized before those gates.
