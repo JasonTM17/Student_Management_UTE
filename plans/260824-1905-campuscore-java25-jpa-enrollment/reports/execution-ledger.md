@@ -602,3 +602,26 @@ evidence was unavailable; no application traffic cutover is authorized.
 - [ ] Exact-head independent reviews still require a clean successor SHA. No
   archive tag, Docker push, GitHub release, merge or branch cleanup is
   authorized before those gates.
+
+## Auth-mail locale and frontend session-race checkpoint (2026-08-26)
+
+- [x] Commit `fdabcd321671ab27f9a55c2e9e001a7361dd30b5` preserves the
+  requested `vi`/`en` locale in verification and password-reset mail links;
+  the Mailpit browser contract now follows the captured link instead of
+  reconstructing one. The focused Java mail test passed under Java 25.
+- [x] Commit `65b2bb65384a3335e8b4e7449a8cb1d0e194b5fc` fences stale
+  `AuthProvider` background refresh completion from overwriting an explicit
+  login/logout transition. The regression was observed red before the fence
+  existed and green afterward; frontend tests are 40/40, typecheck, zero-warning
+  lint and production build all pass.
+- [x] The strengthened authenticated lifecycle verifies refresh success, logout
+  cookie removal and rejected post-logout refresh before reset/fresh login. The
+  default Playwright invocation was `NOT_RUN` because its bundled Chromium was
+  not installed and its disposable Compose project was removed. Re-running on
+  the available system Chrome channel passed the complete Mailpit flow in 35.7
+  seconds and removed its exact containers, volume and network. The test-owned
+  timeout is 60 seconds because the previous 30-second budget expired before
+  the final login on cold Next route compilation.
+- [ ] Freeze the clean successor SHA after this ledger update, run the planned
+  terminal verification matrix once on that exact SHA, then dispatch fresh
+  Kongming/Wukong/FE/test/debug/code-review evidence before shipping or merge.
