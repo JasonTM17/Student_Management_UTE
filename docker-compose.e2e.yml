@@ -36,8 +36,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_e2e}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore_e2e}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_e2e_password}
-      JWT_SECRET: ${JWT_SECRET:-local-course-e2e-jwt-secret}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-e2e-refresh-secret}
+      JWT_SECRET: ${JWT_SECRET:-local-course-e2e-jwt-secret-2026-campuscore}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-e2e-refresh-secret-2026-campuscore}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-e2e-health-key}
       COOKIE_SECURE: "false"
       FLYWAY_ENABLED: "true"

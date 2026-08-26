@@ -137,7 +137,9 @@ public class AuthLifecycleService {
             }
             throw throttled;
         }
-        Optional<AuthUserRecord> userResult = users.findByEmail(email);
+        // Serialize the account read with admin status mutations so a disable
+        // that wins this race cannot issue a fresh reset challenge.
+        Optional<AuthUserRecord> userResult = users.findByEmailForUpdate(email);
         if (userResult.isEmpty() || !"ACTIVE".equals(userResult.get().status())) {
             return new MessageResponse(RESET_MESSAGE);
         }
@@ -167,7 +169,12 @@ public class AuthLifecycleService {
         }
         Challenge challenge = consumeValidChallenge(Purpose.PASSWORD_RESET, token);
         AuthUserRecord user = users.findById(challenge.userId()).orElseThrow(this::invalidChallenge);
-        users.resetPassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
+        int reset = users.resetPassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
+        if (reset != 1) {
+            // A reset token issued while ACTIVE must not change credentials
+            // after an administrator disables the account.
+            throw invalidChallenge();
+        }
         users.deleteAllRefreshSessions(user.id());
         users.clearUserRefreshToken(user.id());
         return new MessageResponse("Password reset successfully. Please sign in.");

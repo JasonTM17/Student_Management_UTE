@@ -20,6 +20,11 @@ the local thesis assistant. Auth and academic records use stable string IDs;
 thesis and assistant records use UUIDs. Student and lecturer codes remain
 unique business identifiers.
 
+For browser recovery, the token resolver ignores a stale access cookie on the
+public login and refresh routes so it cannot pre-empt the controller or a
+valid refresh cookie. Those cookie mutations still require the double-submit
+CSRF cookie/header pair; mobile bearer requests bypass that cookie-only check.
+
 Flyway owns the schema. A fresh course database is seeded deterministically
 with roles, demo users, academic catalog, sections, announcements,
 notifications, thesis data and curated assistant knowledge. No legacy service

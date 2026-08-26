@@ -317,8 +317,8 @@ public class AuthUserRepository {
                         .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
     }
 
-    public void resetPassword(String userId, String passwordHash, Instant passwordChangedAt) {
-        jdbc.update(
+    public int resetPassword(String userId, String passwordHash, Instant passwordChangedAt) {
+        return jdbc.update(
                 "UPDATE " + USER_TABLE
                         + " SET \"password\" = :password,"
                         + " \"passwordChangedAt\" = :passwordChangedAt,"
@@ -326,7 +326,7 @@ public class AuthUserRepository {
                         + " \"failedLoginAttempts\" = 0,"
                         + " \"lockedUntil\" = NULL,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP"
-                        + " WHERE \"id\" = :userId",
+                        + " WHERE \"id\" = :userId AND \"status\" = 'ACTIVE'",
                 new MapSqlParameterSource()
                         .addValue("userId", userId)
                         .addValue("password", passwordHash)

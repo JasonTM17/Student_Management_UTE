@@ -14,6 +14,8 @@ public interface AssistantKnowledgeDocumentJpaRepository
 
     boolean existsBySlug(String slug);
 
+    boolean existsBySlugAndIdNot(String slug, UUID id);
+
     @Lock(LockModeType.PESSIMISTIC_WRITE)
     @Query("select d from AssistantKnowledgeDocumentEntity d where d.id = :id")
     Optional<AssistantKnowledgeDocumentEntity> findLockedById(@Param("id") UUID id);

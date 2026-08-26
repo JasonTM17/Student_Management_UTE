@@ -67,7 +67,7 @@ BEGIN
         ) THEN
             RAISE EXCEPTION USING
                 ERRCODE = '55000',
-                MESSAGE = 'The CampusCore Supabase baseline requires an exact Flyway schema marker and B20 history';
+                MESSAGE = 'The CampusCore Supabase baseline requires one of the allowlisted Flyway histories: marker-only, marker+B20, or marker+B20+V21';
         END IF;
         IF total_count = 1 THEN
             SELECT EXISTS (

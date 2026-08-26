@@ -5,12 +5,15 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService;
+import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService.IssuedChallengeToken;
 import io.campuscore.restfulapi.auth.service.AuthLifecycleService;
 import io.campuscore.restfulapi.auth.service.AuthLoginService;
 import io.campuscore.restfulapi.auth.web.AuthDtos.EmailRequest;
+import io.campuscore.restfulapi.auth.web.AuthDtos.PasswordResetConfirmRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
+import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -23,6 +26,7 @@ import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.condition.EnabledIfEnvironmentVariable;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -58,6 +62,9 @@ class AuthConcurrencyPostgresIT {
 
     @Autowired
     private AuthLoginService login;
+
+    @Autowired
+    private org.springframework.transaction.PlatformTransactionManager transactionManager;
 
     private final List<String> createdUserIds = new ArrayList<>();
     private final List<String[]> createdRateLimitKeys = new ArrayList<>();
@@ -183,6 +190,56 @@ class AuthConcurrencyPostgresIT {
                 email);
         assertEquals(1, userIds.size());
         createdUserIds.add(userIds.getFirst());
+    }
+
+    @Test
+    void passwordResetBlockedWhenDisableHoldsTheUserRowLock() throws Exception {
+        String userId = insertUser("ACTIVE");
+        String email = userId + "@auth-race.invalid";
+        String oldHash = jdbc.queryForObject(
+                "SELECT password FROM campuscore_auth.\"User\" WHERE id = ?",
+                String.class,
+                userId);
+        IssuedChallengeToken issued = AuthChallengeTokenService.issue();
+        Instant now = Instant.now();
+        jdbc.update("INSERT INTO campuscore_auth.\"AuthChallenge\""
+                        + " (id, \"userId\", purpose, \"tokenHash\", \"expiresAt\", \"attemptCount\", \"lastSentAt\", \"createdAt\")"
+                        + " VALUES (?, ?, 'PASSWORD_RESET', ?, ?, 0, ?, ?)",
+                issued.challengeId(), userId, issued.tokenHash(),
+                Timestamp.from(now.plusSeconds(1_800)), Timestamp.from(now), Timestamp.from(now));
+
+        CountDownLatch disableLocked = new CountDownLatch(1);
+        CountDownLatch allowDisableCommit = new CountDownLatch(1);
+        ExecutorService pool = Executors.newFixedThreadPool(2);
+        Future<?> disable = pool.submit(() -> new TransactionTemplate(transactionManager).execute(status -> {
+            jdbc.update("UPDATE campuscore_auth.\"User\" SET status = 'DISABLED' WHERE id = ?", userId);
+            disableLocked.countDown();
+            await(allowDisableCommit);
+            return null;
+        }));
+        assertTrue(disableLocked.await(10, TimeUnit.SECONDS));
+
+        Future<String> reset = pool.submit(() -> {
+            try {
+                lifecycle.confirmPasswordReset(new PasswordResetConfirmRequest(issued.rawToken(), "disabled-race-123"));
+                return "SUCCESS";
+            } catch (DomainException exception) {
+                return exception.code();
+            }
+        });
+        // The reset transaction must wait on the user row until the disable
+        // commits; releasing only after the waiter has been scheduled makes
+        // the lock-order/race path deterministic without touching a shared DB.
+        Thread.sleep(200);
+        allowDisableCommit.countDown();
+        assertEquals("AUTH_CHALLENGE_INVALID", reset.get(20, TimeUnit.SECONDS));
+        disable.get(20, TimeUnit.SECONDS);
+        pool.shutdownNow();
+
+        assertEquals("DISABLED", jdbc.queryForObject(
+                "SELECT status FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId));
+        assertEquals(oldHash, jdbc.queryForObject(
+                "SELECT password FROM campuscore_auth.\"User\" WHERE id = ?", String.class, userId));
     }
 
     private void resend(String email, String ip, CountDownLatch ready, CountDownLatch start) {

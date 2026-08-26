@@ -386,7 +386,11 @@ public class ThesisAssistantTurnRepository {
     @Transactional
     public CancelResult cancelBeforeReservation(String ownerId, UUID clientRequestId, String requestHash,
             Consumer<DispatchHandle> fence) {
-        TurnRow existing = findForUpdate(ownerId, clientRequestId);
+        // Cancellation must enter the same conversation -> ledger lock order
+        // as completion and purge. A read-only probe is sufficient for the
+        // hash/idempotency check; locking the ledger here would invert the
+        // order against a completion that already owns the conversation row.
+        TurnRow existing = findForUpdateRead(ownerId, clientRequestId);
         if (existing != null) {
             ensureRequestHash(existing, requestHash);
             return cancel(existing.turnId(), ownerId, clientRequestId, fence);
@@ -399,7 +403,7 @@ public class ThesisAssistantTurnRepository {
                         .addValue("request", clientRequestId).addValue("hash", requestHash)
                         .addValue("tombstone", timestampAfterDays(TOMBSTONE_DAYS)));
         if (inserted == 1) return new CancelResult(true, "CANCELLED");
-        existing = findForUpdate(ownerId, clientRequestId);
+        existing = findForUpdateRead(ownerId, clientRequestId);
         return existing == null ? new CancelResult(false, "TURN_NOT_FOUND")
                 : cancelAfterHashCheck(existing, ownerId, clientRequestId, requestHash, fence);
     }

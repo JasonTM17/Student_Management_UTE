@@ -45,6 +45,11 @@ SHA-256 hashes in PostgreSQL, single-use, expired/invalid-safe and absent from
 application logs. Do not substitute an SMTP configuration check for captured
 mail evidence.
 
+When testing a browser with stale access and refresh cookies, confirm that the
+resolver lets `/auth/login` and `/auth/refresh` reach their public controllers,
+while the cookie CSRF pair is still required. A bearer mobile request must
+remain independent of that cookie-only CSRF rule.
+
 Supabase synchronization is a separate remote database gate. Apply no remote
 migration until the exact project, current migration/schema drift, backup or
 rollback path, and compatibility with Supabase-managed schemas have been

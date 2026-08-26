@@ -37,6 +37,7 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
+  const [verificationRequired, setVerificationRequired] = useState(false);
   const formErrorRef = useRef<HTMLDivElement>(null);
   const { login } = useAuth();
   const { href, messages } = useI18n();
@@ -107,6 +108,7 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
+    setVerificationRequired(false);
     setIsLoading(true);
 
     try {
@@ -116,6 +118,10 @@ export default function LoginPage() {
     } catch (error: unknown) {
       const message = getLoginErrorMessage(error);
       setFormError(message);
+      setVerificationRequired(
+        error instanceof AxiosError
+          && (error.response?.data as { code?: string } | undefined)?.code === 'EMAIL_VERIFICATION_REQUIRED',
+      );
     } finally {
       setIsLoading(false);
     }
@@ -166,6 +172,15 @@ export default function LoginPage() {
           >
             {formError}
           </div>
+        ) : null}
+
+        {verificationRequired ? (
+          <LocalizedLink
+            href="/verify-email"
+            className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+          >
+            {messages.verifyEmail.heading}
+          </LocalizedLink>
         ) : null}
 
         <form

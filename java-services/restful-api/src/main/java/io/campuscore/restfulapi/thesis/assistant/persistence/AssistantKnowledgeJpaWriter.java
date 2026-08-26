@@ -54,6 +54,9 @@ public class AssistantKnowledgeJpaWriter {
     public RevisionSnapshot update(UUID documentId, KnowledgeCommand command, String actor) {
         KnowledgeCommand clean = validate(command, actor);
         AssistantKnowledgeDocumentEntity document = lockDocument(documentId);
+        if (documents.existsBySlugAndIdNot(clean.slug(), documentId)) {
+            throw conflict("KNOWLEDGE_SLUG_CONFLICT");
+        }
         Instant now = Instant.now();
         List<AssistantKnowledgeRevisionEntity> drafts = revisions.findOwnDraftsForUpdate(documentId, clean.actor());
         AssistantKnowledgeRevisionEntity revision;
@@ -95,6 +98,9 @@ public class AssistantKnowledgeJpaWriter {
         AssistantKnowledgeRevisionEntity selected = pending.get(0);
         validatePublic(selected.getSlug(), selected.getLocale(), selected.getTitle(),
                 selected.getContent(), selected.getSource());
+        if (documents.existsBySlugAndIdNot(selected.getSlug(), documentId)) {
+            throw conflict("KNOWLEDGE_SLUG_CONFLICT");
+        }
         Instant now = Instant.now();
         for (AssistantKnowledgeRevisionEntity published : revisions.findPublishedForUpdate(documentId)) {
             published.archive();

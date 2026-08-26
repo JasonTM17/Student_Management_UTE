@@ -1,5 +1,5 @@
--- The B20 baseline is for a new target only.  Refuse it when any Flyway
--- history table already contains a migration, including an existing V20 DB.
+-- The baseline callback accepts only the reviewed history states: marker-only,
+-- marker+B20, or marker+B20+V21. Existing V-history databases are not targets.
 DO $$
 DECLARE
     schema_name text;
@@ -67,7 +67,7 @@ BEGIN
         ) THEN
             RAISE EXCEPTION USING
                 ERRCODE = '55000',
-                MESSAGE = 'The CampusCore Supabase baseline requires an exact Flyway schema marker and B20 history';
+                MESSAGE = 'The CampusCore Supabase baseline requires one of the allowlisted Flyway histories: marker-only, marker+B20, or marker+B20+V21';
         END IF;
         IF total_count = 1 THEN
             SELECT EXISTS (
