@@ -35,6 +35,7 @@ test('web token handoff scrubs URLs and disables referrer leakage', () => {
 
   assert.match(pages, /window\.history\.replaceState/);
   assert.match(pages, /searchParams\.delete\('token'\)/);
+  assert.match(pages, /nextUrl\.hash\s*=\s*['"]['"]/);
   assert.match(pages, /type="password" value=\{token\}/);
   assert.match(nextConfig, /Referrer-Policy', value: 'no-referrer'/);
   assert.match(nextConfig, /\/:locale\(en\|vi\)\/verify-email/);

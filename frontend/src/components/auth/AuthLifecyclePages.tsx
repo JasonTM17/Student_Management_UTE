@@ -41,8 +41,11 @@ function useAlertFocus(active: boolean) {
 
 function scrubToken(pathname: string, searchParams: URLSearchParams) {
   searchParams.delete('token');
-  const query = searchParams.toString();
-  window.history.replaceState({}, document.title, `${pathname}${query ? `?${query}` : ''}`);
+  const nextUrl = new URL(window.location.href);
+  nextUrl.pathname = pathname;
+  nextUrl.search = searchParams.toString();
+  nextUrl.hash = '';
+  window.history.replaceState({}, document.title, `${nextUrl.pathname}${nextUrl.search}`);
 }
 
 function lifecycleToken(searchParams: URLSearchParams) {
