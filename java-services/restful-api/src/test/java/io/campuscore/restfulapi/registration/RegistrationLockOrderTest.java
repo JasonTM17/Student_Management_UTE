@@ -18,6 +18,7 @@ import io.campuscore.restfulapi.academic.persistence.EnrollmentRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationJpaMutationGateway;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundEntity;
 import io.campuscore.restfulapi.academic.persistence.RegistrationRoundRepository;
+import io.campuscore.restfulapi.academic.persistence.RegistrationCohortWindowRepository;
 import io.campuscore.restfulapi.academic.persistence.RegistrationSlipRepository;
 import java.time.Clock;
 import java.time.Instant;
@@ -42,6 +43,7 @@ class RegistrationLockOrderTest {
         EnrollmentAuditRepository audits = mock(EnrollmentAuditRepository.class);
         RegistrationSlipRepository slips = mock(RegistrationSlipRepository.class);
         RegistrationJpaMutationGateway gateway = mock(RegistrationJpaMutationGateway.class);
+        RegistrationCohortWindowRepository cohorts = mock(RegistrationCohortWindowRepository.class);
         UUID key = UUID.fromString("00000000-0000-4000-8000-000000000001");
         String hash = sha256("ENROLL|student-1|round-1|section-1");
         EnrollmentOperationEntity operation = EnrollmentOperationEntity.processing(
@@ -62,7 +64,7 @@ class RegistrationLockOrderTest {
                 .thenReturn(List.of());
 
         RegistrationService service = new RegistrationService(jdbc, new ObjectMapper(),
-                Clock.fixed(NOW, ZoneOffset.UTC), rounds, sections, enrollments, operations, audits, slips, gateway);
+                Clock.fixed(NOW, ZoneOffset.UTC), rounds, sections, enrollments, operations, audits, slips, gateway, cohorts);
 
         assertThrows(RegistrationProblemException.class, () -> service.enroll(
                 "student-1", new RegistrationDtos.EnrollmentRequest("section-1", "round-1"), key));

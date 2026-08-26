@@ -78,7 +78,7 @@ class RegistrationEligibilityPolicyPersistenceTest {
     }
 
     @Test
-    void expiredCohortWindowRejectsAndCurrentOrAbsentCohortWindowAllowsEligibility() {
+    void expiredCohortWindowRejectsAndOnlyConfiguredCurrentCohortAllowsEligibility() {
         cohortWindow("expired", "2", Instant.now().minusSeconds(1800), Instant.now().minusSeconds(600));
         assertThat(registration.eligibility(STUDENT, ROUND, 9).eligibilityState()).isEqualTo("INELIGIBLE");
 
@@ -88,6 +88,9 @@ class RegistrationEligibilityPolicyPersistenceTest {
 
         jdbc.update("DELETE FROM academic.\"RegistrationCohortWindow\"");
         cohortWindow("other-cohort", "3", Instant.now().minusSeconds(600), Instant.now().plusSeconds(600));
+        assertThat(registration.eligibility(STUDENT, ROUND, 9).eligibilityState()).isEqualTo("INELIGIBLE");
+
+        jdbc.update("DELETE FROM academic.\"RegistrationCohortWindow\"");
         assertThat(registration.eligibility(STUDENT, ROUND, 9).eligibilityState()).isEqualTo("ELIGIBLE");
     }
 
@@ -134,6 +137,27 @@ class RegistrationEligibilityPolicyPersistenceTest {
 
         assertThat(registration.validate(STUDENT, new EnrollmentRequest(TARGET_SECTION, ROUND)).violations())
                 .contains("SCHEDULE_CONFLICT");
+    }
+
+    @Test
+    void adminRoundConfigurationRoundTripsStudyYearAllowlistAndGuardsMutation() {
+        RegistrationDtos.RoundView current = registration.round(ROUND);
+        AdminRegistrationController.AdminRoundRequest request = new AdminRegistrationController.AdminRoundRequest(
+                current.semesterId(), current.registrationStart(), current.registrationEnd(),
+                current.addDropStart(), current.addDropEnd(), current.maxCredits(),
+                current.institutionTimeZone(), current.version(), java.util.List.of(1));
+
+        RegistrationDtos.RoundView updated = registration.adminUpdate(ROUND, request.toService());
+        assertThat(updated.cohortYears()).containsExactly(1);
+        assertThat(jdbc.queryForList(
+                "SELECT \"cohortCode\" FROM academic.\"RegistrationCohortWindow\" WHERE \"roundId\" = ? ORDER BY \"priorityRank\"",
+                String.class, ROUND)).containsExactly("1");
+        assertThatThrownBy(() -> registration.enroll(
+                STUDENT, new EnrollmentRequest(TARGET_SECTION, ROUND), UUID.randomUUID()))
+                .isInstanceOf(RegistrationProblemException.class)
+                .extracting(error -> ((RegistrationProblemException) error).code())
+                .isEqualTo("COHORT_NOT_ELIGIBLE");
+        assertUnchangedAfterRejectedEnrollment();
     }
 
     private void assertUnchangedAfterRejectedEnrollment() {

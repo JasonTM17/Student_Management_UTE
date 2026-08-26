@@ -1,7 +1,11 @@
 package io.campuscore.restfulapi.registration;
 
 import jakarta.validation.Valid;
+import jakarta.validation.constraints.Max;
+import jakarta.validation.constraints.Min;
 import jakarta.validation.constraints.NotBlank;
+import jakarta.validation.constraints.NotNull;
+import jakarta.validation.constraints.Size;
 import java.time.Instant;
 import java.util.List;
 import org.springframework.context.annotation.Profile;
@@ -43,13 +47,17 @@ public class AdminRegistrationController {
         return service.adminTransition(roundId, action, request == null ? null : request.version());
     }
 
-    public record AdminRoundRequest(@NotBlank String semesterId, Instant registrationStart, Instant registrationEnd,
-            Instant addDropStart, Instant addDropEnd, int maxCredits, String institutionTimeZone,
-            Long version, List<Integer> cohortYears) {
+    public record AdminRoundRequest(@NotBlank String semesterId,
+            @NotNull Instant registrationStart, @NotNull Instant registrationEnd,
+            @NotNull Instant addDropStart, @NotNull Instant addDropEnd,
+            @Min(1) @Max(60) int maxCredits, String institutionTimeZone,
+            Long version,
+            @Size(max = 20) List<@NotNull @Min(1) @Max(20) Integer> cohortYears) {
         RegistrationService.AdminRoundRequest toService() {
             return new RegistrationService.AdminRoundRequest(semesterId, registrationStart, registrationEnd,
                     addDropStart, addDropEnd, maxCredits <= 0 ? 28 : maxCredits,
-                    institutionTimeZone == null || institutionTimeZone.isBlank() ? "Asia/Ho_Chi_Minh" : institutionTimeZone, version);
+                    institutionTimeZone == null || institutionTimeZone.isBlank() ? "Asia/Ho_Chi_Minh" : institutionTimeZone,
+                    version, cohortYears == null ? List.of() : cohortYears);
         }
     }
     public record TransitionRequest(Long version) { }

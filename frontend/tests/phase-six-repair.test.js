@@ -127,3 +127,13 @@ test('the mobile student context drawer traps focus and inerts the portal shell'
   assert.match(rail, /ref=\{containerRef\}/);
   assert.match(rail, /id=\{mobile \? 'student-context-rail' : undefined\}/);
 });
+
+test('shared modal does not restart its open lifecycle when an inline close callback changes', () => {
+  const modal = read('src/components/ui/modal.tsx');
+
+  assert.match(modal, /const onCloseRef = React\.useRef\(onClose\)/);
+  assert.match(modal, /onCloseRef\.current = onClose/);
+  assert.match(modal, /onCloseRef\.current\(\)/);
+  assert.match(modal, /\}, \[isOpen\]\);/);
+  assert.doesNotMatch(modal, /\[isOpen, onClose\]/);
+});

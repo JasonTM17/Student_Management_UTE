@@ -11,7 +11,18 @@ public final class RegistrationDtos {
 
     public record RoundView(String id, String semesterId, String status, Instant registrationStart,
             Instant registrationEnd, Instant addDropStart, Instant addDropEnd, Instant serverNow,
-            String institutionTimeZone, int maxCredits, long version) { }
+            String institutionTimeZone, int maxCredits, long version, List<Integer> cohortYears) {
+        public RoundView(String id, String semesterId, String status, Instant registrationStart,
+                Instant registrationEnd, Instant addDropStart, Instant addDropEnd, Instant serverNow,
+                String institutionTimeZone, int maxCredits, long version) {
+            this(id, semesterId, status, registrationStart, registrationEnd, addDropStart, addDropEnd,
+                    serverNow, institutionTimeZone, maxCredits, version, List.of());
+        }
+
+        public RoundView {
+            cohortYears = cohortYears == null ? List.of() : List.copyOf(cohortYears);
+        }
+    }
 
     public record RoundPage(List<RoundView> items, String nextCursor) { }
 

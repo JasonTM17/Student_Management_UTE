@@ -21,6 +21,7 @@ export interface RegistrationRound {
   institutionTimeZone?: string | null;
   maxCredits?: number | null;
   version?: number | null;
+  cohortYears?: number[];
   eligibilityState?: 'ELIGIBLE' | 'INELIGIBLE' | 'PENDING' | string;
   priorityRank?: number | null;
   reasonCode?: string | null;

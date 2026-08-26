@@ -28,12 +28,14 @@ export function Modal({
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
+  const onCloseRef = React.useRef(onClose);
+  onCloseRef.current = onClose;
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -91,7 +93,7 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  }, [isOpen]);
 
   if (!isOpen) return null;
 
