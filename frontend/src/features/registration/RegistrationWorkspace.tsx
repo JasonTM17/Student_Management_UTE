@@ -146,7 +146,7 @@ export default function RegistrationWorkspace() {
       setRoundId(active);
       const roundDetail = await registrationApi.getRound(active);
       const [sectionPage, nextEligibility, nextSummary, enrollmentPage] = await Promise.all([
-        registrationApi.getSections(active), registrationApi.getEligibility(active), registrationApi.getSummary(active), registrationApi.getEnrollments(roundDetail.semesterId ?? undefined),
+        registrationApi.getSections(active), registrationApi.getEligibility(active), registrationApi.getSummary(active), registrationApi.getEnrollments(roundDetail.semesterId),
       ]);
       setRound(roundDetail); setServerOffset(roundDetail.serverNow ? new Date(roundDetail.serverNow).getTime() - Date.now() : 0); setSections(sectionPage.items.map((item) => normalizeSection(item))); setEligibility(nextEligibility); setSummary(nextSummary); setEnrollments(enrollmentPage.items.map((item) => normalizeEnrollment(item))); setSelected([]);
     } catch (error) {

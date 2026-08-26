@@ -314,6 +314,26 @@ export function AssistantPanel() {
     setHistoryStatus('idle');
   };
 
+  const cancelActiveRequest = useCallback(() => {
+    const requestId = activeRequestIdRef.current;
+    if (requestId) {
+      // Unmounts can happen during logout or route transitions. The local abort
+      // fences late reader callbacks immediately; the server cancel is best
+      // effort because the auth session may already be closing.
+      void thesisApi.cancelRequest(requestId).catch(() => undefined);
+    }
+    requestGenerationRef.current += 1;
+    abortRef.current?.abort();
+    abortRef.current = null;
+    activeRequestIdRef.current = undefined;
+    activeConversationIdRef.current = undefined;
+    activePromptRef.current = undefined;
+    retryRequestIdRef.current = undefined;
+    retryConversationIdRef.current = undefined;
+  }, []);
+
+  useEffect(() => cancelActiveRequest, [cancelActiveRequest]);
+
   useEffect(() => {
     if (!open || historyFetchedRef.current || selectedHistoryRef.current)
       return;
@@ -338,27 +358,17 @@ export function AssistantPanel() {
   };
 
   const closePanel = useCallback(() => {
-    const requestId = activeRequestIdRef.current;
-    if (requestId) {
-      void thesisApi.cancelRequest(requestId).catch(() => undefined);
-    }
-    requestGenerationRef.current += 1;
-    abortRef.current?.abort();
+    cancelActiveRequest();
     dispatch({ type: 'discard-pending' });
     setIsSending(false);
     setOpen(false);
     setShowHistory(false);
-    activeRequestIdRef.current = undefined;
-    retryRequestIdRef.current = undefined;
-    activeConversationIdRef.current = undefined;
-    retryConversationIdRef.current = undefined;
-    activePromptRef.current = undefined;
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
     userScrolledRef.current = false;
     setHistoryStatus('idle');
     requestAnimationFrame(() => launcherRef.current?.focus());
-  }, []);
+  }, [cancelActiveRequest]);
 
   const closeHistory = useCallback(() => {
     setShowHistory(false);

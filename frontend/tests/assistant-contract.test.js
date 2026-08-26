@@ -112,6 +112,14 @@ test('closing an active assistant stream removes its optimistic pending bubble',
   assert.match(source, /const closePanel = useCallback\(\(\) => \{[\s\S]*?dispatch\(\{ type: 'discard-pending' \}\)/);
 });
 
+test('assistant unmount fences and cancels an active provider turn', () => {
+  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(source, /const cancelActiveRequest = useCallback/);
+  assert.match(source, /void thesisApi\.cancelRequest\(requestId\)/);
+  assert.match(source, /requestGenerationRef\.current \+= 1/);
+  assert.match(source, /useEffect\(\(\) => cancelActiveRequest, \[cancelActiveRequest\]\)/);
+});
+
 test('admin knowledge action errors remain visible inside active dialogs', () => {
   const page = fs.readFileSync(path.join(root, 'src/app/admin/assistant-knowledge/page.tsx'), 'utf8');
   const modal = fs.readFileSync(path.join(root, 'src/components/ui/modal.tsx'), 'utf8');
