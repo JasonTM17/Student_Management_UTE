@@ -14,10 +14,13 @@ test('mobile registration uses the canonical Java routes and DTO shapes', () => 
   assert.match(client, /summary: '\/me\/registration\/summary'/);
   assert.match(client, /enrollments: '\/me\/enrollments'/);
   assert.match(client, /validate: '\/me\/enrollments\/validate'/);
-  assert.match(client, /registrationEnroll: \(sectionId: string, roundId: string, idempotencyKey: string\)/);
+  assert.match(client, /registrationEnroll: async \(sectionId: string, roundId: string, idempotencyKey: string\)/);
   assert.match(client, /\{ sectionId, roundId \}/);
   assert.match(client, /'Idempotency-Key': idempotencyKey/);
   assert.match(client, /registrationDrop: \(enrollmentId: string, idempotencyKey: string\)/);
+  assert.match(client, /normalizeRegistrationEnrollment/);
+  assert.match(client, /apiClient\.post<EnrollmentMutationResponse>\(\s*apiRoutes\.registration\.enrollments/);
+  assert.match(client, /return normalizeRegistrationMutation\(/);
   assert.match(client, /requestBytes\(path: string/);
 });
 

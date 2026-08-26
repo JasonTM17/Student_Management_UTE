@@ -134,3 +134,48 @@ test('public lifecycle requests never attach a stale bearer token', async () => 
 
   await client.post('/auth/login', { email: 'student@campuscore.test', password: 'password123' });
 });
+
+test('registration normalizer preserves canonical context and unwraps the legacy alias', async () => {
+  const { normalizeRegistrationEnrollment, campusApi } = loadClient(async (url, init = {}) => {
+    assert.match(String(url), /\/enrollments\/enroll$/);
+    assert.deepEqual(JSON.parse(String(init.body)), { sectionId: 'section-1', locale: 'vi' });
+    assert.equal(new Headers(init.headers).get('idempotency-key'), 'key-1');
+    return jsonResponse(200, {
+      enrollment: {
+        id: 'enrollment-1',
+        sectionId: 'section-1',
+        roundId: 'round-1',
+        status: 'ENROLLED',
+        enrolledAt: '2026-08-26T00:00:00Z',
+        section: {
+          id: 'section-1',
+          sectionNumber: '01',
+          capacity: 30,
+          enrolledCount: 1,
+          remainingSeats: 29,
+          status: 'OPEN',
+          schedules: [],
+          violations: [],
+        },
+      },
+      replayed: true,
+      clientRequestId: 'key-1',
+    });
+  });
+
+  const normalized = normalizeRegistrationEnrollment({
+    id: 'enrollment-1',
+    sectionId: 'section-1',
+    roundId: 'round-1',
+    status: 'ENROLLED',
+    section: { id: 'section-1', sectionNumber: '01', capacity: 30, enrolledCount: 1, status: 'OPEN' },
+  }, 'round-1', 'semester-1');
+  assert.equal(normalized.roundId, 'round-1');
+  assert.equal(normalized.semesterId, 'semester-1');
+  assert.equal(normalized.section?.semesterId, 'semester-1');
+
+  const legacy = await campusApi.enroll('section-1', 'vi', 'key-1');
+  assert.equal(legacy.id, 'enrollment-1');
+  assert.equal(legacy.roundId, 'round-1');
+  assert.equal('enrollment' in legacy, false);
+});
