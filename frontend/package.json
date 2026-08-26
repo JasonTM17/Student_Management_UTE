@@ -3,7 +3,7 @@
   "version": "1.0.0",
   "description": "CampusCore web portal for the Java RESTful course project",
   "author": "Nguyen Tien Son <jasonbmt06@gmail.com>",
-  "homepage": "https://github.com/JasonTM17/CampusCore_FullStack_Individual",
+  "homepage": "https://github.com/JasonTM17/Student_Management_UTE",
   "private": true,
   "scripts": {
     "dev": "next dev",
