@@ -625,3 +625,87 @@ evidence was unavailable; no application traffic cutover is authorized.
 - [ ] Freeze the clean successor SHA after this ledger update, run the planned
   terminal verification matrix once on that exact SHA, then dispatch fresh
   Kongming/Wukong/FE/test/debug/code-review evidence before shipping or merge.
+
+## Independent review defect checkpoint (2026-08-26)
+
+- Active plan remains `plans/260824-1905-campuscore-java25-jpa-enrollment/plan.md`.
+  Current phase is 7; next step is the bounded auth/registration defect repair,
+  with failing-before/passing-after regressions and a clean successor review
+  as its exit criterion. This is a repair within the accepted contract, not a
+  new architecture or release target.
+- [x] Clean reviewed source: `42a32ddf6fa46c1dd07c8abd4844ff3481cb75f6`.
+  Its only change from `0965068ce62fdcd13f64c1479ab11d5e265e9e69`
+  is the frontend regression loader's Node 20 compatibility repair. Frontend
+  tests pass 40/40 in `node:20-alpine` with a read-only mount and no network.
+  The Java subtree remains `a429bd57a3171f83c58684677cc01b1634256b8b`.
+- [x] Java 25 `clean verify` at the identical Java subtree passed 216 tests
+  across 46 suites. This command does not select the PostgreSQL `*IT` classes;
+  their evidence is recorded separately, not inferred from `verify`.
+- [x] Explicit PostgreSQL authority run selected `AuthConcurrencyPostgresIT`,
+  `RegistrationPostgresConcurrencyIT` and `ThesisAssistantTurnLedgerPostgresIT`:
+  4 + 6 + 12 = 22 tests, zero failures/errors/skips. It used three fresh,
+  task-owned databases, one per suite. A preceding reused-database run failed
+  a retention-count assertion because an older expired conversation was
+  legitimately purged; the disposable-fixture precondition was restored
+  without changing the application or weakening the assertion.
+- [ ] Kongming's fresh read-only review returned `FAIL`: cohort windows were
+  not enforced by enrollment mutations; prerequisite row counting could accept
+  duplicate completions instead of distinct required courses; corequisite and
+  schedule checks did not restrict active enrollments to the target semester;
+  refresh/reset acquired User and Session locks in opposite order.
+- [x] The controller independently reproduced the auth lock cycle on an
+  isolated PostgreSQL 15.19 database using two transactions and an observed
+  `pg_blocking_pids` wait edge. Rotation failed with SQLSTATE `40P01`; both
+  transactions rolled back and the original session remained. The database's
+  deadlock counter was exactly 1. No hosted DB, real account or token was used.
+- [x] The real-service PostgreSQL regression was then run against the unfixed
+  auth implementation: `AuthConcurrencyPostgresIT#passwordResetSerializesWithWaitingSessionMutations`
+  ran three cases, with two errors and one assertion failure as expected.
+  Refresh deadlocked at the Session insert's User FK check; logout deadlocked
+  at its User update; a waiting password change accepted credentials read
+  before reset and overwrote the reset password. These are behavioral failures,
+  not a source-pattern or missing-module assertion.
+- [ ] The narrow auth repair now takes the User row lock before refresh session
+  lookup, logout deletion and old-password validation. Tests also cover the
+  reverse refresh-before-reset order and concurrent single-use consumption for
+  each challenge purpose. Focused green verification is pending.
+- [x] Test-first registration policy regression on the unfixed source was
+  genuinely red: 6 tests failed (future/expired cohort, mutation rollback,
+  duplicate prerequisite, prior-semester corequisite and prior-semester
+  schedule isolation). After the bounded patch, the same persisted H2 fixture
+  passed 6/6 with zero failures/errors/skips. It uses `academic.Student.year`,
+  real enrollment/course/section rows and verifies rejected mutation leaves
+  enrollment, operation, audit and section count unchanged.
+- [x] A serialized focused batch on the patched working tree reports
+  `AuthConcurrencyPostgresIT` 10/10, `AuthLifecyclePersistenceTest` 9/9,
+  `AuthLoginPersistenceTest` 11/11 and `RegistrationEligibilityPolicyPersistenceTest`
+  6/6, all with zero failures/errors/skips. The report files were written by
+  the Java 25 container using the task-owned PostgreSQL database for the auth
+  suite and isolated H2 for the registration policy suite.
+- [x] The explicit successor-focused rerun selected exactly
+  `AuthConcurrencyPostgresIT,RegistrationEligibilityPolicyPersistenceTest`
+  with the same Java 25 Maven container and exited `0`. Surefire reports show
+  10 + 6 tests, zero failures/errors/skips. This is the accepted focused green
+  checkpoint for the repair circuit.
+- [x] The bounded code and regression repair is committed as
+  `f6e744b7d835ceabb88bc4678b1b178fbb6186b6`
+  (`fix(auth-registration): enforce serialized account policy`). Only the three
+  production auth/registration files and their two PostgreSQL/H2 regression
+  files are in that commit; plan evidence is intentionally separate.
+- [ ] Wukong independently identified the source/FK lock conflict and supplied
+  a deterministic probe design, but its tool run failed before a final verdict.
+  Its required sign-off is `BLOCKED_CAPABILITY`, not PASS and not replaced by
+  the controller's reproduction. A fresh successor review is still required.
+- Ownership: controller writes auth/tests and plan evidence; the bounded
+  registration specialist writes only `RegistrationService.java` and its
+  registration tests. Neither changes Flyway, FE/mobile, remote services,
+  dirty main or release state. Test-first focused Maven runs are serialized.
+- Verification budget: first run the new auth/registration regressions against
+  the unfixed implementation; after the fixes, run only the affected auth and
+  registration suites. Broaden to the terminal matrix after a clean source
+  freeze. Rerun a passing gate only for changed covered code or a documented
+  fixture/capability correction.
+- Resume point: collect focused regression results, complete the minimal
+  User-before-Session and registration-validator repairs, then update this
+  ledger and freeze a successor. No archive tag, push, release, merge or branch
+  deletion has occurred; all publication and cleanup gates remain pending.
