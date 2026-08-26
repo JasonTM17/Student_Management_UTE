@@ -1,6 +1,6 @@
 ---
 title: "Phase 6: Runtime consolidation and documentation"
-status: in-progress
+status: completed
 ---
 
 # Phase 6: Runtime consolidation and documentation
