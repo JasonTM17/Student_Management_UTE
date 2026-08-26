@@ -1,11 +1,12 @@
 # Additive local override for the dedicated thesis RAG service.
 # Use with: docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
-# Images are intentionally pinned to the locally verified split-service build;
+# The RAG image is pinned to the published immutable digest tag by default;
+# set CAMPUSCORE_RAG_IMAGE to a local tag only for an explicit local rebuild.
 # no provider credentials belong in this file.
 
 services:
   rag-service:
-    image: campuscore-rag-service:local
+    image: ${CAMPUSCORE_RAG_IMAGE:-nguyenson1710/campuscore-rag-service:c23caa0d}
     container_name: campuscore-rag-service
     environment:
       SPRING_PROFILES_ACTIVE: persistence
