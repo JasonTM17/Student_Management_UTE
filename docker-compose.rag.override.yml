@@ -59,6 +59,8 @@ services:
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-replace-with-a-long-random-refresh-secret}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
       DEEPSEEK_ENABLED: "false"
+      # Keep provider credentials scoped to rag-service; the gateway only proxies internal RAG.
+      DEEPSEEK_API_KEY: ""
     depends_on:
       postgres:
         condition: service_healthy
