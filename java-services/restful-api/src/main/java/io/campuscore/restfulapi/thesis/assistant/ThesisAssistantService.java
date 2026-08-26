@@ -127,12 +127,16 @@ public class ThesisAssistantService {
     public ThesisAssistantTurnRepository.CancelResult cancelBeforeStart(UUID clientRequestId, String ownerId,
             String message, String locale, String conversationId) {
         if (turns == null) return new ThesisAssistantTurnRepository.CancelResult(false, "TURN_NOT_FOUND");
-        if (cancellations != null) cancellations.preCancel(ownerId, clientRequestId);
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(message);
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         UUID requestedConversation = parseConversation(conversationId);
         String hash = AssistantInputGuard.canonicalHash(guard.normalizedMessage(), normalizedLocale, requestedConversation);
         try {
+            // Validate and canonicalize every request field before installing
+            // the generation-zero marker.  A malformed conversation id must
+            // fail without leaving an in-process fence that can poison a later
+            // retry using the same client request id.
+            if (cancellations != null) cancellations.preCancel(ownerId, clientRequestId);
             return turns.cancelBeforeReservation(ownerId, clientRequestId, hash,
                     handle -> { if (cancellations != null) cancellations.fence(ownerId, handle.clientRequestId(), handle.leaseGeneration()); });
         } finally {

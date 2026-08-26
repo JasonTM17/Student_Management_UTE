@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -76,6 +77,27 @@ class ThesisAssistantServiceTest {
         assertThrows(DomainException.class,
                 () -> service.stream("topic", "en", null, "owner-disconnect", request, ignored -> { }));
         verifyNoInteractions(knowledge, provider, catalog, history);
+    }
+
+    @Test
+    void malformedConversationDoesNotLeakPreReservationCancellationFence() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        AssistantCancellationRegistry cancellations = new AssistantCancellationRegistry();
+        UUID request = UUID.randomUUID();
+        String owner = "owner-malformed-conversation";
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, mock(DeepSeekClient.class),
+                mock(ThesisAssistantRepository.class), turns, mock(ThesisAssistantCatalogRepository.class),
+                cancellations,
+                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90));
+
+        DomainException invalid = assertThrows(DomainException.class,
+                () -> service.cancelBeforeStart(request, owner, "topic", "en", "not-a-uuid"));
+
+        assertEquals("INVALID_CONVERSATION_ID", invalid.code());
+        assertFalse(cancellations.isPreCancelled(owner, request));
     }
 
     @Test
