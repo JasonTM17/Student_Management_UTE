@@ -606,7 +606,7 @@ evidence was unavailable; no application traffic cutover is authorized.
 ## Successor exact-head terminal matrix (2026-08-26)
 
 - [x] Frozen candidate `e25d9aee16c2e82427b772b4909fa2ca98ed3499` remained clean
-  during the terminal matrix. The three repair commits are `b6bcbb1c`
+  during the terminal matrix. The four repair commits are `b6bcbb1c`
   (auth token/hash scrubbing), `917a3333` (FE assistant unmount/registration
   scope), `aa4dd65b` (knowledge archive and H2 ledger parity), and `e25d9aee`
   (early cancellation-handle cleanup).
@@ -631,6 +631,30 @@ evidence was unavailable; no application traffic cutover is authorized.
 - [ ] Fresh exact-head Kongming, Wukong and code-review evidence is still
   required after this ledger commit; no merge, push, archive tag, release or
   branch/worktree cleanup is authorized before those reviews and safe-boundary
+  identity checks pass.
+
+## Pre-reservation fence repair checkpoint (2026-08-26)
+
+- [x] Wukong falsified a generation-zero cancellation-fence leak when
+  `cancelBeforeStart` parsed a malformed `conversationId`. The repair moves
+  fence installation after guard/locale/UUID/hash validation and adds a
+  regression asserting `INVALID_CONVERSATION_ID` leaves no pre-cancel marker.
+- [x] Repair source/test changes are limited to
+  `ThesisAssistantService.java` and `ThesisAssistantServiceTest.java`; no
+  public route or persistence schema changed.
+- [x] Serialized Java 25 runs on the repaired source passed
+  `ThesisAssistantServiceTest` 7/7, `ThesisAssistantTurnLedgerH2Test` 17/17,
+  `AssistantKnowledgeJpaWriterPersistenceTest` 4/4,
+  `ThesisAssistantGovernanceWebTest` 4/4,
+  `ThesisAssistantApiContractTest` 7/7,
+  `ThesisAssistantSseControllerTest` 2/2 and
+  `io.campuscore.restfulapi.thesis.ThesisAssistantContractTest` 4/4, with
+  zero failures/errors/skips. A prior concurrent Surefire artifact reporting
+  H2 failures was superseded by these serialized clean-target runs and is not
+  release evidence.
+- [ ] Commit the repair, freeze the resulting clean SHA, and obtain fresh
+  exact-head Kongming/Wukong/code-review verdicts. No merge, push, archive tag,
+  release or cleanup is authorized before those reviews and dirty-main
   identity checks pass.
 
 ## Auth-mail locale and frontend session-race checkpoint (2026-08-26)
