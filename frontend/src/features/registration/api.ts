@@ -51,7 +51,7 @@ export const registrationApi = {
     const response = await api.get<RegistrationSummary>('/me/registration/summary', { params: { roundId } });
     return response.data;
   },
-  async getEnrollments(semesterId?: string, params?: { cursor?: string; limit?: number }): Promise<RegistrationPage<RegistrationEnrollment>> {
+  async getEnrollments(semesterId?: string | null, params?: { cursor?: string; limit?: number }): Promise<RegistrationPage<RegistrationEnrollment>> {
     const response = await api.get('/me/enrollments', { params: { semesterId, limit: 50, ...params } });
     return page<RegistrationEnrollment>(response.data, headerCursor(response.headers as Record<string, unknown>));
   },
