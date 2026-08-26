@@ -876,3 +876,40 @@ evidence was unavailable; no application traffic cutover is authorized.
   archive tag or cleanup has occurred.
 - Resume point: commit this bounded mobile repair, then rerun the required
   exact-source focused/runtime checks and freeze the review snapshot.
+
+## Exact-head terminal and review closure (2026-08-26)
+
+- [x] Candidate remained clean at exact HEAD
+  `739e3aa93e2b23f08e41fb786da9a40554f24a89` throughout terminal checks. Full
+  Java 25 Docker `clean verify` passed 49 Surefire suites, 232 tests, zero
+  failures/errors/skips. The focused compatibility/domain rerun was bound to
+  the same HEAD before and after the command: each controller test passed 2/2;
+  report hashes were recorded as `30B78498C36342F113AF6E0691B73EA556790E80BB2AD4691E418A390ED6147E`
+  and `A318D9648BBA1277A91682773C73E6E5C1EBBD878E9F160632D02E04332073DF`.
+- [x] PostgreSQL authority on the same exact HEAD passed auth 10/10 and
+  registration 6/6 in fresh task-owned databases (report hashes
+  `CBDDD2553446DA720D8085CE22374C34A051008920D0423290F9C0DD5CFC33E` and
+  `B42664CB3E070FDEF43584A2C9AC462A001284530599FDE0B6A3C5D8BE6AFE9F`). A
+  reused assistant database
+  produced one retention-precondition assertion (`expected 0, was 1`) while
+  leaving the source unchanged; the assistant suite was then rerun against
+  fresh `campuscore_final_assistant_20260826_r3`, Flyway V21, and passed 12/12
+  with report hash
+  `2D32915A2D5291E3C619EDB32D23647416F1F57AC824F6163B81F7AA530319CB`.
+  The retry command bound HEAD before and after as `739e3aa...`; no assertion
+  was weakened and no old database was dropped.
+- [x] Mobile terminal gates on this source pass 24/24 tests and TypeScript
+  typecheck. Authenticated Chrome-channel Playwright/Mailpit E2E on disposable
+  project `campuscore-course-e2e-final-20260826-r3` passed all 6 scenarios in
+  1.2 minutes; only that project's containers, volume and network were removed.
+- [x] Exact-head read-only reviews are now complete: Kongming PASS on
+  `739e3aa...`; code review PASS on `739e3aa...`; Wukong
+  `NOT_FALSIFIED`, gate `PROCEED_WITH_RESIDUAL_RISK`, high confidence E3 on
+  the same exact HEAD after the bound Java 25 rerun. Wukong's residual note is
+  that the focused rerun does not exhaustively repeat every PostgreSQL history
+  scenario; the full and authority matrices above cover those planned gates.
+- [ ] Push, archive tag, clean integration-worktree merge, Docker/GitHub
+  publication and candidate cleanup remain pending. Live DeepSeek/provider
+  billing, remote CI, native device execution and production cutover remain
+  unobserved/HOLD. Preserve the dirty main checkout and task-owned PostgreSQL
+  container/DBs until the final safe-boundary decision.

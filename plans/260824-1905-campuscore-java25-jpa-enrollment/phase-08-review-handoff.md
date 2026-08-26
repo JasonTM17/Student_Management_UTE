@@ -1,6 +1,6 @@
 ---
 title: "Phase 7: Independent verification and handoff"
-status: pending
+status: in-progress
 ---
 
 # Phase 7: Independent verification and handoff
