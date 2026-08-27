@@ -19,7 +19,7 @@ import org.springframework.stereotype.Repository;
 public class AcademicAttendanceReadRepository {
     private static final String ATTENDANCE = "\"academic\".\"Attendance\"";
     private static final String STUDENT = "\"academic\".\"Student\"";
-    private static final String USER = "\"campuscore_auth\".\"User\"";
+    private static final String USER = "\"auth\".\"User\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String COURSE = "\"academic\".\"Course\"";
 

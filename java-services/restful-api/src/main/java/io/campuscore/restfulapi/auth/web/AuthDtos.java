@@ -48,30 +48,6 @@ public final class AuthDtos {
             @NotBlank @Size(min = 8) String newPassword) {
     }
 
-    public record ChallengeTokenRequest(
-            @NotBlank @Size(max = 240) String token) {
-    }
-
-    public record EmailRequest(
-            @NotBlank @Email String email) {
-    }
-
-    public record PasswordResetRequest(
-            @NotBlank @Email String email) {
-    }
-
-    public record PasswordResetConfirmRequest(
-            @NotBlank @Size(max = 240) String token,
-            @NotBlank @Size(min = 8, max = 200) String newPassword) {
-    }
-
-    public record RegistrationPendingResponse(
-            String email,
-            boolean verificationRequired,
-            long expiresInSeconds,
-            long resendAfterSeconds) {
-    }
-
     public record MessageResponse(String message) {
     }
 
@@ -86,7 +62,6 @@ public final class AuthDtos {
             String address,
             String avatar,
             String status,
-            boolean emailVerified,
             Instant createdAt,
             List<String> roles,
             List<String> permissions,

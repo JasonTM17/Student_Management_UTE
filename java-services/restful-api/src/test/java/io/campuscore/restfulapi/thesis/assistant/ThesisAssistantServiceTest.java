@@ -1,7 +1,6 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
-import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -13,7 +12,6 @@ import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantCompletionProvider.CompletionResult;
@@ -27,7 +25,6 @@ import io.campuscore.restfulapi.web.DomainException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.atomic.AtomicBoolean;
 import org.junit.jupiter.api.Test;
 import org.springframework.http.HttpStatus;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -48,89 +45,6 @@ class ThesisAssistantServiceTest {
         assertEquals("curated-lexical-rag", response.model());
         assertEquals("vi", response.locale());
         assertTrue(response.citations().isEmpty());
-    }
-
-    @Test
-    void preReservationDisconnectBlocksWorkerBeforeKnowledgeProviderQuotaOrLedgerReservation() {
-        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        DeepSeekClient provider = mock(DeepSeekClient.class);
-        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
-        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
-        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        AssistantCancellationRegistry cancellations = new AssistantCancellationRegistry();
-        UUID request = UUID.randomUUID();
-        when(turns.cancelBeforeReservation(anyString(), eq(request), anyString(),
-                any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.CancelResult(true, "CANCELLED"));
-
-        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
-                cancellations,
-                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
-
-        service.cancelBeforeStart(request, "owner-disconnect", "topic", "en", null);
-
-        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
-                any(java.util.function.Consumer.class)))
-                .thenThrow(new DomainException(HttpStatus.GONE, "TURN_PURGED", "Request key is no longer replayable"));
-
-        assertThrows(DomainException.class,
-                () -> service.stream("topic", "en", null, "owner-disconnect", request, ignored -> { }));
-        verifyNoInteractions(knowledge, provider, catalog, history);
-    }
-
-    @Test
-    void malformedConversationDoesNotLeakPreReservationCancellationFence() {
-        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
-        AssistantCancellationRegistry cancellations = new AssistantCancellationRegistry();
-        UUID request = UUID.randomUUID();
-        String owner = "owner-malformed-conversation";
-
-        ThesisAssistantService service = new ThesisAssistantService(knowledge, mock(DeepSeekClient.class),
-                mock(ThesisAssistantRepository.class), turns, mock(ThesisAssistantCatalogRepository.class),
-                cancellations,
-                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
-
-        DomainException invalid = assertThrows(DomainException.class,
-                () -> service.cancelBeforeStart(request, owner, "topic", "en", "not-a-uuid"));
-
-        assertEquals("INVALID_CONVERSATION_ID", invalid.code());
-        assertFalse(cancellations.isPreCancelled(owner, request));
-    }
-
-    @Test
-    void cancelledGenerationIsRemovedWhenCancellationWinsImmediatelyAfterRegistration() {
-        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
-        DeepSeekClient provider = mock(DeepSeekClient.class);
-        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
-        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
-        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
-        AssistantCancellationRegistry cancellations = new AssistantCancellationRegistry();
-        UUID request = UUID.randomUUID();
-        UUID turn = UUID.randomUUID();
-        UUID conversation = UUID.randomUUID();
-        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
-                any(java.util.function.Consumer.class)))
-                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
-                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
-        // Model the cancel CAS winning before the worker's first cancellation
-        // check. The service must not leave the generation handle resident.
-        cancellations.fence("owner-immediate-cancel", request, 1L);
-
-        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
-                cancellations,
-                new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
-
-        DomainException cancelled = assertThrows(DomainException.class,
-                () -> service.stream("topic", "en", null, "owner-immediate-cancel", request, ignored -> { }));
-        assertEquals("TURN_CANCELLED", cancelled.code());
-        AtomicBoolean replacement = cancellations.register("owner-immediate-cancel", request, 1L);
-        assertTrue(!replacement.get(), "the cancelled generation handle must have been removed");
-        cancellations.remove("owner-immediate-cancel", request, 1L);
-        verifyNoInteractions(knowledge, provider, catalog, history);
     }
 
     @Test

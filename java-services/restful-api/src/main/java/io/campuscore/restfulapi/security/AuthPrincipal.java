@@ -12,7 +12,6 @@ public record AuthPrincipal(
         String firstName,
         String lastName,
         String status,
-        boolean emailVerified,
         List<String> roles,
         List<String> permissions,
         String studentId,

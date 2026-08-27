@@ -39,7 +39,7 @@ class AcademicSectionReadPersistenceTest {
 
     @BeforeEach
     void prepareReadOnlyFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
         clearTables();
@@ -187,7 +187,7 @@ class AcademicSectionReadPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(200) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
@@ -337,7 +337,7 @@ class AcademicSectionReadPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
         jdbc.update("DELETE FROM \"academic\".\"Department\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
     }
 
     private void insertFixture() {
@@ -376,7 +376,7 @@ class AcademicSectionReadPersistenceTest {
     }
 
     private void insertUser(String id, String email, String firstName, String lastName) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
                 id, email, firstName, lastName);
     }
 

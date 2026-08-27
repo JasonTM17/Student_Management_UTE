@@ -1,8 +1,7 @@
 # DeepSeek thesis assistant integration
 
-CampusCore's assistant is a thesis-only, grounded RAG feature exposed through
-the Java API and executed by the internal `rag-service` container in Docker
-Compose. The normal path is deterministic PostgreSQL lexical retrieval with
+CampusCore's assistant is a thesis-only, grounded RAG feature owned by the
+Java API. The normal path is deterministic PostgreSQL lexical retrieval with
 server-owned citations. DeepSeek is an optional answer synthesizer, not a
 knowledge authority and not a client-side dependency.
 
@@ -26,8 +25,6 @@ repository contains placeholders, never credentials:
 | `ASSISTANT_RETENTION_DAYS` | `90` | Conversation/message retention |
 | `ASSISTANT_RECOVERY_DELAY_MS` | `30000` | Expired lease recovery sweep |
 | `ASSISTANT_RECOVERY_INITIAL_DELAY_MS` | `30000` | Startup grace before first sweep |
-| `ASSISTANT_RAG_SERVICE_TOKEN` | local placeholder | Shared token used only between `restful-api` and `rag-service` |
-| `ASSISTANT_RAG_BASE_URL` | empty | Public API proxy target; Compose sets this to the internal service URL |
 
 The endpoint/model follow DeepSeek's OpenAI-compatible chat completion contract:
 <https://api-docs.deepseek.com/api/create-chat-completion/>. CampusCore pins
@@ -52,10 +49,6 @@ unsupported claims. Citations are attached by Java from retrieved rows.
 - Only students and lecturers can chat or read/delete their own history.
   Admins manage knowledge revisions but do not see user conversations by
   default.
-- Docker Compose routes those authenticated public calls from `restful-api` to
-  `rag-service`. The internal `/internal/rag/**` endpoints are active only when
-  `ASSISTANT_RAG_SERVICE_MODE=true` and require `X-Rag-Service-Token` plus
-  `X-Assistant-Owner`.
 - Every intentional send carries a caller-owned `clientRequestId`; completed
   keys replay the committed answer, while cancelled/purged keys return a
   stable terminal error. Web streaming uses `meta → delta/replace → citation

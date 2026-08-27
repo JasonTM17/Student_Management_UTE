@@ -2,14 +2,12 @@ package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
-import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.asyncDispatch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
-import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.request;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import com.fasterxml.jackson.databind.JsonNode;
@@ -142,16 +140,12 @@ class ThesisAssistantGovernanceWebTest {
 
     @Test
     void streamIncludesDiscriminatedMetaDeltaCitationAndDoneEvents() throws Exception {
-        var initial = mvc.perform(post("/api/v1/thesis/assistant/chat/stream")
+        mvc.perform(post("/api/v1/thesis/assistant/chat/stream")
                         .with(jwt().jwt(token -> token.subject("student-stream"))
                                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT")))
                         .contentType("application/json")
                         .accept("text/event-stream")
                         .content("{\"message\":\"How do I choose a thesis topic?\",\"locale\":\"en\",\"clientRequestId\":\"00000000-0000-4000-8000-000000000010\"}"))
-                .andExpect(request().asyncStarted())
-                .andReturn();
-
-        mvc.perform(asyncDispatch(initial))
                 .andExpect(status().isOk())
                 .andExpect(content().string(containsString("\"type\":\"meta\"")))
                 .andExpect(content().string(containsString("\"type\":\"delta\"")))

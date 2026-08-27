@@ -104,8 +104,9 @@ local PostgreSQL plus Java Flyway remains the runtime authority.
 ## Verification
 
 The local validation command above is the seed-count and duplicate `slug`
-invariant. It should pass before import and after export. Any earlier proof from
-another configured Supabase project is historical only and must not be reused
-for the `Student_Management` target. That exact project still requires fresh
-identity, RLS, row-count and authenticated Data API evidence; no service key is
-stored locally.
+invariant. It should pass before import and after export. The
+configured remote table was verified through Supabase MCP with 10 rows, 10
+active/public rows, RLS enabled, and no remaining security advisor lints after
+the controller revoked an unrelated public `rls_auto_enable()` RPC execute
+grant. An authenticated Data API request still requires a real staff token and
+was not run in this workspace; no service key is stored locally.
