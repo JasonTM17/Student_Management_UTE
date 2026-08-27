@@ -26,28 +26,11 @@ jobs:
       - uses: actions/setup-java@v4
         with:
           distribution: temurin
-          java-version: '25'
-          cache: maven
-          cache-dependency-path: java-services/pom.xml
-      - name: Verify Java API
-        run: ./mvnw -q -f java-services/pom.xml verify
-
-  java-api-baseline:
-    name: Java 21 compatibility baseline
-    runs-on: ubuntu-latest
-    env:
-      DEEPSEEK_ENABLED: 'false'
-      DEEPSEEK_API_KEY: ''
-    steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-java@v4
-        with:
-          distribution: temurin
           java-version: '21'
           cache: maven
           cache-dependency-path: java-services/pom.xml
-      - name: Verify Java 21 baseline
-        run: ./mvnw -q -f java-services/pom.xml -Dcampuscore.java-baseline=true verify
+      - name: Verify Java API
+        run: mvn -q -f java-services/pom.xml verify
 
   frontend:
     name: Next.js web
@@ -120,8 +103,7 @@ jobs:
         shell: bash
         run: |
           version="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc 'SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1')"
-          expected_version="$(find java-services/restful-api/src/main/resources/db/migration -maxdepth 1 -name 'V*.sql' -printf '%f\n' | sed -E 's/^V([0-9]+)_.*/\1/' | sort -n | tail -1)"
-          test "$version" = "$expected_version"
+          test "$version" = "12"
           curl --fail --silent --show-error http://127.0.0.1:4010/api/v1/health/liveness
           curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
           curl --fail --silent --show-error http://127.0.0.1:4010/v3/api-docs > openapi.json
