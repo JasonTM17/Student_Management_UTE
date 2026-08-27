@@ -25,8 +25,9 @@ import {
   SectionSchedule,
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
+import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+export const API_BASE_URL = resolvePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 type ApiObject = Record<string, unknown>;
 type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRefresh?: boolean;

@@ -133,7 +133,8 @@ services:
       dockerfile: frontend/Dockerfile
       args:
         JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
-        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+        # Same-origin browser path. Do not interpolate host/Expo NEXT_PUBLIC_API_URL.
+        NEXT_PUBLIC_API_URL: /api/v1
     image: campuscore-frontend:local
     container_name: campuscore-frontend
     environment:
@@ -141,7 +142,7 @@ services:
       PORT: 3000
       HOSTNAME: 0.0.0.0
       JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
-      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
+      NEXT_PUBLIC_API_URL: /api/v1
     ports:
       - "127.0.0.1:${FRONTEND_HOST_PORT:-3000}:3000"
     depends_on:

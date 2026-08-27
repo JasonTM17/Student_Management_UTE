@@ -83,6 +83,7 @@ test('npm test includes smoke, portal, and Phase 6 source regressions', () => {
   assert.match(packageJson.scripts.test, /frontend-smoke\.test\.js/);
   assert.match(packageJson.scripts.test, /portal-shell\.test\.js/);
   assert.match(packageJson.scripts.test, /phase-six-repair\.test\.js/);
+  assert.match(packageJson.scripts.test, /docker-browser-api-origin\.test\.js/);
   assert.doesNotMatch(packageJson.scripts.test, /viewport/);
 });
 
