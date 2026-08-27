@@ -7,8 +7,10 @@ authorize production deployment.
 
 - Record exact `main`, candidate and tree SHA.
 - Verify `git status --short` is empty before review.
-- Confirm no legacy backend, gateway, K8s, monitoring or external Docker Hub
-  image reference remains.
+- Confirm no legacy backend, K8s, monitoring or external Docker Hub image
+  reference remains. The internal `rag-service` sidecar is an intentional
+  course-runtime component and is addressed only through its token-protected
+  `/internal/rag/**` contract.
 
 ## API and database
 

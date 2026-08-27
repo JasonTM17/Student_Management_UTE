@@ -1,12 +1,13 @@
 # RESTful API consolidation decision
 
-Trạng thái: **course runtime đã thu gọn, còn chờ terminal verification và
-merge vào `main`**.
+Trạng thái: **course runtime đã thu gọn; mọi claim release vẫn phải gắn với
+một exact SHA sạch và CI tương ứng**.
 
-CampusCore vận hành một Java Spring Boot RESTful API duy nhất. API sở hữu
-toàn bộ `/api/v1`; không còn service sibling, gateway hoặc runtime adapter.
-Next.js và Expo dùng chung OpenAPI contract, còn PostgreSQL local là nguồn dữ
-liệu duy nhất.
+CampusCore vận hành một Java Spring Boot RESTful API công khai duy nhất. API sở
+hữu toàn bộ `/api/v1`; Next.js và Expo dùng chung OpenAPI contract, còn
+PostgreSQL local là nguồn dữ liệu duy nhất. Riêng assistant chạy trong
+`rag-service` nội bộ và REST API chuyển tiếp qua contract `/internal/rag/**`
+được bảo vệ bằng service token; route này không phải public API.
 
 Phạm vi gồm auth, people, academic catalog, sections, enrollment, grades,
 schedules, announcements, notifications, thesis core và assistant lexical RAG.
