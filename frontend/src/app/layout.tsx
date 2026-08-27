@@ -51,7 +51,7 @@ export default async function RootLayout({
 
   return (
     <html lang={htmlLang} suppressHydrationWarning>
-      <body className="min-h-[100dvh]">
+      <body className="min-h-screen">
         <ThemeProvider>
           <I18nProvider locale={locale} isPrefixed={prefixed}>
             <AuthProvider>

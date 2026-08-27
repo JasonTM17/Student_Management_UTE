@@ -37,7 +37,6 @@ export default function LoginPage() {
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
-  const [verificationRequired, setVerificationRequired] = useState(false);
   const formErrorRef = useRef<HTMLDivElement>(null);
   const { login } = useAuth();
   const { href, messages } = useI18n();
@@ -80,12 +79,6 @@ export default function LoginPage() {
       return messages.login.errors.backendUnavailable;
     }
 
-    const code = (error.response.data as { code?: string } | undefined)?.code;
-
-    if (code === 'EMAIL_VERIFICATION_REQUIRED') {
-      return messages.login.errors.emailVerificationRequired;
-    }
-
     if (error.response.status === 401) {
       return messages.login.errors.invalidCredentials;
     }
@@ -108,7 +101,6 @@ export default function LoginPage() {
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
-    setVerificationRequired(false);
     setIsLoading(true);
 
     try {
@@ -118,10 +110,6 @@ export default function LoginPage() {
     } catch (error: unknown) {
       const message = getLoginErrorMessage(error);
       setFormError(message);
-      setVerificationRequired(
-        error instanceof AxiosError
-          && (error.response?.data as { code?: string } | undefined)?.code === 'EMAIL_VERIFICATION_REQUIRED',
-      );
     } finally {
       setIsLoading(false);
     }
@@ -139,7 +127,7 @@ export default function LoginPage() {
     >
       <div className="space-y-6">
         <div className="space-y-3">
-          <SectionEyebrow className="lg:hidden">{messages.login.sectionEyebrow}</SectionEyebrow>
+          <SectionEyebrow>{messages.login.sectionEyebrow}</SectionEyebrow>
           <div className="space-y-2">
             <h2 className="text-2xl font-semibold leading-8 text-foreground">
               {messages.login.heading}
@@ -174,15 +162,6 @@ export default function LoginPage() {
           </div>
         ) : null}
 
-        {verificationRequired ? (
-          <LocalizedLink
-            href="/verify-email"
-            className="inline-flex min-h-11 items-center rounded-sm text-sm font-semibold text-primary underline-offset-4 transition-colors hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-          >
-            {messages.verifyEmail.heading}
-          </LocalizedLink>
-        ) : null}
-
         <form
           onSubmit={handleSubmit}
           className="space-y-5"
@@ -208,13 +187,14 @@ export default function LoginPage() {
           </div>
 
           <div className="space-y-2">
-            <div>
+            <div className="flex items-center justify-between gap-4">
               <label
                 htmlFor="password"
                 className="text-sm font-medium text-foreground"
               >
                 {messages.login.passwordLabel}
               </label>
+              <span className="text-xs text-muted-foreground">Academic office support</span>
             </div>
             <div className="relative">
               <Input
@@ -246,10 +226,10 @@ export default function LoginPage() {
             </div>
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading || !isClientReady} aria-busy={isLoading}>
+          <Button type="submit" className="w-full" disabled={isLoading || !isClientReady}>
             {isLoading ? (
               <span className="inline-flex items-center gap-2">
-                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground motion-reduce:animate-none" aria-hidden="true" />
+                <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
                 {messages.login.signingIn}
               </span>
             ) : (
@@ -260,15 +240,6 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
-
-        <div className="flex flex-wrap items-center justify-between gap-3 text-sm">
-          <LocalizedLink href="/forgot-password" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
-            {messages.login.forgotPassword}
-          </LocalizedLink>
-          <LocalizedLink href="/register" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
-            {messages.register.heading}
-          </LocalizedLink>
-        </div>
 
         <div className="border-l-2 border-primary bg-secondary/35 px-4 py-3">
           <div className="flex items-start gap-3">
@@ -288,7 +259,7 @@ export default function LoginPage() {
 
         <p className="text-sm text-muted-foreground">
           {messages.login.returnHomeLead}{' '}
-          <LocalizedLink href="/" className="inline-flex min-h-11 items-center rounded-sm font-medium text-primary underline-offset-4 transition-transform duration-150 hover:underline active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none">
+          <LocalizedLink href="/" className="font-medium text-primary hover:underline">
             {messages.common.actions.returnHome}
           </LocalizedLink>
           .

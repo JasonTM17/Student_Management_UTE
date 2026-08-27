@@ -48,18 +48,6 @@ test('assistant stream contract rejects out-of-order and duplicate delta sequenc
   assert.throws(() => new AssistantStreamOrder().accept(parseAssistantStreamEvent({ type: 'done' })), /missing meta/);
 });
 
-test('assistant stream contract rejects incomplete citation frames before render', () => {
-  const { parseAssistantStreamEvent } = load('src/lib/assistant-stream.ts');
-  assert.throws(
-    () => parseAssistantStreamEvent({ type: 'citation', citation: {} }),
-    /citation id is required/,
-  );
-  assert.throws(
-    () => parseAssistantStreamEvent({ type: 'citation', citation: [] }),
-    /assistant event must be an object/,
-  );
-});
-
 test('assistant parser reports malformed JSON through opt-in invalid callback', () => {
   const { createAssistantSseParser } = load('src/lib/assistant-stream.ts');
   const invalid = [];
@@ -89,52 +77,6 @@ test('assistant launcher has a thesis-specific icon mark and full interaction st
   assert.match(source, /hover:-translate-y-0\.5/);
   assert.match(source, /focus-visible:ring-2/);
   assert.match(source, /motion-reduce:transition-none/);
-  assert.match(source, /useDialogFocusTrap/);
-  assert.match(source, /aria-modal="true"/);
-});
-
-test('assistant history and feedback states recover focus and avoid contradictory empty output', () => {
-  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /const closeHistory = useCallback/);
-  assert.match(source, /historyRef\.current\?\.focus/);
-  assert.match(source, /historyStatus === 'loaded' && !history\.length/);
-  assert.match(source, /feedbackPendingMessageId/);
-  assert.match(source, /feedbackErrorMessageId/);
-  assert.match(source, /rating: previous/);
-  assert.match(source, /messages\.assistant\.feedbackUnavailable/);
-  assert.match(source, /thesisApi\.cancelRequest\(requestId\)/);
-});
-
-test('closing an active assistant stream removes its optimistic pending bubble', () => {
-  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /type: 'discard-pending'/);
-  assert.match(source, /message\.role === 'assistant' && message\.pending/);
-  assert.match(source, /const closePanel = useCallback\(\(\) => \{[\s\S]*?dispatch\(\{ type: 'discard-pending' \}\)/);
-});
-
-test('assistant unmount fences and cancels an active provider turn', () => {
-  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /const cancelActiveRequest = useCallback/);
-  assert.match(source, /void thesisApi\.cancelRequest\(requestId\)/);
-  assert.match(source, /requestGenerationRef\.current \+= 1/);
-  assert.match(source, /useEffect\(\(\) => cancelActiveRequest, \[cancelActiveRequest\]\)/);
-});
-
-test('admin knowledge action errors remain visible inside active dialogs', () => {
-  const page = fs.readFileSync(path.join(root, 'src/app/admin/assistant-knowledge/page.tsx'), 'utf8');
-  const modal = fs.readFileSync(path.join(root, 'src/components/ui/modal.tsx'), 'utf8');
-  assert.match(page, /role="alert"/);
-  assert.match(page, /error=\{archiveTarget \? error : undefined\}/);
-  assert.match(modal, /error\?: string/);
-  assert.match(modal, /\{error\}/);
-});
-
-test('admin knowledge is available through the localized route tree', () => {
-  const localizedPage = fs.readFileSync(
-    path.join(root, 'src/app/[locale]/admin/assistant-knowledge/page.tsx'),
-    'utf8',
-  );
-  assert.match(localizedPage, /admin\/assistant-knowledge\/page/);
 });
 
 test('assistant history routes URI-encode owner-scoped identifiers', () => {

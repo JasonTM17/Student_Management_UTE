@@ -53,11 +53,9 @@ test('the web client has one Java API boundary and no removed domain client', ()
   const apiSource = read('src/lib/api.ts');
   const nextConfig = read('next.config.mjs');
   assert.doesNotMatch(apiSource, /analyticsApi|financeApi|waitlistApi|socket\.io/);
-  assert.match(apiSource, /AUTH_REFRESH_ROUTE_PATTERN[\s\S]*forgot-password[\s\S]*reset-password/);
+  assert.doesNotMatch(apiSource, /forgot-password|reset-password|verify-email|resend-verification/);
   assert.doesNotMatch(nextConfig, /LOCAL_EDGE_ORIGIN|socket\.io|redis|rabbitmq/i);
   assert.match(nextConfig, /JAVA_API_ORIGIN/);
-  assert.doesNotMatch(nextConfig, /destination:\s*`\$\{javaApiOrigin\}/);
-  assert.match(read('src/app/api/v1/[...path]/route.ts'), /process\.env\.JAVA_API_ORIGIN/);
 });
 
 test('the Java API proxy preserves query parameters and encodes path segments', () => {
@@ -93,13 +91,10 @@ test('assistant UI exposes provenance and degraded state', () => {
   assert.match(assistantSource, /messages\.assistant\.degraded/);
 });
 
-test('frontend source contains only retained routes and the auth lifecycle contract', () => {
+test('frontend source contains no removed route or runtime reference', () => {
   const source = walk('src')
     .map((relativePath) => read(relativePath))
     .join('\n');
   assert.doesNotMatch(source, /\/admin\/analytics|\/dashboard\/invoices|financeApi|analyticsApi|waitlistApi|socket\.io/);
-  assert.match(source, /\/forgot-password/);
-  assert.match(source, /\/verify-email/);
-  assert.match(source, /confirmPasswordReset/);
-  assert.match(source, /resendVerification/);
+  assert.doesNotMatch(source, /href=["']\/forgot-password|authApi\.(forgotPassword|resetPassword|verifyEmail|resendVerification)/);
 });

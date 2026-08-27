@@ -89,7 +89,7 @@ export default function ThesisTopicDetailPage() {
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">{messages.thesis.roundStatus}</span>
               <span className="font-semibold text-primary">
-                {workspace.selectedRound ? workspace.statusLabel(workspace.selectedRound.status) : '–'}
+                {workspace.selectedRound ? workspace.statusLabel(workspace.selectedRound.status) : '—'}
               </span>
             </div>
           </CardContent>

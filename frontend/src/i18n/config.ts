@@ -2,9 +2,7 @@ export const locales = ['en', 'vi'] as const;
 
 export type Locale = (typeof locales)[number];
 
-// Vietnamese is the product default; English remains available through the
-// explicit /en locale alias and the language switcher.
-export const defaultLocale: Locale = 'vi';
+export const defaultLocale: Locale = 'en';
 
 export const localeLabels: Record<Locale, string> = {
   en: 'English',

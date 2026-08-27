@@ -25,8 +25,6 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
-import { useDialogFocusTrap } from '@/components/ui/use-dialog-focus-trap';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
@@ -78,8 +76,7 @@ type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating?: 'UP' | 'DOWN' }
-  | { type: 'discard-pending' }
+  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' }
   | { type: 'clear-error' };
 
 const TRANSIENT_TERMINAL_CODES = new Set([
@@ -206,16 +203,6 @@ export function assistantReducer(
       );
       return { ...state, messages };
     }
-    case 'discard-pending':
-      // Closing the panel fences the active stream. Drop its optimistic bubble
-      // so a late/aborted reader cannot leave a permanent thinking state after
-      // the panel is reopened. The user prompt remains visible as context.
-      return {
-        ...state,
-        messages: state.messages.filter(
-          (message) => !(message.role === 'assistant' && message.pending),
-        ),
-      };
     default:
       return state;
   }
@@ -258,7 +245,6 @@ function fromHistoryMessage(message: {
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
-  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
@@ -269,16 +255,11 @@ export function AssistantPanel() {
   >('idle');
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
-  const [feedbackPendingMessageId, setFeedbackPendingMessageId] =
-    useState<string>();
-  const [feedbackErrorMessageId, setFeedbackErrorMessageId] =
-    useState<string>();
   const [lastPrompt, setLastPrompt] = useState<string>();
   const [state, dispatch] = useReducer(assistantReducer, initialState);
   const launcherRef = useRef<HTMLButtonElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
-  const historyRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
   const activeRequestIdRef = useRef<string>();
@@ -292,6 +273,24 @@ export function AssistantPanel() {
   const selectedHistoryRef = useRef(false);
   const historyFetchedRef = useRef(false);
   const userScrolledRef = useRef(false);
+
+  useEffect(() => {
+    if (!open) return undefined;
+    const handleEscape = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Escape') return;
+      event.preventDefault();
+      if (showHistory) {
+        setShowHistory(false);
+        requestAnimationFrame(() => inputRef.current?.focus());
+      } else {
+        setOpen(false);
+        requestAnimationFrame(() => launcherRef.current?.focus());
+      }
+    };
+    document.addEventListener('keydown', handleEscape);
+    requestAnimationFrame(() => inputRef.current?.focus());
+    return () => document.removeEventListener('keydown', handleEscape);
+  }, [open, showHistory]);
 
   const loadHistory = useCallback(() => {
     if (historyStatus === 'loading') return;
@@ -314,26 +313,6 @@ export function AssistantPanel() {
     setHistoryStatus('idle');
   };
 
-  const cancelActiveRequest = useCallback(() => {
-    const requestId = activeRequestIdRef.current;
-    if (requestId) {
-      // Unmounts can happen during logout or route transitions. The local abort
-      // fences late reader callbacks immediately; the server cancel is best
-      // effort because the auth session may already be closing.
-      void thesisApi.cancelRequest(requestId).catch(() => undefined);
-    }
-    requestGenerationRef.current += 1;
-    abortRef.current?.abort();
-    abortRef.current = null;
-    activeRequestIdRef.current = undefined;
-    activeConversationIdRef.current = undefined;
-    activePromptRef.current = undefined;
-    retryRequestIdRef.current = undefined;
-    retryConversationIdRef.current = undefined;
-  }, []);
-
-  useEffect(() => cancelActiveRequest, [cancelActiveRequest]);
-
   useEffect(() => {
     if (!open || historyFetchedRef.current || selectedHistoryRef.current)
       return;
@@ -348,7 +327,7 @@ export function AssistantPanel() {
       top: node.scrollHeight,
       behavior: isSending ? 'smooth' : 'auto',
     });
-  }, [state.messages, isSending, open]);
+  }, [state.messages, isSending]);
 
   const handleLogScroll = () => {
     const node = logRef.current;
@@ -357,56 +336,22 @@ export function AssistantPanel() {
       node.scrollHeight - node.scrollTop - node.clientHeight > 48;
   };
 
-  const closePanel = useCallback(() => {
-    cancelActiveRequest();
-    dispatch({ type: 'discard-pending' });
+  const closePanel = () => {
+    requestGenerationRef.current += 1;
+    abortRef.current?.abort();
     setIsSending(false);
     setOpen(false);
     setShowHistory(false);
+    activeRequestIdRef.current = undefined;
+    retryRequestIdRef.current = undefined;
+    activeConversationIdRef.current = undefined;
+    retryConversationIdRef.current = undefined;
+    activePromptRef.current = undefined;
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
-    userScrolledRef.current = false;
     setHistoryStatus('idle');
     requestAnimationFrame(() => launcherRef.current?.focus());
-  }, [cancelActiveRequest]);
-
-  const closeHistory = useCallback(() => {
-    setShowHistory(false);
-    requestAnimationFrame(() => inputRef.current?.focus());
-  }, []);
-
-  const openPanel = useCallback(() => {
-    userScrolledRef.current = false;
-    setOpen(true);
-  }, []);
-
-  const toggleHistory = useCallback(() => {
-    setShowHistory((current) => {
-      const next = !current;
-      requestAnimationFrame(() => {
-        if (next) historyRef.current?.focus();
-        else inputRef.current?.focus();
-      });
-      return next;
-    });
-  }, []);
-
-  const handlePanelEscape = useCallback(() => {
-    if (showHistory) {
-      closeHistory();
-      return;
-    }
-    closePanel();
-  }, [closeHistory, closePanel, showHistory]);
-
-  // The shared trap owns the previous `event.key !== 'Escape'` guard while
-  // adding Tab containment, scroll locking and nested-dialog coordination.
-  const panelRef = useDialogFocusTrap<HTMLElement>({
-    open,
-    onClose: handlePanelEscape,
-    initialFocusRef: inputRef,
-    restoreFocusRef: launcherRef,
-  });
+  };
 
   const selectConversation = async (conversation: AssistantConversation) => {
     if (isSending) return;
@@ -421,8 +366,7 @@ export function AssistantPanel() {
         conversationId: conversation.id,
         messages: loaded.map(fromHistoryMessage),
       });
-      userScrolledRef.current = false;
-      closeHistory();
+      setShowHistory(false);
       setHistoryStatus('loaded');
     } catch {
       setHistoryStatus('error');
@@ -438,8 +382,7 @@ export function AssistantPanel() {
       // locally so the next send can target it without showing an empty row.
       selectedHistoryRef.current = true;
       dispatch({ type: 'reset', conversationId: conversation.id });
-      userScrolledRef.current = false;
-      closeHistory();
+      setShowHistory(false);
     } catch {
       dispatch({ type: 'error', kind: 'unavailable' });
     }
@@ -447,14 +390,14 @@ export function AssistantPanel() {
 
   const deleteConversation = async (conversationId: string) => {
     if (isSending || deletingConversationId) return;
-    const confirmed = await confirm({
-      title: messages.assistant.deleteConversation,
-      message:
+    if (
+      typeof window !== 'undefined' &&
+      !window.confirm(
         messages.assistant.deleteConversationConfirm ??
-        messages.assistant.deleteConversation,
-      variant: 'destructive',
-    });
-    if (!confirmed) return;
+          messages.assistant.deleteConversation,
+      )
+    )
+      return;
     setDeletingConversationId(conversationId);
     try {
       await thesisApi.deleteConversation(conversationId);
@@ -714,18 +657,11 @@ export function AssistantPanel() {
   };
 
   const setFeedback = async (messageId: string, rating: 'UP' | 'DOWN') => {
-    if (feedbackPendingMessageId) return;
-    const previous = state.messages.find((message) => message.id === messageId)?.feedback;
-    setFeedbackPendingMessageId(messageId);
-    setFeedbackErrorMessageId(undefined);
     dispatch({ type: 'feedback', messageId, rating });
     try {
       await thesisApi.setMessageFeedback(messageId, rating);
     } catch {
-      dispatch({ type: 'feedback', messageId, rating: previous });
-      setFeedbackErrorMessageId(messageId);
-    } finally {
-      setFeedbackPendingMessageId(undefined);
+      /* feedback is best effort and never changes answer state */
     }
   };
 
@@ -768,29 +704,19 @@ export function AssistantPanel() {
           size="icon"
           data-assistant-launcher="thesis-mark"
           className="group ml-auto min-h-14 min-w-14 rounded-xl border border-primary-foreground/20 bg-primary text-primary-foreground shadow-xl transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
-          onClick={openPanel}
+          onClick={() => setOpen(true)}
           aria-label={messages.assistant.open}
-          aria-expanded={open}
           title={messages.assistant.open}
         >
           <AssistantLauncherMark />
-          <span
-            aria-hidden="true"
-            className={cn(
-              'absolute right-1.5 top-1.5 size-2.5 rounded-full border-2 border-primary',
-              isSending ? 'bg-[hsl(var(--accent-warm))]' : state.error ? 'bg-destructive' : 'bg-emerald-400',
-            )}
-          />
         </Button>
       ) : (
         <section
-          ref={panelRef}
           role="dialog"
-          aria-modal="true"
+          aria-modal="false"
           aria-labelledby="assistant-panel-title"
           aria-describedby="assistant-panel-description"
-          tabIndex={-1}
-          className="flex h-[min(100dvh,42rem)] max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-none border border-border/80 bg-card shadow-2xl sm:rounded-lg md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))]"
+          className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-lg border border-border/80 bg-card shadow-2xl md:max-h-[min(42rem,calc(100dvh-2rem))]"
         >
           <header className="flex items-start justify-between gap-4 border-b border-border/70 bg-foreground px-4 py-4 text-background">
             <div className="flex min-w-0 items-start gap-3">
@@ -815,10 +741,9 @@ export function AssistantPanel() {
                 variant="ghost"
                 size="icon"
                 className="text-background hover:bg-white/10 hover:text-background"
-                onClick={toggleHistory}
+                onClick={() => setShowHistory((current) => !current)}
                 aria-label={messages.assistant.history}
                 aria-expanded={showHistory}
-                aria-controls="assistant-history"
               >
                 <History className="h-4 w-4" aria-hidden="true" />
               </Button>
@@ -835,20 +760,10 @@ export function AssistantPanel() {
               </Button>
             </div>
           </header>
-          <p className="border-b border-border/70 bg-secondary/35 px-4 py-2 text-[11px] leading-5 text-muted-foreground">
-            {locale === 'vi'
-              ? 'Không nhập mã sinh viên, điểm hoặc thông tin cá nhân vào trợ lý.'
-              : 'Do not enter student IDs, grades, or personal information into the assistant.'}
-          </p>
           {showHistory ? (
             <div
-              id="assistant-history"
-              ref={historyRef}
-              role="region"
-              tabIndex={-1}
               className="border-b border-border/70 bg-secondary/30 px-3 py-3"
               aria-label={messages.assistant.history}
-              aria-busy={historyStatus === 'loading'}
             >
               <div className="mb-2 flex items-center justify-between gap-2">
                 <Button
@@ -856,7 +771,7 @@ export function AssistantPanel() {
                   variant="ghost"
                   size="sm"
                   className="min-h-11 gap-1"
-                  onClick={closeHistory}
+                  onClick={() => setShowHistory(false)}
                 >
                   <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                   {messages.assistant.backToChat}
@@ -896,7 +811,7 @@ export function AssistantPanel() {
                   </Button>
                 </div>
               ) : null}
-              {historyStatus === 'loaded' && !history.length ? (
+              {historyStatus !== 'loading' && !history.length ? (
                 <p className="px-2 py-4 text-sm text-muted-foreground">
                   {messages.assistant.historyEmpty}
                 </p>
@@ -1014,46 +929,38 @@ export function AssistantPanel() {
                   !message.id.startsWith('local-') ? (
                     <div
                       data-assistant-feedback={message.id}
-                      className="mt-2 border-t border-border/50 pt-1"
-                      aria-busy={feedbackPendingMessageId === message.id}
+                      className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-1"
                     >
-                      <div className="flex items-center justify-end gap-1">
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={feedbackPendingMessageId === message.id}
-                          className={cn(
-                            message.feedback === 'UP' &&
-                              'bg-secondary text-primary',
-                          )}
-                          aria-label={messages.assistant.feedbackUp}
-                          aria-pressed={message.feedback === 'UP'}
-                          onClick={() => void setFeedback(message.id, 'UP')}
-                        >
-                          <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="icon"
-                          disabled={feedbackPendingMessageId === message.id}
-                          className={cn(
-                            message.feedback === 'DOWN' &&
-                              'bg-secondary text-destructive',
-                          )}
-                          aria-label={messages.assistant.feedbackDown}
-                          aria-pressed={message.feedback === 'DOWN'}
-                          onClick={() => void setFeedback(message.id, 'DOWN')}
-                        >
-                          <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                        </Button>
-                      </div>
-                      {feedbackErrorMessageId === message.id ? (
-                        <p className="pb-1 text-xs text-destructive" role="alert">
-                          {messages.assistant.feedbackUnavailable}
-                        </p>
-                      ) : null}
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'min-h-10 min-w-10',
+                          message.feedback === 'UP' &&
+                            'bg-secondary text-primary',
+                        )}
+                        aria-label={messages.assistant.feedbackUp}
+                        aria-pressed={message.feedback === 'UP'}
+                        onClick={() => void setFeedback(message.id, 'UP')}
+                      >
+                        <ThumbsUp className="h-4 w-4" aria-hidden="true" />
+                      </Button>
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="icon"
+                        className={cn(
+                          'min-h-10 min-w-10',
+                          message.feedback === 'DOWN' &&
+                            'bg-secondary text-destructive',
+                        )}
+                        aria-label={messages.assistant.feedbackDown}
+                        aria-pressed={message.feedback === 'DOWN'}
+                        onClick={() => void setFeedback(message.id, 'DOWN')}
+                      >
+                        <ThumbsDown className="h-4 w-4" aria-hidden="true" />
+                      </Button>
                     </div>
                   ) : null}
                 </div>
@@ -1140,7 +1047,6 @@ export function AssistantPanel() {
               {input.length}/2000
             </p>
           </form>
-          {confirmationDialog}
         </section>
       )}
     </div>
