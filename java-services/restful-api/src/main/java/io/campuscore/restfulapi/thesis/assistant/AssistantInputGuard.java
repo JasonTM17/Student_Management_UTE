@@ -13,8 +13,6 @@ import java.util.regex.Pattern;
 public final class AssistantInputGuard {
     private static final Pattern EMAIL = Pattern.compile("(?i)\\b[\\w.+-]+@[\\w-]+\\.[\\w.-]+\\b");
     private static final Pattern PHONE = Pattern.compile("(?<!\\d)(?:\\+?\\d[\\d .()-]{7,}\\d)(?!\\d)");
-    private static final Pattern UUID_VALUE = Pattern.compile(
-            "(?i)\\b[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}\\b");
     private static final Pattern STUDENT_ID = Pattern.compile("(?i)\\b(?:student\\s*id|mssv|ma\\s*sv|sinh\\s*vien)\\s*[:#-]?\\s*[a-z0-9-]*\\d[a-z0-9-]{3,20}\\b");
     private static final Pattern SECRET = Pattern.compile("(?i)\\b(?:bearer\\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\\s*[:=]|token\\s*[:=]|password\\s*[:=])");
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
@@ -75,12 +73,7 @@ public final class AssistantInputGuard {
      * conventional hyphen used by grouped phone numbers.
      */
     private static boolean containsPhone(String normalized) {
-        // UUIDs are common immutable identifiers in curated slugs and audit
-        // metadata. Some valid UUIDs contain a numeric substring such as
-        // `48-01075739`, which otherwise resembles a grouped telephone number.
-        // Remove only syntactically valid UUID values before evaluating phone
-        // candidates; arbitrary digit groups remain subject to the guard.
-        Matcher matcher = PHONE.matcher(UUID_VALUE.matcher(normalized).replaceAll(" "));
+        Matcher matcher = PHONE.matcher(normalized);
         while (matcher.find()) {
             String candidate = matcher.group();
             long digits = candidate.chars().filter(Character::isDigit).count();

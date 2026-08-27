@@ -6,12 +6,6 @@ security:
 health:
   readiness-key: test-health-key
 
-assistant:
-  # Focused H2 fixtures do not create the PostgreSQL assistant schema. The
-  # repository recovery tests invoke the worker explicitly when needed.
-  retention:
-    enabled: false
-
 spring:
   datasource:
     url: jdbc:h2:mem:restful_api;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1
@@ -20,7 +14,3 @@ spring:
   flyway:
     enabled: true
     locations: classpath:db/migration-h2
-  jpa:
-    hibernate:
-      # Focused JDBC fixtures intentionally create only their owned tables.
-      ddl-auto: none

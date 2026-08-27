@@ -155,48 +155,6 @@ class ThesisAssistantTurnLedgerPostgresIT {
     }
 
     @Test
-    void preReservationCancelAndCompletionUseTheSameConversationFirstLockOrder() throws Exception {
-        String owner = "pg-cancel-order-" + UUID.randomUUID();
-        UUID request = UUID.randomUUID();
-        String requestHash = hash(request);
-        var reservation = tx(() -> turns.reserve(owner, request, requestHash, null, "vi", "cancel-order", 90));
-        assertTrue(tx(() -> turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), requestHash)));
-        assertTrue(tx(() -> turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 20, 200)).dispatched());
-
-        CountDownLatch start = new CountDownLatch(1);
-        ExecutorService pool = Executors.newFixedThreadPool(2);
-        Future<?> cancel = pool.submit(() -> {
-            await(start);
-            try {
-                return tx(() -> turns.cancelBeforeReservation(owner, request, requestHash));
-            } catch (DomainException expectedTerminalRace) {
-                assertTrue(List.of("TURN_TERMINAL_RACE", "FAILED_AMBIGUOUS", "TURN_NOT_ACTIVE")
-                        .contains(expectedTerminalRace.code()));
-                return null;
-            }
-        });
-        Future<?> complete = pool.submit(() -> {
-            await(start);
-            try {
-                return tx(() -> turns.complete(reservation.turnId(), owner, reservation.leaseGeneration(),
-                        "cancel order", "model", "answer", false, "ANSWERED", List.of()));
-            } catch (DomainException expectedTerminalRace) {
-                assertTrue(List.of("TURN_TERMINAL_RACE", "FAILED_AMBIGUOUS", "TURN_NOT_ACTIVE")
-                        .contains(expectedTerminalRace.code()));
-                return null;
-            }
-        });
-        start.countDown();
-
-        cancel.get(10, TimeUnit.SECONDS);
-        complete.get(10, TimeUnit.SECONDS);
-        pool.shutdownNow();
-        String state = jdbc.queryForObject("SELECT state FROM assistant.chat_turn_ledger WHERE turn_id=:turn",
-                java.util.Map.of("turn", reservation.turnId()), String.class);
-        assertTrue("CANCELLED".equals(state) || "COMPLETED".equals(state));
-    }
-
-    @Test
     void completionAndPhysicalDeleteShareConversationFirstLockOrder() throws Exception {
         String owner = "pg-delete-race-" + UUID.randomUUID();
         UUID request = UUID.randomUUID();

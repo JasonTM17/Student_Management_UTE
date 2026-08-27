@@ -56,8 +56,8 @@ class ThesisTopicPersistenceTest {
         jdbc.update("DELETE FROM thesis.thesis_group");
         topics.deleteAll();
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
-        jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'test-member-%'");
-        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'test-user-%'");
+        jdbc.update("DELETE FROM auth.\"Student\" WHERE \"id\" LIKE 'test-member-%'");
+        jdbc.update("DELETE FROM auth.\"User\" WHERE \"id\" LIKE 'test-user-%'");
     }
 
     @Test
@@ -417,11 +417,11 @@ class ThesisTopicPersistenceTest {
 
     private void ensureStudent(String studentId, String userId, String email) {
         jdbc.update(
-                "INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") VALUES (?, ?, 'test-password', 'Test', 'Member', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                "INSERT INTO auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") VALUES (?, ?, 'test-password', 'Test', 'Member', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 userId,
                 email);
         jdbc.update(
-                "INSERT INTO campuscore_auth.\"Student\" (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"admissionDate\") VALUES (?, ?, ?, 'curriculum-demo', 2, CURRENT_TIMESTAMP)",
+                "INSERT INTO auth.\"Student\" (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"admissionDate\") VALUES (?, ?, ?, 'curriculum-demo', 2, CURRENT_TIMESTAMP)",
                 studentId,
                 userId,
                 "CODE-" + studentId);

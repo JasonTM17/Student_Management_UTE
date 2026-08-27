@@ -1,21 +1,16 @@
 package io.campuscore.restfulapi.auth.service;
 
-import io.campuscore.restfulapi.auth.mail.AuthMailService;
-import io.campuscore.restfulapi.auth.repository.AuthChallengeRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.RegisterCommand;
-import io.campuscore.restfulapi.auth.service.AuthChallengeTokenService.IssuedChallengeToken;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.RegistrationPendingResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedRefreshToken;
-import io.campuscore.restfulapi.web.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -28,7 +23,6 @@ import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.BadCredentialsException;
@@ -50,57 +44,34 @@ public class AuthLoginService {
     private final AuthUserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService tokens;
-    private final AuthChallengeRepository challenges;
-    private final AuthMailService mail;
-    private final AuthRequestRateLimiter rateLimiter;
     private final Clock clock;
-
-    @Value("${auth.lifecycle.verification-ttl-seconds:86400}")
-    private long verificationTtlSeconds;
 
     @Autowired
     public AuthLoginService(
             AuthUserRepository users,
             PasswordEncoder passwordEncoder,
-            AuthTokenService tokens,
-            AuthChallengeRepository challenges,
-            AuthMailService mail,
-            AuthRequestRateLimiter rateLimiter) {
-        this(users, passwordEncoder, tokens, challenges, mail, rateLimiter, Clock.systemUTC());
+            AuthTokenService tokens) {
+        this(users, passwordEncoder, tokens, Clock.systemUTC());
     }
 
     AuthLoginService(
             AuthUserRepository users,
             PasswordEncoder passwordEncoder,
             AuthTokenService tokens,
-            Clock clock) {
-        this(users, passwordEncoder, tokens, null, null, null, clock);
-    }
-
-    AuthLoginService(
-            AuthUserRepository users,
-            PasswordEncoder passwordEncoder,
-            AuthTokenService tokens,
-            AuthChallengeRepository challenges,
-            AuthMailService mail,
-            AuthRequestRateLimiter rateLimiter,
             Clock clock) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
-        this.challenges = challenges;
-        this.mail = mail;
-        this.rateLimiter = rateLimiter;
         this.clock = clock;
     }
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
     public LoginResult login(String email, String password, String ipAddress, String userAgent) {
-        AuthUserRecord user = users.findByEmailForUpdate(email)
+        AuthUserRecord user = users.findByEmail(email)
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
 
-        if (user.lockedUntil() != null && user.lockedUntil().isAfter(now)) {
+        if (!"ACTIVE".equals(user.status()) || (user.lockedUntil() != null && user.lockedUntil().isAfter(now))) {
             throw new BadCredentialsException("Invalid credentials");
         }
 
@@ -111,22 +82,12 @@ public class AuthLoginService {
             throw new BadCredentialsException("Invalid credentials");
         }
 
-        if (!user.emailVerified() || "PENDING_VERIFICATION".equals(user.status())) {
-            throw new DomainException(
-                    HttpStatus.FORBIDDEN,
-                    "EMAIL_VERIFICATION_REQUIRED",
-                    "Email verification is required before signing in");
-        }
-        if (!"ACTIVE".equals(user.status())) {
-            throw new BadCredentialsException("Invalid credentials");
-        }
-
         users.recordSuccessfulLogin(user.id(), now);
         return issueSession(user, ipAddress, userAgent);
     }
 
-    @Transactional(noRollbackFor = DomainException.class)
-    public RegistrationPendingResponse register(RegisterRequest request, String ipAddress, String userAgent) {
+    @Transactional
+    public LoginResult register(RegisterRequest request, String ipAddress, String userAgent) {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration request is required");
         }
@@ -137,16 +98,8 @@ public class AuthLoginService {
         }
         String firstName = required(request.firstName(), "firstName");
         String lastName = required(request.lastName(), "lastName");
-        if (rateLimiter == null || challenges == null || mail == null) {
-            throw new IllegalStateException("Auth lifecycle dependencies are unavailable");
-        }
-        rateLimiter.check("register", email, ipAddress);
-        users.lockEmailForRegistration(email);
         if (users.findByEmail(email).isPresent()) {
-            throw new DomainException(
-                    HttpStatus.CONFLICT,
-                    "EMAIL_ALREADY_EXISTS",
-                    "An account already exists for this email");
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
         }
         AuthUserRecord user = users.createUser(new RegisterCommand(
                 email,
@@ -159,18 +112,7 @@ public class AuthLoginService {
                         ? null
                         : parseDate(request.dateOfBirth()),
                 request.address()));
-        Instant now = clock.instant();
-        Instant expiresAt = now.plusSeconds(verificationTtlSeconds);
-        IssuedChallengeToken token = AuthChallengeTokenService.issue();
-        challenges.create(
-                token.challengeId(),
-                user.id(),
-                AuthChallengeRepository.Purpose.EMAIL_VERIFICATION,
-                token.tokenHash(),
-                expiresAt,
-                now);
-        mail.queueVerification(user.email(), user.firstName(), token.rawToken(), expiresAt);
-        return new RegistrationPendingResponse(user.email(), true, verificationTtlSeconds, 60);
+        return issueSession(user, ipAddress, userAgent);
     }
 
     @Transactional
@@ -181,17 +123,9 @@ public class AuthLoginService {
 
         Jwt decoded = decodeRefresh(refreshTokenValue);
         String refreshTokenHash = hash(refreshTokenValue);
-        // The verified JWT identifies the parent row before a Session lock is
-        // taken. Re-query the session after waiting: reset/logout may have
-        // revoked it while this transaction was acquiring the User lock.
-        if (!users.lockUser(decoded.getSubject())) {
-            throw new BadCredentialsException("Invalid refresh token");
-        }
         AuthUserRecord user = users.findByActiveRefreshSession(refreshTokenHash, clock.instant())
                 .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
-        if (!user.id().equals(decoded.getSubject())
-                || !"ACTIVE".equals(user.status())
-                || !user.emailVerified()) {
+        if (!user.id().equals(decoded.getSubject()) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
         }
 
@@ -232,9 +166,6 @@ public class AuthLoginService {
 
     @Transactional
     public void changePassword(String userId, String oldPassword, String newPassword) {
-        if (!users.lockUser(userId)) {
-            throw new BadCredentialsException("Invalid session");
-        }
         AuthUserRecord user = requireActiveUser(userId);
         if (oldPassword == null || oldPassword.isBlank() || newPassword == null || newPassword.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password fields are required");
@@ -252,9 +183,6 @@ public class AuthLoginService {
 
     @Transactional
     public void logout(String userId, String refreshTokenValue) {
-        if (!users.lockUser(userId)) {
-            return;
-        }
         if (refreshTokenValue != null && !refreshTokenValue.isBlank()) {
             users.deleteRefreshSession(userId, hash(refreshTokenValue));
         } else {
@@ -288,14 +216,13 @@ public class AuthLoginService {
         }
     }
 
-    static AuthPrincipal principal(AuthUserRecord user) {
+    private static AuthPrincipal principal(AuthUserRecord user) {
         return new AuthPrincipal(
                 user.id(),
                 user.email(),
                 user.firstName(),
                 user.lastName(),
                 user.status(),
-                user.emailVerified(),
                 user.roles(),
                 user.permissions(),
                 user.studentId(),
@@ -303,7 +230,7 @@ public class AuthLoginService {
                 user.lecturerId());
     }
 
-    LoginResult issueSession(AuthUserRecord user, String ipAddress, String userAgent) {
+    private LoginResult issueSession(AuthUserRecord user, String ipAddress, String userAgent) {
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
         IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal);
@@ -327,7 +254,7 @@ public class AuthLoginService {
         return value.trim();
     }
 
-    static String hash(String token) {
+    private static String hash(String token) {
         try {
             byte[] digest = MessageDigest.getInstance("SHA-256").digest(token.getBytes(StandardCharsets.UTF_8));
             return HexFormat.of().formatHex(digest);

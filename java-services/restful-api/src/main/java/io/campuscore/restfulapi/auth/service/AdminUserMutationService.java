@@ -18,11 +18,11 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 public class AdminUserMutationService {
 
-    private static final String USER = "\"campuscore_auth\".\"User\"";
-    private static final String ROLE = "\"campuscore_auth\".\"Role\"";
-    private static final String USER_ROLE = "\"campuscore_auth\".\"UserRole\"";
-    private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
-    private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
+    private static final String USER = "\"auth\".\"User\"";
+    private static final String ROLE = "\"auth\".\"Role\"";
+    private static final String USER_ROLE = "\"auth\".\"UserRole\"";
+    private static final String STUDENT = "\"auth\".\"Student\"";
+    private static final String LECTURER = "\"auth\".\"Lecturer\"";
     private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN");
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -78,7 +78,7 @@ public class AdminUserMutationService {
                         + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE',"
-                        + " TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 new MapSqlParameterSource().addValue("id", id).addValue("email", email)
                         .addValue("password", passwordEncoder.encode(password))
                         .addValue("firstName", required(input, "firstName"))

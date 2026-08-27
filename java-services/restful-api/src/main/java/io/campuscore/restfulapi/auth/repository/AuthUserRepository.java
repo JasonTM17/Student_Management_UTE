@@ -2,7 +2,6 @@ package io.campuscore.restfulapi.auth.repository;
 
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.StudentContext;
-import java.sql.Connection;
 import java.sql.ResultSet;
 import java.sql.SQLException;
 import java.sql.Timestamp;
@@ -13,7 +12,6 @@ import java.util.List;
 import java.util.Objects;
 import java.util.Optional;
 import java.util.UUID;
-import javax.sql.DataSource;
 import org.springframework.context.annotation.Profile;
 import org.springframework.jdbc.core.RowMapper;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -25,7 +23,7 @@ import org.springframework.stereotype.Repository;
 @Profile("persistence")
 public class AuthUserRepository {
 
-    private static final String SCHEMA = "\"campuscore_auth\".";
+    private static final String SCHEMA = "\"auth\".";
     private static final String USER_TABLE = SCHEMA + "\"User\"";
     private static final String STUDENT_TABLE = SCHEMA + "\"Student\"";
     private static final String LECTURER_TABLE = SCHEMA + "\"Lecturer\"";
@@ -37,55 +35,22 @@ public class AuthUserRepository {
     private static final RowMapper<AuthUserRecord> USER_MAPPER = AuthUserRepository::mapUser;
 
     private final NamedParameterJdbcTemplate jdbc;
-    private final boolean postgres;
 
     public AuthUserRepository(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
-        this.postgres = isPostgres(jdbc.getJdbcTemplate().getDataSource());
-    }
-
-    /**
-     * Serializes public registration attempts for one normalized address before
-     * the read-then-insert sequence. A unique index remains the integrity
-     * boundary; this transaction-scoped PostgreSQL lock makes a duplicate
-     * request deterministically return the public EMAIL_ALREADY_EXISTS contract
-     * instead of surfacing a database constraint race.
-     */
-    public void lockEmailForRegistration(String normalizedEmail) {
-        if (!postgres) {
-            return;
-        }
-        jdbc.query(
-                "SELECT pg_advisory_xact_lock(hashtextextended(CAST(:email AS TEXT), 0))",
-                new MapSqlParameterSource("email", normalizedEmail),
-                (resultSet, ignored) -> null);
     }
 
     public Optional<AuthUserRecord> findByEmail(String email) {
-        return findByEmail(email, false);
-    }
-
-    /**
-     * Loads an account while holding its row lock for the surrounding
-     * transaction.  Login failure counters are stateful security controls;
-     * they must be read from the same serialized stream that updates them.
-     */
-    public Optional<AuthUserRecord> findByEmailForUpdate(String email) {
-        return findByEmail(email, true);
-    }
-
-    private Optional<AuthUserRecord> findByEmail(String email, boolean lock) {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
                         + " LEFT JOIN " + STUDENT_TABLE + " s ON s.\"userId\" = u.\"id\""
                         + " LEFT JOIN " + LECTURER_TABLE + " l ON l.\"userId\" = u.\"id\""
-                        + " WHERE u.\"email\" = :email"
-                        + (lock ? " FOR UPDATE OF u" : ""),
+                        + " WHERE u.\"email\" = :email",
                 new MapSqlParameterSource("email", email),
                 USER_MAPPER);
         return matches.stream().findFirst().map(user -> user.withAuthorities(
@@ -97,7 +62,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -109,18 +74,6 @@ public class AuthUserRepository {
         return matches.stream().findFirst().map(user -> user.withAuthorities(
                 findRoles(user.id()),
                 findPermissions(user.id())));
-    }
-
-    /**
-     * Account mutations acquire User before Session, matching challenge
-     * consumption and password reset. Keep this lock through the surrounding
-     * transaction and re-read credentials/session state after acquiring it.
-     */
-    public boolean lockUser(String userId) {
-        return !jdbc.query(
-                "SELECT \"id\" FROM " + USER_TABLE + " WHERE \"id\" = :id FOR UPDATE",
-                new MapSqlParameterSource("id", userId),
-                (resultSet, ignored) -> resultSet.getString("id")).isEmpty();
     }
 
     public AuthUserRecord createUser(RegisterCommand command) {
@@ -141,8 +94,7 @@ public class AuthUserRepository {
                         + " \"phone\", \"gender\", \"dateOfBirth\", \"address\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (:id, :email, :password, :firstName, :lastName, :phone, :gender,"
-                        + " :dateOfBirth, :address, 'PENDING_VERIFICATION', FALSE, FALSE, 0,"
-                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " :dateOfBirth, :address, 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 parameters);
 
         String roleId = jdbc.query(
@@ -192,7 +144,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"emailVerified\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + SESSION_TABLE + " se"
@@ -229,17 +181,6 @@ public class AuthUserRepository {
                 new MapSqlParameterSource()
                         .addValue("id", userId)
                         .addValue("loggedInAt", localDateTime(loggedInAt)));
-    }
-
-    public int markEmailVerified(String userId, Instant verifiedAt) {
-        return jdbc.update(
-                "UPDATE " + USER_TABLE
-                        + " SET \"emailVerified\" = TRUE, \"status\" = 'ACTIVE', \"updatedAt\" = :verifiedAt"
-                        + " WHERE \"id\" = :userId AND \"emailVerified\" = FALSE"
-                        + " AND \"status\" = 'PENDING_VERIFICATION'",
-                new MapSqlParameterSource()
-                        .addValue("userId", userId)
-                        .addValue("verifiedAt", localDateTime(verifiedAt)));
     }
 
     public void replaceRefreshSession(
@@ -329,22 +270,6 @@ public class AuthUserRepository {
                         .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
     }
 
-    public int resetPassword(String userId, String passwordHash, Instant passwordChangedAt) {
-        return jdbc.update(
-                "UPDATE " + USER_TABLE
-                        + " SET \"password\" = :password,"
-                        + " \"passwordChangedAt\" = :passwordChangedAt,"
-                        + " \"refreshToken\" = NULL,"
-                        + " \"failedLoginAttempts\" = 0,"
-                        + " \"lockedUntil\" = NULL,"
-                        + " \"updatedAt\" = CURRENT_TIMESTAMP"
-                        + " WHERE \"id\" = :userId AND \"status\" = 'ACTIVE'",
-                new MapSqlParameterSource()
-                        .addValue("userId", userId)
-                        .addValue("password", passwordHash)
-                        .addValue("passwordChangedAt", localDateTime(passwordChangedAt)));
-    }
-
     private List<String> findRoles(String userId) {
         return jdbc.queryForList(
                 "SELECT r.\"name\""
@@ -382,7 +307,6 @@ public class AuthUserRepository {
                 resultSet.getString("address"),
                 resultSet.getString("avatar"),
                 resultSet.getString("status"),
-                resultSet.getBoolean("emailVerified"),
                 resultSet.getInt("failedLoginAttempts"),
                 instant(resultSet.getTimestamp("lockedUntil")),
                 instant(resultSet.getTimestamp("createdAt")),
@@ -391,19 +315,6 @@ public class AuthUserRepository {
                 resultSet.getString("lecturer_id"),
                 List.of(),
                 List.of());
-    }
-
-    private static boolean isPostgres(DataSource dataSource) {
-        if (dataSource == null) {
-            return false;
-        }
-        try (Connection connection = dataSource.getConnection()) {
-            return connection.getMetaData().getDatabaseProductName()
-                    .toLowerCase(java.util.Locale.ROOT)
-                    .contains("postgres");
-        } catch (SQLException exception) {
-            throw new IllegalStateException("Unable to identify auth user database", exception);
-        }
     }
 
     private static Integer nullableInteger(ResultSet resultSet, String column) throws SQLException {
@@ -435,7 +346,6 @@ public class AuthUserRepository {
             String address,
             String avatar,
             String status,
-            boolean emailVerified,
             int failedLoginAttempts,
             Instant lockedUntil,
             Instant createdAt,
@@ -458,7 +368,6 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
-                    emailVerified,
                     failedLoginAttempts,
                     lockedUntil,
                     createdAt,
@@ -482,7 +391,6 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
-                    emailVerified,
                     createdAt,
                     roles,
                     permissions,

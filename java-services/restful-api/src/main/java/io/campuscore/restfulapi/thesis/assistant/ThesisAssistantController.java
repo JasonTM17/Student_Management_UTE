@@ -9,14 +9,8 @@ import jakarta.servlet.http.HttpServletResponse;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
-import java.util.concurrent.RejectedExecutionException;
-import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.function.Consumer;
-import org.springframework.beans.factory.annotation.Autowired;
-import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.context.annotation.Profile;
-import org.springframework.core.task.SyncTaskExecutor;
-import org.springframework.core.task.TaskExecutor;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -43,36 +37,13 @@ import org.slf4j.LoggerFactory;
 public class ThesisAssistantController {
     private static final Logger LOG = LoggerFactory.getLogger(ThesisAssistantController.class);
     private final ThesisAssistantService assistant;
-    private final TaskExecutor streamExecutor;
-    private final RagAssistantGateway ragGateway;
 
-    /** Compatibility constructor for focused controller tests. */
-    public ThesisAssistantController(ThesisAssistantService assistant) {
-        this(assistant, new SyncTaskExecutor(), null);
-    }
-
-    /** Compatibility constructor for focused controller tests. */
-    public ThesisAssistantController(ThesisAssistantService assistant, TaskExecutor streamExecutor) {
-        this(assistant, streamExecutor, null);
-    }
-
-    @Autowired
-    public ThesisAssistantController(ThesisAssistantService assistant,
-            @Qualifier("assistantStreamExecutor") TaskExecutor streamExecutor,
-            RagAssistantGateway ragGateway) {
-        this.assistant = assistant;
-        this.streamExecutor = streamExecutor;
-        this.ragGateway = ragGateway;
-    }
+    public ThesisAssistantController(ThesisAssistantService assistant) { this.assistant = assistant; }
 
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            return ragGateway.chat(request, owner);
-        }
-        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner, request.clientRequestId());
+        return assistant.answer(request.message(), request.locale(), request.conversationId(), subject(actor), request.clientRequestId());
     }
 
     /** Deprecated compatibility alias; clients should use /chat. */
@@ -87,84 +58,28 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
-        SseEmitter emitter = createEmitter();
+        SseEmitter emitter = new SseEmitter(120_000L);
         String owner = subject(actor);
-        AtomicBoolean terminal = new AtomicBoolean(false);
-        Runnable cancelOnDisconnect = () -> {
-            if (terminal.get()) return;
-            try {
-                // The emitter can close before the bounded worker starts.  In
-                // that window there is no turn row yet; install the durable
-                // request-key tombstone so the later worker cannot retrieve,
-                // dispatch, charge quota, or commit an uncancelled answer.
-                assistant.cancelBeforeStart(request.clientRequestId(), owner, request.message(),
-                        request.locale(), request.conversationId());
-            } catch (Exception ignored) {
-                // Disconnect cleanup must never turn into a transport error.
-                // The worker still observes the durable row when cancellation
-                // won before reservation; terminal races are handled by the
-                // normal turn CAS.
-            }
-        };
-        emitter.onTimeout(cancelOnDisconnect);
-        emitter.onError(ignored -> cancelOnDisconnect.run());
-        emitter.onCompletion(cancelOnDisconnect);
+        Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
-            streamExecutor.execute(() -> {
-                Consumer<ThesisAssistantService.StreamEvent> sink = event -> {
-                    if (event instanceof ThesisAssistantService.StreamDone
-                            || event instanceof ThesisAssistantService.StreamError) {
-                        terminal.set(true);
-                    }
-                    send(emitter, event);
-                };
-                try {
-                    if (remoteRag()) {
-                        ragGateway.stream(request, owner, sink);
-                    } else {
-                        assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                                request.clientRequestId(), sink);
-                    }
-                    // A successful service call must emit done; if a future
-                    // implementation violates that invariant, fail closed so
-                    // clients never mistake a closed socket for completion.
-                    if (terminal.compareAndSet(false, true)) {
-                        sendError(emitter, "ASSISTANT_STREAM_INCOMPLETE", true);
-                    }
-                    emitter.complete();
-                } catch (DomainException exception) {
-                    terminal.set(true);
-                    sendError(emitter, exception.code(), exception.status().is5xxServerError()
-                            || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
-                    emitter.complete();
-                } catch (Exception exception) {
-                    terminal.set(true);
-                    LOG.warn("assistant stream failed with {}", exception.getClass().getSimpleName());
-                    sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
-                    emitter.complete();
-                }
-            });
-        } catch (RejectedExecutionException exception) {
-            terminal.set(true);
-            sendError(emitter, "ASSISTANT_BUSY", true);
+            assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
+                    request.clientRequestId(), sink);
+            emitter.complete();
+        } catch (DomainException exception) {
+            sendError(emitter, exception.code(), exception.status().is5xxServerError() || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
+            emitter.complete();
+        } catch (Exception exception) {
+            LOG.warn("assistant stream failed with {}", exception.getClass().getSimpleName());
+            sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
             emitter.complete();
         }
         return emitter;
     }
 
-    /** Small protected seam for lifecycle callback tests; production uses the default emitter. */
-    protected SseEmitter createEmitter() {
-        return new SseEmitter(120_000L);
-    }
-
     @PostMapping("/requests/{clientRequestId}/cancel")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public CancelResponse cancel(@PathVariable UUID clientRequestId, @AuthenticationPrincipal Jwt actor) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            return ragGateway.cancel(clientRequestId, owner);
-        }
-        var result = assistant.cancel(clientRequestId, owner);
+        var result = assistant.cancel(clientRequestId, subject(actor));
         if (!result.cancelled() && "COMPLETED".equals(result.status())) {
             throw new DomainException(HttpStatus.CONFLICT, "TURN_COMPLETED", "Completed turns are replayable and cannot be cancelled");
         }
@@ -181,11 +96,7 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public FeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            return ragGateway.feedback(messageId, request, owner);
-        }
-        assistant.setFeedback(messageId, owner, request.rating(), request.reason());
+        assistant.setFeedback(messageId, subject(actor), request.rating(), request.reason());
         return new FeedbackResponse(messageId, request.rating(), request.reason(), false);
     }
 
@@ -193,12 +104,7 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFeedback(@PathVariable UUID messageId, @AuthenticationPrincipal Jwt actor) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            ragGateway.deleteFeedback(messageId, owner);
-            return;
-        }
-        assistant.deleteFeedback(messageId, owner);
+        assistant.deleteFeedback(messageId, subject(actor));
     }
 
     @GetMapping("/conversations")
@@ -206,14 +112,7 @@ public class ThesisAssistantController {
     public List<ThesisAssistantRepository.Conversation> conversations(
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Conversation>> page =
-                    ragGateway.conversations(owner, limit, cursor);
-            if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
-            return page.data();
-        }
-        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner, limit, cursor);
+        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(subject(actor), limit, cursor);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -226,11 +125,7 @@ public class ThesisAssistantController {
         if (locale != null && !locale.isBlank() && !locale.equals("vi") && !locale.equals("en")) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
-        String owner = subject(actor);
-        if (remoteRag()) {
-            return ragGateway.createConversation(request, owner);
-        }
-        String id = assistant.createConversation(owner, locale);
+        String id = assistant.createConversation(subject(actor), locale);
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
@@ -239,14 +134,7 @@ public class ThesisAssistantController {
     public List<ThesisAssistantRepository.Message> messages(@PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Message>> page =
-                    ragGateway.messages(id, owner, limit, cursor);
-            if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
-            return page.data();
-        }
-        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, owner, limit, cursor);
+        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, subject(actor), limit, cursor);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -255,16 +143,7 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
-        String owner = subject(actor);
-        if (remoteRag()) {
-            ragGateway.deleteConversation(id, owner);
-            return;
-        }
-        assistant.deleteConversation(id, owner);
-    }
-
-    private boolean remoteRag() {
-        return ragGateway != null && ragGateway.enabled();
+        assistant.deleteConversation(id, subject(actor));
     }
 
     private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {

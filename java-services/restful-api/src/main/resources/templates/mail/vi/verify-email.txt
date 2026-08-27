@@ -1,9 +1,0 @@
-Xin chào {{firstName}},
-
-Vui lòng xác minh email CampusCore bằng liên kết sau:
-{{actionUrl}}
-
-Liên kết có hiệu lực trong {{expiresMinutes}} phút và chỉ dùng được một lần.
-Nếu bạn không tạo tài khoản này, hãy bỏ qua email. Không chuyển tiếp liên kết cho người khác.
-
-CampusCore

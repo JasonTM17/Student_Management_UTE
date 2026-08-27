@@ -39,7 +39,7 @@ class AdminUserMutationPersistenceTest {
 
     @BeforeEach
     void prepareFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
         createTables();
         clearTables();
         insertFixture();
@@ -62,12 +62,12 @@ class AdminUserMutationPersistenceTest {
                 .containsExactly("academic:read", "audit:read")
                 .doesNotContain("admin:write");
         assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = ?",
+                "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?",
                 Integer.class,
                 "target-user"))
                 .isEqualTo(1);
         assertThat(jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Lecturer\" WHERE \"userId\" = ?",
+                "SELECT COUNT(*) FROM \"auth\".\"Lecturer\" WHERE \"userId\" = ?",
                 Integer.class,
                 "target-user"))
                 .isZero();
@@ -122,7 +122,7 @@ class AdminUserMutationPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(320) UNIQUE NOT NULL,
                     "password" VARCHAR(200) NOT NULL,
@@ -138,7 +138,7 @@ class AdminUserMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Role" (
+                CREATE TABLE IF NOT EXISTS "auth"."Role" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(80) UNIQUE NOT NULL,
                     "description" VARCHAR(500),
@@ -148,7 +148,7 @@ class AdminUserMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Permission" (
+                CREATE TABLE IF NOT EXISTS "auth"."Permission" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(160) UNIQUE NOT NULL,
                     "description" VARCHAR(500),
@@ -158,24 +158,24 @@ class AdminUserMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."UserRole" (
+                CREATE TABLE IF NOT EXISTS "auth"."UserRole" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."User" ("id") ON DELETE CASCADE,
-                    "roleId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."Role" ("id") ON DELETE CASCADE,
+                    "userId" VARCHAR(120) NOT NULL REFERENCES "auth"."User" ("id") ON DELETE CASCADE,
+                    "roleId" VARCHAR(120) NOT NULL REFERENCES "auth"."Role" ("id") ON DELETE CASCADE,
                     CONSTRAINT admin_user_role_unique UNIQUE ("userId", "roleId")
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."RolePermission" (
+                CREATE TABLE IF NOT EXISTS "auth"."RolePermission" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "roleId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."Role" ("id") ON DELETE CASCADE,
-                    "permissionId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."Permission" ("id") ON DELETE CASCADE
+                    "roleId" VARCHAR(120) NOT NULL REFERENCES "auth"."Role" ("id") ON DELETE CASCADE,
+                    "permissionId" VARCHAR(120) NOT NULL REFERENCES "auth"."Permission" ("id") ON DELETE CASCADE
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Student" (
+                CREATE TABLE IF NOT EXISTS "auth"."Student" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) UNIQUE NOT NULL REFERENCES "campuscore_auth"."User" ("id") ON DELETE CASCADE,
+                    "userId" VARCHAR(120) UNIQUE NOT NULL REFERENCES "auth"."User" ("id") ON DELETE CASCADE,
                     "studentId" VARCHAR(120) UNIQUE NOT NULL,
                     "curriculumId" VARCHAR(120) NOT NULL,
                     "year" INTEGER NOT NULL,
@@ -186,9 +186,9 @@ class AdminUserMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Lecturer" (
+                CREATE TABLE IF NOT EXISTS "auth"."Lecturer" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) UNIQUE NOT NULL REFERENCES "campuscore_auth"."User" ("id") ON DELETE CASCADE,
+                    "userId" VARCHAR(120) UNIQUE NOT NULL REFERENCES "auth"."User" ("id") ON DELETE CASCADE,
                     "departmentId" VARCHAR(120) NOT NULL,
                     "employeeId" VARCHAR(120) UNIQUE NOT NULL,
                     "isActive" BOOLEAN NOT NULL
@@ -197,13 +197,13 @@ class AdminUserMutationPersistenceTest {
     }
 
     private void clearTables() {
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Student\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Lecturer\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"RolePermission\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"UserRole\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Permission\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Role\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
+        jdbc.update("DELETE FROM \"auth\".\"Student\"");
+        jdbc.update("DELETE FROM \"auth\".\"Lecturer\"");
+        jdbc.update("DELETE FROM \"auth\".\"RolePermission\"");
+        jdbc.update("DELETE FROM \"auth\".\"UserRole\"");
+        jdbc.update("DELETE FROM \"auth\".\"Permission\"");
+        jdbc.update("DELETE FROM \"auth\".\"Role\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
     }
 
     private void insertFixture() {
@@ -222,37 +222,37 @@ class AdminUserMutationPersistenceTest {
         insertUser("third-user", "third@campuscore.edu", "Third", "User");
         insertUserRole("user-role-admin", "target-user", "role-admin");
         insertUserRole("user-role-auditor", "target-user", "role-auditor");
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"Student\""
+        jdbc.update("INSERT INTO \"auth\".\"Student\""
                         + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
                         + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
                         + " VALUES ('target-student-profile', 'target-user', 'SV-TARGET', 'curriculum-demo',"
                         + " 2, 'ACTIVE', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"Lecturer\""
+        jdbc.update("INSERT INTO \"auth\".\"Lecturer\""
                         + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
                         + " VALUES ('target-lecturer-profile', 'target-user', 'department-demo', 'GV-TARGET', TRUE)");
     }
 
     private void insertRole(String id, String name, boolean system) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"Role\""
+        jdbc.update("INSERT INTO \"auth\".\"Role\""
                         + " (\"id\", \"name\", \"isSystem\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 id, name, system);
     }
 
     private void insertPermission(String id, String module, String action) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"Permission\""
+        jdbc.update("INSERT INTO \"auth\".\"Permission\""
                         + " (\"id\", \"name\", \"module\", \"action\", \"createdAt\")"
                         + " VALUES (?, ?, ?, ?, CURRENT_TIMESTAMP)",
                 id, module + ":" + action, module, action);
     }
 
     private void insertRolePermission(String id, String roleId, String permissionId) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"RolePermission\" (\"id\", \"roleId\", \"permissionId\") VALUES (?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"RolePermission\" (\"id\", \"roleId\", \"permissionId\") VALUES (?, ?, ?)",
                 id, roleId, permissionId);
     }
 
     private void insertUser(String id, String email, String firstName, String lastName) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"User\""
+        jdbc.update("INSERT INTO \"auth\".\"User\""
                         + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, 'encoded', ?, ?, 'ACTIVE', TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
@@ -260,14 +260,14 @@ class AdminUserMutationPersistenceTest {
     }
 
     private void insertUserRole(String id, String userId, String roleId) {
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"UserRole\" (\"id\", \"userId\", \"roleId\") VALUES (?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"UserRole\" (\"id\", \"userId\", \"roleId\") VALUES (?, ?, ?)",
                 id, userId, roleId);
     }
 
     private List<String> roleNames(String userId) {
         return jdbc.queryForList(
-                "SELECT role.\"name\" FROM \"campuscore_auth\".\"UserRole\" user_role"
-                        + " JOIN \"campuscore_auth\".\"Role\" role ON role.\"id\" = user_role.\"roleId\""
+                "SELECT role.\"name\" FROM \"auth\".\"UserRole\" user_role"
+                        + " JOIN \"auth\".\"Role\" role ON role.\"id\" = user_role.\"roleId\""
                         + " WHERE user_role.\"userId\" = ? ORDER BY role.\"name\"",
                 String.class,
                 userId);
@@ -276,9 +276,9 @@ class AdminUserMutationPersistenceTest {
     private List<String> authorities(String userId) {
         return jdbc.queryForList(
                 "SELECT DISTINCT CONCAT(permission.\"module\", ':', permission.\"action\")"
-                        + " FROM \"campuscore_auth\".\"UserRole\" user_role"
-                        + " JOIN \"campuscore_auth\".\"RolePermission\" role_permission ON role_permission.\"roleId\" = user_role.\"roleId\""
-                        + " JOIN \"campuscore_auth\".\"Permission\" permission ON permission.\"id\" = role_permission.\"permissionId\""
+                        + " FROM \"auth\".\"UserRole\" user_role"
+                        + " JOIN \"auth\".\"RolePermission\" role_permission ON role_permission.\"roleId\" = user_role.\"roleId\""
+                        + " JOIN \"auth\".\"Permission\" permission ON permission.\"id\" = role_permission.\"permissionId\""
                         + " WHERE user_role.\"userId\" = ? ORDER BY 1",
                 String.class,
                 userId);

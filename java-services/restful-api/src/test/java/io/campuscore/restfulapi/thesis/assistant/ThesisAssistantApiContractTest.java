@@ -42,8 +42,6 @@ class ThesisAssistantApiContractTest {
     void publicKnowledgeGuardAllowsUuidSlugsButStillRejectsReadablePhones() {
         assertTrue(AssistantInputGuard.inspectPublicKnowledge(
                 "test-governance-123e4567-e89b-12d3-a456-426614174000").allowed());
-        assertTrue(AssistantInputGuard.inspectPublicKnowledge(
-                "test-governance-f37e51d1-d1c2-44cd-9c48-01075739fefc").allowed());
         assertFalse(AssistantInputGuard.inspectPublicKnowledge("Call +84 912 345 678").allowed());
         assertFalse(AssistantInputGuard.inspectPublicKnowledge("Call 0901234567").allowed());
         assertEquals("SENSITIVE_PHONE",

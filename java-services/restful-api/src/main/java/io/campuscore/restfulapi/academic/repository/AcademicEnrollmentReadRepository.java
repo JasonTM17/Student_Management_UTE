@@ -29,7 +29,7 @@ public class AcademicEnrollmentReadRepository {
     private static final String ACADEMIC_YEAR = "\"academic\".\"AcademicYear\"";
     private static final String STUDENT = "\"academic\".\"Student\"";
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
-    private static final String USER = "\"campuscore_auth\".\"User\"";
+    private static final String USER = "\"auth\".\"User\"";
     private static final String GRADE_ITEM = "\"academic\".\"GradeItem\"";
     private static final String STUDENT_GRADE = "\"academic\".\"StudentGrade\"";
 

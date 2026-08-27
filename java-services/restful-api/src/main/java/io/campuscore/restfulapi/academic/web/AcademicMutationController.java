@@ -1,17 +1,14 @@
 package io.campuscore.restfulapi.academic.web;
 
 import io.campuscore.restfulapi.academic.service.AcademicMutationService;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.EnrollRequest;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdateRequest;
-import io.campuscore.restfulapi.registration.RegistrationDtos.MutationResponse;
-import io.campuscore.restfulapi.registration.RegistrationService;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
-import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
-import jakarta.servlet.http.HttpServletResponse;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -21,7 +18,6 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
-import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -32,52 +28,35 @@ import org.springframework.web.bind.annotation.RestController;
 public class AcademicMutationController {
 
     private final AcademicMutationService mutations;
-    private final RegistrationService registration;
 
-    public AcademicMutationController(AcademicMutationService mutations,
-                                      RegistrationService registration) {
+    public AcademicMutationController(AcademicMutationService mutations) {
         this.mutations = mutations;
-        this.registration = registration;
     }
 
     @PostMapping("enrollments/enroll")
-    @PreAuthorize("hasRole('STUDENT') and principal.claims['emailVerified'] == true")
-    public MutationResponse enroll(
+    @PreAuthorize("hasRole('STUDENT')")
+    public EnrollmentResponse enroll(
             @AuthenticationPrincipal Jwt jwt,
-            @Valid @RequestBody EnrollRequest request,
-            @RequestHeader("Idempotency-Key") UUID key,
-            HttpServletResponse response) {
-        markDeprecated(response, "/api/v1/me/enrollments");
-        RegistrationService.MutationResult result = registration.enrollBySection(
-                jwt.getClaimAsString("studentId"), request.sectionId(), key);
-        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
-        return new MutationResponse(result.enrollment(), result.replayed(), key.toString());
+            @Valid @RequestBody EnrollRequest request) {
+        return mutations.enroll(
+                jwt.getClaimAsString("studentId"),
+                request.sectionId(),
+                jwt.getClaimAsStringList("roles"));
     }
 
     @PostMapping("enrollments/{id}/drop")
-    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN') and principal.claims['emailVerified'] == true")
+    @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN')")
     public Map<String, String> drop(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String id,
-            @RequestHeader("Idempotency-Key") UUID key,
-            HttpServletResponse response) {
-        markDeprecated(response, "/api/v1/me/enrollments/" + id);
-        RegistrationService.DropResult result = isAdmin(jwt.getClaimAsStringList("roles"))
-                ? registration.dropAsAdmin(id, key)
-                : registration.drop(jwt.getClaimAsString("studentId"), id, key);
-        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
+            @PathVariable String id) {
+        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"));
         return Map.of("message", "Enrollment dropped successfully");
     }
 
     @DeleteMapping("enrollments/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN') and principal.claims['emailVerified'] == true")
-    public Map<String, String> deleteEnrollment(
-            @PathVariable String id,
-            @RequestHeader("Idempotency-Key") UUID key,
-            HttpServletResponse response) {
-        markDeprecated(response, "/api/v1/me/enrollments/" + id);
-        RegistrationService.DropResult result = registration.dropAsAdmin(id, key);
-        response.setHeader("Idempotency-Replayed", Boolean.toString(result.replayed()));
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public Map<String, String> deleteEnrollment(@PathVariable String id) {
+        mutations.deleteEnrollment(id);
         return Map.of("message", "Enrollment deleted successfully");
     }
 
@@ -114,10 +93,5 @@ public class AcademicMutationController {
 
     private static boolean isAdmin(List<String> roles) {
         return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
-    }
-
-    private static void markDeprecated(HttpServletResponse response, String successor) {
-        response.setHeader("Deprecation", "true");
-        response.setHeader("Link", "<" + successor + ">; rel=\"successor-version\"");
     }
 }

@@ -64,9 +64,9 @@ class AuthLoginPersistenceTest {
 
     @BeforeEach
     void prepareAuthFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                CREATE TABLE IF NOT EXISTS "auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(320) UNIQUE NOT NULL,
                     "password" VARCHAR(200) NOT NULL,
@@ -93,7 +93,7 @@ class AuthLoginPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Role" (
+                CREATE TABLE IF NOT EXISTS "auth"."Role" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(80) UNIQUE NOT NULL,
                     "description" VARCHAR(500),
@@ -103,7 +103,7 @@ class AuthLoginPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Permission" (
+                CREATE TABLE IF NOT EXISTS "auth"."Permission" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "name" VARCHAR(160) UNIQUE NOT NULL,
                     "description" VARCHAR(500),
@@ -113,21 +113,21 @@ class AuthLoginPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."UserRole" (
+                CREATE TABLE IF NOT EXISTS "auth"."UserRole" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
                     "roleId" VARCHAR(120) NOT NULL
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."RolePermission" (
+                CREATE TABLE IF NOT EXISTS "auth"."RolePermission" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "roleId" VARCHAR(120) NOT NULL,
                     "permissionId" VARCHAR(120) NOT NULL
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Student" (
+                CREATE TABLE IF NOT EXISTS "auth"."Student" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) UNIQUE NOT NULL,
                     "studentId" VARCHAR(120) UNIQUE NOT NULL,
@@ -140,7 +140,7 @@ class AuthLoginPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Lecturer" (
+                CREATE TABLE IF NOT EXISTS "auth"."Lecturer" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) UNIQUE NOT NULL,
                     "departmentId" VARCHAR(120) NOT NULL,
@@ -149,7 +149,7 @@ class AuthLoginPersistenceTest {
                 )
                 """);
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Session" (
+                CREATE TABLE IF NOT EXISTS "auth"."Session" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "userId" VARCHAR(120) NOT NULL,
                     "refreshToken" VARCHAR(200) NOT NULL,
@@ -159,45 +159,20 @@ class AuthLoginPersistenceTest {
                     "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."AuthChallenge" (
-                    "id" VARCHAR(120) PRIMARY KEY,
-                    "userId" VARCHAR(120) NOT NULL,
-                    "purpose" VARCHAR(40) NOT NULL,
-                    "tokenHash" VARCHAR(64) NOT NULL UNIQUE,
-                    "expiresAt" TIMESTAMP NOT NULL,
-                    "consumedAt" TIMESTAMP,
-                    "attemptCount" INTEGER NOT NULL,
-                    "lastSentAt" TIMESTAMP NOT NULL,
-                    "createdAt" TIMESTAMP NOT NULL
-                )
-                """);
-        jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "campuscore_auth"."AuthRateLimitBucket" (
-                    "scope" VARCHAR(80) NOT NULL,
-                    "bucketKeyHash" VARCHAR(64) NOT NULL,
-                    "windowStart" TIMESTAMP NOT NULL,
-                    "requestCount" INTEGER NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL,
-                    PRIMARY KEY ("scope", "bucketKeyHash", "windowStart")
-                )
-                """);
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"AuthRateLimitBucket\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"AuthChallenge\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Session\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Student\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Lecturer\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"RolePermission\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"UserRole\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Permission\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"Role\"");
-        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
+        jdbc.update("DELETE FROM \"auth\".\"Session\"");
+        jdbc.update("DELETE FROM \"auth\".\"Student\"");
+        jdbc.update("DELETE FROM \"auth\".\"Lecturer\"");
+        jdbc.update("DELETE FROM \"auth\".\"RolePermission\"");
+        jdbc.update("DELETE FROM \"auth\".\"UserRole\"");
+        jdbc.update("DELETE FROM \"auth\".\"Permission\"");
+        jdbc.update("DELETE FROM \"auth\".\"Role\"");
+        jdbc.update("DELETE FROM \"auth\".\"User\"");
         insertStudentUser("student-user", "student@campuscore.edu", "password123", 0, null);
     }
 
     @Test
-    void registrationCreatesAPendingStudentWithoutIssuingASession() throws Exception {
-        mvc.perform(post("/api/v1/auth/register")
+    void registrationCreatesAnImmediatelyUsableStudentProfile() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
@@ -207,41 +182,20 @@ class AuthLoginPersistenceTest {
                                   "lastName":"Student"
                                 }
                                 """))
-                .andExpect(status().isAccepted())
-                .andExpect(jsonPath("$.email").value("new.student@campuscore.edu"))
-                .andExpect(jsonPath("$.verificationRequired").value(true))
-                .andExpect(jsonPath("$.expiresInSeconds").value(86400))
-                .andExpect(jsonPath("$.accessToken").doesNotExist())
-                .andExpect(jsonPath("$.refreshToken").doesNotExist())
-                .andExpect(cookie().doesNotExist("cc_access_token"))
-                .andExpect(cookie().doesNotExist("cc_refresh_token"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.email").value("new.student@campuscore.edu"))
+                .andExpect(jsonPath("$.user.roles[0]").value("STUDENT"))
+                .andExpect(jsonPath("$.user.studentId", notNullValue()))
+                .andReturn();
 
-        String userId = jdbc.queryForObject(
-                "SELECT \"id\" FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
-                String.class,
-                "new.student@campuscore.edu");
+        String userId = objectMapper.readTree(result.getResponse().getContentAsString())
+                .path("user").path("id").asText();
         Integer profiles = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = ?"
+                "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?"
                         + " AND \"curriculumId\" = 'curriculum-demo' AND \"status\" = 'ACTIVE'",
                 Integer.class,
                 userId);
-        String status = jdbc.queryForObject(
-                "SELECT \"status\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = ?",
-                String.class,
-                userId);
-        Boolean emailVerified = jdbc.queryForObject(
-                "SELECT \"emailVerified\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = ?",
-                Boolean.class,
-                userId);
-        Integer challenges = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"AuthChallenge\" WHERE \"userId\" = ?"
-                        + " AND \"purpose\" = 'EMAIL_VERIFICATION' AND LENGTH(\"tokenHash\") = 64",
-                Integer.class,
-                userId);
         org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
-        org.junit.jupiter.api.Assertions.assertEquals("PENDING_VERIFICATION", status);
-        org.junit.jupiter.api.Assertions.assertEquals(false, emailVerified);
-        org.junit.jupiter.api.Assertions.assertEquals(1, challenges);
     }
 
     @Test
@@ -267,7 +221,7 @@ class AuthLoginPersistenceTest {
 
         String userId = objectMapper.readTree(result.getResponse().getContentAsString()).path("id").asText();
         Integer profiles = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = ?"
+                "SELECT COUNT(*) FROM \"auth\".\"Student\" WHERE \"userId\" = ?"
                         + " AND \"studentId\" = 'SV-MANAGED-001'",
                 Integer.class,
                 userId);
@@ -298,13 +252,13 @@ class AuthLoginPersistenceTest {
         jwtDecoder.decode(body.get("accessToken").asText());
 
         Integer failedAttempts = jdbc.queryForObject(
-                "SELECT \"failedLoginAttempts\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                "SELECT \"failedLoginAttempts\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Integer.class);
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 String.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, failedAttempts);
@@ -342,10 +296,10 @@ class AuthLoginPersistenceTest {
         assertNotEquals(oldRefreshToken, newRefreshToken);
 
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 String.class);
         org.junit.jupiter.api.Assertions.assertEquals(1, sessions);
         org.junit.jupiter.api.Assertions.assertNotEquals(sha256(oldRefreshToken), storedRefresh);
@@ -375,7 +329,7 @@ class AuthLoginPersistenceTest {
         assertNotEquals(oldRefreshToken, newRefreshToken);
 
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 String.class);
         org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
     }
@@ -481,13 +435,13 @@ class AuthLoginPersistenceTest {
                 .andExpect(jsonPath("$.message").value("Password changed successfully"));
 
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
                 String.class);
         Object passwordChangedAt = jdbc.queryForObject(
-                "SELECT \"passwordChangedAt\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                "SELECT \"passwordChangedAt\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
                 Object.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
@@ -532,10 +486,10 @@ class AuthLoginPersistenceTest {
                 .andExpect(cookie().maxAge("cc_csrf", 0));
 
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
                 String.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
@@ -562,10 +516,10 @@ class AuthLoginPersistenceTest {
                 .andExpect(cookie().maxAge("cc_csrf", 0));
 
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'student-user'",
                 Integer.class);
         String storedRefresh = jdbc.queryForObject(
-                "SELECT \"refreshToken\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                "SELECT \"refreshToken\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
                 String.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(0, sessions);
@@ -585,13 +539,13 @@ class AuthLoginPersistenceTest {
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
 
         Integer failedAttempts = jdbc.queryForObject(
-                "SELECT \"failedLoginAttempts\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'locked-user'",
+                "SELECT \"failedLoginAttempts\" FROM \"auth\".\"User\" WHERE \"id\" = 'locked-user'",
                 Integer.class);
         Object lockedUntil = jdbc.queryForObject(
-                "SELECT \"lockedUntil\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'locked-user'",
+                "SELECT \"lockedUntil\" FROM \"auth\".\"User\" WHERE \"id\" = 'locked-user'",
                 Object.class);
         Integer sessions = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'locked-user'",
+                "SELECT COUNT(*) FROM \"auth\".\"Session\" WHERE \"userId\" = 'locked-user'",
                 Integer.class);
 
         org.junit.jupiter.api.Assertions.assertEquals(5, failedAttempts);
@@ -614,7 +568,7 @@ class AuthLoginPersistenceTest {
             int failedAttempts,
             Instant lockedUntil) {
         jdbc.update(
-                "INSERT INTO \"campuscore_auth\".\"User\""
+                "INSERT INTO \"auth\".\"User\""
                         + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
                         + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"lockedUntil\","
                         + " \"createdAt\", \"updatedAt\")"
@@ -632,11 +586,11 @@ class AuthLoginPersistenceTest {
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
         Integer roleCount = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Role\" WHERE \"id\" = 'role-student'",
+                "SELECT COUNT(*) FROM \"auth\".\"Role\" WHERE \"id\" = 'role-student'",
                 Integer.class);
         if (roleCount == 0) {
             jdbc.update(
-                "INSERT INTO \"campuscore_auth\".\"Role\""
+                "INSERT INTO \"auth\".\"Role\""
                             + " (\"id\", \"name\", \"description\", \"isSystem\", \"createdAt\", \"updatedAt\")"
                             + " VALUES (?, ?, ?, ?, ?, ?)",
                     "role-student",
@@ -647,7 +601,7 @@ class AuthLoginPersistenceTest {
                     localDateTime(BASE_TIME));
         }
         jdbc.update(
-                "INSERT INTO \"campuscore_auth\".\"Permission\""
+                "INSERT INTO \"auth\".\"Permission\""
                         + " (\"id\", \"name\", \"description\", \"module\", \"action\", \"createdAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?)",
                 "permission-" + userId,
@@ -656,12 +610,12 @@ class AuthLoginPersistenceTest {
                 "thesis",
                 "read",
                 localDateTime(BASE_TIME));
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"UserRole\" (\"id\", \"userId\", \"roleId\") VALUES (?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"UserRole\" (\"id\", \"userId\", \"roleId\") VALUES (?, ?, ?)",
                 "user-role-" + userId, userId, "role-student");
-        jdbc.update("INSERT INTO \"campuscore_auth\".\"RolePermission\" (\"id\", \"roleId\", \"permissionId\") VALUES (?, ?, ?)",
+        jdbc.update("INSERT INTO \"auth\".\"RolePermission\" (\"id\", \"roleId\", \"permissionId\") VALUES (?, ?, ?)",
                 "role-permission-" + userId, "role-student", "permission-" + userId);
         jdbc.update(
-                "INSERT INTO \"campuscore_auth\".\"Student\""
+                "INSERT INTO \"auth\".\"Student\""
                         + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
                         + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
                         + " VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",

@@ -1,9 +1,0 @@
-Hello {{firstName}},
-
-Verify your CampusCore email using this link:
-{{actionUrl}}
-
-The link expires in {{expiresMinutes}} minutes and can be used only once.
-If you did not create this account, ignore this email. Do not forward the link.
-
-CampusCore

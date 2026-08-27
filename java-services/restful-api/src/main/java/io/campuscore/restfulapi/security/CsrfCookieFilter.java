@@ -45,7 +45,6 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
             FilterChain filterChain) throws ServletException, IOException {
         if (isSafeMethod(request.getMethod())
                 || hasBearerHeader(request)
-                || isPublicLifecycleRequest(request)
                 || !hasSessionCookie(request)) {
             filterChain.doFilter(request, response);
             return;
@@ -82,21 +81,6 @@ public class CsrfCookieFilter extends OncePerRequestFilter {
     private boolean hasSessionCookie(HttpServletRequest request) {
         return cookieValue(request, accessTokenCookie) != null
                 || cookieValue(request, refreshTokenCookie) != null;
-    }
-
-    private boolean isPublicLifecycleRequest(HttpServletRequest request) {
-        if (!HttpMethod.POST.matches(request.getMethod())) {
-            return false;
-        }
-        String path = request.getRequestURI();
-        return path.equals("/api/v1/auth/register")
-                || path.startsWith("/api/v1/auth/email-verifications/")
-                || path.equals("/api/v1/auth/password-reset-requests")
-                || path.equals("/api/v1/auth/password-reset/confirm")
-                || path.equals("/api/v1/auth/verify-email")
-                || path.equals("/api/v1/auth/resend-verification")
-                || path.equals("/api/v1/auth/forgot-password")
-                || path.equals("/api/v1/auth/reset-password");
     }
 
     private String cookieValue(HttpServletRequest request, String name) {

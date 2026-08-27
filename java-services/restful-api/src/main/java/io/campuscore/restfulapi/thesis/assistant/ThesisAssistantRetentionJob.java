@@ -1,13 +1,11 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import org.springframework.context.annotation.Profile;
-import org.springframework.boot.autoconfigure.condition.ConditionalOnProperty;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Component;
 
 @Component
 @Profile("persistence")
-@ConditionalOnProperty(name = "assistant.retention.enabled", havingValue = "true", matchIfMissing = true)
 public class ThesisAssistantRetentionJob {
     private final ThesisAssistantRepository repository;
     private final ThesisAssistantTurnRepository turns;
