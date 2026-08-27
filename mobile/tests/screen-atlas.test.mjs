@@ -25,7 +25,7 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   ].map((match) => match[1] ?? match[2]);
   const screenCount = registeredRoutes.length;
 
-  assert.equal(screenCount, 25);
+  assert.equal(screenCount, 21);
   assert.equal(new Set(registeredRoutes).size, screenCount);
   assert.deepEqual(componentRoutes.sort(), [...registeredRoutes].sort());
   for (const requiredRoute of [
@@ -38,7 +38,7 @@ test('native registry keeps the Stitch mobile atlas above the 20-screen requirem
   ]) {
     assert.match(routes, new RegExp(`name: '${requiredRoute.replace('.', '\\.')}'`));
   }
-  assert.match(readme, /25 navigable screens/);
+  assert.match(readme, /21 navigable screens/);
 });
 
 test('native tokens preserve the institutional portal contract', () => {
@@ -67,7 +67,7 @@ test('native API seam fails closed until live mode is explicitly enabled', () =>
   assert.match(client, /'X-Request-Id': `\$\{requestId\}-refresh`/);
   assert.match(client, /'The Java auth refresh response did not include rotated tokens'/);
   assert.match(client, /shouldRefreshAfterUnauthorized\(path, response\.status\) && refreshToken/);
-  assert.match(client, /headers\.set\('Authorization', `Bearer \$\{token\}`\)/);
+  assert.match(client, /headers\.set\('Authorization', `Bearer \$\{accessToken\}`\)/);
   assert.match(client, /apiRoutes\.auth\.refresh,[\s\S]*?\{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
   assert.match(client, /apiClient\.setSessionTokens\(response\.accessToken, response\.refreshToken\)/);
   assert.match(client, /apiRoutes\.auth\.logout, \{ refreshToken: apiClient\.getRefreshToken\(\) \}/);
@@ -89,7 +89,7 @@ test('mobile role navigation rejects unauthorized routes and uses role-specific 
   assert.match(navigator, /<BottomNavigation[\s\S]*?role=\{role\}/);
   assert.match(bottomNavigation, /getBottomNavigation\(role\)/);
   assert.match(bottomNavigation, /role: UserRole/);
-  assert.match(navigator, /if \(!hasActiveSession && !nextRoute\.startsWith\('auth\.'\)\) \{\s*return;/);
+  assert.match(navigator, /if \(!hasActiveSession\) \{\s*return;/);
   assert.match(navigator, /if \(!isPreviewSession\) \{\s*return;/);
   assert.match(navigator, /type SessionKind = 'signedOut' \| 'preview' \| 'authenticated'/);
   assert.match(navigator, /const isAuthenticated = sessionKind === 'authenticated'/);

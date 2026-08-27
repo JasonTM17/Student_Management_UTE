@@ -89,7 +89,6 @@ export interface AuthUser {
   permissions?: string[];
   studentId?: string | null;
   lecturerId?: string | null;
-  emailVerified?: boolean;
 }
 
 export interface LoginResponse {
@@ -98,98 +97,26 @@ export interface LoginResponse {
   refreshToken: string;
 }
 
-export interface RegistrationPendingResponse {
-  email: string;
-  verificationRequired: boolean;
-  expiresInSeconds: number;
-  resendAfterSeconds: number;
-}
-
-export interface AuthActionResponse {
-  message: string;
-}
-
 export interface MobileSection {
   id: string;
-  courseId?: string;
-  courseCode?: string;
-  courseName?: string;
-  credits?: number;
   sectionNumber: string;
-  /** Registration SectionView carries round context outside the DTO. */
-  semesterId?: string;
+  semesterId: string;
   capacity: number;
   enrolledCount: number;
   status: string;
-  lecturerName?: string | null;
-  classroom?: string | null;
-  selected?: boolean;
-  remainingSeats?: number;
-  violations?: string[];
   course?: { code?: string; name?: string; nameEn?: string; nameVi?: string; credits?: number };
-  schedules?: Array<{ id?: string; dayOfWeek: number; startTime: string; endTime: string; classroom?: { building?: string; roomNumber?: string } | null; building?: string | null; roomNumber?: string | null }>;
+  schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string; classroom?: { building?: string; roomNumber?: string } }>;
 }
 
 export interface MobileEnrollment {
   id: string;
   sectionId: string;
-  roundId?: string;
-  /** Legacy academic reads include this; canonical registration views do not. */
-  semesterId?: string;
+  semesterId: string;
   status: string;
-  enrolledAt?: string | null;
   finalGrade?: number | null;
   letterGrade?: string | null;
   gradeStatus?: string;
   section?: MobileSection;
-}
-
-export interface RegistrationRound {
-  id: string;
-  semesterId: string;
-  status: string;
-  registrationStart: string;
-  registrationEnd: string;
-  addDropStart: string;
-  addDropEnd: string;
-  serverNow: string;
-  institutionTimeZone: string;
-  maxCredits: number;
-  version?: number;
-}
-
-export interface RegistrationEligibility {
-  roundId: string;
-  eligibilityState: string;
-  priorityRank?: number | null;
-  maxCredits: number;
-  selectedCredits: number;
-  reasonCode?: string | null;
-  serverNow: string;
-}
-
-export interface RegistrationSummary {
-  roundId: string;
-  selectedCredits: number;
-  maxCredits: number;
-  selectedCount: number;
-  selectedSections: MobileSection[];
-}
-
-export interface EnrollmentMutationResponse {
-  enrollment: MobileEnrollment;
-  replayed: boolean;
-  clientRequestId: string;
-}
-
-export interface DropMutationResponse {
-  enrollmentId: string;
-  replayed: boolean;
-}
-
-export interface RegistrationValidationResponse {
-  valid: boolean;
-  violations: string[];
 }
 
 export interface MobileGrade {
@@ -269,7 +196,6 @@ export interface ApiClient {
   clearAccessToken(): void;
   request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
   requestWithMeta<TResponse>(path: string, init?: RequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
-  requestBytes(path: string, init?: RequestInit): Promise<{ data: Uint8Array; headers: Headers; requestId: string }>;
   get<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
   post<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
   put<TResponse>(path: string, body?: unknown, init?: RequestInit): Promise<TResponse>;
@@ -281,17 +207,13 @@ export class ApiClientError extends Error {
   readonly status: number;
   readonly code?: string;
   readonly requestId: string;
-  readonly retryable: boolean;
-  readonly violations: JsonObject[];
 
-  constructor(message: string, status: number, requestId: string, code?: string, retryable = false, violations: JsonObject[] = []) {
+  constructor(message: string, status: number, requestId: string, code?: string) {
     super(message);
     this.name = 'ApiClientError';
     this.status = status;
     this.requestId = requestId;
     this.code = code;
-    this.retryable = retryable;
-    this.violations = violations;
   }
 }
 
@@ -325,9 +247,6 @@ export function createAssistantClientRequestId() {
   });
 }
 
-/** UUID that must be retained by callers across retries of one mutation. */
-export const createIdempotencyKey = createAssistantClientRequestId;
-
 async function readResponseBody(response: Response) {
   if (response.status === 204) {
     return undefined;
@@ -344,15 +263,16 @@ async function readResponseBody(response: Response) {
 
 function getErrorDetails(body: unknown) {
   if (!body || typeof body !== 'object') {
-    return { message: 'The API request failed', code: undefined, retryable: false, violations: [] as JsonObject[] };
+    return { message: 'The API request failed', code: undefined };
   }
 
   const payload = body as JsonObject;
   return {
-    message: typeof payload.message === 'string' ? payload.message : typeof payload.title === 'string' ? payload.title : 'The API request failed',
+    message:
+      typeof payload.message === 'string'
+        ? payload.message
+        : 'The API request failed',
     code: typeof payload.code === 'string' ? payload.code : undefined,
-    retryable: payload.retryable === true,
-    violations: Array.isArray(payload.violations) ? payload.violations.filter((item): item is JsonObject => Boolean(item && typeof item === 'object')) : [],
   };
 }
 
@@ -362,30 +282,8 @@ function shouldRefreshAfterUnauthorized(path: string, status: number) {
     status === 401 &&
     !normalizedPath.startsWith('/auth/login') &&
     !normalizedPath.startsWith('/auth/refresh') &&
-    !normalizedPath.startsWith('/auth/logout') &&
-    !normalizedPath.startsWith('/auth/register') &&
-    !normalizedPath.startsWith('/auth/email-verifications') &&
-    !normalizedPath.startsWith('/auth/password-reset') &&
-    !normalizedPath.startsWith('/auth/password-reset-requests') &&
-    !normalizedPath.startsWith('/auth/verify-email') &&
-    !normalizedPath.startsWith('/auth/resend-verification') &&
-    !normalizedPath.startsWith('/auth/forgot-password') &&
-    !normalizedPath.startsWith('/auth/reset-password')
+    !normalizedPath.startsWith('/auth/logout')
   );
-}
-
-function isPublicLifecyclePath(path: string) {
-  const normalizedPath = normalizePath(path);
-  return normalizedPath.startsWith('/auth/login')
-    || normalizedPath.startsWith('/auth/refresh')
-    || normalizedPath.startsWith('/auth/register')
-    || normalizedPath.startsWith('/auth/email-verifications')
-    || normalizedPath.startsWith('/auth/password-reset')
-    || normalizedPath.startsWith('/auth/password-reset-requests')
-    || normalizedPath.startsWith('/auth/verify-email')
-    || normalizedPath.startsWith('/auth/resend-verification')
-    || normalizedPath.startsWith('/auth/forgot-password')
-    || normalizedPath.startsWith('/auth/reset-password');
 }
 
 export function createApiClient(options: ApiClientOptions = {}): ApiClient {
@@ -394,135 +292,52 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   );
   const mode = options.mode ?? configuredApiMode;
   let accessToken: string | undefined;
-  let hasLocalAccessToken = false;
   let refreshToken: string | undefined;
-  let sessionGeneration = 0;
-  let refreshInFlight: Promise<boolean> | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
-
-  function currentAccessToken() {
-    return hasLocalAccessToken ? accessToken : getAccessToken();
-  }
-
-  function clearSessionIfCurrent(refreshAtStart: string, generationAtStart: number) {
-    if (refreshToken !== refreshAtStart || sessionGeneration !== generationAtStart) return;
-    accessToken = undefined;
-    hasLocalAccessToken = true;
-    refreshToken = undefined;
-    sessionGeneration += 1;
-  }
 
   async function refreshMobileSession(requestId: string) {
     if (!refreshToken) {
       return false;
     }
 
-    // All requests that observe the same expired access token share one
-    // refresh request. Java rotates the refresh token and invalidates the old
-    // row, so concurrent independent refreshes would otherwise revoke the
-    // winner's session for the losing waiter.
-    if (refreshInFlight) return refreshInFlight;
+    const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
+      method: 'POST',
+      headers: {
+        Accept: 'application/json',
+        'Content-Type': 'application/json',
+        'X-Request-Id': `${requestId}-refresh`,
+      },
+      body: JSON.stringify({ refreshToken }),
+    });
+    const body = await readResponseBody(response);
 
-    const refreshAtStart = refreshToken;
-    const generationAtStart = sessionGeneration;
-    const flight = (async () => {
-      const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
-        method: 'POST',
-        headers: {
-          Accept: 'application/json',
-          'Content-Type': 'application/json',
-          'X-Request-Id': `${requestId}-refresh`,
-        },
-        body: JSON.stringify({ refreshToken: refreshAtStart }),
-      });
-      const body = await readResponseBody(response);
-
-      if (!response.ok) {
-        clearSessionIfCurrent(refreshAtStart, generationAtStart);
-        const details = getErrorDetails(body);
-        throw new ApiClientError(
-          details.message,
-          response.status,
-          requestId,
-          details.code ?? (response.status === 401 ? 'SESSION_EXPIRED' : response.status === 403 ? 'FORBIDDEN' : undefined),
-          details.retryable,
-          details.violations,
-        );
-      }
-
-      const nextSession = body as LoginResponse;
-      if (!nextSession?.accessToken || !nextSession.refreshToken) {
-        clearSessionIfCurrent(refreshAtStart, generationAtStart);
-        throw new ApiClientError(
-          'The Java auth refresh response did not include rotated tokens',
-          401,
-          requestId,
-          'INVALID_REFRESH_RESPONSE',
-        );
-      }
-
-      // A logout or a newer login may have changed the session while the
-      // network request was in flight. Never let that stale response overwrite
-      // the newer generation.
-      if (refreshToken === refreshAtStart && sessionGeneration === generationAtStart) {
-        accessToken = nextSession.accessToken;
-        hasLocalAccessToken = true;
-        refreshToken = nextSession.refreshToken;
-        sessionGeneration += 1;
-      }
-      return Boolean(currentAccessToken());
-    })();
-
-    refreshInFlight = flight;
-    void flight.then(
-      () => { if (refreshInFlight === flight) refreshInFlight = undefined; },
-      () => { if (refreshInFlight === flight) refreshInFlight = undefined; },
-    );
-    return flight;
-  }
-
-  async function fetchWithAuthRetry(path: string, init: RequestInit, accept: string, requestId: string) {
-    const url = `${baseUrl}${normalizePath(path)}`;
-    const requestGeneration = sessionGeneration;
-    const attachAccessToken = !isPublicLifecyclePath(path);
-    const makeHeaders = () => {
-      const headers = new Headers(init.headers);
-      const token = attachAccessToken ? currentAccessToken() : undefined;
-      headers.set('Accept', accept);
-      headers.set('X-Request-Id', requestId);
-      if (init.body && !headers.has('Content-Type')) {
-        headers.set('Content-Type', 'application/json');
-      }
-      if (token) headers.set('Authorization', `Bearer ${token}`);
-      else headers.delete('Authorization');
-      return headers;
-    };
-
-    let response: Response;
-    try {
-      response = await fetch(url, { ...init, headers: makeHeaders() });
-    } catch (error) {
-      throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
+    if (!response.ok) {
+      accessToken = undefined;
+      refreshToken = undefined;
+      const details = getErrorDetails(body);
+      throw new ApiClientError(
+        details.message,
+        response.status,
+        requestId,
+        details.code,
+      );
     }
 
-    if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
-      // A late 401 can arrive after another request has already completed the
-      // refresh flight. Reuse that newer generation instead of rotating the
-      // refresh token a second time.
-      const refreshed = sessionGeneration !== requestGeneration
-        ? Boolean(currentAccessToken())
-        : await refreshMobileSession(requestId);
-      if (refreshed && currentAccessToken()) {
-        try {
-          // Build a fresh header object so a retry can never reuse the expired
-          // Authorization value captured by the first attempt.
-          response = await fetch(url, { ...init, headers: makeHeaders() });
-        } catch (error) {
-          throw new ApiClientError(error instanceof Error ? error.message : 'Network unavailable', 0, requestId, 'NETWORK_OFFLINE', true);
-        }
-      }
+    const nextSession = body as LoginResponse;
+    if (!nextSession?.accessToken || !nextSession.refreshToken) {
+      accessToken = undefined;
+      refreshToken = undefined;
+      throw new ApiClientError(
+        'The Java auth refresh response did not include rotated tokens',
+        401,
+        requestId,
+        'INVALID_REFRESH_RESPONSE',
+      );
     }
-    return response;
+
+    accessToken = nextSession.accessToken;
+    refreshToken = nextSession.refreshToken;
+    return true;
   }
 
   const client: ApiClient = {
@@ -531,15 +346,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     setAccessToken(token) {
       accessToken = token;
-      hasLocalAccessToken = true;
-      sessionGeneration += 1;
     },
 
     setSessionTokens(nextAccessToken, nextRefreshToken) {
       accessToken = nextAccessToken;
-      hasLocalAccessToken = true;
       refreshToken = nextRefreshToken;
-      sessionGeneration += 1;
     },
 
     getRefreshToken() {
@@ -548,9 +359,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
 
     clearAccessToken() {
       accessToken = undefined;
-      hasLocalAccessToken = true;
       refreshToken = undefined;
-      sessionGeneration += 1;
     },
 
     async requestWithMeta<TResponse>(path: string, init: RequestInit = {}) {
@@ -563,8 +372,35 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           'MOBILE_API_PREVIEW',
         );
       }
-      let response = await fetchWithAuthRetry(path, init, 'application/json', requestId);
+      const headers = new Headers(init.headers);
+      const token = getAccessToken();
+
+      headers.set('Accept', 'application/json');
+      headers.set('X-Request-Id', requestId);
+      if (init.body && !headers.has('Content-Type')) {
+        headers.set('Content-Type', 'application/json');
+      }
+      if (token) {
+        headers.set('Authorization', `Bearer ${token}`);
+      }
+
+      let response = await fetch(`${baseUrl}${normalizePath(path)}`, {
+        ...init,
+        headers,
+      });
       let body = await readResponseBody(response);
+
+      if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
+        const refreshed = await refreshMobileSession(requestId);
+        if (refreshed && accessToken) {
+          headers.set('Authorization', `Bearer ${accessToken}`);
+          response = await fetch(`${baseUrl}${normalizePath(path)}`, {
+            ...init,
+            headers,
+          });
+          body = await readResponseBody(response);
+        }
+      }
 
       if (!response.ok) {
         const details = getErrorDetails(body);
@@ -572,25 +408,11 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
           details.message,
           response.status,
           requestId,
-          details.code ?? (response.status === 401 ? 'SESSION_EXPIRED' : response.status === 403 ? 'FORBIDDEN' : undefined),
-          details.retryable,
-          details.violations,
+          details.code,
         );
       }
 
       return { data: body as TResponse, headers: response.headers, requestId };
-    },
-
-    async requestBytes(path: string, init: RequestInit = {}) {
-      const requestId = createRequestId();
-      if (mode !== 'live') throw new ApiClientError('Live mobile API mode is disabled for this preview build', 0, requestId, 'MOBILE_API_PREVIEW');
-      const response = await fetchWithAuthRetry(path, init, 'application/pdf,application/octet-stream', requestId);
-      if (!response.ok) {
-        const body = await readResponseBody(response);
-        const details = getErrorDetails(body);
-        throw new ApiClientError(details.message, response.status, requestId, details.code ?? (response.status === 401 ? 'SESSION_EXPIRED' : response.status === 403 ? 'FORBIDDEN' : undefined), details.retryable, details.violations);
-      }
-      return { data: new Uint8Array(await response.arrayBuffer()), headers: response.headers, requestId };
     },
 
     async request<TResponse>(path: string, init: RequestInit = {}) {
@@ -639,14 +461,9 @@ export const apiClient = createApiClient();
 export const apiRoutes = {
   auth: {
     login: '/auth/login',
-    register: '/auth/register',
     refresh: '/auth/refresh',
     logout: '/auth/logout',
     me: '/auth/me',
-    verifyEmail: '/auth/email-verifications/confirm',
-    resendVerification: '/auth/email-verifications/resend',
-    requestPasswordReset: '/auth/password-reset-requests',
-    resetPassword: '/auth/password-reset/confirm',
   },
   identity: '/me',
   health: '/health/liveness',
@@ -664,63 +481,7 @@ export const apiRoutes = {
   enrollments: '/enrollments/my',
   grades: '/enrollments/my/grades',
   attendanceSummary: '/attendance/my/summary',
-  registration: {
-    rounds: '/registration/rounds',
-    eligibility: '/me/registration/eligibility',
-    summary: '/me/registration/summary',
-    enrollments: '/me/enrollments',
-    validate: '/me/enrollments/validate',
-    slip: '/me/registration/slip',
-  },
 } as const;
-
-type RegistrationSnapshot = {
-  round?: RegistrationRound;
-  sections?: MobileSection[];
-  eligibility?: RegistrationEligibility;
-  summary?: RegistrationSummary;
-  enrollments?: MobileEnrollment[];
-};
-let registrationSnapshot: RegistrationSnapshot = {};
-export function getRegistrationSnapshot() { return registrationSnapshot; }
-
-/**
- * Normalize the canonical Java EnrollmentView into the mobile read model.
- * Registration SectionView intentionally omits semesterId because the round
- * endpoint supplies that context; callers pass the known round/semester as a
- * hint so mobile cards retain stable filtering metadata without inventing it.
- */
-export function normalizeRegistrationEnrollment(
-  enrollment: MobileEnrollment,
-  roundIdHint?: string,
-  semesterIdHint?: string,
-): MobileEnrollment {
-  const roundId = enrollment.roundId ?? roundIdHint;
-  const semesterId = enrollment.semesterId ?? semesterIdHint;
-  const section = enrollment.section
-    ? {
-      ...enrollment.section,
-      ...(semesterId ? { semesterId } : {}),
-    }
-    : undefined;
-  return {
-    ...enrollment,
-    ...(roundId ? { roundId } : {}),
-    ...(semesterId ? { semesterId } : {}),
-    ...(section ? { section } : {}),
-  };
-}
-
-function normalizeRegistrationMutation(
-  response: EnrollmentMutationResponse,
-  roundIdHint?: string,
-  semesterIdHint?: string,
-): EnrollmentMutationResponse {
-  return {
-    ...response,
-    enrollment: normalizeRegistrationEnrollment(response.enrollment, roundIdHint, semesterIdHint),
-  };
-}
 
 export const campusApi = {
   health: () => apiClient.get<JsonObject>(apiRoutes.health),
@@ -729,16 +490,6 @@ export const campusApi = {
   account: () => apiClient.get<AuthUser>(apiRoutes.auth.me),
   login: (email: string, password: string) =>
     apiClient.post<LoginResponse>(apiRoutes.auth.login, { email, password }),
-  register: (payload: { email: string; password: string; firstName: string; lastName: string }) =>
-    apiClient.post<RegistrationPendingResponse>(apiRoutes.auth.register, payload),
-  verifyEmail: (token: string) =>
-    apiClient.post<AuthActionResponse>(apiRoutes.auth.verifyEmail, { token }),
-  resendVerification: (email: string) =>
-    apiClient.post<AuthActionResponse>(apiRoutes.auth.resendVerification, { email }),
-  requestPasswordReset: (email: string) =>
-    apiClient.post<AuthActionResponse>(apiRoutes.auth.requestPasswordReset, { email }),
-  resetPassword: (token: string, password: string) =>
-    apiClient.post<AuthActionResponse>(apiRoutes.auth.resetPassword, { token, newPassword: password }),
   refresh: async () => {
     const response = await apiClient.post<LoginResponse>(
       apiRoutes.auth.refresh,
@@ -757,81 +508,10 @@ export const campusApi = {
     apiClient.get<MobileEnrollment[]>(
       apiRoutes.enrollments + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
-  enroll: async (sectionId: string, locale: AssistantLocale = 'vi', idempotencyKey = createIdempotencyKey()) => {
-    const response = await apiClient.post<EnrollmentMutationResponse>(
-      '/enrollments/enroll',
-      { sectionId, locale },
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    );
-    // The deprecated route now shares the canonical MutationResponse wrapper;
-    // keep this legacy helper flat for existing mobile callers.
-    return normalizeRegistrationEnrollment(
-      response.enrollment,
-      response.enrollment.roundId,
-      registrationSnapshot.round?.semesterId,
-    );
-  },
-  dropEnrollment: (enrollmentId: string, idempotencyKey = createIdempotencyKey()) =>
-    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}, { headers: { 'Idempotency-Key': idempotencyKey } }),
-  registrationRounds: async (semesterId?: string) => {
-    const query = semesterId ? `?semesterId=${encodeURIComponent(semesterId)}&limit=20` : '?limit=20';
-    const page = await apiClient.get<{ items: RegistrationRound[]; nextCursor?: string | null }>(`${apiRoutes.registration.rounds}${query}`);
-    const round = page.items?.[0];
-    if (round) registrationSnapshot = { ...registrationSnapshot, round };
-    return page;
-  },
-  registrationRound: async (roundId: string) => {
-    const round = await apiClient.get<RegistrationRound>(`${apiRoutes.registration.rounds}/${encodeURIComponent(roundId)}`);
-    registrationSnapshot = { ...registrationSnapshot, round };
-    return round;
-  },
-  registrationSections: async (roundId: string) => {
-    const sections = (await apiClient.get<MobileSection[]>(`${apiRoutes.registration.rounds}/${encodeURIComponent(roundId)}/sections`))
-      .map((section) => ({
-        ...section,
-        ...(registrationSnapshot.round?.semesterId ? { semesterId: registrationSnapshot.round.semesterId } : {}),
-      }));
-    registrationSnapshot = { ...registrationSnapshot, sections };
-    return sections;
-  },
-  registrationEligibility: async (roundId: string) => {
-    const eligibility = await apiClient.get<RegistrationEligibility>(`${apiRoutes.registration.eligibility}?roundId=${encodeURIComponent(roundId)}`);
-    registrationSnapshot = { ...registrationSnapshot, eligibility };
-    return eligibility;
-  },
-  registrationSummary: async (roundId: string) => {
-    const summary = await apiClient.get<RegistrationSummary>(`${apiRoutes.registration.summary}?roundId=${encodeURIComponent(roundId)}`);
-    registrationSnapshot = { ...registrationSnapshot, summary };
-    return summary;
-  },
-  registrationEnrollments: async (semesterId?: string, cursor?: string, limit = 50) => {
-    const query = new URLSearchParams({ limit: String(limit) });
-    if (semesterId) query.set('semesterId', semesterId);
-    if (cursor) query.set('cursor', cursor);
-    const response = await apiClient.requestWithMeta<{ items: MobileEnrollment[]; nextCursor?: string | null } | MobileEnrollment[]>(`${apiRoutes.registration.enrollments}?${query.toString()}`, { method: 'GET' });
-    const payload = (Array.isArray(response.data) ? response.data : response.data.items ?? [])
-      .map((enrollment) => normalizeRegistrationEnrollment(
-        enrollment,
-        enrollment.roundId,
-        semesterId ?? registrationSnapshot.round?.semesterId,
-      ));
-    registrationSnapshot = { ...registrationSnapshot, enrollments: payload };
-    return { items: payload, nextCursor: response.headers.get('X-Next-Cursor') || (Array.isArray(response.data) ? null : response.data.nextCursor) };
-  },
-  validateEnrollment: (sectionId: string, roundId: string) =>
-    apiClient.post<RegistrationValidationResponse>(apiRoutes.registration.validate, { sectionId, roundId }),
-  registrationEnroll: async (sectionId: string, roundId: string, idempotencyKey: string) => {
-    const response = await apiClient.post<EnrollmentMutationResponse>(
-      apiRoutes.registration.enrollments,
-      { sectionId, roundId },
-      { headers: { 'Idempotency-Key': idempotencyKey } },
-    );
-    return normalizeRegistrationMutation(response, roundId, registrationSnapshot.round?.semesterId);
-  },
-  registrationDrop: (enrollmentId: string, idempotencyKey: string) =>
-    apiClient.delete<DropMutationResponse>(`${apiRoutes.registration.enrollments}/${encodeURIComponent(enrollmentId)}`, { headers: { 'Idempotency-Key': idempotencyKey } }),
-  registrationSlip: (roundId: string) =>
-    apiClient.requestBytes(`${apiRoutes.registration.slip}?roundId=${encodeURIComponent(roundId)}`),
+  enroll: (sectionId: string, locale: AssistantLocale = 'vi') =>
+    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }),
+  dropEnrollment: (enrollmentId: string) =>
+    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}),
   grades: (semesterId?: string) =>
     apiClient.get<MobileGrade[]>(
       apiRoutes.grades + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),

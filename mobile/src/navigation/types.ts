@@ -17,5 +17,4 @@ export interface MobileScreenProps {
   navigation: MobileNavigation;
   role: UserRole;
   selectedThesisTopicId: string | null;
-  authToken?: string | null;
 }
