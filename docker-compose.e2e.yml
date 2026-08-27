@@ -1,72 +1,80 @@
-# Disposable authenticated browser stack.  The runner supplies a unique
-# Compose project and host ports; no fixed container names or developer volume
-# names are allowed here.
+name: campuscore-course-e2e
+
 services:
   postgres:
     image: postgres:15-alpine
     environment:
-      POSTGRES_USER: ${POSTGRES_USER:-campuscore_e2e}
-      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_e2e_password}
-      POSTGRES_DB: ${POSTGRES_DB:-campuscore_e2e}
+      POSTGRES_USER: ${POSTGRES_USER:-campuscore}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      POSTGRES_DB: ${POSTGRES_DB:-campuscore_restful_e2e}
     ports:
       - "127.0.0.1:${POSTGRES_HOST_PORT:-5433}:5432"
     volumes:
-      - e2e_postgres_data:/var/lib/postgresql/data
+      - campuscore_postgres_e2e_data:/var/lib/postgresql/data
     healthcheck:
-      test: ["CMD-SHELL", "pg_isready -U $${POSTGRES_USER} -d $${POSTGRES_DB}"]
-      interval: 3s
-      timeout: 3s
-      retries: 30
-    restart: "no"
-
-  mailpit:
-    image: axllent/mailpit:v1.21
-    ports:
-      - "127.0.0.1:${MAILPIT_E2E_SMTP_HOST_PORT:-1125}:1025"
-      - "127.0.0.1:${MAILPIT_E2E_UI_HOST_PORT:-8125}:8025"
-    restart: "no"
+      test:
+        [
+          "CMD-SHELL",
+          "pg_isready -U ${POSTGRES_USER:-campuscore} -d ${POSTGRES_DB:-campuscore_restful_e2e}",
+        ]
+      interval: 10s
+      timeout: 5s
+      retries: 10
+    restart: unless-stopped
 
   restful-api:
     build:
+      # The Dockerfile copies the reactor from repository-root paths; keeping
+      # the isolated Compose project separate does not require narrowing the
+      # build context and avoids silently omitting the parent pom.
       context: .
       dockerfile: java-services/restful-api/Dockerfile
+    image: ${E2E_CORE_API_IMAGE:-campuscore-restful-api:e2e-local}
     environment:
-      SPRING_PROFILES_ACTIVE: persistence
-      SERVER_PORT: 4010
-      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_e2e}
-      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore_e2e}
-      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_e2e_password}
-      JWT_SECRET: ${JWT_SECRET:-local-course-e2e-jwt-secret-2026-campuscore}
-      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-e2e-refresh-secret-2026-campuscore}
-      HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-e2e-health-key}
-      COOKIE_SECURE: "false"
-      FLYWAY_ENABLED: "true"
-      DEEPSEEK_ENABLED: "false"
-      DEEPSEEK_API_KEY: ""
-      ASSISTANT_RETENTION_ENABLED: "false"
-      MAIL_ENABLED: "true"
-      SPRING_MAIL_HOST: mailpit
-      SPRING_MAIL_PORT: "1025"
-      SPRING_MAIL_USERNAME: ""
-      SPRING_MAIL_PASSWORD: ""
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: "false"
-      SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: "false"
-      MAIL_FROM: ${MAIL_FROM:-no-reply@campuscore.local}
-      AUTH_FRONTEND_BASE_URL: ${AUTH_FRONTEND_BASE_URL:-http://localhost:3000}
+      SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-persistence}
+      SERVER_PORT: 4100
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful_e2e}?currentSchema=thesis
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-edge-e2e-readiness-key-12345}
+      INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-edge-e2e-internal-service-token-12345}
+      JWT_SECRET: ${JWT_SECRET:-edge-e2e-jwt-secret-0123456789abcdef}
+      JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-edge-e2e-refresh-secret-0123456789abcdef}
+      JWT_ACCESS_TOKEN_TTL_SECONDS: ${JWT_ACCESS_TOKEN_TTL_SECONDS:-900}
+      JWT_REFRESH_TOKEN_TTL_SECONDS: ${JWT_REFRESH_TOKEN_TTL_SECONDS:-604800}
+      SWAGGER_ENABLED: ${SWAGGER_ENABLED:-true}
+      THESIS_READ_ENABLED: ${THESIS_READ_ENABLED:-true}
+      AUTH_LOGIN_ENABLED: ${AUTH_LOGIN_ENABLED:-false}
+      NOTIFICATIONS_READ_ENABLED: ${NOTIFICATIONS_READ_ENABLED:-false}
+      ENGAGEMENT_READ_ENABLED: ${ENGAGEMENT_READ_ENABLED:-false}
+      ENGAGEMENT_WRITE_ENABLED: ${ENGAGEMENT_WRITE_ENABLED:-false}
+      ACADEMIC_READ_ENABLED: ${ACADEMIC_READ_ENABLED:-false}
+      ACADEMIC_CONTEXT_ENABLED: ${ACADEMIC_CONTEXT_ENABLED:-false}
+      ACADEMIC_ENROLLMENT_READ_ENABLED: ${ACADEMIC_ENROLLMENT_READ_ENABLED:-false}
+      ACADEMIC_SCHEDULE_READ_ENABLED: ${ACADEMIC_SCHEDULE_READ_ENABLED:-false}
+      ACADEMIC_WAITLIST_READ_ENABLED: ${ACADEMIC_WAITLIST_READ_ENABLED:-false}
+      ACADEMIC_ATTENDANCE_READ_ENABLED: ${ACADEMIC_ATTENDANCE_READ_ENABLED:-false}
+      ACADEMIC_SECTION_READ_ENABLED: ${ACADEMIC_SECTION_READ_ENABLED:-false}
+      PEOPLE_READ_ENABLED: ${PEOPLE_READ_ENABLED:-false}
+      FINANCE_READ_ENABLED: ${FINANCE_READ_ENABLED:-false}
+      ANALYTICS_READ_ENABLED: ${ANALYTICS_READ_ENABLED:-false}
+      THESIS_ASSISTANT_ENABLED: ${THESIS_ASSISTANT_ENABLED:-true}
     ports:
-      - "127.0.0.1:${E2E_API_HOST_PORT:-4100}:4010"
+      - "127.0.0.1:${E2E_API_HOST_PORT:-4100}:4100"
     depends_on:
       postgres:
         condition: service_healthy
-      mailpit:
-        condition: service_started
     healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4010/api/v1/health/readiness >/dev/null"]
-      interval: 5s
+      test:
+        [
+          "CMD-SHELL",
+          "wget --no-verbose --tries=1 -O- http://127.0.0.1:4100/api/v1/health/liveness >/dev/null",
+        ]
+      interval: 20s
       timeout: 5s
-      retries: 30
-      start_period: 20s
-    restart: "no"
+      retries: 10
+      start_period: 45s
+    restart: unless-stopped
 
 volumes:
-  e2e_postgres_data:
+  campuscore_postgres_e2e_data:

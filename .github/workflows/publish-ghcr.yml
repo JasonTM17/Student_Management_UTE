@@ -75,5 +75,8 @@ jobs:
           context: .
           file: ${{ matrix.dockerfile }}
           push: true
+          build-args: |
+            JAVA_API_ORIGIN=http://restful-api:4010
+            NEXT_PUBLIC_API_URL=/api/v1
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}

@@ -97,7 +97,18 @@ services:
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_AUTH:-false}
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_ENABLE:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@campuscore.local}
-      AUTH_FRONTEND_BASE_URL: ${AUTH_FRONTEND_BASE_URL:-http://localhost:3000}
+      AUTH_FRONTEND_BASE_URL: ${AUTH_FRONTEND_BASE_URL:-http://web:3000}
+      DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
+      DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
+      DEEPSEEK_BASE_URL: ${DEEPSEEK_BASE_URL:-https://api.deepseek.com}
+      DEEPSEEK_MODEL: ${DEEPSEEK_MODEL:-deepseek-v4-flash}
+      DEEPSEEK_TIMEOUT_MS: ${DEEPSEEK_TIMEOUT_MS:-8000}
+      DEEPSEEK_MAX_OUTPUT_TOKENS: ${DEEPSEEK_MAX_OUTPUT_TOKENS:-800}
+      ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
+      ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
+      ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
+      ASSISTANT_GLOBAL_DAILY_QUOTA: ${ASSISTANT_GLOBAL_DAILY_QUOTA:-200}
+      ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-90}
     ports:
       - "127.0.0.1:${RESTFUL_API_HOST_PORT:-4010}:4010"
     depends_on:
@@ -119,7 +130,11 @@ services:
     build:
       context: .
       dockerfile: frontend/Dockerfile
+      args:
+        JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-/api/v1}
     image: campuscore-frontend:local
+    container_name: campuscore-frontend
     environment:
       NODE_ENV: production
       PORT: 3000
@@ -131,12 +146,6 @@ services:
     depends_on:
       restful-api:
         condition: service_healthy
-    healthcheck:
-      test: ["CMD-SHELL", "wget --no-verbose --tries=1 -O- http://localhost:3000/ >/dev/null"]
-      interval: 10s
-      timeout: 5s
-      retries: 12
-      start_period: 15s
     restart: unless-stopped
 
 volumes:
