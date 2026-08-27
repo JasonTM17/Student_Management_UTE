@@ -12,10 +12,13 @@ import { Input } from '@/components/ui/input';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { toast } from 'sonner';
 
 export default function RegisterPage() {
-  const { isLoading: authLoading, hasAccess } = useRequireAuth(['STUDENT']);
+  const { user, isLoading: authLoading, hasAccess } = useRequireAuth(['STUDENT']);
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const { locale, messages, formatNumber } = useI18n();
   const [sections, setSections] = useState<Section[]>([]);
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
@@ -71,7 +74,7 @@ export default function RegisterPage() {
     setError('');
     try {
       const [sectionResponse, enrollmentData, semesterResponse] = await Promise.all([
-        sectionsApi.getAll({ limit: 150, semesterId: semesterId || undefined }),
+        sectionsApi.getAll({ limit: 100, semesterId: semesterId || undefined }),
         enrollmentsApi.getMyEnrollments(semesterId || undefined),
         semestersApi.getAll(),
       ]);
@@ -111,7 +114,12 @@ export default function RegisterPage() {
   );
 
   async function register(sectionId: string) {
-    if (!window.confirm(copy.confirmRegister)) return;
+    const shouldContinue = await confirm({
+      title: copy.title,
+      message: copy.confirmRegister,
+      confirmText: copy.register,
+    });
+    if (!shouldContinue) return;
     setPending(sectionId);
     try {
       await enrollmentsApi.enroll(sectionId, locale);
@@ -125,7 +133,13 @@ export default function RegisterPage() {
   }
 
   async function drop(enrollment: Enrollment) {
-    if (!window.confirm(copy.confirmDrop)) return;
+    const shouldContinue = await confirm({
+      title: copy.drop,
+      message: copy.confirmDrop,
+      confirmText: copy.drop,
+      variant: 'destructive',
+    });
+    if (!shouldContinue) return;
     setPending(enrollment.id);
     try {
       await enrollmentsApi.drop(enrollment.id);
@@ -138,11 +152,10 @@ export default function RegisterPage() {
     }
   }
 
-  if (authLoading || !hasAccess) return <LoadingState label={messages.dashboardShell.menu.courseRegistration} />;
-  if (loading && sections.length === 0) return <LoadingState label={copy.title} />;
-  if (error && sections.length === 0) {
-    return <ErrorState title={copy.loadFailed} description={error} onRetry={() => void load()} />;
-  }
+  if (authLoading) return <LoadingState label={messages.dashboardShell.menu.courseRegistration} />;
+  if (!hasAccess) return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+
+  const showCatalog = sections.length > 0 || (!loading && !error);
 
   return (
     <div className="space-y-6">
@@ -151,7 +164,12 @@ export default function RegisterPage() {
         title={copy.title}
         description={copy.description}
       />
-
+      {loading && sections.length === 0 ? <LoadingState label={copy.title} /> : null}
+      {error && sections.length === 0 && !loading ? (
+        <ErrorState title={copy.loadFailed} description={error} onRetry={() => void load()} />
+      ) : null}
+      {showCatalog ? (
+        <>
       <Card>
         <CardContent className="grid gap-4 p-4 md:grid-cols-[minmax(0,1fr)_16rem]">
           <label className="relative block">
@@ -203,7 +221,7 @@ export default function RegisterPage() {
                       <td className="px-4 py-4"><div className="font-semibold text-foreground">{section.course?.code}</div><div className="mt-1 text-muted-foreground">{name}</div></td>
                       <td className="px-4 py-4 text-muted-foreground">{section.sectionNumber}</td>
                       <td className="px-4 py-4 text-muted-foreground">{section.schedules?.map((schedule) => schedule.dayOfWeek + ' · ' + schedule.startTime + '-' + schedule.endTime).join(', ') || '—'}</td>
-                      <td className="px-4 py-4"><span className={seats > 0 ? 'font-semibold text-emerald-700 dark:text-emerald-300' : 'font-semibold text-muted-foreground'}>{seats > 0 ? formatNumber(seats) : copy.full}</span></td>
+                      <td className="px-4 py-4"><span className={seats > 0 ? 'font-semibold text-status-success' : 'font-semibold text-muted-foreground'}>{seats > 0 ? formatNumber(seats) : copy.full}</span></td>
                       <td className="px-4 py-4 text-right">
                         {enrollment && enrollment.status !== 'DROPPED' ? (
                           <Button type="button" size="sm" variant="outline" onClick={() => void drop(enrollment)} disabled={pending === enrollment.id}><CheckCircle2 className="mr-2 h-4 w-4" />{pending === enrollment.id ? '...' : copy.drop}</Button>
@@ -239,7 +257,7 @@ export default function RegisterPage() {
                     </div>
                     <div>
                       <dt className="font-semibold text-foreground">{copy.seats}</dt>
-                      <dd className={seats > 0 ? 'mt-1 font-semibold text-emerald-700 dark:text-emerald-300' : 'mt-1 font-semibold text-muted-foreground'}>
+                      <dd className={seats > 0 ? 'mt-1 font-semibold text-status-success' : 'mt-1 font-semibold text-muted-foreground'}>
                         {seats > 0 ? formatNumber(seats) : copy.full}
                       </dd>
                     </div>
@@ -262,6 +280,9 @@ export default function RegisterPage() {
           </>
         )}
       </Card>
+        </>
+      ) : null}
+      {confirmationDialog}
     </div>
   );
 }

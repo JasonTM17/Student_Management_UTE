@@ -5,9 +5,12 @@ const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
 
 async function login(page: Page, account: typeof student) {
   await page.goto('/login');
+  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await submit.click();
+  await expect(page).not.toHaveURL(/\/login(?:$|[/?#])/, { timeout: 20_000 });
 }
 
 function jsonResponse(body: unknown, status = 200) {
