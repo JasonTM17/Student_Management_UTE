@@ -24,8 +24,14 @@ test.describe('public and auth', () => {
     expect(box!.width).toBeGreaterThanOrEqual(40);
     expect(box!.height).toBeGreaterThanOrEqual(40);
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await expect(page.getByText(/openapi|flyway|postgresql|\/api\/v1/i)).toHaveCount(0);
     await expect(page.locator('main#main-content')).toBeVisible();
     await expect(page.locator('.sm\\:grid-cols-3')).toHaveCount(0);
+    await expect(page.getByRole('tab', { name: /lecturer|giảng viên/i })).toBeVisible();
+    await page.getByRole('tab', { name: /lecturer|giảng viên/i }).click();
+    await expect(page.getByText('SE204')).toBeVisible();
+    await page.getByRole('tab', { name: /admin|quản trị/i }).click();
+    await expect(page.getByText('USR')).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });

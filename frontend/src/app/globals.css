@@ -5,13 +5,14 @@
 @layer base {
   :root {
     --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
-    --background: 216 25% 97%;
+    /* Stitch #F9F9FF canvas and #003F87 primary. --portal-yellow stays HCMUTE chrome. */
+    --background: 240 100% 98.8%;
     --foreground: 217 34% 16%;
     --card: 0 0% 100%;
     --card-foreground: 220 24% 14%;
     --popover: 0 0% 100%;
     --popover-foreground: 220 24% 14%;
-    --primary: 213 74% 31%;
+    --primary: 212 100% 26.5%;
     --primary-foreground: 0 0% 100%;
     --secondary: 214 30% 94%;
     --secondary-foreground: 215 38% 20%;
@@ -32,6 +33,16 @@
     --accent-warm: 43 94% 48%;
     --accent-cool: 213 72% 38%;
     --success: 152 57% 38%;
+    --status-success: var(--success);
+    --status-success-foreground: var(--success);
+    --status-warning: var(--accent-warm);
+    --status-warning-foreground: 38 72% 28%;
+    --status-danger: var(--destructive);
+    --status-danger-foreground: var(--destructive);
+    --status-info: var(--primary);
+    --status-info-foreground: var(--primary);
+    --status-neutral: var(--muted-foreground);
+    --status-neutral-foreground: var(--muted-foreground);
     --portal-sidebar: oklch(0.31 0.095 252);
     --portal-sidebar-strong: oklch(0.235 0.075 252);
     --portal-sidebar-hover: oklch(0.37 0.09 252);
@@ -40,7 +51,7 @@
     --portal-yellow: oklch(0.83 0.17 89);
     --portal-yellow-ink: oklch(0.26 0.055 82);
     --portal-ribbon: oklch(0.995 0.002 248);
-    --portal-canvas: oklch(0.965 0.006 248);
+    --portal-canvas: oklch(0.984 0.009 264);
     --portal-surface: oklch(0.995 0.002 248);
     --portal-rule: oklch(0.855 0.012 248);
     --portal-scrim: oklch(0.16 0.035 252 / 0.58);
@@ -62,7 +73,7 @@
     --secondary: 220 11% 16%;
     --secondary-foreground: 210 18% 94%;
     --muted: 220 10% 14%;
-    --muted-foreground: 214 10% 74%;
+    --muted-foreground: 214 14% 84%;
     --accent: 220 11% 16%;
     --accent-foreground: 210 18% 94%;
     --destructive: 0 74% 63%;
@@ -77,6 +88,16 @@
     --accent-warm: 24 78% 64%;
     --accent-cool: 205 44% 72%;
     --success: 152 42% 48%;
+    --status-success: var(--success);
+    --status-success-foreground: 152 40% 72%;
+    --status-warning: var(--accent-warm);
+    --status-warning-foreground: 38 70% 78%;
+    --status-danger: var(--destructive);
+    --status-danger-foreground: 0 80% 78%;
+    --status-info: var(--primary);
+    --status-info-foreground: var(--primary);
+    --status-neutral: var(--muted-foreground);
+    --status-neutral-foreground: var(--muted-foreground);
     --portal-sidebar: oklch(0.25 0.085 252);
     --portal-sidebar-strong: oklch(0.19 0.065 252);
     --portal-sidebar-hover: oklch(0.33 0.09 252);
@@ -278,6 +299,48 @@
       hsl(var(--accent-warm) / 0.45) 48%,
       transparent 100%
     );
+  }
+
+  [data-sonner-toaster] {
+    --normal-bg: hsl(var(--card));
+    --normal-border: hsl(var(--border));
+    --normal-text: hsl(var(--card-foreground));
+    --success-bg: hsl(var(--status-success) / 0.12);
+    --success-border: hsl(var(--status-success) / 0.35);
+    --success-text: hsl(var(--status-success-foreground));
+    --error-bg: hsl(var(--status-danger) / 0.12);
+    --error-border: hsl(var(--status-danger) / 0.35);
+    --error-text: hsl(var(--status-danger-foreground));
+    --warning-bg: hsl(var(--status-warning) / 0.12);
+    --warning-border: hsl(var(--status-warning) / 0.35);
+    --warning-text: hsl(var(--status-warning-foreground));
+    --info-bg: hsl(var(--status-info) / 0.12);
+    --info-border: hsl(var(--status-info) / 0.35);
+    --info-text: hsl(var(--status-info-foreground));
+  }
+
+  [data-sonner-toast][data-type='success'] {
+    background: hsl(var(--status-success) / 0.12);
+    border-color: hsl(var(--status-success) / 0.35);
+    color: hsl(var(--status-success-foreground));
+  }
+
+  [data-sonner-toast][data-type='error'] {
+    background: hsl(var(--status-danger) / 0.12);
+    border-color: hsl(var(--status-danger) / 0.35);
+    color: hsl(var(--status-danger-foreground));
+  }
+
+  [data-sonner-toast][data-type='warning'] {
+    background: hsl(var(--status-warning) / 0.12);
+    border-color: hsl(var(--status-warning) / 0.35);
+    color: hsl(var(--status-warning-foreground));
+  }
+
+  [data-sonner-toast][data-type='info'] {
+    background: hsl(var(--status-info) / 0.12);
+    border-color: hsl(var(--status-info) / 0.35);
+    color: hsl(var(--status-info-foreground));
   }
 }
 

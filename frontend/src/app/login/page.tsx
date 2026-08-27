@@ -10,7 +10,6 @@ import { AuthShell } from '@/components/auth/AuthShell';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { SectionEyebrow } from '@/components/ui/page-header';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 
@@ -126,16 +125,13 @@ export default function LoginPage() {
       }))}
     >
       <div className="space-y-6">
-        <div className="space-y-3">
-          <SectionEyebrow>{messages.login.sectionEyebrow}</SectionEyebrow>
-          <div className="space-y-2">
-            <h2 className="text-2xl font-semibold leading-8 text-foreground">
-              {messages.login.heading}
-            </h2>
-            <p className="text-sm leading-6 text-muted-foreground">
-              {messages.login.subheading}
-            </p>
-          </div>
+        <div className="space-y-2">
+          <h2 className="text-2xl font-semibold leading-8 text-foreground">
+            {messages.login.heading}
+          </h2>
+          <p className="text-sm leading-6 text-muted-foreground">
+            {messages.login.subheading}
+          </p>
         </div>
 
         {notice ? (
@@ -194,7 +190,7 @@ export default function LoginPage() {
               >
                 {messages.login.passwordLabel}
               </label>
-              <span className="text-xs text-muted-foreground">Academic office support</span>
+              <span className="text-xs text-muted-foreground">{messages.login.officeSupport}</span>
             </div>
             <div className="relative">
               <Input
@@ -241,16 +237,16 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="border-l-2 border-primary bg-secondary/35 px-4 py-3">
+        <div className="border-l-4 border-[var(--portal-yellow)] bg-card px-4 py-3">
           <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-primary text-primary-foreground">
+            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
               <KeyRound className="h-4 w-4" />
             </div>
             <div>
               <div className="text-sm font-semibold text-foreground">
                 {messages.login.sessionBehaviorTitle}
               </div>
-              <p className="mt-1 text-sm leading-6 text-muted-foreground">
+              <p className="mt-1 text-sm leading-6 text-foreground/80">
                 {messages.login.sessionBehaviorDescription}
               </p>
             </div>

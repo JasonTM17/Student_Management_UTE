@@ -1,27 +1,17 @@
 'use client';
 
-import {
-  ArrowRight,
-  BarChart3,
-  BookOpen,
-  CalendarRange,
-  CheckCircle2,
-  GraduationCap,
-  ShieldCheck,
-  UsersRound,
-} from 'lucide-react';
+import { ArrowRight } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
 import { LanguageToggle } from '@/components/LanguageToggle';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { LinkButton } from '@/components/ui/link-button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { SectionEyebrow } from '@/components/ui/page-header';
+import { HomeIdentityBoard } from '@/components/home/HomeIdentityBoard';
 import { buildSiteUrl } from '@/lib/site';
 import { useI18n } from '@/i18n';
 import { buildCanonicalPath } from '@/i18n/paths';
-
-export const dynamic = 'force-dynamic';
 
 export default function HomePage() {
   const {
@@ -33,33 +23,16 @@ export default function HomePage() {
   } = useAuth();
   const { locale, messages } = useI18n();
   const currentYear = new Date().getFullYear();
-  const academicPillars = [
-    { icon: ShieldCheck, ...messages.home.pillars[0] },
-    { icon: BookOpen, ...messages.home.pillars[1] },
-    { icon: BarChart3, ...messages.home.pillars[2] },
-    { icon: UsersRound, ...messages.home.pillars[3] },
-    { icon: CalendarRange, ...messages.home.pillars[4] },
-    { icon: GraduationCap, ...messages.home.pillars[5] },
-  ];
   const workspaceHref = isAdmin || isSuperAdmin
     ? '/admin'
     : isLecturer
       ? '/dashboard/lecturer'
       : '/dashboard';
-  const secondaryWorkspace = isAdmin || isSuperAdmin
-    ? {
-        href: '/admin/thesis',
-        label: messages.common.actions.reviewAdmin,
-      }
-    : isLecturer
-      ? {
-          href: '/dashboard/lecturer/schedule',
-          label: messages.common.actions.openSchedule,
-        }
-      : {
-          href: '/dashboard/register',
-          label: messages.common.actions.browseSections,
-        };
+  const primaryHref = user ? workspaceHref : '/login';
+  const primaryLabel = user
+    ? messages.common.actions.openDashboard
+    : messages.common.actions.signIn;
+  const proofRows = messages.home.publicProof;
   const homepageStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -76,7 +49,7 @@ export default function HomePage() {
   };
 
   return (
-    <main className="min-h-screen bg-background">
+    <div className="min-h-dvh bg-background">
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -84,222 +57,215 @@ export default function HomePage() {
           __html: JSON.stringify(homepageStructuredData),
         }}
       />
-      <nav className="border-b border-border/70 bg-background/95 backdrop-blur">
-        <div className="mx-auto flex h-16 max-w-6xl items-center justify-between px-4 sm:px-6 lg:px-8">
+      <a href="#main-content" className="portal-skip-link">
+        {messages.home.skipToContent}
+      </a>
+
+      <header className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+        <nav className="mx-auto flex h-16 max-w-[1280px] items-center justify-between gap-2 px-4 sm:px-6 lg:px-12">
           <BrandMark
             href="/"
             subtitle={messages.home.navSubtitle}
             compact
             className="min-w-0"
-            subtitleClassName="hidden sm:block"
+            markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+            titleClassName="max-sm:sr-only text-[var(--portal-sidebar-text)]"
+            subtitleClassName="hidden sm:block text-[var(--portal-sidebar-muted)]"
           />
-          <div className="flex shrink-0 items-center gap-2">
-            <LanguageToggle />
-            <ThemeToggle />
-            {!isLoading &&
-              (user ? (
-                <LinkButton href={workspaceHref} className="hidden sm:inline-flex">
+          <div className="flex shrink-0 items-center gap-1 sm:gap-2">
+            <LanguageToggle inverse />
+            <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)]" />
+            {!isLoading ? (
+              user ? (
+                <LinkButton href={workspaceHref} variant="warm" className="inline-flex shrink-0 px-3 sm:px-4">
                   {messages.common.actions.openDashboard}
-                  <ArrowRight className="ml-2 h-4 w-4" />
                 </LinkButton>
               ) : (
-                <LinkButton href="/login" variant="outline" className="hidden sm:inline-flex">
+                <LinkButton
+                  href="/login"
+                  variant="warm"
+                  className="inline-flex shrink-0 px-3 sm:px-4"
+                >
                   {messages.common.actions.signIn}
                 </LinkButton>
-              ))}
+              )
+            ) : null}
           </div>
-        </div>
-      </nav>
+        </nav>
+      </header>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8 lg:py-20">
-        <div className="grid gap-12 lg:grid-cols-[1.1fr_0.9fr] lg:items-start">
-          <div className="space-y-8">
-            <div className="space-y-4">
-              <SectionEyebrow>{messages.home.eyebrow}</SectionEyebrow>
-              <h1 className="max-w-3xl text-4xl font-semibold tracking-tight text-foreground sm:text-5xl lg:text-6xl">
-                {messages.home.title}
-              </h1>
-              <p className="max-w-2xl text-base leading-7 text-muted-foreground sm:text-lg">
-                {messages.home.description}
-              </p>
-            </div>
-
-            <div className="flex flex-wrap items-center gap-3">
-              <LinkButton href={user ? workspaceHref : '/login'} size="lg">
-                {user
-                  ? messages.common.actions.continueToWorkspace
-                  : messages.common.actions.signInToWorkspace}
-                <ArrowRight className="ml-2 h-4 w-4" />
+      <main id="main-content" tabIndex={-1}>
+        <section className="mx-auto grid max-w-[1280px] items-stretch gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-12 lg:py-14">
+          <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-yellow)] pl-6">
+            <SectionEyebrow>{messages.home.eyebrow}</SectionEyebrow>
+            <h1 className="max-w-xl text-4xl font-bold leading-[2.75rem] text-foreground lg:text-[2.75rem] lg:leading-[3.1rem]">
+              {messages.home.title}
+            </h1>
+            <p className="max-w-xl text-base leading-7 text-foreground/80 lg:text-lg">
+              {messages.home.description}
+            </p>
+            <div>
+              <LinkButton
+                href={primaryHref}
+                size="lg"
+                className="group min-h-12 bg-[var(--portal-sidebar)] px-8 text-base text-[var(--portal-sidebar-text)] hover:bg-[var(--portal-sidebar-hover)]"
+              >
+                {primaryLabel}
+                <ArrowRight className="ml-2 h-4 w-4 transition-transform duration-150 motion-safe:group-hover:translate-x-0.5" />
               </LinkButton>
-              {user ? (
-                <LinkButton href={secondaryWorkspace.href} size="lg" variant="outline">
-                  {secondaryWorkspace.label}
-                </LinkButton>
-              ) : null}
-            </div>
-
-            <div className="grid gap-4 sm:grid-cols-3">
-              {messages.home.metricCards.map((item) => (
-                <Card key={item.title} variant="muted">
-                  <CardHeader className="pb-3">
-                    <CardTitle className="text-base">{item.title}</CardTitle>
-                  </CardHeader>
-                  <CardContent>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {item.description}
-                    </p>
-                  </CardContent>
-                </Card>
-              ))}
             </div>
           </div>
 
-          <Card variant="elevated" className="overflow-hidden">
-            <div className="orbital-divider h-px w-full" />
-            <CardHeader className="space-y-3">
-              <SectionEyebrow>{messages.home.snapshotEyebrow}</SectionEyebrow>
-              <CardTitle className="text-2xl">
-                {messages.home.snapshotTitle}
-              </CardTitle>
-            </CardHeader>
-            <CardContent className="space-y-6">
-              <div className="grid gap-3">
-                {messages.home.snapshotChecks.map((item) => (
-                  <div key={item} className="flex items-start gap-3">
-                    <CheckCircle2 className="mt-0.5 h-5 w-5 text-[hsl(var(--success))]" />
-                    <p className="text-sm leading-6 text-muted-foreground">{item}</p>
-                  </div>
+          <HomeIdentityBoard />
+        </section>
+
+        <section className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
+          <div className="grid gap-12 lg:grid-cols-[2fr_1fr_1fr] lg:gap-12">
+            <article className="min-w-0">
+              <h2 className="text-3xl font-semibold leading-9 text-foreground">
+                {messages.home.roleLanes.student.title}
+              </h2>
+              <ul className="mt-6 divide-y divide-border border-y border-border">
+                {messages.home.roleLanes.student.rows.map((row) => (
+                  <li key={row} className="py-3 text-base leading-6 text-muted-foreground">
+                    {row}
+                  </li>
                 ))}
-              </div>
-              <div className="rounded-lg border border-border/70 bg-secondary/45 p-4">
-                <div className="grid gap-4 sm:grid-cols-2">
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">
-                      {messages.home.snapshotPrimaryAccessTitle}
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {messages.home.snapshotPrimaryAccessDescription}
-                    </div>
-                  </div>
-                  <div>
-                    <div className="text-sm font-semibold text-foreground">
-                      {messages.home.snapshotReleaseTitle}
-                    </div>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                      {messages.home.snapshotReleaseDescription}
-                    </div>
-                  </div>
-                </div>
-              </div>
-            </CardContent>
-          </Card>
-        </div>
-      </section>
+              </ul>
+              <LocalizedLink
+                href={messages.home.roleLanes.student.href}
+                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {messages.home.roleLanes.student.action}
+              </LocalizedLink>
+            </article>
 
-      <section className="border-y border-border/70 bg-canvas-subtle">
-        <div className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-          <div className="mb-10 max-w-3xl space-y-3">
-            <SectionEyebrow>{messages.home.capabilitiesEyebrow}</SectionEyebrow>
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              {messages.home.capabilitiesTitle}
-            </h2>
-            <p className="text-base leading-7 text-muted-foreground">
-              {messages.home.capabilitiesDescription}
-            </p>
+            <article className="min-w-0 border-t border-border pt-8 lg:border-t-0 lg:pt-0">
+              <h2 className="text-xl font-semibold leading-7 text-foreground">
+                {messages.home.roleLanes.lecturer.title}
+              </h2>
+              <ul className="mt-6 space-y-3">
+                {messages.home.roleLanes.lecturer.rows.map((row) => (
+                  <li key={row} className="text-sm leading-6 text-muted-foreground">
+                    {row}
+                  </li>
+                ))}
+              </ul>
+            </article>
+
+            <article className="min-w-0 border-t border-border pt-8 lg:border-t-0 lg:pt-0">
+              <h2 className="text-xl font-semibold leading-7 text-foreground">
+                {messages.home.roleLanes.admin.title}
+              </h2>
+              <ul className="mt-6 space-y-3">
+                {messages.home.roleLanes.admin.rows.map((row) => (
+                  <li key={row} className="text-sm leading-6 text-muted-foreground">
+                    {row}
+                  </li>
+                ))}
+              </ul>
+            </article>
           </div>
+        </section>
 
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {academicPillars.map((pillar) => (
-              <Card key={pillar.title} variant="default" className="h-full">
-                <CardContent className="flex h-full flex-col gap-4 pt-6">
-                  <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
-                    <pillar.icon className="h-5 w-5" />
-                  </div>
-                  <div className="space-y-2">
-                    <h3 className="text-lg font-semibold text-foreground">
-                      {pillar.title}
-                    </h3>
-                    <p className="text-sm leading-6 text-muted-foreground">
-                      {pillar.description}
-                    </p>
-                  </div>
-                </CardContent>
-              </Card>
+        <section className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+          <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-12">
+            <SectionEyebrow className="text-[var(--portal-yellow)]">
+              {messages.home.processKicker}
+            </SectionEyebrow>
+            <ol className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-0">
+              {messages.home.processSteps.map((step, index) => (
+                <li
+                  key={step}
+                  className="flex items-center gap-4 border-l-4 border-[var(--portal-yellow)] pl-4 lg:flex-1 lg:border-l-0 lg:pl-0"
+                >
+                  <span
+                    className="hidden h-4 w-1 shrink-0 bg-[var(--portal-yellow)] lg:block"
+                    aria-hidden="true"
+                  />
+                  <span className="text-xl font-semibold leading-7">{step}</span>
+                  {index < messages.home.processSteps.length - 1 ? (
+                    <span
+                      className="mx-4 hidden h-px flex-1 bg-white/20 lg:block"
+                      aria-hidden="true"
+                    />
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          </div>
+        </section>
+
+        <section className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
+          <ul className="divide-y divide-border border-y border-border">
+            {proofRows.map((row) => (
+              <li key={row.title} className="grid gap-2 py-6 md:grid-cols-[1fr_2fr] md:gap-8">
+                <h2 className="text-base font-semibold leading-6 text-foreground">
+                  {row.title}
+                </h2>
+                <p className="text-sm leading-6 text-muted-foreground">{row.description}</p>
+              </li>
             ))}
-          </div>
-        </div>
-      </section>
+          </ul>
+        </section>
+      </main>
 
-      <section className="mx-auto max-w-6xl px-4 py-16 sm:px-6 lg:px-8">
-        <div className="space-y-10">
-          <div className="max-w-3xl space-y-3">
-            <SectionEyebrow>{messages.home.whyEyebrow}</SectionEyebrow>
-            <h2 className="text-3xl font-semibold tracking-tight text-foreground">
-              {messages.home.whyTitle}
-            </h2>
-            <p className="text-base leading-7 text-muted-foreground">
-              {messages.home.whyDescription}
-            </p>
-          </div>
-
-          <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
-            {messages.home.whyPoints.map((point) => (
-              <Card key={point.title} variant="default" className="h-full">
-                <CardContent className="space-y-3 pt-6">
-                  <h3 className="text-lg font-semibold text-foreground">
-                    {point.title}
-                  </h3>
-                  <p className="text-sm leading-6 text-muted-foreground">
-                    {point.description}
-                  </p>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-        </div>
-      </section>
-
-      <footer className="bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
-        <div className="mx-auto max-w-6xl px-4 py-12 sm:px-6 lg:px-8">
+      <footer className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
+        <div className="mx-auto max-w-[1280px] px-4 py-12 sm:px-6 lg:px-12">
           <div className="grid gap-8 md:grid-cols-[1.2fr_1fr_1fr]">
             <div className="space-y-3">
               <BrandMark
                 href="/"
                 compact
-                markClassName="bg-[hsl(var(--background))] text-[hsl(var(--foreground))] border-transparent"
-                titleClassName="text-[hsl(var(--background))]"
+                markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+                titleClassName="text-[var(--portal-sidebar-text)]"
+                subtitleClassName="text-[var(--portal-sidebar-muted)]"
                 subtitle={messages.home.footerSubtitle}
               />
-              <p className="max-w-sm text-sm leading-6 text-[hsl(var(--background))/0.72]">
+              <p className="max-w-sm text-sm leading-6 text-[var(--portal-sidebar-muted)]">
                 {messages.home.footerDescription}
               </p>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-[hsl(var(--background))/0.65]">
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
                 {messages.home.footerWorkspace}
-              </h3>
-              <div className="space-y-2 text-sm text-[hsl(var(--background))/0.8]">
-                {messages.home.footerLinks.workspace.map((item) => (
-                  <div key={item}>{item}</div>
+              </h2>
+              <ul>
+                {messages.home.footerNav.workspace.map((item) => (
+                  <li key={item.label}>
+                    <LocalizedLink
+                      href={item.href}
+                      className="inline-flex min-h-11 items-center text-sm text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:text-[var(--portal-sidebar-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+                    >
+                      {item.label}
+                    </LocalizedLink>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
-            <div className="space-y-3">
-              <h3 className="text-sm font-semibold uppercase tracking-[0.18em] text-[hsl(var(--background))/0.65]">
+            <div className="space-y-2">
+              <h2 className="text-sm font-semibold text-[var(--portal-sidebar-text)]">
                 {messages.home.footerDelivery}
-              </h3>
-              <div className="space-y-2 text-sm text-[hsl(var(--background))/0.8]">
-                {messages.home.footerLinks.delivery.map((item) => (
-                  <div key={item}>{item}</div>
+              </h2>
+              <ul>
+                {messages.home.footerNav.delivery.map((item) => (
+                  <li key={item.label}>
+                    <LocalizedLink
+                      href={item.href}
+                      className="inline-flex min-h-11 items-center text-sm text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:text-[var(--portal-sidebar-text)] hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
+                    >
+                      {item.label}
+                    </LocalizedLink>
+                  </li>
                 ))}
-              </div>
+              </ul>
             </div>
           </div>
-          <div className="mt-8 border-t border-white/10 pt-6 text-sm text-[hsl(var(--background))/0.7]">
+          <div className="mt-8 border-t border-white/10 pt-6 text-sm text-[var(--portal-sidebar-muted)]">
             &copy; {currentYear} CampusCore. {messages.home.footerCopyright}
           </div>
         </div>
       </footer>
-    </main>
+    </div>
   );
 }
