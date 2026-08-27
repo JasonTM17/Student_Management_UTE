@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
-import { Alert, Share, StyleSheet, View } from 'react-native';
+import { StyleSheet, View } from 'react-native';
 
 import {
   Avatar,
@@ -17,7 +17,7 @@ import {
   UiText,
 } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
-import { ApiClientError, apiClient, campusApi, createIdempotencyKey, getRegistrationSnapshot, type AuthUser, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type MobileSection, type RegistrationEligibility, type RegistrationRound, type RegistrationSummary } from '../../api/client';
+import { ApiClientError, apiClient, campusApi, type AuthUser, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type MobileSection } from '../../api/client';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const upcomingClasses = [
@@ -474,85 +474,72 @@ export function AttendanceScreen({ navigation }: MobileScreenProps) {
 }
 
 export function RegistrationScreen({ navigation }: MobileScreenProps) {
-  const isPreview = apiClient.mode === 'preview';
-  const [round, setRound] = useState<RegistrationRound | null>(null);
-  const [eligibility, setEligibility] = useState<RegistrationEligibility | null>(null);
-  const [summary, setSummary] = useState<RegistrationSummary | null>(null);
-  const [sections, setSections] = useState<MobileSection[]>([]);
-  const [enrollments, setEnrollments] = useState<MobileEnrollment[]>([]);
   const [pending, setPending] = useState<string | null>(null);
-  const [retryKeys, setRetryKeys] = useState<Record<string, string>>({});
   const [mutationError, setMutationError] = useState<string | null>(null);
-  const [error, setError] = useState<string | null>(null);
-  const [offline, setOffline] = useState(false);
-  const [isLoading, setIsLoading] = useState(!isPreview);
-  const [slipHash, setSlipHash] = useState<string | null>(null);
-  const [previewSelected, setPreviewSelected] = useState<string[]>([]);
-
-  const previewRound: RegistrationRound = {
-    id: 'preview-round', semesterId: 'preview-semester', status: 'OPEN',
-    registrationStart: '2026-08-01T00:00:00Z', registrationEnd: '2026-09-01T23:59:59Z',
-    addDropStart: '2026-08-01T00:00:00Z', addDropEnd: '2026-09-10T23:59:59Z',
-    serverNow: '2026-08-24T08:00:00Z', institutionTimeZone: 'Asia/Ho_Chi_Minh', maxCredits: 28,
-  };
-  const previewSections: MobileSection[] = [
-    { id: 'preview-cs401', sectionNumber: '01', semesterId: previewRound.semesterId, courseCode: 'CS401', courseName: 'Distributed Systems', credits: 3, capacity: 40, enrolledCount: 28, status: 'OPEN', schedules: [{ dayOfWeek: 2, startTime: '10:00', endTime: '11:30', building: 'A3', roomNumber: '201' }] },
-    { id: 'preview-ux305', sectionNumber: '01', semesterId: previewRound.semesterId, courseCode: 'UX305', courseName: 'Service Design', credits: 3, capacity: 35, enrolledCount: 30, status: 'OPEN', schedules: [{ dayOfWeek: 4, startTime: '13:30', endTime: '15:00', building: 'C2', roomNumber: '105' }] },
-    { id: 'preview-ma210', sectionNumber: '02', semesterId: previewRound.semesterId, courseCode: 'MA210', courseName: 'Applied Statistics', credits: 3, capacity: 45, enrolledCount: 37, status: 'OPEN', schedules: [{ dayOfWeek: 6, startTime: '08:00', endTime: '09:30', building: 'B1', roomNumber: '101' }] },
-  ];
-
-  const reload = async () => {
-    if (isPreview) {
-      setRound(previewRound); setSections(previewSections); setEligibility({ roundId: previewRound.id, eligibilityState: 'ELIGIBLE', priorityRank: 1, maxCredits: previewRound.maxCredits, selectedCredits: previewSelected.length * 3, serverNow: previewRound.serverNow }); setIsLoading(false); return;
-    }
-    setIsLoading(true); setError(null); setOffline(false);
-    try {
-      const rounds = await campusApi.registrationRounds();
-      const nextRound = rounds.items[0];
-      if (!nextRound) throw new ApiClientError('No registration round is currently available.', 409, 'mobile', 'REGISTRATION_ROUND_CLOSED');
-      const [nextSections, nextEligibility, nextSummary, nextEnrollments] = await Promise.all([
-        campusApi.registrationSections(nextRound.id), campusApi.registrationEligibility(nextRound.id), campusApi.registrationSummary(nextRound.id), campusApi.registrationEnrollments(nextRound.semesterId),
+  const {
+    data: registrationData,
+    error,
+    isLoading,
+    reload,
+    setData: setRegistrationData,
+  } = useLiveResource<{ sections: MobileSection[]; enrollments: MobileEnrollment[] }>(
+    { sections: [], enrollments: [] },
+    async () => {
+      const [sectionResponse, enrollmentResponse] = await Promise.all([
+        campusApi.sections(),
+        campusApi.enrollments(),
       ]);
-      setRound(nextRound); setSections(nextSections); setEligibility(nextEligibility); setSummary(nextSummary); setEnrollments(nextEnrollments.items);
-    } catch (nextError) {
-      const cached = getRegistrationSnapshot();
-      if (nextError instanceof ApiClientError && nextError.status === 0 && (cached.sections?.length || cached.round)) {
-        setRound(cached.round ?? null); setSections(cached.sections ?? []); setEligibility(cached.eligibility ?? null); setSummary(cached.summary ?? null); setEnrollments(cached.enrollments ?? []); setOffline(true);
-      } else setError(nextError instanceof ApiClientError ? nextError.message : 'Registration data is unavailable.');
-    } finally { setIsLoading(false); }
-  };
-  useEffect(() => { void reload(); }, [isPreview]);
-
+      return { sections: sectionResponse.data, enrollments: enrollmentResponse };
+    },
+    'Registration data is unavailable.',
+  );
+  const liveSections = registrationData.sections;
+  const enrollments = registrationData.enrollments;
   const activeEnrollmentCount = enrollments.filter((item) => item.status !== 'DROPPED').length;
-  const selectedCredits = summary?.selectedCredits ?? (isPreview ? previewSelected.length * 3 : enrollments.reduce((total, item) => total + (item.section?.credits ?? item.section?.course?.credits ?? 0), 0));
+
+  const availableSections = apiClient.mode === 'preview'
+    ? [
+        { id: 'preview-cs401', code: 'CS401', name: 'Distributed Systems', slot: 'Tue · 10:00 · A3.201', seats: '12 seats left' },
+        { id: 'preview-ux305', code: 'UX305', name: 'Service Design', slot: 'Thu · 13:30 · C2.105', seats: '5 seats left' },
+        { id: 'preview-ma210', code: 'MA210', name: 'Applied Statistics', slot: 'Fri · 08:00 · B1.101', seats: '8 seats left',
+        },
+      ]
+    : liveSections.map((section) => ({
+        id: section.id,
+        code: section.course?.code ?? section.sectionNumber,
+        name: section.course?.nameVi ?? section.course?.name ?? 'Course',
+        slot: section.schedules?.[0]
+          ? `${section.schedules[0].startTime} · ${section.schedules[0].classroom?.building ?? ''} ${section.schedules[0].classroom?.roomNumber ?? ''}`
+          : 'Schedule pending',
+        seats: Math.max(0, section.capacity - section.enrolledCount) > 0
+          ? `${Math.max(0, section.capacity - section.enrolledCount)} seats left`
+          : 'Full',
+      }));
+
   const toggleEnrollment = async (sectionId: string) => {
-    if (isPreview) { setPreviewSelected((current) => current.includes(sectionId) ? current.filter((id) => id !== sectionId) : [...current, sectionId]); return; }
-    if (!round || offline) return;
-    const existing = enrollments.find((item) => item.sectionId === sectionId && item.status !== 'DROPPED');
-    const mutationId = existing?.id ?? sectionId;
-    const key = retryKeys[mutationId] ?? createIdempotencyKey();
-    setPending(mutationId); setMutationError(null);
+    if (apiClient.mode === 'preview') return;
+    setPending(sectionId);
+    setMutationError(null);
     try {
+      const existing = enrollments.find((item) => item.sectionId === sectionId && item.status !== 'DROPPED');
       if (existing) {
-        Alert.alert('Drop section?', 'This removes the confirmed enrollment after the server accepts the request.', [{ text: 'Cancel', style: 'cancel' }, { text: 'Drop', style: 'destructive', onPress: () => void commitDrop(existing.id, key) }]);
-        setPending(null); return;
+        await campusApi.dropEnrollment(existing.id);
+        setRegistrationData((current) => ({
+          ...current,
+          enrollments: current.enrollments.filter((item) => item.id !== existing.id),
+        }));
+      } else {
+        const next = await campusApi.enroll(sectionId);
+        setRegistrationData((current) => ({
+          ...current,
+          enrollments: [...current.enrollments, next],
+        }));
       }
-      const response = await campusApi.registrationEnroll(sectionId, round.id, key);
-      setEnrollments((current) => current.some((item) => item.id === response.enrollment.id) ? current : [...current, response.enrollment]);
-      setRetryKeys((current) => { const next = { ...current }; delete next[mutationId]; return next; });
     } catch (nextError) {
-      if (nextError instanceof ApiClientError && (nextError.status === 0 || nextError.retryable)) setRetryKeys((current) => ({ ...current, [mutationId]: key }));
       setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Enrollment could not be updated.');
-    } finally { setPending(null); }
-  };
-  const commitDrop = async (enrollmentId: string, key: string) => {
-    try { await campusApi.registrationDrop(enrollmentId, key); setEnrollments((current) => current.filter((item) => item.id !== enrollmentId)); setRetryKeys((current) => { const next = { ...current }; delete next[enrollmentId]; return next; }); }
-    catch (nextError) { if (nextError instanceof ApiClientError && (nextError.status === 0 || nextError.retryable)) setRetryKeys((current) => ({ ...current, [enrollmentId]: key })); setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Enrollment could not be updated.'); }
-  };
-  const shareSlip = async () => {
-    if (isPreview || !round) return;
-    try { const slip = await campusApi.registrationSlip(round.id); const hash = slip.headers.get('X-Registration-Slip-Hash') ?? 'unavailable'; setSlipHash(hash); await Share.share({ message: `Registration slip checksum: ${hash}` }); }
-    catch (nextError) { setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Registration slip is unavailable.'); }
+    } finally {
+      setPending(null);
+    }
   };
 
   if (isLoading || error) {
@@ -577,62 +564,52 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
           <View style={styles.registrationHeroCopy}>
             <UiText variant="headlineSmall">Current selections</UiText>
             <UiText variant="bodySmall" tone="muted">
-              {isPreview
+              {apiClient.mode === 'preview'
                 ? 'Preview data stays on this device.'
-                : `${selectedCredits}/${round?.maxCredits ?? 28} credits · ${activeEnrollmentCount} active section${activeEnrollmentCount === 1 ? '' : 's'} selected.`}
+                : `${activeEnrollmentCount} active section${activeEnrollmentCount === 1 ? '' : 's'} selected.`}
             </UiText>
           </View>
           <Badge
-            label={isPreview ? 'Preview' : `${selectedCredits}/${round?.maxCredits ?? 28} credits`}
+            label={apiClient.mode === 'preview' ? 'Preview' : `${activeEnrollmentCount} selected`}
             tone={activeEnrollmentCount > 0 ? 'success' : 'primary'}
           />
         </View>
         <Button label="View selected courses" onPress={() => navigation.navigate('courses')} variant="secondary" />
-        {!isPreview ? <Button label="Share PDF registration slip" onPress={() => void shareSlip()} variant="secondary" style={styles.slipButton} /> : null}
-        {slipHash ? <UiText variant="meta" tone="muted" style={styles.slipHash}>SHA-256 {slipHash}</UiText> : null}
       </Card>
       <ScreenSpacer />
       <SectionHeading title="Recommended sections" />
-      {offline ? <StatePanel kind="error" title="Offline read-only mode" description="Showing the last cached registration snapshot. Mutations are disabled until you reconnect." actionLabel="Reconnect" onAction={() => void reload()} /> : null}
-      {eligibility && eligibility.eligibilityState !== 'ELIGIBLE' ? <StatePanel kind="error" title="Registration eligibility" description={eligibility.reasonCode ?? 'Your cohort is not eligible in this window.'} /> : null}
       {mutationError ? (
         <StatePanel kind="error" title="Could not update registration" description={mutationError} />
       ) : null}
-      {(isPreview ? previewSections : sections).map((section) => {
-        {/* Compatibility note for legacy screen contracts: label={section.seats}; section.slot. */}
-        const enrolled = isPreview ? previewSelected.includes(section.id) : enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
-        const code = section.courseCode ?? section.course?.code ?? section.sectionNumber;
-        const name = section.courseName ?? section.course?.nameVi ?? section.course?.name ?? 'Course';
-        const slots = section.schedules?.map((slot) => `${slot.startTime}–${slot.endTime} · ${slot.building ?? slot.classroom?.building ?? ''} ${slot.roomNumber ?? slot.classroom?.roomNumber ?? ''}`.trim()).join(' | ') || 'Schedule pending';
-        const remaining = section.remainingSeats ?? Math.max(0, section.capacity - section.enrolledCount);
-        const mutationId = enrollments.find((item) => item.sectionId === section.id)?.id ?? section.id;
+      {availableSections.map((section) => {
+        const enrolled = enrollments.some((item) => item.sectionId === section.id && item.status !== 'DROPPED');
+        const isPreview = apiClient.mode === 'preview';
         return (
         <Card key={section.id} style={styles.registrationCard}>
-          <UiText variant="meta" tone="primary">{code} · {section.credits ?? section.course?.credits ?? 0} credits · Section {section.sectionNumber}</UiText>
+          <UiText variant="meta" tone="primary">{section.code}</UiText>
           <UiText variant="headlineSmall" style={styles.registrationCourseTitle}>
-            {name}
+            {section.name}
           </UiText>
           <View style={styles.registrationMeta}>
             <UiText variant="bodySmall" tone="muted" style={styles.registrationSlot}>
-              {slots}
+              {section.slot}
             </UiText>
             <Badge
-              label={remaining > 0 ? `${remaining} seats left` : 'Full'}
-              tone={remaining === 0 ? 'warning' : 'success'}
+              label={section.seats}
+              tone={section.seats === 'Full' ? 'warning' : 'success'}
             />
           </View>
-          {section.violations?.length ? <UiText variant="bodySmall" tone="error">{section.violations.join(' · ')}</UiText> : null}
           <Button
-            label={isPreview ? enrolled ? 'Selected locally' : 'Select locally' : enrolled ? retryKeys[mutationId] ? 'Retry drop' : 'Drop section' : retryKeys[mutationId] ? 'Retry enrollment' : 'Add section'}
-            disabled={(!isPreview && offline) || pending === mutationId || (!enrolled && remaining === 0)}
-            loading={pending === mutationId}
+            label={isPreview ? 'Preview only' : enrolled ? 'Drop section' : 'Add section'}
+            disabled={isPreview || pending === section.id || section.seats === 'Full'}
+            loading={pending === section.id}
             onPress={() => void toggleEnrollment(section.id)}
             variant="secondary"
           />
         </Card>
         );
       })}
-      {(isPreview ? previewSections : sections).length === 0 ? <StatePanel kind="empty" title="No sections available" description="New sections will appear when the academic office publishes them." /> : null}
+      {availableSections.length === 0 ? <StatePanel kind="empty" title="No sections available" description="New sections will appear when the academic office publishes them." /> : null}
     </ScreenShell>
   );
 }
@@ -838,8 +815,6 @@ const styles = StyleSheet.create({
   registrationCourseTitle: { marginTop: tokens.spacing.xs },
   registrationMeta: { alignItems: 'flex-start', flexDirection: 'row', gap: tokens.spacing.sm, marginBottom: tokens.spacing.md, marginTop: tokens.spacing.sm },
   registrationSlot: { flex: 1 },
-  slipButton: { marginTop: tokens.spacing.sm },
-  slipHash: { marginTop: tokens.spacing.sm },
   notificationSummary: { padding: tokens.spacing.md },
   profileHero: { padding: tokens.spacing.lg },
   profileHeader: { alignItems: 'center', flexDirection: 'row' },

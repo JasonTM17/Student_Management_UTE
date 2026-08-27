@@ -56,9 +56,6 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
       navigation.completeSignIn(role);
     } catch (signInError) {
       apiClient.clearAccessToken();
-      if (signInError instanceof ApiClientError && signInError.code === 'EMAIL_VERIFICATION_REQUIRED') {
-        navigation.navigate('auth.verifyEmail');
-      }
       setError(
         signInError instanceof ApiClientError
           ? signInError.message
@@ -123,10 +120,6 @@ export function SignInScreen({ navigation }: MobileScreenProps) {
             </UiText>
           </View>
         ) : null}
-        <View style={styles.authLinks}>
-          <Button label="Create account" onPress={() => navigation.navigate('auth.register')} variant="text" />
-          <Button label="Forgot password" onPress={() => navigation.navigate('auth.forgotPassword')} variant="text" />
-        </View>
       </Card>
     </ScreenShell>
   );
@@ -141,5 +134,4 @@ const styles = StyleSheet.create({
   formIntro: { marginBottom: tokens.spacing.lg, marginTop: tokens.spacing.xs },
   submit: { marginTop: tokens.spacing.sm },
   errorPanel: { backgroundColor: '#FFF1F0', borderColor: '#F3C7C3', borderLeftColor: tokens.colors.error, borderLeftWidth: 3, borderRadius: tokens.radii.control, borderWidth: 1, marginTop: tokens.spacing.md, padding: tokens.spacing.sm },
-  authLinks: { alignItems: 'center', flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', marginTop: tokens.spacing.sm },
 });
