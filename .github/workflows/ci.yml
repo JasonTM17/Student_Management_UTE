@@ -112,6 +112,10 @@ jobs:
           token="$(LOGIN="$login" python3 -c 'import json, os; print(json.loads(os.environ["LOGIN"])["accessToken"])')"
           assistant="$(curl --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000001"}' http://127.0.0.1:4010/api/v1/thesis/assistant/chat)"
           ASSISTANT="$assistant" python3 -c 'import json, os; data=json.loads(os.environ["ASSISTANT"]); assert data["reasonCode"] == "PROVIDER_DISABLED" and data["degraded"] is True and len(data["citations"]) > 0'
+          rag_rejection="$(docker compose exec -T rag-service wget --server-response --tries=1 --header='Content-Type: application/json' --header='X-Rag-Service-Token: wrong-token' --header='X-Assistant-Owner: ci-rag-probe' --post-data='{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000003"}' -O /dev/null http://localhost:4011/internal/rag/thesis/assistant/chat 2>&1 || true)"
+          printf '%s\n' "$rag_rejection" | grep -Eq 'HTTP/[0-9.]+ 403'
+          rag_internal="$(docker compose exec -T rag-service wget --no-verbose --tries=1 --header='Content-Type: application/json' --header='X-Rag-Service-Token: local-rag-service-token-change-me' --header='X-Assistant-Owner: ci-rag-probe' --post-data='{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000003"}' -O- http://localhost:4011/internal/rag/thesis/assistant/chat)"
+          RAG_INTERNAL="$rag_internal" python3 -c 'import json, os; data=json.loads(os.environ["RAG_INTERNAL"]); assert data["reasonCode"] == "PROVIDER_DISABLED" and data["degraded"] is True and len(data["citations"]) > 0'
           docker compose stop postgres
           readiness_code="$(curl --max-time 8 --silent --output /dev/null --write-out '%{http_code}' -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness)"
           test "$readiness_code" = "503"

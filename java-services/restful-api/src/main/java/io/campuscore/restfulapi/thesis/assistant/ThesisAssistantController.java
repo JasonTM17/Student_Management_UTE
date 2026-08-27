@@ -10,6 +10,7 @@ import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -37,13 +38,27 @@ import org.slf4j.LoggerFactory;
 public class ThesisAssistantController {
     private static final Logger LOG = LoggerFactory.getLogger(ThesisAssistantController.class);
     private final ThesisAssistantService assistant;
+    private final RagAssistantGateway ragGateway;
 
-    public ThesisAssistantController(ThesisAssistantService assistant) { this.assistant = assistant; }
+    /** Compatibility constructor for focused controller tests. */
+    public ThesisAssistantController(ThesisAssistantService assistant) {
+        this(assistant, null);
+    }
+
+    @Autowired
+    public ThesisAssistantController(ThesisAssistantService assistant, RagAssistantGateway ragGateway) {
+        this.assistant = assistant;
+        this.ragGateway = ragGateway;
+    }
 
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
-        return assistant.answer(request.message(), request.locale(), request.conversationId(), subject(actor), request.clientRequestId());
+        String owner = subject(actor);
+        if (remoteRag()) {
+            return ragGateway.chat(request, owner);
+        }
+        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner, request.clientRequestId());
     }
 
     /** Deprecated compatibility alias; clients should use /chat. */
@@ -62,8 +77,12 @@ public class ThesisAssistantController {
         String owner = subject(actor);
         Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
-            assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                    request.clientRequestId(), sink);
+            if (remoteRag()) {
+                ragGateway.stream(request, owner, sink);
+            } else {
+                assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
+                        request.clientRequestId(), sink);
+            }
             emitter.complete();
         } catch (DomainException exception) {
             sendError(emitter, exception.code(), exception.status().is5xxServerError() || exception.status() == HttpStatus.TOO_MANY_REQUESTS);
@@ -79,7 +98,11 @@ public class ThesisAssistantController {
     @PostMapping("/requests/{clientRequestId}/cancel")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public CancelResponse cancel(@PathVariable UUID clientRequestId, @AuthenticationPrincipal Jwt actor) {
-        var result = assistant.cancel(clientRequestId, subject(actor));
+        String owner = subject(actor);
+        if (remoteRag()) {
+            return ragGateway.cancel(clientRequestId, owner);
+        }
+        var result = assistant.cancel(clientRequestId, owner);
         if (!result.cancelled() && "COMPLETED".equals(result.status())) {
             throw new DomainException(HttpStatus.CONFLICT, "TURN_COMPLETED", "Completed turns are replayable and cannot be cancelled");
         }
@@ -96,7 +119,11 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public FeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal Jwt actor) {
-        assistant.setFeedback(messageId, subject(actor), request.rating(), request.reason());
+        String owner = subject(actor);
+        if (remoteRag()) {
+            return ragGateway.feedback(messageId, request, owner);
+        }
+        assistant.setFeedback(messageId, owner, request.rating(), request.reason());
         return new FeedbackResponse(messageId, request.rating(), request.reason(), false);
     }
 
@@ -104,7 +131,12 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFeedback(@PathVariable UUID messageId, @AuthenticationPrincipal Jwt actor) {
-        assistant.deleteFeedback(messageId, subject(actor));
+        String owner = subject(actor);
+        if (remoteRag()) {
+            ragGateway.deleteFeedback(messageId, owner);
+            return;
+        }
+        assistant.deleteFeedback(messageId, owner);
     }
 
     @GetMapping("/conversations")
@@ -112,7 +144,14 @@ public class ThesisAssistantController {
     public List<ThesisAssistantRepository.Conversation> conversations(
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
-        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(subject(actor), limit, cursor);
+        String owner = subject(actor);
+        if (remoteRag()) {
+            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Conversation>> page =
+                    ragGateway.conversations(owner, limit, cursor);
+            if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
+            return page.data();
+        }
+        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner, limit, cursor);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -125,7 +164,11 @@ public class ThesisAssistantController {
         if (locale != null && !locale.isBlank() && !locale.equals("vi") && !locale.equals("en")) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
-        String id = assistant.createConversation(subject(actor), locale);
+        String owner = subject(actor);
+        if (remoteRag()) {
+            return ragGateway.createConversation(request, owner);
+        }
+        String id = assistant.createConversation(owner, locale);
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
@@ -134,7 +177,14 @@ public class ThesisAssistantController {
     public List<ThesisAssistantRepository.Message> messages(@PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
-        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, subject(actor), limit, cursor);
+        String owner = subject(actor);
+        if (remoteRag()) {
+            RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Message>> page =
+                    ragGateway.messages(id, owner, limit, cursor);
+            if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
+            return page.data();
+        }
+        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, owner, limit, cursor);
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -143,7 +193,16 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
-        assistant.deleteConversation(id, subject(actor));
+        String owner = subject(actor);
+        if (remoteRag()) {
+            ragGateway.deleteConversation(id, owner);
+            return;
+        }
+        assistant.deleteConversation(id, owner);
+    }
+
+    private boolean remoteRag() {
+        return ragGateway != null && ragGateway.enabled();
     }
 
     private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {

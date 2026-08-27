@@ -69,6 +69,12 @@ assistant:
   retention-days: ${ASSISTANT_RETENTION_DAYS:90}
   recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
   recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
+  rag:
+    base-url: ${ASSISTANT_RAG_BASE_URL:}
+    service-token: ${ASSISTANT_RAG_SERVICE_TOKEN:}
+    service-mode: ${ASSISTANT_RAG_SERVICE_MODE:false}
+    connect-timeout-ms: ${ASSISTANT_RAG_CONNECT_TIMEOUT_MS:1000}
+    read-timeout-ms: ${ASSISTANT_RAG_READ_TIMEOUT_MS:30000}
 
 ---
 spring:
