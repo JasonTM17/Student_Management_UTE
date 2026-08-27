@@ -30,6 +30,35 @@ test.describe('public and auth', () => {
     expect(overflow).toBeLessThanOrEqual(1);
   });
 
+  test('anonymous homepage does not probe auth/me or auth/refresh', async ({ page }) => {
+    const authCalls: string[] = [];
+    page.on('response', (response) => {
+      if (response.url().includes('/api/v1/auth/')) {
+        authCalls.push(`${response.request().method()} ${response.url()}`);
+      }
+    });
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    await page.waitForTimeout(1200);
+    expect(authCalls.some((call) => /\/auth\/me(?:\?|$)/.test(call))).toBe(false);
+    expect(authCalls.some((call) => /\/auth\/refresh(?:\?|$)/.test(call))).toBe(false);
+  });
+
+  test('theme toggle flips html.dark on the first click', async ({ page }) => {
+    await page.goto('/');
+    await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
+    const before = await page.evaluate(() => document.documentElement.classList.contains('dark'));
+    const toggle = page.getByRole('button', {
+      name: before
+        ? /switch to light theme|chuyển sang giao diện sáng/i
+        : /switch to dark theme|chuyển sang giao diện tối/i,
+    });
+    await toggle.click();
+    await expect
+      .poll(async () => page.evaluate(() => document.documentElement.classList.contains('dark')))
+      .toBe(!before);
+  });
+
   test('login labels stay visible and rejects empty submit', async ({ page }) => {
     await page.goto('/login');
     await expect(page.getByLabel(/email/i)).toBeVisible();

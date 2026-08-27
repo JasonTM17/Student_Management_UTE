@@ -12,7 +12,8 @@ import React, {
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/i18n';
 import { User } from '@/types/api';
-import { authApi } from '@/lib/api';
+import { authApi, refreshSessionSingleFlight } from '@/lib/api';
+import { hasCsrfSessionHint } from '@/lib/session-hint';
 
 interface AuthContextType {
   user: User | null;
@@ -37,11 +38,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoggingOut, setIsLoggingOut] = useState(false);
 
   const refreshUser = useCallback(async () => {
-    try {
-      const userData = await authApi.me();
-      setUser(userData);
-    } catch {
+    if (!hasCsrfSessionHint()) {
       setUser(null);
+      return;
+    }
+
+    try {
+      setUser(await authApi.me());
+    } catch {
+      try {
+        await refreshSessionSingleFlight();
+        setUser(await authApi.me());
+      } catch {
+        setUser(null);
+      }
     }
   }, []);
 
@@ -109,13 +119,32 @@ export function useAuth() {
   return context;
 }
 
+function userHasRequiredRole(
+  user: User | null,
+  requiredRoles: ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[],
+) {
+  if (!user) {
+    return false;
+  }
+
+  if (requiredRoles.length === 0) {
+    return true;
+  }
+
+  return requiredRoles.some((role) => {
+    if (role === 'ADMIN') {
+      return user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN');
+    }
+    return user.roles?.includes(role);
+  });
+}
+
 export function useRequireAuth(
   requiredRoles?: ('STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN')[],
 ) {
   const { user, isLoading, isLoggingOut } = useAuth();
   const router = useRouter();
   const { href } = useI18n();
-  const [hasAccess, setHasAccess] = useState(false);
   const rolesKey = requiredRoles?.join(',') ?? '';
   const requiredRolesList = useMemo(
     () =>
@@ -124,41 +153,31 @@ export function useRequireAuth(
         : [],
     [rolesKey],
   );
+  const resolving = isLoading || isLoggingOut;
+  const hasRole = userHasRequiredRole(user, requiredRolesList);
+  const hasAccess = !resolving && Boolean(user) && hasRole;
+  const isForbidden = !resolving && Boolean(user) && !hasRole;
 
   useEffect(() => {
-    if (isLoading || isLoggingOut) {
+    if (resolving) {
       return;
     }
-
-    setHasAccess(false);
 
     if (!user) {
       router.push(href('/login'));
       return;
     }
 
-    if (requiredRolesList.length > 0) {
-      const hasRole = requiredRolesList.some((role) => {
-        if (role === 'ADMIN') {
-          return user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN');
-        }
-        return user.roles?.includes(role);
-      });
-
-      if (!hasRole) {
-        if (user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN')) {
-          router.push(href('/admin'));
-        } else if (user.roles?.includes('LECTURER')) {
-          router.push(href('/dashboard/lecturer'));
-        } else {
-          router.push(href('/dashboard'));
-        }
-        return;
+    if (!hasRole) {
+      if (user.roles?.includes('ADMIN') || user.roles?.includes('SUPER_ADMIN')) {
+        router.push(href('/admin'));
+      } else if (user.roles?.includes('LECTURER')) {
+        router.push(href('/dashboard/lecturer'));
+      } else {
+        router.push(href('/dashboard'));
       }
     }
+  }, [hasRole, href, resolving, router, user]);
 
-    setHasAccess(true);
-  }, [href, user, isLoading, isLoggingOut, requiredRolesList, router]);
-
-  return { user, isLoading, hasAccess };
+  return { user, isLoading: resolving, hasAccess, isForbidden };
 }

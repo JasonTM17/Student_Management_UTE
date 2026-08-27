@@ -1,8 +1,14 @@
 'use client';
 
-import { createContext, useCallback, useContext, useEffect, useState } from 'react';
+import { createContext, useCallback, useContext, useEffect, useRef, useState } from 'react';
+import {
+  applyThemeClass,
+  nextTheme,
+  resolveStoredTheme,
+  type ThemeName,
+} from '@/lib/apply-theme';
 
-type Theme = 'light' | 'dark';
+type Theme = ThemeName;
 
 interface ThemeContextType {
   theme: Theme;
@@ -14,15 +20,14 @@ const ThemeContext = createContext<ThemeContextType | undefined>(undefined);
 export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const [theme, setTheme] = useState<Theme>('light');
   const [mounted, setMounted] = useState(false);
+  const userToggled = useRef(false);
 
   useEffect(() => {
-    const savedTheme = localStorage.getItem('theme') as Theme | null;
-    const initialTheme =
-      savedTheme === 'dark' || savedTheme === 'light' ? savedTheme : 'light';
-
-    setTheme(initialTheme);
-    document.documentElement.classList.toggle('dark', initialTheme === 'dark');
-    document.documentElement.dataset.theme = initialTheme;
+    const initialTheme = resolveStoredTheme(localStorage.getItem('theme'));
+    if (!userToggled.current) {
+      setTheme(initialTheme);
+      applyThemeClass(initialTheme, document.documentElement);
+    }
     setMounted(true);
   }, []);
 
@@ -32,12 +37,21 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
     }
 
     localStorage.setItem('theme', theme);
-    document.documentElement.classList.toggle('dark', theme === 'dark');
-    document.documentElement.dataset.theme = theme;
+    applyThemeClass(theme, document.documentElement);
   }, [mounted, theme]);
 
   const toggleTheme = useCallback(() => {
-    setTheme((currentTheme) => (currentTheme === 'light' ? 'dark' : 'light'));
+    setTheme((currentTheme) => {
+      const next = nextTheme(currentTheme);
+      userToggled.current = true;
+      applyThemeClass(next, document.documentElement);
+      try {
+        localStorage.setItem('theme', next);
+      } catch {
+        // Private mode can block storage; the class still flips this click.
+      }
+      return next;
+    });
   }, []);
 
   return (
