@@ -36,6 +36,49 @@ function extractComposeService(compose, name) {
   return lines.slice(start, end).join('\n');
 }
 
+test('anonymous browsers without cc_csrf do not look like a live session', () => {
+  const { hasCsrfSessionHint } = loadTypeScriptModule('src/lib/session-hint.ts');
+  assert.equal(hasCsrfSessionHint(''), false);
+  assert.equal(hasCsrfSessionHint('theme=dark'), false);
+  assert.equal(hasCsrfSessionHint('cc_csrf=token'), true);
+  assert.equal(hasCsrfSessionHint('foo=1; cc_csrf=token; bar=2'), true);
+});
+
+test('theme helpers apply html.dark immediately for a click that races hydration', () => {
+  const { applyThemeClass, nextTheme, resolveStoredTheme } = loadTypeScriptModule(
+    'src/lib/apply-theme.ts',
+  );
+  assert.equal(nextTheme('light'), 'dark');
+  assert.equal(resolveStoredTheme(null), 'light');
+  assert.equal(resolveStoredTheme('dark'), 'dark');
+
+  const classList = {
+    dark: false,
+    toggle(token, force) {
+      if (token === 'dark') {
+        this.dark = Boolean(force);
+      }
+    },
+  };
+  const root = { classList, dataset: {} };
+  applyThemeClass('dark', root);
+  assert.equal(classList.dark, true);
+  assert.equal(root.dataset.theme, 'dark');
+});
+
+test('theme provider click cannot be overwritten by the hydration read of localStorage', () => {
+  const provider = fs.readFileSync(path.join(root, 'src/components/ThemeProvider.tsx'), 'utf8');
+  const layout = fs.readFileSync(path.join(root, 'src/app/layout.tsx'), 'utf8');
+  const auth = fs.readFileSync(path.join(root, 'src/context/AuthContext.tsx'), 'utf8');
+  const api = fs.readFileSync(path.join(root, 'src/lib/api.ts'), 'utf8');
+
+  assert.match(provider, /userToggled/);
+  assert.match(provider, /applyThemeClass\(next/);
+  assert.match(layout, /localStorage\.getItem\('theme'\)/);
+  assert.match(auth, /hasCsrfSessionHint\(\)/);
+  assert.match(api, /skipAuthRefresh:\s*true/);
+});
+
 test('shipped resolver refuses the host Expo 4010 origin for the browser API', () => {
   const { resolvePublicApiBaseUrl } = loadTypeScriptModule('src/lib/public-api-url.ts');
 

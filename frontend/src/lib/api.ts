@@ -26,6 +26,7 @@ import {
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
+import { CSRF_COOKIE_NAME } from '@/lib/session-hint';
 
 export const API_BASE_URL = resolvePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
 type ApiObject = Record<string, unknown>;
@@ -69,7 +70,6 @@ type SectionDetail = Section & {
   >;
 };
 
-const CSRF_COOKIE_NAME = 'cc_csrf';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout)(?:\/|$)/;
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -268,6 +268,7 @@ export const authApi = {
   me: async (): Promise<User> => {
     const response = await api.get<User>('/auth/me', {
       skipAuthRedirect: true,
+      skipAuthRefresh: true,
     } as AuthRequestConfig);
     return response.data;
   },
