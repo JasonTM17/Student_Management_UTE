@@ -10,7 +10,11 @@ RUN npm ci
 FROM node:20-alpine AS build
 
 WORKDIR /app
+ARG JAVA_API_ORIGIN=http://restful-api:4010
+ARG NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_TELEMETRY_DISABLED=1
+ENV JAVA_API_ORIGIN=${JAVA_API_ORIGIN}
+ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ ./
@@ -25,6 +29,8 @@ WORKDIR /app
 ENV NODE_ENV=production
 ENV PORT=3000
 ENV HOSTNAME=0.0.0.0
+ENV JAVA_API_ORIGIN=http://restful-api:4010
+ENV NEXT_PUBLIC_API_URL=/api/v1
 ENV NEXT_TELEMETRY_DISABLED=1
 
 RUN apk upgrade --no-cache libcrypto3 libssl3
