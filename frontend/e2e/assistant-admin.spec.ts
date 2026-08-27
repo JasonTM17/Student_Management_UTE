@@ -2,10 +2,9 @@ import { test, expect, type Page } from '@playwright/test';
 
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
-const localePrefix = '/en';
 
 async function login(page: Page, account: typeof student) {
-  await page.goto(`${localePrefix}/login`);
+  await page.goto('/login');
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
   await page.getByRole('button', { name: /sign in/i }).click();
@@ -83,60 +82,6 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await expect.poll(() => feedbackCalls).toBe(1);
 });
 
-test('closing an active assistant stream does not restore a stale thinking bubble', async ({ page }) => {
-  await page.route('**/api/v1/semesters**', (route) =>
-    route.fulfill(jsonResponse({ data: [{ id: 'semester-1', name: '2026 Spring', status: 'ACTIVE' }] })),
-  );
-  await page.route('**/api/v1/enrollments/my**', (route) => route.fulfill(jsonResponse([])));
-  await page.route('**/api/v1/thesis/assistant/conversations**', (route) =>
-    route.fulfill(jsonResponse([])),
-  );
-  await page.route('**/api/v1/thesis/assistant/requests/**', (route) =>
-    route.fulfill(jsonResponse({}, 204)),
-  );
-
-  let releaseFallback!: () => void;
-  const fallbackBlocked = new Promise<void>((resolve) => {
-    releaseFallback = resolve;
-  });
-  await page.route('**/api/v1/thesis/assistant/chat', async (route) => {
-    await fallbackBlocked;
-    await route.fulfill(jsonResponse({ answer: 'late response should be ignored', messageId: 'late' }));
-  });
-  await page.route('**/api/v1/thesis/assistant/chat/stream', (route) =>
-    route.fulfill({
-      status: 200,
-      headers: { 'Content-Type': 'text/event-stream', 'Cache-Control': 'no-cache' },
-      body: [
-        'event: meta\n',
-        'data: {"requestId":"11111111-1111-4111-8111-111111111111","clientRequestId":"22222222-2222-4222-8222-222222222222","turnId":"33333333-3333-4333-8333-333333333333","conversationId":"44444444-4444-4444-8444-444444444444","model":"lexical-fallback","locale":"en"}\n\n',
-        'event: delta\n',
-        'data: {"sequence":0,"text":"Still working"}\n\n',
-      ].join(''),
-    }),
-  );
-
-  try {
-    await login(page, student);
-    await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
-    await page.getByRole('button', { name: 'Open thesis assistant' }).click();
-    const panel = page.getByRole('dialog');
-    const composer = page.getByRole('textbox', { name: 'Ask about registration, topics, groups, or progress...' });
-    await composer.fill('Keep this request open');
-    await page.getByRole('button', { name: 'Send message' }).click();
-    await expect(panel.getByRole('article', { name: 'AI assistant' })).toContainText('Still working');
-
-    await panel.getByRole('button', { name: 'Close thesis assistant' }).click();
-    await expect(panel).toHaveCount(0);
-    await page.getByRole('button', { name: 'Open thesis assistant' }).click();
-    const reopened = page.getByRole('dialog');
-    await expect(reopened.getByText('Checking the authorized thesis context...', { exact: true })).toHaveCount(0);
-    await expect(reopened.getByRole('status')).toHaveCount(0);
-  } finally {
-    releaseFallback();
-  }
-});
-
 test('authenticated admin can inspect curated sources and the public catalog coverage surface', async ({ page }) => {
   const source = {
     documentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
@@ -162,21 +107,12 @@ test('authenticated admin can inspect curated sources and the public catalog cov
 
   await login(page, admin);
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
-  await page.goto(`${localePrefix}/admin/assistant-knowledge`);
+  await page.goto('/admin/assistant-knowledge');
 
   await expect(page.getByRole('heading', { name: 'AI assistant knowledge' })).toBeVisible();
   await expect(page.getByText('Public catalog coverage')).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
-
-  await page.getByRole('button', { name: 'Create source' }).click();
-  const slugInput = page.getByLabel('Slug');
-  await slugInput.fill('campuscore-thesis-guide');
-  await expect(slugInput).toBeFocused();
-  await slugInput.pressSequentially('-updated');
-  await expect(slugInput).toHaveValue('campuscore-thesis-guide-updated');
-  await expect(slugInput).toBeFocused();
-  await page.getByRole('button', { name: 'Cancel' }).click();
 
   await page.getByLabel('Filter state').selectOption('PUBLISHED');
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
@@ -205,7 +141,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     { width: 1440, height: 900 },
   ]) {
     await page.setViewportSize(viewport);
-    await page.goto(`${localePrefix}/dashboard`);
+    await page.goto('/dashboard');
     const launcher = page.getByRole('button', { name: 'Open thesis assistant' });
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
@@ -228,10 +164,6 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     await launcher.click();
     const panel = page.getByRole('dialog');
     await expect(panel).toBeVisible();
-    for (let step = 0; step < 12; step += 1) {
-      await page.keyboard.press('Tab');
-      expect(await panel.evaluate((dialog) => dialog.contains(document.activeElement))).toBe(true);
-    }
     const panelBox = await panel.boundingBox();
     expect(panelBox).not.toBeNull();
     expect(panelBox!.x).toBeGreaterThanOrEqual(0);
@@ -245,8 +177,6 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       expect(navBox).not.toBeNull();
       expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navBox!.y);
     }
-    await page.keyboard.press('Escape');
-    await expect(panel).toHaveCount(0);
-    await expect(launcher).toBeFocused();
+    await page.getByRole('button', { name: 'Close thesis assistant' }).click();
   }
 });

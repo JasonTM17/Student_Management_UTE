@@ -28,14 +28,12 @@ export function Modal({
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
-  const onCloseRef = React.useRef(onClose);
-  onCloseRef.current = onClose;
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onCloseRef.current();
+        onClose();
         return;
       }
 
@@ -93,14 +91,14 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
-  }, [isOpen]);
+  }, [isOpen, onClose]);
 
   if (!isOpen) return null;
 
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
       <div
-        className="absolute inset-0 bg-[var(--portal-scrim)]"
+        className="absolute inset-0 bg-black/55"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -149,7 +147,6 @@ interface ConfirmModalProps {
   cancelText?: string;
   variant?: 'default' | 'destructive';
   isLoading?: boolean;
-  error?: string;
 }
 
 export function ConfirmModal({
@@ -162,18 +159,12 @@ export function ConfirmModal({
   cancelText,
   variant = 'default',
   isLoading = false,
-  error,
 }: ConfirmModalProps) {
   const { messages } = useI18n();
 
   return (
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-4">
-        {error ? (
-          <div role="alert" className="border border-destructive/35 bg-destructive/5 px-3 py-2 text-sm text-destructive">
-            {error}
-          </div>
-        ) : null}
         <p className="text-sm leading-6 text-muted-foreground">{message}</p>
         <div className="flex justify-end gap-2">
           <Button

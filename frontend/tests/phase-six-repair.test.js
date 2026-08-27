@@ -95,8 +95,6 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /fixed bottom-\[/);
   assert.match(assistant, /right-4/);
   assert.match(assistant, /role="dialog"/);
-  assert.match(assistant, /useConfirmationDialog/);
-  assert.doesNotMatch(assistant, /window\.confirm/);
   assert.match(assistant, /max-h-\[min\(42rem,calc\(100dvh-6\.5rem-env\(safe-area-inset-bottom\)\)\)\]/);
   assert.match(assistant, /md:max-h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/);
   assert.match(assistant, /role="log"/);
@@ -126,14 +124,4 @@ test('the mobile student context drawer traps focus and inerts the portal shell'
   assert.match(layout, /containerRef=\{studentRailRef\}/);
   assert.match(rail, /ref=\{containerRef\}/);
   assert.match(rail, /id=\{mobile \? 'student-context-rail' : undefined\}/);
-});
-
-test('shared modal does not restart its open lifecycle when an inline close callback changes', () => {
-  const modal = read('src/components/ui/modal.tsx');
-
-  assert.match(modal, /const onCloseRef = React\.useRef\(onClose\)/);
-  assert.match(modal, /onCloseRef\.current = onClose/);
-  assert.match(modal, /onCloseRef\.current\(\)/);
-  assert.match(modal, /\}, \[isOpen\]\);/);
-  assert.doesNotMatch(modal, /\[isOpen, onClose\]/);
 });

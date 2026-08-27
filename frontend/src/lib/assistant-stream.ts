@@ -13,19 +13,6 @@ function assertObject(value: unknown): Record<string, unknown> {
   return value as Record<string, unknown>;
 }
 
-function assertCitation(value: unknown): Record<string, unknown> {
-  const citation = assertObject(value);
-  for (const field of ['id', 'title', 'source', 'locale', 'excerpt']) {
-    if (typeof citation[field] !== 'string' || !citation[field].trim()) {
-      throw new Error(`assistant citation ${field} is required`);
-    }
-  }
-  if (!['vi', 'en', 'both'].includes(String(citation.locale))) {
-    throw new Error('assistant citation locale is not supported');
-  }
-  return citation;
-}
-
 /** Zod-equivalent runtime contract kept dependency-free for the browser and Node contract harness. */
 export const assistantStreamEventSchema = {
   parse(value: unknown): AssistantStreamEventInput {
@@ -44,7 +31,11 @@ export const assistantStreamEventSchema = {
       throw new Error('assistant text is required');
     if (type === 'error' && typeof event.code !== 'string')
       throw new Error('assistant error code is required');
-    if (type === 'citation') event.citation = assertCitation(event.citation);
+    if (
+      type === 'citation' &&
+      (!event.citation || typeof event.citation !== 'object')
+    )
+      throw new Error('assistant citation is required');
     return event as AssistantStreamEventInput;
   },
 };

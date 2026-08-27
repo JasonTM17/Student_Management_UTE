@@ -30,7 +30,6 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
 import { stripLocaleFromPathname } from '@/i18n/paths';
 import { cn } from '@/lib/utils';
-import { useDialogFocusTrap } from '@/components/ui/use-dialog-focus-trap';
 
 interface AdminFrameProps {
   title: string;
@@ -60,15 +59,6 @@ export function AdminFrame({
   const openSidebarButtonRef = React.useRef<HTMLButtonElement>(null);
   const mainRef = React.useRef<HTMLElement>(null);
   const previousPathnameRef = React.useRef(pathname);
-  const closeSidebar = React.useCallback(() => {
-    setSidebarOpen(false);
-  }, []);
-  const sidebarRef = useDialogFocusTrap<HTMLElement>({
-    open: sidebarOpen && !isDesktopSidebar,
-    onClose: closeSidebar,
-    initialFocusRef: sidebarCloseRef,
-    restoreFocusRef: openSidebarButtonRef,
-  });
 
   const resolvedEyebrow = eyebrow || messages.adminShell.eyebrow;
   const resolvedBackLabel = backLabel || messages.adminShell.backToDashboard;
@@ -99,7 +89,6 @@ export function AdminFrame({
         { href: '/admin/sections', icon: BookMarked, label: messages.admin.menuItems[4]?.[0] },
         { href: '/admin/enrollments', icon: FileText, label: messages.admin.menuItems[5]?.[0] },
         { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
-        { href: '/admin/registration-rounds', icon: CalendarRange, label: locale === 'vi' ? 'Đợt đăng ký' : 'Registration rounds' },
         { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
         { href: '/admin/departments', icon: Building2, label: messages.admin.menuItems[7]?.[0] },
         { href: '/admin/classrooms', icon: DoorOpen, label: messages.admin.menuItems[8]?.[0] },
@@ -133,6 +122,35 @@ export function AdminFrame({
     }
   }, [pathname]);
 
+  React.useEffect(() => {
+    if (!sidebarOpen || isDesktopSidebar) {
+      return;
+    }
+
+    const frame = window.requestAnimationFrame(() => sidebarCloseRef.current?.focus());
+    return () => window.cancelAnimationFrame(frame);
+  }, [isDesktopSidebar, sidebarOpen]);
+
+  React.useEffect(() => {
+    const previousOverflow = document.body.style.overflow;
+    if (sidebarOpen) {
+      document.body.style.overflow = 'hidden';
+    }
+
+    const handleEscape = (event: KeyboardEvent) => {
+      if (event.key === 'Escape' && sidebarOpen) {
+        setSidebarOpen(false);
+        window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
+      }
+    };
+
+    document.addEventListener('keydown', handleEscape);
+    return () => {
+      document.body.style.overflow = previousOverflow;
+      document.removeEventListener('keydown', handleEscape);
+    };
+  }, [sidebarOpen]);
+
   return (
     <div className="portal-shell">
       <a
@@ -148,16 +166,15 @@ export function AdminFrame({
           type="button"
           tabIndex={-1}
           className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden"
-          onClick={closeSidebar}
-          aria-label={messages.adminShell.closeOverlay}
-          onKeyDown={(event) => {
-            if (event.key === 'Escape') closeSidebar();
+          onClick={() => {
+            setSidebarOpen(false);
+            window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
           }}
+          aria-label={messages.adminShell.closeOverlay}
         />
       ) : null}
 
       <aside
-        ref={sidebarRef}
         id="admin-sidebar"
         aria-label={messages.adminShell.sidebarNavigation}
         role={!isDesktopSidebar ? 'dialog' : undefined}
@@ -184,7 +201,10 @@ export function AdminFrame({
             variant="ghost"
             size="icon"
             className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:hidden"
-            onClick={closeSidebar}
+            onClick={() => {
+              setSidebarOpen(false);
+              window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
+            }}
             aria-label={messages.adminShell.closeSidebar}
           >
             <X className="h-5 w-5" aria-hidden="true" />
@@ -266,7 +286,7 @@ export function AdminFrame({
       </aside>
 
       <div
-        className="min-h-[100dvh] lg:pl-[var(--portal-sidebar-width)]"
+        className="min-h-screen lg:pl-[var(--portal-sidebar-width)]"
         inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
       >
         <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--portal-surface)]/90">
