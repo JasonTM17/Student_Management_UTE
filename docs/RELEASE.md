@@ -30,7 +30,7 @@ Also verify the forward-only V12 assistant migration, conversation ownership,
 idempotency ledger, quota buckets, terminal CAS/cancel race and knowledge
 revision workflow. Provider tests must use a no-network fake by default; a live
 DeepSeek smoke is optional, chargeable and only allowed after a rotated runtime
-key is injected explicitly. Java 21 is the release runtime authority; a local
+key is injected explicitly. Java 25 is the release runtime authority; a local
 run on another JDK is recorded as NOT_RUN for that gate.
 
 The published GHCR images mirror the local stack and can be smoked without a
