@@ -198,6 +198,7 @@ export interface ApiClientOptions {
   baseUrl?: string;
   mode?: ApiMode;
   getAccessToken?: () => string | undefined;
+  onSessionExpired?: () => void;
 }
 
 export type ApiMode = 'preview' | 'live';
@@ -208,6 +209,7 @@ export interface ApiClient {
   setAccessToken(token: string | undefined): void;
   setSessionTokens(accessToken: string | undefined, refreshToken: string | undefined): void;
   getRefreshToken(): string | undefined;
+  setOnSessionExpired(handler: (() => void) | undefined): void;
   clearAccessToken(): void;
   request<TResponse>(path: string, init?: RequestInit): Promise<TResponse>;
   requestWithMeta<TResponse>(path: string, init?: RequestInit): Promise<{ data: TResponse; headers: Headers; requestId: string }>;
@@ -309,11 +311,20 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
   let accessToken: string | undefined;
   let refreshToken: string | undefined;
   const getAccessToken = options.getAccessToken ?? (() => accessToken);
+  let onSessionExpired = options.onSessionExpired;
+  // All transports share one refresh promise: the backend rotates refresh tokens
+  // on every refresh, so concurrent independent refreshes race and log the user
+  // out even though one rotation succeeded.
+  let sessionRefreshPromise: Promise<boolean> | null = null;
+  // Bumped whenever the app replaces or clears the session; an in-flight refresh
+  // must not apply rotated tokens over a newer sign-in or sign-out.
+  let sessionEpoch = 0;
 
   async function refreshMobileSession(requestId: string) {
     if (!refreshToken) {
       return false;
     }
+    const epoch = sessionEpoch;
 
     const response = await fetch(`${baseUrl}${apiRoutes.auth.refresh}`, {
       method: 'POST',
@@ -326,9 +337,14 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     });
     const body = await readResponseBody(response);
 
+    if (epoch !== sessionEpoch) {
+      return false;
+    }
+
     if (!response.ok) {
       accessToken = undefined;
       refreshToken = undefined;
+      onSessionExpired?.();
       const details = getErrorDetails(body);
       throw new ApiClientError(
         details.message,
@@ -342,6 +358,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     if (!nextSession?.accessToken || !nextSession.refreshToken) {
       accessToken = undefined;
       refreshToken = undefined;
+      onSessionExpired?.();
       throw new ApiClientError(
         'The Java auth refresh response did not include rotated tokens',
         401,
@@ -355,6 +372,15 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     return true;
   }
 
+  function refreshSessionOnce(requestId: string): Promise<boolean> {
+    if (!sessionRefreshPromise) {
+      sessionRefreshPromise = refreshMobileSession(requestId).finally(() => {
+        sessionRefreshPromise = null;
+      });
+    }
+    return sessionRefreshPromise;
+  }
+
   const client: ApiClient = {
     baseUrl,
     mode,
@@ -364,6 +390,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
     },
 
     setSessionTokens(nextAccessToken, nextRefreshToken) {
+      sessionEpoch += 1;
       accessToken = nextAccessToken;
       refreshToken = nextRefreshToken;
     },
@@ -372,7 +399,12 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       return refreshToken;
     },
 
+    setOnSessionExpired(handler) {
+      onSessionExpired = handler;
+    },
+
     clearAccessToken() {
+      sessionEpoch += 1;
       accessToken = undefined;
       refreshToken = undefined;
     },
@@ -406,7 +438,7 @@ export function createApiClient(options: ApiClientOptions = {}): ApiClient {
       let body = await readResponseBody(response);
 
       if (shouldRefreshAfterUnauthorized(path, response.status) && refreshToken) {
-        const refreshed = await refreshMobileSession(requestId);
+        const refreshed = await refreshSessionOnce(requestId);
         if (refreshed && accessToken) {
           headers.set('Authorization', `Bearer ${accessToken}`);
           response = await fetch(`${baseUrl}${normalizePath(path)}`, {

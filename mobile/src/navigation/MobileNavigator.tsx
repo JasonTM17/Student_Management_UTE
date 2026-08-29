@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { SafeAreaView, StatusBar, StyleSheet, View } from 'react-native';
 
 import { apiClient, campusApi } from '../api/client';
@@ -26,6 +26,19 @@ export function MobileNavigator() {
   const isPreviewSession = sessionKind === 'preview';
   const isAuthenticated = sessionKind === 'authenticated';
   const hasActiveSession = isPreviewSession || isAuthenticated;
+
+  // A failed refresh clears the client tokens; without this bridge every screen
+  // keeps showing retry states that can never succeed.
+  useEffect(() => {
+    apiClient.setOnSessionExpired(() => {
+      setSessionKind('signedOut');
+      setRole('student');
+      setSelectedThesisTopicId(null);
+      setRoute('auth.signIn');
+      setMenuOpen(false);
+    });
+    return () => apiClient.setOnSessionExpired(undefined);
+  }, []);
 
   const navigation: MobileNavigation = {
     navigate(nextRoute, options) {
