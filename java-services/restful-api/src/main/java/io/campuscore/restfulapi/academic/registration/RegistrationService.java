@@ -302,7 +302,7 @@ public class RegistrationService {
                 "UPDATE " + SECTION + " SET \"enrolledCount\" = CASE WHEN \"enrolledCount\" > 0 THEN \"enrolledCount\" - 1 ELSE 0 END,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
                 new MapSqlParameterSource("sectionId", enrollment.get("section_id")));
-        completeIdempotency(studentId, idempotencyKey, enrollmentId, hash);
+        completeIdempotency(studentId == null ? enrollmentId : studentId, idempotencyKey, enrollmentId, hash);
     }
 
     private void persistSlip(String studentId, EnrollmentResponse response) {
