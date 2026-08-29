@@ -66,5 +66,8 @@ test('register dashboard uses bilingual messages and local gold CTA', () => {
   assert.match(page, /!roundOpen/);
   assert.match(page, /copy\.roundUnavailable/);
   assert.match(api, /Idempotency-Key/);
+  assert.match(api, /Idempotency-Key': createRequestId\(\)/);
+  assert.match(api, /typeof globalThis\.crypto\?\.randomUUID === 'function'/);
+  assert.doesNotMatch(api, /'Idempotency-Key': crypto\.randomUUID\(\)/);
   assert.match(api, /\/me\/enrollments/);
 });
