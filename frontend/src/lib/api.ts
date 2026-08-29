@@ -29,6 +29,15 @@ import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
 import { CSRF_COOKIE_NAME } from '@/lib/session-hint';
 
 export const API_BASE_URL = resolvePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
+
+// crypto.randomUUID only exists in secure contexts (HTTPS/localhost); the Docker
+// web stack serves plain HTTP on LAN IPs, so fall back to a timestamp-based id.
+export function createRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 type ApiObject = Record<string, unknown>;
 type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRefresh?: boolean;
@@ -449,7 +458,7 @@ export const enrollmentsApi = {
     const response = await api.post<EnrollmentActionResult>(
       '/me/enrollments',
       { sectionId, locale },
-      { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      { headers: { 'Idempotency-Key': createRequestId() } },
     );
     return response.data;
   },
@@ -458,7 +467,7 @@ export const enrollmentsApi = {
     const response = await api.post<{ message: string }>(
       `/me/enrollments/${enrollmentId}/drop`,
       {},
-      { headers: { 'Idempotency-Key': crypto.randomUUID() } },
+      { headers: { 'Idempotency-Key': createRequestId() } },
     );
     return response.data;
   },
