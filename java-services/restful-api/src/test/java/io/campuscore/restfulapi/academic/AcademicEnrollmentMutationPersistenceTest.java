@@ -224,12 +224,54 @@ class AcademicEnrollmentMutationPersistenceTest {
                 .andExpect(jsonPath("$.code").value("CREDIT_CAP_EXCEEDED"));
     }
 
+    @Test
+    void adminDropCompletesIdempotencySoRetriesReplayInsteadOfConflicting() throws Exception {
+        MvcResult enrolled = mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "admin-drop-enroll-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("ENROLLED"))
+                .andReturn();
+        String enrollmentId = objectMapper.readTree(enrolled.getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(adminJwt())
+                        .header("Idempotency-Key", "admin-drop-1"))
+                .andExpect(status().isOk());
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT \"state\" FROM \"academic\".\"RegistrationIdempotency\" WHERE \"ownerId\" = ? AND \"idempotencyKey\" = ?",
+                        String.class,
+                        enrollmentId,
+                        "admin-drop-1"))
+                .isEqualTo("COMPLETED");
+
+        mvc.perform(post("/api/v1/enrollments/" + enrollmentId + "/drop")
+                        .with(adminJwt())
+                        .header("Idempotency-Key", "admin-drop-1"))
+                .andExpect(status().isOk());
+        assertThat(jdbc.queryForObject(
+                        "SELECT \"status\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                        String.class,
+                        enrollmentId))
+                .isEqualTo("DROPPED");
+    }
+
     private static RequestPostProcessor studentJwt(String subject, String studentId) {
         return jwt().jwt(token -> token
                         .subject(subject)
                         .claim("roles", List.of("STUDENT"))
                         .claim("studentId", studentId))
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private static RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("admin-user")
+                        .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 
     private void createTables() {
