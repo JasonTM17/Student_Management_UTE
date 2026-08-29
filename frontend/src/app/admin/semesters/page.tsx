@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -47,6 +48,21 @@ interface Semester {
 interface AcademicYearOption {
   id: string;
   year: number;
+}
+
+function semesterStatusTone(status: string): StatusTone {
+  switch (status) {
+    case 'ACTIVE':
+    case 'IN_PROGRESS':
+      return 'success';
+    case 'REGISTRATION_OPEN':
+    case 'ADD_DROP_OPEN':
+      return 'info';
+    case 'DRAFT':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
 }
 
 export default function AdminSemestersPage() {
@@ -81,7 +97,7 @@ export default function AdminSemestersPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -471,7 +487,7 @@ export default function AdminSemestersPage() {
                             {getSemesterTypeLabel(semester.type)} · {semester.academicYear?.year || copy.unassigned}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
                           {semester.status.replace(/_/g, ' ')}
                         </span>
                       </div>
@@ -517,7 +533,7 @@ export default function AdminSemestersPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[840px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.type}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.academicYear}</th>
@@ -560,7 +576,7 @@ export default function AdminSemestersPage() {
                           {formatDate(semester.endDate)}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
                             {semester.status.replace(/_/g, ' ')}
                           </span>
                         </td>

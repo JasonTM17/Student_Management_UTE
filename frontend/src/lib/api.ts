@@ -83,10 +83,17 @@ function redirectToLogin(reason: 'session-expired' | 'unauthorized') {
     return;
   }
 
-  const { locale } = stripLocaleFromPathname(window.location.pathname);
+  const { locale, pathname } = stripLocaleFromPathname(window.location.pathname);
   const loginPath = locale ? addLocalePrefix('/login', locale) : '/login';
   const loginUrl = new URL(loginPath, window.location.origin);
   loginUrl.searchParams.set('reason', reason);
+  if (pathname.startsWith('/admin')) {
+    loginUrl.searchParams.set('portal', 'admin');
+  } else if (pathname.startsWith('/dashboard/lecturer')) {
+    loginUrl.searchParams.set('portal', 'lecturer');
+  } else {
+    loginUrl.searchParams.set('portal', 'student');
+  }
   window.location.href = loginUrl.toString();
 }
 
@@ -377,22 +384,81 @@ export const sectionsApi = {
 };
 
 // Enrollments API
+export const registrationApi = {
+  rounds: async (semesterId?: string) => {
+    const response = await api.get<Array<{
+      id: string;
+      semesterId: string;
+      name: string;
+      kind: string;
+      status: string;
+      windowStart: string;
+      windowEnd: string;
+      creditLimit: number;
+    }>>('/registration/rounds', { params: { semesterId } });
+    return response.data;
+  },
+  eligibility: async (params?: { semesterId?: string; roundId?: string }) => {
+    const response = await api.get<{
+      roundId: string;
+      semesterId: string;
+      kind: string;
+      eligible: boolean;
+      creditLimit: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+      windowStart: string;
+      windowEnd: string;
+    }>('/me/registration/eligibility', { params });
+    return response.data;
+  },
+  sections: async (params?: { semesterId?: string; roundId?: string }) => {
+    const response = await api.get<Array<{
+      id: string;
+      sectionNumber: string;
+      courseId: string;
+      courseCode: string;
+      courseName: string;
+      credits: number;
+      capacity: number;
+      enrolledCount: number;
+      remainingSeats: number;
+      status: string;
+      scheduleConflict: boolean;
+      alreadyEnrolled: boolean;
+    }>>('/me/registration/sections', { params });
+    return response.data;
+  },
+  summary: async (semesterId?: string) => {
+    const response = await api.get<{
+      roundId: string;
+      creditLimit: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+      enrollmentIds: string[];
+    }>('/me/registration/summary', { params: { semesterId } });
+    return response.data;
+  },
+};
+
 export const enrollmentsApi = {
   enroll: async (
     sectionId: string,
     locale?: 'en' | 'vi',
   ): Promise<EnrollmentActionResult> => {
     const response = await api.post<EnrollmentActionResult>(
-      '/enrollments/enroll',
+      '/me/enrollments',
       { sectionId, locale },
+      { headers: { 'Idempotency-Key': crypto.randomUUID() } },
     );
     return response.data;
   },
 
   drop: async (enrollmentId: string): Promise<{ message: string }> => {
     const response = await api.post<{ message: string }>(
-      `/enrollments/${enrollmentId}/drop`,
+      `/me/enrollments/${enrollmentId}/drop`,
       {},
+      { headers: { 'Idempotency-Key': crypto.randomUUID() } },
     );
     return response.data;
   },

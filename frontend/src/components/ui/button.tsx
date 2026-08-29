@@ -19,6 +19,8 @@ const buttonVariants = cva(
         ghost: 'text-foreground hover:bg-secondary/75',
         link: 'text-primary underline-offset-4 hover:underline',
         warm: 'bg-[hsl(var(--accent-warm))] text-[var(--portal-yellow-ink)] hover:bg-[hsl(var(--accent-warm))/0.9]',
+        registration:
+          'bg-[var(--registration-gold)] text-[var(--registration-gold-ink)] hover:bg-[var(--registration-gold)]/90',
       },
       size: {
         default: 'h-11 px-4 py-2',

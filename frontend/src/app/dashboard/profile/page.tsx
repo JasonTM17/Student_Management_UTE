@@ -9,7 +9,19 @@ import { Input } from '@/components/ui/input';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
+
+function roleLabel(
+  role: string,
+  labels: { student: string; lecturer: string; admin: string },
+) {
+  const normalized = role.trim().toUpperCase();
+  if (normalized === 'STUDENT') return labels.student;
+  if (normalized === 'LECTURER') return labels.lecturer;
+  if (normalized === 'ADMIN' || normalized === 'SUPER_ADMIN') return labels.admin;
+  return labels.student;
+}
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
@@ -79,8 +91,11 @@ export default function ProfilePage() {
       toast.success(messages.profile.passwordUpdated);
       form.reset();
     } catch (error: any) {
-      const message =
-        error.response?.data?.message || messages.profile.passwordUpdateFailed;
+      const message = campusErrorMessage(
+        error,
+        messages.common.campusErrors,
+        messages.profile.passwordUpdateFailed,
+      );
       setPasswordError(message);
       toast.error(message);
     } finally {
@@ -118,7 +133,7 @@ export default function ProfilePage() {
                       key={role}
                       className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-foreground"
                     >
-                      {role}
+                      {roleLabel(role, messages.dashboardShell.roles)}
                     </span>
                   ))}
                 </div>

@@ -14,6 +14,7 @@ import { useI18n } from '@/i18n';
 import { User } from '@/types/api';
 import { authApi, refreshSessionSingleFlight } from '@/lib/api';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
+import { loginHref, portalFromPathname, portalFromUser } from '@/lib/login-portal';
 
 interface AuthContextType {
   user: User | null;
@@ -24,7 +25,13 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   login: (email: string, password: string) => Promise<User>;
-  logout: () => Promise<void>;
+  register: (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => Promise<User>;
+  logout: (options?: { redirect?: boolean }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
 
@@ -74,7 +81,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.user;
   }, []);
 
-  const logout = useCallback(async () => {
+  const register = useCallback(async (data: {
+    email: string;
+    password: string;
+    firstName: string;
+    lastName: string;
+  }) => {
+    const response = await authApi.register(data);
+    setIsLoggingOut(false);
+    setUser(response.user);
+    return response.user;
+  }, []);
+
+  const logout = useCallback(async (options?: { redirect?: boolean }) => {
     setIsLoggingOut(true);
     try {
       await authApi.logout();
@@ -82,9 +101,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       // Ignore logout API failures and still clear the client session.
     } finally {
       setUser(null);
-      router.replace(`${href('/login')}?reason=signed-out`);
+      if (options?.redirect === false) {
+        setIsLoggingOut(false);
+        return;
+      }
+
+      router.replace(loginHref(href, portalFromUser(user), 'signed-out'));
     }
-  }, [href, router]);
+  }, [href, router, user]);
 
   const isStudent = user?.roles?.includes('STUDENT') ?? false;
   const isLecturer = user?.roles?.includes('LECTURER') ?? false;
@@ -102,6 +126,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSuperAdmin,
         login,
+        register,
         logout,
         refreshUser,
       }}
@@ -164,7 +189,7 @@ export function useRequireAuth(
     }
 
     if (!user) {
-      router.push(href('/login'));
+      router.push(loginHref(href, portalFromPathname(typeof window === 'undefined' ? '' : window.location.pathname), 'session-expired'));
       return;
     }
 

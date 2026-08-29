@@ -52,7 +52,7 @@ test('admin thesis and home routing distinguish role state explicitly', () => {
   const thesis = read('src/app/admin/thesis/page.tsx');
   const home = read('src/app/page.tsx');
 
-  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login"/);
+  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login\?portal=admin"/);
   assert.match(thesis, /if \(!canAccess\) \{[\s\S]*?<ForbiddenState/);
   assert.ok(thesis.indexOf('if (!canAccess)') < thesis.indexOf('if (isLoading && rounds.length === 0)'));
   assert.match(home, /const workspaceHref = isAdmin \|\| isSuperAdmin/);

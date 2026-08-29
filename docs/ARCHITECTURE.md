@@ -6,7 +6,10 @@
 Next.js web ─────┐
                  ├── Java Spring Boot REST API ─── PostgreSQL
 Expo mobile ─────┘
+Local course compose also runs rag-service and Mailpit. They are not a second
+public API; Java remains the only /api/v1 owner.
 ```
+
 
 The Java application is the only public backend owner of `/api/v1`. Web uses
 cookie authentication with CSRF protection; mobile uses bearer access and

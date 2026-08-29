@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { statusToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -66,7 +67,7 @@ export default function AdminClassroomsPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -400,7 +401,7 @@ export default function AdminClassroomsPage() {
                         </p>
                         <h3 className="mt-1 font-semibold text-foreground">{room.roomNumber}</h3>
                       </div>
-                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
                         {room.isActive ? copy.active : copy.inactive}
                       </span>
                     </div>
@@ -445,7 +446,7 @@ export default function AdminClassroomsPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.building}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.room}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.capacity}</th>
@@ -470,7 +471,7 @@ export default function AdminClassroomsPage() {
                           {room.type}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
                             {room.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>

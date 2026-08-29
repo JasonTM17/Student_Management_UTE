@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Award, FileText, GraduationCap, TrendingUp } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
@@ -23,26 +25,22 @@ import { useI18n } from '@/i18n';
 
 function getGradeTone(letterGrade: string | null) {
   if (!letterGrade) {
-    return 'bg-secondary text-muted-foreground';
+    return metricToneClass('neutral');
   }
 
   if (letterGrade.startsWith('A')) {
-    return 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400';
+    return metricToneClass('success');
   }
 
   if (letterGrade.startsWith('B')) {
-    return 'bg-blue-500/12 text-blue-600 dark:text-blue-400';
+    return metricToneClass('info');
   }
 
-  if (letterGrade.startsWith('C')) {
-    return 'bg-amber-500/12 text-amber-600 dark:text-amber-400';
+  if (letterGrade.startsWith('C') || letterGrade.startsWith('D')) {
+    return metricToneClass('warning');
   }
 
-  if (letterGrade.startsWith('D')) {
-    return 'bg-orange-500/12 text-orange-600 dark:text-orange-400';
-  }
-
-  return 'bg-rose-500/12 text-rose-600 dark:text-rose-400';
+  return metricToneClass('danger');
 }
 
 const gradePoints: Record<string, number> = {
@@ -74,7 +72,7 @@ function getGradePoint(record: StudentGradeRecord) {
 }
 
 export default function TranscriptPage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber } = useI18n();
   const [transcriptData, setTranscriptData] = useState<{
     summary: {
@@ -214,8 +212,12 @@ export default function TranscriptPage() {
           },
         };
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -275,7 +277,7 @@ export default function TranscriptPage() {
                     {transcriptData.summary.cumulativeGpa.toFixed(2)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
                   <TrendingUp className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -288,7 +290,7 @@ export default function TranscriptPage() {
                     {formatNumber(transcriptData.summary.totalCreditsEarned)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
                   <Award className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -301,7 +303,7 @@ export default function TranscriptPage() {
                     {formatNumber(transcriptData.summary.totalCreditsAttempted)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
                   <GraduationCap className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -314,7 +316,7 @@ export default function TranscriptPage() {
                     {formatNumber(totalCourses)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-amber-500/12 text-amber-600 dark:text-amber-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('warning')}`}>
                   <FileText className="h-5 w-5" />
                 </div>
               </CardContent>

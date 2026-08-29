@@ -2,12 +2,14 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, BookMarked, BookOpen, Calendar, ClipboardList, FileText, GraduationCap, TrendingUp } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { metricToneClass } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import {
   WorkspaceActionTile,
@@ -38,17 +40,17 @@ const quickActions = [
   {
     href: '/dashboard/register',
     icon: ClipboardList,
-    tone: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+    tone: metricToneClass('info'),
   },
   {
     href: '/dashboard/schedule',
     icon: Calendar,
-    tone: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
+    tone: metricToneClass('success'),
   },
   {
     href: '/dashboard/grades',
     icon: TrendingUp,
-    tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-400',
+    tone: metricToneClass('neutral'),
   },
 ];
 
@@ -56,22 +58,22 @@ const portalLinks = [
   {
     href: '/dashboard/enrollments',
     icon: BookOpen,
-    tone: 'bg-cyan-500/12 text-cyan-600 dark:text-cyan-400',
+    tone: metricToneClass('info'),
   },
   {
     href: '/dashboard/transcript',
     icon: FileText,
-    tone: 'bg-indigo-500/12 text-indigo-600 dark:text-indigo-400',
+    tone: metricToneClass('neutral'),
   },
   {
     href: '/dashboard/announcements',
     icon: Bell,
-    tone: 'bg-pink-500/12 text-pink-600 dark:text-pink-400',
+    tone: metricToneClass('warning'),
   },
 ];
 
 export default function DashboardPage() {
-  const { user } = useAuth();
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatDate, formatNumber, messages } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -103,8 +105,10 @@ export default function DashboardPage() {
   }, [messages.studentDashboard.errors.loadFailed]);
 
   useEffect(() => {
-    void fetchData();
-  }, [fetchData]);
+    if (hasAccess) {
+      void fetchData();
+    }
+  }, [fetchData, hasAccess]);
 
   const currentSemesterName = useMemo(() => {
     return (
@@ -129,6 +133,14 @@ export default function DashboardPage() {
   );
   const highlightedCourses = confirmedCourses.slice(0, 3);
 
+  if (authLoading) {
+    return <LoadingState label={messages.studentDashboard.errors.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
+
   return (
     <div className="space-y-6">
       <PageHeader
@@ -136,13 +148,18 @@ export default function DashboardPage() {
         title={messages.studentDashboard.title.replace('{name}', user?.firstName ?? 'student')}
         description={messages.studentDashboard.description.replace('{semester}', currentSemesterName)}
         actions={
-          <div className="inline-flex rounded-md border border-border/70 bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
-            {formatDate(new Date(), {
-              weekday: 'long',
-              month: 'long',
-              day: 'numeric',
-              year: 'numeric',
-            })}
+          <div className="flex flex-wrap items-center gap-2">
+            <div className="inline-flex rounded-md border border-border/70 bg-card px-3 py-2 text-xs font-medium text-muted-foreground">
+              {formatDate(new Date(), {
+                weekday: 'long',
+                month: 'long',
+                day: 'numeric',
+                year: 'numeric',
+              })}
+            </div>
+            <LinkButton href="/dashboard/register" size="sm">
+              {messages.studentDashboard.quickActions[0][0]}
+            </LinkButton>
           </div>
         }
       />
@@ -163,21 +180,21 @@ export default function DashboardPage() {
               value={formatNumber(enrollments.length)}
               icon={<BookOpen className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[0]}
-              toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+              toneClassName={metricToneClass('info')}
             />
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.confirmedEnrollments}
               value={formatNumber(confirmedCourses.length)}
               icon={<GraduationCap className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[1]}
-              toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+              toneClassName={metricToneClass('success')}
             />
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.pendingDecisions}
               value={formatNumber(pendingCourses.length)}
               icon={<ClipboardList className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[2]}
-              toneClassName="bg-amber-500/12 text-amber-600 dark:text-amber-400"
+              toneClassName={metricToneClass('warning')}
             />
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.currentSemester}
@@ -185,7 +202,7 @@ export default function DashboardPage() {
               icon={<Calendar className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[3]}
               valueClassName="text-xl sm:text-2xl"
-              toneClassName="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+              toneClassName={metricToneClass('neutral')}
             />
           </div>
 

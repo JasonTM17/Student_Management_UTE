@@ -95,7 +95,7 @@ test('shipped resolver refuses the host Expo 4010 origin for the browser API', (
 
 test('course registration asks the Java sections API within the page-size maximum of 100', () => {
   const register = fs.readFileSync(path.join(root, 'src/app/dashboard/register/page.tsx'), 'utf8');
-  assert.match(register, /sectionsApi\.getAll\(\{ limit: 100/);
+  assert.match(register, /registrationApi\.sections\(/);
   assert.doesNotMatch(register, /limit:\s*150/);
   assert.match(register, /title=\{copy\.title\}/);
 });

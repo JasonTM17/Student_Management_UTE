@@ -4,8 +4,6 @@ import { useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   CalendarDays,
-  Check,
-  CircleDot,
   FileStack,
   UsersRound,
 } from 'lucide-react';
@@ -13,7 +11,8 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
-import { cn } from '@/lib/utils';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { metricToneClass, type StatusTone } from '@/components/ui/status';
 import { useI18n } from '@/i18n';
 import {
   thesisApi,
@@ -21,16 +20,6 @@ import {
   type ThesisRound,
   type ThesisTopic,
 } from '@/lib/thesis-api';
-
-function statusClass(status: string) {
-  if (['APPROVED', 'PROPOSALS_PUBLISHED'].includes(status)) {
-    return 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300';
-  }
-  if (['REJECTED', 'CANCELLED'].includes(status)) {
-    return 'bg-red-500/12 text-red-700 dark:text-red-300';
-  }
-  return 'bg-amber-500/12 text-amber-700 dark:text-amber-300';
-}
 
 export default function ThesisRoundDetailPage() {
   const { roundId } = useParams<{ roundId: string }>();
@@ -106,8 +95,8 @@ export default function ThesisRoundDetailPage() {
       />
 
       <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
-        <MetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warm" />
-        <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="cool" />
+        <MetricCard label={messages.thesis.roundStatus} value={statusLabel(round.status)} icon={<CalendarDays className="h-5 w-5" />} tone="warning" />
+        <MetricCard label={messages.thesis.topics} value={topics.length} icon={<FileStack className="h-5 w-5" />} tone="info" />
         <MetricCard label={messages.thesis.groups} value={groups.length} icon={<UsersRound className="h-5 w-5" />} tone="success" />
       </div>
 
@@ -126,9 +115,7 @@ export default function ThesisRoundDetailPage() {
                   <article key={topic.id} className="rounded-xl border border-border/70 bg-card p-4">
                     <div className="flex items-start justify-between gap-3">
                       <h3 className="text-sm font-semibold leading-6 text-foreground">{topic.title}</h3>
-                      <span className={cn('shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(topic.status))}>
-                        {statusLabel(topic.status)}
-                      </span>
+                      <StatusBadge status={topic.status} />
                     </div>
                     <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">{topic.description}</p>
                     <p className="mt-3 text-xs text-muted-foreground">
@@ -164,9 +151,7 @@ export default function ThesisRoundDetailPage() {
                         <p className="font-mono text-xs text-muted-foreground">{group.memberStudentIds.length} {messages.thesis.detail.members}</p>
                       </div>
                     </div>
-                    <span className={cn('rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(group.approvalStatus))}>
-                      {statusLabel(group.approvalStatus)}
-                    </span>
+                    <StatusBadge status={group.approvalStatus} variant="approval" />
                   </div>
                 ))}
               </div>
@@ -188,19 +173,12 @@ function MetricCard({
   label: string;
   value: string | number;
   icon: React.ReactNode;
-  tone: 'warm' | 'cool' | 'success' | 'violet';
+  tone: StatusTone;
 }) {
-  const toneClasses = {
-    warm: 'bg-amber-500/12 text-amber-700 dark:text-amber-300',
-    cool: 'bg-cyan-500/12 text-cyan-700 dark:text-cyan-300',
-    success: 'bg-emerald-500/12 text-emerald-700 dark:text-emerald-300',
-    violet: 'bg-violet-500/12 text-violet-700 dark:text-violet-300',
-  };
-
   return (
     <Card variant="elevated">
       <CardContent className="flex items-start justify-between gap-4 pt-6">
-        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', toneClasses[tone])}>{icon}</div>
+        <div className={`flex h-11 w-11 shrink-0 items-center justify-center rounded-lg ${metricToneClass(tone)}`}>{icon}</div>
         <div className="min-w-0 text-right">
           <div className="break-words text-2xl font-semibold tracking-tight text-foreground">{value}</div>
           <div className="mt-1 text-sm text-muted-foreground">{label}</div>

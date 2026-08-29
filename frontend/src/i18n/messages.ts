@@ -58,13 +58,26 @@ export const en = {
       perPage50: '50 per page',
       perPage100: '100 per page',
     },
+    campusErrors: {
+      network:
+        'CampusCore could not reach the workspace right now. Try again in a moment.',
+      validation: 'Please check the details and try again.',
+      conflict:
+        'That change could not be completed. Please check the current records and try again.',
+      unauthorized: 'Please sign in again to continue.',
+      forbidden: 'You do not have access to this action.',
+      notFound: 'That record is no longer available.',
+      server:
+        'Something went wrong on campus systems. Please try again in a moment.',
+      unknown: 'We could not complete that action. Please try again.',
+    },
   },
   meta: {
     defaults: {
       siteName: 'CampusCore',
       title: 'Campus academic workspace',
       description:
-        'CampusCore is a focused academic workspace powered by one Java RESTful API and PostgreSQL.',
+        'CampusCore is a focused academic workspace for registration, schedules, grades, announcements, and thesis work.',
       ogAlt: 'CampusCore workspace overview',
       twitterTitle: 'CampusCore',
       twitterDescription:
@@ -73,7 +86,7 @@ export const en = {
     home: {
       title: 'Campus academic workspace',
       description:
-        'CampusCore gives administrators, lecturers, and students one steady workspace backed by a single Java API contract.',
+        'CampusCore gives administrators, lecturers, and students one steady campus workspace.',
     },
     login: {
       title: 'Sign in',
@@ -104,7 +117,7 @@ export const en = {
       badges: [
         'Role-aware workspace',
         'Verified releases',
-        'Single Java API',
+        'One academic portal',
       ],
     },
   },
@@ -142,10 +155,10 @@ export const en = {
     ],
     snapshotPrimaryAccessTitle: 'Primary access',
     snapshotPrimaryAccessDescription:
-      'Students, lecturers, and admins all enter through one consistent sign-in experience.',
+      'Students, lecturers, and admins each enter through their own campus portal.',
     snapshotReleaseTitle: 'Course-demo scope',
     snapshotReleaseDescription:
-      'One Java API, one PostgreSQL database, and focused clients keep the demo easy to verify.',
+      'One campus portal and focused clients keep the course demo easy to follow.',
     capabilitiesEyebrow: 'What the portal is built to do',
     capabilitiesTitle:
       'One frontend language across the critical campus workflows',
@@ -160,7 +173,7 @@ export const en = {
       {
         title: 'Academic workflows',
         description:
-          'Registration, schedules, grades, transcript views, and section work share one stable API contract.',
+          'Registration, schedules, grades, transcript views, and section work share the same campus records.',
       },
       {
         title: 'Clear academic status',
@@ -183,10 +196,10 @@ export const en = {
           'One portal for students, lecturers, and admins with sharper states, fewer dead ends, and calmer navigation.',
       },
     ],
-    whyEyebrow: 'Why one RESTful API for CampusCore',
+    whyEyebrow: 'Why CampusCore stays on one campus portal',
     whyTitle: 'Keep the course project focused and reproducible',
     whyDescription:
-      'CampusCore keeps the backend in one Java application so the academic contract, database migrations, authorization, and local demo remain easy to understand and verify.',
+      'CampusCore keeps academic records in one campus workspace so registration, authorization, and the local demo remain easy to understand and verify.',
     whyPoints: [
       {
         title: 'One campus portal',
@@ -206,12 +219,12 @@ export const en = {
       {
         title: 'Straightforward verification',
         description:
-          'Focused Java, frontend, mobile, and Compose gates make the demo state traceable.',
+          'Focused web, mobile, and local demo checks make the campus state easy to follow.',
       },
       {
         title: 'Simple local runtime',
         description:
-          'The local stack needs only the Java API and PostgreSQL.',
+          'The local course demo only needs the campus portal and its records.',
       },
       {
         title: 'Clearer course handoff',
@@ -230,9 +243,9 @@ export const en = {
     },
     footerNav: {
       workspace: [
-        { href: '/login', label: 'Student access' },
-        { href: '/login', label: 'Lecturer workflows' },
-        { href: '/login', label: 'Admin tools' },
+        { href: '/login?portal=student', label: 'Student access' },
+        { href: '/login?portal=lecturer', label: 'Lecturer workflows' },
+        { href: '/login?portal=admin', label: 'Admin tools' },
       ],
       delivery: [
         { href: '/login', label: 'Sign in' },
@@ -247,15 +260,19 @@ export const en = {
         title: 'Student',
         rows: ['Register', 'Schedule', 'Grades'],
         action: 'Sign in to register',
-        href: '/login',
+        href: '/login?portal=student',
       },
       lecturer: {
         title: 'Lecturer',
         rows: ['Gradebook', 'Teaching schedule'],
+        action: 'Open faculty sign-in',
+        href: '/login?portal=lecturer',
       },
       admin: {
         title: 'Admin',
         rows: ['People', 'Course catalog'],
+        action: 'Open operations sign-in',
+        href: '/login?portal=admin',
       },
     },
     publicProof: [
@@ -296,6 +313,8 @@ export const en = {
   authShell: {
     desktopSubtitle: 'Campus academic workspace',
     mobileSubtitle: 'Academic access',
+    lecturerSubtitle: 'Faculty workspace',
+    adminSubtitle: 'Campus operations',
   },
   login: {
     eyebrow: 'Secure access',
@@ -320,9 +339,6 @@ export const en = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     signingIn: 'Signing in',
-    sessionBehaviorTitle: 'Stay signed in for the day',
-    sessionBehaviorDescription:
-      'After you sign in, registration, grades, and teaching stay in the same campus session.',
     reasonMessages: {
       sessionExpired: {
         title: 'Your session ended',
@@ -354,6 +370,123 @@ export const en = {
         'Sign-in is temporarily unavailable. Please try again in a moment.',
     },
     returnHomeLead: 'Need a different starting point?',
+    portals: {
+      groupLabel: 'Choose your campus portal',
+      student: {
+        tab: 'Student',
+        eyebrow: 'Student portal',
+        title: 'Sign in to the student workspace.',
+        description:
+          'Register for sections, read your timetable, and follow grades from the student desk.',
+        heading: 'Student sign-in',
+        subheading: 'Use your student campus account to open registration and class records.',
+        officeSupport: 'Campus academic office',
+        destination: 'A matching student account opens the student dashboard.',
+        mismatch:
+          'This account belongs to another campus portal. Open the lecturer or admin sign-in instead.',
+        featureTitles: ['Register', 'Timetable', 'Grades'],
+        featureDescriptions: [
+          'Pick sections while the registration window is open.',
+          'See class times and rooms for the current term.',
+          'Follow published scores without leaving the student desk.',
+        ],
+      },
+      lecturer: {
+        tab: 'Lecturer',
+        eyebrow: 'Faculty portal',
+        title: 'Sign in to the faculty workspace.',
+        description:
+          'Open the gradebook, teaching timetable, and section notices from the faculty desk.',
+        heading: 'Faculty sign-in',
+        subheading: 'Use your lecturer campus account to continue teaching work.',
+        officeSupport: 'Faculty office',
+        destination: 'A matching lecturer account opens the faculty dashboard.',
+        mismatch:
+          'This account belongs to another campus portal. Open the student or admin sign-in instead.',
+        featureTitles: ['SE204', 'GRADE', 'SLOT'],
+        featureDescriptions: [
+          'Section lists stay next to the people on your roster.',
+          'Enter and review scores for the sections you teach.',
+          'Check teaching hours without switching to another desk.',
+        ],
+      },
+      admin: {
+        tab: 'Admin',
+        eyebrow: 'Operations portal',
+        title: 'Sign in to campus operations.',
+        description:
+          'Manage people, the catalog, notices, and the public campus look from one operations desk.',
+        heading: 'Operations sign-in',
+        subheading: 'Use an administrator account to continue campus records work.',
+        officeSupport: 'Campus operations',
+        destination: 'A matching administrator account opens the admin workspace.',
+        mismatch:
+          'This account belongs to another campus portal. Open the student or lecturer sign-in instead.',
+        opsMark: 'Ops',
+        featureTitles: ['People records', 'Catalog', 'Campus look'],
+        featureDescriptions: [
+          'Review accounts and role assignments.',
+          'Keep courses, sections, and rooms aligned.',
+          'Publish notices and arrange how they appear.',
+        ],
+      },
+    },
+  },
+  courseRegistration: {
+    eyebrow: 'Student portal',
+    title: 'Course registration',
+    description: 'Browse open sections, check remaining seats, and confirm your course registration.',
+    searchPlaceholder: 'Search by course code or name',
+    semester: 'Semester',
+    allSemesters: 'All semesters',
+    seatsLeft: 'Seats left',
+    full: 'Full',
+    register: 'Register',
+    registered: 'Registered',
+    drop: 'Drop course',
+    emptyTitle: 'No matching sections',
+    emptyDescription: 'Try another semester or search term.',
+    loadFailed: 'Course registration data could not be loaded.',
+    success: 'Enrollment updated.',
+    confirmRegister: 'Confirm course registration?',
+    confirmDrop: 'Are you sure you want to drop this course?',
+    sectionCount: '{count} sections',
+    working: 'Working',
+    roundUnavailable: 'No registration round is open right now.',
+    exportUnavailable: 'A registration slip is not available yet.',
+    enrolledRail: 'Registered this term',
+    columns: {
+      course: 'Course',
+      section: 'Section',
+      schedule: 'Schedule',
+      action: 'Action',
+    },
+  },
+  workspaceForbidden: {
+    title: 'Access restricted',
+    signedInDescription: 'This account does not have permission for this workspace.',
+    signedOutDescription: 'Sign in to continue to this workspace.',
+  },
+  signup: {
+    eyebrow: 'Create a campus account',
+    title: 'Register for CampusCore.',
+    description: 'Create a student account with your campus email to start course registration.',
+    heading: 'Create your account',
+    subheading: 'Use a campus email, a password of at least 8 characters, and your name.',
+    firstNameLabel: 'First name',
+    lastNameLabel: 'Last name',
+    emailLabel: 'Email address',
+    passwordLabel: 'Password',
+    submit: 'Create account',
+    submitting: 'Creating account',
+    hasAccount: 'Already have an account?',
+    signInLink: 'Sign in',
+    needAccount: 'Need a student account?',
+    errors: {
+      fallback: 'We could not create the account right now.',
+      conflict: 'That email is already registered. Sign in instead.',
+      validation: 'Please check the details and try again.',
+    },
   },
   forgotPassword: {
     eyebrow: 'Password recovery',
@@ -456,6 +589,7 @@ export const en = {
       ['Classrooms', 'Track rooms, buildings, and capacity readiness.'],
       ['Announcements', 'Publish updates that flow out to the rest of the campus.'],
       ['AI assistant knowledge', 'Review public academic sources and the curated retrieval boundary.'],
+      ['Site appearance', 'Change public campus chrome and the order of notices while people are using the portal.'],
     ],
     stats: ['Students', 'Lecturers', 'Courses', 'Enrollments'],
     statDetails: [
@@ -467,6 +601,37 @@ export const en = {
     loading: 'Loading campus overview',
     unavailableTitle: 'Admin overview unavailable',
     unavailableDescription: 'Campus overview is not available right now.',
+    appearance: {
+      title: 'Site appearance',
+      description:
+        'Change the public campus look and the order of notices. Other open pages pick up the change within a few seconds.',
+      eyebrow: 'Public campus chrome',
+      live: 'Live on the public site',
+      saving: 'Saving',
+      saved: 'Published',
+      saveFailed: 'The campus look could not be saved right now.',
+      loadFailed: 'The campus look could not be loaded right now.',
+      heroEyebrow: 'Home eyebrow',
+      heroTitle: 'Home title',
+      heroDescription: 'Home description',
+      heroHint: 'Leave a field empty to keep the default campus wording.',
+      localeEn: 'English copy',
+      localeVi: 'Vietnamese copy',
+      accent: 'Campus accent',
+      accents: {
+        'ute-yellow': 'UTE yellow',
+        'campus-gold': 'Campus gold',
+        'river-blue': 'River blue',
+      },
+      preview: 'Live preview',
+      postsTitle: 'Notice order',
+      postsDescription:
+        'Move a notice up or down. Student and lecturer feeds follow this order as soon as it is saved.',
+      postsEmpty: 'Publish a notice first, then arrange it here.',
+      moveUp: 'Move up',
+      moveDown: 'Move down',
+      openAnnouncements: 'Open notices',
+    },
   },
   dashboardShell: {
     portalTitle: 'Academic information portal',
@@ -710,8 +875,8 @@ export const en = {
     whatChangesTitle: 'What changes here',
     whatChanges: [
       'Profile edits update the browser session view after a successful save.',
-      'Password rotation stays on the same authenticated route and uses the shared auth contract.',
-      'Sensitive account ownership fields, such as your email, stay controlled by the service owner instead of an inline edit field.',
+      'Password changes stay on this account page after you confirm.',
+      'Sensitive account fields such as your email stay managed by campus staff, not an inline edit field.',
     ],
     fields: {
       firstName: 'First name',
@@ -1043,13 +1208,26 @@ export const vi: I18nMessages = {
       perPage50: '50 dòng / trang',
       perPage100: '100 dòng / trang',
     },
+    campusErrors: {
+      network:
+        'CampusCore chưa kết nối được workspace lúc này. Hãy thử lại sau một lát.',
+      validation: 'Hãy kiểm tra lại thông tin rồi thử lại.',
+      conflict:
+        'Thay đổi này chưa thể hoàn tất. Hãy kiểm tra hồ sơ hiện tại rồi thử lại.',
+      unauthorized: 'Hãy đăng nhập lại để tiếp tục.',
+      forbidden: 'Bạn không có quyền thực hiện thao tác này.',
+      notFound: 'Hồ sơ này không còn khả dụng.',
+      server:
+        'Hệ thống học vụ đang gặp sự cố. Hãy thử lại sau một lát.',
+      unknown: 'Chưa thể hoàn tất thao tác này. Hãy thử lại.',
+    },
   },
   meta: {
     defaults: {
       siteName: 'CampusCore',
       title: 'Không gian học vụ CampusCore',
       description:
-        'CampusCore là workspace học vụ tập trung, chạy bằng một Java RESTful API và PostgreSQL.',
+        'CampusCore là workspace học vụ tập trung cho đăng ký, lịch học, điểm, thông báo và luận văn.',
       ogAlt: 'Tổng quan workspace CampusCore',
       twitterTitle: 'CampusCore',
       twitterDescription:
@@ -1058,7 +1236,7 @@ export const vi: I18nMessages = {
     home: {
       title: 'Không gian học vụ CampusCore',
       description:
-        'CampusCore mang đến một workspace ổn định cho quản trị, giảng viên và sinh viên trên cùng một contract Java API.',
+        'CampusCore mang đến một workspace ổn định cho quản trị, giảng viên và sinh viên.',
     },
     login: {
       title: 'Đăng nhập',
@@ -1089,7 +1267,7 @@ export const vi: I18nMessages = {
       badges: [
         'Workspace theo vai trò',
         'Phát hành đã xác minh',
-        'Một Java API',
+        'Một cổng học vụ',
       ],
     },
   },
@@ -1127,10 +1305,10 @@ export const vi: I18nMessages = {
     ],
     snapshotPrimaryAccessTitle: 'Lối vào chính',
     snapshotPrimaryAccessDescription:
-      'Sinh viên, giảng viên và quản trị cùng đi qua một trải nghiệm đăng nhập nhất quán.',
+      'Sinh viên, giảng viên và quản trị mỗi người vào bằng cổng đăng nhập riêng.',
     snapshotReleaseTitle: 'Phạm vi demo môn học',
     snapshotReleaseDescription:
-      'Một Java API, một PostgreSQL và các client tập trung giúp demo dễ kiểm chứng.',
+      'Một cổng học vụ và các client tập trung giúp demo môn học dễ theo dõi.',
     capabilitiesEyebrow: 'Portal này được xây để làm gì',
     capabilitiesTitle: 'Một ngôn ngữ giao diện cho các luồng campus quan trọng',
     capabilitiesDescription:
@@ -1144,7 +1322,7 @@ export const vi: I18nMessages = {
       {
         title: 'Luồng học vụ',
         description:
-          'Đăng ký, thời khóa biểu, điểm, bảng điểm và công việc section dùng chung một contract API ổn định.',
+          'Đăng ký, thời khóa biểu, điểm, bảng điểm và công việc lớp học phần dùng chung cùng hồ sơ campus.',
       },
       {
         title: 'Trạng thái học vụ rõ ràng',
@@ -1167,10 +1345,10 @@ export const vi: I18nMessages = {
           'Một cổng chung cho sinh viên, giảng viên và quản trị với trạng thái rõ hơn, ít ngõ cụt hơn và điều hướng điềm tĩnh hơn.',
       },
     ],
-    whyEyebrow: 'Vì sao CampusCore dùng một RESTful API',
+    whyEyebrow: 'Vì sao CampusCore giữ một cổng học vụ',
     whyTitle: 'Giữ đồ án tập trung và dễ tái lập',
     whyDescription:
-      'CampusCore giữ backend trong một ứng dụng Java để contract học vụ, migration database, phân quyền và demo local dễ hiểu và dễ kiểm chứng.',
+      'CampusCore giữ hồ sơ học vụ trong một workspace để đăng ký, phân quyền và demo local dễ hiểu và dễ kiểm chứng.',
     whyPoints: [
       {
         title: 'Một cổng học vụ',
@@ -1190,12 +1368,12 @@ export const vi: I18nMessages = {
       {
         title: 'Kiểm chứng đơn giản',
         description:
-          'Các gate Java, frontend, mobile và Compose giúp truy dấu trạng thái demo.',
+          'Các bước kiểm tra web, điện thoại và demo local giúp theo dõi trạng thái campus.',
       },
       {
         title: 'Runtime local gọn',
         description:
-          'Stack local chỉ cần Java API và PostgreSQL.',
+          'Demo môn học local chỉ cần cổng học vụ và hồ sơ campus.',
       },
       {
         title: 'Bàn giao đồ án rõ hơn',
@@ -1214,9 +1392,9 @@ export const vi: I18nMessages = {
     },
     footerNav: {
       workspace: [
-        { href: '/login', label: 'Khu sinh viên' },
-        { href: '/login', label: 'Luồng giảng viên' },
-        { href: '/login', label: 'Công cụ quản trị' },
+        { href: '/login?portal=student', label: 'Khu sinh viên' },
+        { href: '/login?portal=lecturer', label: 'Luồng giảng viên' },
+        { href: '/login?portal=admin', label: 'Công cụ quản trị' },
       ],
       delivery: [
         { href: '/login', label: 'Đăng nhập' },
@@ -1231,15 +1409,19 @@ export const vi: I18nMessages = {
         title: 'Sinh viên',
         rows: ['Đăng ký', 'Thời khóa biểu', 'Điểm'],
         action: 'Đăng nhập để đăng ký',
-        href: '/login',
+        href: '/login?portal=student',
       },
       lecturer: {
         title: 'Giảng viên',
         rows: ['Sổ điểm', 'Lịch giảng'],
+        action: 'Mở đăng nhập giảng viên',
+        href: '/login?portal=lecturer',
       },
       admin: {
         title: 'Quản trị',
         rows: ['Người dùng', 'Danh mục môn'],
+        action: 'Mở đăng nhập quản trị',
+        href: '/login?portal=admin',
       },
     },
     publicProof: [
@@ -1280,6 +1462,8 @@ export const vi: I18nMessages = {
   authShell: {
     desktopSubtitle: 'Không gian học vụ CampusCore',
     mobileSubtitle: 'Truy cập học vụ',
+    lecturerSubtitle: 'Không gian giảng viên',
+    adminSubtitle: 'Bàn quản trị campus',
   },
   login: {
     eyebrow: 'Truy cập an toàn',
@@ -1304,9 +1488,6 @@ export const vi: I18nMessages = {
     showPassword: 'Hiện mật khẩu',
     hidePassword: 'Ẩn mật khẩu',
     signingIn: 'Đang đăng nhập',
-    sessionBehaviorTitle: 'Giữ đăng nhập trong ngày học vụ',
-    sessionBehaviorDescription:
-      'Sau khi đăng nhập, bạn có thể chuyển giữa đăng ký học phần, điểm số và giảng dạy mà không phải đăng nhập lại.',
     reasonMessages: {
       sessionExpired: {
         title: 'Phiên của bạn đã kết thúc',
@@ -1338,6 +1519,123 @@ export const vi: I18nMessages = {
         'Đăng nhập tạm thời chưa sẵn sàng. Vui lòng thử lại sau ít phút.',
     },
     returnHomeLead: 'Cần một điểm vào khác?',
+    portals: {
+      groupLabel: 'Chọn cổng campus của bạn',
+      student: {
+        tab: 'Sinh viên',
+        eyebrow: 'Cổng sinh viên',
+        title: 'Đăng nhập vào không gian sinh viên.',
+        description:
+          'Đăng ký học phần, xem thời khóa biểu và theo dõi điểm từ bàn làm việc sinh viên.',
+        heading: 'Đăng nhập sinh viên',
+        subheading: 'Dùng tài khoản sinh viên để mở đăng ký và hồ sơ lớp học.',
+        officeSupport: 'Phòng học vụ',
+        destination: 'Tài khoản sinh viên khớp sẽ mở dashboard sinh viên.',
+        mismatch:
+          'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập giảng viên hoặc quản trị.',
+        featureTitles: ['Đăng ký', 'Thời khóa biểu', 'Điểm'],
+        featureDescriptions: [
+          'Chọn học phần khi cửa sổ đăng ký đang mở.',
+          'Xem giờ học và phòng cho học kỳ hiện tại.',
+          'Theo dõi điểm đã công bố ngay tại bàn sinh viên.',
+        ],
+      },
+      lecturer: {
+        tab: 'Giảng viên',
+        eyebrow: 'Cổng giảng viên',
+        title: 'Đăng nhập vào không gian giảng viên.',
+        description:
+          'Mở sổ điểm, lịch giảng và thông báo lớp từ bàn giảng viên.',
+        heading: 'Đăng nhập giảng viên',
+        subheading: 'Dùng tài khoản giảng viên để tiếp tục công việc giảng dạy.',
+        officeSupport: 'Văn phòng khoa',
+        destination: 'Tài khoản giảng viên khớp sẽ mở dashboard giảng viên.',
+        mismatch:
+          'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập sinh viên hoặc quản trị.',
+        featureTitles: ['SE204', 'GRADE', 'SLOT'],
+        featureDescriptions: [
+          'Danh sách lớp nằm cạnh người trong roster của bạn.',
+          'Nhập và rà điểm cho các lớp bạn giảng.',
+          'Xem giờ giảng mà không phải đổi bàn làm việc.',
+        ],
+      },
+      admin: {
+        tab: 'Quản trị',
+        eyebrow: 'Cổng quản trị',
+        title: 'Đăng nhập vào bàn quản trị campus.',
+        description:
+          'Quản lý người dùng, danh mục, thông báo và diện mạo cổng công khai từ một bàn quản trị.',
+        heading: 'Đăng nhập quản trị',
+        subheading: 'Dùng tài khoản quản trị để tiếp tục hồ sơ campus.',
+        officeSupport: 'Bàn quản trị campus',
+        destination: 'Tài khoản quản trị khớp sẽ mở workspace quản trị.',
+        mismatch:
+          'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập sinh viên hoặc giảng viên.',
+        opsMark: 'Quản trị',
+        featureTitles: ['Hồ sơ người', 'Danh mục', 'Diện mạo campus'],
+        featureDescriptions: [
+          'Rà tài khoản và phân quyền.',
+          'Giữ môn, lớp và phòng học khớp nhau.',
+          'Phát hành thông báo và sắp thứ tự hiển thị.',
+        ],
+      },
+    },
+  },
+  courseRegistration: {
+    eyebrow: 'Cổng sinh viên',
+    title: 'Đăng ký học phần',
+    description: 'Tra cứu lớp đang mở, kiểm tra số chỗ và xác nhận đăng ký học phần.',
+    searchPlaceholder: 'Tìm theo mã hoặc tên môn học',
+    semester: 'Học kỳ',
+    allSemesters: 'Tất cả học kỳ',
+    seatsLeft: 'Còn chỗ',
+    full: 'Đã đầy',
+    register: 'Đăng ký',
+    registered: 'Đã đăng ký',
+    drop: 'Hủy đăng ký',
+    emptyTitle: 'Chưa có section phù hợp',
+    emptyDescription: 'Thử đổi học kỳ hoặc từ khóa tìm kiếm.',
+    loadFailed: 'Không thể tải dữ liệu đăng ký học phần.',
+    success: 'Đã cập nhật đăng ký học phần.',
+    confirmRegister: 'Xác nhận đăng ký học phần này?',
+    confirmDrop: 'Bạn có chắc muốn hủy học phần này không?',
+    sectionCount: '{count} lớp học phần',
+    working: 'Đang xử lý',
+    roundUnavailable: 'Hiện chưa có đợt đăng ký đang mở.',
+    exportUnavailable: 'Phiếu đăng ký chưa sẵn sàng.',
+    enrolledRail: 'Đã đăng ký trong học kỳ',
+    columns: {
+      course: 'Học phần',
+      section: 'Section',
+      schedule: 'Lịch học',
+      action: 'Thao tác',
+    },
+  },
+  workspaceForbidden: {
+    title: 'Không có quyền truy cập',
+    signedInDescription: 'Tài khoản hiện không được phép dùng khu vực này.',
+    signedOutDescription: 'Hãy đăng nhập lại để tiếp tục vào không gian làm việc.',
+  },
+  signup: {
+    eyebrow: 'Tạo tài khoản campus',
+    title: 'Đăng ký CampusCore.',
+    description: 'Tạo tài khoản sinh viên bằng email campus để bắt đầu đăng ký học phần.',
+    heading: 'Tạo tài khoản',
+    subheading: 'Dùng email campus, mật khẩu tối thiểu 8 ký tự và họ tên của bạn.',
+    firstNameLabel: 'Tên',
+    lastNameLabel: 'Họ',
+    emailLabel: 'Địa chỉ email',
+    passwordLabel: 'Mật khẩu',
+    submit: 'Tạo tài khoản',
+    submitting: 'Đang tạo tài khoản',
+    hasAccount: 'Đã có tài khoản?',
+    signInLink: 'Đăng nhập',
+    needAccount: 'Chưa có tài khoản sinh viên?',
+    errors: {
+      fallback: 'Hiện chưa thể tạo tài khoản.',
+      conflict: 'Email này đã được đăng ký. Hãy đăng nhập.',
+      validation: 'Hãy kiểm tra lại thông tin và thử lại.',
+    },
   },
   forgotPassword: {
     eyebrow: 'Khôi phục mật khẩu',
@@ -1440,6 +1738,7 @@ export const vi: I18nMessages = {
       ['Phòng học', 'Theo dõi phòng, tòa nhà và mức sẵn sàng về sức chứa.'],
       ['Thông báo', 'Phát hành cập nhật ra toàn campus.'],
       ['Kiến thức trợ lý AI', 'Quản lý nguồn học thuật công khai và ranh giới truy xuất đã kiểm duyệt.'],
+      ['Diện mạo cổng', 'Đổi chrome công khai và thứ tự thông báo khi mọi người đang dùng cổng.'],
     ],
     stats: ['Sinh viên', 'Giảng viên', 'Môn học', 'Đăng ký học'],
     statDetails: [
@@ -1451,6 +1750,37 @@ export const vi: I18nMessages = {
     loading: 'Đang tải tổng quan campus',
     unavailableTitle: 'Tổng quan quản trị chưa sẵn sàng',
     unavailableDescription: 'Hiện chưa thể tải tổng quan campus.',
+    appearance: {
+      title: 'Diện mạo cổng',
+      description:
+        'Đổi diện mạo campus công khai và thứ tự thông báo. Các trang đang mở nhận thay đổi sau vài giây.',
+      eyebrow: 'Chrome campus công khai',
+      live: 'Đang hiện trên cổng công khai',
+      saving: 'Đang lưu',
+      saved: 'Đã phát hành',
+      saveFailed: 'Hiện chưa thể lưu diện mạo campus.',
+      loadFailed: 'Hiện chưa thể tải diện mạo campus.',
+      heroEyebrow: 'Dòng dẫn trang chủ',
+      heroTitle: 'Tiêu đề trang chủ',
+      heroDescription: 'Mô tả trang chủ',
+      heroHint: 'Để trống một trường nếu muốn giữ lời mặc định của campus.',
+      localeEn: 'Bản tiếng Anh',
+      localeVi: 'Bản tiếng Việt',
+      accent: 'Màu nhấn campus',
+      accents: {
+        'ute-yellow': 'Vàng UTE',
+        'campus-gold': 'Vàng campus',
+        'river-blue': 'Xanh sông',
+      },
+      preview: 'Xem trước trực tiếp',
+      postsTitle: 'Thứ tự thông báo',
+      postsDescription:
+        'Đưa thông báo lên hoặc xuống. Bảng tin sinh viên và giảng viên theo thứ tự này ngay khi được lưu.',
+      postsEmpty: 'Hãy phát hành một thông báo trước, rồi sắp xếp tại đây.',
+      moveUp: 'Đưa lên',
+      moveDown: 'Đưa xuống',
+      openAnnouncements: 'Mở thông báo',
+    },
   },
   dashboardShell: {
     portalTitle: 'Cổng thông tin học vụ',
@@ -1694,8 +2024,8 @@ export const vi: I18nMessages = {
     whatChangesTitle: 'Những gì thay đổi ở đây',
     whatChanges: [
       'Chỉnh sửa hồ sơ sẽ cập nhật lại góc nhìn phiên trình duyệt sau khi lưu thành công.',
-      'Đổi mật khẩu vẫn nằm trên cùng route đã xác thực và dùng chung auth contract.',
-      'Các trường sở hữu nhạy cảm như email vẫn do service owner kiểm soát, không cho sửa trực tiếp trong form.',
+      'Đổi mật khẩu vẫn nằm trên trang tài khoản này sau khi bạn xác nhận.',
+      'Các trường nhạy cảm như email do cán bộ campus quản lý, không cho sửa trực tiếp trong form.',
     ],
     fields: {
       firstName: 'Tên',

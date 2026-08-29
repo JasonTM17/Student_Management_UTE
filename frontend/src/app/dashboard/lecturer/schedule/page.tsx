@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Clock, MapPin, Users } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi, semestersApi } from '@/lib/api';
 import {
@@ -10,10 +11,10 @@ import {
   getLocalizedName,
 } from '@/lib/academic-content';
 import { LecturerSection, Semester } from '@/types/api';
-import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -50,7 +51,7 @@ const dayNames = [
 ];
 
 export default function LecturerSchedulePage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
   const { locale, formatNumber } = useI18n();
   const [sections, setSections] = useState<LecturerSection[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -196,8 +197,12 @@ export default function LecturerSchedulePage() {
           studentsSuffix: 'students',
         };
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -249,7 +254,7 @@ export default function LecturerSchedulePage() {
                     {formatNumber(slots.length)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
                   <Calendar className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -262,7 +267,7 @@ export default function LecturerSchedulePage() {
                     {formatNumber(sections.length)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
                   <Users className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -277,7 +282,7 @@ export default function LecturerSchedulePage() {
                     )}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
                   <Users className="h-5 w-5" />
                 </div>
               </CardContent>

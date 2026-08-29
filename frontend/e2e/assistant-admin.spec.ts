@@ -3,8 +3,12 @@ import { test, expect, type Page } from '@playwright/test';
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
 
-async function login(page: Page, account: typeof student) {
-  await page.goto('/login');
+async function login(
+  page: Page,
+  account: typeof student,
+  portal: 'student' | 'lecturer' | 'admin' = account.email.startsWith('admin') ? 'admin' : 'student',
+) {
+  await page.goto(`/login?portal=${portal}`);
   const submit = page.locator('form').getByRole('button', { name: /sign in/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);

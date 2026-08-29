@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.academic.service;
 
+import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.web.DomainException;
@@ -31,81 +32,23 @@ public class AcademicMutationService {
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
+    private final RegistrationService registration;
 
     public AcademicMutationService(
             NamedParameterJdbcTemplate jdbc,
-            AcademicEnrollmentReadService reads) {
+            AcademicEnrollmentReadService reads,
+            RegistrationService registration) {
         this.jdbc = jdbc;
         this.reads = reads;
+        this.registration = registration;
     }
 
-    @Transactional
-    public EnrollmentResponse enroll(String studentId, String sectionId, List<String> roles) {
-        requireStudent(studentId);
-        Map<String, Object> section = section(sectionId);
-        String status = String.valueOf(section.get("status"));
-        if (!"OPEN".equals(status)) {
-            throw problem(HttpStatus.CONFLICT, "SECTION_CLOSED", "Section is not open for registration");
-        }
-
-        int capacity = ((Number) section.get("capacity")).intValue();
-        int enrolledCount = ((Number) section.get("enrolled_count")).intValue();
-        if (enrolledCount >= capacity) {
-            throw problem(HttpStatus.CONFLICT, "SECTION_FULL", "Section is full");
-        }
-
-        String semesterId = String.valueOf(section.get("semester_id"));
-        if (!semesterOpen(semesterId)) {
-            throw problem(HttpStatus.CONFLICT, "REGISTRATION_CLOSED", "Registration is closed for this semester");
-        }
-        Long existing = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"sectionId\" = :sectionId"
-                        + " AND \"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
-                new MapSqlParameterSource().addValue("studentId", studentId).addValue("sectionId", sectionId),
-                Long.class);
-        if (existing != null && existing > 0) {
-            throw problem(HttpStatus.CONFLICT, "ENROLLMENT_DUPLICATE", "Student is already enrolled in this section");
-        }
-
-        String enrollmentId = UUID.randomUUID().toString();
-        MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("id", enrollmentId)
-                .addValue("studentId", studentId)
-                .addValue("sectionId", sectionId)
-                .addValue("semesterId", semesterId)
-                .addValue("now", Timestamp.from(Instant.now()));
-        jdbc.update(
-                "INSERT INTO " + ENROLLMENT
-                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"gradeStatus\")"
-                        + " VALUES (:id, :studentId, :sectionId, :semesterId, 'ENROLLED', :now, 'NOT_GRADED')",
-                parameters);
-        jdbc.update(
-                "UPDATE " + SECTION + " SET \"enrolledCount\" = \"enrolledCount\" + 1, \"updatedAt\" = CURRENT_TIMESTAMP"
-                        + " WHERE \"id\" = :sectionId",
-                new MapSqlParameterSource("sectionId", sectionId));
-        return reads.findEnrollment(enrollmentId, roles, studentId);
+    public EnrollmentResponse enroll(String studentId, String sectionId, List<String> roles, String idempotencyKey) {
+        return registration.enroll(studentId, sectionId, roles, idempotencyKey);
     }
 
-    @Transactional
-    public void drop(String enrollmentId, String studentId, List<String> roles) {
-        Map<String, Object> enrollment = enrollment(enrollmentId);
-        boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
-        if (!admin && !studentId.equals(enrollment.get("student_id"))) {
-            throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_FORBIDDEN", "Enrollment does not belong to the current student");
-        }
-        if (!"ENROLLED".equals(enrollment.get("status")) && !"PENDING".equals(enrollment.get("status"))) {
-            throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment is no longer active");
-        }
-
-        jdbc.update(
-                "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
-                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
-                new MapSqlParameterSource("id", enrollmentId));
-        jdbc.update(
-                "UPDATE " + SECTION + " SET \"enrolledCount\" = GREATEST(0, \"enrolledCount\" - 1),"
-                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
-                new MapSqlParameterSource("sectionId", enrollment.get("section_id")));
+    public void drop(String enrollmentId, String studentId, List<String> roles, String idempotencyKey) {
+        registration.drop(enrollmentId, studentId, roles, idempotencyKey);
     }
 
     @Transactional

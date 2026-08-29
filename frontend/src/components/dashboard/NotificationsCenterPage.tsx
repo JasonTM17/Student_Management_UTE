@@ -9,6 +9,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { LinkButton } from '@/components/ui/link-button';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
@@ -19,6 +20,7 @@ import {
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
+import { statusToneClass } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 
 type NotificationItem = {
@@ -33,7 +35,7 @@ type NotificationItem = {
 type Filter = 'all' | 'unread';
 
 export default function NotificationsCenterPage() {
-  const { isLoading: authLoading, hasAccess } = useRequireAuth();
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { formatDateTime, messages } = useI18n();
   const copy = messages.dashboardShell.notifications;
   const [items, setItems] = useState<NotificationItem[]>([]);
@@ -131,8 +133,12 @@ export default function NotificationsCenterPage() {
     filterRefs.current[next]?.focus();
   }
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={messages.common.states.loadingContent} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -220,7 +226,7 @@ export default function NotificationsCenterPage() {
       {status ? (
         <div
           role="status"
-          className="rounded-md border border-emerald-500/25 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300"
+          className={`rounded-md border px-4 py-3 text-sm ${statusToneClass('success')}`}
         >
           {status}
         </div>

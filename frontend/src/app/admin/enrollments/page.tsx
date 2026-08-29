@@ -23,6 +23,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -80,11 +81,11 @@ interface Section {
 }
 
 const statusColors: Record<string, string> = {
-  PENDING: 'bg-yellow-100 text-yellow-700',
-  CONFIRMED: 'bg-blue-100 text-blue-700',
-  COMPLETED: 'bg-green-100 text-green-700',
-  DROPPED: 'bg-red-100 text-red-700',
-  CANCELLED: 'bg-muted text-muted-foreground',
+  PENDING: metricToneClass('warning'),
+  CONFIRMED: metricToneClass('info'),
+  COMPLETED: metricToneClass('success'),
+  DROPPED: metricToneClass('danger'),
+  CANCELLED: metricToneClass('neutral'),
 };
 
 export default function AdminEnrollmentsPage() {
@@ -122,7 +123,7 @@ export default function AdminEnrollmentsPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
