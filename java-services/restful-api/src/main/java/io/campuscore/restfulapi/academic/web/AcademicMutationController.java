@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.MediaType;
+import org.springframework.http.ResponseEntity;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -18,6 +19,7 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestBody;
+import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -35,22 +37,32 @@ public class AcademicMutationController {
 
     @PostMapping("enrollments/enroll")
     @PreAuthorize("hasRole('STUDENT')")
-    public EnrollmentResponse enroll(
+    public ResponseEntity<EnrollmentResponse> enroll(
             @AuthenticationPrincipal Jwt jwt,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey,
             @Valid @RequestBody EnrollRequest request) {
-        return mutations.enroll(
+        EnrollmentResponse body = mutations.enroll(
                 jwt.getClaimAsString("studentId"),
                 request.sectionId(),
-                jwt.getClaimAsStringList("roles"));
+                jwt.getClaimAsStringList("roles"),
+                idempotencyKey);
+        return ResponseEntity.ok()
+                .header("Deprecation", "true")
+                .header("Sunset", "true")
+                .body(body);
     }
 
     @PostMapping("enrollments/{id}/drop")
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN')")
-    public Map<String, String> drop(
+    public ResponseEntity<Map<String, String>> drop(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String id) {
-        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"));
-        return Map.of("message", "Enrollment dropped successfully");
+            @PathVariable String id,
+            @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
+        mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey);
+        return ResponseEntity.ok()
+                .header("Deprecation", "true")
+                .header("Sunset", "true")
+                .body(Map.of("message", "Enrollment dropped successfully"));
     }
 
     @DeleteMapping("enrollments/{id}")

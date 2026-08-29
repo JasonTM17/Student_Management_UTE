@@ -99,7 +99,9 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DomainException.class)
     ResponseEntity<ApiError> domain(DomainException exception, HttpServletRequest request) {
-        return error(exception.status(), exception.code(), exception.getMessage(), request, Map.of());
+        return ResponseEntity.status(exception.status())
+                .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
+                .body(problemBody(exception.status(), exception.code(), exception.getMessage(), request, Map.of()));
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)
@@ -128,9 +130,18 @@ public class ApiExceptionHandler {
             String message,
             HttpServletRequest request,
             Map<String, String> fields) {
+        return ResponseEntity.status(status).body(problemBody(status, code, message, request, fields));
+    }
+
+    private ApiError problemBody(
+            HttpStatus status,
+            String code,
+            String message,
+            HttpServletRequest request,
+            Map<String, String> fields) {
         Object requestId = request.getAttribute(
                 io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
-        return ResponseEntity.status(status).body(new ApiError(
+        return new ApiError(
                 Instant.now(),
                 status.value(),
                 code,
@@ -140,7 +151,7 @@ public class ApiExceptionHandler {
                 fields.entrySet().stream()
                         .map(entry -> new FieldError(entry.getKey(), entry.getValue()))
                         .toList(),
-                fields));
+                fields);
     }
 
     public record ApiError(

@@ -7,11 +7,13 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicDetailPage() {
-  const { isLoading: authLoading, hasAccess } = useRequireAuth();
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages } = useI18n();
   const params = useParams<{ id: string }>();
   const searchParams = useSearchParams();
@@ -19,7 +21,15 @@ export default function ThesisTopicDetailPage() {
   const workspace = useThesisWorkspace(searchParams.get('roundId') ?? '');
   const topic = workspace.topics.find((item) => item.id === topicId);
 
-  if (authLoading || !hasAccess || workspace.isLoading) {
+  if (authLoading) {
+    return <LoadingState label={messages.thesis.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
+
+  if (workspace.isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
@@ -88,9 +98,11 @@ export default function ThesisTopicDetailPage() {
             </div>
             <div className="flex items-center justify-between gap-3">
               <span className="text-muted-foreground">{messages.thesis.roundStatus}</span>
-              <span className="font-semibold text-primary">
-                {workspace.selectedRound ? workspace.statusLabel(workspace.selectedRound.status) : '—'}
-              </span>
+              {workspace.selectedRound ? (
+                <StatusBadge status={workspace.selectedRound.status} />
+              ) : (
+                <span className="font-semibold text-foreground">—</span>
+              )}
             </div>
           </CardContent>
         </Card>

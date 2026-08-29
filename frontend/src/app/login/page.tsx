@@ -3,31 +3,23 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
-import { ArrowRight, Eye, EyeOff, KeyRound, Lock, Mail } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { User } from '@/types/api';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n';
-import { toast } from 'sonner';
+import {
+  LOGIN_PORTALS,
+  parseLoginPortal,
+  portalMatchesUser,
+  postLoginRoute,
+  type LoginPortal,
+} from '@/lib/login-portal';
+import { cn } from '@/lib/utils';
 
 export const dynamic = 'force-dynamic';
-
-function getPostLoginRoute(user: User) {
-  const roles = user.roles ?? (user.role ? [user.role] : []);
-
-  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) {
-    return '/admin';
-  }
-
-  if (roles.includes('LECTURER')) {
-    return '/dashboard/lecturer';
-  }
-
-  return '/dashboard';
-}
 
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -37,14 +29,20 @@ export default function LoginPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [formError, setFormError] = useState('');
   const formErrorRef = useRef<HTMLDivElement>(null);
-  const { login } = useAuth();
+  const { login, logout } = useAuth();
   const { href, messages } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
+  const portal = parseLoginPortal(searchParams.get('portal'));
+  const portalCopy = messages.login.portals[portal];
 
   useEffect(() => {
     setIsClientReady(true);
   }, []);
+
+  useEffect(() => {
+    setFormError('');
+  }, [portal]);
 
   useEffect(() => {
     if (formError) {
@@ -104,8 +102,13 @@ export default function LoginPage() {
 
     try {
       const user = await login(email.trim(), password);
-      toast.success(messages.login.heading);
-      router.push(href(getPostLoginRoute(user)));
+      if (!portalMatchesUser(portal, user)) {
+        await logout({ redirect: false });
+        setFormError(portalCopy.mismatch);
+        return;
+      }
+
+      router.push(href(postLoginRoute(portal)));
     } catch (error: unknown) {
       const message = getLoginErrorMessage(error);
       setFormError(message);
@@ -114,25 +117,62 @@ export default function LoginPage() {
     }
   };
 
+  const portalHref = (next: LoginPortal) => {
+    const params = new URLSearchParams();
+    params.set('portal', next);
+    if (reason) {
+      params.set('reason', reason);
+    }
+    return `${href('/login')}?${params.toString()}`;
+  };
+
   return (
     <AuthShell
-      eyebrow={messages.login.eyebrow}
-      title={messages.login.title}
-      description={messages.login.description}
-      features={messages.login.featureTitles.map((label, index) => ({
+      portal={portal}
+      eyebrow={portalCopy.eyebrow}
+      title={portalCopy.title}
+      description={portalCopy.description}
+      features={portalCopy.featureTitles.map((label, index) => ({
         label,
-        description: messages.login.featureDescriptions[index],
+        description: portalCopy.featureDescriptions[index],
       }))}
     >
       <div className="space-y-6">
         <div className="space-y-2">
           <h2 className="text-2xl font-semibold leading-8 text-foreground">
-            {messages.login.heading}
+            {portalCopy.heading}
           </h2>
           <p className="text-sm leading-6 text-muted-foreground">
-            {messages.login.subheading}
+            {portalCopy.subheading}
           </p>
         </div>
+
+        <div
+          className="grid grid-cols-3 gap-1 rounded-md border border-border/80 bg-secondary/40 p-1"
+          role="tablist"
+          aria-label={messages.login.portals.groupLabel}
+        >
+          {LOGIN_PORTALS.map((item) => {
+            const selected = item === portal;
+            return (
+              <LocalizedLink
+                key={item}
+                href={portalHref(item)}
+                role="tab"
+                aria-selected={selected}
+                className={cn(
+                  'inline-flex min-h-11 items-center justify-center rounded-sm px-2 text-center text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  selected
+                    ? 'bg-card text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
+                )}
+              >
+                {messages.login.portals[item].tab}
+              </LocalizedLink>
+            );
+          })}
+        </div>
+        <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
 
         {notice ? (
           <div role="status" className="rounded-md border border-border/80 bg-secondary/50 px-4 py-3">
@@ -190,7 +230,7 @@ export default function LoginPage() {
               >
                 {messages.login.passwordLabel}
               </label>
-              <span className="text-xs text-muted-foreground">{messages.login.officeSupport}</span>
+              <span className="text-xs text-muted-foreground">{portalCopy.officeSupport}</span>
             </div>
             <div className="relative">
               <Input
@@ -237,22 +277,14 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        <div className="border-l-4 border-[var(--portal-yellow)] bg-card px-4 py-3">
-          <div className="flex items-start gap-3">
-            <div className="mt-0.5 flex h-9 w-9 items-center justify-center rounded-md bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
-              <KeyRound className="h-4 w-4" />
-            </div>
-            <div>
-              <div className="text-sm font-semibold text-foreground">
-                {messages.login.sessionBehaviorTitle}
-              </div>
-              <p className="mt-1 text-sm leading-6 text-foreground/80">
-                {messages.login.sessionBehaviorDescription}
-              </p>
-            </div>
-          </div>
-        </div>
-
+        {portal === 'student' ? (
+          <p className="text-sm text-muted-foreground">
+            {messages.signup.needAccount}{' '}
+            <LocalizedLink href="/register" className="font-medium text-primary hover:underline">
+              {messages.signup.submit}
+            </LocalizedLink>
+          </p>
+        ) : null}
         <p className="text-sm text-muted-foreground">
           {messages.login.returnHomeLead}{' '}
           <LocalizedLink href="/" className="font-medium text-primary hover:underline">

@@ -18,10 +18,10 @@ test('public home and login copy stays campus-facing', () => {
   assert.match(home, /messages\.home\.publicProof/);
   assert.doesNotMatch(home, /whyPoints|pillars\[2\]/);
   assert.match(messages, /publicProof:/);
-  assert.match(messages, /Stay signed in for the day/);
-  assert.match(messages, /Giữ đăng nhập trong ngày học vụ/);
   assert.match(messages, /One campus portal/);
   assert.match(messages, /Một cổng học vụ/);
+  assert.doesNotMatch(login, /Stay signed in for the day|sessionTitle|KeyRound/);
+  assert.doesNotMatch(messages, /sessionBehaviorTitle|sessionTitle:/);
   assert.doesNotMatch(
     rendered,
     /sessionBehaviorTitle:[\s\S]{0,40}One steady session|sessionBehaviorTitle:[\s\S]{0,80}Một phiên làm việc liền mạch/,
@@ -29,6 +29,8 @@ test('public home and login copy stays campus-facing', () => {
   assert.doesNotMatch(messages, /whyPoints:[\s\S]*?\/api\/v1/);
   assert.doesNotMatch(messages, /whyPoints:[\s\S]*?OpenAPI/);
   assert.doesNotMatch(messages, /whyPoints:[\s\S]*?Flyway/);
+  assert.doesNotMatch(rendered, /Java API|RESTful|PostgreSQL|OpenAPI|Flyway|\/api\/v1/);
+  assert.match(messages, /campusErrors:/);
 });
 
 test('public homepage keeps navy chrome so dark mode cannot invert the hero panel', () => {
@@ -64,6 +66,34 @@ test('portal tokens and page ribbon define the institutional visual grammar', ()
   assert.match(globals, /prefers-reduced-motion:\s*reduce/);
   assert.match(pageHeader, /portal-page-ribbon/);
   assert.match(pageHeader, /portal-page-actions/);
+});
+
+test('login chrome is role-specific and admin can publish live appearance', () => {
+  const login = read('src/app/login/page.tsx');
+  const messages = read('src/i18n/messages.ts');
+  const appearance = read('src/app/admin/appearance/page.tsx');
+  const globals = read('src/app/globals.css');
+
+  assert.match(login, /parseLoginPortal/);
+  assert.match(login, /messages\.login\.portals/);
+  assert.match(messages, /Student sign-in/);
+  assert.match(messages, /Faculty sign-in/);
+  assert.match(messages, /Operations sign-in/);
+  assert.match(messages, /Đăng nhập sinh viên/);
+  assert.match(messages, /Đăng nhập giảng viên/);
+  assert.match(messages, /Đăng nhập quản trị/);
+  assert.match(appearance, /Site appearance|copy\.postsTitle/);
+  assert.match(globals, /data-accent='campus-gold'/);
+  assert.match(globals, /data-accent='river-blue'/);
+});
+
+test('student dashboard does not repeat the welcome title in a second hero band', () => {
+  const dashboard = read('src/app/dashboard/page.tsx');
+  const layout = read('src/app/dashboard/layout.tsx');
+
+  assert.match(dashboard, /PageHeader/);
+  assert.doesNotMatch(dashboard, /section className="[^"]*bg-primary/);
+  assert.match(layout, /hidden sm:block xl:hidden/);
 });
 
 test('student and lecturer routes share one accessible responsive sidebar', () => {
@@ -136,6 +166,7 @@ test('admin routes use the same fixed sidebar and retained route inventory', () 
   assert.match(frame, /aria-controls="admin-sidebar"/);
   assert.match(frame, /id="admin-main-content"/);
   assert.match(frame, /\/admin\/announcements/);
+  assert.match(frame, /\/admin\/appearance/);
   assert.doesNotMatch(frame, /\/admin\/(analytics|invoices|support)/);
   assert.doesNotMatch(frame, /\/admin\/thesis\/(councils|evaluation|reviews)/);
 });

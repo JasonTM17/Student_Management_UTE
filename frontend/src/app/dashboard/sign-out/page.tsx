@@ -17,7 +17,9 @@ export default function DashboardSignOutPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=signed-out`);
+      router.replace(
+        `${href('/login')}?portal=${window.location.pathname.includes('/lecturer') ? 'lecturer' : 'student'}&reason=signed-out`,
+      );
       return;
     }
 

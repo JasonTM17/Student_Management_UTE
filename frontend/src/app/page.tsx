@@ -12,23 +12,25 @@ import { HomeIdentityBoard } from '@/components/home/HomeIdentityBoard';
 import { buildSiteUrl } from '@/lib/site';
 import { useI18n } from '@/i18n';
 import { buildCanonicalPath } from '@/i18n/paths';
+import { useSiteAppearance } from '@/components/providers/SiteAppearanceProvider';
 
 export default function HomePage() {
   const {
     user,
     isAdmin,
     isLecturer,
-    isLoading,
     isSuperAdmin,
   } = useAuth();
   const { locale, messages } = useI18n();
+  const { appearance } = useSiteAppearance();
+  const hero = appearance.hero[locale];
   const currentYear = new Date().getFullYear();
   const workspaceHref = isAdmin || isSuperAdmin
     ? '/admin'
     : isLecturer
       ? '/dashboard/lecturer'
       : '/dashboard';
-  const primaryHref = user ? workspaceHref : '/login';
+  const primaryHref = user ? workspaceHref : '/login?portal=student';
   const primaryLabel = user
     ? messages.common.actions.openDashboard
     : messages.common.actions.signIn;
@@ -75,21 +77,19 @@ export default function HomePage() {
           <div className="flex shrink-0 items-center gap-1 sm:gap-2">
             <LanguageToggle inverse />
             <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)]" />
-            {!isLoading ? (
-              user ? (
-                <LinkButton href={workspaceHref} variant="warm" className="inline-flex shrink-0 px-3 sm:px-4">
-                  {messages.common.actions.openDashboard}
-                </LinkButton>
-              ) : (
-                <LinkButton
-                  href="/login"
-                  variant="warm"
-                  className="inline-flex shrink-0 px-3 sm:px-4"
-                >
-                  {messages.common.actions.signIn}
-                </LinkButton>
-              )
-            ) : null}
+            {user ? (
+              <LinkButton href={workspaceHref} variant="warm" className="inline-flex shrink-0 px-3 sm:px-4">
+                {messages.common.actions.openDashboard}
+              </LinkButton>
+            ) : (
+              <LinkButton
+                href="/login?portal=student"
+                variant="warm"
+                className="inline-flex shrink-0 px-3 sm:px-4"
+              >
+                {messages.common.actions.signIn}
+              </LinkButton>
+            )}
           </div>
         </nav>
       </header>
@@ -97,12 +97,12 @@ export default function HomePage() {
       <main id="main-content" tabIndex={-1}>
         <section className="mx-auto grid max-w-[1280px] items-stretch gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-12 lg:py-14">
           <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-yellow)] pl-6">
-            <SectionEyebrow>{messages.home.eyebrow}</SectionEyebrow>
+            <SectionEyebrow>{hero.eyebrow || messages.home.eyebrow}</SectionEyebrow>
             <h1 className="max-w-xl text-4xl font-bold leading-[2.75rem] text-foreground lg:text-[2.75rem] lg:leading-[3.1rem]">
-              {messages.home.title}
+              {hero.title || messages.home.title}
             </h1>
             <p className="max-w-xl text-base leading-7 text-foreground/80 lg:text-lg">
-              {messages.home.description}
+              {hero.description || messages.home.description}
             </p>
             <div>
               <LinkButton
@@ -151,6 +151,12 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
+              <LocalizedLink
+                href={messages.home.roleLanes.lecturer.href}
+                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {messages.home.roleLanes.lecturer.action}
+              </LocalizedLink>
             </article>
 
             <article className="min-w-0 border-t border-border pt-8 lg:border-t-0 lg:pt-0">
@@ -164,6 +170,12 @@ export default function HomePage() {
                   </li>
                 ))}
               </ul>
+              <LocalizedLink
+                href={messages.home.roleLanes.admin.href}
+                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+              >
+                {messages.home.roleLanes.admin.action}
+              </LocalizedLink>
             </article>
           </div>
         </section>

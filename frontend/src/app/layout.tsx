@@ -7,6 +7,7 @@ import type { Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
 import { QueryProvider } from "@/components/providers/query-provider";
+import { SiteAppearanceProvider } from "@/components/providers/SiteAppearanceProvider";
 import { Toaster } from "sonner";
 import { I18nProvider } from "@/i18n";
 import { isLocale } from "@/i18n/config";
@@ -65,8 +66,10 @@ export default async function RootLayout({
           <I18nProvider locale={locale} isPrefixed={prefixed}>
             <AuthProvider>
               <QueryProvider>
-                {children}
-                <Toaster position="top-right" />
+                <SiteAppearanceProvider>
+                  {children}
+                  <Toaster position="top-right" />
+                </SiteAppearanceProvider>
               </QueryProvider>
             </AuthProvider>
           </I18nProvider>

@@ -44,6 +44,7 @@ test('the retained portal surfaces are present', () => {
     'src/app/dashboard/notifications/page.tsx',
     'src/app/dashboard/thesis/page.tsx',
     'src/app/admin/page.tsx',
+    'src/app/admin/appearance/page.tsx',
   ]) {
     assert.equal(fs.existsSync(path.join(root, relativePath)), true, relativePath);
   }

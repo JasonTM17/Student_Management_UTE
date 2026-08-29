@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FileText, GraduationCap, Users } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
@@ -18,10 +19,11 @@ import {
   WorkspaceMetricCard,
   WorkspacePanel,
 } from '@/components/dashboard/WorkspaceSurface';
+import { metricToneClass } from '@/components/ui/status';
 import { useI18n } from '@/i18n';
 
 export default function LecturerGradesPage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
   const { locale, formatNumber, messages } = useI18n();
   const [sections, setSections] = useState<GradingSection[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -79,8 +81,12 @@ export default function LecturerGradesPage() {
     0,
   );
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={messages.lecturerGrades.errors.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -123,21 +129,21 @@ export default function LecturerGradesPage() {
               value={formatNumber(sections.length)}
               icon={<FileText className="h-5 w-5" />}
               detail={messages.lecturerGrades.details[0]}
-              toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+              toneClassName={metricToneClass('info')}
             />
             <WorkspaceMetricCard
               label={messages.lecturerGrades.labels.gradesCaptured}
               value={formatNumber(totalGradedEntries)}
               icon={<Users className="h-5 w-5" />}
               detail={messages.lecturerGrades.details[1]}
-              toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+              toneClassName={metricToneClass('success')}
             />
             <WorkspaceMetricCard
               label={messages.lecturerGrades.labels.readyToPublish}
               value={formatNumber(publishReadyCount)}
               icon={<GraduationCap className="h-5 w-5" />}
               detail={messages.lecturerGrades.details[2]}
-              toneClassName="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+              toneClassName={metricToneClass('neutral')}
             />
           </div>
 
@@ -207,10 +213,10 @@ export default function LecturerGradesPage() {
                       <span
                         className={`rounded-full px-2.5 py-1 text-xs font-medium ${
                           section.canPublish
-                            ? 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400'
+                            ? metricToneClass('success')
                             : section.gradeStatus === 'PARTIAL'
-                              ? 'bg-amber-500/12 text-amber-600 dark:text-amber-400'
-                              : 'bg-secondary text-foreground'
+                              ? metricToneClass('warning')
+                              : metricToneClass('neutral')
                         }`}
                       >
                         {section.canPublish ? messages.lecturerGrades.labels.readyStatus : section.gradeStatus}

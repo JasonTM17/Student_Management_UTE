@@ -7,6 +7,7 @@ import {
   Button,
   Card,
   Divider,
+  Field,
   ListRow,
   MetricCard,
   ProgressBar,
@@ -17,7 +18,7 @@ import {
   UiText,
 } from '../../components/Ui';
 import { tokens } from '../../design/tokens';
-import { ApiClientError, apiClient, campusApi, type AuthUser, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type MobileSection } from '../../api/client';
+import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import type { MobileScreenProps } from '../../navigation/types';
 
 const upcomingClasses = [
@@ -101,6 +102,13 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
     () => campusApi.enrollments(),
     'Dashboard data is unavailable.',
   );
+  const {
+    data: liveAnnouncements,
+  } = useLiveResource<JsonObject[]>(
+    [],
+    async () => (await campusApi.announcements()).data ?? [],
+    'Announcements are unavailable.',
+  );
   const dashboardClasses = apiClient.mode === 'preview'
     ? upcomingClasses
     : liveEnrollments.slice(0, 3).map((item) => ({
@@ -144,7 +152,9 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
             {apiClient.mode === 'preview' ? 'Preview semester overview' : `${liveEnrollments.length} active sections`}
           </UiText>
           <UiText variant="bodySmall" tone="muted">
-            {apiClient.mode === 'preview' ? 'Preview data is local.' : 'Live data from the Java REST API.'}
+            {apiClient.mode === 'preview'
+              ? 'Preview data is local.'
+              : `${liveAnnouncements.length} campus announcements available.`}
           </UiText>
         </View>
         <Button label="Open schedule" onPress={() => navigation.navigate('schedule')} variant="secondary" />
@@ -348,6 +358,7 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
   } = useLiveResource<Array<{ code: string; name: string; score: string; letter: string; detail: string }>>(
     [],
     async () => {
+      await campusApi.transcript();
       const items = await campusApi.grades();
       return items.map((item) => ({
         code: item.courseCode,
@@ -482,19 +493,39 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
     isLoading,
     reload,
     setData: setRegistrationData,
-  } = useLiveResource<{ sections: MobileSection[]; enrollments: MobileEnrollment[] }>(
-    { sections: [], enrollments: [] },
+  } = useLiveResource<{
+    sections: RegistrationCatalogSection[];
+    enrollments: MobileEnrollment[];
+    roundOpen: boolean;
+  }>(
+    { sections: [], enrollments: [], roundOpen: true },
     async () => {
-      const [sectionResponse, enrollmentResponse] = await Promise.all([
-        campusApi.sections(),
-        campusApi.enrollments(),
-      ]);
-      return { sections: sectionResponse.data, enrollments: enrollmentResponse };
+      const enrollmentResponse = await campusApi.enrollments();
+      try {
+        const [rounds, catalog] = await Promise.all([
+          campusApi.registrationRounds(),
+          campusApi.registrationSections(),
+        ]);
+        return {
+          sections: catalog,
+          enrollments: enrollmentResponse,
+          roundOpen: rounds.some((round) => round.status === 'OPEN'),
+        };
+      } catch (catalogError) {
+        if (
+          catalogError instanceof ApiClientError
+          && (catalogError.code === 'WINDOW_CLOSED' || catalogError.code === 'COHORT_INELIGIBLE' || catalogError.code === 'ROUND_NOT_FOUND')
+        ) {
+          return { sections: [], enrollments: enrollmentResponse, roundOpen: false };
+        }
+        throw catalogError;
+      }
     },
     'Registration data is unavailable.',
   );
   const liveSections = registrationData.sections;
   const enrollments = registrationData.enrollments;
+  const roundOpen = registrationData.roundOpen;
   const activeEnrollmentCount = enrollments.filter((item) => item.status !== 'DROPPED').length;
 
   const availableSections = apiClient.mode === 'preview'
@@ -506,14 +537,10 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
       ]
     : liveSections.map((section) => ({
         id: section.id,
-        code: section.course?.code ?? section.sectionNumber,
-        name: section.course?.nameVi ?? section.course?.name ?? 'Course',
-        slot: section.schedules?.[0]
-          ? `${section.schedules[0].startTime} · ${section.schedules[0].classroom?.building ?? ''} ${section.schedules[0].classroom?.roomNumber ?? ''}`
-          : 'Schedule pending',
-        seats: Math.max(0, section.capacity - section.enrolledCount) > 0
-          ? `${Math.max(0, section.capacity - section.enrolledCount)} seats left`
-          : 'Full',
+        code: section.courseCode,
+        name: section.courseName,
+        slot: 'Schedule pending',
+        seats: section.remainingSeats > 0 ? `${section.remainingSeats} seats left` : 'Full',
       }));
 
   const toggleEnrollment = async (sectionId: string) => {
@@ -601,7 +628,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
           </View>
           <Button
             label={isPreview ? 'Preview only' : enrolled ? 'Drop section' : 'Add section'}
-            disabled={isPreview || pending === section.id || section.seats === 'Full'}
+            disabled={isPreview || !roundOpen || pending === section.id || section.seats === 'Full'}
             loading={pending === section.id}
             onPress={() => void toggleEnrollment(section.id)}
             variant="secondary"
@@ -609,7 +636,11 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         </Card>
         );
       })}
-      {availableSections.length === 0 ? <StatePanel kind="empty" title="No sections available" description="New sections will appear when the academic office publishes them." /> : null}
+      {!roundOpen ? (
+        <StatePanel kind="empty" title="No registration round is open" description="Course registration is unavailable until an academic round opens." />
+      ) : availableSections.length === 0 ? (
+        <StatePanel kind="empty" title="No sections available" description="New sections will appear when the academic office publishes them." />
+      ) : null}
     </ScreenShell>
   );
 }
@@ -731,6 +762,16 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
     () => campusApi.account(),
     'Profile is unavailable.',
   );
+  const [firstName, setFirstName] = useState(account?.firstName ?? '');
+  const [lastName, setLastName] = useState(account?.lastName ?? '');
+  const [oldPassword, setOldPassword] = useState('');
+  const [newPassword, setNewPassword] = useState('');
+  const [profileMessage, setProfileMessage] = useState<string | null>(null);
+
+  useEffect(() => {
+    setFirstName(account?.firstName ?? '');
+    setLastName(account?.lastName ?? '');
+  }, [account]);
   const displayName = apiClient.mode === 'preview'
     ? 'Nguyen Duc Minh'
     : [account?.firstName, account?.lastName].filter(Boolean).join(' ') || 'Student';
@@ -771,6 +812,35 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
         <ListRow title="Student ID" subtitle={displayStudentId} />
         <Divider />
         <ListRow title="Account status" subtitle={apiClient.mode === 'preview' ? 'Preview' : 'Authenticated through Java API'} />
+        {apiClient.mode === 'live' ? (
+          <>
+            <Divider />
+            <Field label="First name" value={firstName} onChangeText={setFirstName} />
+            <Field label="Last name" value={lastName} onChangeText={setLastName} />
+            <Button
+              label="Save profile"
+              onPress={() => {
+                void campusApi.updateProfile({ firstName, lastName }).then(() => {
+                  setProfileMessage('Profile saved.');
+                  void reload();
+                }).catch(() => setProfileMessage('Profile could not be saved.'));
+              }}
+            />
+            <Field label="Current password" value={oldPassword} onChangeText={setOldPassword} secureTextEntry />
+            <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
+            <Button
+              label="Update password"
+              onPress={() => {
+                void campusApi.changePassword(oldPassword, newPassword).then(() => {
+                  setProfileMessage('Password updated.');
+                  setOldPassword('');
+                  setNewPassword('');
+                }).catch(() => setProfileMessage('Password could not be updated.'));
+              }}
+            />
+            {profileMessage ? <UiText variant="bodySmall">{profileMessage}</UiText> : null}
+          </>
+        ) : null}
       </Card>
       <ScreenSpacer />
       <Card tone="low">

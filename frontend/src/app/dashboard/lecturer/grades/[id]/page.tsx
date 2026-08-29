@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi } from '@/lib/api';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
@@ -19,6 +21,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
 type GradeUpdate = {
@@ -61,8 +64,8 @@ function calculateGrade(score: number) {
 
 export default function SectionGradingPage() {
   const params = useParams<{ id: string }>();
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
-  const { locale, formatNumber } = useI18n();
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
+  const { locale, formatNumber, messages } = useI18n();
   const [sectionData, setSectionData] = useState<SectionGrades | null>(null);
   const [grades, setGrades] = useState<Map<string, GradeUpdate>>(new Map());
   const [isLoading, setIsLoading] = useState(true);
@@ -209,11 +212,13 @@ export default function SectionGradingPage() {
 
       setGrades(nextGrades);
     } catch (requestError: any) {
-      setError(requestError.response?.data?.message ?? copy.loadFailed);
+      setError(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [copy.loadFailed, copy.missingSection, sectionId]);
+  }, [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -287,7 +292,9 @@ export default function SectionGradingPage() {
       toast.success(copy.saved);
       await fetchSectionGrades();
     } catch (requestError: any) {
-      toast.error(requestError.response?.data?.message ?? copy.saveFailed);
+      toast.error(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+      );
     } finally {
       setIsSaving(false);
     }
@@ -315,14 +322,20 @@ export default function SectionGradingPage() {
       toast.success(copy.published);
       await fetchSectionGrades();
     } catch (requestError: any) {
-      toast.error(requestError.response?.data?.message ?? copy.publishFailed);
+      toast.error(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.publishFailed),
+      );
     } finally {
       setIsPublishing(false);
     }
   };
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   if (error) {
@@ -402,7 +415,7 @@ export default function SectionGradingPage() {
                 {formatNumber(sectionData.enrollments.length)}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
               <Users className="h-5 w-5" />
             </div>
           </CardContent>
@@ -417,7 +430,7 @@ export default function SectionGradingPage() {
                 )}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
               <CheckCircle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -430,7 +443,7 @@ export default function SectionGradingPage() {
                 {sectionData.status ?? 'OPEN'}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
               <FileText className="h-5 w-5" />
             </div>
           </CardContent>

@@ -2,7 +2,9 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Calendar, Clock, MapPin } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
@@ -43,7 +45,7 @@ const dayNames = [
 ];
 
 export default function SchedulePage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
@@ -241,8 +243,12 @@ export default function SchedulePage() {
           roomPending: 'Room information pending',
         };
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -302,7 +308,7 @@ export default function SchedulePage() {
                     {formatNumber(agenda.length)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
                   <Calendar className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -319,7 +325,7 @@ export default function SchedulePage() {
                     )}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
                   <Clock className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -342,7 +348,7 @@ export default function SchedulePage() {
                     )}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
                   <MapPin className="h-5 w-5" />
                 </div>
               </CardContent>

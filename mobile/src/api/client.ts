@@ -108,6 +108,21 @@ export interface MobileSection {
   schedules?: Array<{ dayOfWeek: number; startTime: string; endTime: string; classroom?: { building?: string; roomNumber?: string } }>;
 }
 
+export interface RegistrationCatalogSection {
+  id: string;
+  sectionNumber: string;
+  courseId?: string;
+  courseCode: string;
+  courseName: string;
+  credits?: number;
+  capacity: number;
+  enrolledCount: number;
+  remainingSeats: number;
+  status: string;
+  scheduleConflict?: boolean;
+  alreadyEnrolled?: boolean;
+}
+
 export interface MobileEnrollment {
   id: string;
   sectionId: string;
@@ -253,7 +268,7 @@ async function readResponseBody(response: Response) {
   }
 
   const contentType = response.headers.get('content-type') ?? '';
-  if (contentType.includes('application/json')) {
+  if (contentType.includes('json')) {
     return response.json();
   }
 
@@ -509,9 +524,26 @@ export const campusApi = {
       apiRoutes.enrollments + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),
     ),
   enroll: (sectionId: string, locale: AssistantLocale = 'vi') =>
-    apiClient.post<MobileEnrollment>('/enrollments/enroll', { sectionId, locale }),
+    apiClient.post<MobileEnrollment>(
+      '/me/enrollments',
+      { sectionId, locale },
+      { headers: { 'Idempotency-Key': createAssistantClientRequestId() } },
+    ),
   dropEnrollment: (enrollmentId: string) =>
-    apiClient.post<{ message: string }>(`/enrollments/${enrollmentId}/drop`, {}),
+    apiClient.post<{ message: string }>(
+      `/me/enrollments/${enrollmentId}/drop`,
+      {},
+      { headers: { 'Idempotency-Key': createAssistantClientRequestId() } },
+    ),
+  registrationRounds: () =>
+    apiClient.get<Array<{ id: string; status: string; kind?: string }>>('/registration/rounds'),
+  registrationSections: () =>
+    apiClient.get<RegistrationCatalogSection[]>('/me/registration/sections'),
+  transcript: () => apiClient.get<JsonObject>('/enrollments/my/transcript'),
+  announcements: () => apiClient.get<{ data: JsonObject[] }>('/announcements/my'),
+  updateProfile: (body: JsonObject) => apiClient.put<AuthUser>('/auth/profile', body),
+  changePassword: (oldPassword: string, newPassword: string) =>
+    apiClient.post<JsonObject>('/auth/change-password', { oldPassword, newPassword }),
   grades: (semesterId?: string) =>
     apiClient.get<MobileGrade[]>(
       apiRoutes.grades + (semesterId ? `?semesterId=${encodeURIComponent(semesterId)}` : ''),

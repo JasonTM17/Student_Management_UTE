@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
@@ -51,6 +52,21 @@ function roleLabel(roles?: string | string[]) {
   return values.filter(Boolean).join(', ') || defaultRole;
 }
 
+function userStatusTone(status: string): StatusTone {
+  switch (status.toUpperCase()) {
+    case 'ACTIVE':
+      return 'success';
+    case 'PENDING':
+      return 'warning';
+    case 'LOCKED':
+    case 'SUSPENDED':
+    case 'DISABLED':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function AdminUsersPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
   const { href, locale, formatDate, messages } = useI18n();
@@ -81,7 +97,7 @@ export default function AdminUsersPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -99,13 +115,23 @@ export default function AdminUsersPage() {
         limit: 20,
         search: search || undefined,
       });
-      setUsers(response.data);
+      const rows = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+      setUsers(rows as UserRecord[]);
       setTotalPages(response.meta?.totalPages || 1);
-    } catch {
+    } catch (loadError) {
+      const status = (loadError as { response?: { status?: number } }).response?.status;
       setError(
-        locale === 'vi'
-          ? 'Hiện chưa thể tải hồ sơ người dùng.'
-          : 'User records could not be loaded.',
+        status === 403
+          ? locale === 'vi'
+            ? 'Bạn không có quyền xem danh sách người dùng.'
+            : 'You do not have permission to view user records.'
+          : locale === 'vi'
+            ? 'Hiện chưa thể tải hồ sơ người dùng.'
+            : 'User records could not be loaded.',
       );
     } finally {
       setIsLoading(false);
@@ -413,7 +439,7 @@ export default function AdminUsersPage() {
                           {record.email}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
                         {record.status}
                       </span>
                     </div>
@@ -454,7 +480,7 @@ export default function AdminUsersPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.email}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.status}</th>
@@ -475,7 +501,7 @@ export default function AdminUsersPage() {
                           {record.email}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
                             {record.status}
                           </span>
                         </td>

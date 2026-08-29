@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Calendar, Clock, MapPin, Trash2 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -17,13 +19,14 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
 const statusTone: Record<string, string> = {
-  CONFIRMED: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
-  PENDING: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
-  DROPPED: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
-  COMPLETED: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+  CONFIRMED: metricToneClass('success'),
+  PENDING: metricToneClass('warning'),
+  DROPPED: metricToneClass('danger'),
+  COMPLETED: metricToneClass('info'),
 };
 
 function getDayName(day: number, locale: 'en' | 'vi') {
@@ -52,8 +55,8 @@ function getDayName(day: number, locale: 'en' | 'vi') {
 }
 
 export default function EnrollmentsPage() {
-  const { user } = useAuth();
-  const { locale, formatDate, formatNumber } = useI18n();
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
+  const { locale, formatDate, formatNumber, messages } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -142,8 +145,10 @@ export default function EnrollmentsPage() {
   }, [copy.loadFailed]);
 
   useEffect(() => {
-    void fetchEnrollments();
-  }, [fetchEnrollments]);
+    if (hasAccess) {
+      void fetchEnrollments();
+    }
+  }, [fetchEnrollments, hasAccess]);
 
   const handleDrop = async (enrollmentId: string, courseLabel: string) => {
     if (!user?.studentId) {
@@ -168,7 +173,7 @@ export default function EnrollmentsPage() {
       toast.success(copy.dropped);
       await fetchEnrollments();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || copy.dropFailed);
+      toast.error(campusErrorMessage(error, messages.common.campusErrors, copy.dropFailed));
     } finally {
       setIsDropping(null);
     }
@@ -186,17 +191,17 @@ export default function EnrollmentsPage() {
       {
         label: copy.coursesInView,
         value: formatNumber(enrollments.length),
-        tone: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+        tone: metricToneClass('info'),
       },
       {
         label: copy.confirmed,
         value: formatNumber(confirmedCourses.length),
-        tone: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
+        tone: metricToneClass('success'),
       },
       {
         label: copy.pending,
         value: formatNumber(pendingCourses.length),
-        tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
+        tone: metricToneClass('warning'),
       },
     ],
     [
@@ -209,6 +214,14 @@ export default function EnrollmentsPage() {
       pendingCourses.length,
     ],
   );
+
+  if (authLoading) {
+    return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
 
   return (
     <div className="space-y-8">

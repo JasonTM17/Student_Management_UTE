@@ -25,6 +25,7 @@ import {
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import {
@@ -245,6 +246,7 @@ function fromHistoryMessage(message: {
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
@@ -390,14 +392,16 @@ export function AssistantPanel() {
 
   const deleteConversation = async (conversationId: string) => {
     if (isSending || deletingConversationId) return;
-    if (
-      typeof window !== 'undefined' &&
-      !window.confirm(
+    const shouldDelete = await confirm({
+      title: messages.assistant.deleteConversation,
+      message:
         messages.assistant.deleteConversationConfirm ??
-          messages.assistant.deleteConversation,
-      )
-    )
-      return;
+        messages.assistant.deleteConversation,
+      confirmText: messages.assistant.deleteConversation,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!shouldDelete) return;
     setDeletingConversationId(conversationId);
     try {
       await thesisApi.deleteConversation(conversationId);
@@ -696,6 +700,7 @@ export function AssistantPanel() {
             ? messages.assistant.forbidden
             : messages.assistant.unavailable;
   return (
+    <>
     <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-50 w-[min(26rem,calc(100vw-2rem))] md:bottom-6 md:right-6">
       {!open ? (
         <Button
@@ -889,7 +894,7 @@ export function AssistantPanel() {
                       className={cn(
                         'mt-2 text-[11px] uppercase tracking-wide',
                         message.degraded
-                          ? 'text-amber-700'
+                          ? 'text-status-warning-foreground'
                           : 'text-muted-foreground',
                       )}
                     >
@@ -1050,5 +1055,7 @@ export function AssistantPanel() {
         </section>
       )}
     </div>
+    {confirmationDialog}
+    </>
   );
 }

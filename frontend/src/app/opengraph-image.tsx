@@ -95,9 +95,9 @@ export default function OpenGraphImage() {
             }}
           >
             {[
-              'Cookie sessions + CSRF',
-              'One Java REST API',
-              'PostgreSQL + Compose',
+              'Role-aware workspace',
+              'One academic portal',
+              'Campus records in one place',
             ].map((item) => (
               <div
                 key={item}

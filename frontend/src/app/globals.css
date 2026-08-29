@@ -61,6 +61,16 @@
     --portal-header-height: 3.75rem;
   }
 
+  html[data-accent='campus-gold'] {
+    --portal-yellow: oklch(0.81 0.15 78);
+    --portal-yellow-ink: oklch(0.28 0.06 78);
+  }
+
+  html[data-accent='river-blue'] {
+    --portal-yellow: oklch(0.78 0.12 230);
+    --portal-yellow-ink: oklch(0.24 0.07 240);
+  }
+
   .dark {
     --background: 220 18% 9%;
     --foreground: 210 18% 94%;
@@ -110,6 +120,16 @@
     --portal-surface: oklch(0.225 0.018 248);
     --portal-rule: oklch(0.34 0.02 248);
     --portal-scrim: oklch(0.1 0.02 252 / 0.7);
+  }
+
+  html.dark[data-accent='campus-gold'] {
+    --portal-yellow: oklch(0.84 0.14 78);
+    --portal-yellow-ink: oklch(0.24 0.05 78);
+  }
+
+  html.dark[data-accent='river-blue'] {
+    --portal-yellow: oklch(0.8 0.1 230);
+    --portal-yellow-ink: oklch(0.22 0.06 240);
   }
 }
 
@@ -206,6 +226,12 @@
 
   .focus-ring {
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
+  }
+
+  .registration-workspace {
+    --registration-navy: #002147;
+    --registration-gold: #c5b358;
+    --registration-gold-ink: #002147;
   }
 
   .portal-shell {

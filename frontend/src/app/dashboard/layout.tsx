@@ -27,6 +27,7 @@ import {
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -120,6 +121,46 @@ const dashboardMenuItems = [...studentMenuSections, ...lecturerMenuSections].fla
   (section) => section.items,
 );
 
+type MobileNavLinkConfig = {
+  kind: 'link';
+  href: string;
+  icon: LucideIcon;
+  labelKey: DashboardMenuLabelKey;
+};
+
+type MobileNavMenuConfig = {
+  kind: 'menu';
+  icon: LucideIcon;
+};
+
+type MobileNavItemConfig = MobileNavLinkConfig | MobileNavMenuConfig;
+
+const studentMobileNavItems: readonly MobileNavItemConfig[] = [
+  { kind: 'link', href: '/dashboard', icon: LayoutDashboard, labelKey: 'dashboard' },
+  { kind: 'link', href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
+  { kind: 'link', href: '/dashboard/register', icon: ClipboardList, labelKey: 'courseRegistration' },
+  { kind: 'link', href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
+  { kind: 'menu', icon: Menu },
+];
+
+const lecturerMobileNavItems: readonly MobileNavItemConfig[] = [
+  { kind: 'link', href: '/dashboard/lecturer', icon: LayoutDashboard, labelKey: 'dashboard' },
+  {
+    kind: 'link',
+    href: '/dashboard/lecturer/schedule',
+    icon: Calendar,
+    labelKey: 'teachingSchedule',
+  },
+  {
+    kind: 'link',
+    href: '/dashboard/lecturer/grades',
+    icon: FileText,
+    labelKey: 'gradeManagement',
+  },
+  { kind: 'link', href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+  { kind: 'menu', icon: Menu },
+];
+
 interface NotificationItem {
   id: string;
   title?: string;
@@ -173,9 +214,11 @@ export default function DashboardLayout({
           label: menuLabels[item.labelKey],
         })),
       }));
-  const mobileNavItems = menuSections
-    .flatMap((section) => section.items)
-    .slice(0, 4);
+  const mobileNavItems = isAdmin
+    ? []
+    : isLecturer
+      ? lecturerMobileNavItems
+      : studentMobileNavItems;
 
   const pageMetadata = useMemo<Record<string, { title: string; description: string }>>(
     () => ({
@@ -254,13 +297,15 @@ export default function DashboardLayout({
   useEffect(() => {
     if (isLoading || isLoggingOut) return;
     if (!user) {
-      router.replace(`${href('/login')}?reason=unauthorized`);
+      router.replace(
+        `${href('/login')}?portal=${isAdmin ? 'admin' : isLecturer ? 'lecturer' : 'student'}&reason=unauthorized`,
+      );
       return;
     }
     if (isAdmin) {
       router.replace(href('/admin'));
     }
-  }, [href, user, isLoading, isLoggingOut, isAdmin, router]);
+  }, [href, user, isLoading, isLoggingOut, isAdmin, isLecturer, router]);
 
   useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');
@@ -511,7 +556,11 @@ export default function DashboardLayout({
   }
 
   if (!user) {
-    return null;
+    return (
+      <div className="portal-shell flex min-h-screen items-center justify-center px-6">
+        <WorkspaceForbiddenState signedIn={false} />
+      </div>
+    );
   }
 
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
@@ -756,11 +805,11 @@ export default function DashboardLayout({
         <>
           <button
             type="button"
-            className="fixed inset-0 z-40 bg-[var(--portal-scrim)] 2xl:hidden"
+            className="fixed inset-0 z-40 bg-[var(--portal-scrim)] xl:hidden"
             onClick={closeStudentRail}
             aria-label={messages.dashboardShell.controls.closeStudentRailOverlay}
           />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 2xl:hidden">
+          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 xl:hidden">
             <StudentContextRail
               mobile
               containerRef={studentRailRef}
@@ -817,7 +866,7 @@ export default function DashboardLayout({
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="2xl:hidden"
+                  className="xl:hidden"
                   onClick={() => setStudentRailOpen(true)}
                   aria-label={messages.dashboardShell.controls.openStudentRail}
                   aria-expanded={studentRailOpen}
@@ -826,10 +875,10 @@ export default function DashboardLayout({
                   <DoorOpen className="h-5 w-5" aria-hidden="true" />
                 </Button>
               ) : null}
-              <div className="hidden sm:block">
+              <div className="hidden sm:block xl:hidden">
                 <LanguageToggle />
               </div>
-              <div className="hidden sm:block">
+              <div className="hidden sm:block xl:hidden">
                 <ThemeToggle />
               </div>
 
@@ -964,7 +1013,7 @@ export default function DashboardLayout({
                       <LocalizedLink
                         href="/dashboard/sign-out"
                         role="menuitem"
-                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-red-500 transition-colors hover:bg-red-500/10"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-left text-sm text-destructive transition-colors hover:bg-destructive/10"
                         onClick={() => setProfileOpen(false)}
                       >
                         <LogOut className="h-4 w-4" aria-hidden="true" />
@@ -984,8 +1033,8 @@ export default function DashboardLayout({
               className={cn(
                 'grid items-start gap-6',
                 studentRailCollapsed
-                  ? '2xl:grid-cols-[minmax(0,1fr)_5.5rem]'
-                  : '2xl:grid-cols-[minmax(0,1fr)_20rem]',
+                  ? 'xl:grid-cols-[minmax(0,1fr)_5.5rem]'
+                  : 'xl:grid-cols-[minmax(0,1fr)_20rem]',
               )}
             >
               <main
@@ -996,7 +1045,7 @@ export default function DashboardLayout({
               >
                 {children}
               </main>
-              <div className="hidden 2xl:block">
+              <div className="hidden xl:block">
                 <StudentContextRail
                   currentPageTitle={currentPage.title}
                   currentPageDescription={currentPage.description}
@@ -1020,30 +1069,72 @@ export default function DashboardLayout({
           )}
         </div>
       </div>
-      <nav
-        aria-label={messages.dashboardShell.controls.mobileNavigation}
-        className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden"
-      >
-        <div className="mx-auto grid max-w-md grid-cols-4 gap-1 py-2">
-          {mobileNavItems.map((item) => {
-            const isActive = pathname === item.href || (item.href !== '/dashboard' && pathname.startsWith(item.href));
-            return (
-              <LocalizedLink
-                key={item.href}
-                href={item.href}
-                aria-current={isActive ? 'page' : undefined}
-                className={cn(
-                  'flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-[11px] font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
-                  isActive ? 'bg-secondary text-primary' : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
-                )}
-              >
-                <item.icon className="h-4 w-4" aria-hidden="true" />
-                <span className="max-w-full truncate">{menuLabels[item.labelKey]}</span>
-              </LocalizedLink>
-            );
-          })}
-        </div>
-      </nav>
+      {mobileNavItems.length > 0 ? (
+        <nav
+          aria-label={messages.dashboardShell.controls.mobileNavigation}
+          className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden"
+        >
+          <div className="mx-auto grid max-w-md grid-cols-5 gap-1 py-2">
+            {mobileNavItems.map((item) => {
+              if (item.kind === 'menu') {
+                return (
+                  <button
+                    key="mobile-menu"
+                    type="button"
+                    onClick={() => setSidebarOpen(true)}
+                    aria-label={messages.dashboardShell.controls.openSidebar}
+                    aria-expanded={sidebarOpen}
+                    aria-controls="dashboard-sidebar"
+                    className={cn(
+                      'relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      sidebarOpen
+                        ? 'bg-secondary text-primary'
+                        : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                    )}
+                  >
+                    <item.icon className="h-5 w-5" aria-hidden="true" />
+                    <span className="max-w-full text-center leading-4">
+                      {messages.dashboardShell.controls.bottomNav.menu}
+                    </span>
+                    {unreadCount > 0 ? (
+                      <span className="absolute right-1 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground">
+                        {unreadCount > 99 ? '99+' : unreadCount}
+                      </span>
+                    ) : null}
+                  </button>
+                );
+              }
+
+              const isActive =
+                pathname === item.href ||
+                (item.href !== '/dashboard' &&
+                  item.href !== '/dashboard/lecturer' &&
+                  pathname.startsWith(item.href));
+
+              return (
+                <LocalizedLink
+                  key={item.href}
+                  href={item.href}
+                  aria-current={isActive ? 'page' : undefined}
+                  className={cn(
+                    'flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    isActive
+                      ? 'bg-secondary text-primary'
+                      : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
+                  )}
+                >
+                  <item.icon className="h-5 w-5" aria-hidden="true" />
+                  <span className="max-w-full text-center leading-4">
+                    {messages.dashboardShell.controls.bottomNav[
+                      item.labelKey as keyof typeof messages.dashboardShell.controls.bottomNav
+                    ] ?? menuLabels[item.labelKey]}
+                  </span>
+                </LocalizedLink>
+              );
+            })}
+          </div>
+        </nav>
+      ) : null}
       <AssistantPanel />
     </div>
   );
