@@ -2,6 +2,7 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 const TECHNICAL = /Java API|RESTful|PostgreSQL|OpenAPI|Flyway|\/api\/v1/;
@@ -18,6 +19,18 @@ function walk(relativeDirectory) {
     if (entry.isDirectory()) return walk(relativePath);
     return /\.(tsx?|jsx?)$/.test(entry.name) ? [relativePath] : [];
   });
+}
+
+async function loadCampusErrorModule() {
+  const source = fs.readFileSync(path.join(root, 'src/lib/campus-error.ts'), 'utf8');
+  const { outputText } = ts.transpileModule(source, {
+    compilerOptions: {
+      module: ts.ModuleKind.ESNext,
+      target: ts.ScriptTarget.ES2022,
+    },
+    fileName: 'campus-error.ts',
+  });
+  return import(`data:text/javascript;base64,${Buffer.from(outputText).toString('base64')}`);
 }
 
 test('general-user page and message sources ban technical internals', () => {
@@ -80,7 +93,9 @@ test('demo thesis topic copy is rewritten to campus language', () => {
 });
 
 test('shipped campusErrorMessage maps representative payloads without envelope text', async () => {
-  const { campusErrorKind, campusErrorMessage, campusErrorCode } = await import('../src/lib/campus-error.ts');
+  // Keep this behavior test runnable on the Node 20 CI runner, which does not
+  // natively load TypeScript files, while still executing the shipped module.
+  const { campusErrorKind, campusErrorMessage, campusErrorCode } = await loadCampusErrorModule();
   const copy = {
     network: 'NETWORK_COPY',
     validation: 'VALIDATION_COPY',
