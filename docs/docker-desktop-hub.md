@@ -11,13 +11,27 @@ Do not guess the Hub namespace from GitHub (`jasontm17`). Read the signed-in Doc
 
 On this machine the Hub user is `nguyenson1710`.
 
-## Publish a frontend image
+## Publish images manually (fallback)
 
 ```powershell
 docker tag campuscore-frontend:local nguyenson1710/campuscore-frontend:<version>
 docker push nguyenson1710/campuscore-frontend:<version>
 docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<version>
 ```
+
+The supported release path is the `Publish container images` workflow. It
+builds and pushes the four images from the same commit to Docker Hub and GHCR:
+
+| Component | Docker Hub | GHCR |
+| --- | --- | --- |
+| Database | `nguyenson1710/campuscore-database` | `ghcr.io/jasontm17/student-management-ute-database` |
+| REST API | `nguyenson1710/campuscore-restful-api` | `ghcr.io/jasontm17/student-management-ute-restful-api` |
+| RAG service | `nguyenson1710/campuscore-rag-service` | `ghcr.io/jasontm17/student-management-ute-rag-service` |
+| Frontend | `nguyenson1710/campuscore-frontend` | `ghcr.io/jasontm17/student-management-ute-frontend` |
+
+The workflow needs repository secrets `DOCKERHUB_USERNAME` and
+`DOCKERHUB_TOKEN`; it never stores credentials in the repository. It publishes
+an immutable short-SHA tag and only moves `latest` on the default branch.
 
 GitHub Packages stays separate:
 

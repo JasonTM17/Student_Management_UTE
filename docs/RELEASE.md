@@ -7,10 +7,12 @@ authorize production deployment.
 
 - Record exact `main`, candidate and tree SHA.
 - Verify `git status --short` is empty before review.
-- Confirm no legacy backend, K8s, monitoring or external Docker Hub image
-  reference remains. The internal `rag-service` sidecar is an intentional
-  course-runtime component and is addressed only through its token-protected
-  `/internal/rag/**` contract.
+- Confirm no legacy backend, K8s, monitoring or retired image reference
+  remains. The internal `rag-service` sidecar is an intentional course-runtime
+  component and is addressed only through its token-protected
+  `/internal/rag/**` contract. The current release workflow publishes the
+  four course images to both Docker Hub (`nguyenson1710/campuscore-*`) and
+  GHCR (`ghcr.io/jasontm17/student-management-ute-*`) from the same commit.
 
 ## API and database
 
@@ -43,6 +45,16 @@ fresh database and the same Flyway/health checks above:
 
 ```powershell
 docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build postgres mailpit rag-service restful-api web
+```
+
+The same workflow publishes Docker Hub tags with the `campuscore-*` names.
+Each registry receives an immutable short-SHA tag; `latest` is updated only
+from the default branch. Verify both registry manifests before announcing a
+release:
+
+```powershell
+docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<short-sha>
+docker manifest inspect ghcr.io/jasontm17/student-management-ute-frontend:<short-sha>
 ```
 
 ## Clients
