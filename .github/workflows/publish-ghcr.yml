@@ -1,4 +1,4 @@
-name: Publish GHCR images
+name: Publish container images
 
 on:
   workflow_dispatch:
@@ -24,6 +24,7 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   IMAGE_OWNER: ${{ github.repository_owner }}
+  DOCKERHUB_OWNER: nguyenson1710
   DOCKER_METADATA_SHORT_SHA_LENGTH: 8
 
 jobs:
@@ -35,15 +36,19 @@ jobs:
       matrix:
         include:
           - package: student-management-ute-database
+            hub-package: campuscore-database
             dockerfile: database/Dockerfile
             description: CampusCore PostgreSQL runtime; schema managed by Flyway
           - package: student-management-ute-restful-api
+            hub-package: campuscore-restful-api
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore Spring Boot RESTful API
           - package: student-management-ute-rag-service
+            hub-package: campuscore-rag-service
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore dedicated thesis RAG service
           - package: student-management-ute-frontend
+            hub-package: campuscore-frontend
             dockerfile: frontend/Dockerfile
             description: CampusCore Next.js frontend
 
@@ -61,11 +66,19 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
       - name: Generate metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+            docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
           tags: |
             type=sha,format=short,prefix=
             type=raw,value=latest,enable={{is_default_branch}}
