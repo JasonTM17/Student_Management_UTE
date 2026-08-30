@@ -99,9 +99,7 @@ public class ApiExceptionHandler {
 
     @ExceptionHandler(DomainException.class)
     ResponseEntity<ApiError> domain(DomainException exception, HttpServletRequest request) {
-        return ResponseEntity.status(exception.status())
-                .contentType(org.springframework.http.MediaType.APPLICATION_PROBLEM_JSON)
-                .body(problemBody(exception.status(), exception.code(), exception.getMessage(), request, Map.of()));
+        return error(exception.status(), exception.code(), exception.getMessage(), request, Map.of());
     }
 
     @ExceptionHandler(DataIntegrityViolationException.class)

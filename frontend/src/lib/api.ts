@@ -373,7 +373,7 @@ export const sectionsApi = {
 
   updateSectionGrades: async (
     sectionId: string,
-    grades: { enrollmentId: string; finalGrade: number; letterGrade: string }[],
+    grades: { enrollmentId: string; finalGrade: number | null; letterGrade: string }[],
   ): Promise<{ message: string }> => {
     const response = await api.put<{ message: string }>(
       `/sections/${sectionId}/grades`,

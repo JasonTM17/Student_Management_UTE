@@ -217,9 +217,21 @@ public class AcademicMutationService {
         }
     }
 
-    private static String csv(Object value) {
+    static String csv(Object value) {
         String text = value == null ? "" : value.toString();
+        if (startsFormulaCharacter(text)) {
+            text = "'" + text;
+        }
         return "\"" + text.replace("\"", "\"\"") + "\"";
+    }
+
+    private static boolean startsFormulaCharacter(String text) {
+        if (text.isEmpty()) {
+            return false;
+        }
+        char first = text.charAt(0);
+        return first == '=' || first == '+' || first == '-' || first == '@'
+                || first == '\t' || first == '\r';
     }
 
     private static DomainException problem(HttpStatus status, String code, String message) {

@@ -75,6 +75,7 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -263,6 +264,11 @@ export default function AdminUsersPage() {
             `Delete user ${firstName} ${lastName}`,
         };
 
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
+
   if (isAuthLoading || isLoggingOut || !canAccess) {
     return <LoadingState label={copy.loading} className="m-8" />;
   }
@@ -296,10 +302,12 @@ export default function AdminUsersPage() {
     resetForm();
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // The search box keeps its own draft; committing it on submit lets the
+  // fetchUsers effect run once per query instead of once per keystroke.
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearch(searchInput);
     setPage(1);
-    await fetchUsers();
   };
 
   const handleDelete = async (userRecord: UserRecord) => {
@@ -378,8 +386,8 @@ export default function AdminUsersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />
@@ -440,7 +448,7 @@ export default function AdminUsersPage() {
                         </p>
                       </div>
                       <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
-                        {record.status}
+                        {statusLabel(record.status)}
                       </span>
                     </div>
                     <dl className="mt-4 border-t border-border/60 pt-3">
@@ -502,7 +510,7 @@ export default function AdminUsersPage() {
                         </td>
                         <td className="px-2 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
-                            {record.status}
+                            {statusLabel(record.status)}
                           </span>
                         </td>
                         <td className="px-2 py-4 text-muted-foreground">

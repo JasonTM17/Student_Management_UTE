@@ -132,6 +132,9 @@ export default function DashboardPage() {
     (enrollment) => enrollment.status === 'PENDING',
   );
   const highlightedCourses = confirmedCourses.slice(0, 3);
+  const enrollmentStatusLabel = (status: string) =>
+    messages.common.statuses[status as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={messages.studentDashboard.errors.loading} />;
@@ -268,8 +271,11 @@ export default function DashboardPage() {
                             {messages.studentDashboard.panels.currentCourses.sectionLabel.replace('{section}', enrollment.section?.sectionNumber || '')}
                           </div>
                         </div>
-                        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                          {enrollment.status}
+                        <span
+                          className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
+                          aria-label={enrollmentStatusLabel(enrollment.status)}
+                        >
+                          {enrollmentStatusLabel(enrollment.status)}
                         </span>
                       </div>
                       );

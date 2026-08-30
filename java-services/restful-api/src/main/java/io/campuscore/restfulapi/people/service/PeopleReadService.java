@@ -61,7 +61,7 @@ public class PeopleReadService {
         Set<String> authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)
                 .collect(java.util.stream.Collectors.toSet());
-        return authorities.contains("ROLE_STUDENT")
+        return (authorities.contains("ROLE_STUDENT") || authorities.isEmpty())
                 && !authorities.contains("ROLE_ADMIN")
                 && !authorities.contains("ROLE_SUPER_ADMIN")
                 && !authorities.contains("ROLE_LECTURER");
@@ -77,8 +77,28 @@ public class PeopleReadService {
 
     @Transactional(readOnly = true)
     public LecturerResponse findLecturer(String id) {
+        return findLecturer(id, null);
+    }
+
+    @Transactional(readOnly = true)
+    public LecturerResponse findLecturer(String id, Authentication authentication) {
+        if (!staffOnly(authentication)) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Lecturer directory access is required");
+        }
         return people.findLecturerById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Lecturer not found"));
+    }
+
+    private static boolean staffOnly(Authentication authentication) {
+        if (authentication == null) {
+            return true;
+        }
+        Set<String> authorities = authentication.getAuthorities().stream()
+                .map(GrantedAuthority::getAuthority)
+                .collect(java.util.stream.Collectors.toSet());
+        return authorities.contains("ROLE_LECTURER")
+                || authorities.contains("ROLE_ADMIN")
+                || authorities.contains("ROLE_SUPER_ADMIN");
     }
 
     private static String normalizeStatus(String status) {

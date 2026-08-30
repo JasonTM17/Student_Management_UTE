@@ -1,6 +1,9 @@
 services:
   postgres:
-    image: postgres:15-alpine
+    build:
+      context: .
+      dockerfile: database/Dockerfile
+    image: campuscore-database:local
     container_name: campuscore-restful-postgres
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-campuscore}

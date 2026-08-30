@@ -21,6 +21,27 @@ import { tokens } from '../../design/tokens';
 import { ApiClientError, apiClient, campusApi, type AuthUser, type JsonObject, type MobileAttendanceSummary, type MobileEnrollment, type MobileNotification, type RegistrationCatalogSection } from '../../api/client';
 import type { MobileScreenProps } from '../../navigation/types';
 
+const friendlyErrorMessageByCode: Record<string, string> = {
+  ACCESS_DENIED: 'You do not have access to this action.',
+  COHORT_INELIGIBLE: 'Registration is not available for your year group yet.',
+  CONFLICT: 'This change conflicts with your current record.',
+  HTTP_400: 'Please review the information and try again.',
+  HTTP_401: 'Please sign in again to continue.',
+  HTTP_403: 'You do not have access to this action.',
+  HTTP_404: 'We could not find that item.',
+  INVALID_REQUEST: 'Please review the information and try again.',
+  ROUND_NOT_FOUND: 'Registration is not open right now.',
+  UNAUTHENTICATED: 'Please sign in again to continue.',
+  WINDOW_CLOSED: 'Registration is not open right now.',
+};
+
+function studentFriendlyErrorMessage(error: unknown, fallbackMessage: string) {
+  if (error instanceof ApiClientError) {
+    return error.code ? friendlyErrorMessageByCode[error.code] ?? fallbackMessage : fallbackMessage;
+  }
+  return fallbackMessage;
+}
+
 const upcomingClasses = [
   { code: 'CS204', name: 'Software Architecture', time: '08:00 – 09:30', room: 'A2.204' },
   { code: 'BA312', name: 'Business Analytics', time: '13:30 – 15:00', room: 'B1.108' },
@@ -33,9 +54,9 @@ const courses = [
 ];
 
 const grades = [
-  { code: 'CS204', name: 'Software Architecture', score: '9.1', letter: 'A', detail: 'Excellent' },
-  { code: 'BA312', name: 'Business Analytics', score: '8.4', letter: 'B+', detail: 'Very good' },
-  { code: 'EN201', name: 'Academic English', score: '8.8', letter: 'A-', detail: 'Very good' },
+  { id: 'preview-cs204', code: 'CS204', name: 'Software Architecture', score: '9.1', letter: 'A', detail: 'Excellent' },
+  { id: 'preview-ba312', code: 'BA312', name: 'Business Analytics', score: '8.4', letter: 'B+', detail: 'Very good' },
+  { id: 'preview-en201', code: 'EN201', name: 'Academic English', score: '8.8', letter: 'A-', detail: 'Very good' },
 ];
 
 const previewNotifications = [
@@ -75,7 +96,7 @@ function useLiveResource<T>(
       }
     } catch (nextError) {
       if (mountedRef.current) {
-        setError(nextError instanceof ApiClientError ? nextError.message : fallbackMessage);
+        setError(studentFriendlyErrorMessage(nextError, fallbackMessage));
       }
     } finally {
       if (mountedRef.current) {
@@ -109,19 +130,21 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
     async () => (await campusApi.announcements()).data ?? [],
     'Announcements are unavailable.',
   );
-  const dashboardClasses = apiClient.mode === 'preview'
+  const activeEnrollments = liveEnrollments.filter((item) => item.status === 'ENROLLED');
+  const dashboardClasses: Array<{ semesterId?: string; code: string; name: string; time: string; room: string }> = apiClient.mode === 'preview'
     ? upcomingClasses
-    : liveEnrollments.slice(0, 3).map((item) => ({
+    : activeEnrollments.slice(0, 3).map((item) => ({
         code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
         name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
         time: item.section?.schedules?.[0]
-          ? `${item.section.schedules[0].startTime} - ${item.section.schedules[0].endTime}`
+          ? `${item.section.schedules[0].startTime} – ${item.section.schedules[0].endTime}`
           : 'Schedule pending',
         room: item.section?.schedules?.[0]?.classroom
           ? `${item.section.schedules[0].classroom?.building ?? ''}${item.section.schedules[0].classroom?.roomNumber ? ` ${item.section.schedules[0].classroom.roomNumber}` : ''}`.trim()
           : 'TBA',
+        semesterId: item.semesterId,
       }));
-  const scheduledSessions = liveEnrollments.reduce((total, item) => total + (item.section?.schedules?.length ?? 0), 0);
+  const scheduledSessions = activeEnrollments.reduce((total, item) => total + (item.section?.schedules?.length ?? 0), 0);
 
   if (isLoading || error) {
     return (
@@ -149,7 +172,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
             CURRENT SEMESTER
           </UiText>
           <UiText variant="headlineSmall" style={styles.heroTitle}>
-            {apiClient.mode === 'preview' ? 'Preview semester overview' : `${liveEnrollments.length} active sections`}
+            {apiClient.mode === 'preview' ? 'Preview semester overview' : `${activeEnrollments.length} active sections`}
           </UiText>
           <UiText variant="bodySmall" tone="muted">
             {apiClient.mode === 'preview'
@@ -161,7 +184,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
       </Card>
 
       <View style={styles.metricGrid}>
-        <MetricCard label="Active sections" value={apiClient.mode === 'preview' ? '3' : String(liveEnrollments.length)} detail="Current semester" style={styles.metricLeft} />
+        <MetricCard label="Active sections" value={apiClient.mode === 'preview' ? '3' : String(activeEnrollments.length)} detail="Current semester" style={styles.metricLeft} />
         <MetricCard label="Weekly sessions" value={apiClient.mode === 'preview' ? '2' : String(scheduledSessions)} detail="Published schedule" />
       </View>
 
@@ -169,7 +192,7 @@ export function StudentDashboardScreen({ navigation }: MobileScreenProps) {
       <SectionHeading title="Next on your schedule" actionLabel="See all" onAction={() => navigation.navigate('schedule')} />
       <Card>
         {dashboardClasses.map((item, index) => (
-          <View key={item.code}>
+          <View key={`${item.semesterId ?? 'na'}-${item.code}`}>
             <ListRow
               leading={item.code.slice(0, 1)}
               meta={item.time}
@@ -208,7 +231,7 @@ export function ScheduleScreen({ navigation }: MobileScreenProps) {
   const liveSchedule = liveEnrollments.flatMap((item) => (item.section?.schedules ?? []).map((slot) => ({
     code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
     name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
-    time: `${slot.startTime} - ${slot.endTime}`,
+    time: `${slot.startTime} – ${slot.endTime}`,
     room: slot.classroom ? `${slot.classroom.building ?? ''} ${slot.classroom.roomNumber ?? ''}`.trim() : 'TBA',
     day: slot.dayOfWeek,
   })));
@@ -299,13 +322,18 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
     () => campusApi.enrollments(),
     'Courses are unavailable.',
   );
-  const visibleCourses = apiClient.mode === 'preview' ? courses : liveEnrollments.map((item) => ({
-    code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
-    name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
-    lecturer: item.section?.sectionNumber ?? 'Section',
-    progress: item.gradeStatus === 'PUBLISHED' ? 100 : 50,
-    status: item.status,
-  }));
+  const visibleCourses: Array<{ semesterId?: string; code: string; name: string; lecturer: string; progress: number; status: string }> = apiClient.mode === 'preview'
+    ? courses
+    : liveEnrollments
+      .filter((item) => item.status === 'ENROLLED')
+      .map((item) => ({
+        code: item.section?.course?.code ?? item.section?.sectionNumber ?? item.sectionId,
+        name: item.section?.course?.nameVi ?? item.section?.course?.name ?? 'Course',
+        lecturer: item.section?.sectionNumber ?? 'Section',
+        progress: item.gradeStatus === 'PUBLISHED' ? 100 : 50,
+        status: item.status,
+        semesterId: item.semesterId,
+      }));
 
   if (isLoading || error) {
     return (
@@ -331,7 +359,7 @@ export function CoursesScreen({ navigation }: MobileScreenProps) {
       <ScreenSpacer />
       <SectionHeading title="Active courses" actionLabel="Grades" onAction={() => navigation.navigate('grades')} />
       {visibleCourses.map((course) => (
-        <Card key={course.code} style={styles.courseCard}>
+        <Card key={`${course.semesterId ?? 'na'}-${course.code}`} style={styles.courseCard}>
           <View style={styles.courseHeader}>
             <View style={styles.courseCopy}>
               <UiText variant="meta" tone="primary">{course.code}</UiText>
@@ -355,12 +383,12 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
     error,
     isLoading,
     reload,
-  } = useLiveResource<Array<{ code: string; name: string; score: string; letter: string; detail: string }>>(
+  } = useLiveResource<Array<{ id: string; code: string; name: string; score: string; letter: string; detail: string }>>(
     [],
     async () => {
-      await campusApi.transcript();
       const items = await campusApi.grades();
       return items.map((item) => ({
+        id: item.id,
         code: item.courseCode,
         name: item.courseName,
         score: item.finalGrade == null ? '—' : String(item.finalGrade),
@@ -401,7 +429,7 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
       <SectionHeading title="Published grades" actionLabel="Courses" onAction={() => navigation.navigate('courses')} />
       {visibleGrades.length > 0 ? <Card>
         {visibleGrades.map((grade, index) => (
-          <View key={grade.code}>
+          <View key={grade.id}>
             <ListRow
               leading={grade.letter}
               meta={grade.score}
@@ -417,7 +445,7 @@ export function GradesScreen({ navigation }: MobileScreenProps) {
       <ScreenSpacer />
       <Card tone="low">
         <UiText variant="label">Need a transcript?</UiText>
-        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Downloadable transcripts will use the Java API contract when it is connected.</UiText>
+        <UiText variant="bodySmall" tone="muted" style={styles.cardCopy}>Downloadable transcripts will be available when records are connected.</UiText>
         <Button label="Ask assistant" onPress={() => navigation.navigate('assistant.chat')} variant="secondary" />
       </Card>
     </ScreenShell>
@@ -563,7 +591,7 @@ export function RegistrationScreen({ navigation }: MobileScreenProps) {
         }));
       }
     } catch (nextError) {
-      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Enrollment could not be updated.');
+      setMutationError(studentFriendlyErrorMessage(nextError, 'Enrollment could not be updated.'));
     } finally {
       setPending(null);
     }
@@ -674,7 +702,7 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
         item.id === id ? { ...item, isRead: true } : item
       )));
     } catch (nextError) {
-      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Notification could not be updated.');
+      setMutationError(studentFriendlyErrorMessage(nextError, 'Notification could not be updated.'));
     } finally {
       setBusyId(null);
     }
@@ -688,7 +716,7 @@ export function NotificationsScreen({ navigation }: MobileScreenProps) {
       await campusApi.markAllNotificationsRead();
       setLiveNotifications((current) => current.map((item) => ({ ...item, isRead: true })));
     } catch (nextError) {
-      setMutationError(nextError instanceof ApiClientError ? nextError.message : 'Notifications could not be updated.');
+      setMutationError(studentFriendlyErrorMessage(nextError, 'Notifications could not be updated.'));
     } finally {
       setIsMarkingAll(false);
     }
@@ -767,11 +795,46 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
   const [oldPassword, setOldPassword] = useState('');
   const [newPassword, setNewPassword] = useState('');
   const [profileMessage, setProfileMessage] = useState<string | null>(null);
+  const [isSavingProfile, setIsSavingProfile] = useState(false);
+  const [isSavingPassword, setIsSavingPassword] = useState(false);
 
   useEffect(() => {
     setFirstName(account?.firstName ?? '');
     setLastName(account?.lastName ?? '');
   }, [account]);
+
+  const saveProfile = async () => {
+    setIsSavingProfile(true);
+    setProfileMessage(null);
+    try {
+      await campusApi.updateProfile({ firstName, lastName });
+      setProfileMessage('Profile saved.');
+      void reload();
+    } catch {
+      setProfileMessage('Profile could not be saved.');
+    } finally {
+      setIsSavingProfile(false);
+    }
+  };
+
+  const updatePassword = async () => {
+    if (newPassword.length < 8) {
+      setProfileMessage('New password must be at least 8 characters.');
+      return;
+    }
+    setIsSavingPassword(true);
+    setProfileMessage(null);
+    try {
+      await campusApi.changePassword(oldPassword, newPassword);
+      setProfileMessage('Password updated.');
+      setOldPassword('');
+      setNewPassword('');
+    } catch {
+      setProfileMessage('Password could not be updated.');
+    } finally {
+      setIsSavingPassword(false);
+    }
+  };
   const displayName = apiClient.mode === 'preview'
     ? 'Nguyen Duc Minh'
     : [account?.firstName, account?.lastName].filter(Boolean).join(' ') || 'Student';
@@ -819,24 +882,17 @@ export function ProfileScreen({ navigation, role }: MobileScreenProps) {
             <Field label="Last name" value={lastName} onChangeText={setLastName} />
             <Button
               label="Save profile"
-              onPress={() => {
-                void campusApi.updateProfile({ firstName, lastName }).then(() => {
-                  setProfileMessage('Profile saved.');
-                  void reload();
-                }).catch(() => setProfileMessage('Profile could not be saved.'));
-              }}
+              disabled={isSavingProfile}
+              loading={isSavingProfile}
+              onPress={() => void saveProfile()}
             />
             <Field label="Current password" value={oldPassword} onChangeText={setOldPassword} secureTextEntry />
             <Field label="New password" value={newPassword} onChangeText={setNewPassword} secureTextEntry />
             <Button
               label="Update password"
-              onPress={() => {
-                void campusApi.changePassword(oldPassword, newPassword).then(() => {
-                  setProfileMessage('Password updated.');
-                  setOldPassword('');
-                  setNewPassword('');
-                }).catch(() => setProfileMessage('Password could not be updated.'));
-              }}
+              disabled={isSavingPassword}
+              loading={isSavingPassword}
+              onPress={() => void updatePassword()}
             />
             {profileMessage ? <UiText variant="bodySmall">{profileMessage}</UiText> : null}
           </>

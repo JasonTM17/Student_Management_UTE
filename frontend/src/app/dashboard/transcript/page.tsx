@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Award, FileText, GraduationCap, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
@@ -73,7 +73,7 @@ function getGradePoint(record: StudentGradeRecord) {
 
 export default function TranscriptPage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
-  const { locale, formatNumber } = useI18n();
+  const { locale, formatNumber, messages } = useI18n();
   const [transcriptData, setTranscriptData] = useState<{
     summary: {
       cumulativeGpa: number;
@@ -86,6 +86,7 @@ export default function TranscriptPage() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
     const response = await semestersApi.getAll();
@@ -93,20 +94,25 @@ export default function TranscriptPage() {
   }, []);
 
   const fetchTranscript = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setIsLoading(true);
     setError('');
 
     try {
       const data = await gradesApi.getMyTranscript(selectedSemester || undefined);
+      if (generation !== loadGeneration.current) return;
       setTranscriptData(data);
     } catch {
+      if (generation !== loadGeneration.current) return;
       setError(
         locale === 'vi'
           ? 'Hiện chưa thể tải dữ liệu bảng điểm.'
           : 'Transcript data could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (generation === loadGeneration.current) {
+        setIsLoading(false);
+      }
     }
   }, [locale, selectedSemester]);
 
@@ -150,7 +156,7 @@ export default function TranscriptPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Bảng điểm',
           description: `Xem hồ sơ học tập dài hạn cho ${selectedSemesterName}, bao gồm GPA tích lũy và kết quả theo từng học kỳ.`,
           selectSemester: 'Chọn học kỳ cho bảng điểm',
@@ -171,17 +177,17 @@ export default function TranscriptPage() {
           gradePointLabel: 'GPA',
           headers: {
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             credits: 'Tín chỉ',
             score: 'Điểm',
             grade: 'Xếp loại',
             points: 'Điểm hệ',
-            enrollment: 'Enrollment',
+            enrollment: 'Đăng ký',
             gradeStatus: 'Trạng thái điểm',
           },
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Transcript',
           description: `Review the long-form academic record for ${selectedSemesterName}, including cumulative GPA and semester-by-semester outcomes.`,
           selectSemester: 'Select semester for transcript',
@@ -202,15 +208,20 @@ export default function TranscriptPage() {
           gradePointLabel: 'GPA',
           headers: {
             course: 'Course',
-            section: 'Section',
+            section: 'Class',
             credits: 'Credits',
             score: 'Score',
             grade: 'Grade',
             points: 'Points',
-            enrollment: 'Enrollment',
+            enrollment: 'Registration',
             gradeStatus: 'Grade status',
           },
         };
+
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
@@ -414,7 +425,7 @@ export default function TranscriptPage() {
                               {copy.headers.enrollment}
                             </dt>
                             <dd className="mt-1 break-words text-foreground">
-                              {record.enrollmentStatus}
+                              {statusLabel(record.enrollmentStatus)}
                             </dd>
                           </div>
                           <div className="col-span-2 border-t border-border/60 pt-3">
@@ -422,7 +433,7 @@ export default function TranscriptPage() {
                               {copy.headers.gradeStatus}
                             </dt>
                             <dd className="mt-1 break-words text-foreground">
-                              {record.gradeStatus}
+                              {statusLabel(record.gradeStatus)}
                             </dd>
                           </div>
                         </dl>
@@ -491,12 +502,12 @@ export default function TranscriptPage() {
                             </td>
                             <td className="px-2 py-4 text-center">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {record.enrollmentStatus}
+                                {statusLabel(record.enrollmentStatus)}
                               </span>
                             </td>
                             <td className="px-2 py-4 text-right">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {record.gradeStatus}
+                                {statusLabel(record.gradeStatus)}
                               </span>
                             </td>
                           </tr>

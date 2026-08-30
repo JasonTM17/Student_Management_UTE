@@ -61,6 +61,7 @@ frontend/.env.development.local
 frontend/.env.test.local
 frontend/.env.production.local
 frontend/src/designs/
+frontend/.data/
 
 # Stitch design exports (reference artifacts)
 src/designs/

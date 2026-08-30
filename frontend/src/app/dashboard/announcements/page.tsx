@@ -52,25 +52,25 @@ export default function StudentAnnouncementsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Không gian sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Thông báo',
-          description: `Đọc các cập nhật quan trọng dành cho ${user?.firstName ?? 'bạn'} mà không rời khỏi không gian sinh viên.`,
+          description: `Đọc các cập nhật quan trọng dành cho ${user?.firstName ?? 'bạn'} tại đây.`,
           refresh: 'Làm mới',
           loading: 'Đang tải thông báo',
           unavailableTitle: 'Thông báo chưa sẵn sàng',
           emptyTitle: 'Chưa có thông báo',
           emptyDescription:
             'Thông báo toàn trường và cập nhật từ học phần sẽ xuất hiện tại đây sau khi được phát hành.',
-          returnDashboard: 'Quay lại dashboard',
+          returnDashboard: 'Quay lại trang tổng quan',
           recentNotices: 'Thông báo gần đây',
           semesterPrefix: 'Học kỳ',
           sectionPrefix: 'lớp học phần',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Announcements',
-          description: `Read the notices that matter to ${user?.firstName ?? 'you'} without leaving the protected student workspace.`,
+          description: `Read the notices that matter to ${user?.firstName ?? 'you'} in one place.`,
           refresh: 'Refresh',
           loading: 'Loading announcements',
           unavailableTitle: 'Announcements unavailable',
@@ -80,7 +80,7 @@ export default function StudentAnnouncementsPage() {
           returnDashboard: 'Return to dashboard',
           recentNotices: 'Recent notices',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'section',
+          sectionPrefix: 'class',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 

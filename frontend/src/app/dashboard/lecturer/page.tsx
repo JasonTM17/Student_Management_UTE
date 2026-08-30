@@ -97,6 +97,9 @@ export default function LecturerDashboardPage() {
   const readyToPublish = useMemo(() => {
     return gradingSections.filter((section) => section.canPublish).length;
   }, [gradingSections]);
+  const statusLabel = (status: string) =>
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={messages.lecturerDashboard.errors.loading} />;
@@ -205,7 +208,7 @@ export default function LecturerDashboardPage() {
                             )}
                           </div>
                           <div className="mt-1 text-sm text-muted-foreground">
-                            Section {section.sectionNumber} - {getLocalizedFlatLabel(
+                            {messages.lecturerDashboard.sectionPrefix} {section.sectionNumber} - {getLocalizedFlatLabel(
                               locale,
                               section.semester,
                               section.semesterNameEn,
@@ -271,7 +274,7 @@ export default function LecturerDashboardPage() {
                         </div>
                         <div className="text-sm text-muted-foreground sm:text-right">
                           <div>{section.enrolledCount}/{section.capacity} {messages.lecturerDashboard.studentsSuffix}</div>
-                          <div className="mt-1">{section.status}</div>
+                          <div className="mt-1">{statusLabel(section.status)}</div>
                         </div>
                       </div>
                     </div>

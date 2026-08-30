@@ -183,8 +183,8 @@ export default function AdminSectionsPage() {
     )) {
       setReferenceError(
         locale === 'vi'
-          ? 'Một hoặc nhiều danh sách tham chiếu cho biểu mẫu section chưa tải được.'
-          : 'One or more section form reference lists could not be loaded.',
+          ? 'Một hoặc nhiều danh sách cần cho biểu mẫu lớp học phần chưa tải được.'
+          : 'Some course lists needed by this page could not be loaded.',
       );
     }
   }, [locale]);
@@ -204,7 +204,7 @@ export default function AdminSectionsPage() {
     } catch {
       setError(
         locale === 'vi'
-          ? 'Hiện chưa thể tải danh sách section.'
+          ? 'Hiện chưa thể tải danh sách lớp học phần.'
           : 'Sections could not be loaded.',
       );
     } finally {
@@ -239,11 +239,11 @@ export default function AdminSectionsPage() {
   const copy =
     locale === 'vi'
       ? {
-          loading: 'Đang tải section',
-          title: 'Sections',
+          loading: 'Đang tải lớp học phần',
+          title: 'Lớp học phần',
           description:
-            'Quản lý sức chứa, phân công giảng dạy và lịch phòng học của section trong một workflow nhất quán.',
-          create: 'Tạo section',
+            'Quản lý sức chứa, phân công giảng dạy và lịch phòng học trong một quy trình nhất quán.',
+          create: 'Tạo lớp học phần',
           semester: 'Học kỳ',
           allSemesters: 'Tất cả học kỳ',
           selectCourse: 'Chọn môn học',
@@ -252,14 +252,14 @@ export default function AdminSectionsPage() {
           selectRoom: 'Chọn phòng',
           pageSummary: (currentPage: number, pages: number) =>
             `Trang ${currentPage} / ${pages}`,
-          unavailableTitle: 'Section chưa sẵn sàng',
-          emptyTitle: 'Không có section phù hợp',
+          unavailableTitle: 'Lớp học phần chưa sẵn sàng',
+          emptyTitle: 'Không có lớp học phần phù hợp',
           emptyDescription:
-            'Hãy tạo section để liên kết catalog môn học, phân công giảng viên và lịch phòng học vào cùng một bản ghi.',
-          tableTitle: 'Bản ghi section',
+            'Hãy tạo lớp học phần để liên kết môn học, giảng viên và lịch phòng học trong cùng một thông tin.',
+          tableTitle: 'Danh sách lớp học phần',
           headers: {
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             semester: 'Học kỳ',
             lecturer: 'Giảng viên',
             capacity: 'Sức chứa',
@@ -271,43 +271,43 @@ export default function AdminSectionsPage() {
           noCourseName: 'Chưa có tên môn',
           unassigned: 'Chưa gán',
           noSchedule: 'Chưa có lịch',
-          deleteTitle: 'Xóa section',
+          deleteTitle: 'Xóa lớp học phần',
           deleteMessage: (sectionNumber: string, courseCode: string) =>
-            `Xóa section ${sectionNumber} của ${courseCode}?`,
-          deleteConfirm: 'Xóa section',
-          deleted: 'Đã xóa section',
-          deleteFailed: 'Hiện chưa thể xóa section này.',
-          updated: 'Đã cập nhật section',
-          created: 'Đã tạo section',
-          saveFailed: 'Hiện chưa thể lưu section.',
-          editTitle: 'Chỉnh sửa section',
-          createTitle: 'Tạo section',
+            `Xóa lớp học phần ${sectionNumber} của ${courseCode}?`,
+          deleteConfirm: 'Xóa lớp học phần',
+          deleted: 'Đã xóa lớp học phần',
+          deleteFailed: 'Hiện chưa thể xóa lớp học phần này.',
+          updated: 'Đã cập nhật lớp học phần',
+          created: 'Đã tạo lớp học phần',
+          saveFailed: 'Hiện chưa thể lưu lớp học phần.',
+          editTitle: 'Chỉnh sửa lớp học phần',
+          createTitle: 'Tạo lớp học phần',
           fields: {
             course: 'Môn học',
             semester: 'Học kỳ',
-            sectionNumber: 'Mã section',
+            sectionNumber: 'Mã lớp học phần',
             capacity: 'Sức chứa',
             status: 'Trạng thái',
             lecturer: 'Giảng viên',
           },
           schedulesTitle: 'Lịch học',
           schedulesDescription:
-            'Chỉ thêm lịch khi section đã có học kỳ, phòng và ownership đủ rõ.',
+            'Chỉ thêm lịch khi lớp học phần đã có học kỳ, phòng và người phụ trách rõ ràng.',
           addSchedule: 'Thêm lịch',
           noSchedules: 'Chưa có lịch nào.',
           removeSchedule: (index: number) => `Xóa lịch ${index}`,
           saving: 'Đang lưu...',
           editAction: messages.common.actions.saveChanges,
           editLabel: (sectionNumber: string, courseCode: string) =>
-            `Chỉnh sửa section ${sectionNumber} của ${courseCode}`,
+            `Chỉnh sửa lớp học phần ${sectionNumber} của ${courseCode}`,
           deleteLabel: (sectionNumber: string, courseCode: string) =>
-            `Xóa section ${sectionNumber} của ${courseCode}`,
+            `Xóa lớp học phần ${sectionNumber} của ${courseCode}`,
         }
       : {
           loading: 'Loading sections',
           title: 'Sections',
           description:
-            'Control section capacity, teaching assignments, and classroom schedules from one consistent workflow.',
+            'Manage class capacity, teaching assignments, and classroom schedules from one consistent workflow.',
           create: 'Create section',
           semester: 'Semester',
           allSemesters: 'All semesters',
@@ -320,7 +320,7 @@ export default function AdminSectionsPage() {
           unavailableTitle: 'Sections unavailable',
           emptyTitle: 'No matching sections',
           emptyDescription:
-            'Create a section to connect course inventory, lecturer assignment, and room scheduling into one record.',
+            'Create a class to connect course details, lecturer assignment, and room scheduling in one record.',
           tableTitle: 'Section records',
           headers: {
             course: 'Course',
@@ -357,7 +357,7 @@ export default function AdminSectionsPage() {
           },
           schedulesTitle: 'Schedules',
           schedulesDescription:
-            'Add meeting times only when the section already has a reliable semester, room, and ownership context.',
+            'Add meeting times only when the class already has a semester, room, and assigned lecturer.',
           addSchedule: 'Add schedule',
           noSchedules: 'No schedules added yet.',
           removeSchedule: (index: number) => `Remove schedule ${index}`,
@@ -666,7 +666,7 @@ export default function AdminSectionsPage() {
                           </h3>
                         </div>
                         <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
-                          {section.status}
+                          {messages.common.statuses[section.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                         </span>
                       </div>
 
@@ -854,7 +854,7 @@ export default function AdminSectionsPage() {
                         </td>
                         <td className="px-2 py-4">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
-                            {section.status}
+                            {messages.common.statuses[section.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                           </span>
                         </td>
                         <td className="px-2 py-4">

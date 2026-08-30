@@ -31,7 +31,12 @@ interface StatusBadgeProps {
 
 export function StatusBadge({ status, variant = 'default', className }: StatusBadgeProps) {
   const { messages } = useI18n();
-  const label = messages.thesis.status[status as keyof typeof messages.thesis.status] ?? status;
+  const label =
+    messages.thesis.status[status as keyof typeof messages.thesis.status] ??
+    messages.common.statuses[
+      status.toUpperCase() as keyof typeof messages.common.statuses
+    ] ??
+    messages.common.statuses.UNKNOWN;
 
   return (
     <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(status, variant), className)}>

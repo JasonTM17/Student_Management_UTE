@@ -47,9 +47,20 @@ export function SiteAppearanceProvider({ children }: { children: ReactNode }) {
 
   useEffect(() => {
     void refreshAppearance();
+    // Poll slowly and only while the tab is visible; hidden tabs pause
+    // polling and catch up immediately when they become visible again.
     const timer = window.setInterval(() => {
-      void refreshAppearance();
-    }, 4000);
+      if (document.visibilityState === 'visible') {
+        void refreshAppearance();
+      }
+    }, 15000);
+
+    const onVisibilityChange = () => {
+      if (document.visibilityState === 'visible') {
+        void refreshAppearance();
+      }
+    };
+    document.addEventListener('visibilitychange', onVisibilityChange);
 
     const channel = typeof BroadcastChannel !== 'undefined'
       ? new BroadcastChannel(SITE_APPEARANCE_CHANNEL)
@@ -63,6 +74,7 @@ export function SiteAppearanceProvider({ children }: { children: ReactNode }) {
 
     return () => {
       window.clearInterval(timer);
+      document.removeEventListener('visibilitychange', onVisibilityChange);
       channel?.removeEventListener('message', onMessage);
       channel?.close();
     };

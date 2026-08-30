@@ -141,7 +141,7 @@ test.describe('student workspace', () => {
     await signIn(page, student);
     await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
     await expect(page.getByRole('main')).toBeVisible();
-    const mobileNav = page.getByRole('navigation', { name: /mobile workspace navigation/i });
+    const mobileNav = page.getByRole('navigation', { name: /campus navigation on mobile/i });
     if (testInfo.project.name === 'mobile-390') {
       await expect(mobileNav).toBeVisible();
       await expect(mobileNav.getByRole('link', { name: /home|trang chủ/i })).toBeVisible();

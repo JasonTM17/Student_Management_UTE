@@ -26,3 +26,12 @@ gh auth token | docker login ghcr.io -u JasonTM17 --password-stdin
 docker tag campuscore-frontend:local ghcr.io/jasontm17/student-management-ute-frontend:<version>
 docker push ghcr.io/jasontm17/student-management-ute-frontend:<version>
 ```
+
+The GHCR workflow publishes the same course stack as four artifacts. The
+database artifact is a migration-free PostgreSQL runtime wrapper; Flyway in
+the REST API still owns schema and seed data.
+
+```powershell
+docker tag campuscore-database:local ghcr.io/jasontm17/student-management-ute-database:<version>
+docker push ghcr.io/jasontm17/student-management-ute-database:<version>
+```
