@@ -688,7 +688,9 @@ export function AssistantPanel() {
           ? messages.assistant.noMatch
           : message.reasonCode === 'ANSWERED'
             ? messages.assistant.answered
-            : message.reasonCode;
+            : message.reasonCode === 'CANCELLED'
+              ? messages.assistant.cancelled
+              : messages.assistant.answered;
   const errorLabel =
     state.error === 'quota'
       ? messages.assistant.quotaExceeded
@@ -899,11 +901,6 @@ export function AssistantPanel() {
                       )}
                     >
                       {reasonLabel(message)}
-                    </p>
-                  ) : null}
-                  {message.role === 'assistant' && message.model ? (
-                    <p className="mt-1 text-[11px] text-muted-foreground">
-                      {messages.assistant.model}: {message.model}
                     </p>
                   ) : null}
                   {message.citations?.length ? (

@@ -193,9 +193,9 @@ export default function SchedulePage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Không gian sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Thời khóa biểu',
-          description: `Giữ lịch học theo tuần cho ${selectedSemesterName} trong tầm tay trong khi phần còn lại của không gian sinh viên vẫn chỉ cách một lần chạm.`,
+          description: `Giữ lịch học theo tuần cho ${selectedSemesterName} trong tầm tay cùng các tiện ích sinh viên cần dùng mỗi ngày.`,
           selectSemester: 'Chọn học kỳ cho thời khóa biểu',
           allSemesters: 'Tất cả học kỳ',
           openCourses: 'Mở môn học của tôi',
@@ -203,8 +203,8 @@ export default function SchedulePage() {
           unavailableTitle: 'Thời khóa biểu chưa sẵn sàng',
           emptyTitle: 'Chưa có lớp học theo lịch',
           emptyDescription:
-            'Khi section được xác nhận, các buổi học sẽ xuất hiện tại đây theo lịch tuần.',
-          browseSections: 'Xem các section',
+            'Khi lớp học phần được xác nhận, các buổi học sẽ xuất hiện tại đây theo lịch tuần.',
+          browseSections: 'Xem lớp học phần',
           weeklyMeetings: 'Buổi học mỗi tuần',
           coursesInRotation: 'Môn học đang diễn ra',
           teachingSpaces: 'Không gian học tập',
@@ -218,9 +218,9 @@ export default function SchedulePage() {
           roomPending: 'Đang chờ thông tin phòng học',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Schedule',
-          description: `Keep the weekly class agenda for ${selectedSemesterName} visible while the rest of the student workspace stays one click away.`,
+          description: `Keep the weekly class agenda for ${selectedSemesterName} visible while the rest of the student area stays one click away.`,
           selectSemester: 'Select semester for schedule',
           allSemesters: 'All semesters',
           openCourses: 'Open my courses',
@@ -239,7 +239,7 @@ export default function SchedulePage() {
           noSlot: 'No teaching slot scheduled.',
           items: 'items',
           item: 'item',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Class',
           roomPending: 'Room information pending',
         };
 

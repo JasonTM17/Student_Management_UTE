@@ -91,7 +91,9 @@ export default function ThesisPage() {
     (group) => group.leaderStudentId === studentId || group.memberStudentIds.includes(studentId),
   );
   const statusLabel = (status: string) =>
-    messages.thesis.status[status as keyof typeof messages.thesis.status] ?? status;
+    messages.thesis.status[status as keyof typeof messages.thesis.status] ??
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   const refreshGroups = async () => {
     if (!selectedRoundId) return;

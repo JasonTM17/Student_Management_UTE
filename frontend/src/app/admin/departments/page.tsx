@@ -122,7 +122,7 @@ export default function AdminDepartmentsPage() {
           loading: 'Đang tải khoa',
           title: 'Khoa',
           description:
-            'Giữ cấu trúc học thuật rõ ràng để môn học, giảng viên và chương trình cùng bám một ownership.',
+            'Giữ cấu trúc học thuật rõ ràng để môn học, giảng viên và chương trình có người phụ trách cụ thể.',
           create: 'Tạo khoa',
           searchLabel: 'Tìm khoa',
           searchPlaceholder: 'Tìm theo tên hoặc mã khoa',
@@ -132,7 +132,7 @@ export default function AdminDepartmentsPage() {
           unavailableTitle: 'Khoa chưa sẵn sàng',
           emptyTitle: 'Không có khoa phù hợp',
           emptyDescription:
-            'Hãy tạo khoa để môn học, giảng viên và catalog học thuật cùng bám vào một cấu trúc rõ ràng.',
+            'Hãy tạo khoa để môn học, giảng viên và chương trình cùng nằm trong một cấu trúc rõ ràng.',
           tableTitle: 'Bản ghi khoa',
           headers: {
             code: 'Mã',
@@ -169,7 +169,7 @@ export default function AdminDepartmentsPage() {
           loading: 'Loading departments',
           title: 'Departments',
           description:
-            'Keep the academic structure readable for courses, lecturers, and curriculum ownership.',
+            'Keep the academic structure readable for courses, lecturers, and curriculum responsibilities.',
           create: 'Create department',
           searchLabel: 'Search departments',
           searchPlaceholder: 'Search by name or code',
@@ -179,7 +179,7 @@ export default function AdminDepartmentsPage() {
           unavailableTitle: 'Departments unavailable',
           emptyTitle: 'No matching departments',
           emptyDescription:
-            'Create a department to anchor courses, lecturer assignments, and catalog ownership.',
+            'Create a department to organize courses, lecturer assignments, and curriculum responsibilities.',
           tableTitle: 'Department records',
           headers: {
             code: 'Code',

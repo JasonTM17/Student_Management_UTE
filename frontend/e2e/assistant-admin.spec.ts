@@ -89,7 +89,7 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await expect.poll(() => feedbackCalls).toBe(1);
 });
 
-test('authenticated admin can inspect curated sources and the public catalog coverage surface', async ({ page }) => {
+test('authenticated admin can inspect reviewed guidance and public coverage', async ({ page }) => {
   const source = {
     documentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     revisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -116,15 +116,15 @@ test('authenticated admin can inspect curated sources and the public catalog cov
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
   await page.goto('/admin/assistant-knowledge');
 
-  await expect(page.getByRole('heading', { name: 'AI assistant knowledge' })).toBeVisible();
-  await expect(page.getByText('Public catalog coverage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Thesis guidance' })).toBeVisible();
+  await expect(page.getByText('Public guidance coverage')).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
 
-  await page.getByLabel('Filter state').selectOption('PUBLISHED');
+  await page.getByLabel('Filter status').selectOption('PUBLISHED');
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await page.getByRole('button', { name: 'Archive' }).first().click();
-  await expect(page.getByRole('dialog')).toContainText('Archive source?');
+  await expect(page.getByRole('dialog')).toContainText('Archive guidance?');
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -158,7 +158,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     expect(launcherBox!.x + launcherBox!.width).toBeLessThanOrEqual(viewport.width);
     expect(launcherBox!.y + launcherBox!.height).toBeLessThanOrEqual(viewport.height);
 
-    const mobileNav = page.getByRole('navigation', { name: /mobile workspace navigation/i });
+    const mobileNav = page.getByRole('navigation', { name: /campus navigation on mobile/i });
     if (viewport.width < 768) {
       await expect(mobileNav).toBeVisible();
       const navBox = await mobileNav.boundingBox();

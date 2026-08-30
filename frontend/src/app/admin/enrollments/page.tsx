@@ -81,6 +81,7 @@ interface Section {
 }
 
 const statusColors: Record<string, string> = {
+  ENROLLED: metricToneClass('success'),
   PENDING: metricToneClass('warning'),
   CONFIRMED: metricToneClass('info'),
   COMPLETED: metricToneClass('success'),
@@ -228,6 +229,7 @@ export default function AdminEnrollmentsPage() {
           allSections: 'Tất cả section',
           allStatuses: 'Tất cả trạng thái',
           statusOptions: {
+            ENROLLED: 'Đã đăng ký',
             PENDING: 'Chờ xác nhận',
             CONFIRMED: 'Đã xác nhận',
             COMPLETED: 'Hoàn tất',
@@ -303,6 +305,7 @@ export default function AdminEnrollmentsPage() {
           allSections: 'All sections',
           allStatuses: 'All statuses',
           statusOptions: {
+            ENROLLED: 'Registered',
             PENDING: 'Pending',
             CONFIRMED: 'Confirmed',
             COMPLETED: 'Completed',
@@ -364,6 +367,11 @@ export default function AdminEnrollmentsPage() {
           },
         };
 
+  const statusLabel = (status: string) =>
+    copy.statusOptions[status as keyof typeof copy.statusOptions] ??
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
+
   useEffect(() => {
     if (canAccess) {
       void fetchDropdownData();
@@ -413,6 +421,7 @@ export default function AdminEnrollmentsPage() {
   const statusOptions = useMemo(
     () => [
       { value: '', label: copy.allStatuses },
+      { value: 'ENROLLED', label: copy.statusOptions.ENROLLED },
       { value: 'PENDING', label: copy.statusOptions.PENDING },
       { value: 'CONFIRMED', label: copy.statusOptions.CONFIRMED },
       { value: 'COMPLETED', label: copy.statusOptions.COMPLETED },
@@ -620,9 +629,7 @@ export default function AdminEnrollmentsPage() {
                   const lecturerLabel = enrollment.section?.lecturer?.user
                     ? `${enrollment.section.lecturer.user.firstName} ${enrollment.section.lecturer.user.lastName}`
                     : copy.unassigned;
-                  const statusLabel =
-                    copy.statusOptions[enrollment.status as keyof typeof copy.statusOptions] ??
-                    enrollment.status;
+                  const enrollmentStatusLabel = statusLabel(enrollment.status);
 
                   return (
                     <article
@@ -643,9 +650,9 @@ export default function AdminEnrollmentsPage() {
                           </p>
                         </div>
                         <span
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || 'bg-secondary text-foreground'}`}
+                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                         >
-                          {statusLabel}
+                          {enrollmentStatusLabel}
                         </span>
                       </div>
                       <dl className="mt-4 grid gap-3 border-t border-border/60 pt-3 text-sm sm:grid-cols-2">
@@ -783,10 +790,9 @@ export default function AdminEnrollmentsPage() {
                           </td>
                           <td className="px-2 py-4">
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || 'bg-secondary text-foreground'}`}
+                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                             >
-                              {copy.statusOptions[enrollment.status as keyof typeof copy.statusOptions] ??
-                                enrollment.status}
+                              {statusLabel(enrollment.status)}
                             </span>
                           </td>
                           <td className="px-2 py-4 text-muted-foreground">
@@ -853,11 +859,9 @@ export default function AdminEnrollmentsPage() {
                 </label>
                 <div className="mt-1">
                   <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || 'bg-secondary text-foreground'}`}
+                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || metricToneClass('neutral')}`}
                   >
-                    {copy.statusOptions[
-                      selectedEnrollment.status as keyof typeof copy.statusOptions
-                    ] ?? selectedEnrollment.status}
+                    {statusLabel(selectedEnrollment.status)}
                   </span>
                 </div>
               </div>

@@ -31,7 +31,9 @@ export default function ThesisRoundDetailPage() {
   const [error, setError] = useState('');
 
   const statusLabel = (status: string) =>
-    messages.thesis.status[status as keyof typeof messages.thesis.status] ?? status;
+    messages.thesis.status[status as keyof typeof messages.thesis.status] ??
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   useEffect(() => {
     if (!roundId) return;

@@ -101,7 +101,9 @@ export default function ThesisTopicDetailPage() {
               {workspace.selectedRound ? (
                 <StatusBadge status={workspace.selectedRound.status} />
               ) : (
-                <span className="font-semibold text-foreground">—</span>
+                <span className="font-semibold text-foreground">
+                  {messages.common.statuses.UNKNOWN}
+                </span>
               )}
             </div>
           </CardContent>

@@ -9,6 +9,7 @@ on:
       - ".github/workflows/publish-ghcr.yml"
       - "frontend/**"
       - "java-services/**"
+      - "database/**"
       - "docker-compose.yml"
       - "docker-compose.rag.override.yml"
 
@@ -33,6 +34,9 @@ jobs:
       fail-fast: false
       matrix:
         include:
+          - package: student-management-ute-database
+            dockerfile: database/Dockerfile
+            description: CampusCore PostgreSQL runtime; schema managed by Flyway
           - package: student-management-ute-restful-api
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore Spring Boot RESTful API

@@ -24,8 +24,10 @@ Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và m�
 
 Finance, analytics, support ticket, vector database, Redis, RabbitMQ, MinIO,
 Nginx, Kubernetes, Cloudflare tunnel và multi-image release không thuộc runtime
-của đồ án. DeepSeek là tích hợp tùy chọn, mặc định tắt và không cần để chạy
-local lexical fallback.
+của đồ án. Workflow GHCR vẫn xuất bản một wrapper PostgreSQL không chứa
+migration để đồng bộ artifact của course stack; Flyway trong REST API tiếp tục
+sở hữu schema và seed, không biến đây thành production deployment. DeepSeek là
+tích hợp tùy chọn, mặc định tắt và không cần để chạy local lexical fallback.
 
 ## Chạy local
 

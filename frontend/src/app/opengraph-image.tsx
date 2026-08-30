@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'CampusCore workspace overview';
+export const alt = 'CampusCore academic portal overview';
 export const size = {
   width: 1200,
   height: 630,
@@ -95,7 +95,7 @@ export default function OpenGraphImage() {
             }}
           >
             {[
-              'Role-aware workspace',
+              'A portal shaped around each role',
               'One academic portal',
               'Campus records in one place',
             ].map((item) => (

@@ -57,3 +57,13 @@ test('admin-selected notice order is stable for feeds', () => {
   assert.deepEqual(ordered.map((item) => item.id), ['b', 'a', 'c']);
   assert.deepEqual(movePostOrder(['b', 'a', 'c'], 'a', -1), ['a', 'b', 'c']);
 });
+
+test('site appearance polling is throttled and pauses while the tab is hidden', () => {
+  const provider = read('src/components/providers/SiteAppearanceProvider.tsx');
+
+  assert.match(provider, /15000/);
+  assert.doesNotMatch(provider, /4000/);
+  assert.match(provider, /document\.visibilityState === 'visible'/);
+  assert.match(provider, /addEventListener\('visibilitychange', onVisibilityChange\)/);
+  assert.match(provider, /removeEventListener\('visibilitychange', onVisibilityChange\)/);
+});

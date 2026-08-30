@@ -52,7 +52,7 @@ const dayNames = [
 
 export default function LecturerSchedulePage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
-  const { locale, formatNumber } = useI18n();
+  const { locale, formatNumber, messages } = useI18n();
   const [sections, setSections] = useState<LecturerSection[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
@@ -153,7 +153,7 @@ export default function LecturerSchedulePage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Không gian giảng viên',
+          eyebrow: 'Khu giảng viên',
           title: 'Lịch giảng dạy',
           description: `Giữ thời khóa biểu của ${selectedSemesterName} luôn hiển thị trong khi chấm điểm và quản lý lớp học phần vẫn chỉ cách một lần chạm.`,
           selectSemester: 'Chọn học kỳ cho lịch giảng dạy',
@@ -175,27 +175,31 @@ export default function LecturerSchedulePage() {
           studentsSuffix: 'sinh viên',
         }
       : {
-          eyebrow: 'Lecturer workspace',
+          eyebrow: 'Lecturer area',
           title: 'Teaching schedule',
-          description: `Keep your timetable for ${selectedSemesterName} visible while grading and section work stays one click away.`,
+          description: `Keep your timetable for ${selectedSemesterName} visible while grading and class work stays one click away.`,
           selectSemester: 'Select semester for teaching schedule',
           allSemesters: 'All semesters',
           loading: 'Loading teaching schedule',
           unavailableTitle: 'Teaching schedule unavailable',
           emptyTitle: 'No teaching assignments yet',
           emptyDescription:
-            'Sections with active classroom schedules will appear here once they are assigned.',
+            'Classes with active classroom schedules will appear here once they are assigned.',
           teachingSlots: 'Teaching slots',
-          assignedSections: 'Assigned sections',
+          assignedSections: 'Assigned classes',
           studentsInScope: 'Students in scope',
           weeklyAgenda: 'Weekly agenda',
-          assignedSectionsTitle: 'Assigned sections',
+          assignedSectionsTitle: 'Assigned classes',
           noTeachingSlot: 'No teaching slot scheduled.',
           items: 'items',
           item: 'item',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Class',
           studentsSuffix: 'students',
         };
+
+  const statusLabel = (status: string) =>
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
@@ -398,7 +402,7 @@ export default function LecturerSchedulePage() {
                           {copy.studentsSuffix}
                         </div>
                         <div className="mt-1">
-                          {section.status}
+                          {statusLabel(section.status)}
                         </div>
                       </div>
                     </div>

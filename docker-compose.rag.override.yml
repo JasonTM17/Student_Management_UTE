@@ -5,6 +5,9 @@
 # the base full-stack topology unchanged.
 
 services:
+  postgres:
+    image: ghcr.io/jasontm17/student-management-ute-database:latest
+
   rag-service:
     image: ghcr.io/jasontm17/student-management-ute-rag-service:latest
 

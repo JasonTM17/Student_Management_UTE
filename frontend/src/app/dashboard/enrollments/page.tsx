@@ -66,26 +66,26 @@ export default function EnrollmentsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Môn học của tôi',
           description:
-            'Theo dõi trạng thái section, xem lịch học và xử lý thay đổi enrollment mà không rời khỏi workspace dùng chung.',
-          browseSections: 'Xem các section',
+            'Theo dõi lớp học phần, xem lịch học và cập nhật đăng ký ngay trong khu sinh viên.',
+          browseSections: 'Xem lớp học phần',
           loading: 'Đang tải đăng ký học',
           unavailableTitle: 'Đăng ký học chưa sẵn sàng',
           emptyTitle: 'Chưa có môn học',
           emptyDescription:
-            'Khi bạn đăng ký vào một section, lịch học và chi tiết section sẽ xuất hiện ở đây.',
+            'Khi bạn đăng ký một lớp học phần, lịch học và thông tin lớp sẽ xuất hiện ở đây.',
           coursesInView: 'Môn học trong màn hình',
           confirmed: 'Đã xác nhận',
           pending: 'Đang chờ',
           recordTitle: 'Hồ sơ đăng ký',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Lớp học phần',
           enrolledOn: 'Đăng ký ngày',
           credits: 'tín chỉ',
           unknownCourse: 'Môn học',
           unavailableCourseName: 'Chưa có tên môn',
-          unknownSection: 'Chưa rõ section',
+          unknownSection: 'Chưa rõ lớp học phần',
           dropCourse: 'Hủy môn học',
           droppingCourse: 'Đang hủy môn',
           confirmTitle: 'Hủy môn học',
@@ -98,26 +98,26 @@ export default function EnrollmentsPage() {
           loadFailed: 'Hiện chưa thể tải danh sách đăng ký học của bạn.',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'My courses',
           description:
-            'Track section status, review schedules, and make enrollment changes without leaving the shared workspace.',
-          browseSections: 'Browse available sections',
+            'Review your classes, schedules, and registration changes in one clear student area.',
+          browseSections: 'Browse classes',
           loading: 'Loading enrollments',
           unavailableTitle: 'Enrollments unavailable',
           emptyTitle: 'No courses yet',
           emptyDescription:
-            'Once you enroll in a section, the current schedule and section details will appear here.',
+            'Once you enroll in a class, its schedule and details will appear here.',
           coursesInView: 'Courses in view',
           confirmed: 'Confirmed',
           pending: 'Pending',
           recordTitle: 'Enrollment record',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Class',
           enrolledOn: 'Enrolled',
           credits: 'credits',
           unknownCourse: 'Course',
           unavailableCourseName: 'Unavailable',
-          unknownSection: 'Unknown section',
+          unknownSection: 'Unknown class',
           dropCourse: 'Drop course',
           droppingCourse: 'Dropping course',
           confirmTitle: 'Drop course',
@@ -308,7 +308,7 @@ export default function EnrollmentsPage() {
                               'bg-secondary text-foreground'
                             }`}
                           >
-                            {enrollment.status}
+                            {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                           </span>
                         </div>
 

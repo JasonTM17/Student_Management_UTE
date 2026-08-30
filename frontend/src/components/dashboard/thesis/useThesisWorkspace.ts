@@ -15,6 +15,7 @@ export function useThesisWorkspace(initialRoundId = '') {
   const { messages } = useI18n();
   const loadFailedMessage = messages.thesis.loadFailed;
   const thesisStatus = messages.thesis.status;
+  const commonStatuses = messages.common.statuses;
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -94,8 +95,10 @@ export function useThesisWorkspace(initialRoundId = '') {
   );
   const statusLabel = useCallback(
     (status: string) =>
-      thesisStatus[status as keyof typeof thesisStatus] ?? status,
-    [thesisStatus],
+      thesisStatus[status as keyof typeof thesisStatus] ??
+      commonStatuses[status.toUpperCase() as keyof typeof commonStatuses] ??
+      commonStatuses.UNKNOWN,
+    [commonStatuses, thesisStatus],
   );
 
   return {

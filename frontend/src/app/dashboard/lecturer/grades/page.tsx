@@ -80,6 +80,9 @@ export default function LecturerGradesPage() {
     (sum, section) => sum + section.gradedCount,
     0,
   );
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[status?.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={messages.lecturerGrades.errors.loading} />;
@@ -219,7 +222,9 @@ export default function LecturerGradesPage() {
                               : metricToneClass('neutral')
                         }`}
                       >
-                        {section.canPublish ? messages.lecturerGrades.labels.readyStatus : section.gradeStatus}
+                        {section.canPublish
+                          ? messages.lecturerGrades.labels.readyStatus
+                          : statusLabel(section.gradeStatus)}
                       </span>
                       <LinkButton href={`/dashboard/lecturer/grades/${section.id}`}>
                         {section.gradedCount > 0 ? messages.lecturerGrades.labels.manageGrades : messages.lecturerGrades.labels.enterGrades}

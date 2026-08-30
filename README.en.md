@@ -11,7 +11,10 @@ assistant served by the internal `rag-service` container with citations.
 
 Finance, analytics, support tickets, external AI providers, vector search,
 Redis, RabbitMQ, MinIO, Nginx, Kubernetes, Cloudflare Tunnel, and multi-image
-production release are intentionally excluded.
+production release are intentionally excluded. The GHCR workflow still
+publishes a migration-free PostgreSQL wrapper so the course stack has a
+matching database artifact; Flyway in the REST API remains the schema and seed
+owner.
 
 Run the stack with:
 

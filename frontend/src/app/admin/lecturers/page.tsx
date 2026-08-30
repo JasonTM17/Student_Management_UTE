@@ -144,7 +144,7 @@ export default function AdminLecturersPage() {
           loading: 'Đang tải giảng viên',
           title: 'Giảng viên',
           description:
-            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đúng metadata học thuật.',
+            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đủ thông tin chuyên môn.',
           create: 'Tạo giảng viên',
           searchLabel: 'Tìm giảng viên',
           searchPlaceholder: 'Tìm theo tên, email hoặc mã nhân sự',
@@ -155,7 +155,7 @@ export default function AdminLecturersPage() {
           unavailableTitle: 'Giảng viên chưa sẵn sàng',
           emptyTitle: 'Không có giảng viên phù hợp',
           emptyDescription:
-            'Hãy tạo hồ sơ giảng viên để section, lịch dạy và ownership chấm điểm luôn khớp nhau.',
+            'Hãy tạo hồ sơ giảng viên để lớp học phần, lịch dạy và phân công chấm điểm luôn khớp nhau.',
           tableTitle: 'Bản ghi giảng viên',
           headers: {
             employeeId: 'Mã nhân sự',
@@ -200,7 +200,7 @@ export default function AdminLecturersPage() {
           loading: 'Loading lecturers',
           title: 'Lecturers',
           description:
-            'Keep teaching assignments tied to the right people, departments, and profile metadata.',
+            'Keep teaching assignments tied to the right people, departments, and profile details.',
           create: 'Create lecturer',
           searchLabel: 'Search lecturers',
           searchPlaceholder: 'Search by name, email, or employee ID',
@@ -211,7 +211,7 @@ export default function AdminLecturersPage() {
           unavailableTitle: 'Lecturers unavailable',
           emptyTitle: 'No matching lecturers',
           emptyDescription:
-            'Create a lecturer profile to keep schedules, sections, and grading ownership aligned.',
+            'Create a lecturer profile to keep schedules, classes, and grading responsibilities aligned.',
           tableTitle: 'Lecturer records',
           headers: {
             employeeId: 'Employee ID',

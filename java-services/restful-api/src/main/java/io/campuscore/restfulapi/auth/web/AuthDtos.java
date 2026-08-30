@@ -1,7 +1,6 @@
 package io.campuscore.restfulapi.auth.web;
 
 import com.fasterxml.jackson.annotation.JsonInclude;
-import jakarta.validation.constraints.Email;
 import jakarta.validation.constraints.NotBlank;
 import jakarta.validation.constraints.Size;
 import java.time.Instant;
@@ -14,12 +13,12 @@ public final class AuthDtos {
     }
 
     public record LoginRequest(
-            @NotBlank @Email String email,
+            @NotBlank String email,
             @NotBlank String password) {
     }
 
     public record RegisterRequest(
-            @NotBlank @Email String email,
+            @NotBlank String email,
             @NotBlank @Size(min = 8, max = 200) String password,
             @NotBlank @Size(max = 120) String firstName,
             @NotBlank @Size(max = 120) String lastName,

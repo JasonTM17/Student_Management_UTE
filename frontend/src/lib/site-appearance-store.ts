@@ -1,5 +1,4 @@
 import { promises as fs } from 'node:fs';
-import os from 'node:os';
 import path from 'node:path';
 import {
   DEFAULT_SITE_APPEARANCE,
@@ -10,7 +9,7 @@ import {
 function appearancePath(): string {
   return (
     process.env.SITE_APPEARANCE_PATH ||
-    path.join(os.tmpdir(), 'campuscore-site-appearance.json')
+    path.join('.data', 'campuscore-site-appearance.json')
   );
 }
 

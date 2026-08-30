@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Award, BookOpen, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
@@ -63,6 +63,7 @@ export default function GradesPage() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
     const response = await semestersApi.getAll();
@@ -70,20 +71,25 @@ export default function GradesPage() {
   }, []);
 
   const fetchGrades = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setIsLoading(true);
     setError('');
 
     try {
       const data = await gradesApi.getMyGrades(selectedSemester || undefined);
+      if (generation !== loadGeneration.current) return;
       setGrades(data);
     } catch {
+      if (generation !== loadGeneration.current) return;
       setError(
         locale === 'vi'
           ? 'Hiện chưa thể tải dữ liệu điểm số.'
           : 'Grades could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (generation === loadGeneration.current) {
+        setIsLoading(false);
+      }
     }
   }, [locale, selectedSemester]);
 
@@ -161,9 +167,9 @@ export default function GradesPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Điểm số',
-          description: `Xem kết quả đã công bố cho ${selectedSemesterName}, rồi chuyển sang bảng điểm mà không rời khỏi student workspace.`,
+          description: `Xem kết quả đã công bố cho ${selectedSemesterName}, rồi chuyển sang bảng điểm khi cần.`,
           selectSemester: 'Chọn học kỳ cho điểm số',
           allSemesters: 'Tất cả học kỳ',
           openTranscript: 'Mở bảng điểm',
@@ -180,7 +186,7 @@ export default function GradesPage() {
           creditsWord: 'tín chỉ',
           tableHeaders: {
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             lecturer: 'Giảng viên',
             credits: 'Tín chỉ',
             score: 'Điểm',
@@ -191,9 +197,9 @@ export default function GradesPage() {
           notPublished: 'Chưa công bố',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Grades',
-          description: `Review published grading outcomes for ${selectedSemesterName} without losing access to the rest of the academic workspace.`,
+          description: `Review published grading outcomes for ${selectedSemesterName}, then open your transcript when you need the full record.`,
           selectSemester: 'Select semester for grades',
           allSemesters: 'All semesters',
           openTranscript: 'Open transcript',
@@ -210,7 +216,7 @@ export default function GradesPage() {
           creditsWord: 'credits',
           tableHeaders: {
             course: 'Course',
-            section: 'Section',
+            section: 'Class',
             lecturer: 'Lecturer',
             credits: 'Credits',
             score: 'Score',
@@ -220,6 +226,11 @@ export default function GradesPage() {
           pendingAssignment: 'Pending assignment',
           notPublished: 'Not published',
         };
+
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
 
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
@@ -401,7 +412,7 @@ export default function GradesPage() {
                               {copy.tableHeaders.status}
                             </dt>
                             <dd className="mt-1 break-words text-foreground">
-                              {record.gradeStatus}
+                              {statusLabel(record.gradeStatus)}
                             </dd>
                           </div>
                         </dl>
@@ -467,7 +478,7 @@ export default function GradesPage() {
                             </td>
                             <td className="px-2 py-4 text-right">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {record.gradeStatus}
+                                {statusLabel(record.gradeStatus)}
                               </span>
                             </td>
                           </tr>

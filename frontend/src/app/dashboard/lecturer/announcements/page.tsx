@@ -50,37 +50,37 @@ export default function LecturerAnnouncementsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace giảng viên',
+          eyebrow: 'Khu giảng viên',
           title: 'Thông báo',
           description:
-            'Giữ các cập nhật mới nhất từ campus và section sát với luồng công việc giảng dạy của bạn.',
-          backToDashboard: 'Quay lại dashboard giảng viên',
+            'Giữ các cập nhật mới nhất từ trường và lớp học phần sát với luồng giảng dạy của bạn.',
+          backToDashboard: 'Quay lại trang tổng quan giảng viên',
           refresh: 'Làm mới',
           loading: 'Đang tải thông báo',
           unavailableTitle: 'Thông báo chưa sẵn sàng',
           emptyTitle: 'Chưa có thông báo',
           emptyDescription:
-            'Các thông báo dùng chung cho workspace giảng dạy sẽ xuất hiện ở đây sau khi được phát hành.',
+            'Các thông báo dùng chung cho việc giảng dạy sẽ xuất hiện ở đây sau khi được phát hành.',
           recentNotices: 'Thông báo gần đây',
           semesterPrefix: 'Học kỳ',
-          sectionPrefix: 'section',
+          sectionPrefix: 'lớp học phần',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
-          eyebrow: 'Lecturer workspace',
+          eyebrow: 'Lecturer area',
           title: 'Announcements',
           description:
-            'Keep the latest campus and section-level notices close to your teaching workflow.',
+            'Keep the latest campus and class notices close to your teaching workflow.',
           backToDashboard: 'Back to lecturer dashboard',
           refresh: 'Refresh',
           loading: 'Loading announcements',
           unavailableTitle: 'Announcements unavailable',
           emptyTitle: 'No announcements yet',
           emptyDescription:
-            'Shared notices for your teaching workspace will appear here once they are published.',
+            'Shared teaching notices will appear here once they are published.',
           recentNotices: 'Recent notices',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'section',
+          sectionPrefix: 'class',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 

@@ -85,7 +85,7 @@ public class RegistrationService {
     public EligibilityResponse eligibility(String studentId, String semesterId, String roundId) {
         Map<String, Object> student = requireStudent(studentId);
         Map<String, Object> round = roundId == null || roundId.isBlank()
-                ? openRound(semesterId, "REGISTRATION")
+                ? openRoundReadOnly(semesterId, "REGISTRATION")
                 : round(roundId);
         assertEligible(student, round, Instant.now());
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
@@ -106,7 +106,7 @@ public class RegistrationService {
     public List<CatalogSectionResponse> catalog(String studentId, String semesterId, String roundId) {
         Map<String, Object> student = requireStudent(studentId);
         Map<String, Object> round = roundId == null || roundId.isBlank()
-                ? openRound(semesterId, "REGISTRATION")
+                ? openRoundReadOnly(semesterId, "REGISTRATION")
                 : round(roundId);
         assertEligible(student, round, Instant.now());
         String effectiveSemester = String.valueOf(round.get("semester_id"));
@@ -141,7 +141,7 @@ public class RegistrationService {
 
     @Transactional
     public SummaryResponse summary(String studentId, String semesterId) {
-        Map<String, Object> round = openRound(semesterId, "REGISTRATION");
+        Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
         int limit = ((Number) round.get("credit_limit")).intValue();
         List<String> ids = activeEnrollments(studentId, String.valueOf(round.get("semester_id"))).stream()
@@ -421,6 +421,15 @@ public class RegistrationService {
     }
 
     private Map<String, Object> openRound(String semesterId, String preferredKind) {
+        return openRound(semesterId, preferredKind, true);
+    }
+
+    /** Read paths must not hold exclusive round locks; only enroll/drop serialize on them. */
+    private Map<String, Object> openRoundReadOnly(String semesterId, String preferredKind) {
+        return openRound(semesterId, preferredKind, false);
+    }
+
+    private Map<String, Object> openRound(String semesterId, String preferredKind, boolean forUpdate) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
         String sql = "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
                 + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
@@ -429,7 +438,7 @@ public class RegistrationService {
             sql += " AND \"semesterId\" = :semesterId";
             parameters.addValue("semesterId", semesterId);
         }
-        sql += " ORDER BY \"windowStart\" FOR UPDATE";
+        sql += " ORDER BY \"windowStart\"" + (forUpdate ? " FOR UPDATE" : "");
         List<Map<String, Object>> rounds = jdbc.queryForList(sql, parameters);
         Instant now = Instant.now();
         Map<String, Object> preferred = rounds.stream()
@@ -458,7 +467,7 @@ public class RegistrationService {
             return jdbc.queryForMap(
                     "SELECT \"id\", \"semesterId\" AS semester_id, \"kind\", \"status\", \"windowStart\" AS window_start,"
                             + " \"windowEnd\" AS window_end, \"creditLimit\" AS credit_limit FROM " + ROUND
-                            + " WHERE \"id\" = :id FOR UPDATE",
+                            + " WHERE \"id\" = :id",
                     new MapSqlParameterSource("id", roundId));
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration round not found");
