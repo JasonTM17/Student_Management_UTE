@@ -5,6 +5,31 @@ const path = require('node:path');
 
 const root = path.resolve(__dirname, '..');
 
+test('registration E2E fixture refuses developer projects and fails closed on missing seed data', async () => {
+  const { pathToFileURL } = require('node:url');
+  const fixture = await import(pathToFileURL(path.join(root, '../scripts/course-e2e-fixture.mjs')).href);
+  const calls = [];
+  for (const project of ['student_management', 'campuscore-course-e2e', '', 'campuscore-course-e2e-../main']) {
+    await assert.rejects(fixture.seedCourseE2e(project, async (args) => calls.push(args)), /disposable E2E/);
+  }
+  assert.equal(calls.length, 0);
+  await fixture.seedCourseE2e('campuscore-course-e2e-fixture-test', async (args) => calls.push(args));
+  assert.deepEqual(calls[0].slice(0, 4), ['exec', '-T', 'postgres', 'sh']);
+  assert.match(calls[0][5], /ON_ERROR_STOP=1/);
+  assert.equal(calls[0].at(-1), fixture.registrationWindowSql);
+  assert.match(fixture.registrationWindowSql, /CURRENT_TIMESTAMP - INTERVAL '1 day'/);
+  assert.match(fixture.registrationWindowSql, /CURRENT_TIMESTAMP \+ INTERVAL '1 day'/);
+  assert.match(fixture.registrationWindowSql, /"semesterId" = 'semester-demo'/);
+  assert.match(fixture.registrationWindowSql, /updated <> 2/);
+  assert.doesNotMatch(fixture.registrationWindowSql, /SET\s+"status"|DELETE|TRUNCATE|\b20\d\d-/);
+  const runner = fs.readFileSync(path.join(root, '../scripts/run-course-e2e.mjs'), 'utf8');
+  assert.match(runner, /await seedCourseE2e\(projectName, compose\)/);
+  assert.ok(runner.indexOf('assertDisposableProject(projectName)') < runner.indexOf('await seedCourseE2e'));
+  await assert.rejects(fixture.seedCourseE2e('campuscore-course-e2e-fixture-test', async () => {
+    throw new Error('seed missing');
+  }), /seed missing/);
+});
+
 function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
