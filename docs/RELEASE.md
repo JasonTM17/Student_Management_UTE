@@ -38,19 +38,24 @@ key is injected explicitly. Java 21 is the course compile, CI, and Docker runtim
 successor. A local run on another JDK is recorded as NOT_RUN for that gate.
 
 The published GHCR images mirror the local stack and can be smoked without a
-rebuild. This includes `student-management-ute-database`, a thin
+rebuild. Pin `CAMPUSCORE_IMAGE_TAG` to the reviewed short SHA for a
+reproducible smoke; leaving it unset deliberately follows `latest`. This
+includes `student-management-ute-database`, a thin
 `postgres:15-alpine` wrapper with no migrations or credentials. Flyway in the
 REST API remains the only schema/seed owner; upgrading PostgreSQL requires a
 fresh database and the same Flyway/health checks above:
 
 ```powershell
+$env:CAMPUSCORE_IMAGE_TAG = "<short-sha>"
 docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build postgres mailpit rag-service restful-api web
 ```
 
 The same workflow publishes Docker Hub tags with the `campuscore-*` names.
-Each registry receives an immutable short-SHA tag; `latest` is updated only
-from the default branch. Verify both registry manifests before announcing a
-release:
+Each registry receives an immutable short-SHA tag; the workflow refuses to
+overwrite an existing tag or accept a cross-registry digest mismatch, emits
+BuildKit provenance and SBOM attestations, and updates `latest` only after
+parity is verified on the default branch. Verify both registry manifests
+before announcing a release:
 
 ```powershell
 docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<short-sha>

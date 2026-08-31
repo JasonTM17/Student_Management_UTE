@@ -31,7 +31,17 @@ builds and pushes the four images from the same commit to Docker Hub and GHCR:
 
 The workflow needs repository secrets `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`; it never stores credentials in the repository. It publishes
-an immutable short-SHA tag and only moves `latest` on the default branch.
+an immutable short-SHA tag, refuses to overwrite an existing or mismatched
+tag, emits BuildKit provenance and SBOM attestations, and only moves `latest`
+on the default branch after GHCR/Docker Hub digest parity is verified.
+
+For a no-build smoke, set `CAMPUSCORE_IMAGE_TAG` to the reviewed short SHA so
+all services resolve the same immutable release across registries:
+
+```powershell
+$env:CAMPUSCORE_IMAGE_TAG = "<short-sha>"
+docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
+```
 
 GitHub Packages stays separate:
 
