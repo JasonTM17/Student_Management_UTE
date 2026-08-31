@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { statusToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -79,7 +80,7 @@ export default function AdminLecturersPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -143,7 +144,7 @@ export default function AdminLecturersPage() {
           loading: 'Đang tải giảng viên',
           title: 'Giảng viên',
           description:
-            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đúng metadata học thuật.',
+            'Giữ hồ sơ giảng dạy gắn đúng người, đúng khoa và đủ thông tin chuyên môn.',
           create: 'Tạo giảng viên',
           searchLabel: 'Tìm giảng viên',
           searchPlaceholder: 'Tìm theo tên, email hoặc mã nhân sự',
@@ -154,7 +155,7 @@ export default function AdminLecturersPage() {
           unavailableTitle: 'Giảng viên chưa sẵn sàng',
           emptyTitle: 'Không có giảng viên phù hợp',
           emptyDescription:
-            'Hãy tạo hồ sơ giảng viên để section, lịch dạy và ownership chấm điểm luôn khớp nhau.',
+            'Hãy tạo hồ sơ giảng viên để lớp học phần, lịch dạy và phân công chấm điểm luôn khớp nhau.',
           tableTitle: 'Bản ghi giảng viên',
           headers: {
             employeeId: 'Mã nhân sự',
@@ -199,7 +200,7 @@ export default function AdminLecturersPage() {
           loading: 'Loading lecturers',
           title: 'Lecturers',
           description:
-            'Keep teaching assignments tied to the right people, departments, and profile metadata.',
+            'Keep teaching assignments tied to the right people, departments, and profile details.',
           create: 'Create lecturer',
           searchLabel: 'Search lecturers',
           searchPlaceholder: 'Search by name, email, or employee ID',
@@ -210,7 +211,7 @@ export default function AdminLecturersPage() {
           unavailableTitle: 'Lecturers unavailable',
           emptyTitle: 'No matching lecturers',
           emptyDescription:
-            'Create a lecturer profile to keep schedules, sections, and grading ownership aligned.',
+            'Create a lecturer profile to keep schedules, classes, and grading responsibilities aligned.',
           tableTitle: 'Lecturer records',
           headers: {
             employeeId: 'Employee ID',
@@ -469,7 +470,7 @@ export default function AdminLecturersPage() {
                             {lecturer.user?.email || copy.noEmail}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(lecturer.isActive ? 'success' : 'neutral')}`}>
                           {lecturer.isActive ? copy.active : copy.inactive}
                         </span>
                       </div>
@@ -517,7 +518,7 @@ export default function AdminLecturersPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[860px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.employeeId}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.lecturer}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.email}</th>
@@ -552,7 +553,7 @@ export default function AdminLecturersPage() {
                           {lecturer.specialization || copy.notProvided}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(lecturer.isActive ? 'success' : 'neutral')}`}>
                             {lecturer.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>

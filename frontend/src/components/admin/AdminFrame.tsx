@@ -16,6 +16,7 @@ import {
   LayoutDashboard,
   LogOut,
   Menu,
+  Palette,
   School,
   Users,
   X,
@@ -51,7 +52,7 @@ export function AdminFrame({
   children,
 }: AdminFrameProps) {
   const { user, logout } = useAuth();
-  const { messages, locale } = useI18n();
+  const { messages } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = React.useState(false);
@@ -100,7 +101,8 @@ export function AdminFrame({
       items: [
         { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
         { href: '/admin/announcements', icon: Bell, label: messages.admin.menuItems[9]?.[0] },
-        { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: locale === 'vi' ? 'Kiến thức trợ lý AI' : 'AI assistant knowledge' },
+        { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
+        { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
       ],
     },
   ];
@@ -267,9 +269,9 @@ export function AdminFrame({
         </nav>
 
         <div className="border-t border-white/10 px-4 py-3">
-          <div className="mb-3 flex items-center justify-between gap-2 border-b border-white/10 pb-3">
+          <div className="mb-3 flex flex-col gap-2 border-b border-white/10 pb-3">
             <span className="portal-menu-label">{messages.adminShell.preferences}</span>
-            <div className="flex items-center gap-1 rounded-md bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
+            <div className="flex items-center gap-1 self-start rounded-md bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
               <LanguageToggle inverse />
               <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-yellow)]" />
             </div>

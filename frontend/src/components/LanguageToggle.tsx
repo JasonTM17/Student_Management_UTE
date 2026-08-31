@@ -64,9 +64,9 @@ export function LanguageToggle({
             type="button"
             onClick={() => handleSwitch(item)}
             className={cn(
-              'min-h-11 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.12em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'min-h-11 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               inverse &&
-                'focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-[var(--portal-sidebar)]',
+                'min-h-9 px-2.5 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-[var(--portal-sidebar)]',
               isActive
                 ? inverse
                   ? 'bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]'

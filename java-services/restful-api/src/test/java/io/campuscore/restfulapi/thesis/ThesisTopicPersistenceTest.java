@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.patch;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -281,6 +282,44 @@ class ThesisTopicPersistenceTest {
                         .with(studentJwt("test-member-2")))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("GROUP_OWNER_REQUIRED"));
+    }
+
+    @Test
+    void approvedGroupsCannotBeDemotedByTheirLeader() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open round", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID studentId = UUID.randomUUID();
+        UUID approvedGroup = insertGroup(
+                roundId,
+                Instant.parse("2026-01-03T00:00:00Z"),
+                studentId,
+                null,
+                "SUBMITTED",
+                "APPROVED",
+                null);
+
+        // approveGroup flips approval_status while status stays SUBMITTED; the leader
+        // must not demote or cancel the group behind the reviewer's back.
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"DRAFT\"}")
+                        .with(studentJwt(studentId.toString())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATUS_INVALID"));
+
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CANCELLED\"}")
+                        .with(studentJwt(studentId.toString())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATUS_INVALID"));
+
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"COMPLETED\"}")
+                        .with(studentJwt(studentId.toString())))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("COMPLETED"));
     }
 
     @Test

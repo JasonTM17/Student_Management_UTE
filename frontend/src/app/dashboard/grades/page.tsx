@@ -1,8 +1,10 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { Award, BookOpen, TrendingUp } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
@@ -35,36 +37,33 @@ const gradePoints: Record<string, number> = {
 
 function getGradeTone(letterGrade: string | null) {
   if (!letterGrade) {
-    return 'bg-secondary text-muted-foreground';
+    return metricToneClass('neutral');
   }
 
   if (letterGrade.startsWith('A')) {
-    return 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400';
+    return metricToneClass('success');
   }
 
   if (letterGrade.startsWith('B')) {
-    return 'bg-blue-500/12 text-blue-600 dark:text-blue-400';
+    return metricToneClass('info');
   }
 
-  if (letterGrade.startsWith('C')) {
-    return 'bg-amber-500/12 text-amber-600 dark:text-amber-400';
+  if (letterGrade.startsWith('C') || letterGrade.startsWith('D')) {
+    return metricToneClass('warning');
   }
 
-  if (letterGrade.startsWith('D')) {
-    return 'bg-orange-500/12 text-orange-600 dark:text-orange-400';
-  }
-
-  return 'bg-rose-500/12 text-rose-600 dark:text-rose-400';
+  return metricToneClass('danger');
 }
 
 export default function GradesPage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber, messages } = useI18n();
   const [grades, setGrades] = useState<StudentGradeRecord[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const loadGeneration = useRef(0);
 
   const fetchSemesters = useCallback(async () => {
     const response = await semestersApi.getAll();
@@ -72,20 +71,25 @@ export default function GradesPage() {
   }, []);
 
   const fetchGrades = useCallback(async () => {
+    const generation = ++loadGeneration.current;
     setIsLoading(true);
     setError('');
 
     try {
       const data = await gradesApi.getMyGrades(selectedSemester || undefined);
+      if (generation !== loadGeneration.current) return;
       setGrades(data);
     } catch {
+      if (generation !== loadGeneration.current) return;
       setError(
         locale === 'vi'
           ? 'Hiện chưa thể tải dữ liệu điểm số.'
           : 'Grades could not be loaded.',
       );
     } finally {
-      setIsLoading(false);
+      if (generation === loadGeneration.current) {
+        setIsLoading(false);
+      }
     }
   }, [locale, selectedSemester]);
 
@@ -163,9 +167,9 @@ export default function GradesPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Điểm số',
-          description: `Xem kết quả đã công bố cho ${selectedSemesterName}, rồi chuyển sang bảng điểm mà không rời khỏi student workspace.`,
+          description: `Xem kết quả đã công bố cho ${selectedSemesterName}, rồi chuyển sang bảng điểm khi cần.`,
           selectSemester: 'Chọn học kỳ cho điểm số',
           allSemesters: 'Tất cả học kỳ',
           openTranscript: 'Mở bảng điểm',
@@ -182,7 +186,7 @@ export default function GradesPage() {
           creditsWord: 'tín chỉ',
           tableHeaders: {
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             lecturer: 'Giảng viên',
             credits: 'Tín chỉ',
             score: 'Điểm',
@@ -193,9 +197,9 @@ export default function GradesPage() {
           notPublished: 'Chưa công bố',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Grades',
-          description: `Review published grading outcomes for ${selectedSemesterName} without losing access to the rest of the academic workspace.`,
+          description: `Review published grading outcomes for ${selectedSemesterName}, then open your transcript when you need the full record.`,
           selectSemester: 'Select semester for grades',
           allSemesters: 'All semesters',
           openTranscript: 'Open transcript',
@@ -212,7 +216,7 @@ export default function GradesPage() {
           creditsWord: 'credits',
           tableHeaders: {
             course: 'Course',
-            section: 'Section',
+            section: 'Class',
             lecturer: 'Lecturer',
             credits: 'Credits',
             score: 'Score',
@@ -223,8 +227,17 @@ export default function GradesPage() {
           notPublished: 'Not published',
         };
 
-  if (authLoading || !hasAccess) {
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
+
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -286,7 +299,7 @@ export default function GradesPage() {
                     {summary.gpa}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
                   <TrendingUp className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -299,7 +312,7 @@ export default function GradesPage() {
                     {formatNumber(summary.completedCredits)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
                   <Award className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -312,7 +325,7 @@ export default function GradesPage() {
                     {formatNumber(summary.gradedCount)}/{formatNumber(summary.courseCount)}
                   </div>
                 </div>
-                <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+                <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
                   <BookOpen className="h-5 w-5" />
                 </div>
               </CardContent>
@@ -399,7 +412,7 @@ export default function GradesPage() {
                               {copy.tableHeaders.status}
                             </dt>
                             <dd className="mt-1 break-words text-foreground">
-                              {record.gradeStatus}
+                              {statusLabel(record.gradeStatus)}
                             </dd>
                           </div>
                         </dl>
@@ -465,7 +478,7 @@ export default function GradesPage() {
                             </td>
                             <td className="px-2 py-4 text-right">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {record.gradeStatus}
+                                {statusLabel(record.gradeStatus)}
                               </span>
                             </td>
                           </tr>

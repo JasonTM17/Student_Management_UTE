@@ -1,4 +1,4 @@
-name: Publish GHCR images
+name: Publish container images
 
 on:
   workflow_dispatch:
@@ -9,6 +9,7 @@ on:
       - ".github/workflows/publish-ghcr.yml"
       - "frontend/**"
       - "java-services/**"
+      - "database/**"
       - "docker-compose.yml"
       - "docker-compose.rag.override.yml"
 
@@ -17,29 +18,38 @@ permissions:
   packages: write
 
 concurrency:
-  group: ghcr-${{ github.ref }}
+  group: containers-${{ github.ref }}
   cancel-in-progress: false
 
 env:
   REGISTRY: ghcr.io
-  IMAGE_OWNER: ${{ github.repository_owner }}
-  DOCKER_METADATA_SHORT_SHA_LENGTH: 8
+  # GHCR normalizes owner names to lowercase; keep the published namespace
+  # explicit so preflight and metadata address the same package.
+  IMAGE_OWNER: jasontm17
+  DOCKERHUB_OWNER: nguyenson1710
 
 jobs:
   publish:
     name: Publish ${{ matrix.package }}
     runs-on: ubuntu-latest
     strategy:
-      fail-fast: false
+      fail-fast: true
       matrix:
         include:
+          - package: student-management-ute-database
+            hub-package: campuscore-database
+            dockerfile: database/Dockerfile
+            description: CampusCore PostgreSQL runtime; schema managed by Flyway
           - package: student-management-ute-restful-api
+            hub-package: campuscore-restful-api
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore Spring Boot RESTful API
           - package: student-management-ute-rag-service
+            hub-package: campuscore-rag-service
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore dedicated thesis RAG service
           - package: student-management-ute-frontend
+            hub-package: campuscore-frontend
             dockerfile: frontend/Dockerfile
             description: CampusCore Next.js frontend
 
@@ -57,19 +67,106 @@ jobs:
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
 
+      - name: Log in to Docker Hub
+        uses: docker/login-action@v3
+        with:
+          username: ${{ secrets.DOCKERHUB_USERNAME }}
+          password: ${{ secrets.DOCKERHUB_TOKEN }}
+
+      - name: Check immutable tag state
+        id: immutability
+        shell: bash
+        env:
+          GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+          HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
+        run: |
+          set -euo pipefail
+          full_sha="$GITHUB_SHA"
+
+          inspect_digest() {
+            local ref="$1" output status digest
+            set +e
+            output="$(docker buildx imagetools inspect "$ref" 2>&1)"
+            status=$?
+            set -e
+            if [[ "$status" -eq 0 ]]; then
+              digest="$(printf '%s\n' "$output" | awk '$1 == "Digest:" { print $2; exit }')"
+              [[ "$digest" == sha256:* ]] || {
+                printf 'Remote manifest for %s has no usable digest\n' "$ref" >&2
+                return 2
+              }
+              printf '%s\n' "$digest"
+              return 0
+            fi
+            if grep -Eqi 'manifest unknown|name unknown|not found|no such manifest' <<<"$output"; then
+              printf 'ABSENT\n'
+              return 0
+            fi
+            printf '%s\n' "$output" >&2
+            return 2
+          }
+
+          inspect_revision() {
+            local ref="$1" labels status revision
+            set +e
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}' 2>&1)"
+            status=$?
+            set -e
+            [[ "$status" -eq 0 ]] || { printf '%s\n' "$labels" >&2; return 2; }
+            revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
+            printf '%s\n' "$revision"
+          }
+
+          verify_existing() {
+            local ref="$1" digest="$2" revision
+            [[ "$digest" == sha256:* ]] || {
+              echo "Existing immutable tag for $ref has no usable digest." >&2
+              return 1
+            }
+            revision="$(inspect_revision "$ref")"
+            [[ "$revision" == "$full_sha" ]] || {
+              echo "Existing tag $ref is bound to revision '$revision', not $full_sha." >&2
+              return 1
+            }
+          }
+
+          ghcr_digest="$(inspect_digest "$GHCR_IMAGE:$full_sha")"
+          hub_digest="$(inspect_digest "$HUB_IMAGE:$full_sha")"
+          if [[ "$ghcr_digest" == ABSENT && "$hub_digest" == ABSENT ]]; then
+            echo 'should_push=true' >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$ghcr_digest" == sha256:* && "$hub_digest" == sha256:* ]]; then
+            verify_existing "$GHCR_IMAGE:$full_sha" "$ghcr_digest"
+            verify_existing "$HUB_IMAGE:$full_sha" "$hub_digest"
+            [[ "$ghcr_digest" == "$hub_digest" ]] || {
+              echo "Immutable tag $full_sha has mismatched digests across registries; refusing overwrite." >&2
+              exit 1
+            }
+            echo "Immutable tag $full_sha is already verified in both registries; nothing to push." >&2
+          else
+            echo "Immutable tag $full_sha is partially published; refusing to create a cross-registry manifest without a blob-copy tool." >&2
+            exit 1
+          fi
+          echo 'should_push=false' >> "$GITHUB_OUTPUT"
+
       - name: Generate metadata
         id: meta
         uses: docker/metadata-action@v5
         with:
-          images: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+          images: |
+            ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+            docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
           tags: |
-            type=sha,format=short,prefix=
-            type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push
+        if: steps.immutability.outputs.should_push == 'true'
         uses: docker/build-push-action@v6
         with:
           context: .
@@ -80,3 +177,41 @@ jobs:
             NEXT_PUBLIC_API_URL=/api/v1
           labels: ${{ steps.meta.outputs.labels }}
           tags: ${{ steps.meta.outputs.tags }}
+          provenance: mode=max
+          sbom: true
+
+      - name: Verify immutable registry parity and source revision
+        if: always() && steps.immutability.outcome == 'success'
+        shell: bash
+        env:
+          GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
+          HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
+        run: |
+          set -euo pipefail
+          full_sha="$GITHUB_SHA"
+
+          manifest_digest() {
+            docker buildx imagetools inspect "$1" \
+              | awk '$1 == "Digest:" { print $2; exit }'
+          }
+
+          ghcr_digest="$(manifest_digest "$GHCR_IMAGE:$full_sha")"
+          hub_digest="$(manifest_digest "$HUB_IMAGE:$full_sha")"
+          [[ "$ghcr_digest" == sha256:* && "$hub_digest" == "$ghcr_digest" ]] || {
+            echo 'Published full-SHA manifests are missing or differ across registries.' >&2
+            exit 1
+          }
+          for ref in "$GHCR_IMAGE:$full_sha" "$HUB_IMAGE:$full_sha"; do
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}')"
+            revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
+            [[ "$revision" == "$full_sha" ]] || {
+              echo "OCI revision for $ref is '$revision', expected '$full_sha'." >&2
+              exit 1
+            }
+          done
+          {
+            echo "### ${{ matrix.package }}"
+            echo "- full commit SHA: \`$full_sha\`"
+            echo "- digest: \`$ghcr_digest\`"
+            echo '- GHCR and Docker Hub manifests: parity and OCI revision verified'
+          } >> "$GITHUB_STEP_SUMMARY"

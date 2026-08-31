@@ -6,6 +6,8 @@ import "@fontsource/be-vietnam-pro/700.css";
 import type { Viewport } from "next";
 import { AuthProvider } from "@/context/AuthContext";
 import { ThemeProvider } from "@/components/ThemeProvider";
+import { QueryProvider } from "@/components/providers/query-provider";
+import { SiteAppearanceProvider } from "@/components/providers/SiteAppearanceProvider";
 import { Toaster } from "sonner";
 import { I18nProvider } from "@/i18n";
 import { isLocale } from "@/i18n/config";
@@ -51,12 +53,24 @@ export default async function RootLayout({
 
   return (
     <html lang={htmlLang} suppressHydrationWarning>
+      <head>
+        <script
+          dangerouslySetInnerHTML={{
+            __html:
+              "(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.dataset.theme='dark'}}catch(e){}})();",
+          }}
+        />
+      </head>
       <body className="min-h-screen">
         <ThemeProvider>
           <I18nProvider locale={locale} isPrefixed={prefixed}>
             <AuthProvider>
-              {children}
-              <Toaster position="top-right" richColors />
+              <QueryProvider>
+                <SiteAppearanceProvider>
+                  {children}
+                  <Toaster position="top-right" />
+                </SiteAppearanceProvider>
+              </QueryProvider>
             </AuthProvider>
           </I18nProvider>
         </ThemeProvider>

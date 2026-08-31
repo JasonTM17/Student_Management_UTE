@@ -114,7 +114,7 @@ export function DataTable<T extends Record<string, unknown>>({
       <div className="rounded-md border overflow-hidden">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-gray-50 dark:bg-gray-800">
+            <thead className="bg-muted">
               <tr>
                 {columns.map((column) => (
                   <th
@@ -124,7 +124,7 @@ export function DataTable<T extends Record<string, unknown>>({
                         ? sortOrder === 'asc' ? 'ascending' : 'descending'
                         : 'none'
                     }
-                    className="px-4 py-3 text-left text-sm font-medium text-gray-500 dark:text-gray-400 cursor-pointer hover:bg-gray-100 dark:hover:bg-gray-700"
+                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-secondary"
                   >
                     {column.sortable ? (
                       <button
@@ -145,10 +145,10 @@ export function DataTable<T extends Record<string, unknown>>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-gray-200 dark:divide-gray-700">
+            <tbody className="divide-y divide-border">
               {loading ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                     <div className="flex justify-center">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
                     </div>
@@ -156,7 +156,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 </tr>
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-gray-500">
+                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
                     {emptyMessage || messages.common.states.noDataFound}
                   </td>
                 </tr>
@@ -164,7 +164,7 @@ export function DataTable<T extends Record<string, unknown>>({
                 paginatedData.map((item) => (
                   <tr
                     key={String(item[keyField])}
-                    className="hover:bg-gray-50 dark:hover:bg-gray-800/50"
+                    className="hover:bg-muted/60"
                   >
                     {columns.map((column) => (
                       <td key={column.key} className="px-4 py-3 text-sm">
@@ -181,7 +181,7 @@ export function DataTable<T extends Record<string, unknown>>({
 
       {totalPages > 1 && (
         <div className="flex flex-col sm:flex-row items-center justify-between gap-4">
-          <div className="flex items-center gap-2 text-sm text-gray-500">
+          <div className="flex items-center gap-2 text-sm text-muted-foreground">
             <span>
               {messages.common.states.showingResults} {(page - 1) * pageSize + 1} {messages.common.states.to} {Math.min(page * pageSize, sortedData.length)} {messages.common.states.of} {sortedData.length} {messages.common.states.results}
             </span>

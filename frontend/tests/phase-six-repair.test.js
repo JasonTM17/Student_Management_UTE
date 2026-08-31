@@ -52,7 +52,7 @@ test('admin thesis and home routing distinguish role state explicitly', () => {
   const thesis = read('src/app/admin/thesis/page.tsx');
   const home = read('src/app/page.tsx');
 
-  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login"/);
+  assert.match(thesis, /if \(!user\) \{[\s\S]*?<ForbiddenState[\s\S]*?href="\/login\?portal=admin"/);
   assert.match(thesis, /if \(!canAccess\) \{[\s\S]*?<ForbiddenState/);
   assert.ok(thesis.indexOf('if (!canAccess)') < thesis.indexOf('if (isLoading && rounds.length === 0)'));
   assert.match(home, /const workspaceHref = isAdmin \|\| isSuperAdmin/);
@@ -83,6 +83,7 @@ test('npm test includes smoke, portal, and Phase 6 source regressions', () => {
   assert.match(packageJson.scripts.test, /frontend-smoke\.test\.js/);
   assert.match(packageJson.scripts.test, /portal-shell\.test\.js/);
   assert.match(packageJson.scripts.test, /phase-six-repair\.test\.js/);
+  assert.match(packageJson.scripts.test, /docker-browser-api-origin\.test\.js/);
   assert.doesNotMatch(packageJson.scripts.test, /viewport/);
 });
 

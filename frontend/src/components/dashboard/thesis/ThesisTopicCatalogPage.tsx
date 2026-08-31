@@ -7,16 +7,26 @@ import { useI18n } from '@/i18n';
 import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicCatalogPage() {
-  const { isLoading: authLoading, hasAccess } = useRequireAuth();
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages } = useI18n();
   const workspace = useThesisWorkspace();
 
-  if (authLoading || !hasAccess || workspace.isLoading) {
+  if (authLoading) {
+    return <LoadingState label={messages.thesis.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
+
+  if (workspace.isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
@@ -59,9 +69,7 @@ export default function ThesisTopicCatalogPage() {
           </select>
         </label>
         {workspace.selectedRound ? (
-          <span className="rounded-full bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
-            {workspace.statusLabel(workspace.selectedRound.status)}
-          </span>
+          <StatusBadge status={workspace.selectedRound.status} />
         ) : null}
       </div>
 

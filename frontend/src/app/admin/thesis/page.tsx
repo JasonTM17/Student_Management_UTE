@@ -19,6 +19,7 @@ import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ForbiddenState,
@@ -169,7 +170,7 @@ export default function AdminThesisPage() {
           title={messages.thesis.admin.forbiddenTitle}
           description={messages.thesis.admin.forbiddenDescription}
           action={
-            <LinkButton href="/login" variant="outline">
+            <LinkButton href="/login?portal=admin" variant="outline">
               {messages.common.actions.signIn}
             </LinkButton>
           }
@@ -223,7 +224,7 @@ export default function AdminThesisPage() {
         </div>
       ) : null}
       {success ? (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-emerald-500/30 bg-emerald-500/5 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-status-success/30 bg-status-success/12 px-4 py-3 text-sm text-status-success-foreground">
           <Check className="h-4 w-4" />
           {success}
         </div>
@@ -235,25 +236,25 @@ export default function AdminThesisPage() {
             label={messages.thesis.admin.totalRounds}
             value={rounds.length}
             icon={<CalendarDays className="h-5 w-5" />}
-            toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+            toneClassName={metricToneClass('info')}
           />
           <AdminMetricCard
             label={messages.thesis.admin.openRounds}
             value={openRounds}
             icon={<CircleDot className="h-5 w-5" />}
-            toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+            toneClassName={metricToneClass('success')}
           />
           <AdminMetricCard
             label={messages.thesis.topics}
             value={totalTopics}
             icon={<FileStack className="h-5 w-5" />}
-            toneClassName="bg-amber-500/12 text-amber-600 dark:text-amber-400"
+            toneClassName={metricToneClass('warning')}
           />
           <AdminMetricCard
             label={messages.thesis.groups}
             value={totalGroups}
             icon={<UsersRound className="h-5 w-5" />}
-            toneClassName="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+            toneClassName={metricToneClass('neutral')}
           />
         </div>
 

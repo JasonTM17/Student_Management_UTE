@@ -17,6 +17,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
 
 @SpringBootTest
@@ -59,7 +60,7 @@ class PeopleReadPersistenceTest {
         mvc.perform(get("/api/v1/students")
                         .queryParam("page", "1")
                         .queryParam("limit", "2")
-                        .with(jwt().jwt(token -> token.subject("lecturer-user"))))
+                        .with(lecturerJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value("student-other"))
@@ -74,7 +75,7 @@ class PeopleReadPersistenceTest {
 
         mvc.perform(get("/api/v1/students")
                         .queryParam("status", "ACTIVE")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.data[0].id").value("student-other"))
@@ -82,7 +83,7 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.meta.total").value(2));
 
         mvc.perform(get("/api/v1/students/student-old")
-                        .with(jwt().jwt(token -> token.subject("user-student-old"))))
+                        .with(studentJwt("user-student-old")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("student-old"))
                 .andExpect(jsonPath("$.studentId").value("S001"))
@@ -104,7 +105,7 @@ class PeopleReadPersistenceTest {
         mvc.perform(get("/api/v1/lecturers")
                         .queryParam("page", "1")
                         .queryParam("limit", "1")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(1))
                 .andExpect(jsonPath("$.data[0].id").value("lecturer-new"))
@@ -115,7 +116,7 @@ class PeopleReadPersistenceTest {
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
 
         mvc.perform(get("/api/v1/lecturers/lecturer-old")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("lecturer-old"))
                 .andExpect(jsonPath("$.title").value("Dr."))
@@ -132,26 +133,63 @@ class PeopleReadPersistenceTest {
 
         mvc.perform(get("/api/v1/students")
                         .queryParam("limit", "101")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/lecturers")
                         .queryParam("status", "ACTIVE")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/students")
                         .queryParam("page", "1", "2")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(get("/api/v1/lecturers/missing")
-                        .with(jwt().jwt(token -> token.subject("admin-user"))))
+                        .with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
+    }
+
+    @Test
+    void studentDirectoryListsRejectRolesWithoutDirectoryAccessWhileSingleItemsStayOwnerScoped() throws Exception {
+        insertStudent("student-old", "S001", "ACTIVE", 2, BASE_TIME.minusSeconds(60), "department-se");
+        insertStudent("student-other", "S002", "ACTIVE", 2, BASE_TIME.minusSeconds(30), "department-se");
+        insertLecturer("lecturer-old", "E001", BASE_TIME.minusSeconds(60));
+
+        mvc.perform(get("/api/v1/students")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))
+                                .jwt(token -> token.subject("student-user").claim("roles", java.util.List.of("STUDENT")))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))
+                                .jwt(token -> token.subject("student-user").claim("roles", java.util.List.of("STUDENT")))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/students/student-old")
+                        .with(studentJwt("user-student-old")))
+                .andExpect(status().isOk());
+
+        mvc.perform(get("/api/v1/students/student-other")
+                        .with(studentJwt("user-student-old")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        mvc.perform(get("/api/v1/lecturers/lecturer-old")
+                        .with(studentJwt("user-student-old")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/lecturers/lecturer-old")
+                        .with(lecturerJwt()))
+                .andExpect(status().isOk());
     }
 
     private void createTables() {
@@ -253,6 +291,27 @@ class PeopleReadPersistenceTest {
                 "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
                         + " VALUES (?, ?, ?, ?)",
                 id, email, firstName, lastName);
+    }
+
+    private static RequestPostProcessor lecturerJwt() {
+        return jwt().jwt(token -> token
+                        .subject("lecturer-user")
+                        .claim("roles", java.util.List.of("LECTURER")))
+                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private static RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("admin-user")
+                        .claim("roles", java.util.List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private static RequestPostProcessor studentJwt(String subject) {
+        return jwt().jwt(token -> token
+                        .subject(subject)
+                        .claim("roles", java.util.List.of("STUDENT")))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 
     private static String departmentCode(String departmentId) {
