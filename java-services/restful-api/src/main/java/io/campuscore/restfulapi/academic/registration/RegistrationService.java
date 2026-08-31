@@ -24,6 +24,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.annotation.Transactional;
@@ -49,6 +50,7 @@ public class RegistrationService {
     private final AcademicEnrollmentReadService reads;
     private final RegistrationPdfRenderer pdfRenderer;
     private final TransactionTemplate transactions;
+    private final boolean postgres;
 
     public RegistrationService(
             NamedParameterJdbcTemplate jdbc,
@@ -59,6 +61,8 @@ public class RegistrationService {
         this.reads = reads;
         this.pdfRenderer = pdfRenderer;
         this.transactions = new TransactionTemplate(transactionManager);
+        this.postgres = jdbc.getJdbcOperations().execute((ConnectionCallback<Boolean>) connection ->
+                "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName()));
     }
 
     public List<RoundResponse> listRounds(String semesterId) {
@@ -354,30 +358,46 @@ public class RegistrationService {
     }
 
     private Map<String, Object> claimIdempotency(String ownerId, String key, String hash) {
-        try {
-            jdbc.update(
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("id", UUID.randomUUID().toString())
+                .addValue("ownerId", ownerId)
+                .addValue("key", key)
+                .addValue("hash", hash);
+        if (postgres) {
+            int inserted = jdbc.update(
                     "INSERT INTO " + IDEMPOTENCY
                             + " (\"id\", \"ownerId\", \"idempotencyKey\", \"requestHash\", \"state\")"
-                            + " VALUES (:id, :ownerId, :key, :hash, 'IN_PROGRESS')",
-                    new MapSqlParameterSource()
-                            .addValue("id", UUID.randomUUID().toString())
-                            .addValue("ownerId", ownerId)
-                            .addValue("key", key)
-                            .addValue("hash", hash));
-            return null;
-        } catch (DataIntegrityViolationException duplicate) {
-            Map<String, Object> existing = jdbc.queryForMap(
-                    "SELECT \"requestHash\" AS request_hash, \"state\", \"enrollmentId\" AS enrollment_id"
-                            + " FROM " + IDEMPOTENCY + " WHERE \"ownerId\" = :ownerId AND \"idempotencyKey\" = :key",
-                    new MapSqlParameterSource().addValue("ownerId", ownerId).addValue("key", key));
-            if (!hash.equals(String.valueOf(existing.get("request_hash")).trim())) {
-                throw problem(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was reused with a different payload");
+                            + " VALUES (:id, :ownerId, :key, :hash, 'IN_PROGRESS')"
+                            + " ON CONFLICT (\"ownerId\", \"idempotencyKey\") DO NOTHING",
+                    parameters);
+            if (inserted == 1) {
+                return null;
             }
-            if ("IN_PROGRESS".equals(String.valueOf(existing.get("state")))) {
-                throw problem(HttpStatus.CONFLICT, "IDEMPOTENCY_IN_PROGRESS", "The same request is already in progress");
+        } else {
+            try {
+                jdbc.update(
+                        "INSERT INTO " + IDEMPOTENCY
+                                + " (\"id\", \"ownerId\", \"idempotencyKey\", \"requestHash\", \"state\")"
+                                + " VALUES (:id, :ownerId, :key, :hash, 'IN_PROGRESS')",
+                        parameters);
+                return null;
+            } catch (DataIntegrityViolationException duplicate) {
+                // H2 does not implement PostgreSQL's ON CONFLICT syntax. This
+                // fallback is test-only; production PostgreSQL never aborts the
+                // surrounding transaction on the duplicate-key path.
             }
-            return existing;
         }
+        Map<String, Object> existing = jdbc.queryForMap(
+                "SELECT \"requestHash\" AS request_hash, \"state\", \"enrollmentId\" AS enrollment_id"
+                        + " FROM " + IDEMPOTENCY + " WHERE \"ownerId\" = :ownerId AND \"idempotencyKey\" = :key",
+                new MapSqlParameterSource().addValue("ownerId", ownerId).addValue("key", key));
+        if (!hash.equals(String.valueOf(existing.get("request_hash")).trim())) {
+            throw problem(HttpStatus.CONFLICT, "IDEMPOTENCY_CONFLICT", "Idempotency key was reused with a different payload");
+        }
+        if ("IN_PROGRESS".equals(String.valueOf(existing.get("state")))) {
+            throw problem(HttpStatus.CONFLICT, "IDEMPOTENCY_IN_PROGRESS", "The same request is already in progress");
+        }
+        return existing;
     }
 
     private void completeIdempotency(String ownerId, String key, String enrollmentId, String hash) {

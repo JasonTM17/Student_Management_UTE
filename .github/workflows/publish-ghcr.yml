@@ -24,10 +24,9 @@ concurrency:
 env:
   REGISTRY: ghcr.io
   # GHCR normalizes owner names to lowercase; keep the published namespace
-  # explicit so preflight, metadata, and promotion address the same package.
+  # explicit so preflight and metadata address the same package.
   IMAGE_OWNER: jasontm17
   DOCKERHUB_OWNER: nguyenson1710
-  DOCKER_METADATA_SHORT_SHA_LENGTH: 8
 
 jobs:
   publish:
@@ -82,7 +81,7 @@ jobs:
           HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
         run: |
           set -euo pipefail
-          short_sha="${GITHUB_SHA::8}"
+          full_sha="$GITHUB_SHA"
 
           inspect_digest() {
             local ref="$1" output status digest
@@ -107,17 +106,50 @@ jobs:
             return 2
           }
 
-          ghcr_digest="$(inspect_digest "$GHCR_IMAGE:$short_sha")"
-          hub_digest="$(inspect_digest "$HUB_IMAGE:$short_sha")"
+          inspect_revision() {
+            local ref="$1" labels status revision
+            set +e
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}' 2>&1)"
+            status=$?
+            set -e
+            [[ "$status" -eq 0 ]] || { printf '%s\n' "$labels" >&2; return 2; }
+            revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
+            printf '%s\n' "$revision"
+          }
+
+          verify_existing() {
+            local ref="$1" digest="$2" revision
+            [[ "$digest" == sha256:* ]] || {
+              echo "Existing immutable tag for $ref has no usable digest." >&2
+              return 1
+            }
+            revision="$(inspect_revision "$ref")"
+            [[ "$revision" == "$full_sha" ]] || {
+              echo "Existing tag $ref is bound to revision '$revision', not $full_sha." >&2
+              return 1
+            }
+          }
+
+          ghcr_digest="$(inspect_digest "$GHCR_IMAGE:$full_sha")"
+          hub_digest="$(inspect_digest "$HUB_IMAGE:$full_sha")"
           if [[ "$ghcr_digest" == ABSENT && "$hub_digest" == ABSENT ]]; then
             echo 'should_push=true' >> "$GITHUB_OUTPUT"
-          elif [[ "$ghcr_digest" == sha256:* && "$hub_digest" == "$ghcr_digest" ]]; then
-            echo 'should_push=false' >> "$GITHUB_OUTPUT"
-            echo "digest=$ghcr_digest" >> "$GITHUB_OUTPUT"
+            exit 0
+          fi
+
+          if [[ "$ghcr_digest" == sha256:* && "$hub_digest" == sha256:* ]]; then
+            verify_existing "$GHCR_IMAGE:$full_sha" "$ghcr_digest"
+            verify_existing "$HUB_IMAGE:$full_sha" "$hub_digest"
+            [[ "$ghcr_digest" == "$hub_digest" ]] || {
+              echo "Immutable tag $full_sha has mismatched digests across registries; refusing overwrite." >&2
+              exit 1
+            }
+            echo "Immutable tag $full_sha is already verified in both registries; nothing to push." >&2
           else
-            echo 'Short-SHA tag exists in only one registry or has mismatched digests; refusing overwrite.' >&2
+            echo "Immutable tag $full_sha is partially published; refusing to create a cross-registry manifest without a blob-copy tool." >&2
             exit 1
           fi
+          echo 'should_push=false' >> "$GITHUB_OUTPUT"
 
       - name: Generate metadata
         id: meta
@@ -127,10 +159,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
             docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
           tags: |
-            type=sha,format=short,prefix=
+            type=raw,value=${{ github.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=${{ matrix.description }}
+            org.opencontainers.image.revision=${{ github.sha }}
 
       - name: Build and push
         if: steps.immutability.outputs.should_push == 'true'
@@ -147,7 +180,7 @@ jobs:
           provenance: mode=max
           sbom: true
 
-      - name: Verify immutable registry parity
+      - name: Verify immutable registry parity and source revision
         if: always() && steps.immutability.outcome == 'success'
         shell: bash
         env:
@@ -155,87 +188,30 @@ jobs:
           HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
         run: |
           set -euo pipefail
-          short_sha="${GITHUB_SHA::8}"
+          full_sha="$GITHUB_SHA"
 
           manifest_digest() {
             docker buildx imagetools inspect "$1" \
               | awk '$1 == "Digest:" { print $2; exit }'
           }
 
-          ghcr_digest="$(manifest_digest "$GHCR_IMAGE:$short_sha")"
-          hub_digest="$(manifest_digest "$HUB_IMAGE:$short_sha")"
+          ghcr_digest="$(manifest_digest "$GHCR_IMAGE:$full_sha")"
+          hub_digest="$(manifest_digest "$HUB_IMAGE:$full_sha")"
           [[ "$ghcr_digest" == sha256:* && "$hub_digest" == "$ghcr_digest" ]] || {
-            echo 'Published short-SHA manifests are missing or differ across registries.' >&2
+            echo 'Published full-SHA manifests are missing or differ across registries.' >&2
             exit 1
           }
+          for ref in "$GHCR_IMAGE:$full_sha" "$HUB_IMAGE:$full_sha"; do
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}')"
+            revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
+            [[ "$revision" == "$full_sha" ]] || {
+              echo "OCI revision for $ref is '$revision', expected '$full_sha'." >&2
+              exit 1
+            }
+          done
           {
             echo "### ${{ matrix.package }}"
-            echo "- short SHA: \`$short_sha\`"
+            echo "- full commit SHA: \`$full_sha\`"
             echo "- digest: \`$ghcr_digest\`"
-            echo '- GHCR and Docker Hub manifests: parity verified'
+            echo '- GHCR and Docker Hub manifests: parity and OCI revision verified'
           } >> "$GITHUB_STEP_SUMMARY"
-
-  promote-latest:
-    name: Promote verified images to latest
-    if: github.ref == 'refs/heads/main'
-    needs: publish
-    runs-on: ubuntu-latest
-    steps:
-      - name: Set up Docker Buildx
-        uses: docker/setup-buildx-action@v3
-
-      - name: Log in to GHCR
-        uses: docker/login-action@v3
-        with:
-          registry: ${{ env.REGISTRY }}
-          username: ${{ github.actor }}
-          password: ${{ secrets.GITHUB_TOKEN }}
-
-      - name: Log in to Docker Hub
-        uses: docker/login-action@v3
-        with:
-          username: ${{ secrets.DOCKERHUB_USERNAME }}
-          password: ${{ secrets.DOCKERHUB_TOKEN }}
-
-      - name: Promote verified short-SHA manifests
-        shell: bash
-        env:
-          GHCR_OWNER: ${{ env.IMAGE_OWNER }}
-          DOCKERHUB_OWNER: ${{ env.DOCKERHUB_OWNER }}
-        run: |
-          set -euo pipefail
-          short_sha="${GITHUB_SHA::8}"
-          pairs=(
-            'student-management-ute-database|campuscore-database'
-            'student-management-ute-restful-api|campuscore-restful-api'
-            'student-management-ute-rag-service|campuscore-rag-service'
-            'student-management-ute-frontend|campuscore-frontend'
-          )
-
-          manifest_digest() {
-            docker buildx imagetools inspect "$1" \
-              | awk '$1 == "Digest:" { print $2; exit }'
-          }
-
-          for pair in "${pairs[@]}"; do
-            package="${pair%%|*}"
-            hub_package="${pair##*|}"
-            ghcr_image="ghcr.io/${GHCR_OWNER}/${package}"
-            hub_image="docker.io/${DOCKERHUB_OWNER}/${hub_package}"
-            ghcr_digest="$(manifest_digest "$ghcr_image:$short_sha")"
-            hub_digest="$(manifest_digest "$hub_image:$short_sha")"
-            [[ "$ghcr_digest" == sha256:* && "$hub_digest" == "$ghcr_digest" ]] || {
-              echo "Cannot promote $package: short-SHA parity is not proven." >&2
-              exit 1
-            }
-
-            docker buildx imagetools create --tag "$ghcr_image:latest" "$ghcr_image@$ghcr_digest"
-            docker buildx imagetools create --tag "$hub_image:latest" "$hub_image@$hub_digest"
-            latest_ghcr="$(manifest_digest "$ghcr_image:latest")"
-            latest_hub="$(manifest_digest "$hub_image:latest")"
-            [[ "$latest_ghcr" == "$ghcr_digest" && "$latest_hub" == "$hub_digest" ]] || {
-              echo "Latest promotion digest mismatch for $package." >&2
-              exit 1
-            }
-            echo "- $package: $short_sha -> $ghcr_digest (GHCR + Docker Hub latest verified)" >> "$GITHUB_STEP_SUMMARY"
-          done

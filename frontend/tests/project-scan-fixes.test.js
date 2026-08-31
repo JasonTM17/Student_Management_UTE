@@ -95,3 +95,28 @@ test('admin user search commits one query per submit instead of per keystroke', 
   assert.doesNotMatch(page, /value=\{search\}/);
   assert.doesNotMatch(page, /onChange=\{\(e\) => setSearch\(e\.target\.value\)\}/);
 });
+
+test('registration idempotency keeps PostgreSQL duplicate claims inside the transaction', () => {
+  const service = fs.readFileSync(
+    path.join(root, '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/RegistrationService.java'),
+    'utf8',
+  );
+
+  assert.match(service, /private final boolean postgres/);
+  assert.ok(service.includes('ON CONFLICT (\\"ownerId\\", \\"idempotencyKey\\") DO NOTHING'));
+  assert.match(service, /if \(inserted == 1\) \{\s*return null;/s);
+  assert.match(service, /H2 does not implement PostgreSQL's ON CONFLICT syntax/);
+});
+
+test('published image tags are full-SHA, revision-bound, and never auto-promote latest', () => {
+  const workflow = fs.readFileSync(path.join(root, '../.github/workflows/publish-ghcr.yml'), 'utf8');
+  const overlay = fs.readFileSync(path.join(root, '../docker-compose.rag.override.yml'), 'utf8');
+
+  assert.match(workflow, /type=raw,value=\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /org\.opencontainers\.image\.revision=\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /index \.Image "linux\/amd64"/);
+  assert.match(workflow, /refusing wrong-revision|revision.*not \$full_sha/s);
+  assert.match(workflow, /partially published; refusing to create a cross-registry manifest/);
+  assert.doesNotMatch(workflow, /promote-latest|imagetools create/);
+  assert.match(overlay, /CAMPUSCORE_IMAGE_TAG:\?Set CAMPUSCORE_IMAGE_TAG/);
+});
