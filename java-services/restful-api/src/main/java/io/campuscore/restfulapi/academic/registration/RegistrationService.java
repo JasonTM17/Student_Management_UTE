@@ -141,6 +141,7 @@ public class RegistrationService {
 
     @Transactional
     public SummaryResponse summary(String studentId, String semesterId) {
+        requireStudent(studentId);
         Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
         int limit = ((Number) round.get("credit_limit")).intValue();
@@ -157,9 +158,14 @@ public class RegistrationService {
             String idempotencyKey) {
         requireKey(idempotencyKey);
         String hash = sha256("ENROLL|" + sectionId);
-        EnrollmentResponse response = transactions.execute(status ->
-                enrollLocked(studentId, sectionId, roles, idempotencyKey, hash));
-        persistSlip(studentId, response);
+        EnrollmentResponse response = transactions.execute(status -> {
+            EnrollmentResponse enrollment = enrollLocked(studentId, sectionId, roles, idempotencyKey, hash);
+            persistSlip(studentId, enrollment);
+            return enrollment;
+        });
+        if (response == null) {
+            throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED", "Enrollment transaction returned no result");
+        }
         return response;
     }
 

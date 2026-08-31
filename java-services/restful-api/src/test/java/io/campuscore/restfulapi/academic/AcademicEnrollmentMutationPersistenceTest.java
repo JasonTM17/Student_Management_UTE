@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.academic;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.Mockito.doThrow;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -13,6 +15,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import io.campuscore.restfulapi.academic.registration.RegistrationPdfRenderer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -23,6 +26,7 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
+import org.springframework.test.context.bean.override.mockito.MockitoSpyBean;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
@@ -48,6 +52,9 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     @Autowired
     private ObjectMapper objectMapper;
+
+    @MockitoSpyBean
+    private RegistrationPdfRenderer pdfRenderer;
 
     @BeforeEach
     void prepareFixture() {
@@ -151,6 +158,46 @@ class AcademicEnrollmentMutationPersistenceTest {
                         "student-1",
                         sha256))
                 .isEqualTo(1);
+    }
+
+    @Test
+    void enrollmentRollsBackWhenRegistrationSlipCannotBeStored() throws Exception {
+        doThrow(new IllegalStateException("renderer unavailable"))
+                .when(pdfRenderer)
+                .render(anyString(), anyString(), anyString(), anyString());
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "slip-failure-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-open\"}"))
+                .andExpect(status().isInternalServerError())
+                .andExpect(jsonPath("$.code").value("INTERNAL_ERROR"));
+
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"Enrollment\" WHERE \"studentId\" = ?",
+                        Integer.class,
+                        "student-1"))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                        Integer.class,
+                        "section-open"))
+                .isZero();
+        assertThat(jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM \"academic\".\"RegistrationIdempotency\" WHERE \"ownerId\" = ? AND \"idempotencyKey\" = ?",
+                        Integer.class,
+                        "student-1",
+                        "slip-failure-1"))
+                .isZero();
+    }
+
+    @Test
+    void summaryRequiresAnActiveStudentProfile() throws Exception {
+        mvc.perform(get("/api/v1/me/registration/summary")
+                        .with(studentJwtWithoutProfile()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("STUDENT_PROFILE_REQUIRED"));
     }
 
     @Test
@@ -264,6 +311,13 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .subject(subject)
                         .claim("roles", List.of("STUDENT"))
                         .claim("studentId", studentId))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private static RequestPostProcessor studentJwtWithoutProfile() {
+        return jwt().jwt(token -> token
+                        .subject("student-user-without-profile")
+                        .claim("roles", List.of("STUDENT")))
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 
