@@ -3,7 +3,7 @@
 import { useCallback, useEffect, useState } from 'react';
 import { Bell, BookOpen, RefreshCw } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
-import { announcementsApi } from '@/lib/api';
+import { announcementsApi, type AnnouncementRecord } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -18,33 +18,20 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
-
-type Announcement = {
-  id: string;
-  title: string;
-  content: string;
-  priority: string;
-  createdAt: string;
-  semester?: { name: string; nameEn?: string; nameVi?: string } | null;
-  section?: {
-    sectionNumber: string;
-    course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
-  } | null;
-};
-
-const priorityTone: Record<string, string> = {
-  LOW: statusToneClass('neutral'),
-  NORMAL: statusToneClass('info'),
-  HIGH: statusToneClass('warning'),
-  URGENT: statusToneClass('danger'),
-};
+import {
+  announcementIsUpdated,
+  announcementPriorityLabel,
+  announcementPriorityTone,
+  announcementSectionLabel,
+  announcementSemesterName,
+} from '@/lib/announcement-presentation';
 
 export default function StudentAnnouncementsPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth([
     'STUDENT',
   ]);
   const { locale, formatDateTime } = useI18n();
-  const [items, setItems] = useState<Announcement[]>([]);
+  const [items, setItems] = useState<AnnouncementRecord[]>([]);
   const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -64,7 +51,7 @@ export default function StudentAnnouncementsPage() {
           returnDashboard: 'Quay lại trang tổng quan',
           recentNotices: 'Thông báo gần đây',
           semesterPrefix: 'Học kỳ',
-          sectionPrefix: 'lớp học phần',
+          sectionPrefix: 'Lớp học phần',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
@@ -80,7 +67,7 @@ export default function StudentAnnouncementsPage() {
           returnDashboard: 'Return to dashboard',
           recentNotices: 'Recent notices',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'class',
+          sectionPrefix: 'Class',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 
@@ -126,7 +113,8 @@ export default function StudentAnnouncementsPage() {
             disabled={isLoading}
           >
             <RefreshCw
-              className={`mr-2 h-4 w-4 ${isLoading ? 'animate-spin' : ''}`}
+              className={`mr-2 h-4 w-4 motion-reduce:animate-none ${isLoading ? 'animate-spin' : ''}`}
+              aria-hidden="true"
             />
             {copy.refresh}
           </Button>
@@ -165,45 +153,40 @@ export default function StudentAnnouncementsPage() {
                   <div className="space-y-3">
                     <div className="flex flex-wrap items-center gap-2">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
-                          priorityTone[announcement.priority] ??
-                          'bg-secondary text-foreground'
-                        }`}
+                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(announcementPriorityTone(announcement.priority))}`}
                       >
-                        {announcement.priority}
+                        {announcementPriorityLabel(announcement.priority, locale)}
                       </span>
                       <h2 className="text-lg font-semibold text-foreground">
                         {announcement.title}
                       </h2>
+                      {announcementIsUpdated(announcement) ? (
+                        <span className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                          {locale === 'vi' ? 'Đã cập nhật' : 'Updated'}
+                        </span>
+                      ) : null}
                     </div>
                     <p className="max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
                       {announcement.content}
                     </p>
                     <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                      {announcement.semester?.name ? (
+                      {announcementSemesterName(announcement) ? (
                         <span>
                           {copy.semesterPrefix}{' '}
-                          {getLocalizedFlatLabel(
-                            locale,
-                            announcement.semester.name,
-                            announcement.semester.nameEn,
-                            announcement.semester.nameVi,
-                            announcement.semester.name,
-                          )}
+                          {getLocalizedFlatLabel(locale, announcementSemesterName(announcement), announcement.semester?.nameEn, announcement.semester?.nameVi, announcementSemesterName(announcement))}
                         </span>
                       ) : null}
-                      {announcement.section?.course?.code ? (
+                      {announcementSectionLabel(announcement) ? (
                         <span>
-                          {announcement.section.course.code} {copy.sectionPrefix}{' '}
-                          {announcement.section.sectionNumber}
+                          {copy.sectionPrefix}: {announcementSectionLabel(announcement)}
                         </span>
                       ) : null}
                     </div>
                   </div>
 
                   <div className="flex shrink-0 items-start gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
-                    <BookOpen className="h-3.5 w-3.5" />
-                    {formatDateTime(announcement.createdAt)}
+                    <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
+                    {formatDateTime(announcement.publishAt || announcement.createdAt)}
                   </div>
                 </div>
               </article>

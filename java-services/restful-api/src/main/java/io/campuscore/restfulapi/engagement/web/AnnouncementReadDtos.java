@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.engagement.web;
 
 import com.fasterxml.jackson.annotation.JsonFormat;
+import com.fasterxml.jackson.databind.JsonNode;
 import java.time.Instant;
 import java.util.List;
 
@@ -35,6 +36,10 @@ public final class AnnouncementReadDtos {
             Instant createdAt,
             @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
             Instant updatedAt,
+            int version,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant archivedAt,
+            String archivedBy,
             SemesterSummary semester,
             SectionSummary section,
             LecturerSummary lecturer) {
@@ -56,5 +61,24 @@ public final class AnnouncementReadDtos {
     }
 
     public record AnnouncementListResponse(List<AnnouncementResponse> data, PageMeta meta) {
+    }
+
+    public record AnnouncementHistoryResponse(
+            String id,
+            String announcementId,
+            String action,
+            String actorId,
+            String actorLabel,
+            String reason,
+            int version,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            JsonNode before,
+            JsonNode after) {
+    }
+
+    public record AnnouncementHistoryListResponse(
+            List<AnnouncementHistoryResponse> data,
+            PageMeta meta) {
     }
 }

@@ -28,12 +28,17 @@ export function Modal({
   const dialogRef = React.useRef<HTMLDivElement>(null);
   const closeButtonRef = React.useRef<HTMLButtonElement>(null);
   const previousFocusRef = React.useRef<HTMLElement | null>(null);
+  const onCloseRef = React.useRef(onClose);
+
+  React.useEffect(() => {
+    onCloseRef.current = onClose;
+  }, [onClose]);
 
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
         event.preventDefault();
-        onClose();
+        onCloseRef.current();
         return;
       }
 
@@ -91,7 +96,10 @@ export function Modal({
       document.body.style.overflow = previousOverflow;
       previousFocusRef.current?.focus();
     };
-  }, [isOpen, onClose]);
+  // Keep the focus trap tied to the open/closed transition. Parent forms often
+  // recreate onClose while typing; re-running this effect would steal focus
+  // from the active field and return it to the dialog close button.
+  }, [isOpen]);
 
   if (!isOpen) return null;
 

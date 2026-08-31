@@ -42,11 +42,13 @@ class AnnouncementReadPersistenceTest {
     @BeforeEach
     void prepareReadOnlyFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"AnnouncementAudit\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"Announcement\"");
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "engagement"."Announcement" (
+                CREATE TABLE "engagement"."Announcement" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "title" VARCHAR(200) NOT NULL,
-                    "content" VARCHAR(2000) NOT NULL,
+                    "title" VARCHAR(240) NOT NULL,
+                    "content" TEXT NOT NULL,
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
@@ -63,10 +65,12 @@ class AnnouncementReadPersistenceTest {
                     "lecturerId" VARCHAR(120),
                     "lecturerDisplayName" VARCHAR(200),
                     "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL
+                    "updatedAt" TIMESTAMP NOT NULL,
+                    "version" INTEGER NOT NULL DEFAULT 0,
+                    "archivedAt" TIMESTAMP,
+                    "archivedBy" VARCHAR(120)
                 )
                 """);
-        jdbc.update("DELETE FROM \"engagement\".\"Announcement\"");
     }
 
     @Test

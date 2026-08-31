@@ -8,10 +8,13 @@ import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSumm
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Calendar;
+import java.util.TimeZone;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -31,7 +34,8 @@ public class AnnouncementReadRepository {
             "id", "title", "content", "priority", "targetRoles", "targetYears",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
-            "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt"
+            "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
+            "version", "archivedAt", "archivedBy"
             """;
     private static final RowMapper<AnnouncementResponse> ROW_MAPPER =
             AnnouncementReadRepository::mapRow;
@@ -101,6 +105,11 @@ public class AnnouncementReadRepository {
             conditions.add("\"priority\" = :priority");
             parameters.addValue("priority", filter.priority());
         }
+        if ("ACTIVE".equals(filter.status())) {
+            conditions.add("\"archivedAt\" IS NULL");
+        } else if ("ARCHIVED".equals(filter.status())) {
+            conditions.add("\"archivedAt\" IS NOT NULL");
+        }
         return new SqlWhere(where(conditions), parameters);
     }
 
@@ -122,6 +131,7 @@ public class AnnouncementReadRepository {
         conditions.add("(" + String.join(" OR ", audience) + ")");
         conditions.add("(\"publishAt\" IS NULL OR \"publishAt\" <= :now)");
         conditions.add("(\"expiresAt\" IS NULL OR \"expiresAt\" > :now)");
+        conditions.add("\"archivedAt\" IS NULL");
 
         if (visibility.studentId() != null) {
             if (visibility.studentYear() == null) {
@@ -189,6 +199,9 @@ public class AnnouncementReadRepository {
                 lecturerDisplayName,
                 instant(resultSet, "createdAt"),
                 instant(resultSet, "updatedAt"),
+                resultSet.getInt("version"),
+                instant(resultSet, "archivedAt"),
+                resultSet.getString("archivedBy"),
                 semester,
                 section,
                 lecturer);
@@ -219,15 +232,17 @@ public class AnnouncementReadRepository {
     }
 
     private static Instant instant(ResultSet resultSet, String column) throws SQLException {
-        LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
-        return value == null ? null : value.toInstant(ZoneOffset.UTC);
+        Timestamp value = resultSet.getTimestamp(
+                column,
+                Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+        return value == null ? null : value.toInstant();
     }
 
     private static boolean present(String value) {
         return value != null && !value.isEmpty();
     }
 
-    public record AnnouncementFilter(String semesterId, String sectionId, String priority) {
+    public record AnnouncementFilter(String semesterId, String sectionId, String priority, String status) {
     }
 
     public record UserVisibility(
