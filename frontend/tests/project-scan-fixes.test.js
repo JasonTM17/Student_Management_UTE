@@ -115,6 +115,8 @@ test('published image tags are full-SHA, revision-bound, and never auto-promote 
   assert.match(workflow, /type=raw,value=\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /org\.opencontainers\.image\.revision=\$\{\{ github\.sha \}\}/);
   assert.match(workflow, /\.Image\.Config\.Labels/);
+  assert.match(workflow, /--format '\{\{\.Manifest\.Digest\}\}'/);
+  assert.doesNotMatch(workflow, /manifest_digest\(\)[\s\S]*\|\s*awk/);
   assert.match(workflow, /refusing wrong-revision|revision.*not \$full_sha/s);
   assert.match(workflow, /partially published; refusing to create a cross-registry manifest/);
   assert.doesNotMatch(workflow, /promote-latest|imagetools create/);

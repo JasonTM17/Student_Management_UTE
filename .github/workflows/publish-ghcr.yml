@@ -193,8 +193,11 @@ jobs:
           full_sha="$GITHUB_SHA"
 
           manifest_digest() {
-            docker buildx imagetools inspect "$1" \
-              | awk '$1 == "Digest:" { print $2; exit }'
+            # Avoid piping the verbose inspect output into an early-exiting
+            # awk: Buildx can receive SIGPIPE and return 255 after the digest
+            # was already printed. The structured template keeps the command
+            # status tied to the registry lookup itself.
+            docker buildx imagetools inspect "$1" --format '{{.Manifest.Digest}}'
           }
 
           ghcr_digest="$(manifest_digest "$GHCR_IMAGE:$full_sha")"
