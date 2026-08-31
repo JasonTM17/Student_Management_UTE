@@ -27,6 +27,7 @@ public final class AnnouncementWriteDtos {
             "semesterId",
             "sectionId",
             "lecturerId");
+    private static final Set<String> LIFECYCLE_FIELDS = Set.of("reason", "expectedVersion");
 
     private AnnouncementWriteDtos() {
     }
@@ -74,11 +75,13 @@ public final class AnnouncementWriteDtos {
             Instant expiresAt,
             String semesterId,
             String sectionId,
-            String lecturerId) {
+            String lecturerId,
+            String reason,
+            Integer expectedVersion) {
 
         public static UpdateAnnouncementRequest from(JsonNode body) {
             ObjectNode object = objectBody(body);
-            Set<String> presentFields = presentAllowedFields(object);
+            Set<String> presentFields = presentAllowedFields(object, true);
             return new UpdateAnnouncementRequest(
                     Collections.unmodifiableSet(presentFields),
                     stringValue(object, "title", false),
@@ -91,11 +94,24 @@ public final class AnnouncementWriteDtos {
                     instantValue(object, "expiresAt"),
                     stringValue(object, "semesterId", true),
                     stringValue(object, "sectionId", true),
-                    stringValue(object, "lecturerId", true));
+                    stringValue(object, "lecturerId", true),
+                    stringValue(object, "reason", false),
+                    integerValue(object, "expectedVersion"));
         }
 
         public boolean has(String field) {
             return presentFields.contains(field);
+        }
+    }
+
+    public record LifecycleRequest(String reason, Integer expectedVersion) {
+
+        public static LifecycleRequest from(JsonNode body) {
+            ObjectNode object = objectBody(body);
+            presentLifecycleFields(object);
+            return new LifecycleRequest(
+                    stringValue(object, "reason", false),
+                    integerValue(object, "expectedVersion"));
         }
     }
 
@@ -113,20 +129,32 @@ public final class AnnouncementWriteDtos {
     }
 
     private static void ensureAllowedFields(ObjectNode body) {
-        presentAllowedFields(body);
+        presentAllowedFields(body, false);
     }
 
-    private static Set<String> presentAllowedFields(ObjectNode body) {
+    private static Set<String> presentAllowedFields(ObjectNode body, boolean lifecycleAllowed) {
         Set<String> present = new LinkedHashSet<>();
         Iterator<String> fieldNames = body.fieldNames();
         while (fieldNames.hasNext()) {
             String field = fieldNames.next();
             if (!ANNOUNCEMENT_FIELDS.contains(field)) {
-                throw new IllegalArgumentException("Unexpected body property: " + field);
+                if (!lifecycleAllowed || !LIFECYCLE_FIELDS.contains(field)) {
+                    throw new IllegalArgumentException("Unexpected body property: " + field);
+                }
             }
             present.add(field);
         }
         return present;
+    }
+
+    private static void presentLifecycleFields(ObjectNode body) {
+        Iterator<String> fieldNames = body.fieldNames();
+        while (fieldNames.hasNext()) {
+            String field = fieldNames.next();
+            if (!LIFECYCLE_FIELDS.contains(field)) {
+                throw new IllegalArgumentException("Unexpected body property: " + field);
+            }
+        }
     }
 
     private static boolean has(ObjectNode body, String field) {
@@ -159,6 +187,17 @@ public final class AnnouncementWriteDtos {
             throw new IllegalArgumentException(field + " must be a boolean");
         }
         return value.booleanValue();
+    }
+
+    private static Integer integerValue(ObjectNode body, String field) {
+        if (!has(body, field)) {
+            return null;
+        }
+        JsonNode value = body.get(field);
+        if (!value.isIntegralNumber() || !value.canConvertToInt()) {
+            throw new IllegalArgumentException(field + " must be an integer");
+        }
+        return value.intValue();
     }
 
     private static List<?> listValue(ObjectNode body, String field) {
