@@ -38,28 +38,32 @@ key is injected explicitly. Java 21 is the course compile, CI, and Docker runtim
 successor. A local run on another JDK is recorded as NOT_RUN for that gate.
 
 The published GHCR images mirror the local stack and can be smoked without a
-rebuild. Pin `CAMPUSCORE_IMAGE_TAG` to the reviewed short SHA for a
-reproducible smoke; leaving it unset deliberately follows `latest`. This
+rebuild. Pin `CAMPUSCORE_IMAGE_TAG` to the reviewed full commit SHA for a
+reproducible smoke. The published-artifact overlay rejects an unset tag so a
+moving registry alias cannot be selected accidentally. This
 includes `student-management-ute-database`, a thin
 `postgres:15-alpine` wrapper with no migrations or credentials. Flyway in the
 REST API remains the only schema/seed owner; upgrading PostgreSQL requires a
 fresh database and the same Flyway/health checks above:
 
 ```powershell
-$env:CAMPUSCORE_IMAGE_TAG = "<short-sha>"
+$env:CAMPUSCORE_IMAGE_TAG = "<full-commit-sha>"
 docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build postgres mailpit rag-service restful-api web
 ```
 
 The same workflow publishes Docker Hub tags with the `campuscore-*` names.
-Each registry receives an immutable short-SHA tag; the workflow refuses to
-overwrite an existing tag or accept a cross-registry digest mismatch, emits
-BuildKit provenance and SBOM attestations, and updates `latest` only after
-parity is verified on the default branch. Verify both registry manifests
+Each registry receives an immutable full-commit-SHA tag; the workflow binds it
+to `org.opencontainers.image.revision`, refuses wrong-revision or mismatched
+tags, and fails closed when a previous run left only one registry populated;
+that partial state requires an operator-run blob copy after source verification.
+It emits BuildKit provenance and SBOM
+attestations and does not perform a non-atomic cross-registry `latest` move.
+Verify both registry manifests
 before announcing a release:
 
 ```powershell
-docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<short-sha>
-docker manifest inspect ghcr.io/jasontm17/student-management-ute-frontend:<short-sha>
+docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<full-commit-sha>
+docker manifest inspect ghcr.io/jasontm17/student-management-ute-frontend:<full-commit-sha>
 ```
 
 ## Clients

@@ -31,15 +31,17 @@ builds and pushes the four images from the same commit to Docker Hub and GHCR:
 
 The workflow needs repository secrets `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`; it never stores credentials in the repository. It publishes
-an immutable short-SHA tag, refuses to overwrite an existing or mismatched
-tag, emits BuildKit provenance and SBOM attestations, and only moves `latest`
-on the default branch after GHCR/Docker Hub digest parity is verified.
+an immutable full-commit-SHA tag, refuses to overwrite an existing or mismatched
+tag, emits BuildKit provenance and SBOM attestations, and binds each image to
+the full source commit without a non-atomic cross-registry `latest` move.
+The workflow runs on the default branch after GHCR/Docker Hub digest parity is
+verified.
 
-For a no-build smoke, set `CAMPUSCORE_IMAGE_TAG` to the reviewed short SHA so
+For a no-build smoke, set `CAMPUSCORE_IMAGE_TAG` to the reviewed full commit SHA so
 all services resolve the same immutable release across registries:
 
 ```powershell
-$env:CAMPUSCORE_IMAGE_TAG = "<short-sha>"
+$env:CAMPUSCORE_IMAGE_TAG = "<full-commit-sha>"
 docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
 ```
 
