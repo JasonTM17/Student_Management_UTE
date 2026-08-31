@@ -67,7 +67,11 @@ public class AuthLoginService {
 
     @Transactional(noRollbackFor = BadCredentialsException.class)
     public LoginResult login(String email, String password, String ipAddress, String userAgent) {
-        AuthUserRecord user = users.findByEmail(email)
+        String normalizedEmail = normalizeEmail(email);
+        if (normalizedEmail.isBlank() || !isValidEmail(normalizedEmail)) {
+            throw new BadCredentialsException("Invalid credentials");
+        }
+        AuthUserRecord user = users.findByEmail(normalizedEmail)
                 .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
         Instant now = clock.instant();
 
@@ -91,7 +95,10 @@ public class AuthLoginService {
         if (request == null) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration request is required");
         }
-        String email = required(request.email(), "email").toLowerCase(java.util.Locale.ROOT);
+        String email = normalizeEmail(required(request.email(), "email"));
+        if (!isValidEmail(email)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A valid email address is required");
+        }
         String password = required(request.password(), "password");
         if (password.length() < 8) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must contain at least 8 characters");
@@ -245,6 +252,19 @@ public class AuthLoginService {
                 new LoginResponse(user.toResponse(), accessToken.accessToken(), refreshToken.refreshToken()),
                 accessToken.expiresAt(),
                 refreshToken.expiresAt());
+    }
+
+    private static String normalizeEmail(String email) {
+        return email == null ? "" : email.trim().toLowerCase(java.util.Locale.ROOT);
+    }
+
+    private static boolean isValidEmail(String email) {
+        int at = email.indexOf('@');
+        return at > 0
+                && at == email.lastIndexOf('@')
+                && at < email.length() - 1
+                && email.indexOf('.', at + 2) > at + 1
+                && !email.contains(" ");
     }
 
     private static String required(String value, String field) {

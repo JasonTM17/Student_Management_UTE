@@ -1,15 +1,19 @@
 # No-build overlay for the published GHCR images.
 # Use with:
-#   docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
+#   CAMPUSCORE_IMAGE_TAG=<full-commit-sha> docker compose -f docker-compose.yml -f docker-compose.rag.override.yml up -d --no-build
+# The published-artifact overlay requires an explicit immutable commit tag.
 # This swaps the local build tags for the repo-published artifacts while keeping
 # the base full-stack topology unchanged.
 
 services:
+  postgres:
+    image: ghcr.io/jasontm17/student-management-ute-database:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+
   rag-service:
-    image: ghcr.io/jasontm17/student-management-ute-rag-service:latest
+    image: ghcr.io/jasontm17/student-management-ute-rag-service:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
 
   restful-api:
-    image: ghcr.io/jasontm17/student-management-ute-restful-api:latest
+    image: ghcr.io/jasontm17/student-management-ute-restful-api:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
 
   web:
-    image: ghcr.io/jasontm17/student-management-ute-frontend:latest
+    image: ghcr.io/jasontm17/student-management-ute-frontend:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}

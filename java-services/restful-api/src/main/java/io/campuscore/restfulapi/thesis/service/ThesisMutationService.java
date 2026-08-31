@@ -228,8 +228,17 @@ public class ThesisMutationService {
         if (status == null) {
             throw invalid("status is required");
         }
-        if (!isProgressStatus(status) && !isAdmin(actor)) {
-            throw invalid("Students may set only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
+        if (!isAdmin(actor)) {
+            if (!isProgressStatus(status)) {
+                throw invalid("Students may set only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
+            }
+            // approveGroup flips approval_status while the status stays SUBMITTED, so an
+            // approved group must not be demoted or cancelled behind the reviewer's back.
+            if (group.approvalStatus() == ApprovalStatus.APPROVED
+                    && status != GroupStatus.COMPLETED
+                    && status != group.status()) {
+                throw conflict("GROUP_STATUS_INVALID", "An approved group can only be marked COMPLETED");
+            }
         }
         jdbc.update("UPDATE thesis.thesis_group SET status = :status, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("status", status.name()).addValue("groupId", groupId));
         return groups.findById(groupId);
@@ -264,8 +273,8 @@ public class ThesisMutationService {
     }
 
     private GroupRow lockGroup(UUID id) {
-        Map<String, Object> row = one("SELECT id, round_id, leader_student_id, topic_id, status FROM thesis.thesis_group WHERE id = :id FOR UPDATE", params().addValue("id", id), "GROUP_NOT_FOUND", "Thesis group not found");
-        return new GroupRow((UUID) row.get("id"), (UUID) row.get("round_id"), (String) row.get("leader_student_id"), (UUID) row.get("topic_id"), GroupStatus.valueOf((String) row.get("status")));
+        Map<String, Object> row = one("SELECT id, round_id, leader_student_id, topic_id, status, approval_status FROM thesis.thesis_group WHERE id = :id FOR UPDATE", params().addValue("id", id), "GROUP_NOT_FOUND", "Thesis group not found");
+        return new GroupRow((UUID) row.get("id"), (UUID) row.get("round_id"), (String) row.get("leader_student_id"), (UUID) row.get("topic_id"), GroupStatus.valueOf((String) row.get("status")), row.get("approval_status") == null ? ApprovalStatus.PENDING : ApprovalStatus.valueOf((String) row.get("approval_status")));
     }
 
     private void authorizeLeaderOrAdmin(GroupRow group, Jwt actor) {
@@ -351,5 +360,5 @@ public class ThesisMutationService {
     private static DomainException conflict(String code, String message) { return new DomainException(HttpStatus.CONFLICT, code, message); }
     private static DomainException notFound(String code, String message) { return new DomainException(HttpStatus.NOT_FOUND, code, message); }
 
-    private record GroupRow(UUID id, UUID roundId, String leaderStudentId, UUID topicId, GroupStatus status) { }
+    private record GroupRow(UUID id, UUID roundId, String leaderStudentId, UUID topicId, GroupStatus status, ApprovalStatus approvalStatus) { }
 }

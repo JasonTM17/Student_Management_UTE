@@ -19,6 +19,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -28,6 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
+import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
 
 type Semester = {
   id: string;
@@ -52,6 +54,19 @@ type Announcement = {
 const priorities = ['LOW', 'NORMAL', 'HIGH', 'URGENT'] as const;
 const roleOptions = ['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'] as const;
 
+function announcementPriorityTone(priority: string): StatusTone {
+  switch (priority.toUpperCase()) {
+    case 'URGENT':
+      return 'danger';
+    case 'HIGH':
+      return 'warning';
+    case 'NORMAL':
+      return 'info';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function AdminAnnouncementsPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
   const { href, locale, formatDateTime, messages } = useI18n();
@@ -59,6 +74,7 @@ export default function AdminAnnouncementsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [items, setItems] = useState<Announcement[]>([]);
+  const orderedItems = useOrderedPosts(items);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -82,7 +98,7 @@ export default function AdminAnnouncementsPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -412,7 +428,7 @@ export default function AdminAnnouncementsPage() {
           />
         ) : isLoading ? (
           <LoadingState label={copy.loading} />
-        ) : items.length === 0 ? (
+        ) : orderedItems.length === 0 ? (
           <EmptyState
             icon={Bell}
             title={copy.emptyTitle}
@@ -434,7 +450,7 @@ export default function AdminAnnouncementsPage() {
               />
             }
           >
-              {items.map((announcement) => (
+              {orderedItems.map((announcement) => (
                 <div
                   key={announcement.id}
                   className="rounded-lg border border-border/70 bg-background/70 p-5"
@@ -442,7 +458,7 @@ export default function AdminAnnouncementsPage() {
                   <div className="flex items-start justify-between gap-4">
                     <div className="min-w-0 space-y-3">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                        <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(announcementPriorityTone(announcement.priority))}`}>
                           {announcement.priority}
                         </span>
                         <span className="text-xs text-muted-foreground">

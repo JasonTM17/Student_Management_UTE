@@ -527,6 +527,24 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void loginAcceptsMixedCaseAndWhitespaceEmailsLikeRegistration() throws Exception {
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "jest-java-login-mixed-case")
+                        .content("""
+                                {"email":"  Student@CampusCore.Edu ","password":"password123"}
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("student-user"))
+                .andExpect(jsonPath("$.user.email").value("student@campuscore.edu"));
+
+        Integer failedAttempts = jdbc.queryForObject(
+                "SELECT \"failedLoginAttempts\" FROM \"auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, failedAttempts);
+    }
+
+    @Test
     void loginRejectsInvalidCredentialsAndLocksAfterTheFifthFailure() throws Exception {
         insertStudentUser("locked-user", "locked@campuscore.edu", "password123", 4, null);
 

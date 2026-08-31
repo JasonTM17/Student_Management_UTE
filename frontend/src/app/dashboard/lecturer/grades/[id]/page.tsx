@@ -3,7 +3,9 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
 import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi } from '@/lib/api';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
@@ -19,15 +21,17 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
 type GradeUpdate = {
   enrollmentId: string;
-  finalGrade: number;
+  finalGrade: number | null;
   letterGrade: string;
 };
 
 const letterGrades = [
+  '',
   'A+',
   'A',
   'A-',
@@ -43,28 +47,63 @@ const letterGrades = [
   'F',
 ];
 
+function hasCompletedGrade(update: GradeUpdate | undefined) {
+  return Boolean(update && (update.finalGrade !== null || update.letterGrade !== ''));
+}
+
+// Grades are capped at 10.0 by the backend validation contract, so letter
+// bands follow the same 10-point scale.
 function calculateGrade(score: number) {
-  if (score >= 97) return 'A+';
-  if (score >= 93) return 'A';
-  if (score >= 90) return 'A-';
-  if (score >= 87) return 'B+';
-  if (score >= 83) return 'B';
-  if (score >= 80) return 'B-';
-  if (score >= 77) return 'C+';
-  if (score >= 73) return 'C';
-  if (score >= 70) return 'C-';
-  if (score >= 67) return 'D+';
-  if (score >= 63) return 'D';
-  if (score >= 60) return 'D-';
+  if (score >= 9.7) return 'A+';
+  if (score >= 9.3) return 'A';
+  if (score >= 9.0) return 'A-';
+  if (score >= 8.7) return 'B+';
+  if (score >= 8.3) return 'B';
+  if (score >= 8.0) return 'B-';
+  if (score >= 7.7) return 'C+';
+  if (score >= 7.3) return 'C';
+  if (score >= 7.0) return 'C-';
+  if (score >= 6.7) return 'D+';
+  if (score >= 6.3) return 'D';
+  if (score >= 6.0) return 'D-';
   return 'F';
+}
+
+// Score drafts stay strings until commit so "9." and empty inputs survive
+// keystrokes instead of snapping to 0 and stamping an F per character.
+function applyScoreDraft(
+  update: GradeUpdate | undefined,
+  draft: string | undefined,
+): GradeUpdate | undefined {
+  if (!update || draft === undefined) {
+    return update;
+  }
+
+  const trimmed = draft.trim();
+  if (trimmed === '') {
+    return { ...update, finalGrade: null };
+  }
+
+  const parsed = Number(trimmed);
+  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 10) {
+    return update;
+  }
+
+  return { ...update, finalGrade: parsed, letterGrade: calculateGrade(parsed) };
+}
+
+function isGradeComplete(update: GradeUpdate | undefined) {
+  return Boolean(update?.letterGrade && update.finalGrade !== null);
 }
 
 export default function SectionGradingPage() {
   const params = useParams<{ id: string }>();
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
-  const { locale, formatNumber } = useI18n();
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
+  const { locale, formatNumber, messages } = useI18n();
   const [sectionData, setSectionData] = useState<SectionGrades | null>(null);
   const [grades, setGrades] = useState<Map<string, GradeUpdate>>(new Map());
+  const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
+  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -89,16 +128,16 @@ export default function SectionGradingPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace giảng viên',
+          eyebrow: 'Khu giảng viên',
           title: 'Quản lý điểm',
           backToGrades: 'Quay lại quản lý điểm',
-          missingSection: 'Không thể xác định section đã chọn.',
-          loadFailed: 'Hiện chưa thể tải màn hình chấm điểm cho section này.',
-          loading: 'Đang tải section chấm điểm',
+          missingSection: 'Không thể xác định lớp học phần đã chọn.',
+          loadFailed: 'Hiện chưa thể tải màn hình chấm điểm cho lớp học phần này.',
+          loading: 'Đang tải lớp học phần',
           errorDescription:
-            'Hãy xử lý lỗi ở cấp section trước khi thử mở lại màn hình chấm điểm.',
+            'Hãy xử lý lỗi của lớp học phần trước khi thử mở lại màn hình chấm điểm.',
           pageDescription: (courseName: string) =>
-            `Ghi nhận điểm cho ${courseName}, rà soát hồ sơ sinh viên và chỉ công bố khi section đã sẵn sàng.`,
+            `Ghi nhận điểm cho ${courseName}, rà soát hồ sơ sinh viên và chỉ công bố khi lớp học phần đã sẵn sàng.`,
           saveGrades: 'Lưu điểm',
           savingGrades: 'Đang lưu điểm',
           publishGrades: 'Công bố điểm',
@@ -112,12 +151,12 @@ export default function SectionGradingPage() {
           publishFailed: 'Hiện chưa thể công bố điểm.',
           students: 'Sinh viên',
           gradedRecords: 'Bản ghi đã chấm',
-          sectionStatus: 'Trạng thái section',
+          sectionStatus: 'Trạng thái lớp học phần',
           publishWarning:
-            'Vẫn còn ít nhất một bản ghi cần điểm công bố trước khi section này có thể đi sang bước publish.',
+            'Vẫn còn ít nhất một sinh viên cần điểm trước khi lớp học phần này có thể công bố kết quả.',
           emptyTitle: 'Chưa có sinh viên đăng ký',
           emptyDescription:
-            'Section này hiện chưa có sinh viên nào để chấm điểm.',
+            'Lớp học phần này hiện chưa có sinh viên nào để chấm điểm.',
           tableTitle: 'Điểm sinh viên',
           headers: {
             student: 'Sinh viên',
@@ -128,43 +167,44 @@ export default function SectionGradingPage() {
             status: 'Trạng thái',
           },
           unavailableEmail: 'Chưa có',
+          noLetterGrade: 'Chưa chọn',
           finalScoreLabel: (studentName: string) => `Điểm cuối kỳ cho ${studentName}`,
           letterGradeLabel: (studentName: string) => `Xếp loại cho ${studentName}`,
           publishedStatus: 'Đã công bố',
           draftStatus: 'Bản nháp',
-          sectionPrefix: 'Section',
-          unavailableTitle: 'Section chấm điểm chưa sẵn sàng',
+          sectionPrefix: 'Lớp',
+          unavailableTitle: 'Lớp học phần chưa sẵn sàng',
         }
       : {
-          eyebrow: 'Lecturer workspace',
+          eyebrow: 'Lecturer area',
           title: 'Grade management',
           backToGrades: 'Back to grade management',
-          missingSection: 'The selected section could not be resolved.',
+          missingSection: 'The selected class could not be found.',
           loadFailed: 'The grading view could not be loaded.',
-          loading: 'Loading grading section',
+          loading: 'Loading class grades',
           errorDescription:
-            'Resolve section-level grading issues before retrying the section view.',
+            'Resolve class-level grading issues before retrying the class view.',
           pageDescription: (courseName: string) =>
-            `Capture grades for ${courseName}, review student records, and publish only when the section is ready.`,
+            `Capture grades for ${courseName}, review student records, and release results only when the class is ready.`,
           saveGrades: 'Save grades',
           savingGrades: 'Saving grades',
-          publishGrades: 'Publish grades',
-          publishingGrades: 'Publishing grades',
+          publishGrades: 'Release grades',
+          publishingGrades: 'Releasing grades',
           saved: 'Grades saved',
           saveFailed: 'Grades could not be saved.',
-          publishTitle: 'Publish grades',
+          publishTitle: 'Release grades',
           publishMessage:
-            'Publish these grades now? Students will see the published results and this should be treated as a deliberate release step.',
-          published: 'Grades published',
-          publishFailed: 'Grades could not be published.',
+            'Release these grades now? Students will see the results immediately, so confirm that everything is ready.',
+          published: 'Grades released',
+          publishFailed: 'Grades could not be released.',
           students: 'Students',
           gradedRecords: 'Graded records',
-          sectionStatus: 'Section status',
+          sectionStatus: 'Class status',
           publishWarning:
-            'At least one record still needs a published grade before this section can move into the publish step.',
+            'At least one student still needs a grade before this class can release results.',
           emptyTitle: 'No enrolled students',
           emptyDescription:
-            'This section does not currently have any student enrollments to grade.',
+            'This class does not currently have any enrolled students to grade.',
           tableTitle: 'Student grades',
           headers: {
             student: 'Student',
@@ -175,13 +215,19 @@ export default function SectionGradingPage() {
             status: 'Status',
           },
           unavailableEmail: 'Unavailable',
+          noLetterGrade: 'Not selected',
           finalScoreLabel: (studentName: string) => `Final score for ${studentName}`,
           letterGradeLabel: (studentName: string) => `Letter grade for ${studentName}`,
           publishedStatus: 'Published',
           draftStatus: 'Draft',
-          sectionPrefix: 'Section',
-          unavailableTitle: 'Grading section unavailable',
+          sectionPrefix: 'Class',
+          unavailableTitle: 'Class grades unavailable',
         };
+
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
 
   const fetchSectionGrades = useCallback(async () => {
     if (!sectionId) {
@@ -199,21 +245,24 @@ export default function SectionGradingPage() {
 
       const nextGrades = new Map<string, GradeUpdate>();
       data.enrollments.forEach((enrollment) => {
-        const finalGrade = enrollment.finalGrade ?? 0;
         nextGrades.set(enrollment.id, {
           enrollmentId: enrollment.id,
-          finalGrade,
-          letterGrade: enrollment.letterGrade ?? calculateGrade(finalGrade),
+          finalGrade: enrollment.finalGrade ?? null,
+          letterGrade: enrollment.letterGrade ?? '',
         });
       });
 
       setGrades(nextGrades);
+      setEditedIds(new Set());
+      setScoreDrafts({});
     } catch (requestError: any) {
-      setError(requestError.response?.data?.message ?? copy.loadFailed);
+      setError(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
+      );
     } finally {
       setIsLoading(false);
     }
-  }, [copy.loadFailed, copy.missingSection, sectionId]);
+  }, [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -221,80 +270,119 @@ export default function SectionGradingPage() {
     }
   }, [fetchSectionGrades, hasAccess]);
 
-  const hasChanges = useMemo(() => {
-    if (!sectionData) {
-      return false;
-    }
-
-    return sectionData.enrollments.some((enrollment) => {
-      const current = grades.get(enrollment.id);
-      if (!current) {
-        return false;
-      }
-
-      return (
-        current.finalGrade !== (enrollment.finalGrade ?? 0) ||
-        current.letterGrade !==
-          (enrollment.letterGrade ?? calculateGrade(enrollment.finalGrade ?? 0))
-      );
-    });
-  }, [grades, sectionData]);
+  const hasChanges = editedIds.size > 0;
 
   const allGraded = useMemo(() => {
     if (!sectionData) {
       return false;
     }
 
-    return sectionData.enrollments.every(
-      (enrollment) => enrollment.letterGrade !== null || grades.get(enrollment.id),
+    return sectionData.enrollments.every((enrollment) =>
+      hasCompletedGrade(
+        applyScoreDraft(grades.get(enrollment.id), scoreDrafts[enrollment.id]),
+      ),
     );
-  }, [grades, sectionData]);
+  }, [grades, scoreDrafts, sectionData]);
 
-  const handleGradeChange = (
-    enrollmentId: string,
-    field: 'finalGrade' | 'letterGrade',
-    value: number | string,
-  ) => {
+  const markEdited = (enrollmentId: string) => {
+    setEditedIds((previous) => {
+      if (previous.has(enrollmentId)) {
+        return previous;
+      }
+
+      const next = new Set(previous);
+      next.add(enrollmentId);
+      return next;
+    });
+  };
+
+  const handleScoreDraftChange = (enrollmentId: string, draft: string) => {
+    markEdited(enrollmentId);
+    setScoreDrafts((previous) => ({ ...previous, [enrollmentId]: draft }));
+  };
+
+  const commitScoreDraft = (enrollmentId: string) => {
+    const draft = scoreDrafts[enrollmentId];
+    if (draft === undefined) {
+      return;
+    }
+
+    setGrades((previous) => {
+      const current = previous.get(enrollmentId);
+      if (!current) {
+        return previous;
+      }
+
+      const committed = applyScoreDraft(current, draft);
+      if (!committed) {
+        return previous;
+      }
+
+      const next = new Map(previous);
+      next.set(enrollmentId, committed);
+      return next;
+    });
+    setScoreDrafts((previous) => {
+      if (!(enrollmentId in previous)) {
+        return previous;
+      }
+
+      const next = { ...previous };
+      delete next[enrollmentId];
+      return next;
+    });
+  };
+
+  const handleGradeChange = (enrollmentId: string, letterGrade: string) => {
+    markEdited(enrollmentId);
     setGrades((previous) => {
       const next = new Map(previous);
       const existing = next.get(enrollmentId) ?? {
         enrollmentId,
-        finalGrade: 0,
-        letterGrade: 'F',
+        finalGrade: null,
+        letterGrade: '',
       };
 
-      if (field === 'finalGrade') {
-        existing.finalGrade = value as number;
-        existing.letterGrade = calculateGrade(existing.finalGrade);
-      } else {
-        existing.letterGrade = value as string;
-      }
-
-      next.set(enrollmentId, existing);
+      next.set(enrollmentId, { ...existing, letterGrade });
       return next;
     });
   };
 
   const handleSave = async () => {
-    if (!sectionId) {
+    if (!sectionId || !sectionData) {
+      return;
+    }
+
+    // The backend upserts only the rows it receives, so submit just the
+    // enrollments the lecturer actually edited instead of the whole roster.
+    const updates = sectionData.enrollments
+      .filter((enrollment) => editedIds.has(enrollment.id))
+      .map((enrollment) =>
+        applyScoreDraft(grades.get(enrollment.id), scoreDrafts[enrollment.id]),
+      )
+      .filter((update): update is GradeUpdate => hasCompletedGrade(update));
+
+    if (updates.length === 0) {
       return;
     }
 
     setIsSaving(true);
 
     try {
-      await sectionsApi.updateSectionGrades(sectionId, Array.from(grades.values()));
+      await sectionsApi.updateSectionGrades(sectionId, updates);
       toast.success(copy.saved);
       await fetchSectionGrades();
     } catch (requestError: any) {
-      toast.error(requestError.response?.data?.message ?? copy.saveFailed);
+      toast.error(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
+      );
     } finally {
       setIsSaving(false);
     }
   };
 
   const handlePublish = async () => {
-    if (!sectionId) {
+    if (!sectionId || !sectionData || !allGraded) {
       return;
     }
 
@@ -315,14 +403,20 @@ export default function SectionGradingPage() {
       toast.success(copy.published);
       await fetchSectionGrades();
     } catch (requestError: any) {
-      toast.error(requestError.response?.data?.message ?? copy.publishFailed);
+      toast.error(
+        campusErrorMessage(requestError, messages.common.campusErrors, copy.publishFailed),
+      );
     } finally {
       setIsPublishing(false);
     }
   };
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   if (error) {
@@ -402,7 +496,7 @@ export default function SectionGradingPage() {
                 {formatNumber(sectionData.enrollments.length)}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-blue-500/12 text-blue-600 dark:text-blue-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('info')}`}>
               <Users className="h-5 w-5" />
             </div>
           </CardContent>
@@ -417,7 +511,7 @@ export default function SectionGradingPage() {
                 )}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-emerald-500/12 text-emerald-600 dark:text-emerald-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('success')}`}>
               <CheckCircle className="h-5 w-5" />
             </div>
           </CardContent>
@@ -427,10 +521,10 @@ export default function SectionGradingPage() {
             <div>
               <div className="text-sm text-muted-foreground">{copy.sectionStatus}</div>
               <div className="mt-1 text-3xl font-semibold tracking-tight text-foreground">
-                {sectionData.status ?? 'OPEN'}
+                {statusLabel(sectionData.status)}
               </div>
             </div>
-            <div className="flex h-11 w-11 items-center justify-center rounded-lg bg-violet-500/12 text-violet-600 dark:text-violet-400">
+            <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('neutral')}`}>
               <FileText className="h-5 w-5" />
             </div>
           </CardContent>
@@ -465,10 +559,8 @@ export default function SectionGradingPage() {
               {sectionData.enrollments.map((enrollment) => {
                 const current = grades.get(enrollment.id) ?? {
                   enrollmentId: enrollment.id,
-                  finalGrade: enrollment.finalGrade ?? 0,
-                  letterGrade:
-                    enrollment.letterGrade ??
-                    calculateGrade(enrollment.finalGrade ?? 0),
+                  finalGrade: enrollment.finalGrade ?? null,
+                  letterGrade: enrollment.letterGrade ?? '',
                 };
                 const isPublished = enrollment.gradeStatus === 'PUBLISHED';
 
@@ -493,7 +585,7 @@ export default function SectionGradingPage() {
                       <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                         {isPublished
                           ? copy.publishedStatus
-                          : enrollment.gradeStatus ?? copy.draftStatus}
+                          : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}
                       </span>
                     </div>
                     <div className="mt-4 grid gap-4 border-t border-border/60 pt-3 sm:grid-cols-2">
@@ -504,16 +596,21 @@ export default function SectionGradingPage() {
                         <Input
                           type="number"
                           min="0"
-                          max="100"
+                          max="10"
                           step="0.1"
-                          value={current.finalGrade}
+                          value={
+                            scoreDrafts[enrollment.id] ??
+                            (current.finalGrade === null
+                              ? ''
+                              : String(current.finalGrade))
+                          }
                           onChange={(event) =>
-                            handleGradeChange(
+                            handleScoreDraftChange(
                               enrollment.id,
-                              'finalGrade',
-                              Number(event.target.value) || 0,
+                              event.target.value,
                             )
                           }
+                          onBlur={() => commitScoreDraft(enrollment.id)}
                           disabled={isPublished}
                           aria-label={copy.finalScoreLabel(enrollment.studentName)}
                         />
@@ -528,17 +625,19 @@ export default function SectionGradingPage() {
                           onChange={(event) =>
                             handleGradeChange(
                               enrollment.id,
-                              'letterGrade',
                               event.target.value,
                             )
                           }
                           disabled={isPublished}
                           aria-label={copy.letterGradeLabel(enrollment.studentName)}
                         >
+                          <option value="">{copy.noLetterGrade}</option>
                           {letterGrades.map((grade) => (
+                            grade === '' ? null : (
                             <option key={grade} value={grade}>
                               {grade}
                             </option>
+                            )
                           ))}
                         </select>
                       </label>
@@ -563,10 +662,8 @@ export default function SectionGradingPage() {
                   {sectionData.enrollments.map((enrollment) => {
                     const current = grades.get(enrollment.id) ?? {
                       enrollmentId: enrollment.id,
-                      finalGrade: enrollment.finalGrade ?? 0,
-                      letterGrade:
-                        enrollment.letterGrade ??
-                        calculateGrade(enrollment.finalGrade ?? 0),
+                      finalGrade: enrollment.finalGrade ?? null,
+                      letterGrade: enrollment.letterGrade ?? '',
                     };
                     const isPublished = enrollment.gradeStatus === 'PUBLISHED';
 
@@ -588,16 +685,21 @@ export default function SectionGradingPage() {
                             <Input
                               type="number"
                               min="0"
-                              max="100"
+                              max="10"
                               step="0.1"
-                              value={current.finalGrade}
+                              value={
+                                scoreDrafts[enrollment.id] ??
+                                (current.finalGrade === null
+                                  ? ''
+                                  : String(current.finalGrade))
+                              }
                               onChange={(event) =>
-                                handleGradeChange(
+                                handleScoreDraftChange(
                                   enrollment.id,
-                                  'finalGrade',
-                                  Number(event.target.value) || 0,
+                                  event.target.value,
                                 )
                               }
+                              onBlur={() => commitScoreDraft(enrollment.id)}
                               disabled={isPublished}
                               aria-label={copy.finalScoreLabel(enrollment.studentName)}
                             />
@@ -611,17 +713,19 @@ export default function SectionGradingPage() {
                               onChange={(event) =>
                                 handleGradeChange(
                                   enrollment.id,
-                                  'letterGrade',
                                   event.target.value,
                                 )
                               }
                               disabled={isPublished}
                               aria-label={copy.letterGradeLabel(enrollment.studentName)}
                             >
+                              <option value="">{copy.noLetterGrade}</option>
                               {letterGrades.map((grade) => (
+                                grade === '' ? null : (
                                 <option key={grade} value={grade}>
                                   {grade}
                                 </option>
+                                )
                               ))}
                             </select>
                           </div>
@@ -630,7 +734,7 @@ export default function SectionGradingPage() {
                           <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {isPublished
                               ? copy.publishedStatus
-                              : enrollment.gradeStatus ?? copy.draftStatus}
+                              : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}
                           </span>
                         </td>
                       </tr>

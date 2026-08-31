@@ -3,11 +3,18 @@ import { test, expect, type Page } from '@playwright/test';
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
 
-async function login(page: Page, account: typeof student) {
-  await page.goto('/login');
+async function login(
+  page: Page,
+  account: typeof student,
+  portal: 'student' | 'lecturer' | 'admin' = account.email.startsWith('admin') ? 'admin' : 'student',
+) {
+  await page.goto(`/login?portal=${portal}`);
+  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
-  await page.getByRole('button', { name: /sign in/i }).click();
+  await submit.click();
+  await expect(page).not.toHaveURL(/\/login(?:$|[/?#])/, { timeout: 20_000 });
 }
 
 function jsonResponse(body: unknown, status = 200) {
@@ -82,7 +89,7 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await expect.poll(() => feedbackCalls).toBe(1);
 });
 
-test('authenticated admin can inspect curated sources and the public catalog coverage surface', async ({ page }) => {
+test('authenticated admin can inspect reviewed guidance and public coverage', async ({ page }) => {
   const source = {
     documentId: 'aaaaaaaa-aaaa-4aaa-8aaa-aaaaaaaaaaaa',
     revisionId: 'bbbbbbbb-bbbb-4bbb-8bbb-bbbbbbbbbbbb',
@@ -109,15 +116,15 @@ test('authenticated admin can inspect curated sources and the public catalog cov
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
   await page.goto('/admin/assistant-knowledge');
 
-  await expect(page.getByRole('heading', { name: 'AI assistant knowledge' })).toBeVisible();
-  await expect(page.getByText('Public catalog coverage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'Thesis guidance' })).toBeVisible();
+  await expect(page.getByText('Public guidance coverage')).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
 
-  await page.getByLabel('Filter state').selectOption('PUBLISHED');
+  await page.getByLabel('Filter status').selectOption('PUBLISHED');
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await page.getByRole('button', { name: 'Archive' }).first().click();
-  await expect(page.getByRole('dialog')).toContainText('Archive source?');
+  await expect(page.getByRole('dialog')).toContainText('Archive guidance?');
   await page.getByRole('button', { name: 'Cancel' }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
@@ -151,7 +158,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     expect(launcherBox!.x + launcherBox!.width).toBeLessThanOrEqual(viewport.width);
     expect(launcherBox!.y + launcherBox!.height).toBeLessThanOrEqual(viewport.height);
 
-    const mobileNav = page.getByRole('navigation', { name: /mobile workspace navigation/i });
+    const mobileNav = page.getByRole('navigation', { name: /campus navigation on mobile/i });
     if (viewport.width < 768) {
       await expect(mobileNav).toBeVisible();
       const navBox = await mobileNav.boundingBox();

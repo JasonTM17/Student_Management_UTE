@@ -13,8 +13,11 @@ import {
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
+import { statusToneClass } from '@/components/ui/status';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
 
 type Announcement = {
   id: string;
@@ -30,43 +33,44 @@ type Announcement = {
 };
 
 const priorityTone: Record<string, string> = {
-  LOW: 'bg-secondary text-foreground',
-  NORMAL: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
-  HIGH: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
-  URGENT: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
+  LOW: statusToneClass('neutral'),
+  NORMAL: statusToneClass('info'),
+  HIGH: statusToneClass('warning'),
+  URGENT: statusToneClass('danger'),
 };
 
 export default function StudentAnnouncementsPage() {
-  const { user, isLoading: authLoading, hasAccess } = useRequireAuth([
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth([
     'STUDENT',
   ]);
   const { locale, formatDateTime } = useI18n();
   const [items, setItems] = useState<Announcement[]>([]);
+  const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Không gian sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Thông báo',
-          description: `Đọc các cập nhật quan trọng dành cho ${user?.firstName ?? 'bạn'} mà không rời khỏi không gian sinh viên.`,
+          description: `Đọc các cập nhật quan trọng dành cho ${user?.firstName ?? 'bạn'} tại đây.`,
           refresh: 'Làm mới',
           loading: 'Đang tải thông báo',
           unavailableTitle: 'Thông báo chưa sẵn sàng',
           emptyTitle: 'Chưa có thông báo',
           emptyDescription:
             'Thông báo toàn trường và cập nhật từ học phần sẽ xuất hiện tại đây sau khi được phát hành.',
-          returnDashboard: 'Quay lại dashboard',
+          returnDashboard: 'Quay lại trang tổng quan',
           recentNotices: 'Thông báo gần đây',
           semesterPrefix: 'Học kỳ',
           sectionPrefix: 'lớp học phần',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'Announcements',
-          description: `Read the notices that matter to ${user?.firstName ?? 'you'} without leaving the protected student workspace.`,
+          description: `Read the notices that matter to ${user?.firstName ?? 'you'} in one place.`,
           refresh: 'Refresh',
           loading: 'Loading announcements',
           unavailableTitle: 'Announcements unavailable',
@@ -76,7 +80,7 @@ export default function StudentAnnouncementsPage() {
           returnDashboard: 'Return to dashboard',
           recentNotices: 'Recent notices',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'section',
+          sectionPrefix: 'class',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 
@@ -100,8 +104,12 @@ export default function StudentAnnouncementsPage() {
     }
   }, [fetchFeed, hasAccess]);
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -133,7 +141,7 @@ export default function StudentAnnouncementsPage() {
         />
       ) : isLoading ? (
         <LoadingState label={copy.loading} />
-      ) : items.length === 0 ? (
+      ) : orderedItems.length === 0 ? (
         <EmptyState
           icon={Bell}
           title={copy.emptyTitle}
@@ -148,7 +156,7 @@ export default function StudentAnnouncementsPage() {
             <CardTitle className="text-xl">{copy.recentNotices}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {items.map((announcement) => (
+            {orderedItems.map((announcement) => (
               <article
                 key={announcement.id}
                 className="rounded-lg border border-border/70 bg-card px-5 py-5"

@@ -4,6 +4,7 @@ import type { RefObject } from 'react';
 import { Bell, BookOpen, Calendar, ChevronLeft, ChevronRight, ClipboardList, X } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
+import { metricToneClass, type StatusTone } from '@/components/ui/status';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -18,26 +19,31 @@ interface StudentContextRailProps {
   containerRef?: RefObject<HTMLElement>;
 }
 
-const quickLinkConfig = [
+const quickLinkConfig: readonly {
+  href: string;
+  icon: typeof ClipboardList;
+  tone: StatusTone;
+  labelKey: 'registration' | 'schedule' | 'announcements';
+}[] = [
   {
     href: '/dashboard/register',
     icon: ClipboardList,
-    tone: 'bg-blue-500/12 text-blue-600 dark:text-blue-300',
+    tone: 'info',
     labelKey: 'registration',
   },
   {
     href: '/dashboard/schedule',
     icon: Calendar,
-    tone: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-300',
+    tone: 'success',
     labelKey: 'schedule',
   },
   {
     href: '/dashboard/announcements',
     icon: Bell,
-    tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-300',
+    tone: 'neutral',
     labelKey: 'announcements',
   },
-] as const;
+];
 
 export function StudentContextRail({
   currentPageTitle,
@@ -190,7 +196,7 @@ export function StudentContextRail({
                 <div
                   className={cn(
                     'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
-                    item.tone,
+                    metricToneClass(item.tone),
                   )}
                 >
                   <Icon className="h-5 w-5" aria-hidden="true" />

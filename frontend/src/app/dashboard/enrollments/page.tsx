@@ -2,14 +2,16 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { BookOpen, Calendar, Clock, MapPin, Trash2 } from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -17,13 +19,14 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
 const statusTone: Record<string, string> = {
-  CONFIRMED: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
-  PENDING: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
-  DROPPED: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
-  COMPLETED: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+  CONFIRMED: metricToneClass('success'),
+  PENDING: metricToneClass('warning'),
+  DROPPED: metricToneClass('danger'),
+  COMPLETED: metricToneClass('info'),
 };
 
 function getDayName(day: number, locale: 'en' | 'vi') {
@@ -52,8 +55,8 @@ function getDayName(day: number, locale: 'en' | 'vi') {
 }
 
 export default function EnrollmentsPage() {
-  const { user } = useAuth();
-  const { locale, formatDate, formatNumber } = useI18n();
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
+  const { locale, formatDate, formatNumber, messages } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
@@ -63,26 +66,26 @@ export default function EnrollmentsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace sinh viên',
+          eyebrow: 'Khu sinh viên',
           title: 'Môn học của tôi',
           description:
-            'Theo dõi trạng thái section, xem lịch học và xử lý thay đổi enrollment mà không rời khỏi workspace dùng chung.',
-          browseSections: 'Xem các section',
+            'Theo dõi lớp học phần, xem lịch học và cập nhật đăng ký ngay trong khu sinh viên.',
+          browseSections: 'Xem lớp học phần',
           loading: 'Đang tải đăng ký học',
           unavailableTitle: 'Đăng ký học chưa sẵn sàng',
           emptyTitle: 'Chưa có môn học',
           emptyDescription:
-            'Khi bạn đăng ký vào một section, lịch học và chi tiết section sẽ xuất hiện ở đây.',
+            'Khi bạn đăng ký một lớp học phần, lịch học và thông tin lớp sẽ xuất hiện ở đây.',
           coursesInView: 'Môn học trong màn hình',
           confirmed: 'Đã xác nhận',
           pending: 'Đang chờ',
           recordTitle: 'Hồ sơ đăng ký',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Lớp học phần',
           enrolledOn: 'Đăng ký ngày',
           credits: 'tín chỉ',
           unknownCourse: 'Môn học',
           unavailableCourseName: 'Chưa có tên môn',
-          unknownSection: 'Chưa rõ section',
+          unknownSection: 'Chưa rõ lớp học phần',
           dropCourse: 'Hủy môn học',
           droppingCourse: 'Đang hủy môn',
           confirmTitle: 'Hủy môn học',
@@ -95,26 +98,26 @@ export default function EnrollmentsPage() {
           loadFailed: 'Hiện chưa thể tải danh sách đăng ký học của bạn.',
         }
       : {
-          eyebrow: 'Student workspace',
+          eyebrow: 'Student area',
           title: 'My courses',
           description:
-            'Track section status, review schedules, and make enrollment changes without leaving the shared workspace.',
-          browseSections: 'Browse available sections',
+            'Review your classes, schedules, and registration changes in one clear student area.',
+          browseSections: 'Browse classes',
           loading: 'Loading enrollments',
           unavailableTitle: 'Enrollments unavailable',
           emptyTitle: 'No courses yet',
           emptyDescription:
-            'Once you enroll in a section, the current schedule and section details will appear here.',
+            'Once you enroll in a class, its schedule and details will appear here.',
           coursesInView: 'Courses in view',
           confirmed: 'Confirmed',
           pending: 'Pending',
           recordTitle: 'Enrollment record',
-          sectionPrefix: 'Section',
+          sectionPrefix: 'Class',
           enrolledOn: 'Enrolled',
           credits: 'credits',
           unknownCourse: 'Course',
           unavailableCourseName: 'Unavailable',
-          unknownSection: 'Unknown section',
+          unknownSection: 'Unknown class',
           dropCourse: 'Drop course',
           droppingCourse: 'Dropping course',
           confirmTitle: 'Drop course',
@@ -142,8 +145,10 @@ export default function EnrollmentsPage() {
   }, [copy.loadFailed]);
 
   useEffect(() => {
-    void fetchEnrollments();
-  }, [fetchEnrollments]);
+    if (hasAccess) {
+      void fetchEnrollments();
+    }
+  }, [fetchEnrollments, hasAccess]);
 
   const handleDrop = async (enrollmentId: string, courseLabel: string) => {
     if (!user?.studentId) {
@@ -168,7 +173,7 @@ export default function EnrollmentsPage() {
       toast.success(copy.dropped);
       await fetchEnrollments();
     } catch (error: any) {
-      toast.error(error.response?.data?.message || copy.dropFailed);
+      toast.error(campusErrorMessage(error, messages.common.campusErrors, copy.dropFailed));
     } finally {
       setIsDropping(null);
     }
@@ -186,17 +191,17 @@ export default function EnrollmentsPage() {
       {
         label: copy.coursesInView,
         value: formatNumber(enrollments.length),
-        tone: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+        tone: metricToneClass('info'),
       },
       {
         label: copy.confirmed,
         value: formatNumber(confirmedCourses.length),
-        tone: 'bg-emerald-500/12 text-emerald-600 dark:text-emerald-400',
+        tone: metricToneClass('success'),
       },
       {
         label: copy.pending,
         value: formatNumber(pendingCourses.length),
-        tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
+        tone: metricToneClass('warning'),
       },
     ],
     [
@@ -209,6 +214,14 @@ export default function EnrollmentsPage() {
       pendingCourses.length,
     ],
   );
+
+  if (authLoading) {
+    return <LoadingState label={copy.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
 
   return (
     <div className="space-y-8">
@@ -295,7 +308,7 @@ export default function EnrollmentsPage() {
                               'bg-secondary text-foreground'
                             }`}
                           >
-                            {enrollment.status}
+                            {messages.common.statuses[enrollment.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                           </span>
                         </div>
 

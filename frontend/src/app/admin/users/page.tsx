@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { AlertCircle, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
@@ -51,6 +52,21 @@ function roleLabel(roles?: string | string[]) {
   return values.filter(Boolean).join(', ') || defaultRole;
 }
 
+function userStatusTone(status: string): StatusTone {
+  switch (status.toUpperCase()) {
+    case 'ACTIVE':
+      return 'success';
+    case 'PENDING':
+      return 'warning';
+    case 'LOCKED':
+    case 'SUSPENDED':
+    case 'DISABLED':
+      return 'danger';
+    default:
+      return 'neutral';
+  }
+}
+
 export default function AdminUsersPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
   const { href, locale, formatDate, messages } = useI18n();
@@ -59,6 +75,7 @@ export default function AdminUsersPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -81,7 +98,7 @@ export default function AdminUsersPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -99,13 +116,23 @@ export default function AdminUsersPage() {
         limit: 20,
         search: search || undefined,
       });
-      setUsers(response.data);
+      const rows = Array.isArray(response.data)
+        ? response.data
+        : Array.isArray(response)
+          ? response
+          : [];
+      setUsers(rows as UserRecord[]);
       setTotalPages(response.meta?.totalPages || 1);
-    } catch {
+    } catch (loadError) {
+      const status = (loadError as { response?: { status?: number } }).response?.status;
       setError(
-        locale === 'vi'
-          ? 'Hiện chưa thể tải hồ sơ người dùng.'
-          : 'User records could not be loaded.',
+        status === 403
+          ? locale === 'vi'
+            ? 'Bạn không có quyền xem danh sách người dùng.'
+            : 'You do not have permission to view user records.'
+          : locale === 'vi'
+            ? 'Hiện chưa thể tải hồ sơ người dùng.'
+            : 'User records could not be loaded.',
       );
     } finally {
       setIsLoading(false);
@@ -237,6 +264,11 @@ export default function AdminUsersPage() {
             `Delete user ${firstName} ${lastName}`,
         };
 
+  const statusLabel = (status: string | null | undefined) =>
+    messages.common.statuses[
+      (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
+    ] ?? messages.common.statuses.UNKNOWN;
+
   if (isAuthLoading || isLoggingOut || !canAccess) {
     return <LoadingState label={copy.loading} className="m-8" />;
   }
@@ -270,10 +302,12 @@ export default function AdminUsersPage() {
     resetForm();
   };
 
-  const handleSearch = async (e: React.FormEvent) => {
+  // The search box keeps its own draft; committing it on submit lets the
+  // fetchUsers effect run once per query instead of once per keystroke.
+  const handleSearch = (e: React.FormEvent) => {
     e.preventDefault();
+    setSearch(searchInput);
     setPage(1);
-    await fetchUsers();
   };
 
   const handleDelete = async (userRecord: UserRecord) => {
@@ -352,8 +386,8 @@ export default function AdminUsersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(e) => setSearch(e.target.value)}
+                  value={searchInput}
+                  onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />
@@ -413,8 +447,8 @@ export default function AdminUsersPage() {
                           {record.email}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                        {record.status}
+                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                        {statusLabel(record.status)}
                       </span>
                     </div>
                     <dl className="mt-4 border-t border-border/60 pt-3">
@@ -454,7 +488,7 @@ export default function AdminUsersPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.email}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.status}</th>
@@ -475,8 +509,8 @@ export default function AdminUsersPage() {
                           {record.email}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                            {record.status}
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                            {statusLabel(record.status)}
                           </span>
                         </td>
                         <td className="px-2 py-4 text-muted-foreground">

@@ -4,9 +4,12 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { Bell, Calendar, FileText, Users } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { announcementsApi, sectionsApi } from '@/lib/api';
+import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { GradingSection, LecturerSection } from '@/types/api';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { metricToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -31,17 +34,17 @@ const quickLinks = [
   {
     href: '/dashboard/lecturer/schedule',
     icon: Calendar,
-    tone: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
+    tone: metricToneClass('info'),
   },
   {
     href: '/dashboard/lecturer/grades',
     icon: FileText,
-    tone: 'bg-violet-500/12 text-violet-600 dark:text-violet-400',
+    tone: metricToneClass('neutral'),
   },
   {
     href: '/dashboard/lecturer/announcements',
     icon: Bell,
-    tone: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
+    tone: metricToneClass('warning'),
   },
 ];
 
@@ -53,6 +56,7 @@ export default function LecturerDashboardPage() {
   const [scheduleSections, setScheduleSections] = useState<LecturerSection[]>([]);
   const [gradingSections, setGradingSections] = useState<GradingSection[]>([]);
   const [announcements, setAnnouncements] = useState<LecturerAnnouncement[]>([]);
+  const orderedAnnouncements = useOrderedPosts(announcements);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
@@ -93,9 +97,16 @@ export default function LecturerDashboardPage() {
   const readyToPublish = useMemo(() => {
     return gradingSections.filter((section) => section.canPublish).length;
   }, [gradingSections]);
+  const statusLabel = (status: string) =>
+    messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
+    messages.common.statuses.UNKNOWN;
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={messages.lecturerDashboard.errors.loading} />;
+  }
+
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -122,28 +133,28 @@ export default function LecturerDashboardPage() {
               value={formatNumber(scheduleSections.length)}
               icon={<Calendar className="h-5 w-5" />}
               detail={messages.lecturerDashboard.metrics.details[0]}
-              toneClassName="bg-blue-500/12 text-blue-600 dark:text-blue-400"
+              toneClassName={metricToneClass('info')}
             />
             <WorkspaceMetricCard
               label={messages.lecturerDashboard.metrics.labels[1]}
               value={formatNumber(totalStudents)}
               icon={<Users className="h-5 w-5" />}
               detail={messages.lecturerDashboard.metrics.details[1]}
-              toneClassName="bg-emerald-500/12 text-emerald-600 dark:text-emerald-400"
+              toneClassName={metricToneClass('success')}
             />
             <WorkspaceMetricCard
               label={messages.lecturerDashboard.metrics.labels[2]}
               value={formatNumber(readyToPublish)}
               icon={<FileText className="h-5 w-5" />}
               detail={messages.lecturerDashboard.metrics.details[2]}
-              toneClassName="bg-violet-500/12 text-violet-600 dark:text-violet-400"
+              toneClassName={metricToneClass('neutral')}
             />
             <WorkspaceMetricCard
               label={messages.lecturerDashboard.metrics.labels[3]}
               value={formatNumber(announcements.length)}
               icon={<Bell className="h-5 w-5" />}
               detail={messages.lecturerDashboard.metrics.details[3]}
-              toneClassName="bg-amber-500/12 text-amber-600 dark:text-amber-400"
+              toneClassName={metricToneClass('warning')}
             />
           </div>
 
@@ -197,7 +208,7 @@ export default function LecturerDashboardPage() {
                             )}
                           </div>
                           <div className="mt-1 text-sm text-muted-foreground">
-                            Section {section.sectionNumber} - {getLocalizedFlatLabel(
+                            {messages.lecturerDashboard.sectionPrefix} {section.sectionNumber} - {getLocalizedFlatLabel(
                               locale,
                               section.semester,
                               section.semesterNameEn,
@@ -263,7 +274,7 @@ export default function LecturerDashboardPage() {
                         </div>
                         <div className="text-sm text-muted-foreground sm:text-right">
                           <div>{section.enrolledCount}/{section.capacity} {messages.lecturerDashboard.studentsSuffix}</div>
-                          <div className="mt-1">{section.status}</div>
+                          <div className="mt-1">{statusLabel(section.status)}</div>
                         </div>
                       </div>
                     </div>
@@ -285,7 +296,7 @@ export default function LecturerDashboardPage() {
                     className="min-h-[240px] border-none bg-transparent px-0 py-0"
                   />
                 ) : (
-                  announcements.map((announcement) => (
+                  orderedAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
                       className="rounded-lg border border-border/70 bg-card px-4 py-4"

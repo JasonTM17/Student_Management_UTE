@@ -10,7 +10,9 @@ citation, lexical fallback và tùy chọn DeepSeek V4 Flash chỉ ở backend.
 
 Finance, analytics, support ticket, vector search, Redis, RabbitMQ, MinIO,
 Nginx, Kubernetes, Cloudflare Tunnel và release multi-image được loại khỏi đồ
-án. DeepSeek là tùy chọn, mặc định tắt; lexical fallback không cần key.
+án. Workflow GHCR vẫn xuất bản một wrapper PostgreSQL không chứa migration để
+đồng bộ artifact của course stack; Flyway trong REST API tiếp tục sở hữu schema
+và seed. DeepSeek là tùy chọn, mặc định tắt; lexical fallback không cần key.
 
 ```powershell
 docker compose up -d --build postgres mailpit rag-service restful-api web

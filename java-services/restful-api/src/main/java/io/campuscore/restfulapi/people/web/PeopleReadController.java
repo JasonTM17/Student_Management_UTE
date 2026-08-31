@@ -9,6 +9,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
@@ -30,6 +31,7 @@ public class PeopleReadController {
     }
 
     @GetMapping("students")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public StudentListResponse getStudents(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit,
@@ -40,6 +42,7 @@ public class PeopleReadController {
     }
 
     @GetMapping("students/{id}")
+    @PreAuthorize("hasAnyRole('STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public StudentResponse getStudent(
             @PathVariable String id,
             Authentication authentication) {
@@ -47,6 +50,7 @@ public class PeopleReadController {
     }
 
     @GetMapping("lecturers")
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public LecturerListResponse getLecturers(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit,
@@ -56,8 +60,11 @@ public class PeopleReadController {
     }
 
     @GetMapping("lecturers/{id}")
-    public LecturerResponse getLecturer(@PathVariable String id) {
-        return people.findLecturer(id);
+    @PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
+    public LecturerResponse getLecturer(
+            @PathVariable String id,
+            Authentication authentication) {
+        return people.findLecturer(id, authentication);
     }
 
     private static void requireAllowedQuery(

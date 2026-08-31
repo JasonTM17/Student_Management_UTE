@@ -13,8 +13,11 @@ import {
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
+import { statusToneClass } from '@/components/ui/status';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
 
 type Announcement = {
   id: string;
@@ -30,53 +33,54 @@ type Announcement = {
 };
 
 const priorityTone: Record<string, string> = {
-  LOW: 'bg-secondary text-foreground',
-  NORMAL: 'bg-blue-500/12 text-blue-600 dark:text-blue-400',
-  HIGH: 'bg-amber-500/12 text-amber-600 dark:text-amber-400',
-  URGENT: 'bg-rose-500/12 text-rose-600 dark:text-rose-400',
+  LOW: statusToneClass('neutral'),
+  NORMAL: statusToneClass('info'),
+  HIGH: statusToneClass('warning'),
+  URGENT: statusToneClass('danger'),
 };
 
 export default function LecturerAnnouncementsPage() {
-  const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
+  const { user, hasAccess, isLoading: authLoading, isForbidden } = useRequireAuth(['LECTURER']);
   const { locale, formatDateTime } = useI18n();
   const [items, setItems] = useState<Announcement[]>([]);
+  const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Workspace giảng viên',
+          eyebrow: 'Khu giảng viên',
           title: 'Thông báo',
           description:
-            'Giữ các cập nhật mới nhất từ campus và section sát với luồng công việc giảng dạy của bạn.',
-          backToDashboard: 'Quay lại dashboard giảng viên',
+            'Giữ các cập nhật mới nhất từ trường và lớp học phần sát với luồng giảng dạy của bạn.',
+          backToDashboard: 'Quay lại trang tổng quan giảng viên',
           refresh: 'Làm mới',
           loading: 'Đang tải thông báo',
           unavailableTitle: 'Thông báo chưa sẵn sàng',
           emptyTitle: 'Chưa có thông báo',
           emptyDescription:
-            'Các thông báo dùng chung cho workspace giảng dạy sẽ xuất hiện ở đây sau khi được phát hành.',
+            'Các thông báo dùng chung cho việc giảng dạy sẽ xuất hiện ở đây sau khi được phát hành.',
           recentNotices: 'Thông báo gần đây',
           semesterPrefix: 'Học kỳ',
-          sectionPrefix: 'section',
+          sectionPrefix: 'lớp học phần',
           loadFailed: 'Hiện chưa thể tải thông báo.',
         }
       : {
-          eyebrow: 'Lecturer workspace',
+          eyebrow: 'Lecturer area',
           title: 'Announcements',
           description:
-            'Keep the latest campus and section-level notices close to your teaching workflow.',
+            'Keep the latest campus and class notices close to your teaching workflow.',
           backToDashboard: 'Back to lecturer dashboard',
           refresh: 'Refresh',
           loading: 'Loading announcements',
           unavailableTitle: 'Announcements unavailable',
           emptyTitle: 'No announcements yet',
           emptyDescription:
-            'Shared notices for your teaching workspace will appear here once they are published.',
+            'Shared teaching notices will appear here once they are published.',
           recentNotices: 'Recent notices',
           semesterPrefix: 'Semester',
-          sectionPrefix: 'section',
+          sectionPrefix: 'class',
           loadFailed: 'Announcements could not be loaded right now.',
         };
 
@@ -100,8 +104,12 @@ export default function LecturerAnnouncementsPage() {
     }
   }, [fetchFeed, hasAccess]);
 
-  if (authLoading || !hasAccess) {
+  if (authLoading) {
     return <LoadingState label={copy.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
   return (
@@ -143,7 +151,7 @@ export default function LecturerAnnouncementsPage() {
         />
       ) : isLoading ? (
         <LoadingState label={copy.loading} />
-      ) : items.length === 0 ? (
+      ) : orderedItems.length === 0 ? (
         <EmptyState
           icon={Bell}
           title={copy.emptyTitle}
@@ -155,7 +163,7 @@ export default function LecturerAnnouncementsPage() {
             <CardTitle className="text-xl">{copy.recentNotices}</CardTitle>
           </CardHeader>
           <CardContent className="space-y-4">
-            {items.map((announcement) => (
+            {orderedItems.map((announcement) => (
               <article
                 key={announcement.id}
                 className="rounded-lg border border-border/70 bg-card px-5 py-5"

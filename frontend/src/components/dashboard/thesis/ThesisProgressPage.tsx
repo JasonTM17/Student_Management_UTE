@@ -6,6 +6,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
@@ -25,7 +26,7 @@ function getProgressIndex(
 }
 
 export default function ThesisProgressPage() {
-  const { isLoading: authLoading, hasAccess } = useRequireAuth();
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages } = useI18n();
   const workspace = useThesisWorkspace();
   const selectedRound = workspace.selectedRound;
@@ -37,7 +38,15 @@ export default function ThesisProgressPage() {
     selectedRound?.status,
   );
 
-  if (authLoading || !hasAccess || workspace.isLoading) {
+  if (authLoading) {
+    return <LoadingState label={messages.thesis.loading} />;
+  }
+
+  if (isForbidden || !hasAccess) {
+    return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
+
+  if (workspace.isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
@@ -130,8 +139,8 @@ export default function ThesisProgressPage() {
       </Card>
 
       {!workspace.currentGroup ? (
-        <div className="flex items-start gap-4 rounded-lg border border-amber-500/25 bg-amber-500/10 p-5">
-          <UsersRound className="mt-0.5 h-5 w-5 shrink-0 text-amber-700 dark:text-amber-300" />
+        <div className="flex items-start gap-4 rounded-lg border border-status-warning/25 bg-status-warning/12 p-5">
+          <UsersRound className="mt-0.5 h-5 w-5 shrink-0 text-status-warning" />
           <div>
             <p className="font-semibold text-foreground">{messages.thesis.noGroup}</p>
             <p className="mt-1 text-sm leading-6 text-muted-foreground">{messages.thesis.progressGroupRequired}</p>

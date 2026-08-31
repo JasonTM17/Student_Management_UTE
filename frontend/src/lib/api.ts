@@ -25,8 +25,19 @@ import {
   SectionSchedule,
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
+import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
+import { CSRF_COOKIE_NAME } from '@/lib/session-hint';
 
-export const API_BASE_URL = process.env.NEXT_PUBLIC_API_URL || '/api/v1';
+export const API_BASE_URL = resolvePublicApiBaseUrl(process.env.NEXT_PUBLIC_API_URL);
+
+// crypto.randomUUID only exists in secure contexts (HTTPS/localhost); the Docker
+// web stack serves plain HTTP on LAN IPs, so fall back to a timestamp-based id.
+export function createRequestId(): string {
+  if (typeof globalThis.crypto?.randomUUID === 'function') {
+    return globalThis.crypto.randomUUID();
+  }
+  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+}
 type ApiObject = Record<string, unknown>;
 type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRefresh?: boolean;
@@ -68,7 +79,6 @@ type SectionDetail = Section & {
   >;
 };
 
-const CSRF_COOKIE_NAME = 'cc_csrf';
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
 const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout)(?:\/|$)/;
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
@@ -82,10 +92,17 @@ function redirectToLogin(reason: 'session-expired' | 'unauthorized') {
     return;
   }
 
-  const { locale } = stripLocaleFromPathname(window.location.pathname);
+  const { locale, pathname } = stripLocaleFromPathname(window.location.pathname);
   const loginPath = locale ? addLocalePrefix('/login', locale) : '/login';
   const loginUrl = new URL(loginPath, window.location.origin);
   loginUrl.searchParams.set('reason', reason);
+  if (pathname.startsWith('/admin')) {
+    loginUrl.searchParams.set('portal', 'admin');
+  } else if (pathname.startsWith('/dashboard/lecturer')) {
+    loginUrl.searchParams.set('portal', 'lecturer');
+  } else {
+    loginUrl.searchParams.set('portal', 'student');
+  }
   window.location.href = loginUrl.toString();
 }
 
@@ -267,6 +284,7 @@ export const authApi = {
   me: async (): Promise<User> => {
     const response = await api.get<User>('/auth/me', {
       skipAuthRedirect: true,
+      skipAuthRefresh: true,
     } as AuthRequestConfig);
     return response.data;
   },
@@ -355,7 +373,7 @@ export const sectionsApi = {
 
   updateSectionGrades: async (
     sectionId: string,
-    grades: { enrollmentId: string; finalGrade: number; letterGrade: string }[],
+    grades: { enrollmentId: string; finalGrade: number | null; letterGrade: string }[],
   ): Promise<{ message: string }> => {
     const response = await api.put<{ message: string }>(
       `/sections/${sectionId}/grades`,
@@ -375,22 +393,81 @@ export const sectionsApi = {
 };
 
 // Enrollments API
+export const registrationApi = {
+  rounds: async (semesterId?: string) => {
+    const response = await api.get<Array<{
+      id: string;
+      semesterId: string;
+      name: string;
+      kind: string;
+      status: string;
+      windowStart: string;
+      windowEnd: string;
+      creditLimit: number;
+    }>>('/registration/rounds', { params: { semesterId } });
+    return response.data;
+  },
+  eligibility: async (params?: { semesterId?: string; roundId?: string }) => {
+    const response = await api.get<{
+      roundId: string;
+      semesterId: string;
+      kind: string;
+      eligible: boolean;
+      creditLimit: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+      windowStart: string;
+      windowEnd: string;
+    }>('/me/registration/eligibility', { params });
+    return response.data;
+  },
+  sections: async (params?: { semesterId?: string; roundId?: string }) => {
+    const response = await api.get<Array<{
+      id: string;
+      sectionNumber: string;
+      courseId: string;
+      courseCode: string;
+      courseName: string;
+      credits: number;
+      capacity: number;
+      enrolledCount: number;
+      remainingSeats: number;
+      status: string;
+      scheduleConflict: boolean;
+      alreadyEnrolled: boolean;
+    }>>('/me/registration/sections', { params });
+    return response.data;
+  },
+  summary: async (semesterId?: string) => {
+    const response = await api.get<{
+      roundId: string;
+      creditLimit: number;
+      creditsUsed: number;
+      creditsRemaining: number;
+      enrollmentIds: string[];
+    }>('/me/registration/summary', { params: { semesterId } });
+    return response.data;
+  },
+};
+
 export const enrollmentsApi = {
   enroll: async (
     sectionId: string,
     locale?: 'en' | 'vi',
   ): Promise<EnrollmentActionResult> => {
     const response = await api.post<EnrollmentActionResult>(
-      '/enrollments/enroll',
+      '/me/enrollments',
       { sectionId, locale },
+      { headers: { 'Idempotency-Key': createRequestId() } },
     );
     return response.data;
   },
 
   drop: async (enrollmentId: string): Promise<{ message: string }> => {
     const response = await api.post<{ message: string }>(
-      `/enrollments/${enrollmentId}/drop`,
+      `/me/enrollments/${enrollmentId}/drop`,
       {},
+      { headers: { 'Idempotency-Key': createRequestId() } },
     );
     return response.data;
   },

@@ -119,3 +119,22 @@ test('mobile never replays a terminal or fenced request key', () => {
   assert.match(assistant, /'TURN_CANCELLED'/);
   assert.match(assistant, /'TURN_PURGED'/);
 });
+
+test('mobile refreshes the session single-flight and exits to sign-in on expiry', () => {
+  const client = read('src/api/client.ts');
+  const navigator = read('src/navigation/MobileNavigator.tsx');
+
+  // Concurrent 401s must share one refresh rotation; independent refreshes race
+  // the backend rotation and clear both tokens.
+  assert.match(client, /let sessionRefreshPromise: Promise<boolean> \| null = null/);
+  assert.match(client, /refreshSessionOnce\(requestId\)/);
+  assert.doesNotMatch(client, /await refreshMobileSession\(requestId\)/);
+  assert.match(client, /setOnSessionExpired\(handler: \(\(\) => void\) \| undefined\): void/);
+  assert.match(client, /onSessionExpired\?\.\(\)/);
+  // An in-flight refresh must not clobber a newer sign-in or sign-out.
+  assert.match(client, /sessionEpoch \+= 1/);
+  assert.match(client, /if \(epoch !== sessionEpoch\)/);
+  // A failed refresh must bridge back to the sign-in screen instead of a dead end.
+  assert.match(navigator, /apiClient\.setOnSessionExpired\(/);
+  assert.match(navigator, /setSessionKind\('signedOut'\)/);
+});

@@ -21,6 +21,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
 import { Select } from '@/components/ui/select';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -47,6 +48,21 @@ interface Semester {
 interface AcademicYearOption {
   id: string;
   year: number;
+}
+
+function semesterStatusTone(status: string): StatusTone {
+  switch (status) {
+    case 'ACTIVE':
+    case 'IN_PROGRESS':
+      return 'success';
+    case 'REGISTRATION_OPEN':
+    case 'ADD_DROP_OPEN':
+      return 'info';
+    case 'DRAFT':
+      return 'warning';
+    default:
+      return 'neutral';
+  }
 }
 
 export default function AdminSemestersPage() {
@@ -81,7 +97,7 @@ export default function AdminSemestersPage() {
     }
 
     if (!user) {
-      router.replace(`${href('/login')}?reason=session-expired`);
+      router.replace(`${href('/login')}?portal=admin&reason=session-expired`);
       return;
     }
 
@@ -156,7 +172,7 @@ export default function AdminSemestersPage() {
           loading: 'Đang tải học kỳ',
           title: 'Học kỳ',
           description:
-            'Giữ timeline học thuật rõ ràng để đăng ký, section và lịch học cùng bám một mốc.',
+            'Giữ mốc thời gian học kỳ rõ ràng để đăng ký, lớp học phần và lịch học luôn đồng bộ.',
           create: 'Tạo học kỳ',
           searchLabel: 'Tìm học kỳ',
           searchPlaceholder: 'Tìm theo học kỳ, loại hoặc năm',
@@ -167,7 +183,7 @@ export default function AdminSemestersPage() {
           unavailableTitle: 'Học kỳ chưa sẵn sàng',
           emptyTitle: 'Không có học kỳ phù hợp',
           emptyDescription:
-            'Hãy tạo học kỳ để section, đăng ký, lịch học và điểm có cùng một timeline rõ ràng.',
+            'Hãy tạo học kỳ để lớp học phần, đăng ký, lịch học và điểm dùng chung một mốc thời gian.',
           tableTitle: 'Bản ghi học kỳ',
           headers: {
             name: 'Tên học kỳ',
@@ -207,7 +223,7 @@ export default function AdminSemestersPage() {
           loading: 'Loading semesters',
           title: 'Semesters',
           description:
-            'Keep registration windows and teaching periods anchored to a clean academic timeline.',
+            'Keep registration windows and teaching periods anchored to a clear academic calendar.',
           create: 'Create semester',
           searchLabel: 'Search semesters',
           searchPlaceholder: 'Search by semester, type, or year',
@@ -218,7 +234,7 @@ export default function AdminSemestersPage() {
           unavailableTitle: 'Semesters unavailable',
           emptyTitle: 'No matching semesters',
           emptyDescription:
-            'Create a semester to anchor sections, registration timing, schedules, and grades.',
+            'Create a semester to align classes, registration dates, schedules, and grades.',
           tableTitle: 'Semester records',
           headers: {
             name: 'Name',
@@ -282,6 +298,13 @@ export default function AdminSemestersPage() {
     ],
     [academicYears, copy.selectAcademicYear],
   );
+
+  const semesterStatusLabel = (status: string) => {
+    const labels: Record<string, string> = locale === 'vi'
+      ? { ACTIVE: 'Đang diễn ra', IN_PROGRESS: 'Đang diễn ra', REGISTRATION_OPEN: 'Đang mở đăng ký', ADD_DROP_OPEN: 'Đang mở thêm hoặc hủy môn', DRAFT: 'Bản nháp' }
+      : { ACTIVE: 'Active', IN_PROGRESS: 'In progress', REGISTRATION_OPEN: 'Registration open', ADD_DROP_OPEN: 'Add or drop open', DRAFT: 'Draft' };
+    return labels[status] ?? messages.common.statuses[status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN;
+  };
 
   if (isAuthLoading || isLoggingOut || !canAccess) {
     return <LoadingState label={copy.loading} className="m-8" />;
@@ -471,8 +494,8 @@ export default function AdminSemestersPage() {
                             {getSemesterTypeLabel(semester.type)} · {semester.academicYear?.year || copy.unassigned}
                           </p>
                         </div>
-                        <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                          {semester.status.replace(/_/g, ' ')}
+                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
+                          {semesterStatusLabel(semester.status)}
                         </span>
                       </div>
                       <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
@@ -517,7 +540,7 @@ export default function AdminSemestersPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[840px] text-sm">
                   <thead>
-                    <tr className="border-b border-border/70 text-left text-muted-foreground">
+                    <tr className="bg-secondary text-left text-muted-foreground">
                       <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.type}</th>
                       <th className="px-2 py-3 font-medium">{copy.headers.academicYear}</th>
@@ -560,8 +583,8 @@ export default function AdminSemestersPage() {
                           {formatDate(semester.endDate)}
                         </td>
                         <td className="px-2 py-4">
-                          <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                            {semester.status.replace(/_/g, ' ')}
+                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
+                            {semesterStatusLabel(semester.status)}
                           </span>
                         </td>
                         <td className="px-2 py-4">
