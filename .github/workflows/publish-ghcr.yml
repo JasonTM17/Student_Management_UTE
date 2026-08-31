@@ -109,7 +109,9 @@ jobs:
           inspect_revision() {
             local ref="$1" labels status revision
             set +e
-            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}' 2>&1)"
+            # imagetools exposes the selected platform image as .Image; the
+            # OCI index is .Manifest and is not a platform-keyed map.
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json .Image.Config.Labels}}' 2>&1)"
             status=$?
             set -e
             [[ "$status" -eq 0 ]] || { printf '%s\n' "$labels" >&2; return 2; }
@@ -202,7 +204,7 @@ jobs:
             exit 1
           }
           for ref in "$GHCR_IMAGE:$full_sha" "$HUB_IMAGE:$full_sha"; do
-            labels="$(docker buildx imagetools inspect "$ref" --format '{{json (index .Image "linux/amd64").Config.Labels}}')"
+            labels="$(docker buildx imagetools inspect "$ref" --format '{{json .Image.Config.Labels}}')"
             revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
             [[ "$revision" == "$full_sha" ]] || {
               echo "OCI revision for $ref is '$revision', expected '$full_sha'." >&2
