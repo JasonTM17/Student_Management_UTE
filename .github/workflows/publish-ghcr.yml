@@ -84,18 +84,17 @@ jobs:
           full_sha="$GITHUB_SHA"
 
           inspect_digest() {
-            local ref="$1" output status digest
+            local ref="$1" output status
             set +e
-            output="$(docker buildx imagetools inspect "$ref" 2>&1)"
+            output="$(docker buildx imagetools inspect "$ref" --format '{{.Manifest.Digest}}' 2>&1)"
             status=$?
             set -e
             if [[ "$status" -eq 0 ]]; then
-              digest="$(printf '%s\n' "$output" | awk '$1 == "Digest:" { print $2; exit }')"
-              [[ "$digest" == sha256:* ]] || {
+              [[ "$output" == sha256:* ]] || {
                 printf 'Remote manifest for %s has no usable digest\n' "$ref" >&2
                 return 2
               }
-              printf '%s\n' "$digest"
+              printf '%s\n' "$output"
               return 0
             fi
             if grep -Eqi 'manifest unknown|name unknown|not found|no such manifest' <<<"$output"; then
