@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -9,6 +10,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 
 import java.time.Instant;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -39,12 +41,13 @@ class AnnouncementWritePersistenceTest {
     @BeforeEach
     void prepareWriteFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"AnnouncementAudit\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"Announcement\"");
         jdbc.execute("""
                 CREATE TABLE "engagement"."Announcement" (
                     "id" VARCHAR(120) PRIMARY KEY,
-                    "title" VARCHAR(200) NOT NULL,
-                    "content" VARCHAR(2000) NOT NULL,
+                    "title" VARCHAR(240) NOT NULL,
+                    "content" TEXT NOT NULL,
                     "priority" VARCHAR(20) NOT NULL,
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
@@ -61,7 +64,24 @@ class AnnouncementWritePersistenceTest {
                     "lecturerId" VARCHAR(120),
                     "lecturerDisplayName" VARCHAR(200),
                     "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL
+                    "updatedAt" TIMESTAMP NOT NULL,
+                    "version" INTEGER NOT NULL DEFAULT 0,
+                    "archivedAt" TIMESTAMP,
+                    "archivedBy" VARCHAR(120)
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE "engagement"."AnnouncementAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "announcementId" VARCHAR(120) NOT NULL,
+                    "action" VARCHAR(20) NOT NULL,
+                    "actorId" VARCHAR(120) NOT NULL,
+                    "actorLabel" VARCHAR(240),
+                    "reason" VARCHAR(500) NOT NULL,
+                    "version" INTEGER NOT NULL,
+                    "beforeState" CLOB,
+                    "afterState" CLOB,
+                    "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
     }
@@ -86,6 +106,8 @@ class AnnouncementWritePersistenceTest {
                 .andExpect(jsonPath("$.targetYears.length()").value(0))
                 .andExpect(jsonPath("$.isGlobal").value(false))
                 .andExpect(jsonPath("$.publishedBy").value("admin-1"))
+                .andExpect(jsonPath("$.version").value(0))
+                .andExpect(jsonPath("$.archivedAt").doesNotExist())
                 .andExpect(jsonPath("$.semester").doesNotExist())
                 .andExpect(jsonPath("$.section").doesNotExist())
                 .andExpect(jsonPath("$.lecturer").doesNotExist());
@@ -97,6 +119,12 @@ class AnnouncementWritePersistenceTest {
                         + " AND CARDINALITY(\"targetYears\") = 0 AND \"isGlobal\" = FALSE",
                 Integer.class);
         org.junit.jupiter.api.Assertions.assertEquals(1, count);
+        Integer auditCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"AnnouncementAudit\""
+                        + " WHERE \"announcementId\" IN (SELECT \"id\" FROM \"engagement\".\"Announcement\" WHERE \"title\" = 'Welcome back')"
+                        + " AND \"action\" = 'CREATED' AND \"actorId\" = 'admin-1'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, auditCount);
     }
 
     @Test
@@ -235,7 +263,9 @@ class AnnouncementWritePersistenceTest {
                                   "expiresAt": "2026-09-21T08:00:00Z",
                                   "semesterId": "semester-2",
                                   "sectionId": "section-2",
-                                  "lecturerId": "lecturer-2"
+                                  "lecturerId": "lecturer-2",
+                                  "reason": "Cập nhật lịch bảo vệ",
+                                  "expectedVersion": 0
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -243,6 +273,7 @@ class AnnouncementWritePersistenceTest {
                 .andExpect(jsonPath("$.title").value("Updated title"))
                 .andExpect(jsonPath("$.content").value(""))
                 .andExpect(jsonPath("$.priority").value("URGENT"))
+                .andExpect(jsonPath("$.version").value(1))
                 .andExpect(jsonPath("$.targetRoles[0]").value("STUDENT"))
                 .andExpect(jsonPath("$.targetYears[0]").value(2))
                 .andExpect(jsonPath("$.isGlobal").value(true))
@@ -267,6 +298,172 @@ class AnnouncementWritePersistenceTest {
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
         org.junit.jupiter.api.Assertions.assertEquals(1, updated);
+        Integer auditCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"AnnouncementAudit\""
+                        + " WHERE \"announcementId\" = 'existing-announcement'"
+                        + " AND \"action\" = 'UPDATED' AND \"actorId\" = 'admin-2'"
+                        + " AND \"reason\" = 'Cập nhật lịch bảo vệ' AND \"version\" = 1"
+                        + " AND \"beforeState\" IS NOT NULL AND \"afterState\" IS NOT NULL",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, auditCount);
+    }
+
+    @Test
+    void auditUsesHumanNameWhenTheTokenProvidesOneAndKeepsActorId() throws Exception {
+        mvc.perform(post("/api/v1/announcements")
+                        .with(namedAdminJwt("admin-named", "Nguyễn", "Quản trị"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Named audit\",\"content\":\"Visible notice\"}"))
+                .andExpect(status().isCreated());
+
+        Map<String, Object> audit = jdbc.queryForMap(
+                "SELECT \"actorId\", \"actorLabel\" FROM \"engagement\".\"AnnouncementAudit\""
+                        + " WHERE \"action\" = 'CREATED' AND \"actorId\" = 'admin-named'");
+        org.junit.jupiter.api.Assertions.assertEquals("admin-named", audit.get("actorId"));
+        org.junit.jupiter.api.Assertions.assertEquals(
+                "Nguyễn Quản trị · admin-named@campuscore.edu",
+                audit.get("actorLabel"));
+    }
+
+    @Test
+    void staleEditsAndMissingReasonsFailWithoutChangingTheAnnouncement() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"No reason\",\"expectedVersion\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Blank reason\",\"reason\":\"   \",\"expectedVersion\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        String tooLongReason = "x".repeat(501);
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Too long\",\"reason\":\""
+                                + tooLongReason + "\",\"expectedVersion\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-2"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"First update\",\"reason\":\"Sửa lần một\",\"expectedVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1));
+
+        mvc.perform(put("/api/v1/announcements/existing-announcement")
+                        .with(adminJwt("admin-3"))
+                        .contentType("application/json")
+                        .content("{\"title\":\"Silent overwrite\",\"reason\":\"Sửa lần hai\",\"expectedVersion\":0}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ANNOUNCEMENT_VERSION_CONFLICT"));
+
+        Integer unchanged = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement' AND \"title\" = 'First update'"
+                        + " AND \"version\" = 1",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, unchanged);
+        Integer audits = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"AnnouncementAudit\""
+                        + " WHERE \"announcementId\" = 'existing-announcement' AND \"action\" = 'UPDATED'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, audits);
+    }
+
+    @Test
+    void archiveRestoreHistoryIsProtectedAndKeepsFeedStateConsistent() throws Exception {
+        seedAnnouncement();
+
+        mvc.perform(post("/api/v1/announcements/existing-announcement/archive")
+                        .with(superAdminJwt("super-admin-1"))
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Tạm ẩn để rà soát\",\"expectedVersion\":0}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(1))
+                .andExpect(jsonPath("$.archivedAt").isNotEmpty())
+                .andExpect(jsonPath("$.archivedBy").value("super-admin-1"));
+
+        jdbc.update("UPDATE \"engagement\".\"Announcement\""
+                + " SET \"targetRoles\" = ARRAY['STUDENT'], \"targetYears\" = ARRAY[]"
+                + " WHERE \"id\" = 'existing-announcement'");
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("student-1")
+                                        .claim("email", "student-1@campuscore.edu")
+                                        .claim("roles", List.of("STUDENT"))
+                                        .claim("studentId", "student-profile")
+                                        .claim("student", Map.of("year", 1)))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("status", "ACTIVE")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        mvc.perform(get("/api/v1/announcements")
+                        .queryParam("status", "ARCHIVED")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].version").value(1));
+
+        mvc.perform(get("/api/v1/announcements/existing-announcement/history")
+                        .with(jwt()
+                                .jwt(token -> token.subject("student-1").claim("roles", List.of("STUDENT")))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+
+        mvc.perform(get("/api/v1/announcements/existing-announcement/history")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].action").value("ARCHIVED"))
+                .andExpect(jsonPath("$.data[0].actorId").value("super-admin-1"))
+                .andExpect(jsonPath("$.data[0].actorLabel").value("super-admin-1@campuscore.edu"))
+                .andExpect(jsonPath("$.data[0].reason").value("Tạm ẩn để rà soát"))
+                .andExpect(jsonPath("$.data[0].before").exists())
+                .andExpect(jsonPath("$.data[0].after").exists());
+
+        mvc.perform(post("/api/v1/announcements/existing-announcement/restore")
+                        .with(adminJwt("admin-1"))
+                        .contentType("application/json")
+                        .content("{\"reason\":\"Đã rà soát xong\",\"expectedVersion\":1}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.version").value(2))
+                .andExpect(jsonPath("$.archivedAt").doesNotExist());
+
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt()
+                                .jwt(token -> token
+                                        .subject("student-1")
+                                        .claim("email", "student-1@campuscore.edu")
+                                        .claim("roles", List.of("STUDENT"))
+                                        .claim("studentId", "student-profile")
+                                        .claim("student", Map.of("year", 1)))
+                                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].version").value(2));
+
+        mvc.perform(get("/api/v1/announcements/existing-announcement/history")
+                        .with(adminJwt("admin-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].action").value("RESTORED"));
     }
 
     @Test
@@ -282,7 +479,9 @@ class AnnouncementWritePersistenceTest {
                                   "expiresAt": null,
                                   "semesterId": null,
                                   "sectionId": null,
-                                  "lecturerId": null
+                                  "lecturerId": null,
+                                  "reason": "Xoá thông tin lịch cũ",
+                                  "expectedVersion": 0
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -327,42 +526,42 @@ class AnnouncementWritePersistenceTest {
         mvc.perform(put("/api/v1/announcements/missing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"title\":\"Missing\"}"))
+                        .content("{\"title\":\"Missing\",\"reason\":\"Sửa bài bị thiếu\",\"expectedVersion\":0}"))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"priority\":\"CRITICAL\"}"))
+                        .content("{\"priority\":\"CRITICAL\",\"reason\":\"Sửa mức độ\",\"expectedVersion\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"unexpected\":true}"))
+                        .content("{\"unexpected\":true,\"reason\":\"Sửa nội dung\",\"expectedVersion\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"targetYears\":[0]}"))
+                        .content("{\"targetYears\":[0],\"reason\":\"Sửa năm học\",\"expectedVersion\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"targetRoles\":[7]}"))
+                        .content("{\"targetRoles\":[7],\"reason\":\"Sửa nhóm nhận\",\"expectedVersion\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
 
         mvc.perform(put("/api/v1/announcements/existing-announcement")
                         .with(adminJwt("admin-1"))
                         .contentType("application/json")
-                        .content("{\"targetYears\":[1.9]}"))
+                        .content("{\"targetYears\":[1.9],\"reason\":\"Sửa năm học\",\"expectedVersion\":0}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
@@ -380,7 +579,20 @@ class AnnouncementWritePersistenceTest {
                 "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
                         + " WHERE \"id\" = 'existing-announcement'",
                 Integer.class);
-        org.junit.jupiter.api.Assertions.assertEquals(0, remaining);
+        org.junit.jupiter.api.Assertions.assertEquals(1, remaining);
+        Integer archived = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"Announcement\""
+                        + " WHERE \"id\" = 'existing-announcement'"
+                        + " AND \"archivedAt\" IS NOT NULL AND \"archivedBy\" = 'admin-1'"
+                        + " AND \"version\" = 1",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, archived);
+        Integer auditCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"engagement\".\"AnnouncementAudit\""
+                        + " WHERE \"announcementId\" = 'existing-announcement' AND \"action\" = 'ARCHIVED'"
+                        + " AND \"actorId\" = 'admin-1'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, auditCount);
     }
 
     @Test
@@ -412,6 +624,30 @@ class AnnouncementWritePersistenceTest {
         return jwt()
                 .jwt(token -> token
                         .subject(subject)
+                        .claim("email", subject + "@campuscore.edu")
+                        .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor superAdminJwt(String subject) {
+        return jwt()
+                .jwt(token -> token
+                        .subject(subject)
+                        .claim("email", subject + "@campuscore.edu")
+                        .claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
+    }
+
+    private static org.springframework.test.web.servlet.request.RequestPostProcessor namedAdminJwt(
+            String subject,
+            String firstName,
+            String lastName) {
+        return jwt()
+                .jwt(token -> token
+                        .subject(subject)
+                        .claim("email", subject + "@campuscore.edu")
+                        .claim("firstName", firstName)
+                        .claim("lastName", lastName)
                         .claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }

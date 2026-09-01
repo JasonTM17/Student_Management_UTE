@@ -51,17 +51,61 @@ type AuthInternalRequestConfig = InternalAxiosRequestConfig & {
   _retry?: boolean;
   _retryNoCache?: boolean;
 };
-type AnnouncementRecord = {
+export type AnnouncementPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
+export type AnnouncementAudienceRole =
+  | 'STUDENT'
+  | 'LECTURER'
+  | 'ADMIN'
+  | 'SUPER_ADMIN';
+
+export type AnnouncementRecord = {
   id: string;
   title: string;
   content: string;
-  priority: string;
+  priority: AnnouncementPriority | string;
   createdAt: string;
+  updatedAt?: string;
+  publishAt?: string | null;
+  expiresAt?: string | null;
+  version?: number;
+  archivedAt?: string | null;
+  archivedBy?: string | null;
+  publishedBy?: string | null;
+  targetRoles?: string[];
+  targetYears?: number[];
+  isGlobal?: boolean;
+  semesterId?: string | null;
+  sectionId?: string | null;
+  sectionNumber?: string | null;
+  courseCode?: string | null;
+  courseName?: string | null;
+  lecturerId?: string | null;
+  lecturerDisplayName?: string | null;
+  semesterName?: string | null;
   semester?: { name: string; nameEn?: string; nameVi?: string } | null;
   section?: {
-    sectionNumber: string;
+    sectionNumber?: string;
     course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
   } | null;
+  lecturer?: { id?: string; displayName?: string } | null;
+};
+export type AnnouncementMutation = Partial<Pick<AnnouncementRecord,
+  'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'isGlobal' |
+  'publishAt' | 'expiresAt' | 'semesterId' | 'sectionId' | 'lecturerId'>> & {
+  reason?: string;
+  expectedVersion?: number;
+};
+export type AnnouncementHistoryRecord = {
+  id: string;
+  announcementId: string;
+  action: string;
+  actorId?: string;
+  actorLabel?: string | null;
+  reason?: string;
+  version: number;
+  createdAt: string;
+  before?: Record<string, unknown> | null;
+  after?: Record<string, unknown> | null;
 };
 type NotificationRecord = {
   id: string;
@@ -801,6 +845,7 @@ export const announcementsApi = {
     semesterId?: string;
     sectionId?: string;
     priority?: string;
+    status?: 'ACTIVE' | 'ARCHIVED' | 'ALL';
   }): Promise<ApiResponse<AnnouncementRecord[]>> => {
     const response = await api.get<ApiResponse<AnnouncementRecord[]>>(
       '/announcements',
@@ -808,12 +853,24 @@ export const announcementsApi = {
     );
     return response.data;
   },
-  create: async (data: ApiObject): Promise<ApiObject> => {
-    const response = await api.post<ApiObject>('/announcements', data);
+  create: async (data: AnnouncementMutation): Promise<AnnouncementRecord> => {
+    const response = await api.post<AnnouncementRecord>('/announcements', data);
     return response.data;
   },
-  update: async (id: string, data: ApiObject): Promise<ApiObject> => {
-    const response = await api.put<ApiObject>(`/announcements/${id}`, data);
+  update: async (id: string, data: AnnouncementMutation): Promise<AnnouncementRecord> => {
+    const response = await api.put<AnnouncementRecord>(`/announcements/${id}`, data);
+    return response.data;
+  },
+  archive: async (id: string, data: { reason: string; expectedVersion: number }): Promise<AnnouncementRecord> => {
+    const response = await api.post<AnnouncementRecord>(`/announcements/${id}/archive`, data);
+    return response.data;
+  },
+  restore: async (id: string, data: { reason: string; expectedVersion: number }): Promise<AnnouncementRecord> => {
+    const response = await api.post<AnnouncementRecord>(`/announcements/${id}/restore`, data);
+    return response.data;
+  },
+  history: async (id: string, params?: { page?: number; limit?: number }): Promise<ApiResponse<AnnouncementHistoryRecord[]>> => {
+    const response = await api.get<ApiResponse<AnnouncementHistoryRecord[]>>(`/announcements/${id}/history`, { params });
     return response.data;
   },
   delete: async (id: string): Promise<{ message: string }> => {

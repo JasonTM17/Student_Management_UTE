@@ -11,10 +11,12 @@ export interface SelectProps
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
   ({ className, label, error, options, ...props }, ref) => {
+    const generatedId = React.useId().replace(/:/g, '');
+    const controlId = props.id ?? `select-${generatedId}`;
     return (
       <div className="w-full">
         {label && (
-          <label className="mb-1 block text-sm font-medium text-foreground">
+          <label htmlFor={controlId} className="mb-1 block text-sm font-medium text-foreground">
             {label}
           </label>
         )}
@@ -27,6 +29,7 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             )}
             ref={ref}
             {...props}
+            id={controlId}
           >
             {options.map((option) => (
               <option key={option.value} value={option.value}>

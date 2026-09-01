@@ -20,6 +20,7 @@ public class AnnouncementReadService {
 
     public static final int MAX_PAGE_SIZE = 200;
     private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
+    private static final Set<String> STATUSES = Set.of("ACTIVE", "ARCHIVED", "ALL");
 
     private final AnnouncementReadRepository announcements;
 
@@ -34,11 +35,25 @@ public class AnnouncementReadService {
             String semesterId,
             String sectionId,
             String priority) {
+        return findAll(page, limit, semesterId, sectionId, priority, "ACTIVE");
+    }
+
+    @Transactional(readOnly = true)
+    public AnnouncementListResponse findAll(
+            int page,
+            int limit,
+            String semesterId,
+            String sectionId,
+            String priority,
+            String status) {
         requirePage(page, limit);
         if (priority != null && !PRIORITIES.contains(priority)) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
         }
-        AnnouncementFilter filter = new AnnouncementFilter(semesterId, sectionId, priority);
+        if (status == null || !STATUSES.contains(status)) {
+            throw new IllegalArgumentException("status must be ACTIVE, ARCHIVED, or ALL");
+        }
+        AnnouncementFilter filter = new AnnouncementFilter(semesterId, sectionId, priority, status);
         long total = announcements.countAll(filter);
         List<AnnouncementResponse> data = announcements.findAll(filter, offset(page, limit), limit);
         return response(data, total, page, limit);

@@ -10,10 +10,13 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
+import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.Calendar;
+import java.util.TimeZone;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -33,7 +36,8 @@ public class AnnouncementWriteRepository {
             "id", "title", "content", "priority", "targetRoles", "targetYears",
             "isGlobal", "publishAt", "expiresAt", "publishedBy", "semesterId",
             "semesterName", "sectionId", "sectionNumber", "courseCode", "courseName",
-            "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt"
+            "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
+            "version", "archivedAt", "archivedBy"
             """;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -75,7 +79,7 @@ public class AnnouncementWriteRepository {
                 .orElseThrow(() -> new IllegalStateException("created announcement was not found"));
     }
 
-    public void update(UpdateAnnouncementCommand command) {
+    public int update(UpdateAnnouncementCommand command) {
         List<String> assignments = new ArrayList<>();
         List<SqlBinder> binders = new ArrayList<>();
         addString(assignments, binders, "title", command.title());
@@ -94,22 +98,57 @@ public class AnnouncementWriteRepository {
         clearString(assignments, binders, command.sectionId(), "courseName");
         addString(assignments, binders, "lecturerId", command.lecturerId());
         clearString(assignments, binders, command.lecturerId(), "lecturerDisplayName");
+        assignments.add("\"version\" = \"version\" + 1");
         assignments.add("\"updatedAt\" = ?");
         binders.add((statement, index, ignored) -> timestamp(statement, index, command.updatedAt()));
 
-        jdbc.getJdbcOperations().execute((ConnectionCallback<Void>) connection -> {
+        Integer changed = jdbc.getJdbcOperations().execute((ConnectionCallback<Integer>) connection -> {
             String sql = "UPDATE \"engagement\".\"Announcement\" SET "
-                    + String.join(", ", assignments) + " WHERE \"id\" = ?";
+                    + String.join(", ", assignments)
+                    + " WHERE \"id\" = ? AND \"version\" = ? AND \"archivedAt\" IS NULL";
             try (PreparedStatement statement = connection.prepareStatement(sql)) {
                 int index = 1;
                 for (SqlBinder binder : binders) {
                     binder.bind(statement, index++, connection);
                 }
                 statement.setString(index, command.id());
-                statement.executeUpdate();
+                statement.setInt(index + 1, command.expectedVersion());
+                return statement.executeUpdate();
             }
-            return null;
         });
+        return changed == null ? 0 : changed;
+    }
+
+    public int archive(TransitionCommand command) {
+        return transition(command, true);
+    }
+
+    public int restore(TransitionCommand command) {
+        return transition(command, false);
+    }
+
+    private int transition(TransitionCommand command, boolean archive) {
+        String sql = archive
+                ? "UPDATE " + TABLE + " SET \"archivedAt\" = ?, \"archivedBy\" = ?, "
+                        + "\"version\" = \"version\" + 1, \"updatedAt\" = ? "
+                        + "WHERE \"id\" = ? AND \"version\" = ? AND \"archivedAt\" IS NULL"
+                : "UPDATE " + TABLE + " SET \"archivedAt\" = NULL, \"archivedBy\" = NULL, "
+                        + "\"version\" = \"version\" + 1, \"updatedAt\" = ? "
+                        + "WHERE \"id\" = ? AND \"version\" = ? AND \"archivedAt\" IS NOT NULL";
+        Integer changed = jdbc.getJdbcOperations().execute((ConnectionCallback<Integer>) connection -> {
+            try (PreparedStatement statement = connection.prepareStatement(sql)) {
+                int index = 1;
+                if (archive) {
+                    timestamp(statement, index++, command.archivedAt());
+                    statement.setString(index++, command.archivedBy());
+                }
+                timestamp(statement, index++, command.updatedAt());
+                statement.setString(index++, command.id());
+                statement.setInt(index, command.expectedVersion());
+                return statement.executeUpdate();
+            }
+        });
+        return changed == null ? 0 : changed;
     }
 
     public Optional<AnnouncementResponse> findById(String id) {
@@ -118,12 +157,6 @@ public class AnnouncementWriteRepository {
                 new MapSqlParameterSource("id", id),
                 AnnouncementWriteRepository::mapRow);
         return announcements.stream().findFirst();
-    }
-
-    public void delete(String id) {
-        jdbc.update(
-                "DELETE FROM " + TABLE + " WHERE \"id\" = :id",
-                new MapSqlParameterSource("id", id));
     }
 
     private static void addString(
@@ -273,6 +306,9 @@ public class AnnouncementWriteRepository {
                 lecturerDisplayName,
                 instant(resultSet, "createdAt"),
                 instant(resultSet, "updatedAt"),
+                resultSet.getInt("version"),
+                instant(resultSet, "archivedAt"),
+                resultSet.getString("archivedBy"),
                 semester,
                 section,
                 lecturer);
@@ -303,8 +339,10 @@ public class AnnouncementWriteRepository {
     }
 
     private static Instant instant(ResultSet resultSet, String column) throws SQLException {
-        LocalDateTime value = resultSet.getObject(column, LocalDateTime.class);
-        return value == null ? null : value.toInstant(ZoneOffset.UTC);
+        Timestamp value = resultSet.getTimestamp(
+                column,
+                Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+        return value == null ? null : value.toInstant();
     }
 
     private static boolean present(String value) {
@@ -341,6 +379,15 @@ public class AnnouncementWriteRepository {
             PatchValue<String> semesterId,
             PatchValue<String> sectionId,
             PatchValue<String> lecturerId,
+            Instant updatedAt,
+            int expectedVersion) {
+    }
+
+    public record TransitionCommand(
+            String id,
+            int expectedVersion,
+            String archivedBy,
+            Instant archivedAt,
             Instant updatedAt) {
     }
 
