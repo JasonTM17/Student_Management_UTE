@@ -105,7 +105,8 @@ jobs:
         shell: bash
         run: |
           version="$(docker compose exec -T postgres psql -U campuscore -d campuscore_restful -Atc 'SELECT version FROM thesis.flyway_schema_history WHERE success ORDER BY installed_rank DESC LIMIT 1')"
-          test "$version" = "14"
+          # V15 owns the announcement governance columns and audit trail.
+          test "$version" = "15"
           curl --fail --silent --show-error http://127.0.0.1:4010/api/v1/health/liveness
           curl --fail --silent --show-error -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness
           curl --fail --silent --show-error http://127.0.0.1:4010/v3/api-docs > openapi.json
