@@ -97,7 +97,7 @@ public class AnnouncementWriteService {
         String id = requireText(announcementId, "announcement id");
         String reason = requireReason(request.reason());
         int expectedVersion = requireVersion(request.expectedVersion());
-        AnnouncementResponse before = requireAnnouncement(id);
+        AnnouncementResponse before = requireAnnouncementForUpdate(id);
         requireActive(before);
         if (request.has("priority") && !PRIORITIES.contains(request.priority())) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
@@ -156,7 +156,7 @@ public class AnnouncementWriteService {
         String actor = requireText(actorId, "actor");
         String label = requireActorLabel(actorLabel, "actorLabel");
         String id = requireText(announcementId, "announcement id");
-        AnnouncementResponse before = requireAnnouncement(id);
+        AnnouncementResponse before = requireAnnouncementForUpdate(id);
         if (before.archivedAt() != null) {
             return new DeleteAnnouncementResponse("Announcement deleted successfully");
         }
@@ -210,7 +210,7 @@ public class AnnouncementWriteService {
         String id = requireText(announcementId, "announcement id");
         String reason = requireReason(request.reason());
         int expectedVersion = requireVersion(request.expectedVersion());
-        AnnouncementResponse before = requireAnnouncement(id);
+        AnnouncementResponse before = requireAnnouncementForUpdate(id);
         if (archive && before.archivedAt() != null) {
             throw conflict("ANNOUNCEMENT_ALREADY_ARCHIVED", "Announcement is already archived");
         }
@@ -237,6 +237,11 @@ public class AnnouncementWriteService {
 
     private AnnouncementResponse requireAnnouncement(String id) {
         return announcements.findById(id)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
+    }
+
+    private AnnouncementResponse requireAnnouncementForUpdate(String id) {
+        return announcements.findByIdForUpdate(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found"));
     }
 

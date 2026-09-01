@@ -152,8 +152,22 @@ public class AnnouncementWriteRepository {
     }
 
     public Optional<AnnouncementResponse> findById(String id) {
+        return findById(id, false);
+    }
+
+    /**
+     * Loads an announcement while holding its row lock for the surrounding transaction.
+     * Mutation services use this read before the CAS write so the audit snapshots cannot
+     * be interleaved with another writer on the same announcement.
+     */
+    public Optional<AnnouncementResponse> findByIdForUpdate(String id) {
+        return findById(id, true);
+    }
+
+    private Optional<AnnouncementResponse> findById(String id, boolean forUpdate) {
+        String lockClause = forUpdate ? " FOR UPDATE" : "";
         List<AnnouncementResponse> announcements = jdbc.query(
-                "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + " WHERE \"id\" = :id",
+                "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + " WHERE \"id\" = :id" + lockClause,
                 new MapSqlParameterSource("id", id),
                 AnnouncementWriteRepository::mapRow);
         return announcements.stream().findFirst();

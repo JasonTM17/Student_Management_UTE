@@ -1,6 +1,8 @@
 package io.campuscore.restfulapi.engagement;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
@@ -11,12 +13,22 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.TimeoutException;
+import io.campuscore.restfulapi.engagement.repository.AnnouncementWriteRepository;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMockMvc;
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.transaction.PlatformTransactionManager;
+import org.springframework.transaction.support.TransactionTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
@@ -37,6 +49,12 @@ class AnnouncementWritePersistenceTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private AnnouncementWriteRepository announcements;
+
+    @Autowired
+    private PlatformTransactionManager transactionManager;
 
     @BeforeEach
     void prepareWriteFixture() {
@@ -596,6 +614,46 @@ class AnnouncementWritePersistenceTest {
     }
 
     @Test
+    void rowLockSerializesConcurrentMutationSnapshots() throws Exception {
+        seedAnnouncement();
+        TransactionTemplate transaction = new TransactionTemplate(transactionManager);
+        CountDownLatch firstLocked = new CountDownLatch(1);
+        CountDownLatch secondStarted = new CountDownLatch(1);
+        CountDownLatch releaseFirst = new CountDownLatch(1);
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            Future<AnnouncementResponse> first = executor.submit(() -> transaction.execute(status -> {
+                AnnouncementResponse locked = announcements.findByIdForUpdate("existing-announcement")
+                        .orElseThrow();
+                firstLocked.countDown();
+                await(releaseFirst);
+                return locked;
+            }));
+            assertTrue(firstLocked.await(5, TimeUnit.SECONDS));
+
+            Future<AnnouncementResponse> second = executor.submit(() -> transaction.execute(status -> {
+                secondStarted.countDown();
+                return announcements.findByIdForUpdate("existing-announcement").orElseThrow();
+            }));
+            assertTrue(secondStarted.await(5, TimeUnit.SECONDS));
+            try {
+                second.get(300, TimeUnit.MILLISECONDS);
+                org.junit.jupiter.api.Assertions.fail("second mutation snapshot bypassed the row lock");
+            } catch (TimeoutException expected) {
+                // The second transaction must remain blocked until the first one commits.
+            }
+
+            releaseFirst.countDown();
+            assertEquals(0, first.get(5, TimeUnit.SECONDS).version());
+            assertEquals(0, second.get(5, TimeUnit.SECONDS).version());
+        } finally {
+            releaseFirst.countDown();
+            executor.shutdownNow();
+            assertTrue(executor.awaitTermination(5, TimeUnit.SECONDS));
+        }
+    }
+
+    @Test
     void deleteBoundaryFailsClosedForStudentAndMissingAnnouncement() throws Exception {
         seedAnnouncement();
 
@@ -682,5 +740,16 @@ class AnnouncementWritePersistenceTest {
 
     private static java.time.LocalDateTime localDateTime(Instant value) {
         return java.time.LocalDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
+    }
+
+    private static void await(CountDownLatch latch) {
+        try {
+            if (!latch.await(5, TimeUnit.SECONDS)) {
+                throw new IllegalStateException("timed out waiting for the first mutation");
+            }
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            throw new IllegalStateException("interrupted while coordinating mutation test", exception);
+        }
     }
 }
