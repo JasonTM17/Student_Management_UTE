@@ -1,13 +1,19 @@
 import { expect, test, type Page } from '@playwright/test';
 
-const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
+const admin = {
+  email: process.env.E2E_ADMIN_EMAIL ?? 'admin@campuscore.edu',
+  passcode: process.env.E2E_ADMIN_PASSCODE ?? '',
+};
 
 async function login(page: Page) {
+  if (!admin.passcode) {
+    throw new Error('E2E_ADMIN_PASSCODE must be provided by the disposable test environment.');
+  }
   await page.goto('/login?portal=admin');
   const submit = page.locator('form').getByRole('button', { name: /sign in/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(admin.email);
-  await page.locator('#password').fill(admin.password);
+  await page.locator('#password').fill(admin.passcode);
   await submit.click();
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/, { timeout: 20_000 });
 }
