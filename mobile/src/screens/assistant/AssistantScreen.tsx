@@ -87,33 +87,33 @@ type Copy = {
 
 const copy: Record<AssistantLocale, Copy> = {
   vi: {
-    title: 'Trợ lý học tập', eyebrow: 'Hỗ trợ có dẫn nguồn',
-    subtitle: 'Đặt câu hỏi về luận văn và nhận câu trả lời bám sát tài liệu của trường.',
-    trustTitle: 'RAG chuyên biệt cho luận văn',
+    title: 'Trợ lý CampusCore', eyebrow: 'Hỗ trợ có dẫn nguồn',
+    subtitle: 'Hỏi về đăng ký học phần, lịch học, thông báo, chương trình đào tạo hoặc luận văn và nhận câu trả lời bám sát tri thức đã công bố.',
+    trustTitle: 'Trợ lý thông tin nhà trường',
     preview: 'Bản xem trước chỉ ghi nhận câu hỏi cục bộ. Chuyển sang live để gọi API Java sau khi đăng nhập.',
-    live: 'Câu trả lời dùng ngữ cảnh luận văn được chọn ở máy chủ; không gửi lịch sử hay thông tin hồ sơ lên nhà cung cấp.',
+    live: 'Câu trả lời dùng ngữ cảnh nhà trường được chọn ở máy chủ; không gửi lịch sử hay thông tin hồ sơ lên nhà cung cấp.',
     history: 'Lịch sử trò chuyện', newChat: 'Cuộc trò chuyện mới', noHistory: 'Chưa có lịch sử',
     noHistoryDescription: 'Các cuộc trò chuyện của bạn sẽ xuất hiện ở đây và có thể xoá riêng từng cuộc.',
     loadingHistory: 'Đang tải lịch sử…', historyError: 'Không thể tải lịch sử trò chuyện.', retry: 'Thử lại', delete: 'Xoá', confirmDelete: 'Xác nhận xoá', cancelDelete: 'Huỷ',
-    ask: 'Câu hỏi của bạn', placeholder: 'Ví dụ: Mốc tiến độ luận văn tiếp theo là khi nào?', send: 'Gửi câu hỏi', stop: 'Dừng trả lời',
+    ask: 'Câu hỏi của bạn', placeholder: 'Ví dụ: Khi nào mở đăng ký học phần học kỳ tới?', send: 'Gửi câu hỏi', stop: 'Dừng trả lời',
     you: 'BẠN', assistant: 'TRỢ LÝ', sources: 'Nguồn tham khảo', fallback: 'Đang dùng câu trả lời dự phòng', model: 'Mô hình',
-    emptyTitle: 'Sẵn sàng hỗ trợ', emptyDescription: 'Bắt đầu bằng một câu hỏi cụ thể về đề tài, tiến độ hoặc quy trình luận văn.',
+    emptyTitle: 'Sẵn sàng hỗ trợ', emptyDescription: 'Bắt đầu bằng một câu hỏi cụ thể về học tập, đăng ký, thông báo, chương trình hoặc luận văn.',
     errorTitle: 'Trợ lý chưa trả lời được', errorDescription: 'Kiểm tra kết nối rồi thử lại. Câu hỏi của bạn vẫn được giữ để gửi lại.', sessionExpired: 'Phiên đăng nhập đã hết hạn. Vui lòng đăng nhập lại.', forbidden: 'Tài khoản hiện không được phép dùng trợ lý.', offline: 'Không có kết nối mạng. Hãy kiểm tra mạng rồi thử lại.',
     quotaTitle: 'Bạn đã đạt giới hạn hôm nay', quotaDescription: 'Hạn mức RAG theo ngày đã được sử dụng. Hãy thử lại vào ngày mai.',
     unavailable: 'Kho tri thức hiện chưa sẵn sàng.', progress: 'Mở tiến độ luận văn', characterCount: (count) => `${count}/2000 ký tự`, helpful: 'Hữu ích', notHelpful: 'Chưa đúng',
   },
   en: {
-    title: 'Academic assistant', eyebrow: 'Grounded support',
-    subtitle: 'Ask about your thesis and receive answers grounded in the university knowledge base.',
-    trustTitle: 'Thesis-focused RAG',
+    title: 'CampusCore assistant', eyebrow: 'Grounded support',
+    subtitle: 'Ask about registration, schedules, announcements, the academic catalog, or your thesis and receive an answer grounded in the university knowledge base.',
+    trustTitle: 'Campus helpdesk knowledge',
     preview: 'Preview records questions locally. Switch to live mode to call the Java API after sign-in.',
-    live: 'Answers use server-selected thesis context; conversation history and profile data stay out of provider requests.',
+    live: 'Answers use server-selected campus context; conversation history and profile data stay out of provider requests.',
     history: 'Conversation history', newChat: 'New conversation', noHistory: 'No history yet',
     noHistoryDescription: 'Your conversations will appear here and can be deleted one at a time.',
     loadingHistory: 'Loading history…', historyError: 'Conversation history could not be loaded.', retry: 'Retry', delete: 'Delete', confirmDelete: 'Confirm delete', cancelDelete: 'Cancel',
-    ask: 'Your question', placeholder: 'For example: When is my next thesis milestone?', send: 'Send question', stop: 'Stop answer',
+    ask: 'Your question', placeholder: 'For example: When does registration open next semester?', send: 'Send question', stop: 'Stop answer',
     you: 'YOU', assistant: 'ASSISTANT', sources: 'Sources', fallback: 'Using a fallback answer', model: 'Model',
-    emptyTitle: 'Ready when you are', emptyDescription: 'Start with a focused question about your topic, progress, or thesis process.',
+    emptyTitle: 'Ready when you are', emptyDescription: 'Start with a focused question about courses, registration, announcements, the catalog, or your thesis journey.',
     errorTitle: 'The assistant could not answer', errorDescription: 'Check your connection and try again. Your question is kept for retry.', sessionExpired: 'Your session expired. Please sign in again.', forbidden: 'This account is not allowed to use the assistant.', offline: 'No network connection. Check your connection and retry.',
     quotaTitle: 'Daily limit reached', quotaDescription: 'Your daily RAG allowance has been used. Please try again tomorrow.',
     unavailable: 'The knowledge base is not available right now.', progress: 'Open thesis progress', characterCount: (count) => `${count}/2000 characters`, helpful: 'Helpful', notHelpful: 'Not helpful',
@@ -130,7 +130,7 @@ function toChatMessage(message: AssistantHistoryMessage): ChatMessage {
 
 function historyTitle(conversation: AssistantConversation, locale: AssistantLocale) {
   const title = safeText(conversation.title, 80);
-  return title || (locale === 'vi' ? 'Cuộc trò chuyện luận văn' : 'Thesis conversation');
+  return title || (locale === 'vi' ? 'Cuộc trò chuyện CampusCore' : 'CampusCore conversation');
 }
 
 export function AssistantChatScreen({ navigation }: MobileScreenProps) {
@@ -308,8 +308,7 @@ export function AssistantChatScreen({ navigation }: MobileScreenProps) {
       {messages.map((chatMessage) => <View key={chatMessage.id} style={[styles.messageRow, chatMessage.from === 'student' ? styles.studentRow : undefined]}><Card tone={chatMessage.from === 'student' ? 'primary' : 'card'} style={styles.messageCard}>
         <View style={styles.messageHeader}><UiText variant="meta" tone={chatMessage.from === 'student' ? 'primary' : 'muted'}>{chatMessage.from === 'student' ? t.you : t.assistant}</UiText>{chatMessage.from === 'assistant' && chatMessage.degraded ? <Badge label={t.fallback} tone="warning" /> : null}</View>
         <UiText variant="bodySmall" tone={chatMessage.from === 'student' ? 'default' : 'muted'} style={styles.messageText}>{safeText(chatMessage.text) || t.unavailable}</UiText>
-        {chatMessage.from === 'assistant' && chatMessage.model ? <UiText variant="meta" tone="muted" style={styles.reasonCode}>{t.model}: {chatMessage.model}</UiText> : null}
-        {chatMessage.from === 'assistant' && chatMessage.reasonCode && chatMessage.reasonCode !== 'ANSWERED' ? <UiText variant="meta" tone={chatMessage.degraded ? 'warning' : 'muted'} style={styles.reasonCode}>{chatMessage.reasonCode === 'KNOWLEDGE_UNAVAILABLE' ? t.unavailable : chatMessage.reasonCode}</UiText> : null}
+        {chatMessage.from === 'assistant' && chatMessage.reasonCode && chatMessage.reasonCode !== 'ANSWERED' ? <UiText variant="meta" tone={chatMessage.degraded ? 'warning' : 'muted'} style={styles.reasonCode}>{chatMessage.reasonCode === 'KNOWLEDGE_UNAVAILABLE' ? t.unavailable : chatMessage.degraded ? t.fallback : t.unavailable}</UiText> : null}
         {chatMessage.citations?.length ? <View style={styles.sources}><UiText variant="label" tone="primary">{t.sources}</UiText>{chatMessage.citations.map((citation) => <View key={citation.id} style={styles.citation}><UiText variant="label" tone="primary">{safeText(citation.title, 160)}</UiText><UiText variant="meta" tone="muted">{safeText(citation.source, 120)} · {citation.locale.toUpperCase()}</UiText><UiText variant="bodySmall" tone="muted" style={styles.citationExcerpt}>{safeText(citation.excerpt, 600)}</UiText></View>)}</View> : null}
         {chatMessage.from === 'assistant' && !chatMessage.id.startsWith('local-') ? <View style={styles.feedbackRow}><Button label={chatMessage.feedback === 'UP' ? `✓ ${t.helpful}` : t.helpful} loading={feedbackBusyId === chatMessage.id} onPress={() => void submitFeedback(chatMessage.id, 'UP')} variant="text" /><Button label={chatMessage.feedback === 'DOWN' ? `✓ ${t.notHelpful}` : t.notHelpful} loading={feedbackBusyId === chatMessage.id} onPress={() => void submitFeedback(chatMessage.id, 'DOWN')} variant="text" /></View> : null}
       </Card></View>)}
