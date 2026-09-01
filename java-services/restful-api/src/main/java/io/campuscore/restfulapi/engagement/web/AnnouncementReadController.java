@@ -60,18 +60,20 @@ public class AnnouncementReadController {
             @RequestParam(required = false) String semesterId,
             @RequestParam(required = false) String sectionId,
             @RequestParam(required = false) String priority,
+            @RequestParam(defaultValue = "ACTIVE") String status,
             @RequestParam MultiValueMap<String, String> queryParameters,
             @AuthenticationPrincipal Jwt jwt) {
         requireAllowedQuery(
                 queryParameters,
-                Set.of("page", "limit", "semesterId", "sectionId", "priority"));
+                Set.of("page", "limit", "semesterId", "sectionId", "priority", "status"));
         requireIdentity(jwt);
         return announcements.findAll(
                 page,
                 limit,
                 normalizeOptional(semesterId),
                 normalizeOptional(sectionId),
-                priority);
+                priority,
+                status);
     }
 
     private static void requireAllowedQuery(
