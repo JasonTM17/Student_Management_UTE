@@ -51,7 +51,7 @@ export default function HomePage() {
   };
 
   return (
-    <div className="min-h-dvh bg-background">
+    <div className="marketing-shell min-h-dvh bg-background">
       <script
         type="application/ld+json"
         suppressHydrationWarning
@@ -182,7 +182,7 @@ export default function HomePage() {
 
         <section className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
           <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-12">
-            <SectionEyebrow className="text-[var(--portal-yellow)]">
+            <SectionEyebrow className="portal-menu-label-accent">
               {messages.home.processKicker}
             </SectionEyebrow>
             <ol className="mt-8 flex flex-col gap-4 lg:flex-row lg:items-center lg:gap-0">

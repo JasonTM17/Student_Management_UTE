@@ -2,20 +2,24 @@ name: Publish container images
 
 on:
   workflow_dispatch:
-  push:
-    branches:
-      - main
-    paths:
-      - ".github/workflows/publish-ghcr.yml"
-      - "frontend/**"
-      - "java-services/**"
-      - "database/**"
-      - "docker-compose.yml"
-      - "docker-compose.rag.override.yml"
+    inputs:
+      commit_sha:
+        description: "Exact main commit SHA that has passed CI"
+        required: true
+        type: string
+      exact_head_review:
+        description: "Confirm an independent exact-head review has passed"
+        required: true
+        type: choice
+        options:
+          - "yes"
+          - "no"
 
 permissions:
   contents: read
   packages: write
+  actions: read
+  checks: read
 
 concurrency:
   group: containers-${{ github.ref }}
@@ -29,26 +33,73 @@ env:
   DOCKERHUB_OWNER: nguyenson1710
 
 jobs:
+  release-gate:
+    name: Verify reviewed main SHA and CI
+    runs-on: ubuntu-latest
+    outputs:
+      sha: ${{ steps.identity.outputs.sha }}
+    steps:
+      - name: Checkout exact candidate
+        uses: actions/checkout@v4
+        with:
+          ref: ${{ inputs.commit_sha }}
+          fetch-depth: 0
+      - name: Require exact-head review and successful CI
+        id: identity
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CANDIDATE_SHA: ${{ inputs.commit_sha }}
+          REVIEW_CONFIRMATION: ${{ inputs.exact_head_review }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          [[ "$REVIEW_CONFIRMATION" == "yes" ]] || {
+            echo 'An independent exact-head review confirmation is required.' >&2
+            exit 1
+          }
+          [[ "$CANDIDATE_SHA" =~ ^[0-9a-f]{40}$ ]] || {
+            echo 'commit_sha must be a full 40-character SHA.' >&2
+            exit 1
+          }
+          actual="$(git rev-parse HEAD)"
+          [[ "$actual" == "$CANDIDATE_SHA" ]] || {
+            echo "Checked out $actual, expected $CANDIDATE_SHA." >&2
+            exit 1
+          }
+          git fetch --no-tags --depth=1 origin main
+          main_sha="$(git rev-parse FETCH_HEAD)"
+          [[ "$main_sha" == "$CANDIDATE_SHA" ]] || {
+            echo "origin/main is $main_sha, not the requested candidate $CANDIDATE_SHA." >&2
+            exit 1
+          }
+          successful="$(gh run list --workflow ci.yml --commit "$CANDIDATE_SHA" --limit 20 --json status,conclusion --jq '[.[] | select(.status == "completed" and .conclusion == "success")] | length')"
+          [[ "$successful" -ge 1 ]] || {
+            echo "No successful CI run was found for $CANDIDATE_SHA." >&2
+            exit 1
+          }
+          echo "sha=$CANDIDATE_SHA" >> "$GITHUB_OUTPUT"
+
   publish:
     name: Publish ${{ matrix.package }}
     runs-on: ubuntu-latest
+    needs: release-gate
     strategy:
       fail-fast: true
       matrix:
         include:
-          - package: student-management-ute-database
+          - package: campuscore-database
             hub-package: campuscore-database
             dockerfile: database/Dockerfile
             description: CampusCore PostgreSQL runtime; schema managed by Flyway
-          - package: student-management-ute-restful-api
+          - package: campuscore-restful-api
             hub-package: campuscore-restful-api
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore Spring Boot RESTful API
-          - package: student-management-ute-rag-service
+          - package: campuscore-rag-service
             hub-package: campuscore-rag-service
             dockerfile: java-services/restful-api/Dockerfile
-            description: CampusCore dedicated thesis RAG service
-          - package: student-management-ute-frontend
+            description: CampusCore dedicated campus assistant RAG service
+          - package: campuscore-frontend
             hub-package: campuscore-frontend
             dockerfile: frontend/Dockerfile
             description: CampusCore Next.js frontend
@@ -56,6 +107,8 @@ jobs:
     steps:
       - name: Checkout
         uses: actions/checkout@v4
+        with:
+          ref: ${{ needs.release-gate.outputs.sha }}
 
       - name: Set up Docker Buildx
         uses: docker/setup-buildx-action@v3
@@ -81,7 +134,7 @@ jobs:
           HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
         run: |
           set -euo pipefail
-          full_sha="$GITHUB_SHA"
+          full_sha="${{ needs.release-gate.outputs.sha }}"
 
           inspect_digest() {
             local ref="$1" output status
@@ -160,11 +213,11 @@ jobs:
             ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
             docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
           tags: |
-            type=raw,value=${{ github.sha }}
+            type=raw,value=${{ needs.release-gate.outputs.sha }}
           labels: |
             org.opencontainers.image.source=https://github.com/${{ github.repository }}
             org.opencontainers.image.description=${{ matrix.description }}
-            org.opencontainers.image.revision=${{ github.sha }}
+            org.opencontainers.image.revision=${{ needs.release-gate.outputs.sha }}
 
       - name: Build and push
         if: steps.immutability.outputs.should_push == 'true'
@@ -187,9 +240,10 @@ jobs:
         env:
           GHCR_IMAGE: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}
           HUB_IMAGE: docker.io/${{ env.DOCKERHUB_OWNER }}/${{ matrix.hub-package }}
+          IMAGE_PACKAGE: ${{ matrix.package }}
         run: |
           set -euo pipefail
-          full_sha="$GITHUB_SHA"
+          full_sha="${{ needs.release-gate.outputs.sha }}"
 
           manifest_digest() {
             # Avoid piping the verbose inspect output into an early-exiting
@@ -205,6 +259,33 @@ jobs:
             echo 'Published full-SHA manifests are missing or differ across registries.' >&2
             exit 1
           }
+          attestation_count() {
+            local ref="$1" raw
+            raw="$(docker buildx imagetools inspect --raw "$ref")"
+            RAW_INDEX="$raw" python3 - <<'PY'
+          import json
+          import os
+
+          index = json.loads(os.environ["RAW_INDEX"])
+          descriptors = index.get("manifests", [])
+          attestations = [
+              item for item in descriptors
+              if item.get("annotations", {}).get("vnd.docker.reference.type") == "attestation-manifest"
+          ]
+          if not attestations:
+              raise SystemExit("No OCI attestation manifest was found; SBOM/provenance evidence is missing.")
+          print(len(attestations))
+          PY
+          }
+
+          ghcr_attestations="$(attestation_count "$GHCR_IMAGE:$full_sha")"
+          hub_attestations="$(attestation_count "$HUB_IMAGE:$full_sha")"
+          [[ "$ghcr_attestations" -gt 0 && "$hub_attestations" -gt 0 ]] || {
+            echo 'Both registries must retain the BuildKit attestation manifest.' >&2
+            exit 1
+          }
+
+          revisions=()
           for ref in "$GHCR_IMAGE:$full_sha" "$HUB_IMAGE:$full_sha"; do
             labels="$(docker buildx imagetools inspect "$ref" --format '{{json .Image.Config.Labels}}')"
             revision="$(REVISION_LABELS="$labels" python3 -c 'import json, os; labels=json.loads(os.environ["REVISION_LABELS"] or "null") or {}; print(labels.get("org.opencontainers.image.revision", ""))')"
@@ -212,10 +293,112 @@ jobs:
               echo "OCI revision for $ref is '$revision', expected '$full_sha'." >&2
               exit 1
             }
+            revisions+=("$revision")
           done
+          GHCR_IMAGE="$GHCR_IMAGE" HUB_IMAGE="$HUB_IMAGE" FULL_SHA="$full_sha" GHCR_DIGEST="$ghcr_digest" HUB_DIGEST="$hub_digest" GHCR_ATTESTATIONS="$ghcr_attestations" HUB_ATTESTATIONS="$hub_attestations" IMAGE_PACKAGE="$IMAGE_PACKAGE" python3 - <<'PY'
+          import json
+          import os
+
+          payload = {
+              "image": os.environ["IMAGE_PACKAGE"],
+              "commitSha": os.environ["FULL_SHA"],
+              "registries": {
+                  "ghcr": {"ref": os.environ["GHCR_IMAGE"] + ":" + os.environ["FULL_SHA"], "digest": os.environ["GHCR_DIGEST"], "attestationManifests": int(os.environ["GHCR_ATTESTATIONS"])},
+                  "dockerHub": {"ref": os.environ["HUB_IMAGE"] + ":" + os.environ["FULL_SHA"], "digest": os.environ["HUB_DIGEST"], "attestationManifests": int(os.environ["HUB_ATTESTATIONS"])},
+              },
+              "sbom": "BuildKit sbom=true attestation verified",
+              "provenance": "BuildKit provenance=mode=max attestation verified",
+              "vulnerabilityReport": "trivy-" + os.environ["IMAGE_PACKAGE"] + ".json",
+          }
+          with open("release-" + os.environ["IMAGE_PACKAGE"] + ".json", "w", encoding="utf-8") as handle:
+              json.dump(payload, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
           {
             echo "### ${{ matrix.package }}"
             echo "- full commit SHA: \`$full_sha\`"
             echo "- digest: \`$ghcr_digest\`"
-            echo '- GHCR and Docker Hub manifests: parity and OCI revision verified'
+            echo "- GHCR and Docker Hub manifests: parity, OCI revision, and $ghcr_attestations/$hub_attestations attestation manifests verified"
           } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Scan published image for high and critical vulnerabilities
+        if: always() && steps.immutability.outcome == 'success'
+        uses: aquasecurity/trivy-action@0.28.0
+        with:
+          image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}:${{ needs.release-gate.outputs.sha }}
+          format: json
+          output: trivy-${{ matrix.package }}.json
+          severity: CRITICAL,HIGH
+          ignore-unfixed: true
+          exit-code: '1'
+
+      - name: Upload per-image release evidence
+        if: always() && steps.immutability.outcome == 'success'
+        uses: actions/upload-artifact@v4
+        with:
+          name: release-evidence-${{ matrix.package }}
+          path: |
+            release-${{ matrix.package }}.json
+            trivy-${{ matrix.package }}.json
+          if-no-files-found: warn
+          retention-days: 30
+
+  release-manifest:
+    name: Aggregate verified release manifest
+    runs-on: ubuntu-latest
+    needs: [release-gate, publish]
+    if: needs.publish.result == 'success'
+    steps:
+      - name: Download per-image evidence
+        uses: actions/download-artifact@v4
+        with:
+          pattern: release-evidence-*
+          merge-multiple: true
+          path: release-evidence
+
+      - name: Validate and write release manifest
+        env:
+          CANDIDATE_SHA: ${{ needs.release-gate.outputs.sha }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          CANDIDATE_SHA="$CANDIDATE_SHA" python3 - <<'PY'
+          import glob
+          import json
+          import os
+
+          expected = {
+              "campuscore-database",
+              "campuscore-restful-api",
+              "campuscore-rag-service",
+              "campuscore-frontend",
+          }
+          files = sorted(glob.glob("release-evidence/release-*.json"))
+          if len(files) != len(expected):
+              raise SystemExit(f"Expected {len(expected)} release evidence files, found {len(files)}")
+          records = [json.load(open(path, encoding="utf-8")) for path in files]
+          names = {record.get("image") or record.get("package") for record in records}
+          if names != expected:
+              raise SystemExit(f"Unexpected image evidence set: {sorted(names)}")
+          sha = os.environ["CANDIDATE_SHA"]
+          if any(record.get("commitSha") != sha for record in records):
+              raise SystemExit("Release evidence does not share the requested candidate SHA")
+          for record in records:
+              ghcr = record["registries"]["ghcr"]
+              hub = record["registries"]["dockerHub"]
+              if not ghcr["digest"].startswith("sha256:") or ghcr["digest"] != hub["digest"]:
+                  raise SystemExit(f"Digest parity failed for {record.get('image')}")
+              if ghcr["attestationManifests"] < 1 or hub["attestationManifests"] < 1:
+                  raise SystemExit(f"Attestation evidence missing for {record.get('image')}")
+          manifest = {"commitSha": sha, "images": sorted(records, key=lambda item: item.get("image") or item.get("package"))}
+          with open("release-manifest.json", "w", encoding="utf-8") as handle:
+              json.dump(manifest, handle, indent=2, sort_keys=True)
+              handle.write("\n")
+          PY
+
+      - name: Upload immutable release manifest
+        uses: actions/upload-artifact@v4
+        with:
+          name: campuscore-release-manifest-${{ needs.release-gate.outputs.sha }}
+          path: release-manifest.json
+          retention-days: 90

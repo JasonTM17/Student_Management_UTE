@@ -108,7 +108,7 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /citation\.excerpt/);
   assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
   assert.match(assistant, /messages\.assistant\.noMatch/);
-  assert.match(messages, /Hỏi về đăng ký, đề tài, nhóm hoặc tiến độ/);
+  assert.match(messages, /Hỏi về đăng ký học phần, lịch học, thông báo, học liệu, chính sách hoặc hành trình luận văn/);
   assert.doesNotMatch(messages, /nhóm hoặc phản biện|groups, or reviews/i);
 });
 

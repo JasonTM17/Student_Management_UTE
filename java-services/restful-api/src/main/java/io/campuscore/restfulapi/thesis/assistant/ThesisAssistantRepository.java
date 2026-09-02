@@ -192,10 +192,10 @@ public class ThesisAssistantRepository {
         if (messages.isEmpty()) return;
         List<UUID> ids = messages.stream().map(Message::id).toList();
         Map<UUID, List<ThesisAssistantDtos.Citation>> byMessage = new LinkedHashMap<>();
-        jdbc.query("SELECT message_id,CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at FROM assistant.chat_citation WHERE message_id IN (:ids) ORDER BY message_id,ordinal,id",
+        jdbc.query("SELECT message_id,CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at,corpus_version,corpus_hash,release_id FROM assistant.chat_citation WHERE message_id IN (:ids) ORDER BY message_id,ordinal,id",
                 new MapSqlParameterSource("ids", ids), (rs, row) -> {
                     UUID messageId = rs.getObject("message_id", UUID.class);
-                    byMessage.computeIfAbsent(messageId, ignored -> new ArrayList<>()).add(new ThesisAssistantDtos.Citation(rs.getString("id"), rs.getString("slug"), rs.getString("title"), rs.getString("source"), rs.getString("locale"), rs.getString("excerpt"), rs.getString("domain"), rs.getString("source_kind"), rs.getString("source_id"), parseUuid(rs.getString("revision_id")), nullableInt(rs, "revision_version"), rs.getString("snapshot_hash"), rs.getString("catalog_entity_type"), rs.getString("catalog_entity_id"), rs.getString("updated_at")));
+                    byMessage.computeIfAbsent(messageId, ignored -> new ArrayList<>()).add(new ThesisAssistantDtos.Citation(rs.getString("id"), rs.getString("slug"), rs.getString("title"), rs.getString("source"), rs.getString("locale"), rs.getString("excerpt"), rs.getString("domain"), rs.getString("source_kind"), rs.getString("source_id"), parseUuid(rs.getString("revision_id")), nullableInt(rs, "revision_version"), rs.getString("snapshot_hash"), rs.getString("catalog_entity_type"), rs.getString("catalog_entity_id"), rs.getString("updated_at"), rs.getString("corpus_version"), rs.getString("corpus_hash"), parseUuid(rs.getString("release_id"))));
                     return messageId;
                 });
         for (int i = 0; i < messages.size(); i++) {

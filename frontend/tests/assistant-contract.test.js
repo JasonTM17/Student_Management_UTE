@@ -69,9 +69,9 @@ test('assistant reducer owns streaming, citations, degraded, and retry states', 
   assert.match(source, /Do not issue a JSON replay/);
 });
 
-test('assistant launcher has a thesis-specific icon mark and full interaction states', () => {
+test('assistant launcher has a campus helpdesk mark and full interaction states', () => {
   const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /data-assistant-launcher="thesis-mark"/);
+  assert.match(source, /data-assistant-launcher="campus-mark"/);
   assert.match(source, /function AssistantLauncherMark/);
   assert.match(source, /<Bookmark/);
   assert.match(source, /hover:-translate-y-0\.5/);
@@ -82,5 +82,7 @@ test('assistant launcher has a thesis-specific icon mark and full interaction st
 test('assistant history routes URI-encode owner-scoped identifiers', () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
   assert.match(source, /conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);
-  assert.match(source, /delete\(`\/thesis\/assistant\/conversations\/\$\{encodeURIComponent\(conversationId\)\}`\)/);
+  assert.match(source, /delete\(`\/assistant\/conversations\/\$\{encodeURIComponent\(conversationId\)\}`\)/);
+  assert.match(source, /post<AssistantReply>\('\/assistant\/chat'/);
+  assert.doesNotMatch(source, /post<AssistantReply>\('\/thesis\/assistant\/chat'/);
 });

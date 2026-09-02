@@ -12,14 +12,15 @@
   },
   "dependencies": {
     "@expo-google-fonts/be-vietnam-pro": "^0.4.1",
-    "@expo/vector-icons": "~14.0.4",
-    "expo": "~52.0.0",
-    "react": "18.3.1",
-    "react-native": "0.76.5"
+    "@expo/vector-icons": "^15.1.1",
+    "expo": "~57.0.19",
+    "expo-font": "~57.0.3",
+    "react": "19.2.3",
+    "react-native": "0.86.3"
   },
   "devDependencies": {
     "@types/node": "~22.10.2",
-    "@types/react": "~18.3.12",
-    "typescript": "~5.3.3"
+    "@types/react": "~19.2.4",
+    "typescript": "~6.0.3"
   }
 }

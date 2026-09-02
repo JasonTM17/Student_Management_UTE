@@ -46,10 +46,21 @@ public final class ThesisAssistantDtos {
             String snapshotHash,
             String entityType,
             String entityId,
-            String updatedAt) {
+            String updatedAt,
+            String corpusVersion,
+            String corpusHash,
+            UUID releaseId) {
         public Citation(String id, String slug, String title, String source, String locale, String excerpt) {
             this(id, slug, title, source, locale, excerpt, "THESIS", "CURATED", id,
-                    parseUuid(id), null, null, null, null, null);
+                    parseUuid(id), null, null, null, null, null, null, null, null);
+        }
+
+        /** Backwards-compatible constructor for persisted rows from V12-V15. */
+        public Citation(String id, String slug, String title, String source, String locale, String excerpt,
+                String domain, String sourceKind, String sourceId, UUID revisionId, Integer revisionVersion,
+                String snapshotHash, String entityType, String entityId, String updatedAt) {
+            this(id, slug, title, source, locale, excerpt, domain, sourceKind, sourceId, revisionId,
+                    revisionVersion, snapshotHash, entityType, entityId, updatedAt, null, null, null);
         }
     }
 

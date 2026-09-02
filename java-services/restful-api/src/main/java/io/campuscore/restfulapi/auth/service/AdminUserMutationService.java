@@ -46,13 +46,16 @@ public class AdminUserMutationService {
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
-                        + " FROM " + USER + " u WHERE (:status IS NULL OR u.\"status\" = :status)"
-                        + " AND (:search IS NULL OR LOWER(u.\"email\") LIKE :search OR LOWER(u.\"firstName\") LIKE :search OR LOWER(u.\"lastName\") LIKE :search)"
+                        // PostgreSQL cannot infer the type of an unbound NULL in an IS NULL
+                        // predicate. Cast optional filters so the first request from the admin
+                        // console (which intentionally sends neither filter) remains valid.
+                        + " FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
+                        + " AND (CAST(:search AS VARCHAR) IS NULL OR LOWER(u.\"email\") LIKE CAST(:search AS VARCHAR) OR LOWER(u.\"firstName\") LIKE CAST(:search AS VARCHAR) OR LOWER(u.\"lastName\") LIKE CAST(:search AS VARCHAR))"
                         + " ORDER BY u.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 params);
         Long total = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + USER + " u WHERE (:status IS NULL OR u.\"status\" = :status)"
-                        + " AND (:search IS NULL OR LOWER(u.\"email\") LIKE :search OR LOWER(u.\"firstName\") LIKE :search OR LOWER(u.\"lastName\") LIKE :search)",
+                "SELECT COUNT(*) FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
+                        + " AND (CAST(:search AS VARCHAR) IS NULL OR LOWER(u.\"email\") LIKE CAST(:search AS VARCHAR) OR LOWER(u.\"firstName\") LIKE CAST(:search AS VARCHAR) OR LOWER(u.\"lastName\") LIKE CAST(:search AS VARCHAR))",
                 params, Long.class);
         long totalItems = total == null ? 0 : total;
         int totalPages = (int) ((totalItems + limit - 1) / limit);

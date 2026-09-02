@@ -1,6 +1,7 @@
 -- Optional authoring support for the existing assistant.knowledge_document
 -- corpus. This migration creates no second public corpus authority and adds
 -- no seed rows. Java Flyway/local PostgreSQL remains the runtime authority.
+create extension if not exists pgcrypto;
 create schema if not exists assistant;
 
 create table if not exists assistant.knowledge_document (

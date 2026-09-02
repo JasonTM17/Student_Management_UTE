@@ -80,7 +80,7 @@ test('mobile assistant keeps native transport buffered and owner-history operati
   const client = read('src/api/client.ts');
   const assistant = read('src/screens/assistant/AssistantScreen.tsx');
 
-  assert.match(client, /assistantConversations: '\/thesis\/assistant\/conversations'/);
+  assert.match(client, /conversations: '\/assistant\/conversations'/);
   assert.match(client, /\/messages/);
   assert.match(client, /deleteAssistantConversation/);
   assert.match(client, /signal\?: AbortSignal|RequestInit/);
@@ -99,7 +99,7 @@ test('mobile assistant preserves idempotency, server cancellation, pagination, a
   assert.match(client, /createAssistantClientRequestId/);
   assert.match(client, /clientRequestId:/);
   assert.match(client, /X-Next-Cursor/);
-  assert.match(client, /assistantCancel: '\/thesis\/assistant\/requests'/);
+  assert.match(client, /requests: '\/assistant\/requests'/);
   assert.match(client, /cancelAssistantRequest/);
   assert.match(client, /AssistantFeedbackReason/);
   assert.match(client, /putAssistantFeedback/);

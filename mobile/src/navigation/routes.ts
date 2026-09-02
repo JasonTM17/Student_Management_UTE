@@ -72,7 +72,7 @@ export const screenRegistry: readonly ScreenDefinition[] = [
   { name: 'thesis.detail', title: 'Topic detail', family: 'thesis', roles: studentRoles, icon: 'text-box-search-outline' },
   { name: 'thesis.registration', title: 'Thesis registration', family: 'thesis', roles: studentRoles, icon: 'account-group-outline' },
   { name: 'thesis.progress', title: 'Thesis progress', family: 'thesis', roles: studentRoles, icon: 'chart-timeline-variant' },
-  { name: 'assistant.chat', title: 'Academic assistant', family: 'assistant', roles: allRoles, icon: 'robot-outline' },
+  { name: 'assistant.chat', title: 'CampusCore assistant', family: 'assistant', roles: allRoles, icon: 'robot-outline' },
   { name: 'admin.dashboard', title: 'Admin dashboard', family: 'staff', roles: adminRoles, icon: 'shield-account-outline' },
   { name: 'admin.students', title: 'Manage students', family: 'staff', roles: adminRoles, icon: 'school-outline' },
   { name: 'admin.lecturers', title: 'Manage lecturers', family: 'staff', roles: adminRoles, icon: 'account-tie-outline' },

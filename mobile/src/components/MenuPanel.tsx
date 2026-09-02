@@ -110,8 +110,8 @@ export function MenuPanel({ activeRoute, role, onClose, onNavigate, onSwitchRole
 }
 
 const styles = StyleSheet.create({
-  overlay: { ...StyleSheet.absoluteFillObject, justifyContent: 'flex-end', zIndex: 10 },
-  backdrop: { ...StyleSheet.absoluteFillObject, backgroundColor: 'rgba(15, 27, 44, 0.52)' },
+  overlay: { ...StyleSheet.absoluteFill, justifyContent: 'flex-end', zIndex: 10 },
+  backdrop: { ...StyleSheet.absoluteFill, backgroundColor: 'rgba(15, 27, 44, 0.52)' },
   panel: {
     backgroundColor: tokens.colors.card,
     borderColor: tokens.colors.outlineVariant,

@@ -62,6 +62,10 @@ deepseek:
   max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
 
 assistant:
+  knowledge:
+    # sql keeps the course/local authoring compatibility path; production REST
+    # uses remote and private rag-service uses supabase.
+    authority-mode: ${ASSISTANT_KNOWLEDGE_AUTHORITY_MODE:sql}
   max-context-chars: ${ASSISTANT_MAX_CONTEXT_CHARS:6000}
   max-message-chars: ${ASSISTANT_MAX_MESSAGE_CHARS:2000}
   user-daily-quota: ${ASSISTANT_USER_DAILY_QUOTA:20}
@@ -75,6 +79,17 @@ assistant:
     service-mode: ${ASSISTANT_RAG_SERVICE_MODE:false}
     connect-timeout-ms: ${ASSISTANT_RAG_CONNECT_TIMEOUT_MS:1000}
     read-timeout-ms: ${ASSISTANT_RAG_READ_TIMEOUT_MS:30000}
+  supabase:
+    enabled: ${ASSISTANT_SUPABASE_ENABLED:false}
+    url: ${SUPABASE_URL:}
+    service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+    schema: ${SUPABASE_SCHEMA:assistant}
+    release-table: ${SUPABASE_RELEASE_TABLE:knowledge_release}
+    document-table: ${SUPABASE_DOCUMENT_TABLE:knowledge_release_document}
+    reconcile-delay-ms: ${ASSISTANT_SUPABASE_RECONCILE_DELAY_MS:900000}
+    reconcile-initial-delay-ms: ${ASSISTANT_SUPABASE_RECONCILE_INITIAL_DELAY_MS:120000}
+    connect-timeout-ms: ${ASSISTANT_SUPABASE_CONNECT_TIMEOUT_MS:2000}
+    read-timeout-ms: ${ASSISTANT_SUPABASE_READ_TIMEOUT_MS:30000}
 
 ---
 spring:
