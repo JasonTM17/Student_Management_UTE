@@ -1,0 +1,48 @@
+{
+    admin localhost:2019
+    email {$ACME_EMAIL}
+    auto_https disable_redirects
+    grace_period 10s
+}
+
+{$CAMPUSCORE_DOMAIN} {
+    # Keep SSE bytes immediately observable; compress ordinary HTML/API traffic.
+    @not_assistant_stream {
+        not path /api/v1/assistant/chat/stream /api/v1/thesis/assistant/chat/stream
+    }
+    encode @not_assistant_stream zstd gzip
+
+    log {
+        output file /var/log/caddy/access.log {
+            roll_size 10MiB
+            roll_keep 5
+            roll_keep_for 168h
+        }
+        format json
+    }
+
+    header {
+        Strict-Transport-Security "max-age=31536000; includeSubDomains"
+        X-Content-Type-Options "nosniff"
+        X-Frame-Options "DENY"
+        Referrer-Policy "strict-origin-when-cross-origin"
+        Permissions-Policy "camera=(), microphone=(), geolocation=()"
+        -Server
+    }
+
+    # Streaming assistant responses must not be buffered or compressed into a
+    # delayed batch.  The REST service still owns authentication and SSE order.
+    @assistant_stream {
+        path /api/v1/assistant/chat/stream /api/v1/thesis/assistant/chat/stream
+    }
+    reverse_proxy @assistant_stream restful-api:4010 {
+        flush_interval -1
+        header_down Cache-Control "no-cache"
+    }
+
+    @api path /api/v1/*
+    reverse_proxy @api restful-api:4010
+
+    # Only the browser-facing Next.js app is reachable for non-API paths.
+    reverse_proxy web:3000
+}

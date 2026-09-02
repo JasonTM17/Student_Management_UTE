@@ -32,7 +32,7 @@ import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.rag", name = "service-mode", havingValue = "true")
-@RequestMapping("/internal/rag/thesis/assistant")
+@RequestMapping({"/internal/rag/assistant", "/internal/rag/thesis/assistant"})
 public class ThesisAssistantInternalController {
     private static final Logger LOG = LoggerFactory.getLogger(ThesisAssistantInternalController.class);
 

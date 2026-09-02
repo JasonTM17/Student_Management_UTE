@@ -18,16 +18,16 @@ Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và m�
 - Đăng ký/hủy học phần, lịch học, điểm và bảng điểm.
 - Announcement và notification inbox.
 - Thesis core: round, topic, group, member, progress/status.
-- Thesis assistant dùng `rag-service` nội bộ để thực hiện thesis-grounded RAG
-  trong PostgreSQL, có citation,
+- CampusCore assistant dùng `rag-service` nội bộ cho các domain học vụ công
+  khai (đăng ký, lịch, thông báo, chính sách, danh mục và luận văn), có citation,
   lexical fallback và tùy chọn DeepSeek V4 Flash chỉ ở backend.
 
 Finance, analytics, support ticket, vector database, Redis, RabbitMQ, MinIO,
-Nginx, Kubernetes, Cloudflare tunnel và multi-image release không thuộc runtime
-của đồ án. Workflow GHCR vẫn xuất bản một wrapper PostgreSQL không chứa
-migration để đồng bộ artifact của course stack; Flyway trong REST API tiếp tục
-sở hữu schema và seed, không biến đây thành production deployment. DeepSeek là
-tích hợp tùy chọn, mặc định tắt và không cần để chạy local lexical fallback.
+Nginx, Kubernetes, Cloudflare tunnel không thuộc runtime của đồ án. Compose
+local/course vẫn tách khỏi `docker-compose.prod.yml`; production bundle dùng
+Caddy, image tag bất biến, secret file và backup/restore runbook nhưng chưa phải
+cutover VPS. DeepSeek là tích hợp tùy chọn, mặc định tắt và không cần để chạy
+local lexical fallback.
 
 ## Chạy local
 
@@ -46,6 +46,15 @@ npm run typecheck --prefix mobile
 ```
 
 Mailpit UI ở `http://127.0.0.1:8025`.
+
+## Gói production chờ VPS/domain
+
+`docker-compose.prod.yml`, `ops/caddy/Caddyfile`, `ops/secrets/README.md`,
+`ops/backup/` và [docs/PRODUCTION_RUNBOOK.md](docs/PRODUCTION_RUNBOOK.md)
+được chuẩn bị để triển khai sau khi có domain, DNS, firewall và secret runtime.
+Production chỉ mở Caddy ở cổng 80/443; không dùng Mailpit và không mount secret
+vào web client. Cần đặt `CAMPUSCORE_IMAGE_TAG` là full SHA đã review và xác nhận
+digest giống nhau trên Docker Hub/GHCR trước khi khởi động.
 
 ### Tùy chọn DeepSeek RAG
 

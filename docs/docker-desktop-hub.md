@@ -24,10 +24,10 @@ builds and pushes the four images from the same commit to Docker Hub and GHCR:
 
 | Component | Docker Hub | GHCR |
 | --- | --- | --- |
-| Database | `nguyenson1710/campuscore-database` | `ghcr.io/jasontm17/student-management-ute-database` |
-| REST API | `nguyenson1710/campuscore-restful-api` | `ghcr.io/jasontm17/student-management-ute-restful-api` |
-| RAG service | `nguyenson1710/campuscore-rag-service` | `ghcr.io/jasontm17/student-management-ute-rag-service` |
-| Frontend | `nguyenson1710/campuscore-frontend` | `ghcr.io/jasontm17/student-management-ute-frontend` |
+| Database | `nguyenson1710/campuscore-database` | `ghcr.io/jasontm17/campuscore-database` |
+| REST API | `nguyenson1710/campuscore-restful-api` | `ghcr.io/jasontm17/campuscore-restful-api` |
+| RAG service | `nguyenson1710/campuscore-rag-service` | `ghcr.io/jasontm17/campuscore-rag-service` |
+| Frontend | `nguyenson1710/campuscore-frontend` | `ghcr.io/jasontm17/campuscore-frontend` |
 
 The workflow needs repository secrets `DOCKERHUB_USERNAME` and
 `DOCKERHUB_TOKEN`; it never stores credentials in the repository. It publishes
@@ -49,8 +49,8 @@ GitHub Packages stays separate:
 
 ```powershell
 gh auth token | docker login ghcr.io -u JasonTM17 --password-stdin
-docker tag campuscore-frontend:local ghcr.io/jasontm17/student-management-ute-frontend:<version>
-docker push ghcr.io/jasontm17/student-management-ute-frontend:<version>
+docker tag campuscore-frontend:local ghcr.io/jasontm17/campuscore-frontend:<version>
+docker push ghcr.io/jasontm17/campuscore-frontend:<version>
 ```
 
 The GHCR workflow publishes the same course stack as four artifacts. The
@@ -58,6 +58,6 @@ database artifact is a migration-free PostgreSQL runtime wrapper; Flyway in
 the REST API still owns schema and seed data.
 
 ```powershell
-docker tag campuscore-database:local ghcr.io/jasontm17/student-management-ute-database:<version>
-docker push ghcr.io/jasontm17/student-management-ute-database:<version>
+docker tag campuscore-database:local ghcr.io/jasontm17/campuscore-database:<version>
+docker push ghcr.io/jasontm17/campuscore-database:<version>
 ```

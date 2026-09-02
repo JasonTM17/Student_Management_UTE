@@ -43,12 +43,16 @@ export default function RegisterPage() {
       if (generation !== loadGeneration.current) return;
       setEnrollments(enrollmentData);
       try {
-        const [rounds, catalog] = await Promise.all([
-          registrationApi.rounds(),
-          registrationApi.sections(),
-        ]);
+        const rounds = await registrationApi.rounds();
         if (generation !== loadGeneration.current) return;
-        setRoundOpen(rounds.some((round) => round.status === 'OPEN'));
+        const open = rounds.some((round) => round.status === 'OPEN');
+        setRoundOpen(open);
+        if (!open) {
+          setSections([]);
+          return;
+        }
+        const catalog = await registrationApi.sections();
+        if (generation !== loadGeneration.current) return;
         setSections(catalog);
       } catch (catalogError) {
         if (generation !== loadGeneration.current) return;

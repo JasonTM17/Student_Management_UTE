@@ -154,8 +154,8 @@ export function AssistantChatScreen({ navigation }: MobileScreenProps) {
   // Keep the exact conversation value used by the request key. A retry may
   // happen after the visible selection has changed, but it must replay the
   // original canonical payload rather than creating an idempotency conflict.
-  const activeConversationIdRef = useRef<string | undefined>();
-  const lastFailedConversationIdRef = useRef<string | undefined>();
+  const activeConversationIdRef = useRef<string | undefined>(undefined);
+  const lastFailedConversationIdRef = useRef<string | undefined>(undefined);
   const isPreview = apiClient.mode === 'preview';
   const t = copy[locale];
 

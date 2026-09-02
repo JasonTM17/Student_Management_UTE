@@ -34,13 +34,13 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   );
 
   let feedbackCalls = 0;
-  await page.route('**/api/v1/thesis/assistant/conversations**', (route) => {
+  await page.route('**/api/v1/assistant/conversations**', (route) => {
     if (route.request().method() === 'GET') {
       return route.fulfill(jsonResponse([]));
     }
     return route.fulfill(jsonResponse({ id: 'conversation-e2e', locale: 'en' }));
   });
-  await page.route('**/api/v1/thesis/assistant/chat/stream', (route) =>
+  await page.route('**/api/v1/assistant/chat/stream', (route) =>
     route.fulfill({
       status: 200,
       headers: {
@@ -60,7 +60,7 @@ test('authenticated student can use the assistant launcher, stream, citation, an
       ].join(''),
     }),
   );
-  await page.route('**/api/v1/thesis/assistant/messages/**', (route) => {
+  await page.route('**/api/v1/assistant/messages/**', (route) => {
     if (route.request().method() === 'PUT') {
       feedbackCalls += 1;
       return route.fulfill(jsonResponse({ messageId: '55555555-5555-4555-8555-555555555555', rating: 'UP', reason: 'HELPFUL', removed: false }));
@@ -71,18 +71,21 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await login(page, student);
   await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
 
-  const launcher = page.getByRole('button', { name: 'Open thesis assistant' });
+  const launcher = page.getByRole('button', { name: 'Open CampusCore assistant' });
   await expect(launcher).toBeVisible();
   await launcher.click();
-  await expect(page.getByRole('dialog')).toContainText('Thesis guide');
+  // Opening the panel is intentionally side-effect free. Sources appear only
+  // after a submitted question, so an empty conversation cannot look like a
+  // fabricated answer.
+  await expect(page.getByRole('dialog')).toContainText('CampusCore assistant');
   await page.getByRole('button', { name: 'Conversation history' }).click();
   await expect(page.getByText('No saved conversations yet.')).toBeVisible();
   await page.getByRole('button', { name: 'Back to chat' }).click();
 
-  const composer = page.getByRole('textbox', { name: 'Ask about registration, topics, groups, or progress...' });
+  const composer = page.getByRole('textbox', { name: /Ask about registration, schedules, announcements/ });
   await composer.fill('How do I choose a thesis topic?');
   await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByRole('article', { name: 'AI assistant' })).toContainText('Use the published thesis guide.');
+  await expect(page.getByRole('article', { name: 'Campus helpdesk' })).toContainText('Use the published thesis guide.');
   await expect(page.getByLabel('Sources').getByText('Thesis guide')).toBeVisible();
 
   await page.getByRole('button', { name: 'Mark answer helpful' }).click();
@@ -102,7 +105,7 @@ test('authenticated admin can inspect reviewed guidance and public coverage', as
     source: 'assistant-guidance',
     priority: 50,
   };
-  await page.route('**/api/v1/admin/thesis/assistant/knowledge**', (route) => {
+  await page.route('**/api/v1/admin/assistant/knowledge**', (route) => {
     if (route.request().method() === 'GET') return route.fulfill(jsonResponse([source]));
     return route.fulfill(jsonResponse({ documentId: source.documentId, revisionId: source.revisionId, version: 2, state: 'PUBLISHED' }));
   });
@@ -116,8 +119,8 @@ test('authenticated admin can inspect reviewed guidance and public coverage', as
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
   await page.goto('/admin/assistant-knowledge');
 
-  await expect(page.getByRole('heading', { name: 'Thesis guidance' })).toBeVisible();
-  await expect(page.getByText('Public guidance coverage')).toBeVisible();
+  await expect(page.getByRole('heading', { name: 'CampusCore knowledge' })).toBeVisible();
+  await expect(page.getByText('Public CampusCore guidance')).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
   await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
 
@@ -134,7 +137,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     route.fulfill(jsonResponse({ data: [{ id: 'semester-1', name: '2026 Spring', status: 'ACTIVE' }] })),
   );
   await page.route('**/api/v1/enrollments/my**', (route) => route.fulfill(jsonResponse([])));
-  await page.route('**/api/v1/thesis/assistant/conversations**', (route) =>
+  await page.route('**/api/v1/assistant/conversations**', (route) =>
     route.fulfill(jsonResponse([])),
   );
 
@@ -149,7 +152,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/dashboard');
-    const launcher = page.getByRole('button', { name: 'Open thesis assistant' });
+    const launcher = page.getByRole('button', { name: 'Open CampusCore assistant' });
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
     expect(launcherBox).not.toBeNull();
@@ -184,6 +187,6 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       expect(navBox).not.toBeNull();
       expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navBox!.y);
     }
-    await page.getByRole('button', { name: 'Close thesis assistant' }).click();
+    await page.getByRole('button', { name: 'Close CampusCore assistant' }).click();
   }
 });

@@ -399,10 +399,13 @@ public class ThesisAssistantService {
         String snapshotMaterial = documents.stream().map(document -> String.join("|",
                 safe(document.id()), safe(document.slug()), safe(document.locale()), safe(document.title()),
                 safe(document.content()), safe(document.source()),
+                safe(document.domain()),
                 document.revisionId() == null ? "" : document.revisionId().toString(),
                 document.revisionVersion() == null ? "" : document.revisionVersion().toString(),
                 safe(document.catalogEntityType()), safe(document.catalogEntityId()),
-                document.catalogUpdatedAt() == null ? "" : document.catalogUpdatedAt().toString()))
+                document.catalogUpdatedAt() == null ? "" : document.catalogUpdatedAt().toString(),
+                safe(document.corpusVersion()), safe(document.corpusHash()),
+                document.releaseId() == null ? "" : document.releaseId().toString()))
                 .collect(Collectors.joining("\n"));
         return new LexicalResult(answer, documents, citations, context, false, false, sourceIds, sha256(snapshotMaterial));
     }
@@ -434,14 +437,17 @@ public class ThesisAssistantService {
                 document.catalogEntityType() == null ? "" : document.catalogEntityType(),
                 document.catalogEntityId() == null ? "" : document.catalogEntityId(),
                 document.catalogUpdatedAt() == null ? "" : document.catalogUpdatedAt().toString()));
-        if ("academic-catalog".equals(document.source())) {
+        if ("ACADEMIC_CATALOG".equalsIgnoreCase(document.domain()) || "academic-catalog".equals(document.source())) {
             return new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
-                    "ACADEMIC", "CATALOG", sourceId, null, null, hash, document.catalogEntityType(), document.catalogEntityId(), document.catalogUpdatedAt() == null ? null : document.catalogUpdatedAt().toString());
+                    "ACADEMIC_CATALOG", "CATALOG", sourceId, null, null, hash, document.catalogEntityType(), document.catalogEntityId(),
+                    document.catalogUpdatedAt() == null ? null : document.catalogUpdatedAt().toString(),
+                    document.corpusVersion(), document.corpusHash(), document.releaseId());
         }
         UUID revision = parseUuid(document.id());
         return new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
-                "THESIS", "CURATED", sourceId, document.revisionId() == null ? revision : document.revisionId(),
-                document.revisionVersion(), hash, null, null, null);
+                document.domain() == null ? "THESIS" : document.domain(), "CURATED", sourceId, document.revisionId() == null ? revision : document.revisionId(),
+                document.revisionVersion(), hash, null, null, null,
+                document.corpusVersion(), document.corpusHash(), document.releaseId());
     }
 
     private static void validateSegment(ProviderSegment segment, List<String> allowed, int expectedSequence) {
@@ -494,8 +500,8 @@ public class ThesisAssistantService {
         return java.util.Arrays.stream(message.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().limit(16).toList();
     }
-    private static String noMatchMessage(String locale) { return "vi".equals(locale) ? "Chưa tìm thấy tài liệu phù hợp trong kho kiến thức luận văn hoặc học vụ công khai." : "No matching thesis or public academic guidance was found."; }
-    private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức hiện chưa khả dụng. Vui lòng thử lại sau." : "The academic knowledge base is currently unavailable. Please try again later."; }
+    private static String noMatchMessage(String locale) { return "vi".equals(locale) ? "Chưa tìm thấy hướng dẫn phù hợp trong kho kiến thức CampusCore công khai." : "No matching public CampusCore guidance was found."; }
+    private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
     private static String safe(String value) { return value == null ? "" : value; }

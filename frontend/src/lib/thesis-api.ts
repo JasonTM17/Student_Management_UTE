@@ -72,6 +72,9 @@ export interface AssistantCitation {
   entityType?: string | null;
   entityId?: string | null;
   updatedAt?: string | null;
+  corpusVersion?: string | null;
+  corpusHash?: string | null;
+  releaseId?: string | null;
 }
 
 export interface AssistantReply {
@@ -137,6 +140,7 @@ export interface AssistantKnowledgeDocument {
   title: string;
   content: string;
   source: string;
+  domain?: AssistantKnowledgeDomain | string;
   priority: number;
   createdBy?: string | null;
   reviewedBy?: string | null;
@@ -150,8 +154,17 @@ export interface AssistantKnowledgeRequest {
   title: string;
   content: string;
   source: string;
+  domain?: AssistantKnowledgeDomain;
   priority?: number;
 }
+
+export type AssistantKnowledgeDomain =
+  | 'THESIS'
+  | 'REGISTRATION'
+  | 'ACADEMIC_CATALOG'
+  | 'ANNOUNCEMENT'
+  | 'POLICY'
+  | 'GENERAL_FAQ';
 
 export interface AssistantKnowledgeRevision {
   documentId: string;
@@ -327,7 +340,7 @@ export const thesisApi = {
     conversationId?: string,
     clientRequestId = createAssistantRequestId(),
   ): Promise<AssistantReply> => {
-    const response = await api.post<AssistantReply>('/thesis/assistant/chat', {
+    const response = await api.post<AssistantReply>('/assistant/chat', {
       message,
       locale,
       clientRequestId,
@@ -365,7 +378,7 @@ export const thesisApi = {
         typeof document !== 'undefined'
           ? document.cookie.match(/(?:^|; )cc_csrf=([^;]*)/)?.[1]
           : undefined;
-      return fetch(`${base}/thesis/assistant/chat/stream`, {
+      return fetch(`${base}/assistant/chat/stream`, {
         method: 'POST',
         credentials: 'include',
         signal: options.signal,
@@ -435,7 +448,7 @@ export const thesisApi = {
     cursor?: string;
   }): Promise<AssistantConversation[]> => {
     const response = await api.get<AssistantConversation[]>(
-      '/thesis/assistant/conversations',
+      '/assistant/conversations',
       { params },
     );
     return response.data;
@@ -446,7 +459,7 @@ export const thesisApi = {
     params?: { limit?: number; cursor?: string },
   ): Promise<AssistantMessage[]> => {
     const response = await api.get<AssistantMessage[]>(
-      `/thesis/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
+      `/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
       { params },
     );
     return response.data;
@@ -456,21 +469,21 @@ export const thesisApi = {
     locale: 'en' | 'vi',
   ): Promise<AssistantConversation> => {
     const response = await api.post<AssistantConversation>(
-      '/thesis/assistant/conversations',
+      '/assistant/conversations',
       { locale },
     );
     return response.data;
   },
 
   deleteConversation: async (conversationId: string): Promise<void> => {
-    await api.delete(`/thesis/assistant/conversations/${encodeURIComponent(conversationId)}`);
+    await api.delete(`/assistant/conversations/${encodeURIComponent(conversationId)}`);
   },
 
   cancelRequest: async (
     clientRequestId: string,
   ): Promise<{ status: number }> => {
     const response = await api.post(
-      `/thesis/assistant/requests/${encodeURIComponent(clientRequestId)}/cancel`,
+      `/assistant/requests/${encodeURIComponent(clientRequestId)}/cancel`,
     );
     return { status: response.status };
   },
@@ -487,14 +500,14 @@ export const thesisApi = {
       | 'UNSAFE',
   ): Promise<void> => {
     await api.put(
-      `/thesis/assistant/messages/${encodeURIComponent(messageId)}/feedback`,
+      `/assistant/messages/${encodeURIComponent(messageId)}/feedback`,
       { rating, ...(reason ? { reason } : {}) },
     );
   },
 
   deleteMessageFeedback: async (messageId: string): Promise<void> => {
     await api.delete(
-      `/thesis/assistant/messages/${encodeURIComponent(messageId)}/feedback`,
+      `/assistant/messages/${encodeURIComponent(messageId)}/feedback`,
     );
   },
 };
@@ -502,11 +515,11 @@ export const thesisApi = {
 /** Administrative curated-knowledge boundary. All writes use the shared axios client. */
 export const assistantKnowledgeApi = {
   list: async (params?: {
-    domain?: 'THESIS' | 'ACADEMIC';
+    domain?: AssistantKnowledgeDomain;
     state?: AssistantKnowledgeState;
   }): Promise<AssistantKnowledgeDocument[]> => {
     const response = await api.get<AssistantKnowledgeDocument[]>(
-      '/admin/thesis/assistant/knowledge',
+      '/admin/assistant/knowledge',
       { params },
     );
     return response.data;
@@ -516,7 +529,7 @@ export const assistantKnowledgeApi = {
     request: AssistantKnowledgeRequest,
   ): Promise<AssistantKnowledgeRevision> => {
     const response = await api.post<AssistantKnowledgeRevision>(
-      '/admin/thesis/assistant/knowledge',
+      '/admin/assistant/knowledge',
       request,
     );
     return response.data;
@@ -527,7 +540,7 @@ export const assistantKnowledgeApi = {
     request: AssistantKnowledgeRequest,
   ): Promise<AssistantKnowledgeRevision> => {
     const response = await api.put<AssistantKnowledgeRevision>(
-      `/admin/thesis/assistant/knowledge/${encodeURIComponent(documentId)}`,
+      `/admin/assistant/knowledge/${encodeURIComponent(documentId)}`,
       request,
     );
     return response.data;
@@ -535,21 +548,21 @@ export const assistantKnowledgeApi = {
 
   submit: async (documentId: string): Promise<AssistantKnowledgeRevision> => {
     const response = await api.post<AssistantKnowledgeRevision>(
-      `/admin/thesis/assistant/knowledge/${encodeURIComponent(documentId)}/submit`,
+      `/admin/assistant/knowledge/${encodeURIComponent(documentId)}/submit`,
     );
     return response.data;
   },
 
   publish: async (documentId: string): Promise<AssistantKnowledgeRevision> => {
     const response = await api.post<AssistantKnowledgeRevision>(
-      `/admin/thesis/assistant/knowledge/${encodeURIComponent(documentId)}/publish`,
+      `/admin/assistant/knowledge/${encodeURIComponent(documentId)}/publish`,
     );
     return response.data;
   },
 
   archive: async (documentId: string): Promise<void> => {
     await api.delete(
-      `/admin/thesis/assistant/knowledge/${encodeURIComponent(documentId)}`,
+      `/admin/assistant/knowledge/${encodeURIComponent(documentId)}`,
     );
   },
 

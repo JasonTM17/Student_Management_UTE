@@ -158,14 +158,6 @@ export default function AdminDashboardPage() {
         <LoadingState label={messages.admin.loading} />
       ) : (
         <div className="space-y-6">
-          <section className="rounded-lg border-l-4 border-[var(--portal-yellow)] bg-primary p-5 text-primary-foreground">
-            <h2 className="text-xl font-semibold leading-7">
-              {messages.admin.title}
-            </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-primary-foreground/85">
-              {messages.admin.description}
-            </p>
-          </section>
           <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
             {statCards.map((stat) => (
               <AdminMetricCard
