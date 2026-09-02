@@ -53,10 +53,14 @@ test('the retained portal surfaces are present', () => {
 test('the web client has one Java API boundary and no removed domain client', () => {
   const apiSource = read('src/lib/api.ts');
   const nextConfig = read('next.config.mjs');
+  const apiProxy = read('src/app/api/v1/[...path]/route.ts');
+  const docsProxy = read('src/app/api/docs/[[...path]]/route.ts');
   assert.doesNotMatch(apiSource, /analyticsApi|financeApi|waitlistApi|socket\.io/);
   assert.doesNotMatch(apiSource, /forgot-password|reset-password|verify-email|resend-verification/);
   assert.doesNotMatch(nextConfig, /LOCAL_EDGE_ORIGIN|socket\.io|redis|rabbitmq/i);
-  assert.match(nextConfig, /JAVA_API_ORIGIN/);
+  assert.doesNotMatch(nextConfig, /rewrites|JAVA_API_ORIGIN/);
+  assert.match(apiProxy, /process\.env\.JAVA_API_ORIGIN/);
+  assert.match(docsProxy, /process\.env\.JAVA_API_ORIGIN/);
 });
 
 test('the Java API proxy preserves query parameters and encodes path segments', () => {

@@ -1074,7 +1074,7 @@ export default function DashboardLayout({
           aria-label={messages.dashboardShell.controls.mobileNavigation}
           className="fixed inset-x-0 bottom-0 z-40 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden"
         >
-          <div className="mx-auto grid max-w-md grid-cols-5 gap-1 py-2">
+          <div className="mx-auto grid max-w-md grid-cols-6 gap-1 py-2">
             {mobileNavItems.map((item) => {
               if (item.kind === 'menu') {
                 return (
@@ -1132,6 +1132,11 @@ export default function DashboardLayout({
                 </LocalizedLink>
               );
             })}
+            <span
+              data-mobile-assistant-slot="true"
+              aria-hidden="true"
+              className="min-h-11 rounded-md"
+            />
           </div>
         </nav>
       ) : null}

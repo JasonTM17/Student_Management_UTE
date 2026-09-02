@@ -134,7 +134,7 @@ test('authenticated admin can inspect reviewed guidance and public coverage', as
 
 test('assistant launcher and panel stay clear of mobile navigation and viewport edges', async ({ page }) => {
   await page.route('**/api/v1/semesters**', (route) =>
-    route.fulfill(jsonResponse({ data: [{ id: 'semester-1', name: '2026 Spring', status: 'ACTIVE' }] })),
+    route.fulfill(jsonResponse({ data: [{ id: 'semester-1', name: 'Semester 1 2026-2027', status: 'ACTIVE' }] })),
   );
   await page.route('**/api/v1/enrollments/my**', (route) => route.fulfill(jsonResponse([])));
   await page.route('**/api/v1/assistant/conversations**', (route) =>
@@ -147,11 +147,31 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
 
   for (const viewport of [
     { width: 390, height: 844 },
+    { width: 600, height: 844 },
     { width: 768, height: 900 },
     { width: 1440, height: 900 },
   ]) {
     await page.setViewportSize(viewport);
     await page.goto('/dashboard');
+    if (viewport.width < 768) {
+      const metrics = page.locator('[data-dashboard-metrics="student-overview"]');
+      await expect(metrics).toBeVisible();
+      const columnCount = await metrics.evaluate((element) =>
+        getComputedStyle(element).gridTemplateColumns.trim().split(/\s+/).length,
+      );
+      expect(columnCount).toBe(1);
+
+      const semesterValue = page.getByText('Semester 1 2026-2027', { exact: true });
+      await expect(semesterValue).toBeVisible();
+      const semesterHeight = await semesterValue.evaluate((element) => {
+        const style = getComputedStyle(element);
+        return {
+          height: element.getBoundingClientRect().height,
+          lineHeight: Number.parseFloat(style.lineHeight),
+        };
+      });
+      expect(semesterHeight.height).toBeLessThanOrEqual(semesterHeight.lineHeight * 1.25);
+    }
     const launcher = page.getByRole('button', { name: 'Open CampusCore assistant' });
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
@@ -166,7 +186,14 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       await expect(mobileNav).toBeVisible();
       const navBox = await mobileNav.boundingBox();
       expect(navBox).not.toBeNull();
-      expect(launcherBox!.y + launcherBox!.height).toBeLessThanOrEqual(navBox!.y);
+      const assistantSlot = page.locator('[data-mobile-assistant-slot="true"]');
+      await expect(assistantSlot).toBeVisible();
+      const slotBox = await assistantSlot.boundingBox();
+      expect(slotBox).not.toBeNull();
+      expect(launcherBox!.x).toBeGreaterThanOrEqual(slotBox!.x);
+      expect(launcherBox!.x + launcherBox!.width).toBeLessThanOrEqual(slotBox!.x + slotBox!.width);
+      expect(launcherBox!.y).toBeGreaterThanOrEqual(navBox!.y);
+      expect(launcherBox!.y + launcherBox!.height).toBeLessThanOrEqual(navBox!.y + navBox!.height);
     } else {
       await expect(mobileNav).toBeHidden();
     }

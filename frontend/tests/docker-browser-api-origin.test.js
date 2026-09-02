@@ -108,6 +108,11 @@ test('docker web bake cannot interpolate host NEXT_PUBLIC_API_URL=http://127.0.0
     const compose = readRepo('docker-compose.yml');
     const dockerfile = readRepo('frontend/Dockerfile');
     const apiClient = fs.readFileSync(path.join(root, 'src/lib/api.ts'), 'utf8');
+    const nextConfig = fs.readFileSync(path.join(root, 'next.config.mjs'), 'utf8');
+    const runtimeProxy = fs.readFileSync(
+      path.join(root, 'src/app/api/v1/[...path]/route.ts'),
+      'utf8',
+    );
     const web = extractComposeService(compose, 'web');
 
     assert.match(web, /NEXT_PUBLIC_API_URL:\s*\/api\/v1/);
@@ -117,6 +122,9 @@ test('docker web bake cannot interpolate host NEXT_PUBLIC_API_URL=http://127.0.0
     assert.match(dockerfile, /ENV NEXT_PUBLIC_API_URL=\/api\/v1/);
     assert.doesNotMatch(dockerfile, /127\.0\.0\.1:4010/);
     assert.match(apiClient, /resolvePublicApiBaseUrl\(process\.env\.NEXT_PUBLIC_API_URL\)/);
+    assert.doesNotMatch(nextConfig, /rewrites|JAVA_API_ORIGIN/);
+    assert.match(runtimeProxy, /process\.env\.JAVA_API_ORIGIN/);
+    assert.match(runtimeProxy, /export const dynamic = 'force-dynamic'/);
     assert.equal(process.env.NEXT_PUBLIC_API_URL, LIVE_FAIL_ORIGIN);
   } finally {
     if (previous === undefined) {

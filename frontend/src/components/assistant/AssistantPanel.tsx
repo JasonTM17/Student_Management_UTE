@@ -707,7 +707,14 @@ export function AssistantPanel() {
             : messages.assistant.unavailable;
   return (
     <>
-    <div className="fixed bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 z-50 w-[min(26rem,calc(100vw-2rem))] md:bottom-6 md:right-6">
+    <div
+      className={cn(
+        'fixed z-50',
+        open
+          ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(26rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
+          : 'bottom-[calc(0.5rem+env(safe-area-inset-bottom))] right-[max(0.5rem,calc((100vw-28rem)/2+0.5rem))] w-14 md:bottom-6 md:right-6 md:w-[min(26rem,calc(100vw-2rem))]',
+      )}
+    >
       {!open ? (
         <Button
           ref={launcherRef}

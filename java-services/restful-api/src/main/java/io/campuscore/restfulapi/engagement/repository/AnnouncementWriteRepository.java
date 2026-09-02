@@ -10,13 +10,10 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Calendar;
-import java.util.TimeZone;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Optional;
@@ -266,12 +263,12 @@ public class AnnouncementWriteRepository {
     private static void timestamp(PreparedStatement statement, int index, Instant value)
             throws SQLException {
         if (value == null) {
-            statement.setNull(index, Types.TIMESTAMP);
+            statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
         } else {
             statement.setObject(
                     index,
-                    LocalDateTime.ofInstant(value, ZoneOffset.UTC),
-                    Types.TIMESTAMP);
+                    OffsetDateTime.ofInstant(value, ZoneOffset.UTC),
+                    Types.TIMESTAMP_WITH_TIMEZONE);
         }
     }
 
@@ -353,9 +350,7 @@ public class AnnouncementWriteRepository {
     }
 
     private static Instant instant(ResultSet resultSet, String column) throws SQLException {
-        Timestamp value = resultSet.getTimestamp(
-                column,
-                Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+        OffsetDateTime value = resultSet.getObject(column, OffsetDateTime.class);
         return value == null ? null : value.toInstant();
     }
 
