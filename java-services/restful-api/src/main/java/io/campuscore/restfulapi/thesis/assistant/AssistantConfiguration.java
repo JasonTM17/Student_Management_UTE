@@ -6,6 +6,7 @@ import org.springframework.scheduling.annotation.EnableScheduling;
 
 @Configuration
 @EnableScheduling
-@EnableConfigurationProperties({DeepSeekProperties.class, AssistantProperties.class, AssistantRagProperties.class})
+@EnableConfigurationProperties({DeepSeekProperties.class, AssistantProperties.class, AssistantRagProperties.class,
+        SupabaseKnowledgeProperties.class})
 public class AssistantConfiguration {
 }

@@ -77,6 +77,7 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/contract",
                                 "/api/v1/health/**",
+                                "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
                                 "/error",
                                 "/actuator/health/**",

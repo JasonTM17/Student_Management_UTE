@@ -34,7 +34,7 @@ import org.slf4j.LoggerFactory;
 /** Owner-scoped JSON/SSE assistant contract for web and mobile clients. */
 @RestController
 @Profile("persistence")
-@RequestMapping("/api/v1/thesis/assistant")
+@RequestMapping({"/api/v1/assistant", "/api/v1/thesis/assistant"})
 public class ThesisAssistantController {
     private static final Logger LOG = LoggerFactory.getLogger(ThesisAssistantController.class);
     private final ThesisAssistantService assistant;

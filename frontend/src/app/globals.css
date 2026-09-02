@@ -5,6 +5,7 @@
 @layer base {
   :root {
     --font-sans: "Be Vietnam Pro", system-ui, "Segoe UI", Roboto, "Helvetica Neue", Arial, sans-serif;
+    --font-display: "Noto Serif", Georgia, "Times New Roman", serif;
     /* Stitch #F9F9FF canvas and #003F87 primary. --portal-yellow stays HCMUTE chrome. */
     --background: 240 100% 98.8%;
     --foreground: 217 34% 16%;
@@ -32,7 +33,8 @@
     --ink-soft: 217 14% 38%;
     --accent-warm: 43 94% 48%;
     --accent-cool: 213 72% 38%;
-    --success: 152 57% 38%;
+    /* Dark enough for WCAG AA text on the white card/canvas surfaces. */
+    --success: 152 62% 28%;
     --status-success: var(--success);
     --status-success-foreground: var(--success);
     --status-warning: var(--accent-warm);
@@ -59,6 +61,9 @@
     --portal-sidebar-width: 16.5rem;
     --portal-sidebar-collapsed: 4.5rem;
     --portal-header-height: 3.75rem;
+    --content-max: 80rem;
+    --space-section: clamp(3.5rem, 7vw, 7rem);
+    --focus-width: 0.1875rem;
   }
 
   html[data-accent='campus-gold'] {
@@ -178,6 +183,16 @@
     text-wrap: balance;
     scroll-margin-top: calc(var(--portal-header-height) + 1rem);
   }
+
+  .marketing-shell h1,
+  .marketing-shell h2 {
+    font-family: var(--font-display);
+    letter-spacing: -0.025em;
+  }
+
+  .marketing-shell h1 {
+    font-weight: 700;
+  }
   p {
     text-wrap: pretty;
   }
@@ -228,6 +243,37 @@
     @apply focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background;
   }
 
+  .editorial-rule {
+    height: 1px;
+    background: linear-gradient(90deg, hsl(var(--border)), transparent);
+  }
+
+  .editorial-card {
+    border: 1px solid hsl(var(--border) / 0.85);
+    background: hsl(var(--card));
+    box-shadow: 0 20px 50px -36px hsl(var(--primary) / 0.45);
+    transition: transform 180ms var(--portal-ease), box-shadow 180ms var(--portal-ease), border-color 180ms var(--portal-ease);
+  }
+
+  .editorial-card:hover {
+    border-color: hsl(var(--primary) / 0.4);
+    box-shadow: 0 24px 56px -34px hsl(var(--primary) / 0.52);
+    transform: translateY(-2px);
+  }
+
+  .portal-shell :where(button, a, input, select, textarea):focus-visible,
+  .marketing-shell :where(button, a, input, select, textarea):focus-visible {
+    outline: var(--focus-width) solid hsl(var(--ring));
+    outline-offset: 0.1875rem;
+  }
+
+  @media (max-width: 639px) {
+    .portal-shell .portal-page-ribbon,
+    .portal-shell .portal-page-actions {
+      border-left-width: 0.1875rem;
+    }
+  }
+
   .registration-workspace {
     --registration-navy: #002147;
     --registration-gold: #c5b358;
@@ -255,6 +301,10 @@
 
   .portal-sidebar .portal-menu-label {
     color: var(--portal-sidebar-muted);
+  }
+
+  .portal-menu-label.portal-menu-label-accent {
+    color: var(--portal-yellow);
   }
 
   .portal-page-ribbon {

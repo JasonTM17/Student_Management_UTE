@@ -72,7 +72,7 @@ export function LanguageToggle({
                   ? 'bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]'
                   : 'bg-primary text-primary-foreground'
                 : inverse
-                  ? 'text-[var(--portal-sidebar-muted)] hover:text-[var(--portal-sidebar-text)]'
+                  ? 'text-[var(--portal-sidebar-text)] hover:text-white'
                   : 'text-muted-foreground hover:text-foreground',
             )}
             aria-pressed={isActive}

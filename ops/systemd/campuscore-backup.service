@@ -1,0 +1,15 @@
+[Unit]
+Description=CampusCore PostgreSQL backup
+After=docker.service
+Requires=docker.service
+
+[Service]
+Type=oneshot
+WorkingDirectory=/opt/campuscore
+ExecStart=/opt/campuscore/ops/backup/backup-postgres.sh
+User=campuscore
+Group=campuscore
+NoNewPrivileges=true
+PrivateTmp=true
+ProtectSystem=strict
+ReadWritePaths=/opt/campuscore/ops/backups

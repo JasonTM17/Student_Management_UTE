@@ -520,9 +520,12 @@ export const apiRoutes = {
     rounds: '/thesis/rounds',
     topics: '/thesis/topics',
     groups: '/thesis/groups',
-    assistantChat: '/thesis/assistant/chat',
-    assistantConversations: '/thesis/assistant/conversations',
-    assistantCancel: '/thesis/assistant/requests',
+  },
+  assistant: {
+    chat: '/assistant/chat',
+    conversations: '/assistant/conversations',
+    requests: '/assistant/requests',
+    messages: '/assistant/messages',
   },
   sections: '/sections',
   enrollments: '/enrollments/my',
@@ -610,7 +613,7 @@ export const campusApi = {
     init?: RequestInit,
   ) =>
     apiClient.post<AssistantReply>(
-      apiRoutes.thesis.assistantChat,
+      apiRoutes.assistant.chat,
       {
         message,
         locale,
@@ -623,7 +626,7 @@ export const campusApi = {
     const query = new URLSearchParams({ limit: String(limit) });
     if (cursor) query.set('cursor', cursor);
     const response = await apiClient.requestWithMeta<AssistantConversation[] | AssistantConversationListResponse>(
-      `${apiRoutes.thesis.assistantConversations}?${query.toString()}`,
+      `${apiRoutes.assistant.conversations}?${query.toString()}`,
       { method: 'GET' },
     );
     const payload = Array.isArray(response.data) ? response.data : response.data.data;
@@ -634,7 +637,7 @@ export const campusApi = {
     const query = new URLSearchParams({ limit: String(limit) });
     if (cursor) query.set('cursor', cursor);
     const response = await apiClient.requestWithMeta<AssistantHistoryMessage[] | AssistantMessageListResponse>(
-      `${apiRoutes.thesis.assistantConversations}/${encodeURIComponent(conversationId)}/messages?${query.toString()}`,
+      `${apiRoutes.assistant.conversations}/${encodeURIComponent(conversationId)}/messages?${query.toString()}`,
       { method: 'GET' },
     );
     const payload = Array.isArray(response.data) ? response.data : response.data.data;
@@ -643,12 +646,12 @@ export const campusApi = {
   assistantConversationMessages: async (conversationId: string) => campusApi.assistantConversationMessagesPage(conversationId),
   deleteAssistantConversation: (conversationId: string) =>
     apiClient.delete<void>(
-      `${apiRoutes.thesis.assistantConversations}/${encodeURIComponent(conversationId)}`,
+      `${apiRoutes.assistant.conversations}/${encodeURIComponent(conversationId)}`,
     ),
   cancelAssistantRequest: (clientRequestId: string) =>
-    apiClient.post<void>(`${apiRoutes.thesis.assistantCancel}/${encodeURIComponent(clientRequestId)}/cancel`, {}),
+    apiClient.post<void>(`${apiRoutes.assistant.requests}/${encodeURIComponent(clientRequestId)}/cancel`, {}),
   putAssistantFeedback: (messageId: string, rating: AssistantFeedbackRating, reason?: AssistantFeedbackReason) =>
-    apiClient.put<void>(`/thesis/assistant/messages/${encodeURIComponent(messageId)}/feedback`, { rating, ...(reason ? { reason } : {}) }),
+    apiClient.put<void>(`${apiRoutes.assistant.messages}/${encodeURIComponent(messageId)}/feedback`, { rating, ...(reason ? { reason } : {}) }),
   deleteAssistantFeedback: (messageId: string) =>
-    apiClient.delete<void>(`/thesis/assistant/messages/${encodeURIComponent(messageId)}/feedback`),
+    apiClient.delete<void>(`${apiRoutes.assistant.messages}/${encodeURIComponent(messageId)}/feedback`),
 };
