@@ -1,5 +1,25 @@
 # CampusCore
 
+> A bilingual academic workspace for identity, coursework, notices, and thesis
+> workflows — one Java API, one contract, and one shared PostgreSQL source.
+
+![CampusCore product tour](docs/assets/campuscore-product-tour.gif)
+
+## Screenshots and system map
+
+The homepage previews below are the project-owned web assets and show the
+English/Vietnamese visual direction without implying a production deployment.
+
+| English homepage | Vietnamese homepage |
+| --- | --- |
+| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-latest.png) | ![CampusCore Vietnamese homepage](docs/assets/screenshots/campuscore-home-vi-latest.png) |
+
+![CampusCore system architecture](docs/assets/campuscore-system-architecture.png)
+
+Open the [vector system diagram](docs/assets/campuscore-system-architecture.svg)
+for a zoomable version. The complete runtime boundaries and non-goals live in
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 CampusCore is a medium-sized course project built as one Java Spring Boot
 RESTful API, one Next.js web app, one Expo mobile app, and one PostgreSQL
 database.
