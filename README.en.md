@@ -3,7 +3,7 @@
 > A bilingual academic workspace for identity, coursework, notices, and thesis
 > workflows — one Java API, one contract, and one shared PostgreSQL source.
 
-![CampusCore product tour](docs/assets/campuscore-product-tour.gif)
+![Live CampusCore homepage](docs/assets/screenshots/campuscore-home-en-live.png)
 
 ## Screenshots and system map
 
@@ -13,7 +13,11 @@ production deployment.
 
 | English homepage | Vietnamese homepage |
 | --- | --- |
-| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-latest.png) | ![CampusCore Vietnamese homepage](docs/assets/screenshots/campuscore-home-vi-latest.png) |
+| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-live.png) | ![CampusCore Vietnamese homepage](docs/assets/screenshots/campuscore-home-vi-live.png) |
+
+### Live language tour
+
+![CampusCore live language tour](docs/assets/campuscore-language-tour-live.gif)
 
 ![CampusCore system architecture](docs/assets/campuscore-system-architecture.png)
 
