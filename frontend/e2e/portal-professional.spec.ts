@@ -244,7 +244,8 @@ test.describe('admin workspace', () => {
   test('admin lands on the tokenized overview and can open users', async ({ page }) => {
     await signIn(page, admin, 'admin');
     await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
-    await expect(page.getByRole('heading', { name: /admin dashboard/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: 'Admin dashboard', exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /campus overview at a glance/i, exact: true })).toBeVisible();
     await page.goto('/admin/users');
     await expect(page.getByRole('heading', { name: 'User management', exact: true })).toBeVisible({
       timeout: 15_000,

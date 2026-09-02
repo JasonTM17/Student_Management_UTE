@@ -600,6 +600,7 @@ export const en = {
   },
   admin: {
     title: 'Admin dashboard',
+    overviewTitle: 'Campus overview at a glance',
     description:
       'Manage campus identities, academic records, announcements, and core thesis workflows from one consistent portal.',
     managementConsoleTitle: 'Admin tools',
@@ -1786,6 +1787,7 @@ export const vi: I18nMessages = {
   },
   admin: {
     title: 'Tổng quan quản trị',
+    overviewTitle: 'Tổng quan campus',
     description:
       'Quản lý tài khoản, hồ sơ học vụ, thông báo và luồng luận văn cốt lõi trong một cổng thống nhất.',
     managementConsoleTitle: 'Công cụ quản trị',
