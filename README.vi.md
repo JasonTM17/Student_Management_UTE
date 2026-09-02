@@ -3,7 +3,7 @@
 > Không gian học vụ song ngữ cho định danh, học phần, thông báo và thesis — một
 > Java API, một contract và một PostgreSQL dùng chung.
 
-![CampusCore product tour](docs/assets/campuscore-product-tour.gif)
+![Ảnh chụp thật trang chủ CampusCore đang chạy](docs/assets/screenshots/campuscore-home-en-live.png)
 
 ## Ảnh giao diện và sơ đồ hệ thống
 
@@ -13,7 +13,11 @@ deployment.
 
 | English homepage | Trang chủ tiếng Việt |
 | --- | --- |
-| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-latest.png) | ![Trang chủ CampusCore tiếng Việt](docs/assets/screenshots/campuscore-home-vi-latest.png) |
+| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-live.png) | ![Trang chủ CampusCore tiếng Việt](docs/assets/screenshots/campuscore-home-vi-live.png) |
+
+### GIF chuyển đổi ngôn ngữ
+
+![CampusCore live language tour](docs/assets/campuscore-language-tour-live.gif)
 
 ![Sơ đồ kiến trúc CampusCore](docs/assets/campuscore-system-architecture.png)
 
