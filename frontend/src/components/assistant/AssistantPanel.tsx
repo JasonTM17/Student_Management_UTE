@@ -691,6 +691,10 @@ export function AssistantPanel() {
             : message.reasonCode === 'CANCELLED'
               ? messages.assistant.cancelled
               : messages.assistant.answered;
+  const citationDomainLabel = (citation: AssistantCitation) => {
+    const domain = citation.domain?.toUpperCase() as keyof typeof messages.assistant.domains | undefined;
+    return (domain && messages.assistant.domains[domain]) || messages.assistant.domains.GENERAL_FAQ;
+  };
   const errorLabel =
     state.error === 'quota'
       ? messages.assistant.quotaExceeded
@@ -709,7 +713,7 @@ export function AssistantPanel() {
           ref={launcherRef}
           type="button"
           size="icon"
-          data-assistant-launcher="thesis-mark"
+          data-assistant-launcher="campus-mark"
           className="group ml-auto min-h-14 min-w-14 rounded-xl border border-primary-foreground/20 bg-primary text-primary-foreground shadow-xl transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
           onClick={() => setOpen(true)}
           aria-label={messages.assistant.open}
@@ -917,8 +921,9 @@ export function AssistantPanel() {
                             {citation.title}
                           </p>
                           <p className="text-muted-foreground">
-                            {citation.source} · {citation.locale.toUpperCase()}
+                            {citationDomainLabel(citation)} · {citation.locale.toUpperCase()}
                           </p>
+                          <span className="sr-only">{citation.source}</span>
                           <p className="mt-1 text-muted-foreground">
                             {citation.excerpt}
                           </p>

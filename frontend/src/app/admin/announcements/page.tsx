@@ -439,7 +439,10 @@ export default function AdminAnnouncementsPage() {
     setReferenceError('');
     void Promise.allSettled([
       semestersApi.getAll(),
-      sectionsApi.getAll({ page: 1, limit: 200 }),
+      // The section read contract caps a page at 100 rows. Keep the
+      // reference lookup inside that contract so the editor remains usable
+      // on the admin announcements route instead of surfacing a 400.
+      sectionsApi.getAll({ page: 1, limit: 100 }),
       lecturersApi.getAll({ page: 1, limit: 100 }),
     ]).then(([semesterResult, sectionResult, lecturerResult]) => {
       if (cancelled) return;

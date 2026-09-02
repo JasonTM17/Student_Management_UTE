@@ -12,7 +12,7 @@ authorize production deployment.
   component and is addressed only through its token-protected
   `/internal/rag/**` contract. The current release workflow publishes the
   four course images to both Docker Hub (`nguyenson1710/campuscore-*`) and
-  GHCR (`ghcr.io/jasontm17/student-management-ute-*`) from the same commit.
+  GHCR (`ghcr.io/jasontm17/campuscore-*`) from the same commit.
 
 ## API and database
 
@@ -41,7 +41,7 @@ The published GHCR images mirror the local stack and can be smoked without a
 rebuild. Pin `CAMPUSCORE_IMAGE_TAG` to the reviewed full commit SHA for a
 reproducible smoke. The published-artifact overlay rejects an unset tag so a
 moving registry alias cannot be selected accidentally. This
-includes `student-management-ute-database`, a thin
+includes `campuscore-database`, a thin
 `postgres:15-alpine` wrapper with no migrations or credentials. Flyway in the
 REST API remains the only schema/seed owner; upgrading PostgreSQL requires a
 fresh database and the same Flyway/health checks above:
@@ -63,7 +63,7 @@ before announcing a release:
 
 ```powershell
 docker manifest inspect docker.io/nguyenson1710/campuscore-frontend:<full-commit-sha>
-docker manifest inspect ghcr.io/jasontm17/student-management-ute-frontend:<full-commit-sha>
+docker manifest inspect ghcr.io/jasontm17/campuscore-frontend:<full-commit-sha>
 ```
 
 ## Clients

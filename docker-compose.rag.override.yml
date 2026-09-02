@@ -7,13 +7,13 @@
 
 services:
   postgres:
-    image: ghcr.io/jasontm17/student-management-ute-database:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ghcr.io/jasontm17/campuscore-database:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
 
   rag-service:
-    image: ghcr.io/jasontm17/student-management-ute-rag-service:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ghcr.io/jasontm17/campuscore-rag-service:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
 
   restful-api:
-    image: ghcr.io/jasontm17/student-management-ute-restful-api:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ghcr.io/jasontm17/campuscore-restful-api:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
 
   web:
-    image: ghcr.io/jasontm17/student-management-ute-frontend:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ghcr.io/jasontm17/campuscore-frontend:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}

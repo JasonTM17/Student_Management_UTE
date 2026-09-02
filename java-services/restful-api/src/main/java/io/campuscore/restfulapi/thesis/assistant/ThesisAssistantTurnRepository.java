@@ -227,7 +227,7 @@ public class ThesisAssistantTurnRepository {
                         .addValue("content", answer).addValue("model", model).addValue("degraded", degraded).addValue("reason", reasonCode));
         int ordinal = 0;
         for (Citation citation : citations == null ? List.<Citation>of() : citations) {
-            jdbc.update("INSERT INTO assistant.chat_citation(id,message_id,document_id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,catalog_updated_at,ordinal) VALUES (:id,:message,:document,:slug,:title,:source,:locale,:excerpt,:domain,:kind,:sourceId,:revision,:version,:hash,:entityType,:entityId,:updated,:ordinal)",
+            jdbc.update("INSERT INTO assistant.chat_citation(id,message_id,document_id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,catalog_updated_at,corpus_version,corpus_hash,release_id,ordinal) VALUES (:id,:message,:document,:slug,:title,:source,:locale,:excerpt,:domain,:kind,:sourceId,:revision,:version,:hash,:entityType,:entityId,:updated,:corpusVersion,:corpusHash,:releaseId,:ordinal)",
                     citationParams(citation, assistantMessage).addValue("ordinal", ordinal++));
         }
         String title = title(prompt);
@@ -581,8 +581,8 @@ public class ThesisAssistantTurnRepository {
     }
 
     private List<Citation> citations(UUID messageId) {
-        return jdbc.query("SELECT CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at FROM assistant.chat_citation WHERE message_id=:message ORDER BY ordinal,id",
-                p().addValue("message", messageId), (rs, ignored) -> new Citation(rs.getString("id"), rs.getString("slug"), rs.getString("title"), rs.getString("source"), rs.getString("locale"), rs.getString("excerpt"), rs.getString("domain"), rs.getString("source_kind"), rs.getString("source_id"), uuid(rs.getString("revision_id")), integer(rs, "revision_version"), rs.getString("snapshot_hash"), rs.getString("catalog_entity_type"), rs.getString("catalog_entity_id"), rs.getString("updated_at")));
+        return jdbc.query("SELECT CAST(document_id AS VARCHAR) id,slug,title,source,locale,excerpt,domain,source_kind,source_id,revision_id,revision_version,snapshot_hash,catalog_entity_type,catalog_entity_id,CAST(catalog_updated_at AS VARCHAR) updated_at,corpus_version,corpus_hash,release_id FROM assistant.chat_citation WHERE message_id=:message ORDER BY ordinal,id",
+                p().addValue("message", messageId), (rs, ignored) -> new Citation(rs.getString("id"), rs.getString("slug"), rs.getString("title"), rs.getString("source"), rs.getString("locale"), rs.getString("excerpt"), rs.getString("domain"), rs.getString("source_kind"), rs.getString("source_id"), uuid(rs.getString("revision_id")), integer(rs, "revision_version"), rs.getString("snapshot_hash"), rs.getString("catalog_entity_type"), rs.getString("catalog_entity_id"), rs.getString("updated_at"), rs.getString("corpus_version"), rs.getString("corpus_hash"), uuid(rs.getString("release_id"))));
     }
 
     private MapSqlParameterSource citationParams(Citation citation, UUID messageId) {
@@ -594,7 +594,8 @@ public class ThesisAssistantTurnRepository {
                 .addValue("sourceId", safe(citation.sourceId())).addValue("revision", citation.revisionId())
                 .addValue("version", citation.revisionVersion()).addValue("hash", safe(citation.snapshotHash()))
                 .addValue("entityType", safe(citation.entityType())).addValue("entityId", safe(citation.entityId()))
-                .addValue("updated", citation.updatedAt());
+                .addValue("updated", citation.updatedAt()).addValue("corpusVersion", citation.corpusVersion())
+                .addValue("corpusHash", citation.corpusHash()).addValue("releaseId", citation.releaseId());
     }
 
     private void ensureBucket(LocalDate date, String owner, String scope) {

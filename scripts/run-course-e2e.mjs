@@ -39,6 +39,10 @@ async function main() {
     if (filter) {
       args.push('-g', filter);
     }
+    const project = resolvePlaywrightProject();
+    if (project) {
+      args.push('--project', project);
+    }
 
     await run(process.execPath, [playwrightCli, ...args], {
       cwd: frontendDir,
@@ -57,6 +61,16 @@ async function main() {
       await compose(['down', '-v', '--remove-orphans'], { allowFailure: true });
     }
   }
+}
+
+function resolvePlaywrightProject() {
+  const supplied = process.env.E2E_PLAYWRIGHT_PROJECT?.trim();
+  if (!supplied) return null;
+  const allowed = new Set(['chromium', 'tablet-768', 'desktop-1024', 'desktop-1440', 'mobile-390']);
+  if (!allowed.has(supplied)) {
+    throw new Error(`E2E_PLAYWRIGHT_PROJECT must be one of: ${[...allowed].join(', ')}`);
+  }
+  return supplied;
 }
 
 function resolveProjectName() {

@@ -42,7 +42,7 @@ export function AuthShell({
   return (
     <div
       className={cn(
-        'min-h-screen bg-background',
+        'marketing-shell min-h-screen bg-background',
         isAdmin && 'bg-[var(--portal-canvas)]',
       )}
       data-login-portal={portal}
@@ -78,7 +78,7 @@ export function AuthShell({
                 subtitleClassName="text-[var(--portal-sidebar-muted)]"
               />
               <div className="space-y-4 border-l-4 border-[var(--portal-yellow)] pl-6">
-                <SectionEyebrow className="text-[var(--portal-yellow)]">{eyebrow}</SectionEyebrow>
+                <SectionEyebrow className="portal-menu-label-accent">{eyebrow}</SectionEyebrow>
                 <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-[2.75rem]">
                   {title}
                 </h1>

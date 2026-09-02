@@ -15,6 +15,7 @@ java-services/**/target/
 .env.development.local
 .env.test.local
 .env.production.local
+.env.production
 
 # Logs
 logs
@@ -48,6 +49,12 @@ coverage/
 
 # Production
 *.tgz
+
+# Production secret files are provisioned on the target host only.
+ops/secrets/*
+!ops/secrets/README.md
+ops/backups/*
+!ops/backup/README.md
 
 # Frontend
 frontend/node_modules/

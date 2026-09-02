@@ -24,6 +24,9 @@ test('registration E2E fixture refuses developer projects and fails closed on mi
   assert.doesNotMatch(fixture.registrationWindowSql, /SET\s+"status"|DELETE|TRUNCATE|\b20\d\d-/);
   const runner = fs.readFileSync(path.join(root, '../scripts/run-course-e2e.mjs'), 'utf8');
   assert.match(runner, /await seedCourseE2e\(projectName, compose\)/);
+  assert.match(runner, /E2E_PLAYWRIGHT_PROJECT/);
+  assert.match(runner, /\['chromium', 'tablet-768', 'desktop-1024', 'desktop-1440', 'mobile-390'\]/);
+  assert.match(runner, /args\.push\('--project', project\)/);
   assert.ok(runner.indexOf('assertDisposableProject(projectName)') < runner.indexOf('await seedCourseE2e'));
   await assert.rejects(fixture.seedCourseE2e('campuscore-course-e2e-fixture-test', async () => {
     throw new Error('seed missing');
@@ -112,8 +115,8 @@ test('published image tags are full-SHA, revision-bound, and never auto-promote 
   const workflow = fs.readFileSync(path.join(root, '../.github/workflows/publish-ghcr.yml'), 'utf8');
   const overlay = fs.readFileSync(path.join(root, '../docker-compose.rag.override.yml'), 'utf8');
 
-  assert.match(workflow, /type=raw,value=\$\{\{ github\.sha \}\}/);
-  assert.match(workflow, /org\.opencontainers\.image\.revision=\$\{\{ github\.sha \}\}/);
+  assert.match(workflow, /type=raw,value=\$\{\{ needs\.release-gate\.outputs\.sha \}\}/);
+  assert.match(workflow, /org\.opencontainers\.image\.revision=\$\{\{ needs\.release-gate\.outputs\.sha \}\}/);
   assert.match(workflow, /\.Image\.Config\.Labels/);
   assert.match(workflow, /--format '\{\{\.Manifest\.Digest\}\}'/);
   assert.doesNotMatch(workflow, /\|\s*awk/);
@@ -121,4 +124,21 @@ test('published image tags are full-SHA, revision-bound, and never auto-promote 
   assert.match(workflow, /partially published; refusing to create a cross-registry manifest/);
   assert.doesNotMatch(workflow, /promote-latest|imagetools create/);
   assert.match(overlay, /CAMPUSCORE_IMAGE_TAG:\?Set CAMPUSCORE_IMAGE_TAG/);
+});
+
+test('Playwright defaults to the collision-checked CampusCore frontend port', () => {
+  const config = fs.readFileSync(path.join(root, 'playwright.config.ts'), 'utf8');
+  assert.match(config, /E2E_BASE_URL\s*\?\?\s*['"]http:\/\/127\.0\.0\.1:3101['"]/);
+  assert.doesNotMatch(config, /E2E_BASE_URL\s*\?\?\s*['"]http:\/\/127\.0\.0\.1:3000['"]/);
+});
+
+test('admin announcement reference lookup stays within the section API page limit', () => {
+  const page = fs.readFileSync(path.join(root, 'src/app/admin/announcements/page.tsx'), 'utf8');
+  assert.match(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 100\s*\}\)/);
+  assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 200\s*\}\)/);
+});
+
+test('deep persona route matrix has a bounded timeout large enough for cold compilation', () => {
+  const spec = fs.readFileSync(path.join(root, 'e2e/professional-quality.spec.ts'), 'utf8');
+  assert.match(spec, /test\.describe\.configure\(\{\s*timeout:\s*600_000\s*\}\)/);
 });
