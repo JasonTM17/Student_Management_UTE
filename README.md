@@ -7,7 +7,7 @@
 
 ## Ảnh giao diện và sơ đồ hệ thống
 
-Hai ảnh dưới đây là các màn hình homepage được đóng gói cùng web app, dùng để
+Hai ảnh dưới đây là ảnh chụp trực tiếp từ web app CampusCore đang chạy, dùng để
 đọc nhanh hướng thiết kế song ngữ của CampusCore.
 
 | English homepage | Trang chủ tiếng Việt |
