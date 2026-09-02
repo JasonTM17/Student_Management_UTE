@@ -11,6 +11,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import java.time.Instant;
+import java.time.OffsetDateTime;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.CountDownLatch;
@@ -70,8 +71,8 @@ class AnnouncementWritePersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "isGlobal" BOOLEAN NOT NULL,
-                    "publishAt" TIMESTAMP,
-                    "expiresAt" TIMESTAMP,
+                    "publishAt" TIMESTAMP WITH TIME ZONE,
+                    "expiresAt" TIMESTAMP WITH TIME ZONE,
                     "publishedBy" VARCHAR(120),
                     "semesterId" VARCHAR(120),
                     "semesterName" VARCHAR(200),
@@ -81,10 +82,10 @@ class AnnouncementWritePersistenceTest {
                     "courseName" VARCHAR(200),
                     "lecturerId" VARCHAR(120),
                     "lecturerDisplayName" VARCHAR(200),
-                    "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "version" INTEGER NOT NULL DEFAULT 0,
-                    "archivedAt" TIMESTAMP,
+                    "archivedAt" TIMESTAMP WITH TIME ZONE,
                     "archivedBy" VARCHAR(120)
                 )
                 """);
@@ -99,7 +100,7 @@ class AnnouncementWritePersistenceTest {
                     "version" INTEGER NOT NULL,
                     "beforeState" CLOB,
                     "afterState" CLOB,
-                    "createdAt" TIMESTAMP NOT NULL
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL
                 )
                 """);
     }
@@ -313,8 +314,8 @@ class AnnouncementWritePersistenceTest {
                         + " AND CARDINALITY(\"targetYears\") = 1 AND \"createdAt\" = ?"
                         + " AND \"updatedAt\" > ?",
                 Integer.class,
-                localDateTime(BASE_TIME),
-                localDateTime(BASE_TIME));
+                offsetDateTime(BASE_TIME),
+                offsetDateTime(BASE_TIME));
         org.junit.jupiter.api.Assertions.assertEquals(1, updated);
         Integer auditCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"engagement\".\"AnnouncementAudit\""
@@ -522,7 +523,7 @@ class AnnouncementWritePersistenceTest {
                         + " AND \"lecturerId\" IS NULL AND \"lecturerDisplayName\" IS NULL"
                         + " AND \"updatedAt\" > ?",
                 Integer.class,
-                localDateTime(BASE_TIME));
+                offsetDateTime(BASE_TIME));
         org.junit.jupiter.api.Assertions.assertEquals(1, cleared);
     }
 
@@ -734,12 +735,12 @@ class AnnouncementWritePersistenceTest {
                 "Web Programming",
                 "lecturer-1",
                 "Lecturer One",
-                localDateTime(BASE_TIME),
-                localDateTime(BASE_TIME));
+                offsetDateTime(BASE_TIME),
+                offsetDateTime(BASE_TIME));
     }
 
-    private static java.time.LocalDateTime localDateTime(Instant value) {
-        return java.time.LocalDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
+    private static OffsetDateTime offsetDateTime(Instant value) {
+        return OffsetDateTime.ofInstant(value, java.time.ZoneOffset.UTC);
     }
 
     private static void await(CountDownLatch latch) {
