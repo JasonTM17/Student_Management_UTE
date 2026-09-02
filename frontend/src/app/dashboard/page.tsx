@@ -177,7 +177,10 @@ export default function DashboardPage() {
         <LoadingState label={messages.studentDashboard.errors.loading} />
       ) : (
         <>
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+          <div
+            data-dashboard-metrics="student-overview"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
+          >
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.coursesInScope}
               value={formatNumber(enrollments.length)}
@@ -204,7 +207,7 @@ export default function DashboardPage() {
               value={currentSemesterName}
               icon={<Calendar className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[3]}
-              valueClassName="text-xl sm:text-2xl"
+              valueClassName="break-normal text-xl sm:text-2xl"
               toneClassName={metricToneClass('neutral')}
             />
           </div>
