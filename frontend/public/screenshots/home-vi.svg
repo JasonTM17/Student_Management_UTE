@@ -6,16 +6,19 @@
   <rect x="1124" y="120" width="172" height="40" rx="20" fill="#E8EDF5"/>
   <rect x="128" y="224" width="632" height="352" rx="28" fill="#101826"/>
   <text x="176" y="304" fill="#FB923C" font-family="Inter, Arial, sans-serif" font-size="22" letter-spacing="4">NỀN TẢNG CAMPUSCORE</text>
-  <text x="176" y="388" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="54" font-weight="700">Công việc học vụ gọn gàng và đáng tin hơn.</text>
-  <text x="176" y="452" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="26">Định danh, học vụ, thông báo và luận văn trong một workspace rõ ràng.</text>
-  <rect x="176" y="500" width="260" height="52" rx="26" fill="#38BDF8"/>
-  <text x="230" y="534" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Đăng nhập</text>
+  <text x="176" y="370" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">Công việc học vụ gọn</text>
+  <text x="176" y="422" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="42" font-weight="700">gàng và đáng tin hơn.</text>
+  <text x="176" y="466" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="20">Định danh, học vụ, thông báo và luận văn</text>
+  <text x="176" y="494" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="20">trong một workspace rõ ràng.</text>
+  <rect x="176" y="514" width="260" height="52" rx="26" fill="#38BDF8"/>
+  <text x="230" y="548" fill="#0F172A" font-family="Inter, Arial, sans-serif" font-size="22" font-weight="700">Đăng nhập</text>
   <rect x="800" y="224" width="496" height="352" rx="28" fill="#F6F8FB" stroke="#D8E1EC"/>
   <text x="840" y="288" fill="#475569" font-family="Inter, Arial, sans-serif" font-size="20" letter-spacing="3">ẢNH CHỤP RUNTIME</text>
-  <text x="840" y="350" fill="#101826" font-family="Inter, Arial, sans-serif" font-size="36" font-weight="700">Một Java API và PostgreSQL</text>
-  <rect x="840" y="388" width="392" height="18" rx="9" fill="#E2E8F0"/>
-  <rect x="840" y="426" width="432" height="18" rx="9" fill="#E2E8F0"/>
-  <rect x="840" y="464" width="356" height="18" rx="9" fill="#E2E8F0"/>
+  <text x="840" y="340" fill="#101826" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">Một Java API và</text>
+  <text x="840" y="380" fill="#101826" font-family="Inter, Arial, sans-serif" font-size="28" font-weight="700">PostgreSQL</text>
+  <rect x="840" y="414" width="392" height="18" rx="9" fill="#E2E8F0"/>
+  <rect x="840" y="452" width="432" height="18" rx="9" fill="#E2E8F0"/>
+  <rect x="840" y="490" width="356" height="18" rx="9" fill="#E2E8F0"/>
   <rect x="128" y="632" width="1168" height="248" rx="28" fill="#101826"/>
   <text x="176" y="704" fill="#F8FAFC" font-family="Inter, Arial, sans-serif" font-size="34" font-weight="700">Đồ án RESTful API tập trung và dễ chạy</text>
   <text x="176" y="748" fill="#CBD5E1" font-family="Inter, Arial, sans-serif" font-size="24">Một contract, seed ổn định, phân quyền rõ và các luồng học vụ cốt lõi.</text>
