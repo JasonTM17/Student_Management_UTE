@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.web.DomainException;
+import java.sql.Types;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -41,8 +42,11 @@ public class AdminUserMutationService {
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("limit", limit)
                 .addValue("offset", (long) (page - 1) * limit)
-                .addValue("status", status)
-                .addValue("search", search == null ? null : "%" + search.trim().toLowerCase() + "%");
+                .addValue("status", status, Types.VARCHAR)
+                .addValue(
+                        "search",
+                        search == null ? null : "%" + search.trim().toLowerCase() + "%",
+                        Types.VARCHAR);
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
