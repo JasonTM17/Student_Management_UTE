@@ -7,8 +7,9 @@
 
 ## Screenshots and system map
 
-The homepage previews below are the project-owned web assets and show the
-English/Vietnamese visual direction without implying a production deployment.
+The homepage previews below are direct screenshots from the live CampusCore web
+app and show the English/Vietnamese visual direction without implying a
+production deployment.
 
 | English homepage | Vietnamese homepage |
 | --- | --- |

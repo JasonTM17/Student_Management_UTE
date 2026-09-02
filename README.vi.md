@@ -7,8 +7,9 @@
 
 ## Ảnh giao diện và sơ đồ hệ thống
 
-Các ảnh homepage là asset do project sở hữu, giúp xem nhanh hướng thiết kế
-English/VI mà không hàm ý đây là bằng chứng production deployment.
+Các ảnh homepage là ảnh chụp trực tiếp từ web app CampusCore đang chạy, giúp
+xem nhanh hướng thiết kế English/VI mà không hàm ý đây là bằng chứng production
+deployment.
 
 | English homepage | Trang chủ tiếng Việt |
 | --- | --- |
