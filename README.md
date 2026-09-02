@@ -1,5 +1,26 @@
 # CampusCore
 
+> Không gian học vụ song ngữ cho identity, học phần, thông báo và thesis — một
+> Java API, một contract và một PostgreSQL làm nguồn dữ liệu chung.
+
+![CampusCore product tour](docs/assets/campuscore-product-tour.gif)
+
+## Ảnh giao diện và sơ đồ hệ thống
+
+Hai ảnh dưới đây là các màn hình homepage được đóng gói cùng web app, dùng để
+đọc nhanh hướng thiết kế song ngữ của CampusCore.
+
+| English homepage | Trang chủ tiếng Việt |
+| --- | --- |
+| ![CampusCore English homepage](docs/assets/screenshots/campuscore-home-en-latest.png) | ![Trang chủ CampusCore tiếng Việt](docs/assets/screenshots/campuscore-home-vi-latest.png) |
+
+![CampusCore system architecture](docs/assets/campuscore-system-architecture.png)
+
+Sơ đồ vector có thể phóng to tại
+[campuscore-system-architecture.svg](docs/assets/campuscore-system-architecture.svg).
+Các boundary và non-goal đầy đủ nằm trong
+[docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
+
 CampusCore là đồ án quản lý sinh viên dạng RESTful API tầm trung, gồm một
 Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và một PostgreSQL.
 
