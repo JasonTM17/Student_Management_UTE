@@ -1,5 +1,12 @@
 # Architecture
 
+![CampusCore system architecture](assets/campuscore-system-architecture.png)
+
+The [vector source](assets/campuscore-system-architecture.svg) is kept beside
+the rendered PNG so the diagram remains reviewable and zoomable. It describes
+the local/course runtime; the prepared Caddy edge is shown as a bundle boundary,
+not as evidence of production cutover.
+
 ## Runtime
 
 ```text
