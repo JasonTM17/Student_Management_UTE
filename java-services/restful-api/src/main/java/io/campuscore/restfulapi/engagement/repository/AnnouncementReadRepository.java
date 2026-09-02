@@ -8,13 +8,10 @@ import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSumm
 import java.sql.Array;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.sql.Timestamp;
 import java.sql.Types;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
-import java.util.Calendar;
-import java.util.TimeZone;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Objects;
@@ -118,8 +115,8 @@ public class AnnouncementReadRepository {
         MapSqlParameterSource parameters = new MapSqlParameterSource()
                 .addValue(
                         "now",
-                        LocalDateTime.ofInstant(visibility.now(), ZoneOffset.UTC),
-                        Types.TIMESTAMP);
+                        OffsetDateTime.ofInstant(visibility.now(), ZoneOffset.UTC),
+                        Types.TIMESTAMP_WITH_TIMEZONE);
 
         List<String> audience = new ArrayList<>();
         audience.add("\"isGlobal\" = TRUE");
@@ -232,9 +229,7 @@ public class AnnouncementReadRepository {
     }
 
     private static Instant instant(ResultSet resultSet, String column) throws SQLException {
-        Timestamp value = resultSet.getTimestamp(
-                column,
-                Calendar.getInstance(TimeZone.getTimeZone("UTC")));
+        OffsetDateTime value = resultSet.getObject(column, OffsetDateTime.class);
         return value == null ? null : value.toInstant();
     }
 

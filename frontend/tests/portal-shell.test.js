@@ -116,12 +116,13 @@ test('student and lecturer routes share one accessible responsive sidebar', () =
   );
 });
 
-test('student and lecturer mobile nav is an explicit 5-item bar below md', () => {
+test('student and lecturer mobile nav reserves an assistant slot below md', () => {
   const layout = read('src/app/dashboard/layout.tsx');
 
   assert.match(layout, /studentMobileNavItems/);
   assert.match(layout, /lecturerMobileNavItems/);
-  assert.match(layout, /grid-cols-5/);
+  assert.match(layout, /grid-cols-6/);
+  assert.match(layout, /data-mobile-assistant-slot/);
   assert.match(layout, /md:hidden/);
   assert.match(layout, /min-h-11/);
   assert.match(layout, /text-xs/);

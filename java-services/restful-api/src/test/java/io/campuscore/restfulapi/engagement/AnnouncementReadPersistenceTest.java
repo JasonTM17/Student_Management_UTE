@@ -53,8 +53,8 @@ class AnnouncementReadPersistenceTest {
                     "targetRoles" VARCHAR ARRAY NOT NULL,
                     "targetYears" INTEGER ARRAY NOT NULL,
                     "isGlobal" BOOLEAN NOT NULL,
-                    "publishAt" TIMESTAMP,
-                    "expiresAt" TIMESTAMP,
+                    "publishAt" TIMESTAMP WITH TIME ZONE,
+                    "expiresAt" TIMESTAMP WITH TIME ZONE,
                     "publishedBy" VARCHAR(120),
                     "semesterId" VARCHAR(120),
                     "semesterName" VARCHAR(200),
@@ -64,10 +64,10 @@ class AnnouncementReadPersistenceTest {
                     "courseName" VARCHAR(200),
                     "lecturerId" VARCHAR(120),
                     "lecturerDisplayName" VARCHAR(200),
-                    "createdAt" TIMESTAMP NOT NULL,
-                    "updatedAt" TIMESTAMP NOT NULL,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
+                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "version" INTEGER NOT NULL DEFAULT 0,
-                    "archivedAt" TIMESTAMP,
+                    "archivedAt" TIMESTAMP WITH TIME ZONE,
                     "archivedBy" VARCHAR(120)
                 )
                 """);
@@ -414,12 +414,12 @@ class AnnouncementReadPersistenceTest {
     private static void timestamp(PreparedStatement statement, int index, Instant value)
             throws java.sql.SQLException {
         if (value == null) {
-            statement.setNull(index, Types.TIMESTAMP);
+            statement.setNull(index, Types.TIMESTAMP_WITH_TIMEZONE);
         } else {
             statement.setObject(
                     index,
-                    java.time.LocalDateTime.ofInstant(value, java.time.ZoneOffset.UTC),
-                    Types.TIMESTAMP);
+                    java.time.OffsetDateTime.ofInstant(value, java.time.ZoneOffset.UTC),
+                    Types.TIMESTAMP_WITH_TIMEZONE);
         }
     }
 

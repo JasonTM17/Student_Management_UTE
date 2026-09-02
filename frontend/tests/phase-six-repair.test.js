@@ -93,7 +93,8 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   const messages = read('src/i18n/messages.ts');
 
   assert.match(layout, /<AssistantPanel \/>/);
-  assert.match(assistant, /fixed bottom-\[/);
+  assert.match(assistant, /fixed z-50/);
+  assert.match(assistant, /bottom-\[calc\(5\.5rem/);
   assert.match(assistant, /right-4/);
   assert.match(assistant, /role="dialog"/);
   assert.match(assistant, /max-h-\[min\(42rem,calc\(100dvh-6\.5rem-env\(safe-area-inset-bottom\)\)\)\]/);
