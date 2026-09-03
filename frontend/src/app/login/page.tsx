@@ -19,8 +19,13 @@ import {
 } from '@/lib/login-portal';
 import { cn } from '@/lib/utils';
 
-export const dynamic = 'force-dynamic';
+const DEMO_CREDENTIALS: Record<LoginPortal, { email: string; password: string }> = {
+  student: { email: 'student@campuscore.edu', password: 'password123' },
+  lecturer: { email: 'lecturer@campuscore.edu', password: 'password123' },
+  admin: { email: 'admin@campuscore.edu', password: 'admin123' },
+};
 
+export const dynamic = 'force-dynamic';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -30,7 +35,7 @@ export default function LoginPage() {
   const [formError, setFormError] = useState('');
   const formErrorRef = useRef<HTMLDivElement>(null);
   const { login, logout } = useAuth();
-  const { href, messages } = useI18n();
+  const { href, messages, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
   const portal = parseLoginPortal(searchParams.get('portal'));
@@ -42,8 +47,10 @@ export default function LoginPage() {
 
   useEffect(() => {
     setFormError('');
+    const creds = DEMO_CREDENTIALS[portal];
+    setEmail(creds.email);
+    setPassword(creds.password);
   }, [portal]);
-
   useEffect(() => {
     if (formError) {
       formErrorRef.current?.focus();
@@ -173,6 +180,32 @@ export default function LoginPage() {
           })}
         </div>
         <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
+
+        <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs space-y-2">
+          <div className="flex items-center justify-between">
+            <span className="font-semibold text-foreground">
+              {locale === 'vi' ? 'Tài khoản demo sẵn có:' : 'Demo account for this role:'}
+            </span>
+            <button
+              type="button"
+              onClick={() => {
+                const creds = DEMO_CREDENTIALS[portal];
+                setEmail(creds.email);
+                setPassword(creds.password);
+              }}
+              className="text-primary hover:underline font-semibold text-xs flex items-center gap-1"
+            >
+              <ArrowRight className="h-3.5 w-3.5" />
+              {locale === 'vi' ? 'Điền nhanh' : 'Quick fill'}
+            </button>
+          </div>
+          <div className="text-muted-foreground flex items-center justify-between">
+            <code>{DEMO_CREDENTIALS[portal].email}</code>
+            <span className="text-[11px] bg-secondary px-1.5 py-0.5 rounded text-foreground font-mono">
+              {DEMO_CREDENTIALS[portal].password}
+            </span>
+          </div>
+        </div>
 
         {notice ? (
           <div role="status" className="rounded-md border border-border/80 bg-secondary/50 px-4 py-3">

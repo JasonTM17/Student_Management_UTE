@@ -93,7 +93,7 @@ test('student dashboard does not repeat the welcome title in a second hero band'
 
   assert.match(dashboard, /PageHeader/);
   assert.doesNotMatch(dashboard, /section className="[^"]*bg-primary/);
-  assert.match(layout, /hidden sm:block xl:hidden/);
+  assert.match(layout, /hidden sm:flex/);
 });
 
 test('student and lecturer routes share one accessible responsive sidebar', () => {

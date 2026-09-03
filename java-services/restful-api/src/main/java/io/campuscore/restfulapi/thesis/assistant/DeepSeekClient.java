@@ -370,11 +370,17 @@ public class DeepSeekClient implements AssistantCompletionProvider {
         if (!"https".equalsIgnoreCase(baseUri.getScheme())
                 || !"api.deepseek.com".equalsIgnoreCase(baseUri.getHost())
                 || (baseUri.getPort() != -1 && baseUri.getPort() != 443)
-                || baseUri.getUserInfo() != null || baseUri.getQuery() != null || baseUri.getFragment() != null
-                || (baseUri.getPath() != null && !baseUri.getPath().isBlank() && !"/".equals(baseUri.getPath()))) {
+                || baseUri.getUserInfo() != null || baseUri.getQuery() != null || baseUri.getFragment() != null) {
             throw unavailable("provider base URL is not allowlisted");
         }
-        return URI.create(baseUri + "/chat/completions");
+        String path = baseUri.getPath() == null ? "" : baseUri.getPath().trim();
+        if (!path.isEmpty() && !"/".equals(path) && !"/v1".equalsIgnoreCase(path)) {
+            throw unavailable("provider base URL is not allowlisted");
+        }
+        if ("/v1".equalsIgnoreCase(path)) {
+            return URI.create("https://api.deepseek.com/v1/chat/completions");
+        }
+        return URI.create("https://api.deepseek.com/chat/completions");
     }
 
     private void recordFailure() {

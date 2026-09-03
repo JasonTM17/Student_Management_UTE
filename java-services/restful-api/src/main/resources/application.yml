@@ -103,7 +103,7 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:campuscore}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
-      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:3000}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:1000}
   jpa:
     hibernate:

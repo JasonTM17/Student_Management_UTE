@@ -594,7 +594,7 @@ public class ThesisAssistantTurnRepository {
                 .addValue("sourceId", safe(citation.sourceId())).addValue("revision", citation.revisionId())
                 .addValue("version", citation.revisionVersion()).addValue("hash", safe(citation.snapshotHash()))
                 .addValue("entityType", safe(citation.entityType())).addValue("entityId", safe(citation.entityId()))
-                .addValue("updated", citation.updatedAt()).addValue("corpusVersion", citation.corpusVersion())
+                .addValue("updated", parseTimestamp(citation.updatedAt())).addValue("corpusVersion", citation.corpusVersion())
                 .addValue("corpusHash", citation.corpusHash()).addValue("releaseId", citation.releaseId());
     }
 
@@ -631,6 +631,14 @@ public class ThesisAssistantTurnRepository {
     private static int integer(ResultSet rs, String column) throws java.sql.SQLException { int value = rs.getInt(column); return rs.wasNull() ? 0 : value; }
     private static UUID uuid(String value) { try { return value == null || value.isBlank() ? null : UUID.fromString(value); } catch (IllegalArgumentException ignored) { return null; } }
     private static String safe(String value) { return value == null ? "" : value; }
+    private static Timestamp parseTimestamp(String value) {
+        if (value == null || value.isBlank()) return null;
+        try {
+            return Timestamp.from(Instant.parse(value));
+        } catch (RuntimeException ignored) {
+            return null;
+        }
+    }
     private static Timestamp timestampAfterSeconds(long seconds) { return Timestamp.from(Instant.now().plusSeconds(seconds)); }
     private static Timestamp timestampAfterDays(long days) { return Timestamp.from(Instant.now().plusSeconds(days * 86_400L)); }
     private static String normalizeLocale(String locale) { return "en".equalsIgnoreCase(locale) ? "en" : "vi"; }

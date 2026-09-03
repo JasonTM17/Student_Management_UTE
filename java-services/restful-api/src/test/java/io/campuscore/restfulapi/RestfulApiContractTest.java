@@ -12,7 +12,7 @@ import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
-@SpringBootTest
+@SpringBootTest(properties = {"health.readiness-key=test-health-key"})
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 class RestfulApiContractTest {

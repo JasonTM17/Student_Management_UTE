@@ -6,6 +6,9 @@ security:
 health:
   readiness-key: test-health-key
 
+deepseek:
+  enabled: false
+
 assistant:
   # H2-focused legacy fixtures predate the V16 runtime projection. Production
   # keeps this false so a missing projection is a hard startup/runtime defect.

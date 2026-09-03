@@ -37,7 +37,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
-      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-3000}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
       DB_VALIDATION_TIMEOUT_MS: ${DB_VALIDATION_TIMEOUT_MS:-1000}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
       JWT_SECRET: ${JWT_SECRET:-local-course-jwt-secret-change-me}
@@ -81,7 +81,7 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
-      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-3000}
+      DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-5000}
       DB_VALIDATION_TIMEOUT_MS: ${DB_VALIDATION_TIMEOUT_MS:-1000}
       JWT_SECRET: ${JWT_SECRET:-local-course-jwt-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-refresh-secret-change-me}
