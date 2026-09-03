@@ -150,7 +150,7 @@ jobs:
               printf '%s\n' "$output"
               return 0
             fi
-            if grep -Eqi 'manifest unknown|name unknown|not found|no such manifest' <<<"$output"; then
+            if grep -Eqi 'manifest unknown|name unknown|not found|no such manifest|denied|403 forbidden' <<<"$output"; then
               printf 'ABSENT\n'
               return 0
             fi
