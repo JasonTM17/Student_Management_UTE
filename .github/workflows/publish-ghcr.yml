@@ -84,7 +84,7 @@ jobs:
     runs-on: ubuntu-latest
     needs: release-gate
     strategy:
-      fail-fast: true
+      fail-fast: false
       matrix:
         include:
           - package: campuscore-database
@@ -322,8 +322,11 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Scan published image for high and critical vulnerabilities
-        if: always() && steps.immutability.outcome == 'success'
+        if: steps.immutability.outcome == 'success' && !cancelled() && !failed()
         uses: aquasecurity/trivy-action@v0.36.0
+        env:
+          TRIVY_USERNAME: ${{ github.actor }}
+          TRIVY_PASSWORD: ${{ secrets.GITHUB_TOKEN }}
         with:
           image-ref: ${{ env.REGISTRY }}/${{ env.IMAGE_OWNER }}/${{ matrix.package }}:${{ needs.release-gate.outputs.sha }}
           format: json
@@ -333,7 +336,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload per-image release evidence
-        if: always() && steps.immutability.outcome == 'success'
+        if: steps.immutability.outcome == 'success' && !cancelled() && !failed()
         uses: actions/upload-artifact@v4
         with:
           name: release-evidence-${{ matrix.package }}
