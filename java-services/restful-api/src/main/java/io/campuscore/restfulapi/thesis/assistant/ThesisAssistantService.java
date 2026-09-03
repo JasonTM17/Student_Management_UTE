@@ -373,7 +373,8 @@ public class ThesisAssistantService {
         Set<String> seen = new LinkedHashSet<>();
         try {
             addDocuments(documents, seen, knowledge.search(locale, terms, TOP_K));
-            if (!DEFAULT_LOCALE.equals(locale) && documents.size() < TOP_K) addDocuments(documents, seen, knowledge.search(DEFAULT_LOCALE, terms, TOP_K - documents.size()));
+            String alternateLocale = DEFAULT_LOCALE.equals(locale) ? "en" : DEFAULT_LOCALE;
+            if (documents.size() < TOP_K) addDocuments(documents, seen, knowledge.search(alternateLocale, terms, TOP_K - documents.size()));
         } catch (DataAccessException exception) {
             return new LexicalResult(unavailableMessage(locale), List.of(), List.of(), "", true, true);
         }

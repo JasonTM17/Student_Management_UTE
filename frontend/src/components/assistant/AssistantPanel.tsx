@@ -213,11 +213,15 @@ const initialState: AssistantState = { messages: [] };
 function AssistantLauncherMark() {
   return (
     <span
-      className="relative inline-flex size-8 items-center justify-center"
+      className="relative inline-flex size-9 items-center justify-center"
       aria-hidden="true"
     >
-      <MessageCircle className="size-8 stroke-[1.75] transition-transform duration-200 ease-out group-hover:scale-[1.04]" />
-      <Bookmark className="absolute left-1/2 top-1/2 size-3.5 -translate-x-1/2 -translate-y-[42%] fill-current/20 stroke-[2.25]" />
+      <MessageCircle className="size-8 stroke-[1.8] text-white transition-transform duration-200 ease-out group-hover:scale-105" />
+      <Bookmark className="absolute left-1/2 top-1/2 size-3.5 -translate-x-1/2 -translate-y-[42%] fill-white/30 stroke-[2.2] text-white" />
+      <span className="absolute -top-1 -right-1 flex h-3 w-3">
+        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
+        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white"></span>
+      </span>
     </span>
   );
 }
@@ -244,10 +248,21 @@ function fromHistoryMessage(message: {
   };
 }
 
+interface AssistantPanelProps {
+  isOpen?: boolean;
+  onOpenChange?: (open: boolean) => void;
+}
+
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
+
+  useEffect(() => {
+    const handleOpen = () => setOpen(true);
+    window.addEventListener('open-campus-assistant', handleOpen);
+    return () => window.removeEventListener('open-campus-assistant', handleOpen);
+  }, []);
   const [showHistory, setShowHistory] = useState(false);
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
@@ -676,6 +691,11 @@ export function AssistantPanel() {
       event.nativeEvent.isComposing
     )
       return;
+    const value = event.currentTarget.value.trim();
+    if (!value) {
+      event.preventDefault();
+      return;
+    }
     event.preventDefault();
     event.currentTarget.form?.requestSubmit();
   };
@@ -712,42 +732,47 @@ export function AssistantPanel() {
         'fixed z-50',
         open
           ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(26rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
-          : 'bottom-[calc(0.5rem+env(safe-area-inset-bottom))] right-[max(0.5rem,calc((100vw-28rem)/2+0.5rem))] w-14 md:bottom-6 md:right-6 md:w-[min(26rem,calc(100vw-2rem))]',
+          : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
       )}
     >
       {!open ? (
-        <Button
-          ref={launcherRef}
-          type="button"
-          size="icon"
-          data-assistant-launcher="campus-mark"
-          className="group ml-auto min-h-14 min-w-14 rounded-xl border border-primary-foreground/20 bg-primary text-primary-foreground shadow-xl transition-transform duration-200 ease-out hover:-translate-y-0.5 hover:bg-primary/90 active:translate-y-0 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
-          onClick={() => setOpen(true)}
-          aria-label={messages.assistant.open}
-          title={messages.assistant.open}
-        >
-          <AssistantLauncherMark />
-        </Button>
+        <div className="flex items-center gap-2">
+          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-card/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-lg backdrop-blur transition-all duration-200 group-hover:border-primary/40 pointer-events-none">
+            ✨ {locale === 'vi' ? 'Hỏi trợ lý CampusCore' : 'Ask CampusCore AI'}
+          </span>
+          <Button
+            ref={launcherRef}
+            type="button"
+            size="icon"
+            data-assistant-launcher="campus-mark"
+            className="group relative ml-auto min-h-14 min-w-14 rounded-2xl border-2 border-white/40 bg-gradient-to-tr from-primary via-[#004eab] to-[#0070f3] text-white shadow-[0_10px_30px_rgba(0,63,135,0.38)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(0,63,135,0.48)] hover:scale-105 active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
+            onClick={() => setOpen(true)}
+            aria-label={messages.assistant.open}
+            title={messages.assistant.open}
+          >
+            <AssistantLauncherMark />
+          </Button>
+        </div>
       ) : (
         <section
           role="dialog"
           aria-modal="false"
           aria-labelledby="assistant-panel-title"
           aria-describedby="assistant-panel-description"
-          className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-lg border border-border/80 bg-card shadow-2xl md:max-h-[min(42rem,calc(100dvh-2rem))]"
+          className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
         >
-          <header className="flex items-start justify-between gap-4 border-b border-border/70 bg-foreground px-4 py-4 text-background">
+          <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-4 text-white shadow-sm">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-background/15">
+              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
                 <Bot className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
-                <h2 id="assistant-panel-title" className="font-semibold">
+                <h2 id="assistant-panel-title" className="font-semibold text-white text-base">
                   {messages.assistant.title}
                 </h2>
                 <p
                   id="assistant-panel-description"
-                  className="mt-1 text-xs leading-5 text-background/70"
+                  className="mt-0.5 text-xs leading-5 text-white/85"
                 >
                   {messages.assistant.description}
                 </p>
@@ -758,7 +783,7 @@ export function AssistantPanel() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="text-background hover:bg-white/10 hover:text-background"
+                className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
                 onClick={() => setShowHistory((current) => !current)}
                 aria-label={messages.assistant.history}
                 aria-expanded={showHistory}
@@ -769,7 +794,7 @@ export function AssistantPanel() {
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="text-background hover:bg-white/10 hover:text-background"
+                className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
                 onClick={closePanel}
                 aria-label={messages.assistant.close}
                 title={messages.assistant.close}
@@ -873,13 +898,34 @@ export function AssistantPanel() {
             className="min-h-48 flex-1 space-y-3 overflow-y-auto bg-background px-4 py-4"
           >
             {state.messages.length === 0 ? (
-              <div className="flex min-h-40 flex-col items-center justify-center gap-3 text-center">
-                <div className="flex h-10 w-10 items-center justify-center rounded-full bg-secondary text-primary">
-                  <Bot className="h-5 w-5" aria-hidden="true" />
+              <div className="flex min-h-48 flex-col items-center justify-center gap-3.5 text-center p-3">
+                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                  <Bot className="h-6 w-6 animate-bounce" aria-hidden="true" />
                 </div>
-                <p className="max-w-xs text-sm leading-6 text-muted-foreground">
-                  {messages.assistant.empty}
-                </p>
+                <div className="space-y-1">
+                  <p className="text-sm font-semibold text-foreground">
+                    {locale === 'vi' ? 'Xin chào! Mình có thể giúp gì cho bạn?' : 'Hello! How can I help you?'}
+                  </p>
+                  <p className="max-w-xs text-xs text-muted-foreground leading-relaxed">
+                    {messages.assistant.empty}
+                  </p>
+                </div>
+                <div className="mt-2 flex flex-wrap justify-center gap-1.5 max-w-xs">
+                  {[
+                    locale === 'vi' ? 'Đăng ký học phần thế nào?' : 'How to register courses?',
+                    locale === 'vi' ? 'Xem thời khóa biểu ở đâu?' : 'Where is my schedule?',
+                    locale === 'vi' ? 'Tiêu chí chọn đề tài luận văn' : 'Thesis topic criteria',
+                  ].map((suggestion) => (
+                    <button
+                      key={suggestion}
+                      type="button"
+                      onClick={() => setInput(suggestion)}
+                      className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                    >
+                      {suggestion}
+                    </button>
+                  ))}
+                </div>
               </div>
             ) : (
               state.messages.map((message) => (
@@ -1027,6 +1073,7 @@ export function AssistantPanel() {
                 ref={inputRef}
                 value={input}
                 onChange={(event) => setInput(event.target.value)}
+                onInput={(event) => setInput((event.target as HTMLTextAreaElement).value)}
                 onKeyDown={handleComposerKeyDown}
                 placeholder={messages.assistant.placeholder}
                 rows={2}

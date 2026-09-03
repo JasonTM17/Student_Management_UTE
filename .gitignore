@@ -75,3 +75,6 @@ src/designs/
 
 # Cursor IDE local data
 .cursor/
+
+# Local agent harness
+.omp/

@@ -13,7 +13,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 
-@SpringBootTest
+@SpringBootTest(properties = {"deepseek.enabled=false"})
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 class ThesisAssistantContractTest {

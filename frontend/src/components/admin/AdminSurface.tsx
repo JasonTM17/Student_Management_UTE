@@ -148,7 +148,15 @@ export function AdminTableScroll({
   className,
 }: AdminTableScrollProps) {
   return (
-    <div className={cn('min-w-0 max-w-full overflow-x-auto overscroll-x-contain', className)}>
+    <div
+      tabIndex={0}
+      role="region"
+      aria-label="Data table"
+      className={cn(
+        'min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md',
+        className,
+      )}
+    >
       {children}
     </div>
   );

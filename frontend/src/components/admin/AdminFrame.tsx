@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   ArrowLeft,
   Bell,
+  Megaphone,
   BrainCircuit,
   BookMarked,
   BookOpen,
@@ -100,7 +101,7 @@ export function AdminFrame({
       label: messages.adminShell.menuSections.campus,
       items: [
         { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
-        { href: '/admin/announcements', icon: Bell, label: messages.admin.menuItems[9]?.[0] },
+        { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
         { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
       ],
@@ -219,20 +220,19 @@ export function AdminFrame({
               {user?.firstName?.[0]}
               {user?.lastName?.[0]}
             </div>
-            <div className="min-w-0">
+            <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
                 {user?.firstName} {user?.lastName}
               </div>
               <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
                 {user?.email}
               </div>
+              <div className="mt-2">
+                <span className="inline-flex items-center rounded-full bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                  {roleLabel}
+                </span>
+              </div>
             </div>
-          </div>
-          <div className="mt-3 flex items-center justify-between gap-3">
-            <span className="portal-menu-label">{messages.adminShell.identityLabel}</span>
-            <span className="text-xs font-semibold text-[var(--portal-sidebar-text)]">
-              {roleLabel}
-            </span>
           </div>
         </div>
 
@@ -269,13 +269,6 @@ export function AdminFrame({
         </nav>
 
         <div className="border-t border-white/10 px-4 py-3">
-          <div className="mb-3 flex flex-col gap-2 border-b border-white/10 pb-3">
-            <span className="portal-menu-label">{messages.adminShell.preferences}</span>
-            <div className="flex items-center gap-1 self-start rounded-md bg-white/10 p-1 text-[var(--portal-sidebar-text)]">
-              <LanguageToggle inverse />
-              <ThemeToggle className="text-[var(--portal-sidebar-text)] hover:bg-white/10 hover:text-[var(--portal-yellow)]" />
-            </div>
-          </div>
           <button
             type="button"
             className="flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-left text-sm font-medium text-[var(--portal-sidebar-text)] transition-colors duration-150 hover:bg-red-500/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]"
@@ -291,7 +284,7 @@ export function AdminFrame({
         className="min-h-screen lg:pl-[var(--portal-sidebar-width)]"
         inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
       >
-        <header className="sticky top-0 z-30 border-b border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 backdrop-blur supports-[backdrop-filter]:bg-[var(--portal-surface)]/90">
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 shadow-sm">
           <div className="flex min-h-[var(--portal-header-height)] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <Button
@@ -318,11 +311,11 @@ export function AdminFrame({
             </div>
 
             <div className="flex shrink-0 items-center gap-2">
-              <div className="hidden sm:block">
+              <div className="hidden sm:flex items-center">
                 <LanguageToggle />
               </div>
-              <div className="hidden sm:block">
-                <ThemeToggle />
+              <div className="flex items-center">
+                <ThemeToggle className="h-10 w-10 text-muted-foreground hover:bg-secondary/60 hover:text-foreground" />
               </div>
               <Button
                 type="button"
@@ -342,7 +335,7 @@ export function AdminFrame({
           id="admin-main-content"
           ref={mainRef}
           tabIndex={-1}
-          className="mx-auto min-w-0 max-w-[1440px] px-4 py-5 focus:outline-none sm:px-6 lg:px-8"
+          className="mx-auto min-w-0 max-w-[1440px] px-4 py-5 pb-28 focus:outline-none sm:px-6 lg:px-8 lg:pb-28"
         >
           {pathname !== backHref ? (
             <LocalizedLink

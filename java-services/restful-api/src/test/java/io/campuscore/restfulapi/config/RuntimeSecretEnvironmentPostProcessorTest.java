@@ -59,4 +59,15 @@ class RuntimeSecretEnvironmentPostProcessorTest {
 
         assertEquals("DEEPSEEK_API_KEY_FILE is required when its integration is enabled", failure.getMessage());
     }
+
+    @Test
+    void enabledProviderWithDirectKeyDoesNotRequireFile() {
+        MockEnvironment environment = new MockEnvironment()
+                .withProperty("deepseek.enabled", "true")
+                .withProperty("deepseek.api-key", "direct-configured-key");
+
+        new RuntimeSecretEnvironmentPostProcessor().postProcessEnvironment(environment, null);
+
+        assertEquals("direct-configured-key", environment.getProperty("deepseek.api-key"));
+    }
 }

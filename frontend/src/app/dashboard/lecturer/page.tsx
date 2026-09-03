@@ -163,7 +163,7 @@ export default function LecturerDashboardPage() {
               title={messages.lecturerDashboard.quickActionsTitle}
               description={messages.lecturerDashboard.quickActionsDescription}
               variant="muted"
-              contentClassName="grid gap-4 sm:grid-cols-3"
+              contentClassName="flex flex-col gap-3"
             >
                 {quickLinks.map((item, index) => (
                   <WorkspaceActionTile

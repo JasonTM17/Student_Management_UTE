@@ -46,6 +46,10 @@ public final class RuntimeSecretEnvironmentPostProcessor implements EnvironmentP
             String file = environment.getProperty(mapping.getKey());
             if (file == null || file.isBlank()) {
                 if (enabled) {
+                    String direct = environment.getProperty(mapping.getValue());
+                    if (direct != null && !direct.isBlank()) {
+                        continue;
+                    }
                     throw new IllegalStateException(mapping.getKey() + " is required when its integration is enabled");
                 }
                 continue;
