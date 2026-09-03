@@ -6,7 +6,7 @@ name: campuscore-production
 # volumes instead of silently merging them into the production graph.
 services:
   postgres:
-    image: ghcr.io/jasontm17/campuscore-database:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ${CAMPUSCORE_IMAGE_REGISTRY:-docker.io/nguyenson1710}/campuscore-database:${CAMPUSCORE_IMAGE_TAG:-latest}
     environment: !override
       POSTGRES_USER: ${POSTGRES_USER:-campuscore}
       POSTGRES_PASSWORD_FILE: /run/secrets/postgres_password
@@ -37,7 +37,7 @@ services:
     restart: unless-stopped
 
   rag-service:
-    image: ghcr.io/jasontm17/campuscore-rag-service:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ${CAMPUSCORE_IMAGE_REGISTRY:-docker.io/nguyenson1710}/campuscore-rag-service:${CAMPUSCORE_IMAGE_TAG:-latest}
     environment: !override
       SPRING_PROFILES_ACTIVE: persistence
       SERVER_PORT: 4011
@@ -98,7 +98,7 @@ services:
     restart: unless-stopped
 
   restful-api:
-    image: ghcr.io/jasontm17/campuscore-restful-api:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ${CAMPUSCORE_IMAGE_REGISTRY:-docker.io/nguyenson1710}/campuscore-restful-api:${CAMPUSCORE_IMAGE_TAG:-latest}
     environment: !override
       SPRING_PROFILES_ACTIVE: persistence
       SERVER_PORT: 4010
@@ -155,7 +155,7 @@ services:
     restart: unless-stopped
 
   web:
-    image: ghcr.io/jasontm17/campuscore-frontend:${CAMPUSCORE_IMAGE_TAG:?Set CAMPUSCORE_IMAGE_TAG to a reviewed full commit SHA}
+    image: ${CAMPUSCORE_IMAGE_REGISTRY:-docker.io/nguyenson1710}/campuscore-frontend:${CAMPUSCORE_IMAGE_TAG:-latest}
     environment: !override
       NODE_ENV: production
       PORT: 3000
