@@ -322,7 +322,7 @@ jobs:
           } >> "$GITHUB_STEP_SUMMARY"
 
       - name: Scan published image for high and critical vulnerabilities
-        if: steps.immutability.outcome == 'success' && !cancelled() && !failed()
+        if: success() && steps.immutability.outcome == 'success'
         uses: aquasecurity/trivy-action@v0.36.0
         env:
           TRIVY_USERNAME: ${{ github.actor }}
@@ -336,7 +336,7 @@ jobs:
           exit-code: '1'
 
       - name: Upload per-image release evidence
-        if: steps.immutability.outcome == 'success' && !cancelled() && !failed()
+        if: success() && steps.immutability.outcome == 'success'
         uses: actions/upload-artifact@v4
         with:
           name: release-evidence-${{ matrix.package }}
