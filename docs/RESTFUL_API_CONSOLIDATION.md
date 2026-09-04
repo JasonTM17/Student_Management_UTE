@@ -11,7 +11,9 @@ PostgreSQL local là nguồn dữ liệu duy nhất. Riêng assistant chạy tro
 
 Phạm vi gồm auth, people, academic catalog, sections, enrollment, grades,
 schedules, announcements, notifications, thesis core và assistant lexical RAG.
-Finance, analytics, support, realtime, external AI, Redis, RabbitMQ, MinIO,
+Production assistant knowledge is published through Supabase and promoted by
+the private `rag-service` sidecar; optional external synthesis remains disabled
+by default. Finance, analytics, support, realtime, Redis, RabbitMQ, MinIO,
 Nginx và Kubernetes là non-goal của đồ án.
 
 Schema mới được Flyway sở hữu trên database fresh. Không đọc schema legacy và
