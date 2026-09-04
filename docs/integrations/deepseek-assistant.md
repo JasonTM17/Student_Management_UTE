@@ -30,6 +30,18 @@ The endpoint/model follow DeepSeek's OpenAI-compatible chat completion contract:
 <https://api-docs.deepseek.com/api/create-chat-completion/>. CampusCore pins
 the base host and model in server configuration; clients cannot override either.
 
+## RAG-first dispatch policy
+
+Every request retrieves the active published runtime release before any provider
+decision. Direct fact lookups stay entirely on lexical RAG and return model
+`curated-lexical-rag` with reason code `RAG_GROUNDED`; they do not reserve quota
+or open a DeepSeek dispatch. `AssistantDifficultyRouter` only allows synthesis
+for a non-empty retrieval result when the question is long or multi-intent,
+contains comparison/explanation/exception markers, or spans multiple knowledge
+domains. A question with no matching document never calls DeepSeek. This keeps
+the provider as a bounded fallback synthesizer rather than a second knowledge
+authority.
+
 ## Request/data boundary
 
 The provider request contains only the current question and a bounded,

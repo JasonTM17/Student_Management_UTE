@@ -128,6 +128,9 @@ test('student and lecturer mobile nav reserves an assistant slot below md', () =
   assert.match(layout, /text-xs/);
   assert.match(layout, /kind: 'menu'/);
   assert.match(layout, /setSidebarOpen\(true\)/);
+  assert.match(layout, /aria-hidden=\{sidebarOpen \? true : undefined\}/);
+  assert.match(layout, /inert=\{sidebarOpen \? true : undefined\}/);
+  assert.match(layout, /className="fixed inset-x-0 bottom-0 z-30/);
   assert.match(layout, /href: '\/dashboard\/schedule'/);
   assert.match(layout, /href: '\/dashboard\/register'/);
   assert.match(layout, /href: '\/dashboard\/grades'/);

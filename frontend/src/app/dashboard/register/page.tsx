@@ -34,6 +34,7 @@ export default function RegisterPage() {
   const [pending, setPending] = useState('');
   const loadGeneration = useRef(0);
 
+  /** Loads the student's enrollments, active registration rounds, and section catalog. */
   const load = useCallback(async () => {
     const generation = ++loadGeneration.current;
     setLoading(true);
@@ -100,6 +101,7 @@ export default function RegisterPage() {
 
   const registered = enrollments.filter((item) => item.status !== 'DROPPED');
 
+  /** Confirms and submits one section enrollment, then refreshes the live catalog. */
   const register = async (sectionId: string) => {
     const ok = await confirm({
       title: copy.confirmRegister,
@@ -119,6 +121,7 @@ export default function RegisterPage() {
     }
   };
 
+  /** Confirms and drops one active enrollment, then refreshes the live schedule data. */
   const drop = async (enrollment: Enrollment) => {
     const ok = await confirm({
       title: copy.confirmDrop,

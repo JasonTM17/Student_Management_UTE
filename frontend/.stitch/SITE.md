@@ -34,7 +34,7 @@ the web at a 390px viewport; compare native mobile against the mobile atlas.
   0 overflow findings, and 0 missing mobile navigation findings.
 - A fresh in-app browser check on 2026-08-20 observed the public landing page
   at 1440px, 390px, and 768px with no measured horizontal overflow and no
-  console errors. The running `campuscore-frontend:local` image has no
+  console errors. The running `student-management-ute-frontend:local` image has no
   source-revision label, so this is limited runtime evidence for that image,
   not an exact-HEAD Stitch reference diff or authenticated-route proof.
 - Do not upgrade the visual claim until an exact-source browser/Playwright

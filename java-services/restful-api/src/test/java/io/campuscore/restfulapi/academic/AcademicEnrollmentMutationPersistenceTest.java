@@ -14,7 +14,14 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
+import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import io.campuscore.restfulapi.academic.registration.RegistrationPdfRenderer;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -161,6 +168,104 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void catalogReadFallsBackToOpenAddDropWhenRegistrationWindowExpired() throws Exception {
+        jdbc.update("UPDATE \"academic\".\"RegistrationRound\" SET \"windowEnd\" = ? WHERE \"id\" = ?",
+                localDateTime(Instant.parse("2020-01-01T00:00:00Z")), "round-open");
+
+        mvc.perform(get("/api/v1/me/registration/sections")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("section-open"));
+    }
+
+    /**
+     * Verifies that ten independent students racing for one two-seat section
+     * are serialized by the section lock: exactly two requests enroll and the
+     * remaining requests receive a business conflict without duplicate rows.
+     */
+    @Test
+    void tenStudentsCompetingForSameSectionAreSerializedBySectionLock() throws Exception {
+        final int studentCount = 10;
+        final int capacity = 2;
+        insertConcurrentStudents(studentCount);
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"capacity\" = ? WHERE \"id\" = ?",
+                capacity, "section-open");
+
+        ExecutorService executor = Executors.newFixedThreadPool(studentCount);
+        CountDownLatch ready = new CountDownLatch(studentCount);
+        CountDownLatch start = new CountDownLatch(1);
+        List<Future<ConcurrentEnrollmentOutcome>> futures = new ArrayList<>();
+        try {
+            for (int index = 1; index <= studentCount; index++) {
+                final int studentIndex = index;
+                Callable<ConcurrentEnrollmentOutcome> task = () -> {
+                    ready.countDown();
+                    if (!start.await(10, TimeUnit.SECONDS)) {
+                        return new ConcurrentEnrollmentOutcome(studentIndex, -1, "start barrier timeout", null);
+                    }
+                    try {
+                        MvcResult result = mvc.perform(post("/api/v1/me/enrollments")
+                                        .with(studentJwt("student-user-" + studentIndex, "student-" + studentIndex))
+                                        .header("Idempotency-Key", "concurrent-enroll-" + studentIndex)
+                                        .contentType(MediaType.APPLICATION_JSON)
+                                        .content("{\"sectionId\":\"section-open\"}"))
+                                .andReturn();
+                        return new ConcurrentEnrollmentOutcome(
+                                studentIndex,
+                                result.getResponse().getStatus(),
+                                result.getResponse().getContentAsString(),
+                                null);
+                    } catch (Throwable failure) {
+                        return new ConcurrentEnrollmentOutcome(studentIndex, -1, "", failure);
+                    }
+                };
+                futures.add(executor.submit(task));
+            }
+
+            assertThat(ready.await(10, TimeUnit.SECONDS)).isTrue();
+            start.countDown();
+            List<ConcurrentEnrollmentOutcome> outcomes = new ArrayList<>();
+            for (Future<ConcurrentEnrollmentOutcome> future : futures) {
+                outcomes.add(future.get(30, TimeUnit.SECONDS));
+            }
+
+            assertThat(outcomes).hasSize(studentCount);
+            assertThat(outcomes.stream().filter(outcome -> outcome.status() == 200).count())
+                    .isEqualTo(capacity);
+            assertThat(outcomes.stream().filter(outcome -> outcome.status() == 409).count())
+                    .isEqualTo(studentCount - capacity);
+            assertThat(outcomes.stream().filter(outcome -> outcome.status() != 200 && outcome.status() != 409)
+                    .map(ConcurrentEnrollmentOutcome::diagnostic)
+                    .toList()).isEmpty();
+            assertThat(outcomes.stream().filter(outcome -> outcome.failure() != null)
+                    .map(ConcurrentEnrollmentOutcome::failure)
+                    .toList()).isEmpty();
+
+            assertThat(jdbc.queryForObject(
+                            "SELECT \"enrolledCount\" FROM \"academic\".\"Section\" WHERE \"id\" = ?",
+                            Integer.class,
+                            "section-open"))
+                    .isEqualTo(capacity);
+            assertThat(jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM \"academic\".\"Enrollment\""
+                                    + " WHERE \"sectionId\" = ? AND \"status\" = 'ENROLLED'",
+                            Integer.class,
+                            "section-open"))
+                    .isEqualTo(capacity);
+            assertThat(jdbc.queryForObject(
+                            "SELECT COUNT(*) FROM (SELECT \"studentId\" FROM \"academic\".\"Enrollment\""
+                                    + " WHERE \"sectionId\" = ? AND \"status\" = 'ENROLLED'"
+                                    + " GROUP BY \"studentId\" HAVING COUNT(*) > 1) duplicates",
+                            Integer.class,
+                            "section-open"))
+                    .isZero();
+        } finally {
+            executor.shutdownNow();
+            assertThat(executor.awaitTermination(10, TimeUnit.SECONDS)).isTrue();
+        }
+    }
+
+    @Test
     void enrollmentRollsBackWhenRegistrationSlipCannotBeStored() throws Exception {
         doThrow(new IllegalStateException("renderer unavailable"))
                 .when(pdfRenderer)
@@ -304,6 +409,39 @@ class AcademicEnrollmentMutationPersistenceTest {
                         String.class,
                         enrollmentId))
                 .isEqualTo("DROPPED");
+    }
+
+    /**
+     * Adds the additional authenticated student profiles used by the
+     * concurrent-registration regression without changing the shared fixture.
+     */
+    private void insertConcurrentStudents(int studentCount) {
+        LocalDateTime now = localDateTime(BASE_TIME);
+        for (int index = 2; index <= studentCount; index++) {
+            jdbc.update(
+                    "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
+                            + " VALUES (?, ?, ?, ?)",
+                    "student-user-" + index,
+                    "student" + index + "@campuscore.edu",
+                    "Concurrent",
+                    "Student " + index);
+            jdbc.update(
+                    "INSERT INTO \"academic\".\"Student\""
+                            + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
+                            + " \"admissionDate\", \"createdAt\", \"updatedAt\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                    "student-" + index,
+                    "student-user-" + index,
+                    String.format("S%03d", index),
+                    "curriculum-1",
+                    2,
+                    "ACTIVE",
+                    now,
+                    now,
+                    now);
+        }
+    }
+
+    private record ConcurrentEnrollmentOutcome(int studentIndex, int status, String diagnostic, Throwable failure) {
     }
 
     private static RequestPostProcessor studentJwt(String subject, String studentId) {

@@ -87,20 +87,20 @@ jobs:
       fail-fast: false
       matrix:
         include:
-          - package: campuscore-database
-            hub-package: campuscore-database
+          - package: student-management-ute-database
+            hub-package: student-management-ute-database
             dockerfile: database/Dockerfile
             description: CampusCore PostgreSQL runtime; schema managed by Flyway
-          - package: campuscore-restful-api
-            hub-package: campuscore-restful-api
+          - package: student-management-ute-restful-api
+            hub-package: student-management-ute-restful-api
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore Spring Boot RESTful API
-          - package: campuscore-rag-service
-            hub-package: campuscore-rag-service
+          - package: student-management-ute-rag-service
+            hub-package: student-management-ute-rag-service
             dockerfile: java-services/restful-api/Dockerfile
             description: CampusCore dedicated campus assistant RAG service
-          - package: campuscore-frontend
-            hub-package: campuscore-frontend
+          - package: student-management-ute-frontend
+            hub-package: student-management-ute-frontend
             dockerfile: frontend/Dockerfile
             description: CampusCore Next.js frontend
 
@@ -371,10 +371,10 @@ jobs:
           import os
 
           expected = {
-              "campuscore-database",
-              "campuscore-restful-api",
-              "campuscore-rag-service",
-              "campuscore-frontend",
+              "student-management-ute-database",
+              "student-management-ute-restful-api",
+              "student-management-ute-rag-service",
+              "student-management-ute-frontend",
           }
           files = sorted(glob.glob("release-evidence/release-*.json"))
           if len(files) != len(expected):

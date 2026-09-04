@@ -100,7 +100,7 @@ jobs:
       - name: Build and start fresh course stack
         run: docker compose up -d --build --wait
       - name: Verify database image boundary
-        run: docker image inspect campuscore-database:local --format '{{.Config.Labels}}' | grep -q 'Flyway'
+        run: docker image inspect student-management-ute-database:local --format '{{.Config.Labels}}' | grep -q 'Flyway'
       - name: Verify Flyway, health, OpenAPI, login and RAG
         shell: bash
         run: |

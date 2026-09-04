@@ -3,7 +3,7 @@ services:
     build:
       context: .
       dockerfile: database/Dockerfile
-    image: campuscore-database:local
+    image: student-management-ute-database:local
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-campuscore}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
@@ -30,7 +30,7 @@ services:
     build:
       context: .
       dockerfile: java-services/restful-api/Dockerfile
-    image: campuscore-rag-service:local
+    image: student-management-ute-rag-service:local
     environment:
       SPRING_PROFILES_ACTIVE: persistence
       SERVER_PORT: 4011
@@ -74,7 +74,7 @@ services:
     build:
       context: .
       dockerfile: java-services/restful-api/Dockerfile
-    image: campuscore-restful-api:local
+    image: student-management-ute-restful-api:local
     environment:
       SPRING_PROFILES_ACTIVE: persistence
       SERVER_PORT: 4010
@@ -132,7 +132,7 @@ services:
         JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
         # Same-origin browser path. Do not interpolate host/Expo NEXT_PUBLIC_API_URL.
         NEXT_PUBLIC_API_URL: /api/v1
-    image: campuscore-frontend:local
+    image: student-management-ute-frontend:local
     environment:
       NODE_ENV: production
       PORT: 3000
