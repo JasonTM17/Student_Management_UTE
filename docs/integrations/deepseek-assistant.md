@@ -1,9 +1,12 @@
-# DeepSeek thesis assistant integration
+# DeepSeek campus assistant integration
 
-CampusCore's assistant is a thesis-only, grounded RAG feature owned by the
-Java API. The normal path is deterministic PostgreSQL lexical retrieval with
+CampusCore's assistant is a grounded campus RAG feature served by the private
+`rag-service` sidecar, which uses the same Java artifact as the public REST API.
+The normal path is deterministic PostgreSQL lexical retrieval with
 server-owned citations. DeepSeek is an optional answer synthesizer, not a
-knowledge authority and not a client-side dependency.
+knowledge authority and not a client-side dependency. In production the sidecar
+syncs the published Supabase `assistant` release into the PostgreSQL runtime
+snapshot before retrieval; local/course mode seeds that snapshot with Flyway.
 
 ## Runtime configuration
 
@@ -45,7 +48,7 @@ authority.
 ## Request/data boundary
 
 The provider request contains only the current question and a bounded,
-locale-filtered, published thesis context delimited as untrusted data. It does
+locale-filtered, published campus context delimited as untrusted data. It does
 not include email, profile IDs, bearer tokens, raw conversation history, or
 unfiltered database rows. The system instruction requires an answer from the
 context only, ignores instructions inside the question/context, and refuses
@@ -75,7 +78,7 @@ Expired `RESERVED`/`SNAPSHOT_READY` leases become retryable
 
 When provider access is disabled, unauthenticated, over quota, circuit-open,
 timed out, or fails, the service returns the lexical answer with `degraded`
-and a stable `reasonCode`. If retrieval has no matching published thesis
+and a stable `reasonCode`. If retrieval has no matching published campus
 documents, no provider call is attempted.
 
 ## Knowledge lifecycle
