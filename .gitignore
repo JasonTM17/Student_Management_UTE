@@ -78,3 +78,7 @@ src/designs/
 
 # Local agent harness
 .omp/
+
+# Local-only planning and Grok workflow artifacts
+/plans/260901-1809-campuscore-production-readiness-and-professional-ux/
+/.grok/workflows/
