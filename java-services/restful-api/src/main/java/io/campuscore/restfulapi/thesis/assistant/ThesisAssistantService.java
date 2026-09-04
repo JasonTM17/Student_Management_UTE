@@ -216,8 +216,10 @@ public class ThesisAssistantService {
         emit(sink, new StreamMeta(requestId, clientRequestId, reservation.turnId(), reservation.conversationId(), MODEL, normalizedLocale));
 
         boolean providerAttempt = false;
-        String reason = lexical.documents().isEmpty() ? "NO_MATCH" : "PROVIDER_DISABLED";
-        boolean degraded = !lexical.documents().isEmpty();
+        boolean synthesisRequired = AssistantDifficultyRouter.requiresSynthesis(normalized, lexical.documents());
+        String reason = lexical.documents().isEmpty() ? "NO_MATCH"
+                : synthesisRequired ? "PROVIDER_DISABLED" : "RAG_GROUNDED";
+        boolean degraded = synthesisRequired && !lexical.documents().isEmpty();
         String answer = lexical.answer();
         List<ProviderSegment> emittedSegments = new ArrayList<>();
         StringBuilder providerAnswer = new StringBuilder();
@@ -225,7 +227,7 @@ public class ThesisAssistantService {
         AtomicBoolean cancelToken = cancellations == null ? new AtomicBoolean(false)
                 : cancellations.register(ownerId, clientRequestId, reservation.leaseGeneration());
         try {
-            if (!lexical.documents().isEmpty() && deepSeek != null && deepSeek.usable()) {
+            if (synthesisRequired && deepSeek != null && deepSeek.usable()) {
                 ThesisAssistantTurnRepository.DispatchDecision dispatch = cancellations == null
                         ? turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
                                 properties.userDailyQuota(), properties.globalDailyQuota())
@@ -294,7 +296,8 @@ public class ThesisAssistantService {
             // A disabled provider still has a deterministic lexical answer. Emit it as a
             // normal delta so clients can render a useful fallback while retaining the
             // terminal degraded reason in the committed turn.
-            if (!providerAttempt && ("PROVIDER_DISABLED".equals(reason) || "NO_MATCH".equals(reason))) {
+            if (!providerAttempt && ("PROVIDER_DISABLED".equals(reason) || "RAG_GROUNDED".equals(reason)
+                    || "NO_MATCH".equals(reason))) {
                 emit(sink, new StreamDelta(0, answer, lexical.sourceIds()));
             }
             ThesisAssistantTurnRepository.TerminalResult terminal = cancellations == null

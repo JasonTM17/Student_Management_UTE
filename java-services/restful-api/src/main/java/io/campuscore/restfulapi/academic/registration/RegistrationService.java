@@ -89,7 +89,7 @@ public class RegistrationService {
     public EligibilityResponse eligibility(String studentId, String semesterId, String roundId) {
         Map<String, Object> student = requireStudent(studentId);
         Map<String, Object> round = roundId == null || roundId.isBlank()
-                ? openRoundReadOnly(semesterId, "REGISTRATION")
+                ? openReadRound(semesterId)
                 : round(roundId);
         assertEligible(student, round, Instant.now());
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
@@ -110,7 +110,7 @@ public class RegistrationService {
     public List<CatalogSectionResponse> catalog(String studentId, String semesterId, String roundId) {
         Map<String, Object> student = requireStudent(studentId);
         Map<String, Object> round = roundId == null || roundId.isBlank()
-                ? openRoundReadOnly(semesterId, "REGISTRATION")
+                ? openReadRound(semesterId)
                 : round(roundId);
         assertEligible(student, round, Instant.now());
         String effectiveSemester = String.valueOf(round.get("semester_id"));
@@ -146,7 +146,7 @@ public class RegistrationService {
     @Transactional
     public SummaryResponse summary(String studentId, String semesterId) {
         requireStudent(studentId);
-        Map<String, Object> round = openRoundReadOnly(semesterId, "REGISTRATION");
+        Map<String, Object> round = openReadRound(semesterId);
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
         int limit = ((Number) round.get("credit_limit")).intValue();
         List<String> ids = activeEnrollments(studentId, String.valueOf(round.get("semester_id"))).stream()
@@ -453,6 +453,23 @@ public class RegistrationService {
     /** Read paths must not hold exclusive round locks; only enroll/drop serialize on them. */
     private Map<String, Object> openRoundReadOnly(String semesterId, String preferredKind) {
         return openRound(semesterId, preferredKind, false);
+    }
+
+    /**
+     * Reads the active round for catalog, eligibility, and summary screens.
+     * Catalog and summary remain available during an open add/drop window after
+     * the initial registration window has closed; mutation paths keep their
+     * stricter phase-specific locks below.
+     */
+    private Map<String, Object> openReadRound(String semesterId) {
+        try {
+            return openRoundReadOnly(semesterId, "REGISTRATION");
+        } catch (DomainException exception) {
+            if (!"WINDOW_CLOSED".equals(exception.code())) {
+                throw exception;
+            }
+            return openRoundReadOnly(semesterId, "ADD_DROP");
+        }
     }
 
     private Map<String, Object> openRound(String semesterId, String preferredKind, boolean forUpdate) {

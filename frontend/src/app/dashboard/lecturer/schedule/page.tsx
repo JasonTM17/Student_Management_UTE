@@ -216,7 +216,7 @@ export default function LecturerSchedulePage() {
         title={copy.title}
         description={copy.description}
         actions={
-          <div className="min-w-[220px]">
+          <div className="min-w-0 sm:min-w-[300px]">
             <Select
               aria-label={copy.selectSemester}
               value={selectedSemester}

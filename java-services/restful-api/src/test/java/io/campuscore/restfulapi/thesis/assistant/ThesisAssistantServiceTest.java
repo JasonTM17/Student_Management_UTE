@@ -6,12 +6,15 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyInt;
 import static org.mockito.ArgumentMatchers.anyList;
+import static org.mockito.ArgumentMatchers.anyLong;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.doAnswer;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
 import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.verifyNoInteractions;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.thesis.assistant.AssistantCompletionProvider.CompletionResult;
@@ -30,6 +33,49 @@ import org.springframework.http.HttpStatus;
 import org.springframework.dao.DataAccessResourceFailureException;
 
 class ThesisAssistantServiceTest {
+
+    @Test
+    void directFactLookupStaysOnRagWithoutProviderDispatch() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "11111111-1111-1111-1111-111111111111", "topic", "en", "Topic", "topic details", "office");
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
+                eq("topic details"), eq(false), eq("RAG_GROUNDED"), anyList(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, message, "topic details", "curated-lexical-rag", false,
+                        "RAG_GROUNDED", List.of(), false, "COMPLETED"));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90));
+
+        ChatResponse response = service.answer("topic", "en", null, "owner-rag", request);
+
+        assertEquals("RAG_GROUNDED", response.reasonCode());
+        assertEquals("curated-lexical-rag", response.model());
+        assertTrue(!response.degraded());
+        verify(turns, never()).dispatch(any(), anyString(), anyLong(), anyInt(), anyInt(), any());
+        verifyNoInteractions(provider);
+    }
 
     @Test
     void databaseOutageReturnsExplicitDegradedResponseWithoutCitations() {
@@ -90,7 +136,8 @@ class ThesisAssistantServiceTest {
                 .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
         Citation citation = new Citation("doc", "topic", "Topic", "office", "en", "Grounded answer",
                 "THESIS", "CURATED", "11111111-1111-1111-1111-111111111111", null, null, "hash", null, null, null);
-        when(turns.complete(eq(turn), anyString(), eq(1L), eq("topic"), eq("curated-lexical-rag"),
+        String hardQuestion = "topic compare multiple conditions";
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("PROVIDER_UNSAFE_OUTPUT"), anyList(),
                 any(java.util.function.Consumer.class)))
                 .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
@@ -115,7 +162,7 @@ class ThesisAssistantServiceTest {
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
                 new AssistantProperties(6000, 2000, 20, 200, 90));
 
-        ChatResponse response = service.answer("topic", "en", null, "owner-a", request, events::add);
+        ChatResponse response = service.answer(hardQuestion, "en", null, "owner-a", request, events::add);
 
         assertEquals("PROVIDER_UNSAFE_OUTPUT", response.reasonCode());
         assertEquals("Grounded answer", response.answer());
@@ -123,7 +170,7 @@ class ThesisAssistantServiceTest {
                 && "PROVIDER_UNSAFE_OUTPUT".equals(replace.reasonCode())));
         assertTrue(events.stream().noneMatch(event -> event instanceof StreamDelta delta
                 && delta.text().contains("example.edu")));
-        verify(turns).complete(eq(turn), eq("owner-a"), eq(1L), eq("topic"), eq("curated-lexical-rag"),
+        verify(turns).complete(eq(turn), eq("owner-a"), eq(1L), anyString(), eq("curated-lexical-rag"),
                 eq("Grounded answer"), eq(true), eq("PROVIDER_UNSAFE_OUTPUT"), anyList(),
                 any(java.util.function.Consumer.class));
     }
@@ -153,7 +200,8 @@ class ThesisAssistantServiceTest {
         when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
                 any(java.util.function.Consumer.class)))
                 .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
-        when(turns.complete(eq(turn), anyString(), eq(1L), eq("topic"), eq("deepseek-v4-flash"),
+        String hardQuestion = "topic compare multiple conditions";
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("deepseek-v4-flash"),
                 eq("grounded answer"), eq(false), eq("ANSWERED"), anyList(),
                 any(java.util.function.Consumer.class)))
                 .thenThrow(new DomainException(HttpStatus.CONFLICT, "TURN_TERMINAL_RACE", "cancel won"));
@@ -172,7 +220,7 @@ class ThesisAssistantServiceTest {
                 new AssistantProperties(6000, 2000, 20, 200, 90));
 
         assertThrows(DomainException.class,
-                () -> service.answer("topic", "en", null, "owner-race", request, events::add));
+                () -> service.answer(hardQuestion, "en", null, "owner-race", request, events::add));
         assertTrue(events.stream().anyMatch(event -> event instanceof StreamDelta));
         assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
                 && replace.text().isEmpty() && "TURN_TERMINAL_RACE".equals(replace.reasonCode())));

@@ -29,7 +29,7 @@ services:
       # build context and avoids silently omitting the parent pom.
       context: .
       dockerfile: java-services/restful-api/Dockerfile
-    image: ${E2E_CORE_API_IMAGE:-campuscore-restful-api:e2e-local}
+    image: ${E2E_CORE_API_IMAGE:-student-management-ute-restful-api:e2e-local}
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-persistence}
       SERVER_PORT: 4100

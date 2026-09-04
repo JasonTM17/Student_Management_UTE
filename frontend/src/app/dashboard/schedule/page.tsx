@@ -53,6 +53,7 @@ export default function SchedulePage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
 
+  /** Loads semester choices and selects the best current term for the weekly agenda. */
   const fetchSemesters = useCallback(async () => {
     const response = await semestersApi.getAll();
     setSemesters(response.data ?? []);
@@ -62,6 +63,7 @@ export default function SchedulePage() {
     }
   }, []);
 
+  /** Loads the student's enrollment records whose section schedules form the timetable. */
   const fetchEnrollments = useCallback(
     async (semesterId?: string) => {
       const response = await enrollmentsApi.getMyEnrollments(semesterId);
@@ -70,6 +72,7 @@ export default function SchedulePage() {
     [],
   );
 
+  /** Loads schedule filters and maps failures to the page's truthful unavailable state. */
   const loadData = useCallback(async () => {
     setIsLoading(true);
     setError('');
@@ -126,6 +129,7 @@ export default function SchedulePage() {
     };
   }, [fetchEnrollments, hasAccess, locale, selectedSemester]);
 
+  /** Projects active enrollments into sorted weekday meeting cards for the selected term. */
   const agenda = useMemo(() => {
     const items: DayAgendaItem[] = [];
 
@@ -259,7 +263,7 @@ export default function SchedulePage() {
         description={copy.description}
         actions={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="min-w-[220px]">
+            <div className="min-w-0 sm:min-w-[300px]">
               <Select
                 aria-label={copy.selectSemester}
                 value={selectedSemester}
