@@ -14,10 +14,24 @@ async function handle(request: NextRequest, context: RouteContext) {
   const backendPath = suffix === '/openapi.json' ? '/v3/api-docs' : `/v3/api-docs${suffix}`;
   const headers = new Headers(request.headers);
   headers.delete('host');
-  return fetch(`${origin}${backendPath}`, {
+  headers.set('accept-encoding', 'identity');
+
+  const response = await fetch(`${origin}${backendPath}`, {
     method: request.method,
     headers,
     redirect: 'manual',
+  });
+
+  const responseHeaders = new Headers(response.headers);
+  responseHeaders.delete('transfer-encoding');
+  responseHeaders.delete('content-encoding');
+  responseHeaders.delete('content-length');
+  responseHeaders.delete('connection');
+
+  return new Response(response.body, {
+    status: response.status,
+    statusText: response.statusText,
+    headers: responseHeaders,
   });
 }
 
