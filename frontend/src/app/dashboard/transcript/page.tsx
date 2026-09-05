@@ -99,7 +99,7 @@ export default function TranscriptPage() {
     setError('');
 
     try {
-      const data = await gradesApi.getMyTranscript(selectedSemester || undefined);
+      const data = await gradesApi.getMyTranscript();
       if (generation !== loadGeneration.current) return;
       setTranscriptData(data);
     } catch {
@@ -114,7 +114,7 @@ export default function TranscriptPage() {
         setIsLoading(false);
       }
     }
-  }, [locale, selectedSemester]);
+  }, [locale]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -128,10 +128,11 @@ export default function TranscriptPage() {
     }
   }, [fetchTranscript, hasAccess]);
 
-  const transcriptSemesters = useMemo(
-    () => transcriptData?.semesters ?? [],
-    [transcriptData],
-  );
+  const transcriptSemesters = useMemo(() => {
+    const all = transcriptData?.semesters ?? [];
+    if (!selectedSemester) return all;
+    return all.filter((semester) => semester.semesterId === selectedSemester);
+  }, [transcriptData, selectedSemester]);
 
   const totalCourses = useMemo(
     () =>

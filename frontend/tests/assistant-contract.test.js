@@ -57,16 +57,18 @@ test('assistant parser reports malformed JSON through opt-in invalid callback', 
 });
 
 test('assistant reducer owns streaming, citations, degraded, and retry states', () => {
-  const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /export function assistantReducer/);
-  assert.match(source, /type: 'delta'/);
-  assert.match(source, /type: 'citation'/);
-  assert.match(source, /KNOWLEDGE_UNAVAILABLE/);
-  assert.match(source, /QUOTA_EXCEEDED/);
-  assert.match(source, /AbortController/);
-  assert.match(source, /TURN_TERMINAL_RACE/);
-  assert.match(source, /TURN_NOT_ACTIVE/);
-  assert.match(source, /Do not issue a JSON replay/);
+  const reducerSource = fs.readFileSync(path.join(root, 'src/components/assistant/assistant-reducer.ts'), 'utf8');
+  const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(reducerSource, /export function assistantReducer/);
+  assert.match(reducerSource, /type: 'delta'/);
+  assert.match(reducerSource, /type: 'citation'/);
+  assert.match(reducerSource, /TURN_TERMINAL_RACE/);
+  assert.match(reducerSource, /TURN_NOT_ACTIVE/);
+  assert.match(panelSource, /TRANSIENT_TERMINAL_CODES/);
+  assert.match(panelSource, /KNOWLEDGE_UNAVAILABLE/);
+  assert.match(panelSource, /QUOTA_EXCEEDED/);
+  assert.match(panelSource, /AbortController/);
+  assert.match(panelSource, /Do not issue a JSON replay/);
 });
 
 test('assistant launcher has a campus helpdesk mark and full interaction states', () => {

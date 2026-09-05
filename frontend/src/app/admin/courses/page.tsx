@@ -123,17 +123,22 @@ export default function AdminCoursesPage() {
       const response = await coursesApi.getAll({
         page,
         limit: 20,
-        departmentId: departmentFilter || undefined,
       });
-      const filteredCourses = search
-        ? response.data.filter(
-            (course: Course) =>
-              course.code.toLowerCase().includes(search.toLowerCase()) ||
-              course.name.toLowerCase().includes(search.toLowerCase()) ||
-              course.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
-              course.nameVi?.toLowerCase().includes(search.toLowerCase()),
-          )
-        : response.data;
+      let filteredCourses = response.data || [];
+      if (departmentFilter) {
+        filteredCourses = filteredCourses.filter(
+          (course: Course) => course.departmentId === departmentFilter,
+        );
+      }
+      if (search) {
+        filteredCourses = filteredCourses.filter(
+          (course: Course) =>
+            course.code.toLowerCase().includes(search.toLowerCase()) ||
+            course.name.toLowerCase().includes(search.toLowerCase()) ||
+            course.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
+            course.nameVi?.toLowerCase().includes(search.toLowerCase()),
+        );
+      }
 
       setCourses(filteredCourses);
       setTotalPages(response.meta?.totalPages || 1);

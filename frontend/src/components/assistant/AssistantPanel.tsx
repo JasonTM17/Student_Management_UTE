@@ -2,7 +2,6 @@
 
 import {
   FormEvent,
-  KeyboardEvent,
   useCallback,
   useEffect,
   useReducer,
@@ -12,16 +11,10 @@ import {
 import {
   Bookmark,
   Bot,
-  ChevronLeft,
   History,
   LoaderCircle,
   MessageCircle,
   RotateCcw,
-  Send,
-  Square,
-  ThumbsDown,
-  ThumbsUp,
-  Trash2,
   X,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -31,184 +24,22 @@ import { useI18n } from '@/i18n';
 import {
   createAssistantRequestId,
   thesisApi,
-  type AssistantCitation,
   type AssistantConversation,
   type AssistantStreamEvent,
 } from '@/lib/thesis-api';
-
-export interface ChatMessage {
-  id: string;
-  role: 'assistant' | 'user';
-  content: string;
-  citations?: AssistantCitation[];
-  degraded?: boolean;
-  reasonCode?: string;
-  model?: string;
-  pending?: boolean;
-  feedback?: 'UP' | 'DOWN';
-}
-type AssistantError =
-  'unavailable' | 'quota' | 'offline' | 'unauthorized' | 'forbidden';
-interface AssistantState {
-  messages: ChatMessage[];
-  conversationId?: string;
-  model?: string;
-  error?: AssistantError;
-}
-type AssistantReplyPatch = {
-  answer?: string;
-  content?: string;
-  model?: string;
-  degraded?: boolean;
-  reasonCode?: string;
-  locale?: 'en' | 'vi';
-  citations?: AssistantCitation[];
-  messageId?: string | null;
-  conversationId?: string | null;
-};
-type AssistantAction =
-  | { type: 'reset'; conversationId?: string; messages?: ChatMessage[] }
-  | { type: 'user'; message: ChatMessage }
-  | { type: 'assistant-start'; message: ChatMessage }
-  | { type: 'retry-start'; prompt: string }
-  | { type: 'delta'; text: string }
-  | { type: 'replace'; text: string }
-  | { type: 'meta'; model?: string; conversationId?: string }
-  | { type: 'citation'; citation: AssistantCitation }
-  | { type: 'complete'; reply: AssistantReplyPatch }
-  | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' }
-  | { type: 'clear-error' };
-
-const TRANSIENT_TERMINAL_CODES = new Set([
-  'TURN_CANCELLED',
-  'TURN_TERMINAL_RACE',
-  'TURN_NOT_ACTIVE',
-  'FAILED_AMBIGUOUS',
-  'PURGED',
-]);
-
-export function assistantReducer(
-  state: AssistantState,
-  action: AssistantAction,
-): AssistantState {
-  switch (action.type) {
-    case 'reset':
-      return {
-        messages: action.messages ?? [],
-        conversationId: action.conversationId,
-      };
-    case 'user':
-      return {
-        ...state,
-        error: undefined,
-        messages: [...state.messages, action.message],
-      };
-    case 'assistant-start':
-      return {
-        ...state,
-        error: undefined,
-        messages: [...state.messages, action.message],
-      };
-    case 'retry-start': {
-      const messages = [...state.messages];
-      const last = messages[messages.length - 1];
-      if (last?.role === 'assistant') {
-        messages[messages.length - 1] = {
-          ...last,
-          content: '',
-          citations: [],
-          pending: true,
-          degraded: undefined,
-          reasonCode: undefined,
-        };
-      } else {
-        messages.push({
-          id: `${Date.now()}-retry-assistant`,
-          role: 'assistant',
-          content: '',
-          pending: true,
-        });
-      }
-      return { ...state, error: undefined, messages };
-    }
-    case 'delta': {
-      const index = state.messages.length - 1;
-      if (index < 0 || state.messages[index].role !== 'assistant') return state;
-      const messages = [...state.messages];
-      messages[index] = {
-        ...messages[index],
-        content: messages[index].content + action.text,
-      };
-      return { ...state, messages };
-    }
-    case 'replace': {
-      const index = state.messages.length - 1;
-      if (index < 0 || state.messages[index].role !== 'assistant') return state;
-      const messages = [...state.messages];
-      messages[index] = {
-        ...messages[index],
-        content: action.text,
-        degraded: true,
-        pending: true,
-      };
-      return { ...state, messages };
-    }
-    case 'meta':
-      return {
-        ...state,
-        model: action.model ?? state.model,
-        conversationId: action.conversationId ?? state.conversationId,
-      };
-    case 'citation': {
-      const index = state.messages.length - 1;
-      if (index < 0 || state.messages[index].role !== 'assistant') return state;
-      const messages = [...state.messages];
-      messages[index] = {
-        ...messages[index],
-        citations: [...(messages[index].citations ?? []), action.citation],
-      };
-      return { ...state, messages };
-    }
-    case 'complete': {
-      const index = state.messages.length - 1;
-      if (index < 0 || state.messages[index].role !== 'assistant') return state;
-      const messages = [...state.messages];
-      const current = messages[index];
-      messages[index] = {
-        ...current,
-        content: action.reply.content ?? current.content,
-        citations: action.reply.citations ?? current.citations,
-        degraded: action.reply.degraded ?? current.degraded,
-        reasonCode: action.reply.reasonCode ?? current.reasonCode,
-        model: action.reply.model ?? current.model,
-        pending: false,
-        id: action.reply.messageId ?? current.id,
-      };
-      return {
-        ...state,
-        messages,
-        model: action.reply.model ?? state.model,
-        conversationId: action.reply.conversationId ?? state.conversationId,
-      };
-    }
-    case 'error':
-      return { ...state, error: action.kind ?? 'unavailable' };
-    case 'clear-error':
-      return { ...state, error: undefined };
-    case 'feedback': {
-      const messages = state.messages.map((message) =>
-        message.id === action.messageId
-          ? { ...message, feedback: action.rating }
-          : message,
-      );
-      return { ...state, messages };
-    }
-    default:
-      return state;
-  }
-}
-const initialState: AssistantState = { messages: [] };
+import {
+  TRANSIENT_TERMINAL_CODES,
+  assistantReducer,
+  fromHistoryMessage,
+  initialState,
+  type ChatMessage,
+} from './assistant-reducer';
+import { AssistantMessages } from './AssistantMessages';
+import {
+  AssistantHistoryPanel,
+  type AssistantHistoryStatus,
+} from './AssistantHistoryPanel';
+import { AssistantComposer } from './AssistantComposer';
 
 function AssistantLauncherMark() {
   return (
@@ -225,33 +56,6 @@ function AssistantLauncherMark() {
     </span>
   );
 }
-function fromHistoryMessage(message: {
-  id: string;
-  role: 'assistant' | 'user' | 'ASSISTANT' | 'USER';
-  content: string;
-  citations?: AssistantCitation[];
-  degraded?: boolean;
-  reasonCode?: string | null;
-  model?: string | null;
-  feedback?: 'UP' | 'DOWN' | null;
-}): ChatMessage {
-  const role = message.role.toLowerCase() === 'user' ? 'user' : 'assistant';
-  return {
-    id: message.id,
-    role,
-    content: message.content,
-    citations: message.citations,
-    degraded: message.degraded,
-    reasonCode: message.reasonCode ?? undefined,
-    model: message.model ?? undefined,
-    feedback: message.feedback ?? undefined,
-  };
-}
-
-interface AssistantPanelProps {
-  isOpen?: boolean;
-  onOpenChange?: (open: boolean) => void;
-}
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
@@ -267,9 +71,7 @@ export function AssistantPanel() {
   const [input, setInput] = useState('');
   const [isSending, setIsSending] = useState(false);
   const [history, setHistory] = useState<AssistantConversation[]>([]);
-  const [historyStatus, setHistoryStatus] = useState<
-    'idle' | 'loading' | 'loaded' | 'error'
-  >('idle');
+  const [historyStatus, setHistoryStatus] = useState<AssistantHistoryStatus>('idle');
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
   const [lastPrompt, setLastPrompt] = useState<string>();
@@ -684,37 +486,6 @@ export function AssistantPanel() {
     }
   };
 
-  const handleComposerKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
-    if (
-      event.key !== 'Enter' ||
-      event.shiftKey ||
-      event.nativeEvent.isComposing
-    )
-      return;
-    const value = event.currentTarget.value.trim();
-    if (!value) {
-      event.preventDefault();
-      return;
-    }
-    event.preventDefault();
-    event.currentTarget.form?.requestSubmit();
-  };
-  const reasonLabel = (message: ChatMessage) =>
-    message.reasonCode === 'QUOTA_EXCEEDED'
-      ? messages.assistant.quotaExceeded
-      : message.degraded
-        ? messages.assistant.degraded
-        : message.reasonCode === 'NO_MATCH'
-          ? messages.assistant.noMatch
-          : message.reasonCode === 'ANSWERED'
-            ? messages.assistant.answered
-            : message.reasonCode === 'CANCELLED'
-              ? messages.assistant.cancelled
-              : messages.assistant.answered;
-  const citationDomainLabel = (citation: AssistantCitation) => {
-    const domain = citation.domain?.toUpperCase() as keyof typeof messages.assistant.domains | undefined;
-    return (domain && messages.assistant.domains[domain]) || messages.assistant.domains.GENERAL_FAQ;
-  };
   const errorLabel =
     state.error === 'quota'
       ? messages.assistant.quotaExceeded
@@ -731,21 +502,21 @@ export function AssistantPanel() {
       className={cn(
         'fixed z-50',
         open
-          ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(26rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
+          ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(23rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
           : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
       )}
     >
       {!open ? (
         <div className="flex items-center gap-2">
           <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-card/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-lg backdrop-blur transition-all duration-200 group-hover:border-primary/40 pointer-events-none">
-            ✨ {locale === 'vi' ? 'Hỏi trợ lý CampusCore' : 'Ask CampusCore AI'}
+            ✨ {messages.assistant.launcherHint}
           </span>
           <Button
             ref={launcherRef}
             type="button"
             size="icon"
             data-assistant-launcher="campus-mark"
-            className="group relative ml-auto min-h-14 min-w-14 rounded-2xl border-2 border-white/40 bg-gradient-to-tr from-primary via-[#004eab] to-[#0070f3] text-white shadow-[0_10px_30px_rgba(0,63,135,0.38)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(0,63,135,0.48)] hover:scale-105 active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
+            className="group relative ml-auto min-h-12 min-w-12 rounded-2xl border-2 border-white/40 bg-gradient-to-tr from-primary via-[#004eab] to-[#0070f3] text-white shadow-[0_10px_30px_rgba(0,63,135,0.38)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(0,63,135,0.48)] hover:scale-105 active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
             onClick={() => setOpen(true)}
             aria-label={messages.assistant.open}
             title={messages.assistant.open}
@@ -761,9 +532,9 @@ export function AssistantPanel() {
           aria-describedby="assistant-panel-description"
           className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
         >
-          <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-4 text-white shadow-sm">
+          <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
             <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
                 <Bot className="h-5 w-5" aria-hidden="true" />
               </div>
               <div className="min-w-0">
@@ -804,89 +575,16 @@ export function AssistantPanel() {
             </div>
           </header>
           {showHistory ? (
-            <div
-              className="border-b border-border/70 bg-secondary/30 px-3 py-3"
-              aria-label={messages.assistant.history}
-            >
-              <div className="mb-2 flex items-center justify-between gap-2">
-                <Button
-                  type="button"
-                  variant="ghost"
-                  size="sm"
-                  className="min-h-11 gap-1"
-                  onClick={() => setShowHistory(false)}
-                >
-                  <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-                  {messages.assistant.backToChat}
-                </Button>
-                <Button
-                  type="button"
-                  size="sm"
-                  className="min-h-11"
-                  onClick={() => void createConversation()}
-                >
-                  {messages.assistant.newConversation}
-                </Button>
-              </div>
-              {historyStatus === 'loading' ? (
-                <p
-                  className="px-2 py-4 text-sm text-muted-foreground"
-                  role="status"
-                >
-                  {messages.assistant.historyLoading}
-                </p>
-              ) : null}
-              {historyStatus === 'error' ? (
-                <div
-                  className="px-2 py-2 text-sm text-destructive"
-                  role="alert"
-                >
-                  <p>{messages.assistant.historyUnavailable}</p>
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-1 min-h-11 px-0 text-destructive"
-                    onClick={loadHistory}
-                  >
-                    <RotateCcw className="mr-1 h-4 w-4" />
-                    {messages.assistant.retry}
-                  </Button>
-                </div>
-              ) : null}
-              {historyStatus !== 'loading' && !history.length ? (
-                <p className="px-2 py-4 text-sm text-muted-foreground">
-                  {messages.assistant.historyEmpty}
-                </p>
-              ) : null}
-              <div className="max-h-48 space-y-1 overflow-y-auto">
-                {history.map((item) => (
-                  <div
-                    key={item.id}
-                    className="flex items-center gap-1 rounded-md border border-border/60 bg-card"
-                  >
-                    <button
-                      type="button"
-                      onClick={() => void selectConversation(item)}
-                      className="min-h-11 min-w-0 flex-1 truncate px-3 text-left text-sm font-medium text-foreground hover:bg-secondary focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                    >
-                      {item.title || messages.assistant.untitledConversation}
-                    </button>
-                    <Button
-                      type="button"
-                      variant="ghost"
-                      size="icon"
-                      disabled={deletingConversationId === item.id}
-                      className="mr-1 min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
-                      onClick={() => void deleteConversation(item.id)}
-                      aria-label={messages.assistant.deleteConversation}
-                    >
-                      <Trash2 className="h-4 w-4" aria-hidden="true" />
-                    </Button>
-                  </div>
-                ))}
-              </div>
-            </div>
+            <AssistantHistoryPanel
+              history={history}
+              historyStatus={historyStatus}
+              deletingConversationId={deletingConversationId}
+              onBack={() => setShowHistory(false)}
+              onCreate={() => void createConversation()}
+              onSelect={(conversation) => void selectConversation(conversation)}
+              onDelete={(conversationId) => void deleteConversation(conversationId)}
+              onRetry={loadHistory}
+            />
           ) : null}
           <div
             ref={logRef}
@@ -895,27 +593,23 @@ export function AssistantPanel() {
             aria-live="polite"
             aria-relevant="additions text"
             aria-busy={isSending}
-            className="min-h-48 flex-1 space-y-3 overflow-y-auto bg-background px-4 py-4"
+            className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3 py-3"
           >
             {state.messages.length === 0 ? (
-              <div className="flex min-h-48 flex-col items-center justify-center gap-3.5 text-center p-3">
-                <div className="flex h-12 w-12 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                  <Bot className="h-6 w-6 animate-bounce" aria-hidden="true" />
+              <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
+                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                  <Bot className="h-5 w-5 animate-bounce" aria-hidden="true" />
                 </div>
                 <div className="space-y-1">
                   <p className="text-sm font-semibold text-foreground">
-                    {locale === 'vi' ? 'Xin chào! Mình có thể giúp gì cho bạn?' : 'Hello! How can I help you?'}
+                    {messages.assistant.greeting}
                   </p>
                   <p className="max-w-xs text-xs text-muted-foreground leading-relaxed">
                     {messages.assistant.empty}
                   </p>
                 </div>
-                <div className="mt-2 flex flex-wrap justify-center gap-1.5 max-w-xs">
-                  {[
-                    locale === 'vi' ? 'Đăng ký học phần thế nào?' : 'How to register courses?',
-                    locale === 'vi' ? 'Xem thời khóa biểu ở đâu?' : 'Where is my schedule?',
-                    locale === 'vi' ? 'Tiêu chí chọn đề tài luận văn' : 'Thesis topic criteria',
-                  ].map((suggestion) => (
+                <div className="mt-1 flex flex-wrap justify-center gap-1.5 max-w-xs">
+                  {messages.assistant.suggestions.map((suggestion) => (
                     <button
                       key={suggestion}
                       type="button"
@@ -928,103 +622,10 @@ export function AssistantPanel() {
                 </div>
               </div>
             ) : (
-              state.messages.map((message) => (
-                <div
-                  key={message.id}
-                  role="article"
-                  aria-label={
-                    message.role === 'user'
-                      ? messages.assistant.you
-                      : messages.assistant.label
-                  }
-                  className={cn(
-                    'max-w-[90%] rounded-md px-3.5 py-2.5 text-sm leading-6',
-                    message.role === 'user'
-                      ? 'ml-auto bg-primary text-primary-foreground'
-                      : 'border border-border/70 bg-card text-foreground',
-                  )}
-                >
-                  <p className="whitespace-pre-wrap">
-                    {message.content ||
-                      (message.pending ? messages.assistant.thinking : '')}
-                  </p>
-                  {message.role === 'assistant' && message.reasonCode ? (
-                    <p
-                      className={cn(
-                        'mt-2 text-[11px] uppercase tracking-wide',
-                        message.degraded
-                          ? 'text-status-warning-foreground'
-                          : 'text-muted-foreground',
-                      )}
-                    >
-                      {reasonLabel(message)}
-                    </p>
-                  ) : null}
-                  {message.citations?.length ? (
-                    <div
-                      className="mt-3 space-y-2 border-t border-border/70 pt-2"
-                      aria-label={messages.assistant.sources}
-                    >
-                      {message.citations.map((citation) => (
-                        <div
-                          key={citation.id}
-                          className="border-l-2 border-primary pl-2 text-xs leading-5"
-                        >
-                          <p className="font-semibold text-foreground">
-                            {citation.title}
-                          </p>
-                          <p className="text-muted-foreground">
-                            {citationDomainLabel(citation)} · {citation.locale.toUpperCase()}
-                          </p>
-                          <span className="sr-only">{citation.source}</span>
-                          <p className="mt-1 text-muted-foreground">
-                            {citation.excerpt}
-                          </p>
-                        </div>
-                      ))}
-                    </div>
-                  ) : null}
-                  {message.role === 'assistant' &&
-                  !message.pending &&
-                  !message.id.startsWith('local-') ? (
-                    <div
-                      data-assistant-feedback={message.id}
-                      className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-1"
-                    >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'min-h-10 min-w-10',
-                          message.feedback === 'UP' &&
-                            'bg-secondary text-primary',
-                        )}
-                        aria-label={messages.assistant.feedbackUp}
-                        aria-pressed={message.feedback === 'UP'}
-                        onClick={() => void setFeedback(message.id, 'UP')}
-                      >
-                        <ThumbsUp className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'min-h-10 min-w-10',
-                          message.feedback === 'DOWN' &&
-                            'bg-secondary text-destructive',
-                        )}
-                        aria-label={messages.assistant.feedbackDown}
-                        aria-pressed={message.feedback === 'DOWN'}
-                        onClick={() => void setFeedback(message.id, 'DOWN')}
-                      >
-                        <ThumbsDown className="h-4 w-4" aria-hidden="true" />
-                      </Button>
-                    </div>
-                  ) : null}
-                </div>
-              ))
+              <AssistantMessages
+                messageList={state.messages}
+                onFeedback={(messageId, rating) => void setFeedback(messageId, rating)}
+              />
             )}
             {isSending ? (
               <div
@@ -1064,50 +665,14 @@ export function AssistantPanel() {
               </div>
             ) : null}
           </div>
-          <form
+          <AssistantComposer
+            input={input}
+            inputRef={inputRef}
+            isSending={isSending}
+            onInputChange={setInput}
             onSubmit={(event) => void sendMessage(event)}
-            className="border-t border-border/70 bg-card p-3"
-          >
-            <div className="flex items-end gap-2 rounded-md border border-border/80 bg-background p-2 focus-within:ring-2 focus-within:ring-ring">
-              <textarea
-                ref={inputRef}
-                value={input}
-                onChange={(event) => setInput(event.target.value)}
-                onInput={(event) => setInput((event.target as HTMLTextAreaElement).value)}
-                onKeyDown={handleComposerKeyDown}
-                placeholder={messages.assistant.placeholder}
-                rows={2}
-                maxLength={2000}
-                className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
-                aria-label={messages.assistant.placeholder}
-              />
-              {isSending ? (
-                <Button
-                  type="button"
-                  variant="secondary"
-                  size="icon"
-                  className="min-h-11 min-w-11"
-                  onClick={() => void stopGeneration()}
-                  aria-label={messages.assistant.stop}
-                >
-                  <Square className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              ) : (
-                <Button
-                  type="submit"
-                  size="icon"
-                  className="min-h-11 min-w-11"
-                  disabled={!input.trim()}
-                  aria-label={messages.assistant.send}
-                >
-                  <Send className="h-4 w-4" aria-hidden="true" />
-                </Button>
-              )}
-            </div>
-            <p className="mt-2 text-[11px] text-muted-foreground">
-              {input.length}/2000
-            </p>
-          </form>
+            onStop={() => void stopGeneration()}
+          />
         </section>
       )}
     </div>

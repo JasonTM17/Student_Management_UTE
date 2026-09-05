@@ -514,6 +514,16 @@ export default function AdminSectionsPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    if (schedules.some((s) => !s.classroomId)) {
+      toast.error(
+        locale === 'vi'
+          ? 'Vui lòng chọn phòng học cho tất cả các lịch học.'
+          : 'Please select a classroom for each scheduled session.',
+      );
+      return;
+    }
+
     setIsSaving(true);
 
     try {

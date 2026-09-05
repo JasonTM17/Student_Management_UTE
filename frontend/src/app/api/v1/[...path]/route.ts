@@ -31,6 +31,16 @@ async function handle(request: NextRequest, context: RouteContext) {
   responseHeaders.delete('content-length');
   responseHeaders.delete('connection');
 
+  if (typeof response.headers.getSetCookie === 'function') {
+    const cookies = response.headers.getSetCookie();
+    if (cookies.length > 0) {
+      responseHeaders.delete('set-cookie');
+      for (const cookie of cookies) {
+        responseHeaders.append('set-cookie', cookie);
+      }
+    }
+  }
+
   return new Response(response.body, {
     status: response.status,
     statusText: response.statusText,

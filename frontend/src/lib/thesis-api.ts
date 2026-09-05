@@ -256,6 +256,11 @@ export const thesisApi = {
     return response.data;
   },
 
+  getTopic: async (topicId: string): Promise<ThesisTopic> => {
+    const response = await api.get<ThesisTopic>('/thesis/topics/' + topicId);
+    return response.data;
+  },
+
   listGroups: async (roundId: string): Promise<ThesisGroup[]> => {
     const response = await api.get<ThesisGroup[]>('/thesis/groups', {
       params: { roundId },

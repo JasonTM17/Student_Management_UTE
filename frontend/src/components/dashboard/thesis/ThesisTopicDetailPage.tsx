@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useState } from 'react';
 import { ArrowLeft, FileStack } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
 import { LinkButton } from '@/components/ui/link-button';
@@ -10,6 +11,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { thesisApi, type ThesisTopic } from '@/lib/thesis-api';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicDetailPage() {
@@ -19,7 +21,32 @@ export default function ThesisTopicDetailPage() {
   const searchParams = useSearchParams();
   const topicId = Array.isArray(params.id) ? params.id[0] : params.id;
   const workspace = useThesisWorkspace(searchParams.get('roundId') ?? '');
-  const topic = workspace.topics.find((item) => item.id === topicId);
+  const [directTopic, setDirectTopic] = useState<ThesisTopic | null>(null);
+  const [directLoading, setDirectLoading] = useState(false);
+
+  useEffect(() => {
+    if (!topicId || workspace.topics.some((item) => item.id === topicId)) {
+      return;
+    }
+    let cancelled = false;
+    setDirectLoading(true);
+    thesisApi
+      .getTopic(topicId)
+      .then((t) => {
+        if (!cancelled) setDirectTopic(t);
+      })
+      .catch(() => {
+        if (!cancelled) setDirectTopic(null);
+      })
+      .finally(() => {
+        if (!cancelled) setDirectLoading(false);
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [topicId, workspace.topics]);
+
+  const topic = workspace.topics.find((item) => item.id === topicId) ?? directTopic;
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -29,7 +56,7 @@ export default function ThesisTopicDetailPage() {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
-  if (workspace.isLoading) {
+  if (workspace.isLoading || (directLoading && !topic)) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 

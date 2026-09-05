@@ -104,11 +104,13 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /event\.key !== 'Escape'/);
   assert.match(assistant, /launcherRef\.current\?\.focus\(\)/);
   assert.match(assistant, /thesisApi\.chat\(message, locale\)/);
-  assert.match(assistant, /citation\.title/);
-  assert.match(assistant, /citation\.source/);
-  assert.match(assistant, /citation\.excerpt/);
   assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
-  assert.match(assistant, /messages\.assistant\.noMatch/);
+  const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');
+  assert.match(assistantMessages, /citation\.title/);
+  assert.match(assistantMessages, /citation\.source/);
+  assert.match(assistantMessages, /citation\.excerpt/);
+  assert.match(assistantMessages, /messages\.assistant\.noMatch/);
+  assert.match(assistantMessages, /messages\.assistant\.degraded/);
   assert.match(messages, /Hỏi về đăng ký học phần, lịch học, thông báo, học liệu, chính sách hoặc hành trình luận văn/);
   assert.doesNotMatch(messages, /nhóm hoặc phản biện|groups, or reviews/i);
 });

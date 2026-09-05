@@ -1,14 +1,19 @@
 package io.campuscore.restfulapi.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import java.util.List;
 import java.util.Set;
 import org.junit.jupiter.api.Test;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.core.GrantedAuthority;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.web.cors.CorsConfiguration;
+import org.springframework.web.cors.CorsConfigurationSource;
 
 class SecurityConfigTest {
 
@@ -42,6 +47,21 @@ class SecurityConfigTest {
                 BadCredentialsException.class,
                 () -> SecurityConfig.authoritiesFromClaims(
                         token().claim("permissions", List.of("announcement:read", "")).build()));
+    }
+
+    @Test
+    void configuresPermissiveLocalAndProductionCors() {
+        SecurityConfig config = new SecurityConfig();
+        CorsConfigurationSource source = config.corsConfigurationSource();
+        MockHttpServletRequest request = new MockHttpServletRequest();
+        request.setRequestURI("/api/v1/health");
+
+        CorsConfiguration corsConfig = source.getCorsConfiguration(request);
+        assertNotNull(corsConfig);
+        assertTrue(Boolean.TRUE.equals(corsConfig.getAllowCredentials()));
+        assertTrue(corsConfig.getAllowedOriginPatterns().contains("https://campusute.io.vn"));
+        assertTrue(corsConfig.getAllowedOriginPatterns().contains("https://*.vercel.app"));
+        assertTrue(corsConfig.getAllowedOriginPatterns().contains("http://localhost:3000"));
     }
 
     private static Jwt.Builder token() {

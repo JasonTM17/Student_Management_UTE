@@ -247,7 +247,7 @@ export default function DashboardPage() {
                         {messages.common.actions.browseSections}
                       </LinkButton>
                     }
-                    className="min-h-[280px] border-none bg-transparent px-0 py-0"
+                    className="min-h-[224px] border-none bg-transparent px-0 py-0"
                   />
                 ) : (
                   <div className="space-y-3">
@@ -292,7 +292,7 @@ export default function DashboardPage() {
             <WorkspacePanel
               title={messages.studentDashboard.panels.referenceLinks.title}
               description={messages.studentDashboard.panels.referenceLinks.description}
-              contentClassName="grid gap-4 md:grid-cols-3"
+              contentClassName="grid gap-4 sm:grid-cols-2"
             >
                 {portalLinks.map((item, index) => (
                   <WorkspaceActionTile

@@ -78,8 +78,9 @@ public class AcademicMutationController {
             @RequestParam(required = false) String status,
             @RequestParam(required = false) String semesterId,
             @RequestParam(required = false) String studentId,
-            @RequestParam(required = false) String courseId) {
-        return mutations.exportEnrollments(status, semesterId, studentId, courseId);
+            @RequestParam(required = false) String courseId,
+            @RequestParam(required = false) String sectionId) {
+        return mutations.exportEnrollments(status, semesterId, studentId, courseId, sectionId);
     }
 
     @PutMapping("sections/{sectionId}/grades")

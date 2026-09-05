@@ -7,6 +7,7 @@ import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
@@ -27,5 +28,10 @@ public class ThesisTopicController {
             @RequestParam UUID roundId,
             @RequestParam(required = false) TopicStatus status) {
         return topics.list(roundId, status);
+    }
+
+    @GetMapping("/{id}")
+    public TopicResponse get(@PathVariable UUID id) {
+        return topics.get(id);
     }
 }
