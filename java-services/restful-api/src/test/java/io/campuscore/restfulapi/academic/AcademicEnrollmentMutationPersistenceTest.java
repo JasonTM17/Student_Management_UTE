@@ -65,7 +65,7 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     @BeforeEach
     void prepareFixture() {
-        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         createTables();
         clearTables();
@@ -419,7 +419,7 @@ class AcademicEnrollmentMutationPersistenceTest {
         LocalDateTime now = localDateTime(BASE_TIME);
         for (int index = 2; index <= studentCount; index++) {
             jdbc.update(
-                    "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
+                    "INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\")"
                             + " VALUES (?, ?, ?, ?)",
                     "student-user-" + index,
                     "student" + index + "@campuscore.edu",
@@ -468,7 +468,7 @@ class AcademicEnrollmentMutationPersistenceTest {
 
     private void createTables() {
         jdbc.execute("""
-                CREATE TABLE IF NOT EXISTS "auth"."User" (
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(200) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
@@ -689,13 +689,13 @@ class AcademicEnrollmentMutationPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"AcademicYear\"");
         jdbc.update("DELETE FROM \"academic\".\"Lecturer\"");
         jdbc.update("DELETE FROM \"academic\".\"Student\"");
-        jdbc.update("DELETE FROM \"auth\".\"User\"");
+        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\"");
     }
 
     private void insertFixture() {
         LocalDateTime now = localDateTime(BASE_TIME);
         jdbc.update(
-                "INSERT INTO \"auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+                "INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
                 "student-user-1",
                 "student1@campuscore.edu",
                 "An",

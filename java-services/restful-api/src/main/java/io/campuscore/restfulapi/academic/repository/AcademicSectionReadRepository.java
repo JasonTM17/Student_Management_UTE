@@ -23,7 +23,7 @@ public class AcademicSectionReadRepository {
     private static final String DEPARTMENT = "\"academic\".\"Department\"";
     private static final String SEMESTER = "\"academic\".\"Semester\"";
     private static final String LECTURER = "\"academic\".\"Lecturer\"";
-    private static final String USER = "\"auth\".\"User\"";
+    private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SCHEDULE = "\"academic\".\"SectionSchedule\"";
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";

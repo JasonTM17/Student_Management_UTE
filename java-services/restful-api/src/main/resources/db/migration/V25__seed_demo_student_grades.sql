@@ -37,19 +37,19 @@ WITH generated AS (
            'Demo' AS last_name
     FROM generate_series(2, 16) AS series(n)
 )
-INSERT INTO auth."User" (
+INSERT INTO campuscore_auth."User" (
     "id", "email", "password", "firstName", "lastName", "status", "emailVerified"
 )
 SELECT generated.user_id,
        generated.email,
-       (SELECT "password" FROM auth."User" WHERE "id" = 'student-user'),
+       (SELECT "password" FROM campuscore_auth."User" WHERE "id" = 'student-user'),
        generated.first_name,
        generated.last_name,
        'ACTIVE',
        TRUE
 FROM generated
 WHERE NOT EXISTS (
-    SELECT 1 FROM auth."User" existing WHERE existing."id" = generated.user_id
+    SELECT 1 FROM campuscore_auth."User" existing WHERE existing."id" = generated.user_id
 );
 
 WITH generated AS (
@@ -80,12 +80,12 @@ WITH generated AS (
            'user-role-student-' || lpad(n::text, 3, '0') AS user_role_id
     FROM generate_series(2, 16) AS series(n)
 )
-INSERT INTO auth."UserRole" ("id", "userId", "roleId")
+INSERT INTO campuscore_auth."UserRole" ("id", "userId", "roleId")
 SELECT generated.user_role_id, generated.user_id, 'role-student'
 FROM generated
 WHERE NOT EXISTS (
     SELECT 1
-    FROM auth."UserRole" existing
+    FROM campuscore_auth."UserRole" existing
     WHERE existing."userId" = generated.user_id
       AND existing."roleId" = 'role-student'
 );
