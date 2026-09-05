@@ -2,19 +2,19 @@ ALTER TABLE academic."Student"
     DROP CONSTRAINT IF EXISTS "Student_userId_fkey";
 ALTER TABLE academic."Student"
     ADD CONSTRAINT "Student_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES auth."User" ("id") ON DELETE CASCADE;
+    FOREIGN KEY ("userId") REFERENCES campuscore_auth."User" ("id") ON DELETE CASCADE;
 
 ALTER TABLE academic."Lecturer"
     DROP CONSTRAINT IF EXISTS "Lecturer_userId_fkey";
 ALTER TABLE academic."Lecturer"
     ADD CONSTRAINT "Lecturer_userId_fkey"
-    FOREIGN KEY ("userId") REFERENCES auth."User" ("id") ON DELETE CASCADE;
+    FOREIGN KEY ("userId") REFERENCES campuscore_auth."User" ("id") ON DELETE CASCADE;
 
-DROP TABLE IF EXISTS auth."Student";
-DROP TABLE IF EXISTS auth."Lecturer";
+DROP TABLE IF EXISTS campuscore_auth."Student";
+DROP TABLE IF EXISTS campuscore_auth."Lecturer";
 DROP TABLE IF EXISTS academic."User";
 
-CREATE VIEW auth."Student" AS
+CREATE VIEW campuscore_auth."Student" AS
 SELECT
     "id",
     "userId",
@@ -27,7 +27,7 @@ SELECT
     "updatedAt"
 FROM academic."Student";
 
-CREATE VIEW auth."Lecturer" AS
+CREATE VIEW campuscore_auth."Lecturer" AS
 SELECT
     "id",
     "userId",
@@ -53,8 +53,8 @@ CREATE INDEX IF NOT EXISTS academic_attendance_student_idx
     ON academic."Attendance" ("studentId", "date");
 CREATE INDEX IF NOT EXISTS academic_attendance_section_idx
     ON academic."Attendance" ("sectionId", "date");
-CREATE UNIQUE INDEX IF NOT EXISTS auth_session_refresh_unique
-    ON auth."Session" ("refreshToken");
+CREATE UNIQUE INDEX IF NOT EXISTS campuscore_auth_session_refresh_unique
+    ON campuscore_auth."Session" ("refreshToken");
 
 ALTER TABLE thesis.thesis_registration_round
     DROP COLUMN IF EXISTS defense_date;

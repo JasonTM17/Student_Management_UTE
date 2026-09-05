@@ -239,7 +239,7 @@ CREATE TABLE IF NOT EXISTS engagement."Announcement" (
 
 CREATE TABLE IF NOT EXISTS notifications.notification (
     id VARCHAR(120) PRIMARY KEY,
-    user_id VARCHAR(120) NOT NULL REFERENCES auth."User" ("id") ON DELETE CASCADE,
+    user_id VARCHAR(120) NOT NULL REFERENCES campuscore_auth."User" ("id") ON DELETE CASCADE,
     title VARCHAR(240) NOT NULL,
     message VARCHAR(2000) NOT NULL,
     type VARCHAR(60) NOT NULL,

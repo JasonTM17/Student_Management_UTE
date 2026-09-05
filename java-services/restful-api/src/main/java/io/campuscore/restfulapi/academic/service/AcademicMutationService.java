@@ -28,7 +28,7 @@ public class AcademicMutationService {
     private static final String SEMESTER = "\"academic\".\"Semester\"";
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
     private static final String COURSE = "\"academic\".\"Course\"";
-    private static final String USER = "\"auth\".\"User\"";
+    private static final String USER = "\"campuscore_auth\".\"User\"";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;

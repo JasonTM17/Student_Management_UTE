@@ -120,5 +120,5 @@ spring:
     enabled: ${FLYWAY_ENABLED:true}
     create-schemas: true
     default-schema: thesis
-    schemas: thesis,academic
+    schemas: thesis,academic,campuscore_auth
     locations: classpath:db/migration

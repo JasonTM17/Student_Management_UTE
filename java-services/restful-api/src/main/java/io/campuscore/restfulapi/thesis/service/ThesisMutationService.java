@@ -312,7 +312,7 @@ public class ThesisMutationService {
     }
 
     private void requireActiveStudent(String studentId) {
-        if (count("SELECT COUNT(*) FROM auth.\"Student\" WHERE \"id\" = :studentId AND \"status\" = 'ACTIVE'", null, studentId) == 0) {
+        if (count("SELECT COUNT(*) FROM campuscore_auth.\"Student\" WHERE \"id\" = :studentId AND \"status\" = 'ACTIVE'", null, studentId) == 0) {
             throw new DomainException(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "An active student profile is required");
         }
     }
