@@ -29,7 +29,12 @@ test('admin manages a student and lecturer announcement without exposing service
   await login(page);
   await page.goto('/admin/announcements');
 
-  await expect(page.getByRole('heading', { name: 'Manage announcements' })).toBeVisible();
+  // The first cold Next.js development compile of the governed surface can
+  // outlast the default expect timeout; keep the assertion strict but give
+  // the workspace time to assemble, matching the professional-quality matrix.
+  await expect(page.getByRole('heading', { name: 'Manage announcements' })).toBeVisible({
+    timeout: 30_000,
+  });
   await expect(page.locator('body')).not.toContainText(
     /\b(?:ACTIVE|ARCHIVED|STUDENT|LECTURER|SUPER_ADMIN)\b|audit trail|Announcement governance|\/api\/v1/,
   );
