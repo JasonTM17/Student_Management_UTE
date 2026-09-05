@@ -1188,11 +1188,23 @@ export default function DashboardLayout({
                 </LocalizedLink>
               );
             })}
-            <span
+            <button
+              type="button"
               data-mobile-assistant-slot="true"
-              aria-hidden="true"
-              className="min-h-11 rounded-md"
-            />
+              onClick={() => {
+                if (typeof window !== 'undefined') {
+                  window.dispatchEvent(new CustomEvent('open-campus-assistant'));
+                }
+              }}
+              aria-label={messages.assistant.open}
+              title={messages.assistant.open}
+              className="flex min-h-11 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
+            >
+              <Bot className="h-5 w-5" aria-hidden="true" />
+              <span className="max-w-full text-center leading-4">
+                {messages.assistant.slotLabel}
+              </span>
+            </button>
           </div>
         </nav>
       ) : null}

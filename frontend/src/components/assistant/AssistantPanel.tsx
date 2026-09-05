@@ -507,7 +507,7 @@ export function AssistantPanel() {
       )}
     >
       {!open ? (
-        <div className="flex items-center gap-2">
+        <div className="hidden md:flex items-center gap-2">
           <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-card/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-lg backdrop-blur transition-all duration-200 group-hover:border-primary/40 pointer-events-none">
             ✨ {messages.assistant.launcherHint}
           </span>
