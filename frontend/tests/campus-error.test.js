@@ -68,7 +68,7 @@ test('student and lecturer pages map failures instead of backend envelope fields
   assert.match(profile, /campusErrorMessage\(/);
   assert.match(lecturerGrades, /campusErrorMessage\(/);
   assert.doesNotMatch(register, /Java API/);
-  assert.match(register, /if \(enrollment\.status === 'DROPPED'\) continue/);
+  assert.match(register, /ACTIVE_ENROLLMENT_STATUSES\.has\(enrollment\.status\)\) continue/);
 });
 
 test('demo thesis topic copy is rewritten to campus language', () => {

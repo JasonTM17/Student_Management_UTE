@@ -161,6 +161,18 @@ test('wrong-role and unsigned access surfaces ForbiddenState instead of a spinne
   assert.doesNotMatch(register, /authLoading \|\| !hasAccess/);
 });
 
+test('registration drop actions only bind active enrollments, not completed history', () => {
+  const register = read('src/app/dashboard/register/page.tsx');
+
+  assert.match(register, /ACTIVE_ENROLLMENT_STATUSES/);
+  assert.match(
+    register,
+    /new Set\(\['ENROLLED', 'CONFIRMED', 'PENDING'\]\)/,
+  );
+  assert.doesNotMatch(register, /status !== 'DROPPED'/);
+  assert.doesNotMatch(register, /status === 'DROPPED'/);
+});
+
 test('admin routes use the same fixed sidebar and retained route inventory', () => {
   const frame = read('src/components/admin/AdminFrame.tsx');
 
