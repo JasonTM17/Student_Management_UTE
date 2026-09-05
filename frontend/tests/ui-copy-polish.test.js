@@ -18,12 +18,15 @@ test('student status badges use localized labels instead of raw service enums', 
 });
 
 test('assistant never exposes model identifiers or unknown reason codes', () => {
-  const assistant = read('src/components/assistant/AssistantPanel.tsx');
+  const assistantPanel = read('src/components/assistant/AssistantPanel.tsx');
+  const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');
 
-  assert.match(assistant, /message\.reasonCode === 'CANCELLED'/);
-  assert.match(assistant, /messages\.assistant\.answered/);
-  assert.doesNotMatch(assistant, /messages\.assistant\.model\}: \{message\.model\}/);
-  assert.doesNotMatch(assistant, /: message\.reasonCode;/);
+  assert.match(assistantMessages, /message\.reasonCode === 'CANCELLED'/);
+  assert.match(assistantMessages, /messages\.assistant\.answered/);
+  for (const assistant of [assistantPanel, assistantMessages]) {
+    assert.doesNotMatch(assistant, /messages\.assistant\.model\}: \{message\.model\}/);
+    assert.doesNotMatch(assistant, /: message\.reasonCode;/);
+  }
 });
 
 test('visible portal copy avoids known implementation jargon', () => {

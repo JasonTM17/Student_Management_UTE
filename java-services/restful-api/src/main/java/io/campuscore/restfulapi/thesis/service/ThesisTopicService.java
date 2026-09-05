@@ -31,4 +31,12 @@ public class ThesisTopicService {
                 .map(TopicResponse::from)
                 .toList();
     }
+
+    @Transactional(readOnly = true)
+    public TopicResponse get(UUID id) {
+        return topics.findById(id)
+                .map(TopicResponse::from)
+                .orElseThrow(() -> new org.springframework.web.server.ResponseStatusException(
+                        org.springframework.http.HttpStatus.NOT_FOUND, "Thesis topic not found"));
+    }
 }

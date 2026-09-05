@@ -7,10 +7,13 @@ import {
 } from '@/lib/site-appearance';
 
 function appearancePath(): string {
-  return (
-    process.env.SITE_APPEARANCE_PATH ||
-    path.join('.data', 'campuscore-site-appearance.json')
-  );
+  if (process.env.SITE_APPEARANCE_PATH) {
+    return process.env.SITE_APPEARANCE_PATH;
+  }
+  if (process.env.VERCEL || process.env.AWS_LAMBDA_FUNCTION_NAME) {
+    return path.join('/tmp', 'campuscore-site-appearance.json');
+  }
+  return path.join('.data', 'campuscore-site-appearance.json');
 }
 
 let memory: SiteAppearance | null = null;
@@ -39,7 +42,11 @@ export async function writeSiteAppearance(
     updatedAt: new Date().toISOString(),
   });
   memory = next;
-  await fs.mkdir(path.dirname(appearancePath()), { recursive: true });
-  await fs.writeFile(appearancePath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  try {
+    await fs.mkdir(path.dirname(appearancePath()), { recursive: true });
+    await fs.writeFile(appearancePath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
+  } catch (err) {
+    console.warn('Could not persist site appearance to filesystem:', err);
+  }
   return next;
 }

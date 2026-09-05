@@ -87,13 +87,14 @@ test('site metadata defaults to the local course demo and contains no retired do
 });
 
 test('assistant UI exposes provenance and degraded state', () => {
-  const assistantSource = read('src/components/assistant/AssistantPanel.tsx');
+  const assistantPanel = read('src/components/assistant/AssistantPanel.tsx');
+  const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');
   const assistantApi = read('src/lib/thesis-api.ts');
   assert.match(assistantApi, /citations/);
   assert.match(assistantApi, /reasonCode/);
-  assert.match(assistantSource, /citation\.title/);
-  assert.match(assistantSource, /KNOWLEDGE_UNAVAILABLE/);
-  assert.match(assistantSource, /messages\.assistant\.degraded/);
+  assert.match(assistantMessages, /citation\.title/);
+  assert.match(assistantPanel, /KNOWLEDGE_UNAVAILABLE/);
+  assert.match(assistantMessages, /messages\.assistant\.degraded/);
 });
 
 test('frontend source contains no removed route or runtime reference', () => {

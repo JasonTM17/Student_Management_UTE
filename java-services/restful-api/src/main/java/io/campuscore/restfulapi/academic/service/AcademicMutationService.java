@@ -72,12 +72,23 @@ public class AcademicMutationService {
             String semesterId,
             String studentId,
             String courseId) {
+        return exportEnrollments(status, semesterId, studentId, courseId, null);
+    }
+
+    @Transactional(readOnly = true)
+    public String exportEnrollments(
+            String status,
+            String semesterId,
+            String studentId,
+            String courseId,
+            String sectionId) {
         MapSqlParameterSource parameters = new MapSqlParameterSource();
         List<String> filters = new ArrayList<>();
         addFilter(filters, parameters, "status", status, "e.\"status\" = :status");
         addFilter(filters, parameters, "semesterId", semesterId, "e.\"semesterId\" = :semesterId");
         addFilter(filters, parameters, "studentId", studentId, "e.\"studentId\" = :studentId");
         addFilter(filters, parameters, "courseId", courseId, "section.\"courseId\" = :courseId");
+        addFilter(filters, parameters, "sectionId", sectionId, "e.\"sectionId\" = :sectionId");
         String where = filters.isEmpty() ? "" : " WHERE " + String.join(" AND ", filters);
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT e.\"id\", student.\"studentId\" AS student_number,"

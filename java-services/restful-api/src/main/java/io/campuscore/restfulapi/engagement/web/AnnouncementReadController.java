@@ -80,6 +80,9 @@ public class AnnouncementReadController {
             MultiValueMap<String, String> queryParameters,
             Set<String> allowed) {
         for (Map.Entry<String, List<String>> entry : queryParameters.entrySet()) {
+            if ("_cc_nocache".equals(entry.getKey())) {
+                continue;
+            }
             if (!allowed.contains(entry.getKey()) || entry.getValue().size() != 1) {
                 throw new IllegalArgumentException("Unexpected or repeated query parameter: " + entry.getKey());
             }
