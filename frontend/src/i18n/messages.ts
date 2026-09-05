@@ -1143,6 +1143,7 @@ export const en = {
     thinking: 'Checking the public CampusCore knowledge base…',
     empty: 'Start with a focused question about campus services or your thesis journey.',
     launcherHint: 'Ask CampusCore AI',
+    slotLabel: 'Assistant',
     greeting: 'Hello! How can I help you?',
     suggestions: [
       'How to register courses?',
@@ -2337,6 +2338,7 @@ export const vi: I18nMessages = {
     thinking: 'Đang kiểm tra kho kiến thức CampusCore công khai…',
     empty: 'Bắt đầu bằng một câu hỏi cụ thể về học vụ hoặc hành trình luận văn.',
     launcherHint: 'Hỏi trợ lý CampusCore',
+    slotLabel: 'Trợ lý',
     greeting: 'Xin chào! Mình có thể giúp gì cho bạn?',
     suggestions: [
       'Đăng ký học phần thế nào?',
