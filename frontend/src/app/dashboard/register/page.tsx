@@ -20,6 +20,9 @@ type CatalogSection = Awaited<ReturnType<typeof registrationApi.sections>>[numbe
 
 const ROUND_UNAVAILABLE_CODES = new Set(['WINDOW_CLOSED', 'COHORT_INELIGIBLE', 'ROUND_NOT_FOUND']);
 
+/** Registrations that still bind a seat; matches the schedule page convention. */
+const ACTIVE_ENROLLMENT_STATUSES = new Set(['ENROLLED', 'CONFIRMED', 'PENDING']);
+
 export default function RegisterPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth(['STUDENT']);
   const { confirm, confirmationDialog } = useConfirmationDialog();
@@ -83,7 +86,10 @@ export default function RegisterPage() {
   const enrollmentBySection = useMemo(() => {
     const map = new Map<string, Enrollment>();
     for (const enrollment of enrollments) {
-      if (enrollment.status === 'DROPPED') continue;
+      // Only an active registration claims a catalog slot. Completed or
+      // withdrawn history from earlier semesters shares section ids with the
+      // current catalog and must never surface as a drop action here.
+      if (!ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status)) continue;
       map.set(enrollment.sectionId, enrollment);
     }
     return map;
@@ -99,7 +105,7 @@ export default function RegisterPage() {
     );
   }, [search, sections]);
 
-  const registered = enrollments.filter((item) => item.status !== 'DROPPED');
+  const registered = enrollments.filter((item) => ACTIVE_ENROLLMENT_STATUSES.has(item.status));
 
   /** Confirms and submits one section enrollment, then refreshes the live catalog. */
   const register = async (sectionId: string) => {
