@@ -1,0 +1,28 @@
+services:
+  - type: web
+    name: campuscore-backend
+    runtime: docker
+    dockerfilePath: ./java-services/restful-api/Dockerfile
+    dockerContext: .
+    plan: free
+    region: singapore
+    healthCheckPath: /api/v1/health/liveness
+    envVars:
+      - key: SPRING_PROFILES_ACTIVE
+        value: persistence
+      - key: FLYWAY_ENABLED
+        value: "true"
+      - key: COOKIE_SECURE
+        value: "true"
+      - key: JAVA_TOOL_OPTIONS
+        value: "-XX:+UseSerialGC -Xmx350m -Xss512k"
+      - key: SPRING_DATASOURCE_URL
+        sync: false
+      - key: SPRING_DATASOURCE_USERNAME
+        sync: false
+      - key: SPRING_DATASOURCE_PASSWORD
+        sync: false
+      - key: JWT_SECRET
+        generateValue: true
+      - key: JWT_REFRESH_SECRET
+        generateValue: true
