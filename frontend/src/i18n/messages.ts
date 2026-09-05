@@ -1143,7 +1143,7 @@ export const en = {
     thinking: 'Checking the public CampusCore knowledge base…',
     empty: 'Start with a focused question about campus services or your thesis journey.',
     launcherHint: 'Ask CampusCore AI',
-    greeting: 'Hi! How can I help you today?',
+    greeting: 'Hello! How can I help you?',
     suggestions: [
       'How to register courses?',
       'Where is my schedule?',
