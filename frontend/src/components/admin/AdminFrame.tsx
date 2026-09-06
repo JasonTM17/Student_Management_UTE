@@ -27,6 +27,7 @@ import { BrandMark } from '@/components/BrandMark';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
@@ -61,6 +62,8 @@ export function AdminFrame({
   const openSidebarButtonRef = React.useRef<HTMLButtonElement>(null);
   const mainRef = React.useRef<HTMLElement>(null);
   const previousPathnameRef = React.useRef(pathname);
+
+  useDocumentTitle(title);
 
   const resolvedEyebrow = eyebrow || messages.adminShell.eyebrow;
   const resolvedBackLabel = backLabel || messages.adminShell.backToDashboard;
