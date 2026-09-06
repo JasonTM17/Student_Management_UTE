@@ -17,8 +17,14 @@ public final class AssistantInputGuard {
             "(?i)(?<![A-Za-z0-9])[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![A-Za-z0-9])");
     private static final Pattern STUDENT_ID = Pattern.compile("(?i)\\b(?:student\\s*id|mssv|ma\\s*sv|sinh\\s*vien)\\s*[:#-]?\\s*[a-z0-9-]*\\d[a-z0-9-]{3,20}\\b");
     private static final Pattern SECRET = Pattern.compile("(?i)\\b(?:bearer\\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\\s*[:=]|token\\s*[:=]|password\\s*[:=])");
+    // Vietnamese phrasing matters because the assistant audience is bilingual:
+    // the English-only list let "bỏ qua tất cả hướng dẫn..." reach the provider.
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
-            "(?i)(?:ignore\\s+(?:all\\s+)?previous\\s+instructions|disregard\\s+(?:the\\s+)?system\\s+prompt|reveal\\s+(?:the\\s+)?system\\s+prompt|developer\\s+message|jailbreak|prompt\\s+injection)");
+            "(?i)(?:ignore\\s+(?:all\\s+)?previous\\s+instructions|disregard\\s+(?:the\\s+)?system\\s+prompt|reveal\\s+(?:the\\s+)?system\\s+prompt|developer\\s+message|jailbreak|prompt\\s+injection"
+                    + "|bỏ\\s*qua\\s+(?:tất\\s*cả\\s+|mọi\\s+|các\\s+|những\\s+)?(?:hướng\\s+dẫn|chỉ\\s+dẫn|lệnh)"
+                    + "|vô\\s*hiệu\\s+(?:hóa\\s+)?(?:lệnh|hướng\\s+dẫn|chỉ\\s+dẫn)"
+                    + "|(?:in|đọc|xem|hiển\\s*thị|lấy)\\s+(?:ra\\s+|cho\\s+(?:tôi|ta)\\s+)?(?:toàn\\s*bộ\\s+)?(?:system\\s+prompt|prompt\\s+hệ\\s+thống|câu\\s+lệnh\\s+hệ\\s+thống|lệnh\\s+hệ\\s+thống)"
+                    + "|giả\\s*mạo\\s+(?:quản\\s*trị\\s*viên|admin|hệ\\s*thống))");
     private static final String NEW_CONVERSATION = "new-conversation";
 
     private AssistantInputGuard() { }
