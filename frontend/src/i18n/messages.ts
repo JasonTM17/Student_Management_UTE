@@ -836,12 +836,12 @@ export const en = {
     currentDateLabel: 'Today',
     metrics: {
       coursesInScope: 'Courses in scope',
-      confirmedEnrollments: 'Confirmed enrollments',
+      confirmedEnrollments: 'Active registrations',
       pendingDecisions: 'Pending decisions',
       currentSemester: 'Current semester',
       details: [
         'Registration, class details, and current courses remain visible from the same student area.',
-        'Confirmed classes stay close so you can move into schedules, grades, and transcript work without losing context.',
+        'Active classes stay close so you can move into schedules, grades, and transcript work without losing context.',
         'Anything that still needs attention stays visible before it turns into a registration surprise.',
         'The dashboard keeps one active academic context so the rest of the student tools stay aligned.',
       ],
@@ -855,10 +855,10 @@ export const en = {
       currentCourses: {
         title: 'Current courses',
         description:
-          'Confirmed courses stay visible here so you can check your classes before opening more details.',
-        emptyTitle: 'No confirmed courses yet',
+          'Your active courses stay visible here so you can check your classes before opening more details.',
+        emptyTitle: 'No active courses yet',
         emptyDescription:
-          'Once enrollment is confirmed, your current courses will appear here.',
+          'Once you hold an active registration, your current courses will appear here.',
         sectionLabel: 'Section {section}',
       },
       referenceLinks: {
@@ -1156,6 +1156,7 @@ export const en = {
     launcherHint: 'Ask CampusCore AI',
     slotLabel: 'Assistant',
     greeting: 'Hello! How can I help you?',
+    followUpsLabel: 'Keep asking',
     suggestions: [
       'How to register courses?',
       'Where is my schedule?',
@@ -2044,12 +2045,12 @@ export const vi: I18nMessages = {
     currentDateLabel: 'Hôm nay',
     metrics: {
       coursesInScope: 'Môn học trong phạm vi',
-      confirmedEnrollments: 'Đăng ký đã xác nhận',
+      confirmedEnrollments: 'Đăng ký đang hoạt động',
       pendingDecisions: 'Mục chờ xử lý',
       currentSemester: 'Học kỳ hiện tại',
       details: [
         'Đăng ký, thông tin lớp và môn học hiện tại luôn ở cùng một khu sinh viên.',
-        'Các lớp đã xác nhận luôn ở gần để bạn chuyển qua lịch học, điểm số và bảng điểm mà không mất thông tin.',
+        'Các lớp đang hoạt động luôn ở gần để bạn chuyển qua lịch học, điểm số và bảng điểm mà không mất thông tin.',
         'Những mục còn cần xử lý vẫn hiển thị sớm trước khi thành bất ngờ trong đợt đăng ký.',
         'Bảng điều khiển giữ một ngữ cảnh học vụ đang hoạt động để các công cụ còn lại luôn đồng bộ.',
       ],
@@ -2063,10 +2064,10 @@ export const vi: I18nMessages = {
       currentCourses: {
         title: 'Môn học hiện tại',
         description:
-          'Các đăng ký đã xác nhận luôn nằm ở đây để bạn xem lại ngữ cảnh trước khi đi sâu hơn.',
-        emptyTitle: 'Chưa có môn học đã xác nhận',
+          'Các đăng ký đang hoạt động luôn nằm ở đây để bạn xem lại ngữ cảnh trước khi đi sâu hơn.',
+        emptyTitle: 'Chưa có môn học đang hoạt động',
         emptyDescription:
-          'Khi đăng ký được xác nhận, các môn hiện tại sẽ xuất hiện tại đây.',
+          'Khi bạn có đăng ký đang hoạt động, các môn hiện tại sẽ xuất hiện tại đây.',
         sectionLabel: 'Lớp học phần {section}',
       },
       referenceLinks: {
@@ -2364,6 +2365,7 @@ export const vi: I18nMessages = {
     launcherHint: 'Hỏi trợ lý CampusCore',
     slotLabel: 'Trợ lý',
     greeting: 'Xin chào! Mình có thể giúp gì cho bạn?',
+    followUpsLabel: 'Gợi ý tiếp theo',
     suggestions: [
       'Đăng ký học phần thế nào?',
       'Xem thời khóa biểu ở đâu?',

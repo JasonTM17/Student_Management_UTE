@@ -102,7 +102,7 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /role="log"/);
   assert.match(assistant, /aria-live="polite"/);
   assert.match(assistant, /event\.key !== 'Escape'/);
-  assert.match(assistant, /launcherRef\.current\?\.focus\(\)/);
+  assert.match(assistant, /triggerRef\.current\?\.focus\(\)/);
   assert.match(assistant, /thesisApi\.chat\(message, locale\)/);
   assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
   const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');

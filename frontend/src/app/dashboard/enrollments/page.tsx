@@ -77,7 +77,7 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Khi bạn đăng ký một lớp học phần, lịch học và thông tin lớp sẽ xuất hiện ở đây.',
           coursesInView: 'Môn học trong màn hình',
-          confirmed: 'Đã xác nhận',
+          confirmed: 'Đang hoạt động',
           pending: 'Đang chờ',
           recordTitle: 'Hồ sơ đăng ký',
           sectionPrefix: 'Lớp học phần',
@@ -109,7 +109,7 @@ export default function EnrollmentsPage() {
           emptyDescription:
             'Once you enroll in a class, its schedule and details will appear here.',
           coursesInView: 'Courses in view',
-          confirmed: 'Confirmed',
+          confirmed: 'Active',
           pending: 'Pending',
           recordTitle: 'Enrollment record',
           sectionPrefix: 'Class',
@@ -179,8 +179,12 @@ export default function EnrollmentsPage() {
     }
   };
 
-  const confirmedCourses = enrollments.filter(
-    (enrollment) => enrollment.status === 'CONFIRMED',
+  // ENROLLED is the live registration state returned by the API; CONFIRMED is
+  // the post-approval variant. The summary must reflect both, not just the
+  // rare CONFIRMED rows that made the card read zero during active terms.
+  const activeCourses = enrollments.filter(
+    (enrollment) =>
+      enrollment.status === 'CONFIRMED' || enrollment.status === 'ENROLLED',
   );
   const pendingCourses = enrollments.filter(
     (enrollment) => enrollment.status === 'PENDING',
@@ -195,7 +199,7 @@ export default function EnrollmentsPage() {
       },
       {
         label: copy.confirmed,
-        value: formatNumber(confirmedCourses.length),
+        value: formatNumber(activeCourses.length),
         tone: metricToneClass('success'),
       },
       {
@@ -205,7 +209,7 @@ export default function EnrollmentsPage() {
       },
     ],
     [
-      confirmedCourses.length,
+      activeCourses.length,
       copy.confirmed,
       copy.coursesInView,
       copy.pending,

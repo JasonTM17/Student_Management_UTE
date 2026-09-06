@@ -263,7 +263,12 @@ export default function LoginPage() {
               >
                 {messages.login.passwordLabel}
               </label>
-              <span className="text-xs text-muted-foreground">{portalCopy.officeSupport}</span>
+              <span className="text-xs text-muted-foreground">
+                {locale === 'vi'
+                  ? 'Quên mật khẩu? Liên hệ '
+                  : 'Forgot your password? Contact '}
+                {portalCopy.officeSupport}.
+              </span>
             </div>
             <div className="relative">
               <Input
