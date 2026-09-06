@@ -87,3 +87,9 @@ ops/db-production-update/
 .vercel
 frontend-scan/
 
+
+# Local-only tool artifacts and database backups
+database/backups/
+.mimosa/
+.video_agent/
+frontend/.mimosa/
