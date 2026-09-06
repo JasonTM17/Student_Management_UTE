@@ -26,15 +26,33 @@ Các boundary và non-goal đầy đủ nằm trong
 [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md).
 
 CampusCore là đồ án quản lý sinh viên dạng RESTful API tầm trung, gồm một
-Spring Boot Java API, một ứng dụng Next.js, một ứng dụng Expo và một PostgreSQL.
+Spring Boot Java API, một ứng dụng Next.js và một PostgreSQL (ứng dụng Expo
+mobile đang thử nghiệm, xem mục Thành phần). Kịch bản chấm bài/demo:
+[docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md).
 
 ## Thành phần
 
 - API: `java-services/restful-api`
 - RAG service: `rag-service`
 - Web: `frontend`
-- Mobile: `mobile`
+- Mobile: `mobile` (thử nghiệm — chưa nằm trong luồng demo hiện tại)
 - Database: PostgreSQL qua Flyway
+
+## Điểm nhấn kỹ thuật
+
+- **Đăng ký học phần chống race 4 lớp**: row lock `FOR UPDATE`, conditional
+  update theo sức chứa, partial unique index cho đăng ký đang hoạt động và
+  idempotency key bắt buộc — kèm test race 10 thread
+  (`AcademicEnrollmentMutationPersistenceTest`).
+- **Quota trợ lý atomic**: khoá bucket theo thứ tự nhất quán, không thể vượt
+  20 lời gọi/người/ngày ngay cả khi gọi đồng thời.
+- **Quản trị kiến thức 2 người**: bản nháp phải do một admin khác duyệt và xuất
+  bản; privacy gate chạy lại đúng lúc publish.
+- **Prompt-injection guard song ngữ**: chặn cụm tấn công cả tiếng Anh lẫn
+  tiếng Việt ở đầu vào và đầu ra (`AssistantInputGuard`).
+- **Secrets fail-closed**: prod đọc secret từ file, thiếu là dừng khởi động;
+  so sánh secret timing-safe ở CSRF, health key và RAG token.
+- **220 test Java + 71 test frontend**, typecheck và lint zero-warning.
 
 ## Chức năng lõi
 
@@ -106,6 +124,7 @@ Các tài khoản này chỉ dành cho database seed local của đồ án.
 - [README.vi.md](README.vi.md)
 - [README.en.md](README.en.md)
 - [docs/ARCHITECTURE.md](docs/ARCHITECTURE.md)
+- [docs/DEMO_RUNBOOK.md](docs/DEMO_RUNBOOK.md)
 - [docs/RELEASE.md](docs/RELEASE.md)
 - [docs/RESTFUL_API_CONSOLIDATION.md](docs/RESTFUL_API_CONSOLIDATION.md)
 
