@@ -83,3 +83,7 @@ src/designs/
 /plans/260901-1809-campuscore-production-readiness-and-professional-ux/
 /.grok/workflows/
 ops/db-production-update/
+
+.vercel
+frontend-scan/
+

@@ -102,43 +102,54 @@ export const en = {
   },
   meta: {
     defaults: {
-      siteName: 'CampusCore',
-      title: 'Campus academic portal',
+      siteName: 'CampusUTE',
+      title: 'CampusUTE - Academic Portal & Student Management System | HCMUTE',
       description:
-        'CampusCore is a focused academic portal for registration, schedules, grades, announcements, and thesis work.',
-      ogAlt: 'CampusCore academic portal overview',
-      twitterTitle: 'CampusCore',
+        'CampusUTE is the official academic portal for Ho Chi Minh City University of Technology and Education (HCMUTE). Course registration, schedules, transcripts, notifications, and thesis management.',
+      keywords: [
+        'CampusUTE',
+        'HCMUTE',
+        'UTE',
+        'Student Management System',
+        'Academic Portal',
+        'Course Registration',
+        'Class Schedule',
+        'Student Transcripts',
+        'Thesis Management',
+      ],
+      ogAlt: 'CampusUTE Academic Portal Overview - HCMUTE',
+      twitterTitle: 'CampusUTE - Academic Portal | HCMUTE',
       twitterDescription:
-        'A clear academic portal for registration, schedules, grades, announcements, and thesis work.',
+        'Course registration, schedules, transcripts, notifications, and thesis management in one steady campus portal.',
     },
     home: {
-      title: 'Campus academic portal',
+      title: 'CampusUTE - Academic Portal & Student Management System | HCMUTE',
       description:
-        'CampusCore gives administrators, lecturers, and students one steady campus portal.',
+        'CampusUTE gives administrators, lecturers, and students one steady campus portal.',
     },
     login: {
-      title: 'Sign in',
-      description: 'Sign in to CampusCore with your campus account.',
+      title: 'Sign in | CampusUTE',
+      description: 'Sign in to CampusUTE with your campus account.',
     },
     forgotPassword: {
-      title: 'Forgot password',
-      description: 'Request a CampusCore password reset link.',
+      title: 'Forgot password | CampusUTE',
+      description: 'Request a CampusUTE password reset link.',
     },
     resetPassword: {
-      title: 'Reset password',
-      description: 'Set a new CampusCore password and return to the campus portal.',
+      title: 'Reset password | CampusUTE',
+      description: 'Set a new CampusUTE password and return to the campus portal.',
     },
     dashboard: {
-      title: 'Campus portal',
+      title: 'Campus portal | CampusUTE',
       description:
-        'Protected student and lecturer dashboards for CampusCore.',
+        'Protected student and lecturer dashboards for CampusUTE.',
     },
     admin: {
-      title: 'Admin portal',
-      description: 'Protected administration routes for CampusCore.',
+      title: 'Admin portal | CampusUTE',
+      description: 'Protected administration routes for CampusUTE.',
     },
     socialImage: {
-      eyebrow: 'CampusCore',
+      eyebrow: 'CampusUTE · HCMUTE',
       title: 'Academic work that stays clear from sign-in to thesis progress.',
       description:
         'Registration, teaching, people records, announcements, and thesis work in one focused portal.',
@@ -1298,50 +1309,63 @@ export const vi: I18nMessages = {
   },
   meta: {
     defaults: {
-      siteName: 'CampusCore',
-      title: 'Cổng học vụ CampusCore',
+      siteName: 'CampusUTE',
+      title: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE',
       description:
-        'CampusCore là cổng học vụ tập trung cho đăng ký, lịch học, điểm, thông báo và luận văn.',
-      ogAlt: 'Tổng quan cổng học vụ CampusCore',
-      twitterTitle: 'CampusCore',
+        'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Sư phạm Kỹ thuật TP.HCM. Đăng ký học phần, thời khóa biểu, tra cứu điểm, quản lý đồ án và thông báo đào tạo.',
+      keywords: [
+        'CampusUTE',
+        'HCMUTE',
+        'UTE',
+        'Đại học Sư phạm Kỹ thuật',
+        'cổng thông tin học vụ',
+        'quản lý sinh viên',
+        'đăng ký học phần UTE',
+        'thời khóa biểu UTE',
+        'tra cứu điểm UTE',
+        'đồ án tốt nghiệp',
+        'SPKT TP.HCM',
+      ],
+      ogAlt: 'Tổng quan Cổng thông tin đào tạo CampusUTE - HCMUTE',
+      twitterTitle: 'CampusUTE - Cổng thông tin đào tạo HCMUTE',
       twitterDescription:
-        'Cổng học vụ rõ ràng cho đăng ký, lịch học, điểm, thông báo và luận văn.',
+        'Cổng học vụ trực tuyến tập trung cho đăng ký môn học, thời khóa biểu, bảng điểm, thông báo và đồ án tốt nghiệp.',
     },
     home: {
-      title: 'Cổng học vụ CampusCore',
+      title: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE',
       description:
-        'CampusCore mang đến một cổng học vụ ổn định cho quản trị, giảng viên và sinh viên.',
+        'CampusUTE mang đến một cổng đào tạo hiện đại, ổn định cho sinh viên, giảng viên và cán bộ quản trị Trường ĐH Sư phạm Kỹ thuật TP.HCM.',
     },
     login: {
-      title: 'Đăng nhập',
-      description: 'Đăng nhập CampusCore bằng tài khoản campus của bạn.',
+      title: 'Đăng nhập | CampusUTE',
+      description: 'Đăng nhập vào hệ thống CampusUTE bằng tài khoản học vụ HCMUTE.',
     },
     forgotPassword: {
-      title: 'Quên mật khẩu',
-      description: 'Yêu cầu liên kết đặt lại mật khẩu CampusCore.',
+      title: 'Quên mật khẩu | CampusUTE',
+      description: 'Yêu cầu liên kết đặt lại mật khẩu CampusUTE.',
     },
     resetPassword: {
-      title: 'Đặt lại mật khẩu',
-      description: 'Tạo mật khẩu mới cho CampusCore và quay lại cổng học vụ.',
+      title: 'Đặt lại mật khẩu | CampusUTE',
+      description: 'Tạo mật khẩu mới cho CampusUTE và quay lại cổng học vụ.',
     },
     dashboard: {
-      title: 'Cổng học vụ',
+      title: 'Bảng điều khiển học vụ | CampusUTE',
       description:
-        'Các bảng điều khiển được bảo vệ cho sinh viên và giảng viên trong CampusCore.',
+        'Bảng điều khiển học vụ và quản lý tiến độ dành cho sinh viên và giảng viên CampusUTE.',
     },
     admin: {
-      title: 'Cổng quản trị',
-      description: 'Các khu vực quản trị được bảo vệ của CampusCore.',
+      title: 'Cổng quản trị học vụ | CampusUTE',
+      description: 'Khu vực quản trị đào tạo và cấu hình hệ thống CampusUTE.',
     },
     socialImage: {
-      eyebrow: 'CampusCore',
-      title: 'Công việc học vụ rõ ràng từ đăng nhập đến tiến độ luận văn.',
+      eyebrow: 'CampusUTE · HCMUTE',
+      title: 'Đồng hành cùng sinh viên từ nhập học đến tốt nghiệp.',
       description:
-        'Đăng ký học phần, giảng dạy, hồ sơ, thông báo và luận văn trong một cổng thống nhất.',
+        'Đăng ký học phần, lịch học, bảng điểm, thông báo và quản lý đồ án tốt nghiệp trong một nền tảng thống nhất.',
       badges: [
-        'Cổng học vụ theo vai trò',
-        'Phát hành đã xác minh',
-        'Một cổng học vụ',
+        'Hệ thống học vụ HCMUTE',
+        'Phân quyền chuyên sâu',
+        'Quản trị tập trung',
       ],
     },
   },

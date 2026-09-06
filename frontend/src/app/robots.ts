@@ -6,7 +6,20 @@ export default function robots(): MetadataRoute.Robots {
     rules: [
       {
         userAgent: '*',
-        allow: ['/', '/en/', '/vi/'],
+        allow: [
+          '/',
+          '/en/',
+          '/vi/',
+          '/login',
+          '/en/login',
+          '/vi/login',
+          '/register',
+          '/en/register',
+          '/vi/register',
+          '/icon.svg',
+          '/icon.png',
+          '/favicon.ico',
+        ],
         disallow: [
           '/admin/',
           '/dashboard/',
@@ -15,6 +28,7 @@ export default function robots(): MetadataRoute.Robots {
           '/en/dashboard/',
           '/vi/dashboard/',
           '/api/',
+          '/_next/',
         ],
       },
     ],
@@ -22,3 +36,4 @@ export default function robots(): MetadataRoute.Robots {
     host: getSiteUrl(),
   };
 }
+

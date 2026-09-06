@@ -21,6 +21,8 @@ import {
   isPrefixedRequest,
 } from "@/i18n/server";
 
+import { JsonLd } from "@/components/seo/JsonLd";
+
 export const dynamic = 'force-dynamic';
 
 export const viewport: Viewport = {
@@ -57,6 +59,7 @@ export default async function RootLayout({
   return (
     <html lang={htmlLang} suppressHydrationWarning>
       <head>
+        <JsonLd locale={locale} />
         <script
           dangerouslySetInnerHTML={{
             __html:
