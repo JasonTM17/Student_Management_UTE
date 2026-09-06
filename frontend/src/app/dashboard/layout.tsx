@@ -36,6 +36,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
 import { StudentContextRail } from '@/components/dashboard/StudentContextRail';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
+import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
@@ -524,7 +525,6 @@ export default function DashboardLayout({
     const matchingItem = dashboardMenuItems.find(
       (item) => pathname === item.href || pathname.startsWith(`${item.href}/`),
     );
-
     if (matchingItem) {
       return {
         title: menuLabels[matchingItem.labelKey as keyof typeof menuLabels],
@@ -537,6 +537,8 @@ export default function DashboardLayout({
       description: messages.dashboardShell.pageDefaults.fallbackDescription,
     };
   }, [menuLabels, messages, pageMetadata, pathname]);
+
+  useDocumentTitle(currentPage.title);
 
   if (isLoading) {
     return (
@@ -867,7 +869,7 @@ export default function DashboardLayout({
                 <div className="hidden text-sm font-medium text-muted-foreground sm:block">
                   {messages.dashboardShell.portalTitle}
                 </div>
-                <div className="truncate text-base font-semibold text-foreground sm:hidden">
+                <div className="text-sm font-semibold leading-snug text-foreground sm:hidden">
                   {currentPage.title}
                 </div>
               </div>

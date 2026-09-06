@@ -5,6 +5,11 @@ import { Award, FileText, GraduationCap, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
+import { GpaTrendChart, GradeDistributionChart } from '@/components/dashboard/TranscriptCharts';
+import {
+  buildGpaTrendPoints,
+  buildGradeDistribution,
+} from '@/lib/transcript-charts';
 import { useRequireAuth } from '@/context/AuthContext';
 import { gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
@@ -154,6 +159,16 @@ export default function TranscriptPage() {
     );
   }, [locale, selectedSemester, semesters]);
 
+  const gpaTrendPoints = useMemo(
+    () => buildGpaTrendPoints(transcriptData?.semesters ?? [], locale),
+    [locale, transcriptData],
+  );
+
+  const gradeDistribution = useMemo(
+    () => buildGradeDistribution(transcriptSemesters),
+    [transcriptSemesters],
+  );
+
   const copy =
     locale === 'vi'
       ? {
@@ -176,6 +191,8 @@ export default function TranscriptPage() {
           coursesWord: 'môn',
           creditsAttempted: 'tín chỉ đã đăng ký',
           gradePointLabel: 'GPA',
+          gpaTrend: 'Xu hướng GPA theo học kỳ',
+          distribution: 'Phân bố xếp loại',
           headers: {
             course: 'Môn học',
             section: 'Lớp học phần',
@@ -207,6 +224,8 @@ export default function TranscriptPage() {
           coursesWord: 'courses',
           creditsAttempted: 'credits attempted',
           gradePointLabel: 'GPA',
+          gpaTrend: 'GPA trend by semester',
+          distribution: 'Grade distribution',
           headers: {
             course: 'Course',
             section: 'Class',
@@ -331,6 +350,31 @@ export default function TranscriptPage() {
                 <div className={`flex h-11 w-11 items-center justify-center rounded-lg ${metricToneClass('warning')}`}>
                   <FileText className="h-5 w-5" />
                 </div>
+              </CardContent>
+            </Card>
+          </div>
+
+          <div className="grid gap-4 lg:grid-cols-2">
+            <Card variant="elevated">
+              <CardHeader>
+                <CardTitle className="text-base">{copy.gpaTrend}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GpaTrendChart
+                  points={gpaTrendPoints}
+                  ariaLabel={copy.gpaTrend}
+                />
+              </CardContent>
+            </Card>
+            <Card variant="elevated">
+              <CardHeader>
+                <CardTitle className="text-base">{copy.distribution}</CardTitle>
+              </CardHeader>
+              <CardContent>
+                <GradeDistributionChart
+                  buckets={gradeDistribution}
+                  ariaLabel={copy.distribution}
+                />
               </CardContent>
             </Card>
           </div>

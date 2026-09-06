@@ -9,6 +9,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
+import { buildWeeklyGrid } from '@/lib/weekly-grid';
 import { Enrollment, Semester } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -194,6 +195,11 @@ export default function SchedulePage() {
       ? ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy']
       : dayNames;
 
+  const weeklyGrid = useMemo(() => buildWeeklyGrid(agenda), [agenda]);
+  const gridDayLabels = [1, 2, 3, 4, 5, 6, 7].map(
+    (day) => localizedDayNames[day % 7],
+  );
+
   const copy =
     locale === 'vi'
       ? {
@@ -213,6 +219,7 @@ export default function SchedulePage() {
           coursesInRotation: 'Môn học đang diễn ra',
           teachingSpaces: 'Không gian học tập',
           weeklyAgenda: 'Lịch học theo tuần',
+          weeklyGrid: 'Lưới thời khóa biểu',
           upcomingClassList: 'Danh sách lớp sắp tới',
           noMeetings: 'Chưa có buổi học nào.',
           noSlot: 'Chưa có lịch dạy.',
@@ -238,6 +245,7 @@ export default function SchedulePage() {
           coursesInRotation: 'Courses in rotation',
           teachingSpaces: 'Teaching spaces',
           weeklyAgenda: 'Weekly agenda',
+          weeklyGrid: 'Weekly timetable grid',
           upcomingClassList: 'Upcoming class list',
           noMeetings: 'No scheduled meetings.',
           noSlot: 'No teaching slot scheduled.',
@@ -364,8 +372,58 @@ export default function SchedulePage() {
               <CardHeader>
                 <CardTitle className="text-xl">{copy.weeklyAgenda}</CardTitle>
               </CardHeader>
-              <CardContent className="grid gap-4 md:grid-cols-2">
-                {localizedDayNames.slice(1, 6).map((dayName, index) => {
+              <CardContent className="space-y-6">
+                <div className="hidden md:block">
+                  <div
+                    className="grid gap-1 overflow-x-auto"
+                    style={{ gridTemplateColumns: '56px repeat(7, minmax(72px, 1fr))' }}
+                    role="table"
+                    aria-label={copy.weeklyGrid}
+                  >
+                    <div />
+                    {gridDayLabels.map((dayName) => (
+                      <div
+                        key={`grid-${dayName}`}
+                        className="pb-1 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground"
+                      >
+                        {dayName}
+                      </div>
+                    ))}
+                    {weeklyGrid.slots.map((slot) => (
+                      <div key={`slot-${slot}`} className="contents">
+                        <div className="flex items-start justify-end pr-1 pt-1 text-[10px] font-medium tabular-nums text-muted-foreground">
+                          {slot}
+                        </div>
+                        {weeklyGrid.days.map((day) => {
+                          const cellItems = weeklyGrid.cells[`${day}-${slot}`] ?? [];
+                          return (
+                            <div
+                              key={`cell-${day}-${slot}`}
+                              className="min-h-[52px] rounded-md border border-border/60 bg-secondary/20 p-1"
+                            >
+                              {cellItems.map((item) => (
+                                <div
+                                  key={item.id}
+                                  className="mb-1 rounded bg-primary/10 px-1.5 py-1 text-[10px] leading-tight text-foreground"
+                                  title={`${item.courseCode} - ${item.startTime}-${item.endTime}`}
+                                >
+                                  <div className="font-semibold">{item.courseCode}</div>
+                                  {item.roomNumber ? (
+                                    <div className="text-[9px] text-muted-foreground">
+                                      {item.building} {item.roomNumber}
+                                    </div>
+                                  ) : null}
+                                </div>
+                              ))}
+                            </div>
+                          );
+                        })}
+                      </div>
+                    ))}
+                  </div>
+                </div>
+                <div className="grid gap-4 md:grid-cols-2 md:hidden">
+                  {localizedDayNames.slice(1, 7).map((dayName, index) => {
                   const dayOfWeek = index + 1;
                   const items = agendaByDay[dayOfWeek] ?? [];
 
@@ -427,6 +485,7 @@ export default function SchedulePage() {
                     </div>
                   );
                 })}
+                </div>
               </CardContent>
             </Card>
 
