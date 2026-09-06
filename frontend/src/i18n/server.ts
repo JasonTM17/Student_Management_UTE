@@ -108,15 +108,26 @@ export async function getLocalizedMetadata(): Promise<Metadata> {
   const messages = getMessages(locale);
   const routeMetadata = getRouteMetadata(pathname, locale);
   const socialImagePath = `/social-image/${locale}`;
+  const siteUrl = getSiteUrl();
+
+  const isIndexable = routeMetadata.robots.index !== false;
 
   return {
-    metadataBase: new URL(getSiteUrl()),
+    metadataBase: new URL(siteUrl),
     title: {
-      default: messages.meta.defaults.siteName,
+      default: routeMetadata.title,
       template: `%s | ${messages.meta.defaults.siteName}`,
     },
     applicationName: messages.meta.defaults.siteName,
     description: routeMetadata.description,
+    keywords: [...messages.meta.defaults.keywords],
+    authors: [
+      { name: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE)', url: siteUrl },
+      { name: 'CampusUTE Team' },
+    ],
+    creator: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM',
+    publisher: 'CampusUTE - HCMUTE',
+    category: 'education',
     alternates: {
       canonical: buildSiteUrl(canonicalPath),
       languages: {
@@ -151,7 +162,18 @@ export async function getLocalizedMetadata(): Promise<Metadata> {
       description: routeMetadata.description,
       images: [buildSiteUrl(socialImagePath)],
     },
-    robots: routeMetadata.robots,
+    robots: {
+      index: isIndexable,
+      follow: routeMetadata.robots.follow !== false,
+      nocache: Boolean(routeMetadata.robots.nocache),
+      googleBot: {
+        index: isIndexable,
+        follow: routeMetadata.robots.follow !== false,
+        'max-video-preview': -1,
+        'max-image-preview': 'large',
+        'max-snippet': -1,
+      },
+    },
     manifest: '/manifest.webmanifest',
     icons: {
       icon: [
@@ -160,10 +182,15 @@ export async function getLocalizedMetadata(): Promise<Metadata> {
         { url: '/icon.png', type: 'image/png' },
       ],
       shortcut: '/favicon.ico',
-      apple: '/icon.png',
+      apple: '/apple-icon.png',
+    },
+    other: {
+      'mobile-web-app-capable': 'yes',
+      'apple-mobile-web-app-title': messages.meta.defaults.siteName,
     },
   };
 }
+
 
 export async function getHtmlLang() {
   return localeHtmlLang[await getRequestLocale()];

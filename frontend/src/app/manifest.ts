@@ -2,27 +2,33 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'CampusCore',
-    short_name: 'CampusCore',
+    name: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE',
+    short_name: 'CampusUTE',
     description:
-      'CampusCore is a student portal for identity, academics, announcements, notifications, and thesis workflows.',
-    id: '/en',
-    start_url: '/en',
+      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Sư phạm Kỹ thuật TP.HCM.',
+    id: '/vi',
+    start_url: '/vi',
     display: 'standalone',
-    background_color: '#101826',
-    theme_color: '#101826',
-    categories: ['education', 'productivity', 'business'],
+    background_color: '#002D62',
+    theme_color: '#003F87',
+    categories: ['education', 'productivity', 'utilities'],
     icons: [
       {
-        src: '/icons/campuscore-icon.svg',
+        src: '/icon.svg',
         sizes: '512x512',
         type: 'image/svg+xml',
         purpose: 'any',
       },
       {
-        src: '/icons/campuscore-maskable.svg',
+        src: '/icon.png',
         sizes: '512x512',
-        type: 'image/svg+xml',
+        type: 'image/png',
+        purpose: 'any',
+      },
+      {
+        src: '/apple-icon.png',
+        sizes: '180x180',
+        type: 'image/png',
         purpose: 'maskable',
       },
     ],

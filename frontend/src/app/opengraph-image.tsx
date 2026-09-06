@@ -1,6 +1,6 @@
 import { ImageResponse } from 'next/og';
 
-export const alt = 'CampusCore academic portal overview';
+export const alt = 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE';
 export const size = {
   width: 1200,
   height: 630,
@@ -15,9 +15,9 @@ export default function OpenGraphImage() {
           height: '100%',
           width: '100%',
           display: 'flex',
-          background: '#0f1724',
+          background: '#002047',
           color: '#f8fafc',
-          padding: '64px',
+          padding: '54px',
           fontFamily: 'Inter, system-ui, sans-serif',
           position: 'relative',
         }}
@@ -27,7 +27,7 @@ export default function OpenGraphImage() {
             position: 'absolute',
             inset: 0,
             background:
-              'radial-gradient(circle at top left, rgba(86, 199, 255, 0.18), transparent 38%), radial-gradient(circle at bottom right, rgba(249, 115, 22, 0.18), transparent 34%)',
+              'radial-gradient(circle at top left, rgba(56, 189, 248, 0.22), transparent 42%), radial-gradient(circle at bottom right, rgba(245, 158, 11, 0.22), transparent 38%)',
           }}
         />
         <div
@@ -37,10 +37,10 @@ export default function OpenGraphImage() {
             flexDirection: 'column',
             justifyContent: 'space-between',
             width: '100%',
-            border: '1px solid rgba(148, 163, 184, 0.18)',
-            borderRadius: 28,
-            padding: '40px 44px',
-            background: 'rgba(15, 23, 36, 0.82)',
+            border: '2px solid rgba(245, 158, 11, 0.3)',
+            borderRadius: 32,
+            padding: '44px 50px',
+            background: 'rgba(0, 37, 84, 0.88)',
           }}
         >
           <div style={{ display: 'flex', flexDirection: 'column', gap: 18 }}>
@@ -49,65 +49,69 @@ export default function OpenGraphImage() {
                 display: 'flex',
                 alignItems: 'center',
                 gap: 16,
-                color: '#cbd5e1',
-                fontSize: 24,
+                color: '#fde047',
+                fontSize: 26,
                 textTransform: 'uppercase',
-                letterSpacing: '0.28em',
+                fontWeight: 800,
+                letterSpacing: '0.2em',
               }}
             >
               <span
                 style={{
-                  width: 10,
-                  height: 10,
+                  width: 14,
+                  height: 14,
                   borderRadius: 999,
-                  background: '#f97316',
+                  background: '#f59e0b',
                 }}
               />
-              CampusCore
+              CampusUTE · HCMUTE
             </div>
             <div
               style={{
-                fontSize: 68,
-                lineHeight: 1.03,
-                fontWeight: 700,
-                maxWidth: 760,
+                fontSize: 62,
+                lineHeight: 1.08,
+                fontWeight: 800,
+                maxWidth: 820,
+                color: '#ffffff',
               }}
             >
-              Academic work that stays clear from sign-in to thesis progress.
+              Cổng Thông Tin Đào Tạo & Học Vụ Sinh Viên
             </div>
             <div
               style={{
-                fontSize: 28,
+                fontSize: 26,
                 lineHeight: 1.45,
                 color: '#cbd5e1',
-                maxWidth: 820,
+                maxWidth: 860,
               }}
             >
-              Identity, academics, announcements, notifications, and thesis workflows in one course-ready portal.
+              Trường Đại học Sư phạm Kỹ thuật TP.HCM — Đăng ký học phần, thời khóa biểu, điểm số, và đồ án tốt nghiệp.
             </div>
           </div>
 
           <div
             style={{
               display: 'flex',
-              gap: 18,
+              gap: 16,
               flexWrap: 'wrap',
             }}
           >
             {[
-              'A portal shaped around each role',
-              'One academic portal',
-              'Campus records in one place',
+              '🎓 Cổng Đào Tạo HCMUTE',
+              '📚 Đăng Ký Môn Học',
+              '📊 Tra Cứu Điểm Số',
+              '🏆 Đồ Án Tốt Nghiệp',
             ].map((item) => (
               <div
                 key={item}
                 style={{
-                  border: '1px solid rgba(148, 163, 184, 0.18)',
-                  borderRadius: 18,
-                  padding: '14px 18px',
-                  fontSize: 24,
-                  color: '#e2e8f0',
-                  background: 'rgba(30, 41, 59, 0.6)',
+                  border: '1px solid rgba(245, 158, 11, 0.35)',
+                  borderRadius: 16,
+                  padding: '12px 22px',
+                  fontSize: 22,
+                  fontWeight: 600,
+                  color: '#ffffff',
+                  background: 'rgba(255, 255, 255, 0.08)',
                 }}
               >
                 {item}
@@ -120,3 +124,4 @@ export default function OpenGraphImage() {
     size,
   );
 }
+

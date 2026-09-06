@@ -1,6 +1,6 @@
 'use client';
 
-import { GraduationCap } from 'lucide-react';
+import Image from 'next/image';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { cn } from '@/lib/utils';
 
@@ -10,8 +10,30 @@ interface BrandMarkProps {
   markClassName?: string;
   titleClassName?: string;
   subtitleClassName?: string;
+  title?: string;
   subtitle?: string;
   compact?: boolean;
+}
+
+export function CampusUteEmblem({ className, size = 44 }: { className?: string; size?: number }) {
+  return (
+    <div
+      className={cn(
+        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-sm',
+        className,
+      )}
+      style={{ width: size, height: size }}
+    >
+      <Image
+        src="/icon.svg"
+        alt="CampusUTE Logo"
+        width={size}
+        height={size}
+        priority
+        className="h-full w-full object-contain"
+      />
+    </div>
+  );
 }
 
 export function BrandMark({
@@ -20,32 +42,31 @@ export function BrandMark({
   markClassName,
   titleClassName,
   subtitleClassName,
+  title = 'CampusUTE',
   subtitle,
   compact = false,
 }: BrandMarkProps) {
   const content = (
     <div className={cn('flex items-center gap-3', className)}>
-      <div
-        className={cn(
-          'flex h-11 w-11 items-center justify-center rounded-md border border-white/10 bg-[hsl(var(--primary))] text-[hsl(var(--primary-foreground))]',
-          compact && 'h-9 w-9',
-          markClassName,
-        )}
-      >
-        <GraduationCap className={cn('h-5 w-5', compact && 'h-4 w-4')} />
-      </div>
+      <CampusUteEmblem
+        size={compact ? 36 : 44}
+        className={cn('border border-white/10 ring-1 ring-black/5', markClassName)}
+      />
       <div className="min-w-0">
         <div
           className={cn(
-            'text-lg font-bold text-foreground',
+            'flex items-center gap-1.5 text-lg font-bold tracking-tight text-foreground',
             compact && 'text-base',
             titleClassName,
           )}
         >
-          <span translate="no">CampusCore</span>
+          <span translate="no">{title}</span>
+          <span className="rounded bg-[var(--portal-yellow,#F59E0B)]/15 px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--portal-yellow,#D97706)]">
+            HCMUTE
+          </span>
         </div>
         {subtitle ? (
-          <div className={cn('truncate text-sm text-muted-foreground', subtitleClassName)}>
+          <div className={cn('truncate text-xs font-medium text-muted-foreground', subtitleClassName)}>
             {subtitle}
           </div>
         ) : null}
@@ -63,3 +84,4 @@ export function BrandMark({
     </LocalizedLink>
   );
 }
+

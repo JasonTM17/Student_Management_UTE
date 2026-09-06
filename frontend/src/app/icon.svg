@@ -1,13 +1,69 @@
-<svg xmlns="http://www.w3.org/2000/svg" width="512" height="512" viewBox="0 0 512 512" fill="none">
-  <rect width="512" height="512" rx="112" fill="#101826"/>
-  <rect x="88" y="88" width="336" height="336" rx="88" fill="url(#bg)"/>
-  <path d="M256 158L354 204L256 250L158 204L256 158Z" stroke="#F8FAFC" stroke-width="20" stroke-linejoin="round"/>
-  <path d="M192 235V284C192 319.346 220.654 348 256 348C291.346 348 320 319.346 320 284V235" stroke="#F8FAFC" stroke-width="20" stroke-linecap="round"/>
-  <circle cx="364" cy="230" r="16" fill="#F97316"/>
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512" width="512" height="512" fill="none">
   <defs>
-    <linearGradient id="bg" x1="88" y1="88" x2="424" y2="424" gradientUnits="userSpaceOnUse">
-      <stop stop-color="#172554"/>
-      <stop offset="1" stop-color="#0EA5E9"/>
+    <!-- Background Gradient: Institutional HCMUTE Blue -->
+    <linearGradient id="uteBg" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#002D62"/>
+      <stop offset="60%" stop-color="#003F87"/>
+      <stop offset="100%" stop-color="#0056B3"/>
     </linearGradient>
+    <!-- Golden Accent Gradient -->
+    <linearGradient id="goldGradient" x1="0%" y1="0%" x2="100%" y2="100%">
+      <stop offset="0%" stop-color="#FDE047"/>
+      <stop offset="40%" stop-color="#F59E0B"/>
+      <stop offset="100%" stop-color="#D97706"/>
+    </linearGradient>
+    <!-- Subtle Inner Glow -->
+    <radialGradient id="innerGlow" cx="50%" cy="30%" r="60%">
+      <stop offset="0%" stop-color="#38BDF8" stop-opacity="0.35"/>
+      <stop offset="100%" stop-color="#002D62" stop-opacity="0"/>
+    </radialGradient>
+    <filter id="dropShadow" x="-10%" y="-10%" width="120%" height="120%">
+      <feDropShadow dx="0" dy="8" stdDeviation="12" flood-color="#001433" flood-opacity="0.4"/>
+    </filter>
   </defs>
+
+  <!-- Base Rounded Container (Squircle) -->
+  <rect width="512" height="512" rx="112" fill="url(#uteBg)"/>
+  <rect width="512" height="512" rx="112" fill="url(#innerGlow)"/>
+
+  <!-- Golden Emblem Outer Ring -->
+  <circle cx="256" cy="240" r="180" stroke="url(#goldGradient)" stroke-width="8" stroke-dasharray="12 6" opacity="0.65"/>
+  <circle cx="256" cy="240" r="164" stroke="#FFFFFF" stroke-opacity="0.15" stroke-width="3"/>
+
+  <!-- Technology Gear Cog Silhouette (Lower/Background arc) -->
+  <g opacity="0.18" fill="#FFFFFF">
+    <circle cx="256" cy="240" r="140"/>
+  </g>
+
+  <!-- Central Crest / Shield -->
+  <g filter="url(#dropShadow)">
+    <!-- Graduation Cap / Scholar Motif -->
+    <!-- Cap Diamond Top -->
+    <polygon points="256,120 376,175 256,230 136,175" fill="#FFFFFF"/>
+    <polygon points="256,132 360,175 256,218 152,175" fill="url(#goldGradient)"/>
+    <!-- Cap Skull Arc -->
+    <path d="M176,205 V255 C176,295 210,320 256,320 C302,320 336,295 336,255 V205" fill="none" stroke="#FFFFFF" stroke-width="14" stroke-linecap="round"/>
+    <!-- Tassel button and cord -->
+    <line x1="376" y1="175" x2="390" y2="225" stroke="url(#goldGradient)" stroke-width="6" stroke-linecap="round"/>
+    <circle cx="390" cy="235" r="10" fill="url(#goldGradient)"/>
+
+    <!-- Open Knowledge Book at Base of Shield -->
+    <g transform="translate(0, 40)">
+      <!-- Left Page -->
+      <path d="M256,280 C210,265 160,268 126,284 C122,286 120,290 120,295 V348 C120,354 126,358 132,356 C164,342 210,340 256,356 Z" fill="#FFFFFF"/>
+      <!-- Right Page -->
+      <path d="M256,280 C302,265 352,268 386,284 C390,286 392,290 392,295 V348 C392,354 386,358 380,356 C348,342 302,340 256,356 Z" fill="#FFFFFF"/>
+      <!-- Book Spine & Pages Accent -->
+      <path d="M256,280 V356" stroke="#002D62" stroke-width="4"/>
+      <!-- Page detail lines -->
+      <line x1="148" y1="305" x2="236" y2="295" stroke="#003F87" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+      <line x1="148" y1="322" x2="236" y2="312" stroke="#003F87" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+      <line x1="364" y1="305" x2="276" y2="295" stroke="#003F87" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+      <line x1="364" y1="322" x2="276" y2="312" stroke="#003F87" stroke-width="3" stroke-linecap="round" opacity="0.4"/>
+    </g>
+
+    <!-- Prominent "UTE" Typography Ribbon / Badge -->
+    <rect x="156" y="410" width="200" height="52" rx="14" fill="url(#goldGradient)"/>
+    <text x="256" y="447" fill="#002D62" font-family="-apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, 'Helvetica Neue', Arial, sans-serif" font-size="34" font-weight="900" text-anchor="middle" letter-spacing="4">CAMPUS UTE</text>
+  </g>
 </svg>
