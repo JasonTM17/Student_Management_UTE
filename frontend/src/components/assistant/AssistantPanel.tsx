@@ -9,11 +9,9 @@ import {
   useState,
 } from 'react';
 import {
-  Bookmark,
   Bot,
   History,
   LoaderCircle,
-  MessageCircle,
   RotateCcw,
   X,
 } from 'lucide-react';
@@ -41,29 +39,16 @@ import {
 } from './AssistantHistoryPanel';
 import { AssistantComposer } from './AssistantComposer';
 
-function AssistantLauncherMark() {
-  return (
-    <span
-      className="relative inline-flex size-9 items-center justify-center"
-      aria-hidden="true"
-    >
-      <MessageCircle className="size-8 stroke-[1.8] text-white transition-transform duration-200 ease-out group-hover:scale-105" />
-      <Bookmark className="absolute left-1/2 top-1/2 size-3.5 -translate-x-1/2 -translate-y-[42%] fill-white/30 stroke-[2.2] text-white" />
-      <span className="absolute -top-1 -right-1 flex h-3 w-3">
-        <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
-        <span className="relative inline-flex rounded-full h-3 w-3 bg-emerald-500 border-2 border-white"></span>
-      </span>
-    </span>
-  );
-}
-
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
 
   useEffect(() => {
-    const handleOpen = () => setOpen(true);
+    const handleOpen = () => {
+      triggerRef.current = document.activeElement as HTMLElement | null;
+      setOpen(true);
+    };
     window.addEventListener('open-campus-assistant', handleOpen);
     return () => window.removeEventListener('open-campus-assistant', handleOpen);
   }, []);
@@ -76,7 +61,10 @@ export function AssistantPanel() {
     useState<string>();
   const [lastPrompt, setLastPrompt] = useState<string>();
   const [state, dispatch] = useReducer(assistantReducer, initialState);
-  const launcherRef = useRef<HTMLButtonElement>(null);
+  // Focus returns to whichever control opened the panel (header or sidebar
+  // launcher); the desktop floating launcher was removed so its pill stops
+  // covering table content on dashboard pages.
+  const triggerRef = useRef<HTMLElement | null>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const abortRef = useRef<AbortController | null>(null);
@@ -103,7 +91,7 @@ export function AssistantPanel() {
         requestAnimationFrame(() => inputRef.current?.focus());
       } else {
         setOpen(false);
-        requestAnimationFrame(() => launcherRef.current?.focus());
+        requestAnimationFrame(() => triggerRef.current?.focus());
       }
     };
     document.addEventListener('keydown', handleEscape);
@@ -141,7 +129,9 @@ export function AssistantPanel() {
   useEffect(() => {
     const node = logRef.current;
     if (!node) return;
-    if (userScrolledRef.current && !isSending) return;
+    // Respect the reader's position while streaming: never yank them back to
+    // the bottom once they scrolled up to reread earlier messages.
+    if (userScrolledRef.current) return;
     node.scrollTo({
       top: node.scrollHeight,
       behavior: isSending ? 'smooth' : 'auto',
@@ -169,7 +159,7 @@ export function AssistantPanel() {
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
     setHistoryStatus('idle');
-    requestAnimationFrame(() => launcherRef.current?.focus());
+    requestAnimationFrame(() => triggerRef.current?.focus());
   };
 
   const selectConversation = async (conversation: AssistantConversation) => {
@@ -309,6 +299,9 @@ export function AssistantPanel() {
       });
     }
     setIsSending(true);
+    // A fresh send always follows the new exchange, even if the reader was
+    // scrolled up reviewing history when they hit send.
+    userScrolledRef.current = false;
     const controller = new AbortController();
     const generation = ++requestGenerationRef.current;
     const clientRequestId =
@@ -506,25 +499,7 @@ export function AssistantPanel() {
           : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
       )}
     >
-      {!open ? (
-        <div className="hidden md:flex items-center gap-2">
-          <span className="hidden lg:inline-flex items-center gap-1.5 rounded-full border border-primary/20 bg-card/95 px-3 py-1.5 text-xs font-semibold text-primary shadow-lg backdrop-blur transition-all duration-200 group-hover:border-primary/40 pointer-events-none">
-            ✨ {messages.assistant.launcherHint}
-          </span>
-          <Button
-            ref={launcherRef}
-            type="button"
-            size="icon"
-            data-assistant-launcher="campus-mark"
-            className="group relative ml-auto min-h-12 min-w-12 rounded-2xl border-2 border-white/40 bg-gradient-to-tr from-primary via-[#004eab] to-[#0070f3] text-white shadow-[0_10px_30px_rgba(0,63,135,0.38)] transition-all duration-200 ease-out hover:-translate-y-0.5 hover:shadow-[0_14px_36px_rgba(0,63,135,0.48)] hover:scale-105 active:translate-y-0 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transition-none"
-            onClick={() => setOpen(true)}
-            aria-label={messages.assistant.open}
-            title={messages.assistant.open}
-          >
-            <AssistantLauncherMark />
-          </Button>
-        </div>
-      ) : (
+      {open ? (
         <section
           role="dialog"
           aria-modal="false"
@@ -625,6 +600,9 @@ export function AssistantPanel() {
               <AssistantMessages
                 messageList={state.messages}
                 onFeedback={(messageId, rating) => void setFeedback(messageId, rating)}
+                followUps={isSending ? undefined : messages.assistant.suggestions}
+                followUpsLabel={messages.assistant.followUpsLabel}
+                onFollowUp={(suggestion) => setInput(suggestion)}
               />
             )}
             {isSending ? (
@@ -674,7 +652,7 @@ export function AssistantPanel() {
             onStop={() => void stopGeneration()}
           />
         </section>
-      )}
+      ) : null}
     </div>
     {confirmationDialog}
     </>

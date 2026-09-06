@@ -10,19 +10,23 @@ import type { ChatMessage } from './assistant-reducer';
 interface AssistantMessagesProps {
   messageList: ChatMessage[];
   onFeedback: (messageId: string, rating: 'UP' | 'DOWN') => void;
+  /** Suggested follow-up questions shown under the latest answer. */
+  followUps?: readonly string[];
+  followUpsLabel?: string;
+  onFollowUp?: (suggestion: string) => void;
 }
 
 export function reasonLabel(message: ChatMessage, messages: ReturnType<typeof useI18n>['messages']) {
   return message.reasonCode === 'QUOTA_EXCEEDED'
     ? messages.assistant.quotaExceeded
-    : message.degraded
-      ? messages.assistant.degraded
-      : message.reasonCode === 'NO_MATCH'
-        ? messages.assistant.noMatch
-        : message.reasonCode === 'ANSWERED'
-          ? messages.assistant.answered
-          : message.reasonCode === 'CANCELLED'
-            ? messages.assistant.cancelled
+    : message.reasonCode === 'CANCELLED'
+      ? messages.assistant.cancelled
+      : message.degraded
+        ? messages.assistant.degraded
+        : message.reasonCode === 'NO_MATCH'
+          ? messages.assistant.noMatch
+          : message.reasonCode === 'ANSWERED'
+            ? messages.assistant.answered
             : messages.assistant.answered;
 }
 
@@ -37,12 +41,25 @@ function citationDomainLabel(
 export function AssistantMessages({
   messageList,
   onFeedback,
+  followUps,
+  followUpsLabel,
+  onFollowUp,
 }: AssistantMessagesProps) {
   const { messages } = useI18n();
+  const lastAssistantIndex = (() => {
+    for (let index = messageList.length - 1; index >= 0; index -= 1) {
+      const message = messageList[index];
+      if (message.role === 'assistant' && !message.pending && message.content) {
+        return index;
+      }
+    }
+    return -1;
+  })();
 
   return (
     <>
-      {messageList.map((message) => (
+      {messageList.map((message, index) => (
+        <div key={message.id}>
         <div
           key={message.id}
           role="article"
@@ -88,7 +105,9 @@ export function AssistantMessages({
                     {citation.title}
                   </p>
                   <p className="text-muted-foreground">
-                    {citationDomainLabel(citation, messages)} · {citation.locale.toUpperCase()}
+                    {[citationDomainLabel(citation, messages), citation.locale?.toUpperCase()]
+                      .filter(Boolean)
+                      .join(' · ')}
                   </p>
                   <span className="sr-only">{citation.source}</span>
                   <p className="mt-1 text-muted-foreground">
@@ -135,6 +154,28 @@ export function AssistantMessages({
               </Button>
             </div>
           ) : null}
+        </div>
+        {index === lastAssistantIndex && followUps?.length && onFollowUp ? (
+          <div className="ml-auto mt-1 max-w-[92%]">
+            {followUpsLabel ? (
+              <p className="mb-1 text-right text-[11px] font-medium uppercase tracking-wide text-muted-foreground">
+                {followUpsLabel}
+              </p>
+            ) : null}
+            <div className="flex flex-wrap justify-end gap-1.5">
+              {followUps.map((suggestion) => (
+                <button
+                  key={suggestion}
+                  type="button"
+                  onClick={() => onFollowUp(suggestion)}
+                  className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                >
+                  {suggestion}
+                </button>
+              ))}
+            </div>
+          </div>
+        ) : null}
         </div>
       ))}
     </>

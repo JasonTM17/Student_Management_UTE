@@ -71,14 +71,14 @@ test('assistant reducer owns streaming, citations, degraded, and retry states', 
   assert.match(panelSource, /Do not issue a JSON replay/);
 });
 
-test('assistant launcher has a campus helpdesk mark and full interaction states', () => {
+test('assistant panel opens from dashboard entries and restores focus to its trigger', () => {
   const source = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
-  assert.match(source, /data-assistant-launcher="campus-mark"/);
-  assert.match(source, /function AssistantLauncherMark/);
-  assert.match(source, /<Bookmark/);
-  assert.match(source, /hover:-translate-y-0\.5/);
-  assert.match(source, /focus-visible:ring-2/);
-  assert.match(source, /motion-reduce:transition-none/);
+  // The desktop floating launcher was removed so its pill no longer covers
+  // table content; the header and sidebar launchers remain the entry points.
+  assert.doesNotMatch(source, /data-assistant-launcher="campus-mark"/);
+  assert.match(source, /open-campus-assistant/);
+  assert.match(source, /triggerRef\.current = document\.activeElement/);
+  assert.match(source, /triggerRef\.current\?\.focus\(\)/);
 });
 
 test('assistant history routes URI-encode owner-scoped identifiers', () => {

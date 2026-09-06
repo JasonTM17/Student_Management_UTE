@@ -125,13 +125,16 @@ export default function DashboardPage() {
     semesters,
   ]);
 
-  const confirmedCourses = enrollments.filter(
-    (enrollment) => enrollment.status === 'CONFIRMED',
+  // The API marks live registrations ENROLLED; CONFIRMED is the post-approval
+  // state. Counting only CONFIRMED showed "0" for students with active courses.
+  const activeCourses = enrollments.filter(
+    (enrollment) =>
+      enrollment.status === 'CONFIRMED' || enrollment.status === 'ENROLLED',
   );
   const pendingCourses = enrollments.filter(
     (enrollment) => enrollment.status === 'PENDING',
   );
-  const highlightedCourses = confirmedCourses.slice(0, 3);
+  const highlightedCourses = activeCourses.slice(0, 3);
   const enrollmentStatusLabel = (status: string) =>
     messages.common.statuses[status as keyof typeof messages.common.statuses] ??
     messages.common.statuses.UNKNOWN;
@@ -190,7 +193,7 @@ export default function DashboardPage() {
             />
             <WorkspaceMetricCard
               label={messages.studentDashboard.metrics.confirmedEnrollments}
-              value={formatNumber(confirmedCourses.length)}
+              value={formatNumber(activeCourses.length)}
               icon={<GraduationCap className="h-5 w-5" />}
               detail={messages.studentDashboard.metrics.details[1]}
               toneClassName={metricToneClass('success')}
