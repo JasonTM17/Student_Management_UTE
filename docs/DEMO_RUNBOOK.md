@@ -6,31 +6,44 @@ Tài liệu cho buổi demo/chấm điểm. Mọi lệnh chạy từ thư mục 
 ## 0. Chuẩn bị 10 phút trước buổi demo
 
 ```powershell
-docker compose down -v
-docker compose up -d --build
+docker compose up -d --build postgres mailpit rag-service restful-api web
 # chờ tất cả container healthy (API phải áp Flyway V1..V26):
 docker compose ps
 ```
 
-Trạng thái đẹp sau reset: 229 sinh viên, 12 giảng viên, 100 học phần,
+Lệnh trên giữ dữ liệu hiện có. Không chạy `docker compose down -v` trên stack
+đang dùng: lệnh đó xóa volume PostgreSQL, bao gồm dữ liệu tự nhập ngoài seed.
+
+Trạng thái dự kiến của database seed mới: 229 sinh viên, 12 giảng viên, 100 học phần,
 ~700 đăng ký kỳ hiện tại, 1.380 điểm lịch sử, 26 thông báo.
 
 Kiểm tra nhanh trước khi vào lớp:
 
 ```powershell
 curl.exe http://127.0.0.1:4010/api/v1/health/liveness
-curl.exe -o NUL -s -w "%{http_code}" http://127.0.0.1:3100
+$demoWebAddress = docker compose port web 3000
+docker compose port mailpit 8025
+curl.exe -o NUL -s -w "%{http_code}" "http://$demoWebAddress"
 ```
 
-Cả hai phải trả `ok` / `200`.
+Health phải trả `ok`, web phải trả `200`. Nếu `.env` đặt cổng khác, dùng
+kết quả `docker compose port`, không dùng nhầm dịch vụ khác trên máy.
+
+### Reset dữ liệu demo (tùy chọn, không phải bước khởi động)
+
+Chỉ reset một stack demo dùng riêng khi đã xác nhận dữ liệu có thể bỏ và đã
+backup phần cần giữ. Kiểm tra đúng Compose project và volume trước khi xóa;
+không reset stack phát triển hoặc production để chuẩn bị buổi demo.
+Để diễn tập với database mới, ưu tiên project riêng, cổng riêng không trùng
+dịch vụ đang chạy. Xem [hướng dẫn backup/restore](PRODUCTION_RUNBOOK.md).
 
 ## 1. Địa chỉ và tài khoản
 
 | Kênh | Địa chỉ |
 | --- | --- |
-| Web | http://127.0.0.1:3100 (⚠️ port 3100 theo `.env`, không phải 3000) |
+| Web | http://127.0.0.1:3000 mặc định; `FRONTEND_HOST_PORT` trong `.env` có thể đổi cổng |
 | API | http://127.0.0.1:4010/api/v1 |
-| Mailpit (nếu bật mail) | http://127.0.0.1:8026 |
+| Mailpit (nếu bật mail) | http://127.0.0.1:8025 mặc định; `MAILPIT_UI_HOST_PORT` có thể đổi cổng |
 
 | Vai trò | Email | Mật khẩu |
 | --- | --- | --- |
@@ -58,11 +71,11 @@ Cả hai phải trả `ok` / `200`.
 
 | Triệu chứng | Xử lý |
 | --- | --- |
-| Web 3100 trả lỗi | `docker compose ps` — chờ `healthy`; nếu web exit: `docker compose up -d web` |
+| Web trả lỗi | `docker compose port web 3000` để xác định đúng cổng; `docker compose ps`; nếu web exit: `docker compose up -d web` |
 | Chatbot chậm/không trả lời | DeepSeek mặc định TẮT, fallback lexical chạy cục bộ — nói rằng "chatbot không phụ thuộc internet"; kiểm tra `docker compose logs rag-service` |
 | Quên mật khẩu tài khoản demo | Tất cả tài khoản seed dùng `password123` / `admin123` (xem bảng trên) |
-| CSDL lại trạng thái lạ | Quay lại bước 0 — reset là an toàn vì toàn bộ dữ liệu nằm trong migration seed |
-| Cần quay lại dữ liệu trước V26 | `docker exec -i student_management-postgres-1 psql -U campuscore -d campuscore_restful < database/backups/pre-v26-20260906-2134.sql` |
+| CSDL có trạng thái khác seed | Kiểm tra dữ liệu đã nhập và phiên bản Flyway trước; backup dữ liệu cần giữ. Chỉ reset theo mục riêng ở trên khi xác nhận đúng stack demo |
+| Cần khôi phục dữ liệu | Dùng backup đã xác minh theo runbook backup/restore; không giả định có sẵn bản backup hoặc tên container trên máy khác |
 
 ## 4. Điểm nhấn kỹ thuật nên kể (kèm bằng chứng)
 

@@ -90,6 +90,12 @@ npm run typecheck --prefix mobile
 
 Mailpit UI ở `http://127.0.0.1:8025`.
 
+Web mặc định ở `http://127.0.0.1:3000`. Nếu `.env` đổi
+`FRONTEND_HOST_PORT` hoặc `MAILPIT_UI_HOST_PORT`, xác định địa chỉ thật bằng
+`docker compose port web 3000` và `docker compose port mailpit 8025`.
+Khởi động giữ dữ liệu hiện có; không dùng `docker compose down -v` như bước
+chuẩn bị demo thông thường. Xem [runbook demo](docs/DEMO_RUNBOOK.md).
+
 ## Gói production chờ VPS/domain
 
 `docker-compose.prod.yml`, `ops/caddy/Caddyfile`, `ops/secrets/README.md`,
