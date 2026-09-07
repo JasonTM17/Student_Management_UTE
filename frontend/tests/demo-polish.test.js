@@ -39,6 +39,16 @@ test('GPA trend keeps a single graded semester as one explicit point', () => {
   assert.equal(points[0].gpa, 3.0);
 });
 
+test('GPA trend names follow the selected language with missing-translation fallbacks', () => {
+  const { buildGpaTrendPoints } = load('src/lib/transcript-charts.ts');
+  const term = { semesterName: 'Term', semesterNameVi: 'Học kỳ một', semesterNameEn: 'First semester', gpa: 3, records: [] };
+  assert.equal(buildGpaTrendPoints([term], 'en')[0].fullLabel, 'First semester');
+  assert.equal(buildGpaTrendPoints([term], 'vi')[0].fullLabel, 'Học kỳ một');
+  assert.equal(buildGpaTrendPoints([{ ...term, semesterNameEn: null }], 'en')[0].fullLabel, 'Học kỳ một');
+  assert.equal(buildGpaTrendPoints([{ ...term, semesterNameVi: null }], 'vi')[0].fullLabel, 'First semester');
+  assert.equal(buildGpaTrendPoints([{ ...term, semesterNameVi: null, semesterNameEn: null }], 'en')[0].fullLabel, 'Term');
+});
+
 test('grade distribution buckets published letters and ignores ungraded records', () => {
   const { buildGradeDistribution } = load('src/lib/transcript-charts.ts');
   const buckets = buildGradeDistribution([

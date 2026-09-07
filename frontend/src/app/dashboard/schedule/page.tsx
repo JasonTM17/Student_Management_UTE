@@ -423,8 +423,8 @@ export default function SchedulePage() {
                   </div>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2 md:hidden">
-                  {localizedDayNames.slice(1, 7).map((dayName, index) => {
-                  const dayOfWeek = index + 1;
+                  {weeklyGrid.days.map((dayOfWeek) => {
+                  const dayName = localizedDayNames[dayOfWeek % 7];
                   const items = agendaByDay[dayOfWeek] ?? [];
 
                   return (
@@ -514,7 +514,7 @@ export default function SchedulePage() {
                           )}
                         </div>
                         <div className="mt-1 text-sm text-muted-foreground">
-                          {localizedDayNames[item.dayOfWeek]} - {copy.sectionPrefix}{' '}
+                          {localizedDayNames[item.dayOfWeek % 7]} - {copy.sectionPrefix}{' '}
                           {item.sectionNumber}
                         </div>
                       </div>

@@ -29,8 +29,9 @@ export function buildGpaTrendPoints(
     .map((semester, index) => ({
       label: locale === 'vi' ? `HK${index + 1}` : `T${index + 1}`,
       fullLabel:
-        semester.semesterNameVi ??
-        semester.semesterNameEn ??
+        (locale === 'vi'
+          ? semester.semesterNameVi ?? semester.semesterNameEn
+          : semester.semesterNameEn ?? semester.semesterNameVi) ??
         semester.semesterName,
       gpa: semester.gpa,
     }));
