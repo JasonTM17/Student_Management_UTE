@@ -38,6 +38,33 @@
   ```
   Phản hồi chuẩn: `{"status": "ok", "service": "restful-api"}`
 
+### 3.1. Cấu hình Chatbot AI & Định Tuyến Phân Tầng (Tiered Difficulty Routing)
+
+Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiến trúc định tuyến thông minh 2 tầng:
+
+1. **Câu hỏi thông thường & Tra cứu quy chế (RAG Bot nội bộ)**:
+   - Các câu hỏi sự kiện, điều kiện đồ án, học phí, biểu mẫu, tra cứu trực tiếp được giải đáp 100% bởi **RAG bot do chúng ta huấn luyện** (`curated-lexical-rag`) từ bảng `assistant.knowledge_release`.
+   - Phản hồi siêu tốc, đính kèm chính xác trích dẫn văn bản/quy định UTE, tuyệt đối không tiêu tốn token hay quota gọi ra ngoài.
+
+2. **Câu hỏi quá khó / Phân tích tổng hợp (Escalation DeepSeek V4 Flash)**:
+   - `AssistantDifficultyRouter` tự động kiểm tra và nhận diện câu hỏi khó khi:
+     - Câu hỏi dài (> 180 ký tự hoặc >= 12 từ logic).
+     - Chứa từ khóa phức tạp / lập luận: `"so sánh"`, `"khác nhau"`, `"tại sao"`, `"vì sao"`, `"như thế nào"`, `"làm thế nào"`, `"hướng dẫn"`, `"các bước"`, `"ngoại lệ"`, `"trường hợp"`, `"nếu"`, `"compare"`, `"why"`, `"how"`, `"steps"`,...
+     - Dữ liệu liên quan trải rộng trên $\ge$ 3 tài liệu hoặc $\ge$ 2 phân hệ tri thức độc lập.
+   - Khi đó, hệ thống sẽ tự động gọi mô hình `deepseek-v4-flash`, nạp context trích xuất từ tài liệu học vụ nội bộ để mô hình tổng hợp phân tích đa chiều cho sinh viên.
+   - **Cơ chế an toàn (Graceful Fallback)**: Khi chưa bật DeepSeek hoặc API Key hết hạn, hệ thống tự động fallback về câu trả lời RAG nội bộ (`degraded: true`), không bao giờ để xảy ra gián đoạn dịch vụ.
+
+3. **Hướng dẫn thêm DeepSeek API Key vào Render Dashboard**:
+   - **Bước 1**: Đăng nhập vào [Render Dashboard](https://dashboard.render.com).
+   - **Bước 2**: Chọn Web Service `campuscore-backend`.
+   - **Bước 3**: Chọn tab **Environment** ở cột điều hướng bên trái.
+   - **Bước 4**: Thêm hoặc cập nhật các biến môi trường:
+     - `DEEPSEEK_ENABLED`: `true`
+     - `DEEPSEEK_API_KEY`: `<API Key bắt đầu bằng sk-...>` (Lấy từ [DeepSeek Platform](https://platform.deepseek.com))
+     - `DEEPSEEK_MODEL`: `deepseek-v4-flash` *(Đã đặt mặc định chuẩn)*
+     - `DEEPSEEK_BASE_URL`: `https://api.deepseek.com` *(Đã đặt mặc định chuẩn)*
+   - **Bước 5**: Nhấn **Save Changes**. Render sẽ tự động redeploy phiên bản mới có kích hoạt kết nối DeepSeek.
+
 ---
 
 ## 4. Tối Ưu Hóa Nhận Diện Thương Hiệu & SEO
