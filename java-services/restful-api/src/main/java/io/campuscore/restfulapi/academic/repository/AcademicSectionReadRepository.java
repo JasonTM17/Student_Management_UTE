@@ -119,7 +119,9 @@ public class AcademicSectionReadRepository {
                         + " JOIN " + STUDENT + " student ON student.\"id\" = enrollment.\"studentId\""
                         + " JOIN " + USER + " student_user ON student_user.\"id\" = student.\"userId\""
                         + " WHERE enrollment.\"sectionId\" = :sectionId"
-                        + " AND enrollment.\"status\" IN ('CONFIRMED', 'COMPLETED')"
+                        + " AND enrollment.\"semesterId\" = (SELECT section_scope.\"semesterId\""
+                        + "     FROM \"academic\".\"Section\" section_scope WHERE section_scope.\"id\" = :sectionId)"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'CONFIRMED', 'COMPLETED')"
                         + " ORDER BY student_user.\"firstName\" ASC, student_user.\"lastName\" ASC, enrollment.\"id\" ASC",
                 new MapSqlParameterSource("sectionId", sectionId),
                 AcademicSectionReadRepository::mapGradeEnrollment);
@@ -166,7 +168,8 @@ public class AcademicSectionReadRepository {
                 + " classroom.\"building\", classroom.\"roomNumber\","
                 + " (SELECT COUNT(*) FROM " + ENROLLMENT + " active_enrollment"
                 + " WHERE active_enrollment.\"sectionId\" = section.\"id\""
-                + " AND active_enrollment.\"status\" IN ('PENDING', 'CONFIRMED', 'COMPLETED')) AS active_enrollment_count"
+                + " AND active_enrollment.\"semesterId\" = section.\"semesterId\""
+                + " AND active_enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED', 'COMPLETED')) AS active_enrollment_count"
                 + " FROM " + SECTION + " section"
                 + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
                 + " JOIN " + DEPARTMENT + " department ON department.\"id\" = course.\"departmentId\""
@@ -190,7 +193,8 @@ public class AcademicSectionReadRepository {
                 + " JOIN " + DEPARTMENT + " department ON department.\"id\" = course.\"departmentId\""
                 + " JOIN " + SEMESTER + " semester ON semester.\"id\" = section.\"semesterId\""
                 + " LEFT JOIN " + ENROLLMENT + " enrollment ON enrollment.\"sectionId\" = section.\"id\""
-                + " AND enrollment.\"status\" IN ('CONFIRMED', 'COMPLETED')";
+                + " AND enrollment.\"semesterId\" = section.\"semesterId\""
+                + " AND enrollment.\"status\" IN ('ENROLLED', 'CONFIRMED', 'COMPLETED')";
     }
 
     private static String gradingGroupBy() {

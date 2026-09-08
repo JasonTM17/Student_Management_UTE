@@ -107,6 +107,33 @@ class AcademicSectionReadPersistenceTest {
     }
 
     @Test
+    void lecturerGradingCountsStayScopedToTheSectionSemesterAndIncludeEnrolledRows() throws Exception {
+        // A graded history row attached to the current section id from another
+        // semester (the live 331/331/331 defect) must not be counted…
+        insertEnrollmentWithSemester(
+                "enrollment-history", "student-3", "section-1", "semester-9", "COMPLETED", "PUBLISHED", "99.00", "A+");
+        // …while a current-semester ENROLLED student must be counted.
+        insertEnrollmentWithSemester(
+                "enrollment-enrolled", "student-3", "section-1", "semester-1", "ENROLLED", "DRAFT", null, null);
+
+        mvc.perform(get("/api/v1/sections/my/grading")
+                        .queryParam("semesterId", "semester-1")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].sectionId").value("section-1"))
+                .andExpect(jsonPath("$[0].enrolledCount").value(3))
+                .andExpect(jsonPath("$[0].gradedCount").value(2))
+                .andExpect(jsonPath("$[0].publishedCount").value(1))
+                .andExpect(jsonPath("$[0].gradeStatus").value("PARTIAL"));
+
+        mvc.perform(get("/api/v1/sections/section-1/grades").with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollments.length()").value(3))
+                .andExpect(jsonPath("$.enrollments[2].studentCode").value("S003"))
+                .andExpect(jsonPath("$.enrollments[2].enrollmentStatus").value("ENROLLED"));
+    }
+
+    @Test
     void detailAndSectionGradesPreserveLegacyShapeAndNotFoundEnvelope() throws Exception {
         mvc.perform(get("/api/v1/sections/section-1").with(adminJwt()))
                 .andExpect(status().isOk())
@@ -474,6 +501,26 @@ class AcademicSectionReadPersistenceTest {
             String gradeStatus,
             String finalGrade,
             String letterGrade) {
+        insertEnrollmentWithSemester(
+                id,
+                studentId,
+                sectionId,
+                sectionId.equals("section-spring") ? "semester-2" : "semester-1",
+                status,
+                gradeStatus,
+                finalGrade,
+                letterGrade);
+    }
+
+    private void insertEnrollmentWithSemester(
+            String id,
+            String studentId,
+            String sectionId,
+            String semesterId,
+            String status,
+            String gradeStatus,
+            String finalGrade,
+            String letterGrade) {
         jdbc.update(
                 "INSERT INTO \"academic\".\"Enrollment\""
                         + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"droppedAt\","
@@ -482,7 +529,7 @@ class AcademicSectionReadPersistenceTest {
                 id,
                 studentId,
                 sectionId,
-                sectionId.equals("section-spring") ? "semester-2" : "semester-1",
+                semesterId,
                 status,
                 BASE_TIME,
                 null,
