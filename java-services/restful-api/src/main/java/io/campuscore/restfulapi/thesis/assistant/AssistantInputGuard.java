@@ -26,12 +26,22 @@ public final class AssistantInputGuard {
                     + "|(?:in|đọc|xem|hiển\\s*thị|lấy)\\s+(?:ra\\s+|cho\\s+(?:tôi|ta)\\s+)?(?:toàn\\s*bộ\\s+)?(?:system\\s+prompt|prompt\\s+hệ\\s+thống|câu\\s+lệnh\\s+hệ\\s+thống|lệnh\\s+hệ\\s+thống)"
                     + "|giả\\s*mạo\\s+(?:quản\\s*trị\\s*viên|admin|hệ\\s*thống))");
     private static final String NEW_CONVERSATION = "new-conversation";
+    /**
+     * Invisible formatting characters (soft hyphen, zero-width spaces and
+     * joins, directional marks, BOM) split banned keywords across otherwise
+     * matching spans — "ig\u200Bnore previous instructions" — so they are
+     * stripped before NFC folding. Every pattern and the canonical idempotency
+     * hash see the same folded text through this single choke point.
+     */
+    private static final Pattern INVISIBLE = Pattern.compile(
+            "[\\u00AD\\u200B-\\u200F\\u2060-\\u2064\\u206A-\\u206F\\uFEFF]");
 
     private AssistantInputGuard() { }
 
     public static String normalizeMessage(String message) {
         if (message == null) return "";
-        return Normalizer.normalize(message.trim(), Normalizer.Form.NFC);
+        String stripped = INVISIBLE.matcher(message.trim()).replaceAll("");
+        return Normalizer.normalize(stripped, Normalizer.Form.NFC);
     }
 
     public static String normalizeLocale(String locale) {
@@ -110,7 +120,7 @@ public final class AssistantInputGuard {
 
     /** Used at the provider boundary for retrieved text and streamed output. */
     public static boolean containsPromptInjection(String value) {
-        return value != null && PROMPT_INJECTION.matcher(value).find();
+        return value != null && PROMPT_INJECTION.matcher(normalizeMessage(value)).find();
     }
 
     public static String canonicalHash(String message, String locale, UUID conversationId) {
