@@ -6,6 +6,8 @@ import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.RequestMapping;
@@ -26,12 +28,13 @@ public class ThesisTopicController {
     @GetMapping
     public List<TopicResponse> list(
             @RequestParam UUID roundId,
-            @RequestParam(required = false) TopicStatus status) {
-        return topics.list(roundId, status);
+            @RequestParam(required = false) TopicStatus status,
+            @AuthenticationPrincipal Jwt actor) {
+        return topics.list(roundId, status, actor);
     }
 
     @GetMapping("/{id}")
-    public TopicResponse get(@PathVariable UUID id) {
-        return topics.get(id);
+    public TopicResponse get(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+        return topics.get(id, actor);
     }
 }
