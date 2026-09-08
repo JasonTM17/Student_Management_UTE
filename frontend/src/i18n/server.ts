@@ -60,6 +60,14 @@ function getRouteMetadata(pathname: string, locale: Locale) {
     };
   }
 
+  if (pathname === '/register') {
+    return {
+      title: messages.meta.register.title,
+      description: messages.meta.register.description,
+      robots: { index: true, follow: true },
+    };
+  }
+
   if (pathname === '/forgot-password') {
     return {
       title: messages.meta.forgotPassword.title,

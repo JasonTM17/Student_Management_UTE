@@ -311,6 +311,15 @@ export default function AdminUsersPage() {
   };
 
   const handleDelete = async (userRecord: UserRecord) => {
+    if (user && (user.id === userRecord.id || user.email === userRecord.email)) {
+      toast.error(
+        locale === 'vi'
+          ? 'Không thể xóa tài khoản của chính mình.'
+          : 'You cannot delete your own account.',
+      );
+      return;
+    }
+
     const shouldDelete = await confirm({
       title: copy.deleteTitle,
       message: copy.deleteMessage(userRecord.firstName, userRecord.lastName),
@@ -325,7 +334,11 @@ export default function AdminUsersPage() {
     try {
       await usersApi.delete(userRecord.id);
       toast.success(copy.deleted);
-      await fetchUsers();
+      if (users.length === 1 && page > 1) {
+        setPage((prev) => prev - 1);
+      } else {
+        await fetchUsers();
+      }
     } catch {
       toast.error(copy.deleteFailed);
     }
@@ -471,16 +484,34 @@ export default function AdminUsersPage() {
                       >
                         <Pencil className="h-4 w-4" />
                       </Button>
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                        onClick={() => void handleDelete(record)}
-                        aria-label={copy.deleteUserLabel(record.firstName, record.lastName)}
-                        title={copy.deleteUserLabel(record.firstName, record.lastName)}
-                      >
-                        <Trash2 className="h-4 w-4" />
-                      </Button>
+                      {(() => {
+                        const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
+                        return (
+                          <Button
+                            size="icon"
+                            variant="ghost"
+                            className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+                            onClick={() => void handleDelete(record)}
+                            disabled={isSelf}
+                            aria-label={
+                              isSelf
+                                ? (locale === 'vi'
+                                    ? 'Không thể xóa tài khoản của chính mình'
+                                    : 'Cannot delete your own account')
+                                : copy.deleteUserLabel(record.firstName, record.lastName)
+                            }
+                            title={
+                              isSelf
+                                ? (locale === 'vi'
+                                    ? 'Không thể xóa tài khoản của chính mình'
+                                    : 'Cannot delete your own account')
+                                : copy.deleteUserLabel(record.firstName, record.lastName)
+                            }
+                          >
+                            <Trash2 className="h-4 w-4" />
+                          </Button>
+                        );
+                      })()}
                     </AdminRowActions>
                   </article>
                 ))}
@@ -530,16 +561,34 @@ export default function AdminUsersPage() {
                             >
                               <Pencil className="h-4 w-4" />
                             </Button>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              className="text-destructive hover:bg-destructive/10 hover:text-destructive"
-                              onClick={() => void handleDelete(record)}
-                              aria-label={copy.deleteUserLabel(record.firstName, record.lastName)}
-                              title={copy.deleteUserLabel(record.firstName, record.lastName)}
-                            >
-                              <Trash2 className="h-4 w-4" />
-                            </Button>
+                            {(() => {
+                              const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
+                              return (
+                                <Button
+                                  size="icon"
+                                  variant="ghost"
+                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+                                  onClick={() => void handleDelete(record)}
+                                  disabled={isSelf}
+                                  aria-label={
+                                    isSelf
+                                      ? (locale === 'vi'
+                                          ? 'Không thể xóa tài khoản của chính mình'
+                                          : 'Cannot delete your own account')
+                                      : copy.deleteUserLabel(record.firstName, record.lastName)
+                                  }
+                                  title={
+                                    isSelf
+                                      ? (locale === 'vi'
+                                          ? 'Không thể xóa tài khoản của chính mình'
+                                          : 'Cannot delete your own account')
+                                      : copy.deleteUserLabel(record.firstName, record.lastName)
+                                  }
+                                >
+                                  <Trash2 className="h-4 w-4" />
+                                </Button>
+                              );
+                            })()}
                           </AdminRowActions>
                         </td>
                       </tr>

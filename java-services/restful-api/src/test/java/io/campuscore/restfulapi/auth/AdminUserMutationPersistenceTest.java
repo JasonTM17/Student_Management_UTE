@@ -107,6 +107,13 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void adminCannotDeleteOwnAccount() throws Exception {
+        mvc.perform(delete("/api/v1/users/admin-user").with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SELF_DELETION_NOT_ALLOWED"));
+    }
+
+    @Test
     void userListIncludesCeilingTotalPagesMetadata() throws Exception {
         mvc.perform(get("/api/v1/users")
                         .queryParam("page", "1")

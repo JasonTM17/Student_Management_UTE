@@ -133,11 +133,22 @@ public class AdminUserMutationService {
 
     @Transactional
     public void delete(String id) {
-        delete(id, false);
+        delete(id, false, null);
     }
 
     @Transactional
     public void delete(String id, boolean canManageSuperAdmin) {
+        delete(id, canManageSuperAdmin, null);
+    }
+
+    @Transactional
+    public void delete(String id, boolean canManageSuperAdmin, String currentUserId) {
+        if (currentUserId != null && currentUserId.equals(id)) {
+            throw problem(
+                    HttpStatus.BAD_REQUEST,
+                    "SELF_DELETION_NOT_ALLOWED",
+                    "You cannot delete your own account");
+        }
         if (!canManageSuperAdmin && hasRole(id, "SUPER_ADMIN")) {
             throw problem(
                     HttpStatus.FORBIDDEN,
