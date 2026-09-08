@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.security;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -52,7 +53,7 @@ class SecurityConfigTest {
     @Test
     void configuresPermissiveLocalAndProductionCors() {
         SecurityConfig config = new SecurityConfig();
-        CorsConfigurationSource source = config.corsConfigurationSource();
+        CorsConfigurationSource source = config.corsConfigurationSource(SecurityConfig.DEFAULT_CORS_ORIGIN_PATTERNS);
         MockHttpServletRequest request = new MockHttpServletRequest();
         request.setRequestURI("/api/v1/health");
 
@@ -60,8 +61,21 @@ class SecurityConfigTest {
         assertNotNull(corsConfig);
         assertTrue(Boolean.TRUE.equals(corsConfig.getAllowCredentials()));
         assertTrue(corsConfig.getAllowedOriginPatterns().contains("https://campusute.io.vn"));
-        assertTrue(corsConfig.getAllowedOriginPatterns().contains("https://*.vercel.app"));
         assertTrue(corsConfig.getAllowedOriginPatterns().contains("http://localhost:3000"));
+        // Credentialed CORS must not trust a whole public wildcard domain.
+        assertFalse(corsConfig.getAllowedOriginPatterns().contains("https://*.vercel.app"));
+        assertFalse(corsConfig.getAllowedOriginPatterns().stream().anyMatch(pattern -> pattern.contains("*.")));
+    }
+
+    @Test
+    void corsOriginsAreConfigDrivenForPreviewDeployments() {
+        SecurityConfig config = new SecurityConfig();
+        CorsConfigurationSource source = config.corsConfigurationSource(
+                "https://campusute.io.vn,https://campuscore-git-preview.example.vercel.app");
+        CorsConfiguration corsConfig = source.getCorsConfiguration(new MockHttpServletRequest());
+        assertNotNull(corsConfig);
+        assertEquals(List.of("https://campusute.io.vn", "https://campuscore-git-preview.example.vercel.app"),
+                corsConfig.getAllowedOriginPatterns());
     }
 
     private static Jwt.Builder token() {
