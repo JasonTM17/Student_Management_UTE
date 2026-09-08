@@ -109,13 +109,30 @@ public class ThesisMutationService {
         }
         roundReadPort.requireExisting(request.roundId());
         String actorId = subject(actor);
-        ThesisTopic topic = topics.save(new ThesisTopic(
+        ThesisTopic topic = topics.saveAndFlush(new ThesisTopic(
                 request.roundId(),
                 request.departmentId().trim(),
                 request.title().trim(),
                 request.description().trim(),
                 maxGroups,
                 actorId));
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (isLecturer(actor) || !lecturerId.isBlank()) {
+            String supervisorId = !lecturerId.isBlank() ? lecturerId : actorId;
+            if (!supervisorId.isBlank()) {
+                Integer existingSupervisor = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND (lecturer_id = :supervisorId OR supervisor_order = 1)",
+                        params().addValue("topicId", topic.getId()).addValue("supervisorId", supervisorId),
+                        Integer.class);
+                if (existingSupervisor == null || existingSupervisor == 0) {
+                    jdbc.update(
+                            "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) VALUES (:id, :topicId, :lecturerId, 1)",
+                            params().addValue("id", UUID.randomUUID())
+                                    .addValue("topicId", topic.getId())
+                                    .addValue("lecturerId", supervisorId));
+                }
+            }
+        }
         return TopicResponse.from(topic);
     }
 
@@ -205,6 +222,9 @@ public class ThesisMutationService {
         if (topicId == null) {
             throw invalid("topicId is required");
         }
+        if (!isAdmin(actor) && group.approvalStatus() == ApprovalStatus.APPROVED && !topicId.equals(group.topicId())) {
+            throw conflict("GROUP_STATE_CONFLICT", "An approved group cannot change its topic");
+        }
         Map<String, Object> topic = one("SELECT id, round_id, status, max_groups FROM thesis.thesis_topic WHERE id = :id FOR UPDATE", params().addValue("id", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
@@ -213,10 +233,13 @@ public class ThesisMutationService {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be selected");
         }
         int maxGroups = ((Number) topic.get("max_groups")).intValue();
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId AND status <> 'CANCELLED'", topicId) >= maxGroups && !topicId.equals(group.topicId())) {
+        boolean alreadyOccupiesSlot = topicId.equals(group.topicId()) && group.approvalStatus() != ApprovalStatus.REJECTED;
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group WHERE topic_id = :topicId AND status <> 'CANCELLED' AND approval_status <> 'REJECTED'", topicId) >= maxGroups && !alreadyOccupiesSlot) {
             throw conflict("TOPIC_FULL", "This topic has reached its group limit");
         }
-        jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, status = CASE WHEN status = 'DRAFT' THEN 'SUBMITTED' ELSE status END, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("topicId", topicId).addValue("groupId", groupId));
+        boolean isNewTopic = !topicId.equals(group.topicId());
+        jdbc.update("UPDATE thesis.thesis_group SET topic_id = :topicId, status = CASE WHEN status = 'DRAFT' THEN 'SUBMITTED' ELSE status END, approval_status = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN 'PENDING' ELSE approval_status END, approved_by = CASE WHEN :isNewTopic THEN NULL ELSE approved_by END, approved_at = CASE WHEN :isNewTopic THEN NULL ELSE approved_at END, rejection_reason = CASE WHEN approval_status = 'REJECTED' OR :isNewTopic THEN NULL ELSE rejection_reason END, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId",
+                params().addValue("topicId", topicId).addValue("groupId", groupId).addValue("isNewTopic", isNewTopic));
         return groups.findById(groupId);
     }
 
@@ -291,15 +314,40 @@ public class ThesisMutationService {
 
     private void authorizeReviewer(GroupRow group, Jwt actor) {
         if (isAdmin(actor)) return;
-        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
-        if (lecturerId.isBlank() || group.topicId() == null
-                || count("SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId", group.topicId(), lecturerId) == 0) {
+        if (group.topicId() == null) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
         }
+        String actorId = subject(actor);
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+
+        boolean isCreator = (!actorId.isBlank() || !lecturerId.isBlank()) && jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE id = :topicId AND (created_by = :actorId OR (:lecturerId <> '' AND created_by = :lecturerId))",
+                params().addValue("topicId", group.topicId())
+                        .addValue("actorId", actorId)
+                        .addValue("lecturerId", lecturerId),
+                Integer.class) > 0;
+        if (isCreator) {
+            return;
+        }
+
+        Integer supervisorCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND (lecturer_id = :lecturerId OR lecturer_id = :actorId)",
+                params().addValue("topicId", group.topicId())
+                        .addValue("actorId", actorId)
+                        .addValue("lecturerId", lecturerId.isBlank() ? actorId : lecturerId),
+                Integer.class);
+        if (supervisorCount != null && supervisorCount > 0) {
+            return;
+        }
+
+        throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_REVIEWER_REQUIRED", "Only an assigned supervisor or admin can review this group");
     }
 
     private void authorizeTopicOwner(ThesisTopic topic, Jwt actor) {
-        if (!isAdmin(actor) && !topic.getCreatedBy().equals(subject(actor))) {
+        if (isAdmin(actor)) return;
+        String actorId = subject(actor);
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (!topic.getCreatedBy().equals(actorId) && (lecturerId.isBlank() || !topic.getCreatedBy().equals(lecturerId))) {
             throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_OWNER_REQUIRED", "Only the topic owner can change this topic");
         }
     }
@@ -354,6 +402,13 @@ public class ThesisMutationService {
         }
         List<String> roles = actor.getClaimAsStringList("roles");
         return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+    }
+    private static boolean isLecturer(Jwt actor) {
+        if (actor == null) {
+            return false;
+        }
+        List<String> roles = actor.getClaimAsStringList("roles");
+        return roles != null && roles.contains("LECTURER");
     }
     private static boolean isProgressStatus(GroupStatus status) { return status == GroupStatus.DRAFT || status == GroupStatus.SUBMITTED || status == GroupStatus.COMPLETED || status == GroupStatus.CANCELLED; }
     private static DomainException invalid(String message) { return new DomainException(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", message); }

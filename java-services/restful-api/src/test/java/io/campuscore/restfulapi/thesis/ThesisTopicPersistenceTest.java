@@ -55,6 +55,7 @@ class ThesisTopicPersistenceTest {
     void cleanDatabase() {
         jdbc.update("DELETE FROM thesis.thesis_group_member");
         jdbc.update("DELETE FROM thesis.thesis_group");
+        jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
         topics.deleteAll();
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'test-member-%'");
@@ -67,11 +68,16 @@ class ThesisTopicPersistenceTest {
                 "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
                         + "WHERE LOWER(TABLE_SCHEMA) = 'thesis' AND LOWER(TABLE_NAME) = 'thesis_topic'",
                 Integer.class);
+        Integer supervisorTableCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM INFORMATION_SCHEMA.TABLES "
+                        + "WHERE LOWER(TABLE_SCHEMA) = 'thesis' AND LOWER(TABLE_NAME) = 'thesis_topic_supervisor'",
+                Integer.class);
         Integer migrationCount = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.flyway_schema_history WHERE version = '1'",
                 Integer.class);
 
         assertEquals(1, topicTableCount);
+        assertEquals(1, supervisorTableCount);
         assertEquals(1, migrationCount);
     }
 
@@ -380,6 +386,353 @@ class ThesisTopicPersistenceTest {
                         .with(lecturerJwt("lecturer-user")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("TOPIC_STATE_CONFLICT"));
+    }
+
+    @Test
+    void lecturerTopicCreationRegistersSupervisorAndAllowsGroupReview() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open Round 2026", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("student-review-1", "user-student-1", "student1@campuscore.edu");
+
+        // 1. Lecturer creates topic
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Supervisor Flow Topic\",\"description\":\"Testing supervisor workflow\",\"maxGroups\":2}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(lecturerJwt("lecturer-supervisor-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Supervisor Flow Topic'",
+                UUID.class);
+
+        // Verify supervisor was automatically inserted
+        Integer supervisorCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = ? AND lecturer_id = ? AND supervisor_order = 1",
+                Integer.class,
+                topicId,
+                "lecturer-supervisor-1");
+        assertEquals(1, supervisorCount);
+
+        // Publish topic
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(lecturerJwt("lecturer-supervisor-1")))
+                .andExpect(status().isOk());
+
+        // 2. Student creates group and assigns topic
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.approvalStatus").value("PENDING"));
+
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class,
+                roundId,
+                "student-review-1");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.approvalStatus").value("PENDING"));
+
+        // 3. Unauthorized reviewer is rejected (different lecturer)
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("different-lecturer")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_REVIEWER_REQUIRED"));
+
+        // 4. Assigned supervisor / creator approves group
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("lecturer-supervisor-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("SUBMITTED"))
+                .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
+
+        // Approving again triggers conflict
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("lecturer-supervisor-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_APPROVAL_STATE_CONFLICT"));
+    }
+
+    @Test
+    void lecturerRejectionFlowAndTopicReassignment() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open Round 2026-B", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("student-review-2", "user-student-2", "student2@campuscore.edu");
+
+        // 1. Lecturer creates topic
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Topic for Rejection Test\",\"description\":\"Testing rejection\",\"maxGroups\":2}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(lecturerJwt("lecturer-reviewer-2")))
+                .andExpect(status().isOk());
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Topic for Rejection Test'",
+                UUID.class);
+
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(lecturerJwt("lecturer-reviewer-2")))
+                .andExpect(status().isOk());
+
+        // 2. Student creates group & assigns topic
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-2")))
+                .andExpect(status().isOk());
+
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class,
+                roundId,
+                "student-review-2");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-2")))
+                .andExpect(status().isOk());
+
+        // 3. Lecturer rejects with blank reason -> 400 VALIDATION_ERROR
+        mvc.perform(post("/api/v1/thesis/groups/{id}/reject", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"   \"}")
+                        .with(lecturerJwt("lecturer-reviewer-2")))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+
+        // 4. Lecturer rejects with valid reason
+        mvc.perform(post("/api/v1/thesis/groups/{id}/reject", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Proposal needs more detailed architecture.\"}")
+                        .with(lecturerJwt("lecturer-reviewer-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("REJECTED"))
+                .andExpect(jsonPath("$.rejectionReason").value("Proposal needs more detailed architecture."));
+
+        // 5. Student reassigns topic -> resets approvalStatus to PENDING
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("PENDING"))
+                .andExpect(jsonPath("$.rejectionReason").doesNotExist());
+
+        // 6. Supervisor can now approve
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("lecturer-reviewer-2")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
+    }
+
+    @Test
+    void approvedGroupCannotChangeTopicAndRejectedSlotIsFreed() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open Round 2026-C", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("student-review-3", "user-student-3", "student3@campuscore.edu");
+        ensureStudent("student-review-4", "user-student-4", "student4@campuscore.edu");
+
+        // 1. Lecturer creates topic with maxGroups = 1
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Topic Max 1 Slot\",\"description\":\"Testing slot release\",\"maxGroups\":1}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(lecturerJwt("lecturer-reviewer-3")))
+                .andExpect(status().isOk());
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Topic Max 1 Slot'",
+                UUID.class);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(lecturerJwt("lecturer-reviewer-3")))
+                .andExpect(status().isOk());
+
+        // 2. Student 3 creates group and assigns topic (takes the only slot)
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-3")))
+                .andExpect(status().isOk());
+        UUID group3Id = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class, roundId, "student-review-3");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", group3Id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-3")))
+                .andExpect(status().isOk());
+
+        // 3. Student 4 creates group and attempts to assign the same full topic -> 409 TOPIC_FULL
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-4")))
+                .andExpect(status().isOk());
+        UUID group4Id = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class, roundId, "student-review-4");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", group4Id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-4")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_FULL"));
+
+        // 4. Lecturer rejects Group 3 -> releases slot
+        mvc.perform(post("/api/v1/thesis/groups/{id}/reject", group3Id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"reason\":\"Incomplete prerequisites.\"}")
+                        .with(lecturerJwt("lecturer-reviewer-3")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("REJECTED"));
+
+        // 5. Student 4 can now successfully claim the freed slot
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", group4Id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-4")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("PENDING"));
+
+        // 6. Lecturer approves Group 4
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", group4Id)
+                        .with(lecturerJwt("lecturer-reviewer-3")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
+
+        // 7. Student 4 attempts to change topic while approved -> 409 GROUP_STATE_CONFLICT
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", group4Id)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + UUID.randomUUID() + "\"}")
+                        .with(studentJwt("student-review-4")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+    }
+
+    @Test
+    void coSupervisorCanReviewAndApproveGroup() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Open Round 2026-D", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("student-review-5", "user-student-5", "student5@campuscore.edu");
+
+        // 1. Primary supervisor creates topic
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Topic Co-Supervised\",\"description\":\"Testing co-supervisors\",\"maxGroups\":2}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(lecturerJwt("lecturer-lead")))
+                .andExpect(status().isOk());
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Topic Co-Supervised'",
+                UUID.class);
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(lecturerJwt("lecturer-lead")))
+                .andExpect(status().isOk());
+
+        // 2. Add co-supervisor (order = 2)
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) VALUES (?, ?, ?, 2)",
+                UUID.randomUUID(), topicId, "lecturer-co");
+
+        // 3. Student creates group & assigns topic
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-5")))
+                .andExpect(status().isOk());
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class, roundId, "student-review-5");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-5")))
+                .andExpect(status().isOk());
+
+        // 4. Unauthorized lecturer cannot review
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("lecturer-random-unauthorized")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_REVIEWER_REQUIRED"));
+
+        // 5. Co-supervisor can review and approve group
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(lecturerJwt("lecturer-co")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
+    }
+
+    @Test
+    void adminTopicCreationDoesNotRegisterAdminAsSupervisor() throws Exception {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, "Admin Round 2026", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        ensureStudent("student-review-6", "user-student-6", "student6@campuscore.edu");
+
+        // Admin creates topic
+        String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
+                "\"title\":\"Admin Governed Topic\",\"description\":\"Created by administrator\",\"maxGroups\":2}";
+        mvc.perform(post("/api/v1/thesis/topics")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(createBody)
+                        .with(adminJwt()))
+                .andExpect(status().isOk());
+
+        UUID topicId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_topic WHERE title = 'Admin Governed Topic'",
+                UUID.class);
+
+        // Verify admin was NOT inserted into thesis_topic_supervisor
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = ? AND lecturer_id = 'admin-user'",
+                Integer.class, topicId);
+        assertEquals(0, count);
+
+        // Admin publishes topic
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(adminJwt()))
+                .andExpect(status().isOk());
+
+        // Student creates group & assigns topic
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\"}")
+                        .with(studentJwt("student-review-6")))
+                .andExpect(status().isOk());
+        UUID groupId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group WHERE round_id = ? AND leader_student_id = ?",
+                UUID.class, roundId, "student-review-6");
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"topicId\":\"" + topicId + "\"}")
+                        .with(studentJwt("student-review-6")))
+                .andExpect(status().isOk());
+
+        // Admin can still approve group
+        mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
     }
 
     private UUID insertRound() {

@@ -33,6 +33,17 @@ CREATE TABLE thesis.thesis_topic (
 CREATE INDEX thesis_topic_round_idx
     ON thesis.thesis_topic (round_id, status);
 
+CREATE TABLE thesis.thesis_topic_supervisor (
+    id UUID PRIMARY KEY,
+    topic_id UUID NOT NULL REFERENCES thesis.thesis_topic (id) ON DELETE CASCADE,
+    lecturer_id VARCHAR(120) NOT NULL,
+    supervisor_order INTEGER NOT NULL,
+    created_at TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT thesis_topic_supervisor_order_valid CHECK (supervisor_order BETWEEN 1 AND 2),
+    CONSTRAINT thesis_topic_supervisor_unique UNIQUE (topic_id, lecturer_id),
+    CONSTRAINT thesis_topic_supervisor_order_unique UNIQUE (topic_id, supervisor_order)
+);
+
 CREATE TABLE thesis.thesis_group (
     id UUID PRIMARY KEY,
     round_id UUID NOT NULL REFERENCES thesis.thesis_registration_round (id),
