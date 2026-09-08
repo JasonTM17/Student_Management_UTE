@@ -164,7 +164,7 @@ export default function SchedulePage() {
       if (left.dayOfWeek !== right.dayOfWeek) {
         return left.dayOfWeek - right.dayOfWeek;
       }
-      return left.startTime.localeCompare(right.startTime);
+      return (left.startTime || '').localeCompare(right.startTime || '');
     });
   }, [enrollments]);
 

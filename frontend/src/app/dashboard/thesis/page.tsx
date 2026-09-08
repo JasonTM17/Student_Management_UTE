@@ -25,6 +25,9 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { MemberAvatars } from '@/components/thesis/MemberAvatars';
+import { departmentsApi } from '@/lib/api';
+import { getLocalizedName } from '@/lib/academic-content';
+import type { Department } from '@/types/api';
 import {
   thesisApi,
   type ThesisGroup,
@@ -34,10 +37,11 @@ import {
 
 export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin } = useAuth();
-  const { formatDateTime, messages } = useI18n();
+  const { locale, formatDateTime, messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
+  const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [isActionPending, setIsActionPending] = useState(false);
@@ -86,6 +90,33 @@ export default function ThesisPage() {
 
   const isSupervisorOrAdmin = Boolean(isLecturer || isAdmin);
   const [topicFilter, setTopicFilter] = useState<'all' | 'my'>('all');
+
+  useEffect(() => {
+    let cancelled = false;
+    const loadDepartments = async () => {
+      try {
+        const response = await departmentsApi.getAll({ limit: 100 });
+        const list = Array.isArray(response?.data)
+          ? response.data
+          : Array.isArray(response)
+            ? response
+            : [];
+        if (!cancelled && list.length > 0) {
+          setDepartments(list as Department[]);
+          setProposeDepartmentId((current) => (current === 'department-demo' ? list[0].id : current));
+        }
+      } catch {
+        // preserve fallback
+      }
+    };
+
+    if (isSupervisorOrAdmin) {
+      void loadDepartments();
+    }
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupervisorOrAdmin]);
 
   const refreshTopics = useCallback(
     async (roundId: string) => {
@@ -279,7 +310,7 @@ export default function ThesisPage() {
       setIsProposeModalOpen(false);
       setProposeTitle('');
       setProposeDescription('');
-      setProposeDepartmentId('department-demo');
+      setProposeDepartmentId(departments[0]?.id || 'department-demo');
       setProposeMaxGroups(2);
       setProposePublishImmediately(true);
       setActionSuccess(
@@ -764,13 +795,29 @@ export default function ThesisPage() {
               <label className="mb-1 block text-sm font-medium text-foreground">
                 {messages.thesis.topicDepartmentLabel}
               </label>
-              <Input
-                value={proposeDepartmentId}
-                onChange={(e) => setProposeDepartmentId(e.target.value)}
-                placeholder="department-demo"
-                required
-                disabled={isActionPending}
-              />
+              {departments.length > 0 ? (
+                <select
+                  value={proposeDepartmentId}
+                  onChange={(e) => setProposeDepartmentId(e.target.value)}
+                  required
+                  disabled={isActionPending}
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                >
+                  {departments.map((dept) => (
+                    <option key={dept.id} value={dept.id}>
+                      {dept.code} - {getLocalizedName(locale, dept, dept.name)}
+                    </option>
+                  ))}
+                </select>
+              ) : (
+                <Input
+                  value={proposeDepartmentId}
+                  onChange={(e) => setProposeDepartmentId(e.target.value)}
+                  placeholder="department-demo"
+                  required
+                  disabled={isActionPending}
+                />
+              )}
             </div>
             <div>
               <label className="mb-1 block text-sm font-medium text-foreground">

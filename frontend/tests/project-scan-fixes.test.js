@@ -219,20 +219,34 @@ test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 7 and 
   const grid = buildWeeklyGrid([
     { dayOfWeek: 0, startTime: '08:00', endTime: '10:00', courseCode: 'SE499', sectionNumber: 'SE499-01' },
     { dayOfWeek: 7, startTime: '13:00', endTime: '15:00', courseCode: 'SE498', sectionNumber: 'SE498-01' },
+    { dayOfWeek: 3, startTime: '', endTime: '12:00', courseCode: 'SE497', sectionNumber: 'SE497-01' },
+    { dayOfWeek: 99, startTime: '19:00', endTime: '21:00', courseCode: 'SE496', sectionNumber: 'SE496-01' },
   ]);
+  assert.deepEqual(grid.slots, ['08:00', '13:00']);
   assert.equal(grid.cells['7-08:00']?.[0]?.courseCode, 'SE499');
   assert.equal(grid.cells['7-13:00']?.[0]?.courseCode, 'SE498');
+  assert.equal(grid.cells['99-19:00'], undefined);
 
   const lecturerSchedule = read('src/app/dashboard/lecturer/schedule/page.tsx');
   assert.doesNotMatch(lecturerSchedule, /localizedDayNames\.slice\(1,\s*6\)/);
   assert.match(lecturerSchedule, /\[1,\s*2,\s*3,\s*4,\s*5,\s*6,\s*7\]\.map/);
 });
 
-test('dogfood audit: admin user management protects against self-deletion and clamps pagination', () => {
+test('dogfood audit: admin user management protects against self-deletion, self-demotion, and unauthorized super-admin actions', () => {
   const page = read('src/app/admin/users/page.tsx');
   assert.match(page, /user\.id === userRecord\.id \|\| user\.email === userRecord\.email/);
   assert.match(page, /users\.length === 1 && page > 1/);
-  assert.match(page, /disabled=\{isSelf\}/);
+  assert.match(page, /disabled=\{isSelf \|\| !canManageTarget\}/);
+  assert.match(page, /disabled=\{!canManageTarget\}/);
+  assert.match(page, /disabled=\{isSelfEditing\}/);
+  assert.match(page, /isRecordSuperAdmin/);
+});
+
+test('dogfood audit: thesis topic proposal wires academic departments list', () => {
+  const thesis = read('src/app/dashboard/thesis/page.tsx');
+  assert.match(thesis, /departmentsApi\.getAll/);
+  assert.match(thesis, /departments\.map/);
+  assert.match(thesis, /getLocalizedName\(locale,\s*dept,\s*dept\.name\)/);
 });
 
 test('dogfood audit: i18n, metadata, and language toggle regressions stay guarded', () => {
