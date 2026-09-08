@@ -188,6 +188,8 @@ public class ThesisMutationService {
     public GroupResponse addMember(UUID groupId, MemberRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeLeaderOrAdmin(group, actor);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        requireMutableMembership(group, actor);
         String studentId = normalize(request == null ? null : request.studentId());
         requireActiveStudent(studentId);
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
@@ -204,6 +206,8 @@ public class ThesisMutationService {
     public GroupResponse removeMember(UUID groupId, String studentId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeLeaderOrAdmin(group, actor);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
+        requireMutableMembership(group, actor);
         String normalized = normalize(studentId);
         if (group.leaderStudentId().equals(normalized)) {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
@@ -218,6 +222,7 @@ public class ThesisMutationService {
     public GroupResponse assignTopic(UUID groupId, TopicAssignmentRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
         authorizeLeaderOrAdmin(group, actor);
+        requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
         UUID topicId = request == null ? null : request.topicId();
         if (topicId == null) {
             throw invalid("topicId is required");
@@ -251,17 +256,20 @@ public class ThesisMutationService {
         if (status == null) {
             throw invalid("status is required");
         }
-        if (!isAdmin(actor)) {
-            if (!isProgressStatus(status)) {
-                throw invalid("Students may set only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
-            }
-            // approveGroup flips approval_status while the status stays SUBMITTED, so an
-            // approved group must not be demoted or cancelled behind the reviewer's back.
-            if (group.approvalStatus() == ApprovalStatus.APPROVED
-                    && status != GroupStatus.COMPLETED
-                    && status != group.status()) {
-                throw conflict("GROUP_STATUS_INVALID", "An approved group can only be marked COMPLETED");
-            }
+        // APPROVED/REJECTED are approval semantics owned by the reviewer flow;
+        // nobody sets them through progress updates.
+        if (!isProgressStatus(status)) {
+            throw invalid("Progress accepts only DRAFT, SUBMITTED, COMPLETED or CANCELLED");
+        }
+        // approveGroup flips approval_status while the status stays SUBMITTED, so an
+        // approved group must not be demoted or cancelled behind the reviewer's back.
+        if (group.approvalStatus() == ApprovalStatus.APPROVED
+                && status != GroupStatus.COMPLETED
+                && status != group.status()) {
+            throw conflict("GROUP_STATUS_INVALID", "An approved group can only be marked COMPLETED");
+        }
+        if (!isAdmin(actor) && group.status() == GroupStatus.COMPLETED && status != GroupStatus.COMPLETED) {
+            throw conflict("GROUP_STATUS_INVALID", "A completed group cannot reopen; contact your supervisor");
         }
         jdbc.update("UPDATE thesis.thesis_group SET status = :status, updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("status", status.name()).addValue("groupId", groupId));
         return groups.findById(groupId);
@@ -353,10 +361,39 @@ public class ThesisMutationService {
     }
 
     private void requireRoundStatus(UUID id, RoundStatus required) {
-        Map<String, Object> round = one("SELECT status FROM thesis.thesis_registration_round WHERE id = :id", params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        Map<String, Object> round = one(
+                "SELECT status, registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
         if (!required.name().equals(round.get("status"))) {
             throw conflict("ROUND_CLOSED", "Registration is not open for this round");
         }
+        if (required == RoundStatus.REGISTRATION_OPEN) {
+            // The stored dates are normative: an open round whose window has
+            // passed must not keep accepting registration mutations.
+            Instant now = Instant.now();
+            Instant start = instantOf(round.get("registration_start"));
+            Instant end = instantOf(round.get("registration_end"));
+            if (start == null || end == null || now.isBefore(start) || !now.isBefore(end)) {
+                throw conflict("REGISTRATION_WINDOW_CLOSED", "The registration window is closed for this round");
+            }
+        }
+    }
+
+    /** Membership is frozen once a supervisor approves the group; admins coordinate through re-review instead. */
+    private void requireMutableMembership(GroupRow group, Jwt actor) {
+        if (!isAdmin(actor) && group.approvalStatus() == ApprovalStatus.APPROVED) {
+            throw conflict("GROUP_STATE_CONFLICT", "An approved group's membership is frozen");
+        }
+    }
+
+    private static Instant instantOf(Object value) {
+        if (value == null) return null;
+        if (value instanceof Instant instant) return instant;
+        if (value instanceof java.sql.Timestamp timestamp) return timestamp.toInstant();
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) return offsetDateTime.toInstant();
+        if (value instanceof java.time.LocalDateTime localDateTime) return localDateTime.toInstant(java.time.ZoneOffset.UTC);
+        if (value instanceof java.util.Date date) return date.toInstant();
+        return null;
     }
 
     private void requireActiveStudent(String studentId) {
