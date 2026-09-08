@@ -63,19 +63,21 @@ public class SecurityConfig {
         return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
+    /**
+     * Credentialed CORS is allowlist-only. The default list carries local dev
+     * hosts and the production site; extra origins (e.g. a preview deployment)
+     * must be enumerated explicitly via APP_CORS_ALLOWED_ORIGIN_PATTERNS —
+     * no public wildcard such as *.vercel.app.
+     */
+    static final String DEFAULT_CORS_ORIGIN_PATTERNS =
+            "http://localhost:[*],http://127.0.0.1:[*],http://localhost:3000,http://127.0.0.1:3000,"
+                    + "http://127.0.0.1:3100,https://campusute.io.vn";
+
     @Bean
-    CorsConfigurationSource corsConfigurationSource() {
+    CorsConfigurationSource corsConfigurationSource(
+            @Value("${app.cors.allowed-origin-patterns:" + DEFAULT_CORS_ORIGIN_PATTERNS + "}") String allowedOriginPatterns) {
         CorsConfiguration configuration = new CorsConfiguration();
-        configuration.setAllowedOriginPatterns(List.of(
-                "http://localhost:[*]",
-                "http://127.0.0.1:[*]",
-                "http://localhost:*",
-                "http://127.0.0.1:*",
-                "http://localhost:3000",
-                "http://127.0.0.1:3000",
-                "http://127.0.0.1:3100",
-                "https://campusute.io.vn",
-                "https://*.vercel.app"));
+        configuration.setAllowedOriginPatterns(List.of(allowedOriginPatterns.split("\\s*,\\s*")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
         configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "Deprecation", "Sunset", "Idempotency-Key"));
