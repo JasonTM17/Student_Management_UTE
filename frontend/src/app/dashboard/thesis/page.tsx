@@ -233,7 +233,7 @@ export default function ThesisPage() {
       return;
     }
     if (trimmed.length > 500) {
-      setRejectError('Reason must be at most 500 characters.');
+      setRejectError(messages.thesis.reasonTooLong);
       return;
     }
     setIsActionPending(true);
@@ -258,7 +258,7 @@ export default function ThesisPage() {
     const description = proposeDescription.trim();
     const departmentId = proposeDepartmentId.trim();
     if (!title || !description || !departmentId) {
-      setProposeError('All fields are required');
+      setProposeError(messages.thesis.allFieldsRequired);
       return;
     }
     setIsActionPending(true);

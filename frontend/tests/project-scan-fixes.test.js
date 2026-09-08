@@ -213,3 +213,43 @@ test('dogfood audit: profile form is gated on the loaded user and keeps local da
   assert.doesNotMatch(page, /toISOString\(\)\.split\('T'\)\[0\]/);
   assert.match(page, /function localDateInput/);
 });
+
+test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 7 and lecturer agenda covers full week', () => {
+  const { buildWeeklyGrid } = require(path.join(root, 'src/lib/weekly-grid.ts'));
+  const grid = buildWeeklyGrid([
+    { dayOfWeek: 0, startTime: '08:00', endTime: '10:00', courseCode: 'SE499', sectionNumber: 'SE499-01' },
+    { dayOfWeek: 7, startTime: '13:00', endTime: '15:00', courseCode: 'SE498', sectionNumber: 'SE498-01' },
+  ]);
+  assert.equal(grid.cells['7-08:00']?.[0]?.courseCode, 'SE499');
+  assert.equal(grid.cells['7-13:00']?.[0]?.courseCode, 'SE498');
+
+  const lecturerSchedule = read('src/app/dashboard/lecturer/schedule/page.tsx');
+  assert.doesNotMatch(lecturerSchedule, /localizedDayNames\.slice\(1,\s*6\)/);
+  assert.match(lecturerSchedule, /\[1,\s*2,\s*3,\s*4,\s*5,\s*6,\s*7\]\.map/);
+});
+
+test('dogfood audit: admin user management protects against self-deletion and clamps pagination', () => {
+  const page = read('src/app/admin/users/page.tsx');
+  assert.match(page, /user\.id === userRecord\.id \|\| user\.email === userRecord\.email/);
+  assert.match(page, /users\.length === 1 && page > 1/);
+  assert.match(page, /disabled=\{isSelf\}/);
+});
+
+test('dogfood audit: i18n, metadata, and language toggle regressions stay guarded', () => {
+  const messages = read('src/i18n/messages.ts');
+  const server = read('src/i18n/server.ts');
+  const sitemap = read('src/app/sitemap.ts');
+  const languageToggle = read('src/components/LanguageToggle.tsx');
+  const thesis = read('src/app/dashboard/thesis/page.tsx');
+
+  assert.doesNotMatch(messages, /phonePlaceholder:\s*'\+66/);
+  assert.match(messages, /phonePlaceholder:\s*'\+84/);
+  assert.match(server, /pathname === '\/register'/);
+  assert.match(server, /messages\.meta\.register\.title/);
+  assert.doesNotMatch(sitemap, /forgot-password/);
+  assert.match(languageToggle, /if \(nextLocale === locale\) \{\s*return;\s*\}/);
+  assert.match(thesis, /messages\.thesis\.allFieldsRequired/);
+  assert.match(thesis, /messages\.thesis\.reasonTooLong/);
+  assert.doesNotMatch(thesis, /'Reason must be at most 500 characters\.'/);
+  assert.doesNotMatch(thesis, /'All fields are required'/);
+});

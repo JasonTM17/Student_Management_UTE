@@ -104,7 +104,7 @@ export default function LecturerSchedulePage() {
           courseNameEn: section.courseNameEn,
           courseNameVi: section.courseNameVi,
           sectionNumber: section.sectionNumber,
-          dayOfWeek: schedule.dayOfWeek,
+          dayOfWeek: schedule.dayOfWeek === 0 ? 7 : schedule.dayOfWeek,
           startTime: schedule.startTime,
           endTime: schedule.endTime,
           building: schedule.building,
@@ -299,8 +299,8 @@ export default function LecturerSchedulePage() {
                 <CardTitle className="text-xl">{copy.weeklyAgenda}</CardTitle>
               </CardHeader>
               <CardContent className="grid gap-4 md:grid-cols-2">
-                {localizedDayNames.slice(1, 6).map((dayName, index) => {
-                  const dayOfWeek = index + 1;
+                {[1, 2, 3, 4, 5, 6, 7].map((dayOfWeek) => {
+                  const dayName = localizedDayNames[dayOfWeek % 7];
                   const items = slotsByDay[dayOfWeek] ?? [];
 
                   return (

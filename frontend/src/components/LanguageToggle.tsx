@@ -26,7 +26,7 @@ export function LanguageToggle({
   const routeLocale = stripLocaleFromPathname(pathname).locale;
 
   const handleSwitch = (nextLocale: Locale) => {
-    if (nextLocale === locale && pathname.startsWith(`/${locale}`)) {
+    if (nextLocale === locale) {
       return;
     }
 

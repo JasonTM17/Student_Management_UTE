@@ -153,7 +153,7 @@ export default function SchedulePage() {
             sectionNumber: section.sectionNumber,
             startTime: schedule.startTime,
             endTime: schedule.endTime,
-            dayOfWeek: schedule.dayOfWeek,
+            dayOfWeek: schedule.dayOfWeek === 0 ? 7 : schedule.dayOfWeek,
             building: schedule.classroom?.building,
             roomNumber: schedule.classroom?.roomNumber,
           });

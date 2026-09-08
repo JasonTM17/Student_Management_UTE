@@ -145,6 +145,10 @@ export const en = {
       title: 'Sign in | CampusUTE',
       description: 'Sign in to CampusUTE with your campus account.',
     },
+    register: {
+      title: 'Create account | CampusUTE',
+      description: 'Create your CampusUTE account and join the academic portal.',
+    },
     forgotPassword: {
       title: 'Forgot password | CampusUTE',
       description: 'Request a CampusUTE password reset link.',
@@ -943,7 +947,7 @@ export const en = {
       newPassword: 'New password',
       confirmNewPassword: 'Confirm new password',
       managedHint: 'Email is managed through your campus account owner.',
-      phonePlaceholder: '+66...',
+      phonePlaceholder: '+84...',
       addressPlaceholder: 'Street, city, region',
       currentPasswordPlaceholder: 'Enter your current password',
       newPasswordPlaceholder: 'Choose a new password',
@@ -1093,6 +1097,8 @@ export const en = {
     reject: 'Reject',
     rejectionReason: 'Rejection reason',
     rejectionReasonPlaceholder: 'Enter the reason for rejection (required)...',
+    reasonTooLong: 'Reason must be at most 500 characters.',
+    allFieldsRequired: 'All fields are required.',
     rejectModalTitle: 'Reject thesis group',
     rejectModalDescription:
       'Please provide a clear reason to help students understand what needs revision.',
@@ -1399,6 +1405,10 @@ export const vi: I18nMessages = {
     login: {
       title: 'Đăng nhập | CampusUTE',
       description: 'Đăng nhập vào hệ thống CampusUTE bằng tài khoản học vụ HCMUTE.',
+    },
+    register: {
+      title: 'Tạo tài khoản | CampusUTE',
+      description: 'Đăng ký tài khoản CampusUTE để tham gia cổng đào tạo học vụ.',
     },
     forgotPassword: {
       title: 'Quên mật khẩu | CampusUTE',
@@ -2197,7 +2207,7 @@ export const vi: I18nMessages = {
       newPassword: 'Mật khẩu mới',
       confirmNewPassword: 'Xác nhận mật khẩu mới',
       managedHint: 'Email do nhà trường quản lý.',
-      phonePlaceholder: '+66...',
+      phonePlaceholder: '+84...',
       addressPlaceholder: 'Số nhà, thành phố, khu vực',
       currentPasswordPlaceholder: 'Nhập mật khẩu hiện tại',
       newPasswordPlaceholder: 'Chọn mật khẩu mới',
@@ -2347,6 +2357,8 @@ export const vi: I18nMessages = {
     reject: 'Từ chối',
     rejectionReason: 'Lý do từ chối',
     rejectionReasonPlaceholder: 'Nhập lý do từ chối (bắt buộc)...',
+    reasonTooLong: 'Lý do không được vượt quá 500 ký tự.',
+    allFieldsRequired: 'Vui lòng điền đầy đủ các thông tin bắt buộc.',
     rejectModalTitle: 'Từ chối nhóm đề tài',
     rejectModalDescription:
       'Vui lòng cung cấp lý do cụ thể để sinh viên chỉnh sửa đề xuất.',

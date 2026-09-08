@@ -36,12 +36,13 @@ export function buildWeeklyGrid(items: WeeklyGridItem[]): WeeklyGrid {
   const cells: Record<string, WeeklyGridItem[]> = {};
 
   items.forEach((item) => {
-    if (!days.includes(item.dayOfWeek) || !item.startTime) return;
-    const key = `${item.dayOfWeek}-${item.startTime}`;
+    const day = item.dayOfWeek === 0 ? 7 : item.dayOfWeek;
+    if (!days.includes(day) || !item.startTime) return;
+    const key = `${day}-${item.startTime}`;
     if (!cells[key]) {
       cells[key] = [];
     }
-    cells[key].push(item);
+    cells[key].push({ ...item, dayOfWeek: day });
   });
 
   return { days, slots, cells };
