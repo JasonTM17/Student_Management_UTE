@@ -21,13 +21,15 @@ export function reasonLabel(message: ChatMessage, messages: ReturnType<typeof us
     ? messages.assistant.quotaExceeded
     : message.reasonCode === 'CANCELLED'
       ? messages.assistant.cancelled
-      : message.degraded
-        ? messages.assistant.degraded
-        : message.reasonCode === 'NO_MATCH'
-          ? messages.assistant.noMatch
-          : message.reasonCode === 'ANSWERED'
-            ? messages.assistant.answered
-            : messages.assistant.answered;
+      : message.reasonCode === 'PROMPT_INJECTION'
+        ? messages.assistant.blockedLabel
+        : message.degraded
+          ? messages.assistant.degraded
+          : message.reasonCode === 'NO_MATCH'
+            ? messages.assistant.noMatch
+            : message.reasonCode === 'ANSWERED'
+              ? messages.assistant.answered
+              : messages.assistant.answered;
 }
 
 function citationDomainLabel(

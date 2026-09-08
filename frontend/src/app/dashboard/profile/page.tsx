@@ -23,6 +23,32 @@ function roleLabel(
   return labels.student;
 }
 
+/** Local-calendar date input value (toISOString shifts the day for UTC+7). */
+function localDateInput(value: string | undefined): string {
+  if (!value) return '';
+  const parsed = new Date(value);
+  if (Number.isNaN(parsed.getTime())) return '';
+  const month = `${parsed.getMonth() + 1}`.padStart(2, '0');
+  const day = `${parsed.getDate()}`.padStart(2, '0');
+  return `${parsed.getFullYear()}-${month}-${day}`;
+}
+
+function profileFormState(user: {
+  firstName?: string;
+  lastName?: string;
+  phone?: string;
+  dateOfBirth?: string;
+  address?: string;
+} | null | undefined) {
+  return {
+    firstName: user?.firstName || '',
+    lastName: user?.lastName || '',
+    phone: user?.phone || '',
+    dateOfBirth: localDateInput(user?.dateOfBirth),
+    address: user?.address || '',
+  };
+}
+
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
   const { messages } = useI18n();
@@ -30,15 +56,16 @@ export default function ProfilePage() {
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [profileError, setProfileError] = useState('');
   const [passwordError, setPasswordError] = useState('');
-  const [formData, setFormData] = useState({
-    firstName: user?.firstName || '',
-    lastName: user?.lastName || '',
-    phone: user?.phone || '',
-    dateOfBirth: user?.dateOfBirth
-      ? new Date(user.dateOfBirth).toISOString().split('T')[0]
-      : '',
-    address: user?.address || '',
-  });
+  // Key the form by user id so it initializes only after the profile has
+  // loaded: seeding from a null user then saving would wipe every field.
+  const [formData, setFormData] = useState(() => profileFormState(user));
+
+  // Keep the form in sync if the signed-in user changes (re-login, refresh).
+  const [formUserId, setFormUserId] = useState(user?.id);
+  if (user && formUserId !== user.id) {
+    setFormUserId(user.id);
+    setFormData(profileFormState(user));
+  }
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -102,6 +129,23 @@ export default function ProfilePage() {
       setIsUpdatingPassword(false);
     }
   };
+
+  // Never render (or submit) the profile form from an unloaded user: an
+  // early Save before the profile fetch resolves would blank every field.
+  if (!user) {
+    return (
+      <div className="space-y-8">
+        <PageHeader
+          eyebrow={<SectionEyebrow>{messages.profile.eyebrow}</SectionEyebrow>}
+          title={messages.profile.title}
+          description={messages.profile.description}
+        />
+        <p className="text-sm text-muted-foreground" role="status">
+          {messages.common.states.loadingContent}
+        </p>
+      </div>
+    );
+  }
 
   return (
     <div className="space-y-8">

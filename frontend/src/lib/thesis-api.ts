@@ -249,9 +249,12 @@ export const thesisApi = {
     return response.data;
   },
 
-  listTopics: async (roundId: string): Promise<ThesisTopic[]> => {
+  listTopics: async (
+    roundId: string,
+    status?: ThesisTopicStatus,
+  ): Promise<ThesisTopic[]> => {
     const response = await api.get<ThesisTopic[]>('/thesis/topics', {
-      params: { roundId, status: 'PUBLISHED' },
+      params: { roundId, status: status ?? 'PUBLISHED' },
     });
     return response.data;
   },
@@ -318,6 +321,24 @@ export const thesisApi = {
 
   getGroup: async (groupId: string): Promise<ThesisGroup> => {
     const response = await api.get<ThesisGroup>('/thesis/groups/' + groupId);
+    return response.data;
+  },
+
+  approveGroup: async (groupId: string): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      `/thesis/groups/${groupId}/approve`,
+    );
+    return response.data;
+  },
+
+  rejectGroup: async (
+    groupId: string,
+    reason: string,
+  ): Promise<ThesisGroup> => {
+    const response = await api.post<ThesisGroup>(
+      `/thesis/groups/${groupId}/reject`,
+      { reason },
+    );
     return response.data;
   },
 

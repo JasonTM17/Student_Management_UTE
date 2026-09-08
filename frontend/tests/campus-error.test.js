@@ -63,7 +63,10 @@ test('student and lecturer pages map failures instead of backend envelope fields
   const lecturerGrades = read('src/app/dashboard/lecturer/grades/[id]/page.tsx');
 
   assert.doesNotMatch(dashboard, ENVELOPE_PASSTHROUGH);
-  assert.match(register, /campusErrorMessage\(/);
+  // Register enroll/drop use the code-aware wrapper so students see the
+  // specific business reason (e.g. SCHEDULE_CONFLICT) instead of a generic
+  // conflict toast; the other pages keep the kind-level mapper.
+  assert.match(register, /campusCodeMessage\(cause, messages\.common\.campusErrors\)/);
   assert.match(enrollments, /campusErrorMessage\(/);
   assert.match(profile, /campusErrorMessage\(/);
   assert.match(lecturerGrades, /campusErrorMessage\(/);

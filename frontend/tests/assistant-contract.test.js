@@ -88,3 +88,44 @@ test('assistant history routes URI-encode owner-scoped identifiers', () => {
   assert.match(source, /post<AssistantReply>\('\/assistant\/chat'/);
   assert.doesNotMatch(source, /post<AssistantReply>\('\/thesis\/assistant\/chat'/);
 });
+
+test('assistant streaming hook encapsulates lifecycle, CAS recovery, and cleanup', () => {
+  const hookSource = fs.readFileSync(
+    path.join(root, 'src/components/assistant/useAssistantStream.ts'),
+    'utf8',
+  );
+  assert.match(hookSource, /export function useAssistantStream/);
+  assert.match(hookSource, /thesisApi\.streamChat/);
+  assert.match(hookSource, /thesisApi\.cancelRequest/);
+  assert.match(hookSource, /casResolvedRef/);
+  assert.match(hookSource, /status === 409/);
+  assert.match(hookSource, /TRANSIENT_TERMINAL_CODES/);
+  assert.match(hookSource, /onReconcileHistory/);
+  assert.match(hookSource, /isSendingRef/);
+});
+
+test('assistant guard blocks end the turn locally without a JSON replay', () => {
+  const reducerSource = fs.readFileSync(path.join(root, 'src/components/assistant/assistant-reducer.ts'), 'utf8');
+  const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+  const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+  assert.match(reducerSource, /GUARD_BLOCKED_CODES = new Set\(\['PROMPT_INJECTION'\]\)/);
+  assert.match(hookSource, /GUARD_BLOCKED_CODES\.has/);
+  // The localized blocked copy exists in both locales and the chip gets a
+  // dedicated label instead of the generic degraded badge.
+  assert.match(messagesSource, /blockedLabel: 'Blocked request'/);
+  assert.match(messagesSource, /blockedLabel: 'Câu hỏi đã bị chặn'/);
+  assert.match(messagesSource, /asks the assistant to ignore its instructions/);
+  assert.match(messagesSource, /yêu cầu trợ lý bỏ qua hướng dẫn hệ thống/);
+});
+
+test('assistant stop-race and quota-retry regressions stay guarded', () => {
+  const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+  // A Stop click after the final done frame must not overwrite the answer.
+  assert.match(hookSource, /casResolvedRef\.current \|\| sawDone\) return/);
+  // Terminal fallback failures must clear the retry idempotency key.
+  assert.match(hookSource, /kind === 'quota' \? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE'/);
+  const fallback = hookSource.indexOf("kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE'");
+  const afterFallback = hookSource.slice(fallback, fallback + 500);
+  assert.match(afterFallback, /retryRequestIdRef\.current = undefined/);
+  assert.match(afterFallback, /retryConversationIdRef\.current = undefined/);
+});
