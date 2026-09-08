@@ -142,3 +142,74 @@ test('deep persona route matrix has a bounded timeout large enough for cold comp
   const spec = fs.readFileSync(path.join(root, 'e2e/professional-quality.spec.ts'), 'utf8');
   assert.match(spec, /test\.describe\.configure\(\{\s*timeout:\s*600_000\s*\}\)/);
 });
+
+test('thesis lecturer-student multi-role flow provides group approval, rejection, and topic proposal', () => {
+  const thesisApiSource = read('src/lib/thesis-api.ts');
+  const thesisPageSource = read('src/app/dashboard/thesis/page.tsx');
+  const messagesSource = read('src/i18n/messages.ts');
+
+  // API surface
+  assert.match(thesisApiSource, /approveGroup:\s*async\s*\(\s*groupId:\s*string\s*\)/);
+  assert.match(thesisApiSource, /post<ThesisGroup>\(\s*`\/thesis\/groups\/\$\{groupId\}\/approve`,?\s*\)/);
+  assert.match(thesisApiSource, /rejectGroup:\s*async\s*\(\s*groupId:\s*string,\s*reason:\s*string,?\s*\)/);
+  assert.match(thesisApiSource, /post<ThesisGroup>\(\s*`\/thesis\/groups\/\$\{groupId\}\/reject`,\s*\{\s*reason\s*\},?\s*\)/);
+
+  // UI Lecturer Capabilities
+  assert.match(thesisPageSource, /thesisApi\.approveGroup/);
+  assert.match(thesisPageSource, /thesisApi\.rejectGroup/);
+  assert.match(thesisPageSource, /thesisApi\.createTopic/);
+  assert.match(thesisPageSource, /isRejectModalOpen/);
+  assert.match(thesisPageSource, /isProposeModalOpen/);
+  assert.match(thesisPageSource, /supervisedGroupsTitle/);
+
+  // i18n parity
+  assert.match(messagesSource, /supervisedGroupsTitle/);
+  assert.match(messagesSource, /proposeTopic/);
+  assert.match(messagesSource, /rejectModalTitle/);
+  assert.match(messagesSource, /myProposedTopics/);
+  assert.match(messagesSource, /noProposedTopics/);
+
+  // Topic selection approvalStatus guard, filtering, and listTopics status signature
+  assert.match(thesisPageSource, /currentGroup\.approvalStatus !== 'APPROVED'/);
+  assert.match(thesisPageSource, /topicFilter/);
+  assert.match(thesisPageSource, /messages\.thesis\.myProposedTopics/);
+  assert.match(thesisApiSource, /listTopics:\s*async\s*\(\s*roundId:\s*string,\s*status\?:/);
+});
+
+test('dogfood audit: registration conflicts surface the specific backend code', () => {
+  const libSource = read('src/lib/campus-error.ts');
+  const registerPage = read('src/app/dashboard/register/page.tsx');
+  const messagesSource = read('src/i18n/messages.ts');
+
+  assert.match(libSource, /export function campusCodeMessage/);
+  assert.match(libSource, /copy\.codes\?\.\[code\]/);
+  // Register enroll/drop prefer the code-specific copy over the generic kind.
+  assert.doesNotMatch(registerPage, /campusErrorMessage\(cause, messages\.common\.campusErrors\)/);
+  assert.match(registerPage, /campusCodeMessage\(cause, messages\.common\.campusErrors\)/);
+  assert.match(messagesSource, /SCHEDULE_CONFLICT:\s*\n?\s*'This class overlaps your current timetable/);
+  assert.match(messagesSource, /SCHEDULE_CONFLICT:\s*\n?\s*'Lớp này trùng lịch/);
+  assert.match(messagesSource, /SECTION_FULL: 'This section has just filled up/);
+  assert.match(messagesSource, /SECTION_FULL: 'Lớp vừa hết chỗ/);
+});
+
+test('dogfood audit: admin enrollments section lookup respects the 100 cap', () => {
+  const page = read('src/app/admin/enrollments/page.tsx');
+  assert.match(page, /sectionsApi\.getAll\(\{\s*courseId,[\s\S]{0,300}?limit: 100,\s*\}\)/);
+  assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*courseId,\s*limit: ACADEMIC_REFERENCE_LIMIT/);
+});
+
+test('dogfood audit: student group card shows the real group status', () => {
+  const page = read('src/app/dashboard/thesis/page.tsx');
+  // The old derived label claimed SUBMITTED whenever a topic existed, even
+  // while the group was still DRAFT and the supervisor saw no approve button.
+  assert.doesNotMatch(page, /currentGroup\.topicId \? messages\.thesis\.status\.SUBMITTED :/);
+  assert.match(page, /messages\.thesis\.status\[currentGroup\.status\]/);
+});
+
+test('dogfood audit: profile form is gated on the loaded user and keeps local dates', () => {
+  const page = read('src/app/dashboard/profile/page.tsx');
+  assert.match(page, /profileFormState\(user\)/);
+  assert.match(page, /if \(!user\) \{/);
+  assert.doesNotMatch(page, /toISOString\(\)\.split\('T'\)\[0\]/);
+  assert.match(page, /function localDateInput/);
+});

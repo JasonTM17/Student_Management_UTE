@@ -13,7 +13,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage, campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
 type CatalogSection = Awaited<ReturnType<typeof registrationApi.sections>>[number];
@@ -121,7 +121,7 @@ export default function RegisterPage() {
       toast.success(copy.success);
       await load();
     } catch (cause) {
-      toast.error(campusErrorMessage(cause, messages.common.campusErrors));
+      toast.error(campusCodeMessage(cause, messages.common.campusErrors));
     } finally {
       setPending('');
     }
@@ -141,7 +141,7 @@ export default function RegisterPage() {
       toast.success(copy.success);
       await load();
     } catch (cause) {
-      toast.error(campusErrorMessage(cause, messages.common.campusErrors));
+      toast.error(campusCodeMessage(cause, messages.common.campusErrors));
     } finally {
       setPending('');
     }

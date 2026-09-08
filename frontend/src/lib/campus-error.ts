@@ -8,7 +8,10 @@ export type CampusErrorKind =
   | 'server'
   | 'unknown';
 
-export type CampusErrorCopy = Record<CampusErrorKind, string>;
+export type CampusErrorCopy = Record<CampusErrorKind, string> & {
+  /** Optional backend `code` → specific copy, preferred over the kind copy. */
+  codes?: Record<string, string>;
+};
 
 type AxiosLike = {
   code?: unknown;
@@ -90,4 +93,18 @@ export function campusErrorMessage(
 ): string {
   const kind = campusErrorKind(error);
   return copy[kind] || fallback || copy.unknown;
+}
+
+/**
+ * Prefer the backend business code (`SCHEDULE_CONFLICT`, `SECTION_FULL`, …)
+ * over the generic HTTP-kind copy so students learn why a change failed.
+ */
+export function campusCodeMessage(
+  error: unknown,
+  copy: CampusErrorCopy,
+  fallback?: string,
+): string {
+  const code = campusErrorCode(error);
+  const specific = code ? copy.codes?.[code] : undefined;
+  return specific || campusErrorMessage(error, copy, fallback);
 }

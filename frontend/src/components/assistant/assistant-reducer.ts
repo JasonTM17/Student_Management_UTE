@@ -48,6 +48,12 @@ export type AssistantAction =
   | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' }
   | { type: 'clear-error' };
 
+/**
+ * Deterministic guard refusals: the same input is always blocked again, so
+ * the stream ends locally without a JSON replay round trip.
+ */
+export const GUARD_BLOCKED_CODES = new Set(['PROMPT_INJECTION']);
+
 export const TRANSIENT_TERMINAL_CODES = new Set([
   'TURN_CANCELLED',
   'TURN_TERMINAL_RACE',

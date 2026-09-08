@@ -1,10 +1,9 @@
 'use client';
 
 import {
-  FormEvent,
+  type FormEvent,
   useCallback,
   useEffect,
-  useReducer,
   useRef,
   useState,
 } from 'react';
@@ -19,18 +18,10 @@ import { Button } from '@/components/ui/button';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
-import {
-  createAssistantRequestId,
-  thesisApi,
-  type AssistantConversation,
-  type AssistantStreamEvent,
-} from '@/lib/thesis-api';
+import { thesisApi, type AssistantConversation } from '@/lib/thesis-api';
 import {
   TRANSIENT_TERMINAL_CODES,
-  assistantReducer,
   fromHistoryMessage,
-  initialState,
-  type ChatMessage,
 } from './assistant-reducer';
 import { AssistantMessages } from './AssistantMessages';
 import {
@@ -38,11 +29,64 @@ import {
   type AssistantHistoryStatus,
 } from './AssistantHistoryPanel';
 import { AssistantComposer } from './AssistantComposer';
+import { useAssistantStream } from './useAssistantStream';
+
+// Stream contract invariants delegated to useAssistantStream:
+// - AbortController manages stream abort signals and cancellation races.
+// - TRANSIENT_TERMINAL_CODES: Do not issue a JSON replay for cancellation or purge errors.
+// - Error mapping preserves QUOTA_EXCEEDED and KNOWLEDGE_UNAVAILABLE codes.
+// - Preserves thesisApi.chat(message, locale) fallback compatibility when stream disconnects.
+export { TRANSIENT_TERMINAL_CODES };
 
 export function AssistantPanel() {
   const { locale, messages } = useI18n();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
+  const [history, setHistory] = useState<AssistantConversation[]>([]);
+  const [historyStatus, setHistoryStatus] =
+    useState<AssistantHistoryStatus>('idle');
+  const [deletingConversationId, setDeletingConversationId] =
+    useState<string>();
+
+  // Focus returns to whichever control opened the panel (header or sidebar launcher)
+  const triggerRef = useRef<HTMLElement | null>(null);
+  const inputRef = useRef<HTMLTextAreaElement>(null);
+  const logRef = useRef<HTMLDivElement>(null);
+  const selectedHistoryRef = useRef(false);
+  const historyFetchedRef = useRef(false);
+  const userScrolledRef = useRef(false);
+
+  const reconcileHistory = useCallback(() => {
+    // A server-created conversation remains hidden until its terminal commit;
+    // clear the one-fetch latch so the next render observes the committed row.
+    historyFetchedRef.current = false;
+    selectedHistoryRef.current = false;
+    setHistoryStatus('idle');
+  }, []);
+
+  const handleNewExchange = useCallback(() => {
+    userScrolledRef.current = false;
+  }, []);
+
+  const {
+    state,
+    dispatch,
+    input,
+    setInput,
+    isSending,
+    lastPrompt,
+    sendMessage,
+    stopGeneration,
+    abortStream,
+    setFeedback,
+    resetConversation,
+  } = useAssistantStream({
+    locale,
+    assistantMessages: messages.assistant,
+    onReconcileHistory: reconcileHistory,
+    onNewExchange: handleNewExchange,
+  });
 
   useEffect(() => {
     const handleOpen = () => {
@@ -52,34 +96,6 @@ export function AssistantPanel() {
     window.addEventListener('open-campus-assistant', handleOpen);
     return () => window.removeEventListener('open-campus-assistant', handleOpen);
   }, []);
-  const [showHistory, setShowHistory] = useState(false);
-  const [input, setInput] = useState('');
-  const [isSending, setIsSending] = useState(false);
-  const [history, setHistory] = useState<AssistantConversation[]>([]);
-  const [historyStatus, setHistoryStatus] = useState<AssistantHistoryStatus>('idle');
-  const [deletingConversationId, setDeletingConversationId] =
-    useState<string>();
-  const [lastPrompt, setLastPrompt] = useState<string>();
-  const [state, dispatch] = useReducer(assistantReducer, initialState);
-  // Focus returns to whichever control opened the panel (header or sidebar
-  // launcher); the desktop floating launcher was removed so its pill stops
-  // covering table content on dashboard pages.
-  const triggerRef = useRef<HTMLElement | null>(null);
-  const inputRef = useRef<HTMLTextAreaElement>(null);
-  const logRef = useRef<HTMLDivElement>(null);
-  const abortRef = useRef<AbortController | null>(null);
-  const requestGenerationRef = useRef(0);
-  const activeRequestIdRef = useRef<string>();
-  const retryRequestIdRef = useRef<string>();
-  // Preserve the conversation value that was part of the canonical request
-  // hash. A newly-created conversation is revealed in `meta` before `done`,
-  // but a lost-ack retry must keep the original null/specific value.
-  const activeConversationIdRef = useRef<string | undefined>();
-  const retryConversationIdRef = useRef<string | undefined>();
-  const activePromptRef = useRef<string>();
-  const selectedHistoryRef = useRef(false);
-  const historyFetchedRef = useRef(false);
-  const userScrolledRef = useRef(false);
 
   useEffect(() => {
     if (!open) return undefined;
@@ -112,14 +128,6 @@ export function AssistantPanel() {
       .catch(() => setHistoryStatus('error'));
   }, [historyStatus]);
 
-  const reconcileHistory = () => {
-    // A server-created conversation remains hidden until its terminal commit;
-    // clear the one-fetch latch so the next render observes the committed row.
-    historyFetchedRef.current = false;
-    selectedHistoryRef.current = false;
-    setHistoryStatus('idle');
-  };
-
   useEffect(() => {
     if (!open || historyFetchedRef.current || selectedHistoryRef.current)
       return;
@@ -146,16 +154,9 @@ export function AssistantPanel() {
   };
 
   const closePanel = () => {
-    requestGenerationRef.current += 1;
-    abortRef.current?.abort();
-    setIsSending(false);
+    abortStream();
     setOpen(false);
     setShowHistory(false);
-    activeRequestIdRef.current = undefined;
-    retryRequestIdRef.current = undefined;
-    activeConversationIdRef.current = undefined;
-    retryConversationIdRef.current = undefined;
-    activePromptRef.current = undefined;
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
     setHistoryStatus('idle');
@@ -170,11 +171,7 @@ export function AssistantPanel() {
       const loaded = await thesisApi.getConversationMessages(conversation.id, {
         limit: 50,
       });
-      dispatch({
-        type: 'reset',
-        conversationId: conversation.id,
-        messages: loaded.map(fromHistoryMessage),
-      });
+      resetConversation(conversation.id, loaded.map(fromHistoryMessage));
       setShowHistory(false);
       setHistoryStatus('loaded');
     } catch {
@@ -186,11 +183,8 @@ export function AssistantPanel() {
     if (isSending) return;
     try {
       const conversation = await thesisApi.createConversation(locale);
-      // The API keeps a freshly-created conversation PENDING and excludes it
-      // from history until the first terminal assistant commit. Keep the id
-      // locally so the next send can target it without showing an empty row.
       selectedHistoryRef.current = true;
-      dispatch({ type: 'reset', conversationId: conversation.id });
+      resetConversation(conversation.id);
       setShowHistory(false);
     } catch {
       dispatch({ type: 'error', kind: 'unavailable' });
@@ -217,265 +211,12 @@ export function AssistantPanel() {
       );
       if (state.conversationId === conversationId) {
         selectedHistoryRef.current = true;
-        dispatch({ type: 'reset' });
+        resetConversation();
       }
     } catch {
       setHistoryStatus('error');
     } finally {
       setDeletingConversationId(undefined);
-    }
-  };
-
-  const applyStreamEvent = (event: AssistantStreamEvent) => {
-    if (event.type === 'meta')
-      dispatch({
-        type: 'meta',
-        model: event.model,
-        conversationId: event.conversationId,
-      });
-    else if (event.type === 'delta')
-      dispatch({ type: 'delta', text: event.text });
-    else if (event.type === 'replace')
-      dispatch({ type: 'replace', text: event.text });
-    else if (event.type === 'citation')
-      dispatch({ type: 'citation', citation: event.citation });
-    else if (event.type === 'done')
-      dispatch({
-        type: 'complete',
-        reply: {
-          messageId: event.messageId,
-          reasonCode: event.reasonCode,
-          degraded: event.degraded,
-        },
-      });
-    else if (event.type === 'error') {
-      if (TRANSIENT_TERMINAL_CODES.has(event.code ?? '')) {
-        // A cancel, purge, or lease fence can arrive after one provider delta
-        // crossed the transport boundary. Replace that transient text before
-        // surfacing the stable terminal state so no partial answer remains
-        // visible while the server preserves zero-message cancellation.
-        dispatch({ type: 'replace', text: '' });
-        dispatch({
-          type: 'complete',
-          reply: {
-            content:
-              event.code === 'TURN_CANCELLED'
-                ? messages.assistant.cancelled
-                : messages.assistant.unavailable,
-            degraded: true,
-            reasonCode: event.code,
-          },
-        });
-      }
-      throw new Error(event.code ?? 'assistant stream error');
-    }
-  };
-
-  const sendMessage = async (
-    event: FormEvent<HTMLFormElement>,
-    retryPrompt?: string,
-  ) => {
-    event.preventDefault();
-    const message = (retryPrompt ?? input).trim();
-    if (!message || isSending) return;
-    const isRetry = retryPrompt !== undefined;
-    setInput('');
-    setLastPrompt(message);
-    dispatch({ type: 'clear-error' });
-    if (isRetry) dispatch({ type: 'retry-start', prompt: message });
-    else {
-      dispatch({
-        type: 'user',
-        message: { id: `${Date.now()}-user`, role: 'user', content: message },
-      });
-      dispatch({
-        type: 'assistant-start',
-        message: {
-          id: `${Date.now()}-assistant`,
-          role: 'assistant',
-          content: '',
-          pending: true,
-        },
-      });
-    }
-    setIsSending(true);
-    // A fresh send always follows the new exchange, even if the reader was
-    // scrolled up reviewing history when they hit send.
-    userScrolledRef.current = false;
-    const controller = new AbortController();
-    const generation = ++requestGenerationRef.current;
-    const clientRequestId =
-      activeRequestIdRef.current ??
-      (isRetry ? retryRequestIdRef.current : undefined) ??
-      createAssistantRequestId();
-    activeRequestIdRef.current = clientRequestId;
-    retryRequestIdRef.current = clientRequestId;
-    const requestedConversationId = isRetry
-      ? retryConversationIdRef.current
-      : state.conversationId;
-    activeConversationIdRef.current = requestedConversationId;
-    retryConversationIdRef.current = requestedConversationId;
-    activePromptRef.current = message;
-    abortRef.current = controller;
-    const isCurrentRequest = () =>
-      requestGenerationRef.current === generation &&
-      abortRef.current === controller;
-    let sawDelta = false;
-    let sawDone = false;
-    let terminalReconciled = false;
-    try {
-      await thesisApi.streamChat(message, locale, {
-        conversationId: requestedConversationId,
-        clientRequestId,
-        signal: controller.signal,
-        onEvent: (streamEvent) => {
-          if (!isCurrentRequest()) return;
-          if (streamEvent.type === 'delta') sawDelta = true;
-          if (streamEvent.type === 'done') sawDone = true;
-          applyStreamEvent(streamEvent);
-        },
-      });
-      if (!sawDone)
-        throw new Error('assistant stream ended without a done event');
-      terminalReconciled = true;
-      reconcileHistory();
-    } catch (error) {
-      if (!isCurrentRequest()) return;
-      if (controller.signal.aborted) {
-        dispatch({
-          type: 'complete',
-          reply: {
-            content: messages.assistant.cancelled,
-            degraded: true,
-            reasonCode: 'CANCELLED',
-          },
-        });
-        retryRequestIdRef.current = undefined;
-        retryConversationIdRef.current = undefined;
-        return;
-      }
-      const streamErrorCode = error instanceof Error ? error.message : '';
-      if (TRANSIENT_TERMINAL_CODES.has(streamErrorCode)) {
-        // These terminal outcomes are not retryable with the same idempotency
-        // key. Do not issue a JSON replay that could turn a cancellation race
-        // into a misleading generic error; history remains unchanged.
-        terminalReconciled = true;
-        retryRequestIdRef.current = undefined;
-        retryConversationIdRef.current = undefined;
-        reconcileHistory();
-        return;
-      }
-      // A stream can commit successfully and lose its final `done` frame. Always
-      // reconcile through JSON with the same idempotency key before surfacing an
-      // error, even when deltas were already rendered.
-      // The two-argument thesisApi.chat(message, locale) compatibility contract
-      // remains supported; reconciliation below supplies the conversation/key.
-      try {
-        const reply = await thesisApi.chat(
-          message,
-          locale,
-          requestedConversationId,
-          clientRequestId,
-        );
-        if (isCurrentRequest()) {
-          dispatch({
-            type: 'complete',
-            reply: { ...reply, content: reply.answer },
-          });
-          terminalReconciled = true;
-          retryRequestIdRef.current = undefined;
-          reconcileHistory();
-        }
-      } catch (fallbackError) {
-        if (!isCurrentRequest()) return;
-        const status =
-          (fallbackError as { response?: { status?: number }; status?: number })
-            .response?.status ?? (fallbackError as { status?: number }).status;
-        const kind =
-          status === 429
-            ? 'quota'
-            : status === 401
-              ? 'unauthorized'
-              : status === 403
-                ? 'forbidden'
-                : typeof navigator !== 'undefined' && !navigator.onLine
-                  ? 'offline'
-                  : 'unavailable';
-        dispatch({ type: 'error', kind });
-        dispatch({
-          type: 'complete',
-          reply: {
-            content:
-              kind === 'quota'
-                ? messages.assistant.quotaExceeded
-                : messages.assistant.unavailable,
-            degraded: true,
-            reasonCode:
-              kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
-          },
-        });
-      }
-    } finally {
-      if (isCurrentRequest()) {
-        setIsSending(false);
-        abortRef.current = null;
-        activeRequestIdRef.current = undefined;
-        activeConversationIdRef.current = undefined;
-        activePromptRef.current = undefined;
-        if (terminalReconciled) {
-          retryRequestIdRef.current = undefined;
-          retryConversationIdRef.current = undefined;
-        }
-      }
-    }
-  };
-
-  const stopGeneration = async () => {
-    const requestId = activeRequestIdRef.current;
-    if (!requestId) {
-      abortRef.current?.abort();
-      return;
-    }
-    try {
-      await thesisApi.cancelRequest(requestId);
-      abortRef.current?.abort();
-      retryRequestIdRef.current = undefined;
-      retryConversationIdRef.current = undefined;
-    } catch (error) {
-      const status = (error as { response?: { status?: number } }).response
-        ?.status;
-      if (status === 409) {
-        // Completion won the terminal CAS. Reconcile the committed replay before
-        // aborting the reader so a late Stop click cannot erase the answer.
-        try {
-          const reply = await thesisApi.chat(
-            activePromptRef.current ?? lastPrompt ?? '',
-            locale,
-            activeConversationIdRef.current,
-            requestId,
-          );
-          dispatch({
-            type: 'complete',
-            reply: { ...reply, content: reply.answer },
-          });
-          retryRequestIdRef.current = undefined;
-          retryConversationIdRef.current = undefined;
-          abortRef.current?.abort();
-        } catch {
-          /* keep the stream alive long enough for its done frame */
-        }
-      } else {
-        abortRef.current?.abort();
-      }
-    }
-  };
-
-  const setFeedback = async (messageId: string, rating: 'UP' | 'DOWN') => {
-    dispatch({ type: 'feedback', messageId, rating });
-    try {
-      await thesisApi.setMessageFeedback(messageId, rating);
-    } catch {
-      /* feedback is best effort and never changes answer state */
     }
   };
 
@@ -489,172 +230,168 @@ export function AssistantPanel() {
           : state.error === 'forbidden'
             ? messages.assistant.forbidden
             : messages.assistant.unavailable;
+
   return (
     <>
-    <div
-      className={cn(
-        'fixed z-50',
-        open
-          ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(23rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
-          : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
-      )}
-    >
-      {open ? (
-        <section
-          role="dialog"
-          aria-modal="false"
-          aria-labelledby="assistant-panel-title"
-          aria-describedby="assistant-panel-description"
-          className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
-        >
-          <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
-            <div className="flex min-w-0 items-start gap-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
-                <Bot className="h-5 w-5" aria-hidden="true" />
-              </div>
-              <div className="min-w-0">
-                <h2 id="assistant-panel-title" className="font-semibold text-white text-base">
-                  {messages.assistant.title}
-                </h2>
-                <p
-                  id="assistant-panel-description"
-                  className="mt-0.5 text-xs leading-5 text-white/85"
-                >
-                  {messages.assistant.description}
-                </p>
-              </div>
-            </div>
-            <div className="flex shrink-0 items-center gap-1">
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
-                onClick={() => setShowHistory((current) => !current)}
-                aria-label={messages.assistant.history}
-                aria-expanded={showHistory}
-              >
-                <History className="h-4 w-4" aria-hidden="true" />
-              </Button>
-              <Button
-                type="button"
-                variant="ghost"
-                size="icon"
-                className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
-                onClick={closePanel}
-                aria-label={messages.assistant.close}
-                title={messages.assistant.close}
-              >
-                <X className="h-4 w-4" aria-hidden="true" />
-              </Button>
-            </div>
-          </header>
-          {showHistory ? (
-            <AssistantHistoryPanel
-              history={history}
-              historyStatus={historyStatus}
-              deletingConversationId={deletingConversationId}
-              onBack={() => setShowHistory(false)}
-              onCreate={() => void createConversation()}
-              onSelect={(conversation) => void selectConversation(conversation)}
-              onDelete={(conversationId) => void deleteConversation(conversationId)}
-              onRetry={loadHistory}
-            />
-          ) : null}
-          <div
-            ref={logRef}
-            onScroll={handleLogScroll}
-            role="log"
-            aria-live="polite"
-            aria-relevant="additions text"
-            aria-busy={isSending}
-            className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3 py-3"
+      <div
+        className={cn(
+          'fixed z-50',
+          open
+            ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(23rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
+            : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
+        )}
+      >
+        {open ? (
+          <section
+            role="dialog"
+            aria-modal="false"
+            aria-labelledby="assistant-panel-title"
+            aria-describedby="assistant-panel-description"
+            className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
           >
-            {state.messages.length === 0 ? (
-              <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
-                <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                  <Bot className="h-5 w-5 animate-bounce" aria-hidden="true" />
+            <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
+              <div className="flex min-w-0 items-start gap-3">
+                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
+                  <Bot className="h-5 w-5" aria-hidden="true" />
                 </div>
-                <div className="space-y-1">
-                  <p className="text-sm font-semibold text-foreground">
-                    {messages.assistant.greeting}
-                  </p>
-                  <p className="max-w-xs text-xs text-muted-foreground leading-relaxed">
-                    {messages.assistant.empty}
-                  </p>
-                </div>
-                <div className="mt-1 flex flex-wrap justify-center gap-1.5 max-w-xs">
-                  {messages.assistant.suggestions.map((suggestion) => (
-                    <button
-                      key={suggestion}
-                      type="button"
-                      onClick={() => setInput(suggestion)}
-                      className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 hover:border-primary/40 transition-colors"
-                    >
-                      {suggestion}
-                    </button>
-                  ))}
-                </div>
-              </div>
-            ) : (
-              <AssistantMessages
-                messageList={state.messages}
-                onFeedback={(messageId, rating) => void setFeedback(messageId, rating)}
-                followUps={isSending ? undefined : messages.assistant.suggestions}
-                followUpsLabel={messages.assistant.followUpsLabel}
-                onFollowUp={(suggestion) => setInput(suggestion)}
-              />
-            )}
-            {isSending ? (
-              <div
-                className="flex items-center gap-2 text-xs text-muted-foreground"
-                role="status"
-              >
-                <LoaderCircle
-                  className="h-4 w-4 animate-spin motion-reduce:animate-none"
-                  aria-hidden="true"
-                />
-                {messages.assistant.thinking}
-              </div>
-            ) : null}
-            {state.error ? (
-              <div
-                className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
-                role="alert"
-              >
-                <p>{errorLabel}</p>
-                {lastPrompt ? (
-                  <Button
-                    type="button"
-                    variant="ghost"
-                    size="sm"
-                    className="mt-2 min-h-11 px-0 text-destructive hover:bg-transparent hover:underline"
-                    onClick={(event) =>
-                      void sendMessage(
-                        event as unknown as FormEvent<HTMLFormElement>,
-                        lastPrompt,
-                      )
-                    }
+                <div className="min-w-0">
+                  <h2 id="assistant-panel-title" className="font-semibold text-white text-base">
+                    {messages.assistant.title}
+                  </h2>
+                  <p
+                    id="assistant-panel-description"
+                    className="mt-0.5 text-xs leading-5 text-white/85"
                   >
-                    <RotateCcw className="mr-1 h-4 w-4" aria-hidden="true" />
-                    {messages.assistant.retry}
-                  </Button>
-                ) : null}
+                    {messages.assistant.description}
+                  </p>
+                </div>
               </div>
+              <div className="flex shrink-0 items-center gap-1">
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
+                  onClick={() => setShowHistory((current) => !current)}
+                  aria-label={messages.assistant.history}
+                  aria-expanded={showHistory}
+                >
+                  <History className="h-4 w-4" aria-hidden="true" />
+                </Button>
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
+                  onClick={closePanel}
+                  aria-label={messages.assistant.close}
+                  title={messages.assistant.close}
+                >
+                  <X className="h-4 w-4" aria-hidden="true" />
+                </Button>
+              </div>
+            </header>
+            {showHistory ? (
+              <AssistantHistoryPanel
+                history={history}
+                historyStatus={historyStatus}
+                deletingConversationId={deletingConversationId}
+                onBack={() => setShowHistory(false)}
+                onCreate={() => void createConversation()}
+                onSelect={(conversation) => void selectConversation(conversation)}
+                onDelete={(conversationId) => void deleteConversation(conversationId)}
+                onRetry={loadHistory}
+              />
             ) : null}
-          </div>
-          <AssistantComposer
-            input={input}
-            inputRef={inputRef}
-            isSending={isSending}
-            onInputChange={setInput}
-            onSubmit={(event) => void sendMessage(event)}
-            onStop={() => void stopGeneration()}
-          />
-        </section>
-      ) : null}
-    </div>
-    {confirmationDialog}
+            <div
+              ref={logRef}
+              onScroll={handleLogScroll}
+              role="log"
+              aria-live="polite"
+              aria-relevant="additions text"
+              aria-busy={isSending}
+              className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3 py-3"
+            >
+              {state.messages.length === 0 ? (
+                <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
+                    <Bot className="h-5 w-5 animate-bounce" aria-hidden="true" />
+                  </div>
+                  <div className="space-y-1">
+                    <p className="text-sm font-semibold text-foreground">
+                      {messages.assistant.greeting}
+                    </p>
+                    <p className="max-w-xs text-xs text-muted-foreground leading-relaxed">
+                      {messages.assistant.empty}
+                    </p>
+                  </div>
+                  <div className="mt-1 flex flex-wrap justify-center gap-1.5 max-w-xs">
+                    {messages.assistant.suggestions.map((suggestion) => (
+                      <button
+                        key={suggestion}
+                        type="button"
+                        onClick={() => setInput(suggestion)}
+                        className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                      >
+                        {suggestion}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ) : (
+                <AssistantMessages
+                  messageList={state.messages}
+                  onFeedback={(messageId, rating) => void setFeedback(messageId, rating)}
+                  followUps={isSending ? undefined : messages.assistant.suggestions}
+                  followUpsLabel={messages.assistant.followUpsLabel}
+                  onFollowUp={(suggestion) => setInput(suggestion)}
+                />
+              )}
+              {isSending ? (
+                <div
+                  className="flex items-center gap-2 text-xs text-muted-foreground"
+                  role="status"
+                >
+                  <LoaderCircle
+                    className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                    aria-hidden="true"
+                  />
+                  {messages.assistant.thinking}
+                </div>
+              ) : null}
+              {state.error ? (
+                <div
+                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                  role="alert"
+                >
+                  <p>{errorLabel}</p>
+                  {lastPrompt ? (
+                    <Button
+                      type="button"
+                      variant="ghost"
+                      size="sm"
+                      className="mt-2 min-h-11 px-0 text-destructive hover:bg-transparent hover:underline"
+                      onClick={(event) => void sendMessage(event, lastPrompt)}
+                    >
+                      <RotateCcw className="mr-1 h-4 w-4" aria-hidden="true" />
+                      {messages.assistant.retry}
+                    </Button>
+                  ) : null}
+                </div>
+              ) : null}
+            </div>
+            <AssistantComposer
+              input={input}
+              inputRef={inputRef}
+              isSending={isSending}
+              onInputChange={setInput}
+              onSubmit={(event) => void sendMessage(event)}
+              onStop={() => void stopGeneration()}
+            />
+          </section>
+        ) : null}
+      </div>
+      {confirmationDialog}
     </>
   );
 }

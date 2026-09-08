@@ -166,7 +166,9 @@ export default function AdminEnrollmentsPage() {
     try {
       const response = await sectionsApi.getAll({
         courseId,
-        limit: ACADEMIC_REFERENCE_LIMIT,
+        // /sections caps page size at 100 (MAX_PAGE_SIZE); the 200 reference
+        // limit other catalogs accept is a guaranteed 400 for this endpoint.
+        limit: 100,
       });
       setSections(response.data || []);
     } catch {
