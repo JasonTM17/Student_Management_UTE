@@ -48,7 +48,8 @@ public class AdminUserMutationController {
             @PathVariable String id,
             @RequestBody Map<String, Object> input,
             Authentication authentication) {
-        return users.update(id, input, isSuperAdmin(authentication));
+        String currentUserId = authentication != null ? authentication.getName() : null;
+        return users.update(id, input, isSuperAdmin(authentication), currentUserId);
     }
 
     @DeleteMapping("/{id}")

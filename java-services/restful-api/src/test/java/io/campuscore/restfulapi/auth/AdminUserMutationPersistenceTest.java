@@ -114,6 +114,26 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void adminCannotDemoteOwnAccount() throws Exception {
+        mvc.perform(put("/api/v1/users/admin-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"role\":\"STUDENT\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SELF_ROLE_CHANGE_NOT_ALLOWED"));
+    }
+
+    @Test
+    void adminCannotDeactivateOwnAccount() throws Exception {
+        mvc.perform(put("/api/v1/users/admin-user")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"LOCKED\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("SELF_DEACTIVATION_NOT_ALLOWED"));
+    }
+
+    @Test
     void userListIncludesCeilingTotalPagesMetadata() throws Exception {
         mvc.perform(get("/api/v1/users")
                         .queryParam("page", "1")

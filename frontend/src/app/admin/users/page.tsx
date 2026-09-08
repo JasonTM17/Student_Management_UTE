@@ -52,6 +52,11 @@ function roleLabel(roles?: string | string[]) {
   return values.filter(Boolean).join(', ') || defaultRole;
 }
 
+function isRecordSuperAdmin(record: UserRecord): boolean {
+  const values = Array.isArray(record.roles) ? record.roles : record.roles?.split(',') ?? [];
+  return values.some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
+}
+
 function userStatusTone(status: string): StatusTone {
   switch (status.toUpperCase()) {
     case 'ACTIVE':
@@ -285,6 +290,14 @@ export default function AdminUsersPage() {
   };
 
   const openEdit = (userRecord: UserRecord) => {
+    if (!isSuperAdmin && isRecordSuperAdmin(userRecord)) {
+      toast.error(
+        locale === 'vi'
+          ? 'Chỉ siêu quản trị viên mới có thể chỉnh sửa tài khoản siêu quản trị viên.'
+          : 'Only super administrators can edit super administrator accounts.',
+      );
+      return;
+    }
     setEditingUser(userRecord);
     setFormError('');
     setFormData({
@@ -320,6 +333,15 @@ export default function AdminUsersPage() {
       return;
     }
 
+    if (!isSuperAdmin && isRecordSuperAdmin(userRecord)) {
+      toast.error(
+        locale === 'vi'
+          ? 'Chỉ siêu quản trị viên mới có thể xóa tài khoản siêu quản trị viên.'
+          : 'Only super administrators can delete super administrator accounts.',
+      );
+      return;
+    }
+
     const shouldDelete = await confirm({
       title: copy.deleteTitle,
       message: copy.deleteMessage(userRecord.firstName, userRecord.lastName),
@@ -351,6 +373,18 @@ export default function AdminUsersPage() {
 
     try {
       if (editingUser) {
+        const isSelf = Boolean(user && (user.id === editingUser.id || user.email === editingUser.email));
+        if (isSelf && formData.role !== primaryRole(editingUser.roles)) {
+          const selfRoleMsg =
+            locale === 'vi'
+              ? 'Không thể tự thay đổi vai trò của chính mình.'
+              : 'You cannot change your own system role.';
+          setFormError(selfRoleMsg);
+          toast.error(selfRoleMsg);
+          setIsSaving(false);
+          return;
+        }
+
         await usersApi.update(editingUser.id, {
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
@@ -475,41 +509,62 @@ export default function AdminUsersPage() {
                       </div>
                     </dl>
                     <AdminRowActions className="mt-4 border-t border-border/60 pt-3">
-                      <Button
-                        size="icon"
-                        variant="ghost"
-                        onClick={() => openEdit(record)}
-                        aria-label={copy.editUserLabel(record.firstName, record.lastName)}
-                        title={copy.editUserLabel(record.firstName, record.lastName)}
-                      >
-                        <Pencil className="h-4 w-4" />
-                      </Button>
                       {(() => {
                         const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
+                        const isTargetSuperAdmin = isRecordSuperAdmin(record);
+                        const canManageTarget = isSuperAdmin || !isTargetSuperAdmin;
+                        const superAdminOnlyLabel =
+                          locale === 'vi'
+                            ? 'Chỉ siêu quản trị viên mới có thể quản lý tài khoản siêu quản trị viên'
+                            : 'Only super administrators can manage super administrator accounts';
                         return (
-                          <Button
-                            size="icon"
-                            variant="ghost"
-                            className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
-                            onClick={() => void handleDelete(record)}
-                            disabled={isSelf}
-                            aria-label={
-                              isSelf
-                                ? (locale === 'vi'
-                                    ? 'Không thể xóa tài khoản của chính mình'
-                                    : 'Cannot delete your own account')
-                                : copy.deleteUserLabel(record.firstName, record.lastName)
-                            }
-                            title={
-                              isSelf
-                                ? (locale === 'vi'
-                                    ? 'Không thể xóa tài khoản của chính mình'
-                                    : 'Cannot delete your own account')
-                                : copy.deleteUserLabel(record.firstName, record.lastName)
-                            }
-                          >
-                            <Trash2 className="h-4 w-4" />
-                          </Button>
+                          <>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              onClick={() => openEdit(record)}
+                              disabled={!canManageTarget}
+                              aria-label={
+                                !canManageTarget
+                                  ? superAdminOnlyLabel
+                                  : copy.editUserLabel(record.firstName, record.lastName)
+                              }
+                              title={
+                                !canManageTarget
+                                  ? superAdminOnlyLabel
+                                  : copy.editUserLabel(record.firstName, record.lastName)
+                              }
+                            >
+                              <Pencil className="h-4 w-4" />
+                            </Button>
+                            <Button
+                              size="icon"
+                              variant="ghost"
+                              className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+                              onClick={() => void handleDelete(record)}
+                              disabled={isSelf || !canManageTarget}
+                              aria-label={
+                                isSelf
+                                  ? (locale === 'vi'
+                                      ? 'Không thể xóa tài khoản của chính mình'
+                                      : 'Cannot delete your own account')
+                                  : !canManageTarget
+                                    ? superAdminOnlyLabel
+                                    : copy.deleteUserLabel(record.firstName, record.lastName)
+                              }
+                              title={
+                                isSelf
+                                  ? (locale === 'vi'
+                                      ? 'Không thể xóa tài khoản của chính mình'
+                                      : 'Cannot delete your own account')
+                                  : !canManageTarget
+                                    ? superAdminOnlyLabel
+                                    : copy.deleteUserLabel(record.firstName, record.lastName)
+                              }
+                            >
+                              <Trash2 className="h-4 w-4" />
+                            </Button>
+                          </>
                         );
                       })()}
                     </AdminRowActions>
@@ -552,41 +607,62 @@ export default function AdminUsersPage() {
                         </td>
                         <td className="px-2 py-4">
                           <AdminRowActions>
-                            <Button
-                              size="icon"
-                              variant="ghost"
-                              onClick={() => openEdit(record)}
-                              aria-label={copy.editUserLabel(record.firstName, record.lastName)}
-                              title={copy.editUserLabel(record.firstName, record.lastName)}
-                            >
-                              <Pencil className="h-4 w-4" />
-                            </Button>
                             {(() => {
                               const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
+                              const isTargetSuperAdmin = isRecordSuperAdmin(record);
+                              const canManageTarget = isSuperAdmin || !isTargetSuperAdmin;
+                              const superAdminOnlyLabel =
+                                locale === 'vi'
+                                  ? 'Chỉ siêu quản trị viên mới có thể quản lý tài khoản siêu quản trị viên'
+                                  : 'Only super administrators can manage super administrator accounts';
                               return (
-                                <Button
-                                  size="icon"
-                                  variant="ghost"
-                                  className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
-                                  onClick={() => void handleDelete(record)}
-                                  disabled={isSelf}
-                                  aria-label={
-                                    isSelf
-                                      ? (locale === 'vi'
-                                          ? 'Không thể xóa tài khoản của chính mình'
-                                          : 'Cannot delete your own account')
-                                      : copy.deleteUserLabel(record.firstName, record.lastName)
-                                  }
-                                  title={
-                                    isSelf
-                                      ? (locale === 'vi'
-                                          ? 'Không thể xóa tài khoản của chính mình'
-                                          : 'Cannot delete your own account')
-                                      : copy.deleteUserLabel(record.firstName, record.lastName)
-                                  }
-                                >
-                                  <Trash2 className="h-4 w-4" />
-                                </Button>
+                                <>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    onClick={() => openEdit(record)}
+                                    disabled={!canManageTarget}
+                                    aria-label={
+                                      !canManageTarget
+                                        ? superAdminOnlyLabel
+                                        : copy.editUserLabel(record.firstName, record.lastName)
+                                    }
+                                    title={
+                                      !canManageTarget
+                                        ? superAdminOnlyLabel
+                                        : copy.editUserLabel(record.firstName, record.lastName)
+                                    }
+                                  >
+                                    <Pencil className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
+                                    className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
+                                    onClick={() => void handleDelete(record)}
+                                    disabled={isSelf || !canManageTarget}
+                                    aria-label={
+                                      isSelf
+                                        ? (locale === 'vi'
+                                            ? 'Không thể xóa tài khoản của chính mình'
+                                            : 'Cannot delete your own account')
+                                        : !canManageTarget
+                                          ? superAdminOnlyLabel
+                                          : copy.deleteUserLabel(record.firstName, record.lastName)
+                                    }
+                                    title={
+                                      isSelf
+                                        ? (locale === 'vi'
+                                            ? 'Không thể xóa tài khoản của chính mình'
+                                            : 'Cannot delete your own account')
+                                        : !canManageTarget
+                                          ? superAdminOnlyLabel
+                                          : copy.deleteUserLabel(record.firstName, record.lastName)
+                                    }
+                                  >
+                                    <Trash2 className="h-4 w-4" />
+                                  </Button>
+                                </>
                               );
                             })()}
                           </AdminRowActions>
@@ -656,27 +732,42 @@ export default function AdminUsersPage() {
             </AdminFormField>
           </div>
 
-          <AdminFormField label={copy.roleLabel}>
-            <select
-              value={formData.role}
-              onChange={(event) =>
-                setFormData((current) => ({
-                  ...current,
-                  role: event.target.value as ManagedRole,
-                }))
-              }
-              className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-            >
-              {(isSuperAdmin
-                ? (['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'] as ManagedRole[])
-                : (['STUDENT', 'LECTURER', 'ADMIN'] as ManagedRole[])
-              ).map((role) => (
-                <option key={role} value={role}>
-                  {copy.roles[role]}
-                </option>
-              ))}
-            </select>
-          </AdminFormField>
+          {(() => {
+            const isSelfEditing = Boolean(editingUser && user && (user.id === editingUser.id || user.email === editingUser.email));
+            return (
+              <AdminFormField
+                label={copy.roleLabel}
+                description={
+                  isSelfEditing
+                    ? (locale === 'vi'
+                        ? 'Không thể tự thay đổi vai trò tài khoản của chính mình.'
+                        : 'You cannot change your own system role.')
+                    : undefined
+                }
+              >
+                <select
+                  value={formData.role}
+                  disabled={isSelfEditing}
+                  onChange={(event) =>
+                    setFormData((current) => ({
+                      ...current,
+                      role: event.target.value as ManagedRole,
+                    }))
+                  }
+                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:opacity-60 disabled:cursor-not-allowed"
+                >
+                  {(isSuperAdmin
+                    ? (['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'] as ManagedRole[])
+                    : (['STUDENT', 'LECTURER', 'ADMIN'] as ManagedRole[])
+                  ).map((role) => (
+                    <option key={role} value={role}>
+                      {copy.roles[role]}
+                    </option>
+                  ))}
+                </select>
+              </AdminFormField>
+            );
+          })()}
 
           <AdminDialogFooter>
             <Button type="button" variant="outline" onClick={closeModal}>

@@ -99,11 +99,16 @@ public class AdminUserMutationService {
 
     @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input) {
-        return update(id, input, false);
+        return update(id, input, false, null);
     }
 
     @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin) {
+        return update(id, input, canManageSuperAdmin, null);
+    }
+
+    @Transactional
+    public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin, String currentUserId) {
         String requestedRole = input.get("role") == null
                 ? null
                 : text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
@@ -114,6 +119,21 @@ public class AdminUserMutationService {
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage super administrator accounts");
+        }
+        if (currentUserId != null && currentUserId.equals(id)) {
+            if (requestedRole != null && !hasRole(id, requestedRole)) {
+                throw problem(
+                        HttpStatus.BAD_REQUEST,
+                        "SELF_ROLE_CHANGE_NOT_ALLOWED",
+                        "You cannot change your own system role");
+            }
+            String status = input.get("status") == null ? null : text(input, "status", "");
+            if (status != null && !status.isBlank() && !"ACTIVE".equalsIgnoreCase(status)) {
+                throw problem(
+                        HttpStatus.BAD_REQUEST,
+                        "SELF_DEACTIVATION_NOT_ALLOWED",
+                        "You cannot deactivate or lock your own account");
+            }
         }
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"firstName\" = COALESCE(:firstName, \"firstName\"),"

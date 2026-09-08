@@ -30,19 +30,25 @@ export interface WeeklyGrid {
  */
 export function buildWeeklyGrid(items: WeeklyGridItem[]): WeeklyGrid {
   const days = [1, 2, 3, 4, 5, 6, 7];
-  const slots = [...new Set(items.map((item) => item.startTime))].sort((a, b) =>
+  const acceptedItems = items
+    .map((item) => {
+      const day = item.dayOfWeek === 0 ? 7 : item.dayOfWeek;
+      const startTime = typeof item.startTime === 'string' ? item.startTime.trim() : '';
+      return { ...item, dayOfWeek: day, startTime };
+    })
+    .filter((item) => days.includes(item.dayOfWeek) && Boolean(item.startTime));
+
+  const slots = [...new Set(acceptedItems.map((item) => item.startTime))].sort((a, b) =>
     a.localeCompare(b),
   );
   const cells: Record<string, WeeklyGridItem[]> = {};
 
-  items.forEach((item) => {
-    const day = item.dayOfWeek === 0 ? 7 : item.dayOfWeek;
-    if (!days.includes(day) || !item.startTime) return;
-    const key = `${day}-${item.startTime}`;
+  acceptedItems.forEach((item) => {
+    const key = `${item.dayOfWeek}-${item.startTime}`;
     if (!cells[key]) {
       cells[key] = [];
     }
-    cells[key].push({ ...item, dayOfWeek: day });
+    cells[key].push(item);
   });
 
   return { days, slots, cells };
