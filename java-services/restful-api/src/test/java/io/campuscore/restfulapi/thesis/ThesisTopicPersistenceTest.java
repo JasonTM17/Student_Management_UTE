@@ -742,7 +742,12 @@ class ThesisTopicPersistenceTest {
     }
 
     private void insertRound(UUID roundId, String name, Instant start, String status) {
-        Instant end = start.plusSeconds(31L * 24 * 60 * 60);
+        // Registration mutations now enforce the stored window, so open rounds
+        // are seeded with a valid relative window instead of a past fixture date.
+        Instant effectiveStart = "REGISTRATION_OPEN".equals(status) && !start.isAfter(Instant.now())
+                ? Instant.now().minusSeconds(3_600)
+                : start;
+        Instant end = effectiveStart.plusSeconds(31L * 24 * 60 * 60);
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, registration_start, registration_end, status) "
@@ -750,7 +755,7 @@ class ThesisTopicPersistenceTest {
                 roundId,
                 name,
                 "CAPSTONE",
-                Timestamp.from(start),
+                Timestamp.from(effectiveStart),
                 Timestamp.from(end),
                 status);
     }
@@ -770,6 +775,58 @@ class ThesisTopicPersistenceTest {
                 "DRAFT",
                 UUID.randomUUID());
         return topicId;
+    }
+
+    @Test
+    void registrationWindowAndApprovedMembershipGuardsHold() throws Exception {
+        // Open status but an expired window: registration mutations must fail closed.
+        UUID expiredRound = UUID.randomUUID();
+        jdbc.update(
+                "INSERT INTO thesis.thesis_registration_round (id, name, thesis_type, registration_start, registration_end, status) "
+                        + "VALUES (?, ?, ?, ?, ?, ?)",
+                expiredRound,
+                "Expired window",
+                "CAPSTONE",
+                Timestamp.from(Instant.now().minusSeconds(2 * 86_400)),
+                Timestamp.from(Instant.now().minusSeconds(86_400)),
+                "REGISTRATION_OPEN");
+
+        mvc.perform(post("/api/v1/thesis/groups")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + expiredRound + "\"}")
+                        .with(studentJwt(UUID.randomUUID().toString())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("REGISTRATION_WINDOW_CLOSED"));
+
+        // An approved group's membership is frozen for its leader.
+        UUID openRound = UUID.randomUUID();
+        insertRound(openRound, "Open round", Instant.now(), "REGISTRATION_OPEN");
+        UUID leader = UUID.randomUUID();
+        UUID approvedGroup = insertGroup(
+                openRound,
+                Instant.now(),
+                leader,
+                null,
+                "SUBMITTED",
+                "APPROVED",
+                null);
+        insertMember(approvedGroup, openRound, leader, 1);
+
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"" + UUID.randomUUID() + "\"}")
+                        .with(studentJwt(leader.toString())))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+
+        // Admins keep a coordination escape hatch, but cannot write approval
+        // semantics through progress updates.
+        mvc.perform(patch("/api/v1/thesis/groups/{id}/progress", approvedGroup)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"APPROVED\"}")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
     }
 
     private UUID insertGroup(UUID roundId, Instant createdAt, UUID leaderId, UUID topicId, String status, String approvalStatus, String rejectionReason) {
