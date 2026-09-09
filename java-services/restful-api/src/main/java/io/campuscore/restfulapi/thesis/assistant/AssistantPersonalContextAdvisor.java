@@ -44,8 +44,12 @@ public class AssistantPersonalContextAdvisor {
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
 
     private static final Pattern SCHEDULE_INTENT = Pattern.compile(
-            "lịch\\s*học|lich\\s*hoc|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|lịch\\s*dạy|lich\\s*day"
-                    + "|học\\s*ngày\\s*nào|m[oô]n\\s*nào\\s*học|(my\\s+)?(class\\s+)?schedule|timetable|my\\s+classes",
+            "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)?"
+                    + "|lich\\s*(?:hoc|day|giang\\s*day|tuan|hom\\s*nay|ngay\\s*mai|cua\\s*toi|thu\\s*[2-7]|thu\\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\\s*nhat|t[2-7]|cn)?"
+                    + "|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|\\btkb\\b"
+                    + "|(?:thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\\s*nay|ngày\\s*mai|chủ\\s*nhật|hom\\s*nay|ngay\\s*mai|chu\\s*nhat)\\s*(?:tôi\\s*)?(?:có\\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca)"
+                    + "|học\\s*ngày\\s*nào|hoc\\s*ngay\\s*nao|m[oô]n\\s*nào\\s*học|mon\\s*nao\\s*hoc|tiết\\s*học|buổi\\s*học|ca\\s*học|ca\\s*dạy|tiết\\s*dạy"
+                    + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final String[] DAY_LABELS_VI =
@@ -74,7 +78,8 @@ public class AssistantPersonalContextAdvisor {
      */
     public ChatResponse answer(ChatRequest request, Jwt actor) {
         String locale = normalizedLocale(request);
-        String answer = composeAnswer(actor, locale);
+        String message = request != null ? request.message() : null;
+        String answer = composeAnswer(actor, locale, message);
         if (answer == null) {
             return null;
         }
@@ -84,7 +89,8 @@ public class AssistantPersonalContextAdvisor {
     /** Emits the personal answer over the SSE contract as meta → replace → done. */
     public void stream(ChatRequest request, Jwt actor, Consumer<ThesisAssistantService.StreamEvent> sink) {
         String locale = normalizedLocale(request);
-        String answer = composeAnswer(actor, locale);
+        String message = request != null ? request.message() : null;
+        String answer = composeAnswer(actor, locale, message);
         if (answer == null) {
             answer = fallbackMessage(locale);
         }
@@ -94,19 +100,20 @@ public class AssistantPersonalContextAdvisor {
         sink.accept(new ThesisAssistantService.StreamDone(null, "COMPLETED", false, "COMPLETED"));
     }
 
-    private String composeAnswer(Jwt actor, String locale) {
+    private String composeAnswer(Jwt actor, String locale, String message) {
+        Integer requestedDay = detectRequestedDay(message);
         String studentId = claim(actor, "studentId");
         if (StringUtils.hasText(studentId)) {
-            return studentAnswer(studentId, locale);
+            return studentAnswer(studentId, locale, requestedDay);
         }
         String lecturerId = claim(actor, "lecturerId");
         if (StringUtils.hasText(lecturerId)) {
-            return lecturerAnswer(lecturerId, locale);
+            return lecturerAnswer(lecturerId, locale, requestedDay);
         }
         return null;
     }
 
-    private String studentAnswer(String studentId, String locale) {
+    private String studentAnswer(String studentId, String locale, Integer requestedDay) {
         List<EnrollmentResponse> active = enrollments.findStudentEnrollments(studentId, null).stream()
                 .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
                 .toList();
@@ -152,10 +159,10 @@ public class AssistantPersonalContextAdvisor {
         String termName = currentTerm.get(0).section().semester() != null
                 ? semesterLabel(currentTerm.get(0).section().semester(), locale)
                 : null;
-        return timetableAnswer(slots, termName, locale);
+        return timetableAnswer(slots, termName, locale, requestedDay, false);
     }
 
-    private String lecturerAnswer(String lecturerId, String locale) {
+    private String lecturerAnswer(String lecturerId, String locale, Integer requestedDay) {
         List<LecturerScheduleResponse> teaching = sections.findLecturerSchedule(lecturerId, null);
         if (teaching.isEmpty()) {
             return noClassesMessage(locale);
@@ -180,15 +187,72 @@ public class AssistantPersonalContextAdvisor {
         if (slots.isEmpty()) {
             return noClassesMessage(locale);
         }
-        return timetableAnswer(slots, null, locale);
+        return timetableAnswer(slots, null, locale, requestedDay, true);
     }
 
-    private String timetableAnswer(List<Slot> slots, String termName, String locale) {
+    private String timetableAnswer(List<Slot> slots, String termName, String locale, Integer requestedDay, boolean isLecturer) {
         boolean vi = "vi".equals(locale);
+        if (requestedDay != null) {
+            int targetDay = requestedDay == 0 ? 7 : requestedDay;
+            String dayLabel = (vi ? DAY_LABELS_VI : DAY_LABELS_EN)[targetDay];
+            List<Slot> daySlots = slots.stream()
+                    .filter(s -> (s.dayOfWeek() == 0 ? 7 : s.dayOfWeek()) == targetDay)
+                    .sorted(Comparator.comparing(Slot::startTime))
+                    .toList();
+
+            if (daySlots.isEmpty()) {
+                if (isLecturer) {
+                    return vi
+                            ? "Theo lịch phân công hiện tại, bạn không có ca giảng dạy nào vào " + dayLabel + ".\n\n"
+                                    + "Bạn có thể xem lịch các ngày khác ở trang Lịch giảng dạy."
+                            : "According to your current teaching assignments, you have no teaching sessions on " + dayLabel + ".\n\n"
+                                    + "You can check other days on the Teaching Schedule page.";
+                } else {
+                    return vi
+                            ? "Theo thời khóa biểu hiện tại, bạn không có lịch học vào " + dayLabel + ".\n\n"
+                                    + "Bạn có thể xem lịch các ngày khác ở trang Thời khóa biểu."
+                            : "According to your current timetable, you have no classes on " + dayLabel + ".\n\n"
+                                    + "You can check your schedule for other days on the Schedule page.";
+                }
+            }
+
+            StringBuilder answer = new StringBuilder();
+            if (isLecturer) {
+                answer.append(vi
+                        ? "Lịch giảng dạy " + dayLabel + " của bạn:\n"
+                        : "Your " + dayLabel + " teaching schedule:\n");
+            } else {
+                answer.append(vi
+                        ? "Lịch học " + dayLabel + " của bạn"
+                        : "Your " + dayLabel + " class schedule");
+                if (StringUtils.hasText(termName)) {
+                    answer.append(" (" + termName + ")");
+                }
+                answer.append(":\n");
+            }
+
+            for (Slot slot : daySlots) {
+                answer.append("\n• ").append(dayLabel)
+                        .append(" ").append(slot.startTime()).append("-").append(slot.endTime());
+                if (StringUtils.hasText(slot.label())) {
+                    answer.append(" — ").append(slot.label());
+                }
+                if (StringUtils.hasText(slot.room())) {
+                    answer.append(vi ? " (phòng " : " (room ").append(slot.room()).append(")");
+                }
+                answer.append("\n");
+            }
+
+            answer.append(vi
+                    ? (isLecturer ? "\nBạn có thể xem lịch dạng lưới ở trang Lịch giảng dạy." : "\nBạn có thể xem lịch dạng lưới ở trang Thời khóa biểu.")
+                    : (isLecturer ? "\nYou can see this as a weekly grid on the Teaching Schedule page." : "\nYou can see this as a weekly grid on the Schedule page."));
+            return answer.toString();
+        }
+
         StringBuilder answer = new StringBuilder();
         answer.append(vi
-                ? "Lịch học cá nhân của bạn"
-                : "Your personal class schedule");
+                ? (isLecturer ? "Lịch giảng dạy của bạn" : "Lịch học cá nhân của bạn")
+                : (isLecturer ? "Your teaching schedule" : "Your personal class schedule"));
         if (StringUtils.hasText(termName)) {
             answer.append(vi ? " (" + termName + ")" : " (" + termName + ")");
         }
@@ -211,9 +275,33 @@ public class AssistantPersonalContextAdvisor {
                     answer.append("\n");
                 });
         answer.append(vi
-                ? "\nBạn có thể xem lịch dạng lưới ở trang Thời khóa biểu."
-                : "\nYou can see this as a weekly grid on the Schedule page.");
+                ? (isLecturer ? "\nBạn có thể xem lịch dạng lưới ở trang Lịch giảng dạy." : "\nBạn có thể xem lịch dạng lưới ở trang Thời khóa biểu.")
+                : (isLecturer ? "\nYou can see this as a weekly grid on the Teaching Schedule page." : "\nYou can see this as a weekly grid on the Schedule page."));
         return answer.toString();
+    }
+
+    private static Integer detectRequestedDay(String message) {
+        if (!StringUtils.hasText(message)) return null;
+        String lower = message.toLowerCase();
+
+        if (lower.contains("hôm nay") || lower.contains("hom nay") || lower.contains("today")) {
+            java.time.DayOfWeek dow = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).getDayOfWeek();
+            return dow == java.time.DayOfWeek.SUNDAY ? 1 : dow.getValue() + 1;
+        }
+        if (lower.contains("ngày mai") || lower.contains("ngay mai") || lower.contains("tomorrow")) {
+            java.time.DayOfWeek dow = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1).getDayOfWeek();
+            return dow == java.time.DayOfWeek.SUNDAY ? 1 : dow.getValue() + 1;
+        }
+
+        if (Pattern.compile("thứ\\s*(?:hai|2)|\\bt2\\b|monday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 2;
+        if (Pattern.compile("thứ\\s*(?:ba|3)|\\bt3\\b|tuesday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 3;
+        if (Pattern.compile("thứ\\s*(?:tư|bốn|4)|\\bt4\\b|wednesday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 4;
+        if (Pattern.compile("thứ\\s*(?:năm|5)|\\bt5\\b|thursday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 5;
+        if (Pattern.compile("thứ\\s*(?:sáu|6)|\\bt6\\b|friday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 6;
+        if (Pattern.compile("thứ\\s*(?:bảy|7)|\\bt7\\b|saturday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 7;
+        if (Pattern.compile("chủ\\s*nhật|chu\\s*nhat|\\bcn\\b|sunday", Pattern.CASE_INSENSITIVE).matcher(lower).find()) return 1;
+
+        return null;
     }
 
     private static String courseLabel(CourseSummary course, String locale) {

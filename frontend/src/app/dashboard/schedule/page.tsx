@@ -1,7 +1,17 @@
 'use client';
 
 import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
-import { Clock, MapPin } from 'lucide-react';
+import {
+  Calendar,
+  CalendarDays,
+  Clock,
+  GraduationCap,
+  LayoutGrid,
+  List,
+  MapPin,
+  Printer,
+  Sparkles,
+} from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
@@ -13,12 +23,17 @@ import { Enrollment, Semester } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
+import { Button } from '@/components/ui/button';
 import {
   EmptyState,
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
+import {
+  ClassScheduleDetailModal,
+  ScheduleDetailData,
+} from '@/components/schedule/ClassScheduleDetailModal';
 
 type DayAgendaItem = {
   id: string;
@@ -32,17 +47,33 @@ type DayAgendaItem = {
   dayOfWeek: number;
   building?: string;
   roomNumber?: string;
+  credits?: number;
+  lecturerName?: string;
+  status?: string;
 };
 
-const dayNames = [
-  'Sunday',
-  'Monday',
-  'Tuesday',
-  'Wednesday',
-  'Thursday',
-  'Friday',
-  'Saturday',
-];
+const DAY_LABELS_VI: Record<number, string> = {
+  1: 'Chủ Nhật',
+  2: 'Thứ Hai',
+  3: 'Thứ Ba',
+  4: 'Thứ Tư',
+  5: 'Thứ Năm',
+  6: 'Thứ Sáu',
+  7: 'Thứ Bảy',
+};
+
+const DAY_LABELS_EN: Record<number, string> = {
+  1: 'Sunday',
+  2: 'Monday',
+  3: 'Tuesday',
+  4: 'Wednesday',
+  5: 'Thursday',
+  6: 'Friday',
+  7: 'Saturday',
+};
+
+// Standard academic week display order: Monday to Sunday
+const ORDERED_DAYS = [2, 3, 4, 5, 6, 7, 1];
 
 /**
  * Token-based accent pairs that stay readable in light and dark themes. The
@@ -74,6 +105,18 @@ export default function SchedulePage() {
   const [selectedSemester, setSelectedSemester] = useState('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+
+  // Enhanced view options: 'grid' (Lưới tuần), 'day' (Theo ngày), 'list' (Danh sách)
+  const [viewMode, setViewMode] = useState<'grid' | 'day' | 'list'>('grid');
+  const [selectedDetail, setSelectedDetail] = useState<ScheduleDetailData | null>(null);
+
+  // Today indicator
+  const todayDow = useMemo(() => {
+    const jsDay = new Date().getDay();
+    return jsDay === 0 ? 1 : jsDay + 1; // 1 = Sunday, 2 = Monday...
+  }, []);
+
+  const [selectedDayTab, setSelectedDayTab] = useState<number>(todayDow);
 
   /** Loads semester choices and selects the best current term for the weekly agenda. */
   const fetchSemesters = useCallback(async () => {
@@ -164,6 +207,12 @@ export default function SchedulePage() {
       )
       .forEach((enrollment) => {
         const section = enrollment.section;
+        const lecturerName =
+          (section?.lecturer as { fullName?: string } | undefined)?.fullName ??
+          (section?.lecturer?.user
+            ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`.trim()
+            : undefined);
+
         section?.schedules?.forEach((schedule, index) => {
           items.push({
             id: `${enrollment.id}-${index}`,
@@ -174,9 +223,12 @@ export default function SchedulePage() {
             sectionNumber: section.sectionNumber,
             startTime: schedule.startTime,
             endTime: schedule.endTime,
-            dayOfWeek: schedule.dayOfWeek === 0 ? 7 : schedule.dayOfWeek,
+            dayOfWeek: schedule.dayOfWeek === 0 ? 1 : schedule.dayOfWeek,
             building: schedule.classroom?.building,
             roomNumber: schedule.classroom?.roomNumber,
+            credits: section.course?.credits,
+            lecturerName,
+            status: enrollment.status,
           });
         });
       });
@@ -200,26 +252,27 @@ export default function SchedulePage() {
     }, {});
   }, [agenda]);
 
+  // Unique courses count
+  const uniqueCoursesCount = useMemo(() => {
+    return new Set(agenda.map((item) => item.courseCode)).size;
+  }, [agenda]);
+
   const selectedSemesterName = useMemo(() => {
     return (
       getLocalizedName(
         locale,
         semesters.find((semester) => semester.id === selectedSemester),
-        locale === 'vi' ? 't\u1ea5t c\u1ea3 h\u1ecdc k\u1ef3' : 'all terms',
+        locale === 'vi' ? 'tất cả học kỳ' : 'all terms',
       ) ??
       (locale === 'vi' ? 'tất cả học kỳ' : 'all terms')
     );
   }, [locale, selectedSemester, semesters]);
 
-  const localizedDayNames =
-    locale === 'vi'
-      ? ['Chủ nhật', 'Thứ hai', 'Thứ ba', 'Thứ tư', 'Thứ năm', 'Thứ sáu', 'Thứ bảy']
-      : dayNames;
-
   const weeklyGrid = useMemo(() => buildWeeklyGrid(agenda), [agenda]);
-  const gridDayLabels = [1, 2, 3, 4, 5, 6, 7].map(
-    (day) => localizedDayNames[day % 7],
-  );
+
+  const handlePrint = () => {
+    window.print();
+  };
 
   const copy =
     locale === 'vi'
@@ -245,6 +298,15 @@ export default function SchedulePage() {
           item: 'mục',
           sectionPrefix: 'Lớp học phần',
           roomPending: 'Đang chờ thông tin phòng học',
+          today: 'HÔM NAY',
+          viewGrid: 'Lưới tuần',
+          viewDay: 'Theo ngày',
+          viewList: 'Danh sách',
+          print: 'In thời khóa biểu',
+          totalCourses: 'Môn học',
+          totalMeetings: 'Buổi học / tuần',
+          filterDay: 'Chọn ngày trong tuần',
+          clickToViewDetails: 'Bấm vào môn học để xem chi tiết đầy đủ',
         } as const
       : {
           eyebrow: 'Student area',
@@ -268,6 +330,15 @@ export default function SchedulePage() {
           item: 'item',
           sectionPrefix: 'Class',
           roomPending: 'Room information pending',
+          today: 'TODAY',
+          viewGrid: 'Weekly Grid',
+          viewDay: 'Day View',
+          viewList: 'List View',
+          print: 'Print Schedule',
+          totalCourses: 'Courses',
+          totalMeetings: 'Sessions / week',
+          filterDay: 'Select day of week',
+          clickToViewDetails: 'Click on any class to view complete details',
         } as const;
 
   if (authLoading) {
@@ -279,14 +350,14 @@ export default function SchedulePage() {
   }
 
   return (
-    <div className="space-y-8">
+    <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
         description={copy.description}
         actions={
           <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
-            <div className="min-w-0 sm:min-w-[300px]">
+            <div className="min-w-0 sm:min-w-[280px]">
               <Select
                 aria-label={copy.selectSemester}
                 value={selectedSemester}
@@ -325,71 +396,530 @@ export default function SchedulePage() {
           }
         />
       ) : (
-        <div className="grid min-w-0 items-start gap-6 xl:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)] xl:gap-8">
-          <Card variant="muted" className="min-w-0 overflow-hidden border-border/80 shadow-sm">
-            <CardHeader className="border-b border-border/70 bg-card/50 pb-4">
-              <div className="flex flex-wrap items-center justify-between gap-3">
-                <CardTitle className="text-xl font-bold flex items-center gap-2">
-                  <Clock className="h-5 w-5 text-primary" />
-                  {copy.weeklyAgenda}
-                </CardTitle>
-                <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {formatNumber(agenda.length)} {agenda.length === 1 ? copy.item : copy.items}
-                </div>
+        <div className="space-y-6">
+          {/* Top Control Bar & Quick Highlights */}
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+            {/* View Mode Tabs */}
+            <div className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1">
+              <Button
+                variant={viewMode === 'grid' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('grid')}
+                className="gap-2 text-xs font-semibold"
+              >
+                <LayoutGrid className="h-3.5 w-3.5" />
+                {copy.viewGrid}
+              </Button>
+              <Button
+                variant={viewMode === 'day' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('day')}
+                className="gap-2 text-xs font-semibold"
+              >
+                <CalendarDays className="h-3.5 w-3.5" />
+                {copy.viewDay}
+              </Button>
+              <Button
+                variant={viewMode === 'list' ? 'default' : 'ghost'}
+                size="sm"
+                onClick={() => setViewMode('list')}
+                className="gap-2 text-xs font-semibold"
+              >
+                <List className="h-3.5 w-3.5" />
+                {copy.viewList}
+              </Button>
+            </div>
+
+            {/* Quick Metrics & Actions */}
+            <div className="flex items-center gap-3">
+              <div className="hidden sm:flex items-center gap-3 border-r border-border/80 pr-4 text-xs font-medium text-muted-foreground">
+                <span className="flex items-center gap-1.5">
+                  <GraduationCap className="h-4 w-4 text-primary" />
+                  <strong className="text-foreground">{uniqueCoursesCount}</strong> {copy.totalCourses}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <strong className="text-foreground">{agenda.length}</strong> {copy.totalMeetings}
+                </span>
               </div>
-            </CardHeader>
-            <CardContent className="p-4 sm:p-6">
-              <div className="hidden md:block">
-                <div
-                  className="grid gap-2 overflow-x-auto pb-2"
-                  style={{ gridTemplateColumns: '72px repeat(7, minmax(130px, 1fr))' }}
-                  role="table"
-                  aria-label={copy.weeklyGrid}
-                >
-                  <div style={{ gridColumn: 1, gridRow: 1 }} />
-                  {gridDayLabels.map((dayName, dayIndex) => (
-                    <div
-                      key={`grid-${dayName}`}
-                      className="rounded-lg bg-secondary/40 py-2 text-center text-xs font-bold uppercase tracking-wider text-foreground"
-                      style={{ gridColumn: dayIndex + 2, gridRow: 1 }}
-                    >
-                      {dayName}
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={handlePrint}
+                className="gap-2 text-xs font-medium text-foreground hover:bg-secondary"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                {copy.print}
+              </Button>
+            </div>
+          </div>
+
+          {/* MAIN SCHEDULE VIEW AREA */}
+          {viewMode === 'grid' && (
+            <div className="space-y-6">
+              <Card variant="muted" className="min-w-0 overflow-hidden border-border/80 shadow-sm">
+                <CardHeader className="border-b border-border/70 bg-card/50 pb-4">
+                  <div className="flex flex-wrap items-center justify-between gap-3">
+                    <CardTitle className="text-xl font-bold flex items-center gap-2">
+                      <Clock className="h-5 w-5 text-primary" />
+                      {copy.weeklyAgenda}
+                    </CardTitle>
+                    <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                      <Sparkles className="h-3.5 w-3.5 text-primary" />
+                      <span>{copy.clickToViewDetails}</span>
                     </div>
-                  ))}
-                  {weeklyGrid.slots.map((slot, slotIndex) => (
-                    <Fragment key={`slot-${slot}`}>
-                      <div
-                        className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold tabular-nums text-muted-foreground"
-                        style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
-                      >
-                        {slot}
-                      </div>
-                      {weeklyGrid.days.map((day, dayIndex) => {
-                        const cellItems = weeklyGrid.cells[`${day}-${slot}`] ?? [];
-                        if (cellItems.length === 0) {
-                          return (
-                            <div
-                              key={`cell-${day}-${slot}`}
-                              className="min-h-[105px] rounded-lg border border-border/70 bg-card/60 transition hover:border-primary/40 hover:bg-card/90"
-                              style={{ gridColumn: dayIndex + 2, gridRow: slotIndex + 2 }}
-                            />
-                          );
-                        }
-                        // Every grid child is explicitly placed so a meeting
-                        // covering several slot rows grows into one tall block
-                        // without disturbing the other cells' placement.
-                        const rowSpan = Math.max(...cellItems.map((item) => item.span ?? 1));
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  {/* Desktop / Tablet Weekly Grid */}
+                  <div className="hidden md:block">
+                    <div
+                      className="grid gap-2 overflow-x-auto pb-2"
+                      style={{ gridTemplateColumns: '72px repeat(7, minmax(130px, 1fr))' }}
+                      role="table"
+                      aria-label={copy.weeklyGrid}
+                    >
+                      <div style={{ gridColumn: 1, gridRow: 1 }} />
+                      {ORDERED_DAYS.map((dayNum, colIndex) => {
+                        const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
+                        const isToday = dayNum === todayDow;
                         return (
                           <div
-                            key={`cell-${day}-${slot}`}
-                            className="flex min-w-0 flex-col gap-1.5"
-                            style={{
-                              gridColumn: dayIndex + 2,
-                              gridRow: `${slotIndex + 2} / span ${rowSpan}`,
-                            }}
+                            key={`grid-header-${dayNum}`}
+                            className={`rounded-lg py-2.5 px-1 text-center transition-all ${
+                              isToday
+                                ? 'border border-primary/50 bg-primary/10 text-primary shadow-sm font-black'
+                                : 'bg-secondary/40 text-foreground font-bold'
+                            }`}
+                            style={{ gridColumn: colIndex + 2, gridRow: 1 }}
                           >
-                            {cellItems.map((item) => {
-                              const courseName = getLocalizedName(
+                            <div className="text-xs uppercase tracking-wider">{dayName}</div>
+                            {isToday ? (
+                              <span className="mt-0.5 inline-block rounded-full bg-primary px-2 py-0.2 text-[9px] font-bold text-primary-foreground">
+                                {copy.today}
+                              </span>
+                            ) : null}
+                          </div>
+                        );
+                      })}
+
+                      {weeklyGrid.slots.map((slot, slotIndex) => (
+                        <Fragment key={`slot-${slot}`}>
+                          <div
+                            className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold tabular-nums text-muted-foreground"
+                            style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
+                          >
+                            {slot}
+                          </div>
+                          {ORDERED_DAYS.map((dayNum, colIndex) => {
+                            const cellItems = weeklyGrid.cells[`${dayNum}-${slot}`] ?? [];
+                            const isToday = dayNum === todayDow;
+
+                            if (cellItems.length === 0) {
+                              return (
+                                <div
+                                  key={`cell-${dayNum}-${slot}`}
+                                  className={`min-h-[105px] rounded-lg border border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
+                                    isToday ? 'bg-primary/[0.02] border-primary/20' : 'bg-card/60'
+                                  }`}
+                                  style={{ gridColumn: colIndex + 2, gridRow: slotIndex + 2 }}
+                                />
+                              );
+                            }
+
+                            const rowSpan = Math.max(...cellItems.map((item) => item.span ?? 1));
+                            return (
+                              <div
+                                key={`cell-${dayNum}-${slot}`}
+                                className="flex min-w-0 flex-col gap-1.5"
+                                style={{
+                                  gridColumn: colIndex + 2,
+                                  gridRow: `${slotIndex + 2} / span ${rowSpan}`,
+                                }}
+                              >
+                                {cellItems.map((item) => {
+                                  const courseName = getLocalizedName(
+                                    locale,
+                                    {
+                                      code: item.courseCode,
+                                      name: item.courseName,
+                                      nameEn: item.courseNameEn,
+                                      nameVi: item.courseNameVi,
+                                    },
+                                    item.courseName,
+                                  );
+
+                                  return (
+                                    <div
+                                      key={item.id}
+                                      onClick={() => {
+                                        const matchingAgenda = agenda.find((a) => a.id === item.id);
+                                        setSelectedDetail({
+                                          courseCode: item.courseCode,
+                                          courseName: item.courseName ?? item.courseCode,
+                                          courseNameEn: item.courseNameEn,
+                                          courseNameVi: item.courseNameVi,
+                                          sectionNumber: item.sectionNumber,
+                                          dayOfWeek: item.dayOfWeek,
+                                          startTime: item.startTime,
+                                          endTime: item.endTime,
+                                          building: item.building,
+                                          roomNumber: item.roomNumber,
+                                          credits: matchingAgenda?.credits,
+                                          lecturerName: matchingAgenda?.lecturerName,
+                                          status: matchingAgenda?.status,
+                                        });
+                                      }}
+                                      className={`flex-1 rounded-xl border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                                        item.courseCode,
+                                      )}`}
+                                      title={`${item.courseCode} - ${item.startTime}-${item.endTime} (${copy.clickToViewDetails})`}
+                                    >
+                                      <div className="flex items-center justify-between gap-1">
+                                        <span className="font-mono text-[11px] font-extrabold tracking-wide">
+                                          {item.courseCode}
+                                        </span>
+                                        <span className="rounded bg-background/70 px-1.5 py-0.5 text-[9px] font-semibold text-foreground">
+                                          {item.sectionNumber}
+                                        </span>
+                                      </div>
+                                      <div
+                                        className="mt-1.5 font-bold text-[12px] leading-snug line-clamp-2 text-foreground"
+                                        title={courseName}
+                                      >
+                                        {courseName}
+                                      </div>
+                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground border-t border-current/10 pt-1.5">
+                                        <span className="inline-flex items-center gap-1 font-medium">
+                                          <Clock className="h-3 w-3" />
+                                          {item.startTime}-{item.endTime}
+                                        </span>
+                                        {item.roomNumber ? (
+                                          <span className="inline-flex items-center gap-1 font-bold text-foreground">
+                                            <MapPin className="h-3 w-3 text-primary" />
+                                            {item.building ? `${item.building}-` : ''}
+                                            {item.roomNumber}
+                                          </span>
+                                        ) : null}
+                                      </div>
+                                    </div>
+                                  );
+                                })}
+                              </div>
+                            );
+                          })}
+                        </Fragment>
+                      ))}
+                    </div>
+                  </div>
+
+                  {/* Mobile stacked fallback */}
+                  <div className="grid gap-4 md:hidden">
+                    {ORDERED_DAYS.map((dayNum) => {
+                      const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
+                      const items = agendaByDay[dayNum] ?? [];
+                      const isToday = dayNum === todayDow;
+
+                      return (
+                        <div
+                          key={`mobile-day-${dayNum}`}
+                          className={`rounded-xl border p-4 transition-all ${
+                            isToday
+                              ? 'border-primary/50 bg-primary/[0.04]'
+                              : 'border-border/70 bg-card'
+                          }`}
+                        >
+                          <div className="mb-3 flex items-center justify-between">
+                            <div className="flex items-center gap-2">
+                              <h3 className="font-bold text-foreground text-sm">{dayName}</h3>
+                              {isToday ? (
+                                <span className="rounded-full bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
+                                  {copy.today}
+                                </span>
+                              ) : null}
+                            </div>
+                            <span className="text-xs text-muted-foreground font-semibold">
+                              {items.length} {items.length === 1 ? copy.item : copy.items}
+                            </span>
+                          </div>
+
+                          {items.length === 0 ? (
+                            <p className="text-xs text-muted-foreground italic">{copy.noMeetings}</p>
+                          ) : (
+                            <div className="space-y-2.5">
+                              {items.map((item) => (
+                                <div
+                                  key={item.id}
+                                  onClick={() => setSelectedDetail(item)}
+                                  className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer ${accentForCourse(
+                                    item.courseCode,
+                                  )}`}
+                                >
+                                  <div className="flex items-center justify-between">
+                                    <span className="font-mono font-bold">{item.courseCode}</span>
+                                    <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
+                                      {copy.sectionPrefix} {item.sectionNumber}
+                                    </span>
+                                  </div>
+                                  <div className="mt-1 font-semibold text-foreground text-xs">
+                                    {getLocalizedCourseLabel(
+                                      locale,
+                                      {
+                                        code: item.courseCode,
+                                        name: item.courseName,
+                                        nameEn: item.courseNameEn,
+                                        nameVi: item.courseNameVi,
+                                      },
+                                      item.courseName,
+                                    )}
+                                  </div>
+                                  <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
+                                    <span className="inline-flex items-center gap-1">
+                                      <Clock className="h-3 w-3" />
+                                      {item.startTime} - {item.endTime}
+                                    </span>
+                                    {item.roomNumber ? (
+                                      <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                                        <MapPin className="h-3 w-3" />
+                                        {item.building ? `${item.building}-` : ''}
+                                        {item.roomNumber}
+                                      </span>
+                                    ) : null}
+                                  </div>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      );
+                    })}
+                  </div>
+                </CardContent>
+              </Card>
+
+              {/* Collapsible Upcoming Section Below */}
+              <Card variant="elevated" className="border-border/70 shadow-sm">
+                <CardHeader className="border-b border-border/70 pb-3">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-base font-bold flex items-center gap-2">
+                      <GraduationCap className="h-4 w-4 text-primary" />
+                      {copy.upcomingClassList}
+                    </CardTitle>
+                    <span className="text-xs text-muted-foreground font-semibold">
+                      {formatNumber(agenda.length)} {agenda.length === 1 ? copy.item : copy.items}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="pt-4">
+                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                    {agenda.map((item) => (
+                      <div
+                        key={item.id}
+                        onClick={() => setSelectedDetail(item)}
+                        className="rounded-xl border border-border/70 bg-card p-3.5 transition hover:border-primary/50 hover:shadow-md cursor-pointer"
+                      >
+                        <div className="flex items-start justify-between gap-2">
+                          <span className="font-mono text-xs font-bold text-primary">
+                            {item.courseCode}
+                          </span>
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-foreground">
+                            {copy.sectionPrefix} {item.sectionNumber}
+                          </span>
+                        </div>
+                        <h4 className="mt-1.5 font-bold text-foreground text-xs line-clamp-2">
+                          {getLocalizedCourseLabel(
+                            locale,
+                            {
+                              code: item.courseCode,
+                              name: item.courseName,
+                              nameEn: item.courseNameEn,
+                              nameVi: item.courseNameVi,
+                            },
+                            `${item.courseCode} - ${item.courseName}`,
+                          )}
+                        </h4>
+                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
+                          <span className="inline-flex items-center gap-1 font-medium">
+                            <Clock className="h-3 w-3 text-primary" />
+                            {locale === 'vi' ? DAY_LABELS_VI[item.dayOfWeek] : DAY_LABELS_EN[item.dayOfWeek]} ({item.startTime} - {item.endTime})
+                          </span>
+                          {item.roomNumber ? (
+                            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                              <MapPin className="h-3 w-3 text-primary" />
+                              {item.building ? `${item.building}-` : ''}
+                              {item.roomNumber}
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    ))}
+                  </div>
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* DAY VIEW AREA */}
+          {viewMode === 'day' && (
+            <div className="space-y-6">
+              {/* Day Selector Pills */}
+              <div className="flex flex-wrap items-center gap-2">
+                {ORDERED_DAYS.map((dayNum) => {
+                  const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
+                  const count = (agendaByDay[dayNum] ?? []).length;
+                  const isSelected = selectedDayTab === dayNum;
+                  const isToday = dayNum === todayDow;
+
+                  return (
+                    <button
+                      key={`day-tab-${dayNum}`}
+                      type="button"
+                      onClick={() => setSelectedDayTab(dayNum)}
+                      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+                        isSelected
+                          ? 'bg-primary text-primary-foreground shadow-md'
+                          : 'border border-border bg-card text-foreground hover:bg-secondary'
+                      }`}
+                    >
+                      <span>{dayName}</span>
+                      {isToday ? (
+                        <span className="rounded bg-background/20 px-1 text-[9px] font-extrabold uppercase">
+                          {copy.today}
+                        </span>
+                      ) : null}
+                      <span
+                        className={`rounded-full px-1.5 py-0.2 text-[10px] ${
+                          isSelected ? 'bg-primary-foreground/20' : 'bg-secondary text-muted-foreground'
+                        }`}
+                      >
+                        {count}
+                      </span>
+                    </button>
+                  );
+                })}
+              </div>
+
+              {/* Day Details Card */}
+              <Card variant="muted" className="border-border/80 shadow-sm">
+                <CardHeader className="border-b border-border/70 pb-4">
+                  <div className="flex items-center justify-between">
+                    <CardTitle className="text-lg font-bold flex items-center gap-2">
+                      <Calendar className="h-5 w-5 text-primary" />
+                      {locale === 'vi' ? DAY_LABELS_VI[selectedDayTab] : DAY_LABELS_EN[selectedDayTab]}
+                    </CardTitle>
+                    <span className="text-xs text-muted-foreground font-semibold">
+                      {(agendaByDay[selectedDayTab] ?? []).length} {copy.items}
+                    </span>
+                  </div>
+                </CardHeader>
+                <CardContent className="p-4 sm:p-6">
+                  {(agendaByDay[selectedDayTab] ?? []).length === 0 ? (
+                    <div className="py-12 text-center text-muted-foreground">
+                      <Clock className="mx-auto h-10 w-10 text-muted-foreground/50" />
+                      <p className="mt-3 text-sm font-medium">{copy.noMeetings}</p>
+                    </div>
+                  ) : (
+                    <div className="grid gap-4 sm:grid-cols-2">
+                      {(agendaByDay[selectedDayTab] ?? []).map((item) => (
+                        <div
+                          key={item.id}
+                          onClick={() => setSelectedDetail(item)}
+                          className={`rounded-2xl border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                            item.courseCode,
+                          )}`}
+                        >
+                          <div className="flex items-center justify-between gap-2">
+                            <span className="font-mono text-xs font-extrabold">{item.courseCode}</span>
+                            <span className="rounded bg-background/70 px-2 py-0.5 text-xs font-semibold text-foreground">
+                              {copy.sectionPrefix} {item.sectionNumber}
+                            </span>
+                          </div>
+                          <h4 className="mt-2 text-sm font-bold text-foreground">
+                            {getLocalizedCourseLabel(
+                              locale,
+                              {
+                                code: item.courseCode,
+                                name: item.courseName,
+                                nameEn: item.courseNameEn,
+                                nameVi: item.courseNameVi,
+                              },
+                              item.courseName,
+                            )}
+                          </h4>
+                          <div className="mt-3 space-y-1.5 border-t border-current/10 pt-2.5 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2">
+                              <Clock className="h-3.5 w-3.5 text-primary" />
+                              <span className="font-medium text-foreground">
+                                {item.startTime} - {item.endTime}
+                              </span>
+                            </div>
+                            {item.roomNumber ? (
+                              <div className="flex items-center gap-2">
+                                <MapPin className="h-3.5 w-3.5 text-primary" />
+                                <span className="font-medium text-foreground">
+                                  {locale === 'vi' ? 'Phòng' : 'Room'}: {item.building ? `${item.building}-` : ''}
+                                  {item.roomNumber}
+                                </span>
+                              </div>
+                            ) : null}
+                            {item.lecturerName ? (
+                              <div className="flex items-center gap-2">
+                                <GraduationCap className="h-3.5 w-3.5 text-primary" />
+                                <span>{item.lecturerName}</span>
+                              </div>
+                            ) : null}
+                          </div>
+                        </div>
+                      ))}
+                    </div>
+                  )}
+                </CardContent>
+              </Card>
+            </div>
+          )}
+
+          {/* LIST VIEW AREA */}
+          {viewMode === 'list' && (
+            <Card variant="muted" className="border-border/80 shadow-sm">
+              <CardHeader className="border-b border-border/70 pb-4">
+                <CardTitle className="text-lg font-bold flex items-center gap-2">
+                  <List className="h-5 w-5 text-primary" />
+                  {copy.upcomingClassList}
+                </CardTitle>
+              </CardHeader>
+              <CardContent className="p-4 sm:p-6 space-y-6">
+                {ORDERED_DAYS.map((dayNum) => {
+                  const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
+                  const items = agendaByDay[dayNum] ?? [];
+                  if (items.length === 0) return null;
+
+                  return (
+                    <div key={`list-day-${dayNum}`} className="space-y-3">
+                      <div className="flex items-center gap-2 border-b border-border/60 pb-2">
+                        <span className="h-2 w-2 rounded-full bg-primary" />
+                        <h3 className="font-bold text-foreground text-sm">{dayName}</h3>
+                        <span className="text-xs text-muted-foreground font-semibold">
+                          ({items.length} {copy.items})
+                        </span>
+                      </div>
+                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {items.map((item) => (
+                          <div
+                            key={item.id}
+                            onClick={() => setSelectedDetail(item)}
+                            className="rounded-xl border border-border/70 bg-card p-4 transition hover:border-primary/50 hover:shadow-md cursor-pointer"
+                          >
+                            <div className="flex items-center justify-between gap-2">
+                              <span className="font-mono text-xs font-extrabold text-primary">
+                                {item.courseCode}
+                              </span>
+                              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-foreground">
+                                {copy.sectionPrefix} {item.sectionNumber}
+                              </span>
+                            </div>
+                            <h4 className="mt-2 text-xs font-bold text-foreground line-clamp-2">
+                              {getLocalizedCourseLabel(
                                 locale,
                                 {
                                   code: item.courseCode,
@@ -398,174 +928,40 @@ export default function SchedulePage() {
                                   nameVi: item.courseNameVi,
                                 },
                                 item.courseName,
-                              );
-                              return (
-                                <div
-                                  key={item.id}
-                                  className={`flex-1 rounded-lg border p-2 text-xs leading-tight transition hover:shadow-sm ${accentForCourse(item.courseCode)}`}
-                                  title={`${item.courseCode} - ${item.startTime}-${item.endTime}`}
-                                >
-                                  <div className="flex items-center justify-between gap-1">
-                                    <span className="font-mono text-[11px] font-bold">
-                                      {item.courseCode}
-                                    </span>
-                                    <span className="rounded bg-background/60 px-1 py-0.5 text-[9px] font-medium text-foreground">
-                                      {item.sectionNumber}
-                                    </span>
-                                  </div>
-                                  <div
-                                    className="mt-1 truncate text-[11px] font-semibold leading-snug text-foreground"
-                                    title={courseName}
-                                  >
-                                    {courseName}
-                                  </div>
-                                  <div className="mt-1.5 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {item.startTime}-{item.endTime}
-                                    </span>
-                                    {item.roomNumber ? (
-                                      <span className="inline-flex items-center gap-1 font-medium text-foreground/80">
-                                        <MapPin className="h-3 w-3" />
-                                        {item.building} {item.roomNumber}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              );
-                            })}
-                          </div>
-                        );
-                      })}
-                    </Fragment>
-                  ))}
-                </div>
-              </div>
-
-              <div className="grid gap-4 md:grid-cols-2 md:hidden">
-                {weeklyGrid.days.map((dayOfWeek) => {
-                  const dayName = localizedDayNames[dayOfWeek % 7];
-                  const items = agendaByDay[dayOfWeek] ?? [];
-
-                  return (
-                    <div
-                      key={dayName}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4"
-                    >
-                      <div className="mb-3 flex items-center justify-between">
-                        <h2 className="font-semibold text-foreground">{dayName}</h2>
-                        <span className="text-xs uppercase tracking-[0.16em] text-muted-foreground">
-                          {formatNumber(items.length)}{' '}
-                          {items.length === 1 ? copy.item : copy.items}
-                        </span>
-                      </div>
-
-                      {items.length === 0 ? (
-                        <p className="text-sm text-muted-foreground">
-                          {copy.noMeetings}
-                        </p>
-                      ) : (
-                        <div className="space-y-3">
-                          {items.map((item) => (
-                            <div
-                              key={item.id}
-                              className="rounded-lg border border-border/60 bg-secondary/30 px-4 py-3"
-                            >
-                              <div className="font-medium text-foreground">
-                                {getLocalizedCourseLabel(
-                                  locale,
-                                  {
-                                    code: item.courseCode,
-                                    name: item.courseName,
-                                    nameEn: item.courseNameEn,
-                                    nameVi: item.courseNameVi,
-                                  },
-                                  `${item.courseCode} - ${item.courseName}`,
-                                )}
-                              </div>
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                {copy.sectionPrefix} {item.sectionNumber}
-                              </div>
-                              <div className="mt-2 flex flex-wrap gap-3 text-sm text-muted-foreground">
-                                <span className="inline-flex items-center gap-2">
-                                  <Clock className="h-4 w-4" />
-                                  {item.startTime} - {item.endTime}
+                              )}
+                            </h4>
+                            <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
+                              <span className="inline-flex items-center gap-1 font-medium">
+                                <Clock className="h-3 w-3 text-primary" />
+                                {item.startTime} - {item.endTime}
+                              </span>
+                              {item.roomNumber ? (
+                                <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                                  <MapPin className="h-3 w-3 text-primary" />
+                                  {item.building ? `${item.building}-` : ''}
+                                  {item.roomNumber}
                                 </span>
-                                {item.building && item.roomNumber ? (
-                                  <span className="inline-flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
-                                    {item.building} {item.roomNumber}
-                                  </span>
-                                ) : null}
-                              </div>
+                              ) : null}
                             </div>
-                          ))}
-                        </div>
-                      )}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   );
                 })}
-              </div>
-            </CardContent>
-          </Card>
-
-          <Card variant="elevated" className="min-w-0">
-            <CardHeader className="border-b border-border/70 pb-4">
-              <div className="flex items-center justify-between">
-                <CardTitle className="text-lg font-bold">{copy.upcomingClassList}</CardTitle>
-                <span className="text-xs text-muted-foreground">
-                  {formatNumber(agenda.length)} {agenda.length === 1 ? copy.item : copy.items}
-                </span>
-              </div>
-            </CardHeader>
-            <CardContent className="pt-6">
-              <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-1">
-                {agenda.map((item) => (
-                  <div
-                    key={item.id}
-                    className="rounded-lg border border-border/70 bg-card p-4 transition hover:border-primary/40 shadow-sm"
-                  >
-                    <div className="flex items-start justify-between gap-2">
-                      <span className="font-mono text-xs font-bold text-primary">
-                        {item.courseCode}
-                      </span>
-                      <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">
-                        {copy.sectionPrefix} {item.sectionNumber}
-                      </span>
-                    </div>
-                    <h4 className="mt-2 font-semibold text-foreground text-sm line-clamp-2">
-                      {getLocalizedCourseLabel(
-                        locale,
-                        {
-                          code: item.courseCode,
-                          name: item.courseName,
-                          nameEn: item.courseNameEn,
-                          nameVi: item.courseNameVi,
-                        },
-                        `${item.courseCode} - ${item.courseName}`,
-                      )}
-                    </h4>
-                    <div className="mt-3 flex flex-wrap items-center gap-3 text-xs text-muted-foreground border-t border-border/60 pt-2.5">
-                      <span className="inline-flex items-center gap-1.5">
-                        <Clock className="h-3.5 w-3.5 text-primary" />
-                        {localizedDayNames[item.dayOfWeek % 7]} ({item.startTime} - {item.endTime})
-                      </span>
-                      {item.building && item.roomNumber ? (
-                        <span className="inline-flex items-center gap-1.5 font-medium text-foreground/80">
-                          <MapPin className="h-3.5 w-3.5 text-primary" />
-                          {item.building} {item.roomNumber}
-                        </span>
-                      ) : (
-                        <span className="text-muted-foreground text-[11px]">{copy.roomPending}</span>
-                      )}
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
+              </CardContent>
+            </Card>
+          )}
         </div>
       )}
+
+      {/* Class Schedule Detail Modal */}
+      <ClassScheduleDetailModal
+        isOpen={Boolean(selectedDetail)}
+        onClose={() => setSelectedDetail(null)}
+        data={selectedDetail}
+        locale={locale}
+      />
     </div>
   );
 }

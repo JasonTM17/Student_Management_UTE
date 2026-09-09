@@ -43,6 +43,11 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("Tuần này tôi dạy những gì? Lịch dạy của tôi"));
         assertTrue(advisor.handles("What is my schedule this week?"));
         assertTrue(advisor.handles("show my timetable"));
+        assertTrue(advisor.handles("Lịch thứ 2 của tôi là khi nào?"));
+        assertTrue(advisor.handles("thứ 2 học gì"));
+        assertTrue(advisor.handles("lịch dạy thứ 3 của tôi"));
+        assertTrue(advisor.handles("hôm nay tôi có tiết không"));
+        assertTrue(advisor.handles("ngày mai tôi dạy những môn nào"));
 
         assertFalse(advisor.handles("Học phí kỳ này bao nhiêu?"));
         assertFalse(advisor.handles("lớp học phần SE401 còn chỗ không"));
@@ -107,6 +112,60 @@ class AssistantPersonalContextAdvisorTest {
                 Map.of("alg", "HS256"), new HashMap<>(Map.of("sub", "someone", "roles", List.of("STUDENT"))));
 
         assertNull(advisor.answer(chatRequest("vi", "lịch học của tôi?"), guest));
+    }
+
+    @Test
+    void answersStudentScheduleForSpecificDay() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101")))),
+                enrollment("SE403", "Cấu trúc dữ liệu và giải thuật", "Data Structures", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s2", 2, "09:45", "11:45",
+                                new ClassroomSummary("c2", "A", "103")))),
+                enrollment("SE201", "Công nghệ phần mềm", "Software Engineering", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s3", 5, "13:00", "15:30",
+                                new ClassroomSummary("c3", "B", "202"))))));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "Lịch thứ 2 của tôi là khi nào?"), jwtStudent());
+
+        assertNotNull(response);
+        String answer = response.answer();
+        assertTrue(answer.contains("Lịch học Thứ Hai của bạn"), answer);
+        assertTrue(answer.contains("Thứ Hai 07:00-09:30 — SE401 - Lập trình Java nâng cao (phòng A 101)"), answer);
+        assertTrue(answer.contains("Thứ Hai 09:45-11:45 — SE403 - Cấu trúc dữ liệu và giải thuật (phòng A 103)"), answer);
+        assertFalse(answer.contains("SE201"), "non-Monday classes must not be included when Monday was requested");
+    }
+
+    @Test
+    void answersStudentNoClassesOnRequestedDay() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "Chủ nhật tôi có học không?"), jwtStudent());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("không có lịch học vào Chủ Nhật"), response.answer());
+    }
+
+    @Test
+    void answersLecturerScheduleForSpecificDay() {
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
+                        "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
+                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
+                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                        .ClassroomSummary("c1", "A", "102"))))));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "thứ 5 tôi dạy môn nào?"), jwtLecturer());
+
+        assertNotNull(response);
+        String answer = response.answer();
+        assertTrue(answer.contains("Lịch giảng dạy Thứ Năm của bạn"), answer);
+        assertTrue(answer.contains("Thứ Năm 13:00-15:30 — SE402 - Phát triển ứng dụng web (phòng A 102)"), answer);
     }
 
     @Test
