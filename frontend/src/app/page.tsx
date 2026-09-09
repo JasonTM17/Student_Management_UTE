@@ -46,11 +46,11 @@ export default function HomePage() {
   const copy =
     locale === 'vi'
       ? {
-          heroDescription: 'Một cổng duy nhất cho đăng ký, thời khóa biểu và điểm số.',
+          heroDescription: 'Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.',
           footerDescription: 'Một cổng học vụ cho sinh viên, giảng viên và quản trị.',
         } as const
       : {
-          heroDescription: 'One portal for registration, schedules, and grades.',
+          heroDescription: 'Centralized academic management system for students, lecturers, and university administrators.',
           footerDescription: 'One campus portal for students, lecturers, and admins.',
         } as const;
   const hero = appearance.hero[locale];
@@ -168,6 +168,11 @@ export default function HomePage() {
                     </span>
                     <h2 className="text-lg font-semibold text-foreground">{lane.title}</h2>
                   </div>
+                  {lane.description ? (
+                    <p className="text-sm leading-relaxed text-muted-foreground">
+                      {lane.description}
+                    </p>
+                  ) : null}
                   <ul className="flex flex-wrap gap-2">
                     {lane.rows.map((row) => (
                       <li
