@@ -158,15 +158,15 @@ export default function StudentAnnouncementsPage() {
                       >
                         {announcementPriorityLabel(announcement.priority, locale)}
                       </span>
-                      <h2 className="text-lg font-semibold text-foreground">
-                        {announcement.title}
-                      </h2>
                       {announcementIsUpdated(announcement) ? (
-                        <span className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
                           {locale === 'vi' ? 'Đã cập nhật' : 'Updated'}
                         </span>
                       ) : null}
                     </div>
+                    <h2 className="text-lg font-semibold text-foreground">
+                      {announcement.title}
+                    </h2>
                     <div className="max-w-3xl text-sm leading-7 text-muted-foreground">
                       <RichContentRenderer content={announcement.content} />
                     </div>
@@ -185,7 +185,7 @@ export default function StudentAnnouncementsPage() {
                     </div>
                   </div>
 
-                  <div className="flex shrink-0 items-start gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
+                  <div className="flex shrink-0 items-center gap-2 rounded-full bg-secondary px-3 py-1.5 text-xs font-medium text-muted-foreground">
                     <BookOpen className="h-3.5 w-3.5" aria-hidden="true" />
                     {formatDateTime(announcement.publishAt || announcement.createdAt)}
                   </div>

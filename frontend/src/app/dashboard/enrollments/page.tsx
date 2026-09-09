@@ -40,28 +40,27 @@ const statusTone: Record<string, string> = {
 };
 
 function getDayName(day: number, locale: 'en' | 'vi') {
-  const names =
-    locale === 'vi'
-      ? [
-          'Chủ nhật',
-          'Thứ hai',
-          'Thứ ba',
-          'Thứ tư',
-          'Thứ năm',
-          'Thứ sáu',
-          'Thứ bảy',
-        ]
-      : [
-          'Sunday',
-          'Monday',
-          'Tuesday',
-          'Wednesday',
-          'Thursday',
-          'Friday',
-          'Saturday',
-        ];
-
-  return names[day] ?? '';
+  // DB convention: 1 = Sunday/Chủ nhật, 2 = Monday/Thứ hai, ..., 7 = Saturday/Thứ bảy (0 = Sunday)
+  const normalizedDay = day === 0 ? 1 : day;
+  const viMap: Record<number, string> = {
+    1: 'Chủ nhật',
+    2: 'Thứ hai',
+    3: 'Thứ ba',
+    4: 'Thứ tư',
+    5: 'Thứ năm',
+    6: 'Thứ sáu',
+    7: 'Thứ bảy',
+  };
+  const enMap: Record<number, string> = {
+    1: 'Sunday',
+    2: 'Monday',
+    3: 'Tuesday',
+    4: 'Wednesday',
+    5: 'Thursday',
+    6: 'Friday',
+    7: 'Saturday',
+  };
+  return (locale === 'vi' ? viMap[normalizedDay] : enMap[normalizedDay]) ?? '';
 }
 
 export default function EnrollmentsPage() {

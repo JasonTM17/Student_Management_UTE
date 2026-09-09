@@ -18,6 +18,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Modal } from '@/components/ui/modal';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
@@ -565,21 +566,18 @@ export default function ThesisPage() {
                 {messages.thesis.proposeTopic}
               </Button>
             ) : null}
-            <label className="flex min-w-[15rem] flex-col gap-2 text-left text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-              {messages.thesis.selectRound}
-              <select
+            <div className="min-w-[15rem]">
+              <Select
+                label={messages.thesis.selectRound}
                 value={selectedRoundId}
                 onChange={(event) => setSelectedRoundId(event.target.value)}
-                className="h-11 rounded-lg border border-border/80 bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                 aria-label={messages.thesis.selectRound}
-              >
-                {rounds.map((round) => (
-                  <option key={round.id} value={round.id}>
-                    {round.name}
-                  </option>
-                ))}
-              </select>
-            </label>
+                options={rounds.map((round) => ({
+                  value: round.id,
+                  label: round.name,
+                }))}
+              />
+            </div>
           </div>
         }
       />
@@ -1076,31 +1074,31 @@ export default function ThesisPage() {
           </div>
           <div className="grid gap-4 sm:grid-cols-2">
             <div>
-              <label className="mb-1 block text-sm font-medium text-foreground">
-                {messages.thesis.topicDepartmentLabel}
-              </label>
               {departments.length > 0 ? (
-                <select
+                <Select
+                  label={messages.thesis.topicDepartmentLabel}
                   value={proposeDepartmentId}
                   onChange={(e) => setProposeDepartmentId(e.target.value)}
                   required
                   disabled={isActionPending}
-                  className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                >
-                  {departments.map((dept) => (
-                    <option key={dept.id} value={dept.id}>
-                      {dept.code} - {getLocalizedName(locale, dept, dept.name)}
-                    </option>
-                  ))}
-                </select>
-              ) : (
-                <Input
-                  value={proposeDepartmentId}
-                  onChange={(e) => setProposeDepartmentId(e.target.value)}
-                  placeholder="department-demo"
-                  required
-                  disabled={isActionPending}
+                  options={departments.map((dept) => ({
+                    value: dept.id,
+                    label: `${dept.code} - ${getLocalizedName(locale, dept, dept.name)}`,
+                  }))}
                 />
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">
+                    {messages.thesis.topicDepartmentLabel}
+                  </label>
+                  <Input
+                    value={proposeDepartmentId}
+                    onChange={(e) => setProposeDepartmentId(e.target.value)}
+                    placeholder="department-demo"
+                    required
+                    disabled={isActionPending}
+                  />
+                </div>
               )}
             </div>
             <div>
