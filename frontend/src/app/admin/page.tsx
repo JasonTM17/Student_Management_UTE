@@ -185,7 +185,7 @@ export default function AdminDashboardPage() {
                 {messages.admin.managementConsoleDescription}
               </p>
             </div>
-            <div className="grid overflow-hidden border border-border/80 bg-card md:grid-cols-2">
+            <div className="grid overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs md:grid-cols-2">
               {menuItems.map((item, index) => {
                 const localizedItem = messages.admin.menuItems[index] ?? [
                   messages.adminShell.menuSections.campus,

@@ -1,7 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Award, BookOpen, TrendingUp } from 'lucide-react';
+import { Award, BookOpen, ChevronRight, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
@@ -338,7 +338,12 @@ export default function GradesPage() {
             {Object.entries(groupedGrades).map(([semesterName, records]) => (
               <Card key={semesterName} variant="muted">
                 <CardHeader className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                  <CardTitle className="text-xl">{semesterName}</CardTitle>
+                  <div>
+                    <CardTitle className="text-xl">{semesterName}</CardTitle>
+                    <div className="mt-0.5 text-xs text-muted-foreground hidden sm:block">
+                      {locale === 'vi' ? 'Nhấp vào môn học để xem chi tiết điểm quá trình và cuối kỳ' : 'Click any course to view midterm and final component breakdown'}
+                    </div>
+                  </div>
                   <div className="text-sm text-muted-foreground">
                     {formatNumber(records.length)}{' '}
                     {records.length === 1 ? copy.courseWord : copy.coursesWord} -{' '}
@@ -448,7 +453,7 @@ export default function GradesPage() {
                           <tr
                             key={record.id}
                             onClick={() => setSelectedRecord(record)}
-                            className="cursor-pointer transition-colors hover:bg-secondary/30"
+                            className="group cursor-pointer transition-colors hover:bg-secondary/30"
                             title={locale === 'vi' ? 'Nhấp để xem chi tiết điểm GK & CK' : 'Click to view Midterm & Final breakdown'}
                           >
                             <td className="px-2 py-4">
@@ -493,9 +498,12 @@ export default function GradesPage() {
                               )}
                             </td>
                             <td className="px-2 py-4 text-right">
-                              <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                                {statusLabel(record.gradeStatus)}
-                              </span>
+                              <div className="inline-flex items-center justify-end gap-1.5">
+                                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                                  {statusLabel(record.gradeStatus)}
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground/60 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+                              </div>
                             </td>
                           </tr>
                         ))}

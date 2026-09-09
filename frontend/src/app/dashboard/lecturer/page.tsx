@@ -21,6 +21,7 @@ import {
   WorkspacePanel,
 } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
+import { cn } from '@/lib/utils';
 
 type LecturerAnnouncement = {
   id: string;
@@ -194,7 +195,7 @@ export default function LecturerDashboardPage() {
                   gradingSections.slice(0, 4).map((section) => (
                     <div
                       key={section.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -218,7 +219,20 @@ export default function LecturerDashboardPage() {
                           </div>
                         </div>
                         <div className="text-sm text-muted-foreground sm:text-right">
-                          <div>{section.gradedCount}/{section.enrolledCount} {messages.lecturerDashboard.gradedSuffix}</div>
+                          <div className="flex items-center gap-2 sm:justify-end">
+                            <span>{section.gradedCount}/{section.enrolledCount} {messages.lecturerDashboard.gradedSuffix}</span>
+                            <div className="h-1.5 w-16 overflow-hidden rounded-full bg-secondary">
+                              <div
+                                className={cn(
+                                  'h-full rounded-full transition-all duration-300',
+                                  section.canPublish ? 'bg-status-success' : 'bg-primary',
+                                )}
+                                style={{
+                                  width: `${Math.min(100, Math.round(((section.gradedCount ?? 0) / Math.max(1, section.enrolledCount ?? 1)) * 100))}%`,
+                                }}
+                              />
+                            </div>
+                          </div>
                           <div className="mt-1">
                             <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                               {section.canPublish ? messages.lecturerDashboard.queueStatusReady : messages.lecturerDashboard.queueStatusProgress}
@@ -249,7 +263,7 @@ export default function LecturerDashboardPage() {
                   scheduleSections.slice(0, 5).map((section) => (
                     <div
                       key={section.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -299,7 +313,7 @@ export default function LecturerDashboardPage() {
                   orderedAnnouncements.map((announcement) => (
                     <div
                       key={announcement.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4"
+                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
                     >
                       <div className="font-medium text-foreground">
                         {announcement.title}
