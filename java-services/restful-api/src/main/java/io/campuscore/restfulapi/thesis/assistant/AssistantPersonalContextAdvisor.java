@@ -44,8 +44,8 @@ public class AssistantPersonalContextAdvisor {
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
 
     private static final Pattern SCHEDULE_INTENT = Pattern.compile(
-            "lịch\\s*học|lich\\s*hoc|thời\\s*khoá\\s*biểu|thoi\\s*khoa\\s*bieu|lịch\\s*dạy|lich\\s*day"
-                    + "|học\\s*ngày\\s*nào|mon\\s*nào\\s*học|(my\\s+)?(class\\s+)?schedule|timetable|my\\s+classes",
+            "lịch\\s*học|lich\\s*hoc|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|lịch\\s*dạy|lich\\s*day"
+                    + "|học\\s*ngày\\s*nào|m[oô]n\\s*nào\\s*học|(my\\s+)?(class\\s+)?schedule|timetable|my\\s+classes",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final String[] DAY_LABELS_VI =
@@ -220,7 +220,8 @@ public class AssistantPersonalContextAdvisor {
         if (course == null) {
             return null;
         }
-        return courseName(course.code(), "en".equals(locale) ? course.nameEn() : course.nameVi(), course.name());
+        String localized = "en".equals(locale) ? course.nameEn() : course.nameVi();
+        return StringUtils.hasText(localized) ? localized : course.name();
     }
 
     private static String courseName(String code, String localized, String fallback) {
