@@ -663,7 +663,7 @@ export default function AdminSectionsPage() {
                   return (
                     <article
                       key={`${section.id}-mobile`}
-                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      className="rounded-xl border border-border/80 bg-card p-4 shadow-xs"
                       role="listitem"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -782,15 +782,15 @@ export default function AdminSectionsPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[1120px] text-sm">
                   <thead>
-                    <tr className="bg-secondary text-left text-muted-foreground">
-                      <th className="px-2 py-3 font-medium">{copy.headers.course}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.section}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.semester}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.lecturer}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.capacity}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.schedule}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.status}</th>
-                      <th className="px-2 py-3 text-right font-medium">{copy.headers.actions}</th>
+                    <tr className="border-b border-border/70 bg-secondary/50 text-left text-muted-foreground">
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.course}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.section}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.semester}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.lecturer}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.capacity}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.schedule}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.status}</th>
+                      <th className="px-4 py-3.5 text-right font-medium">{copy.headers.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -811,8 +811,8 @@ export default function AdminSectionsPage() {
                         : copy.unassigned;
 
                       return (
-                      <tr key={section.id}>
-                        <td className="px-2 py-4">
+                      <tr key={section.id} className="transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3.5">
                             <div className="space-y-1">
                               <p className="font-medium text-foreground">
                               {section.course?.code || copy.unknownCourse}
@@ -822,21 +822,21 @@ export default function AdminSectionsPage() {
                               </p>
                             </div>
                           </td>
-                        <td className="px-2 py-4 text-foreground">
+                        <td className="px-4 py-3.5 text-foreground">
                           {section.sectionNumber}
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {semesterLabel}
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {section.lecturer?.user
                             ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`
                             : copy.unassigned}
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {formatNumber(section.capacity)}
                         </td>
-                        <td className="px-2 py-4">
+                        <td className="px-4 py-3.5">
                           {section.schedules && section.schedules.length > 0 ? (
                             <div className="space-y-1">
                               {section.schedules.map((schedule, index) => (
@@ -862,12 +862,12 @@ export default function AdminSectionsPage() {
                             </span>
                           )}
                         </td>
-                        <td className="px-2 py-4">
+                        <td className="px-4 py-3.5">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
                             {messages.common.statuses[section.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                           </span>
                         </td>
-                        <td className="px-2 py-4">
+                        <td className="px-4 py-3.5">
                           <AdminRowActions>
                             <Button
                               size="icon"

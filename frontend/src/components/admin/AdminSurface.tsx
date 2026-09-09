@@ -37,7 +37,7 @@ export function AdminMetricCard({
         >
           <div
             className={cn(
-              'order-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
+              'order-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
               toneClassName,
             )}
           >
@@ -153,7 +153,7 @@ export function AdminTableScroll({
       role="region"
       aria-label="Data table"
       className={cn(
-        'min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-md',
+        'min-w-0 max-w-full overflow-x-auto overscroll-x-contain focus-visible:outline-none focus-visible:ring-1 focus-visible:ring-ring rounded-xl',
         className,
       )}
     >

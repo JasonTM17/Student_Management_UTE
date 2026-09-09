@@ -7,6 +7,7 @@ import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { LoadingState } from '@/components/ui/state-block';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
 import { campusErrorMessage } from '@/lib/campus-error';
@@ -297,9 +298,7 @@ export default function ProfilePage() {
           title={messages.profile.title}
           description={messages.profile.description}
         />
-        <p className="text-sm text-muted-foreground" role="status">
-          {messages.common.states.loadingContent}
-        </p>
+        <LoadingState label={messages.common.states.loadingContent} />
       </div>
     );
   }
