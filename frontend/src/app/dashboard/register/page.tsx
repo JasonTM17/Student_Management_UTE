@@ -226,43 +226,41 @@ export default function RegisterPage() {
       />
       {!roundOpen ? (
         <EmptyState icon={BookOpen} title={copy.roundUnavailable} description={copy.exportUnavailable} />
-      ) : null}
-      <div className="grid min-w-0 gap-6 lg:grid-cols-12">
-        <div className="min-w-0 space-y-6 lg:col-span-9">
-          <Card>
-            <CardContent className="grid gap-3 p-4 md:grid-cols-2">
-              <label className="min-w-0 space-y-2">
-                <span className="text-sm font-medium text-foreground">{copy.searchByCode}</span>
-                <Input
-                  value={courseCodeSearch}
-                  onChange={(event) => setCourseCodeSearch(event.target.value)}
-                  placeholder={copy.courseCodePlaceholder}
-                  icon={<Search className="h-4 w-4" />}
-                />
-              </label>
-              <label className="min-w-0 space-y-2">
-                <span className="text-sm font-medium text-foreground">{copy.searchByName}</span>
-                <Input
-                  value={courseNameSearch}
-                  onChange={(event) => setCourseNameSearch(event.target.value)}
-                  placeholder={copy.courseNamePlaceholder}
-                  icon={<Search className="h-4 w-4" />}
-                />
-              </label>
-            </CardContent>
-          </Card>
-          <Card className="min-w-0 overflow-hidden">
-            <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))]">
-              <CardTitle className="flex items-center gap-2 text-base">
-                <BookOpen className="h-4 w-4 text-primary" />
-                {copy.sectionCount.replace('{count}', formatNumber(filteredSections.length))}
-              </CardTitle>
-            </CardHeader>
-            {!roundOpen ? (
-              <EmptyState icon={BookOpen} title={copy.roundUnavailable} description={copy.exportUnavailable} />
-            ) : !activeCourse ? (
-              <EmptyState icon={BookOpen} title={copy.emptyTitle} description={copy.emptyDescription} />
-            ) : (
+      ) : (
+        <div className="grid min-w-0 gap-6 lg:grid-cols-12">
+          <div className="min-w-0 space-y-6 lg:col-span-9">
+            <Card>
+              <CardContent className="grid gap-3 p-4 md:grid-cols-2">
+                <label className="min-w-0 space-y-2">
+                  <span className="text-sm font-medium text-foreground">{copy.searchByCode}</span>
+                  <Input
+                    value={courseCodeSearch}
+                    onChange={(event) => setCourseCodeSearch(event.target.value)}
+                    placeholder={copy.courseCodePlaceholder}
+                    icon={<Search className="h-4 w-4" />}
+                  />
+                </label>
+                <label className="min-w-0 space-y-2">
+                  <span className="text-sm font-medium text-foreground">{copy.searchByName}</span>
+                  <Input
+                    value={courseNameSearch}
+                    onChange={(event) => setCourseNameSearch(event.target.value)}
+                    placeholder={copy.courseNamePlaceholder}
+                    icon={<Search className="h-4 w-4" />}
+                  />
+                </label>
+              </CardContent>
+            </Card>
+            <Card className="min-w-0 overflow-hidden">
+              <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))]">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <BookOpen className="h-4 w-4 text-primary" />
+                  {copy.sectionCount.replace('{count}', formatNumber(filteredSections.length))}
+                </CardTitle>
+              </CardHeader>
+              {!activeCourse ? (
+                <EmptyState icon={BookOpen} title={copy.emptyTitle} description={copy.emptyDescription} />
+              ) : (
               <div className="min-w-0">
                 <div className="space-y-2 border-b border-border/70 p-3 sm:p-4">
                   <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
@@ -428,6 +426,7 @@ export default function RegisterPage() {
           </CardContent>
         </Card>
       </div>
+      )}
       {confirmationDialog}
     </div>
   );
