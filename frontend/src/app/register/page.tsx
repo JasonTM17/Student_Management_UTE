@@ -3,7 +3,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import { AxiosError } from 'axios';
-import { ArrowRight, Lock, Mail, UserRound } from 'lucide-react';
+import { ArrowRight, Eye, EyeOff, Lock, Mail, UserRound } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -18,6 +18,7 @@ export default function RegisterPage() {
   const [password, setPassword] = useState('');
   const [firstName, setFirstName] = useState('');
   const [lastName, setLastName] = useState('');
+  const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
   const formErrorRef = useRef<HTMLDivElement>(null);
@@ -135,13 +136,29 @@ export default function RegisterPage() {
             </label>
             <Input
               id="password"
-              type="password"
+              type={showPassword ? 'text' : 'password'}
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
               minLength={8}
               icon={<Lock className="h-4 w-4" />}
               required
+              endAction={
+                <button
+                  type="button"
+                  className="inline-flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => setShowPassword((current) => !current)}
+                  aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  aria-pressed={showPassword}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              }
             />
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>

@@ -16,7 +16,7 @@ import {
   ChevronLeft,
   ChevronRight,
   ClipboardList,
-  DoorOpen,
+  FileEdit,
   FileText,
   LayoutDashboard,
   LogOut,
@@ -34,7 +34,6 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
-import { StudentContextRail } from '@/components/dashboard/StudentContextRail';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
@@ -52,6 +51,7 @@ type DashboardMenuLabelKey =
   | 'grades'
   | 'transcript'
   | 'thesis'
+  | 'editor'
   | 'announcements'
   | 'notifications'
   | 'teachingSchedule'
@@ -91,6 +91,7 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
     sectionKey: 'campus',
     items: [
       { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+      { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' },
       { href: '/dashboard/announcements', icon: Megaphone, labelKey: 'announcements' },
       { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
     ],
@@ -115,6 +116,7 @@ const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
     sectionKey: 'campus',
     items: [
       { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+      { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' },
       { href: '/dashboard/lecturer/announcements', icon: Megaphone, labelKey: 'announcements' },
       { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
     ],
@@ -186,28 +188,40 @@ export default function DashboardLayout({
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = useState(false);
-  const [studentRailOpen, setStudentRailOpen] = useState(false);
-  const [studentRailCollapsed, setStudentRailCollapsed] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  const [avatarPhoto, setAvatarPhoto] = useState(user?.avatar ?? '');
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
   const sidebarRef = useRef<HTMLElement>(null);
   const sidebarCloseRef = useRef<HTMLButtonElement>(null);
   const openSidebarButtonRef = useRef<HTMLButtonElement>(null);
-  const studentRailRef = useRef<HTMLElement>(null);
-  const studentRailTriggerRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const previousPathnameRef = useRef(pathname);
+
+  useEffect(() => {
+    if (!user?.id || typeof window === 'undefined') {
+      setAvatarPhoto('');
+      return;
+    }
+    setAvatarPhoto(user.avatar ?? '');
+
+    const handleAvatarUpdate = (event: Event) => {
+      const customEvent = event as CustomEvent<{ userId?: string; photo?: string }>;
+      if (!customEvent.detail || customEvent.detail.userId === user.id) {
+        setAvatarPhoto(customEvent.detail?.photo ?? user.avatar ?? '');
+      }
+    };
+
+    window.addEventListener('campuscore:avatar-updated', handleAvatarUpdate);
+    return () => {
+      window.removeEventListener('campuscore:avatar-updated', handleAvatarUpdate);
+    };
+  }, [user?.avatar, user?.id]);
   const menuLabels = messages.dashboardShell.menu;
   const menuSectionLabels = messages.dashboardShell.menuSections;
-  const showStudentRail = !isAdmin && !isLecturer;
-  const closeStudentRail = () => {
-    setStudentRailOpen(false);
-    window.requestAnimationFrame(() => studentRailTriggerRef.current?.focus());
-  };
   const menuSections = isAdmin
     ? []
     : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
@@ -278,6 +292,10 @@ export default function DashboardLayout({
         title: messages.dashboardShell.menu.notifications,
         description: messages.dashboardShell.routeDescriptions.notifications,
       },
+      '/dashboard/editor': {
+        title: messages.dashboardShell.menu.editor,
+        description: messages.dashboardShell.routeDescriptions.editor,
+      },
       '/dashboard/lecturer': {
         title: messages.lecturerDashboard.eyebrow,
         description: messages.dashboardShell.routeDescriptions.lecturer,
@@ -321,7 +339,6 @@ export default function DashboardLayout({
 
   useEffect(() => {
     setSidebarOpen(false);
-    setStudentRailOpen(false);
     setProfileOpen(false);
     setNotificationsOpen(false);
 
@@ -341,56 +358,7 @@ export default function DashboardLayout({
   }, [isDesktopSidebar, sidebarOpen]);
 
   useEffect(() => {
-    if (!studentRailOpen || isDesktopSidebar) {
-      return;
-    }
-
-    const focusableSelector = [
-      'a[href]',
-      'button:not([disabled])',
-      'input:not([disabled])',
-      'select:not([disabled])',
-      'textarea:not([disabled])',
-      '[tabindex]:not([tabindex="-1"])',
-    ].join(',');
-    const frame = window.requestAnimationFrame(() => {
-      studentRailRef.current?.querySelector<HTMLElement>(focusableSelector)?.focus();
-    });
-    const handleTab = (event: KeyboardEvent) => {
-      if (event.key !== 'Tab' || !studentRailRef.current) {
-        return;
-      }
-
-      const focusable = Array.from(
-        studentRailRef.current.querySelectorAll<HTMLElement>(focusableSelector),
-      );
-      if (focusable.length === 0) {
-        event.preventDefault();
-        studentRailRef.current.focus();
-        return;
-      }
-
-      const first = focusable[0];
-      const last = focusable[focusable.length - 1];
-      const active = document.activeElement;
-      if (event.shiftKey && (active === first || !studentRailRef.current.contains(active))) {
-        event.preventDefault();
-        last.focus();
-      } else if (!event.shiftKey && (active === last || !studentRailRef.current.contains(active))) {
-        event.preventDefault();
-        first.focus();
-      }
-    };
-
-    document.addEventListener('keydown', handleTab);
-    return () => {
-      window.cancelAnimationFrame(frame);
-      document.removeEventListener('keydown', handleTab);
-    };
-  }, [isDesktopSidebar, studentRailOpen]);
-
-  useEffect(() => {
-    const drawerOpen = sidebarOpen || studentRailOpen;
+    const drawerOpen = sidebarOpen;
     const previousOverflow = document.body.style.overflow;
 
     if (drawerOpen) {
@@ -406,9 +374,6 @@ export default function DashboardLayout({
         setProfileOpen(false);
       } else if (notificationsOpen) {
         setNotificationsOpen(false);
-      } else if (studentRailOpen) {
-        setStudentRailOpen(false);
-        window.requestAnimationFrame(() => studentRailTriggerRef.current?.focus());
       } else if (sidebarOpen) {
         setSidebarOpen(false);
         window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -420,7 +385,7 @@ export default function DashboardLayout({
       document.body.style.overflow = previousOverflow;
       document.removeEventListener('keydown', handleEscape);
     };
-  }, [notificationsOpen, profileOpen, sidebarOpen, studentRailOpen]);
+  }, [notificationsOpen, profileOpen, sidebarOpen]);
 
   useEffect(() => {
     if (typeof window === 'undefined') {
@@ -443,28 +408,6 @@ export default function DashboardLayout({
       sidebarCollapsed ? 'collapsed' : 'expanded',
     );
   }, [sidebarCollapsed]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !showStudentRail) {
-      return;
-    }
-
-    const persisted = window.localStorage.getItem('campuscore.student-rail');
-    if (persisted === 'collapsed') {
-      setStudentRailCollapsed(true);
-    }
-  }, [showStudentRail]);
-
-  useEffect(() => {
-    if (typeof window === 'undefined' || !showStudentRail) {
-      return;
-    }
-
-    window.localStorage.setItem(
-      'campuscore.student-rail',
-      studentRailCollapsed ? 'collapsed' : 'expanded',
-    );
-  }, [showStudentRail, studentRailCollapsed]);
 
   useEffect(() => {
     function handleClickOutside(event: MouseEvent) {
@@ -688,25 +631,42 @@ export default function DashboardLayout({
               sidebarCollapsed && 'justify-center',
             )}
           >
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
-              {user.firstName?.[0]}
-              {user.lastName?.[0]}
-            </div>
-            {!sidebarCollapsed ? (
-              <div className="min-w-0 flex-1">
-                <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
-                  {user.firstName} {user.lastName}
-                </div>
-                <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
-                  {user.email}
-                </div>
-                <div className="mt-2">
-                  <span className="inline-flex items-center rounded-full bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
-                    {roleLabel}
-                  </span>
-                </div>
+            <LocalizedLink
+              href="/dashboard/profile"
+              aria-label={messages.dashboardShell.menu.profile}
+              title={messages.dashboardShell.menu.profile}
+              className={cn(
+                'flex min-w-0 items-center gap-3 rounded-md p-1.5 text-left transition-[background-color,color] duration-150 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
+                sidebarCollapsed && 'justify-center',
+              )}
+            >
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
+                {avatarPhoto ? (
+                  // eslint-disable-next-line @next/next/no-img-element
+                  <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
+                ) : (
+                  <>
+                    {user.firstName?.[0]}
+                    {user.lastName?.[0]}
+                  </>
+                )}
               </div>
-            ) : null}
+              {!sidebarCollapsed ? (
+                <div className="min-w-0 flex-1">
+                  <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
+                    {user.firstName} {user.lastName}
+                  </div>
+                  <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
+                    {user.email}
+                  </div>
+                  <div className="mt-2">
+                    <span className="inline-flex items-center rounded-full bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                      {roleLabel}
+                    </span>
+                  </div>
+                </div>
+              ) : null}
+            </LocalizedLink>
           </div>
         </div>
 
@@ -817,31 +777,8 @@ export default function DashboardLayout({
         </div>
       </aside>
 
-      {showStudentRail && studentRailOpen ? (
-        <>
-          <button
-            type="button"
-            className="fixed inset-0 z-40 bg-[var(--portal-scrim)] xl:hidden"
-            onClick={closeStudentRail}
-            aria-label={messages.dashboardShell.controls.closeStudentRailOverlay}
-          />
-          <div className="fixed inset-y-0 right-0 z-50 w-full max-w-sm p-4 xl:hidden">
-            <StudentContextRail
-              mobile
-              containerRef={studentRailRef}
-              currentPageTitle={currentPage.title}
-              currentPageDescription={currentPage.description}
-              unreadCount={unreadCount}
-              collapsed={false}
-              onToggleCollapsed={() => undefined}
-              onCloseMobile={closeStudentRail}
-            />
-          </div>
-        </>
-      ) : null}
-
       <div
-        inert={!isDesktopSidebar && (sidebarOpen || studentRailOpen) ? true : undefined}
+        inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
         className={cn(
           'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
           sidebarCollapsed
@@ -876,21 +813,6 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-2">
-              {showStudentRail ? (
-                <Button
-                  ref={studentRailTriggerRef}
-                  type="button"
-                  variant="ghost"
-                  size="icon"
-                  className="xl:hidden"
-                  onClick={() => setStudentRailOpen(true)}
-                  aria-label={messages.dashboardShell.controls.openStudentRail}
-                  aria-expanded={studentRailOpen}
-                  aria-controls="student-context-rail"
-                >
-                  <DoorOpen className="h-5 w-5" aria-hidden="true" />
-                </Button>
-              ) : null}
               <Button
                 type="button"
                 variant="outline"
@@ -1007,9 +929,16 @@ export default function DashboardLayout({
                   aria-controls="dashboard-profile-menu"
                   aria-haspopup="menu"
                 >
-                  <div className="flex h-9 w-9 items-center justify-center rounded-full bg-primary text-sm font-semibold text-primary-foreground">
-                    {user.firstName?.[0]}
-                    {user.lastName?.[0]}
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-semibold text-primary-foreground">
+                    {avatarPhoto ? (
+                      // eslint-disable-next-line @next/next/no-img-element
+                      <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
+                    ) : (
+                      <>
+                        {user.firstName?.[0]}
+                        {user.lastName?.[0]}
+                      </>
+                    )}
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
                     <div className="truncate text-sm font-semibold text-foreground">
@@ -1025,17 +954,30 @@ export default function DashboardLayout({
                   <div
                     id="dashboard-profile-menu"
                     role="menu"
-                    className="absolute right-0 mt-2 w-[min(16rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl"
+                    className="absolute right-0 mt-2 w-[min(18rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl"
                   >
-                    <div className="border-b border-border/70 px-4 py-4">
-                      <p className="font-semibold text-foreground">
-                        {user.firstName} {user.lastName}
-                      </p>
-                      <p className="mt-1 text-sm text-muted-foreground">
-                        {user.email}
-                      </p>
-                      <div className="mt-3 inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
-                        {user.roles?.[0] || 'USER'}
+                    <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-base font-semibold text-primary-foreground">
+                        {avatarPhoto ? (
+                          // eslint-disable-next-line @next/next/no-img-element
+                          <img src={avatarPhoto} alt="" className="h-full w-full object-cover" />
+                        ) : (
+                          <>
+                            {user.firstName?.[0]}
+                            {user.lastName?.[0]}
+                          </>
+                        )}
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-foreground">
+                          {user.firstName} {user.lastName}
+                        </p>
+                        <p className="truncate text-sm text-muted-foreground">
+                          {user.email}
+                        </p>
+                        <div className="mt-1.5 inline-flex rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
+                          {user.roles?.[0] || 'USER'}
+                        </div>
                       </div>
                     </div>
                     <div className="px-2 py-2">
@@ -1084,45 +1026,14 @@ export default function DashboardLayout({
         </header>
 
         <div className="mx-auto w-full max-w-[1440px] px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-28">
-          {showStudentRail ? (
-            <div
-              className={cn(
-                'grid items-start gap-6',
-                studentRailCollapsed
-                  ? 'xl:grid-cols-[minmax(0,1fr)_5.5rem]'
-                  : 'xl:grid-cols-[minmax(0,1fr)_20rem]',
-              )}
-            >
-              <main
-                id="dashboard-main-content"
-                ref={mainRef}
-                tabIndex={-1}
-                className="min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
-              >
-                {children}
-              </main>
-              <div className="hidden xl:block">
-                <StudentContextRail
-                  currentPageTitle={currentPage.title}
-                  currentPageDescription={currentPage.description}
-                  unreadCount={unreadCount}
-                  collapsed={studentRailCollapsed}
-                  onToggleCollapsed={() =>
-                    setStudentRailCollapsed((current) => !current)
-                  }
-                />
-              </div>
-            </div>
-          ) : (
-            <main
-              id="dashboard-main-content"
-              ref={mainRef}
-              tabIndex={-1}
-              className="min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
-            >
-              {children}
-            </main>
-          )}
+          <main
+            id="dashboard-main-content"
+            ref={mainRef}
+            tabIndex={-1}
+            className="min-w-0 focus:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-4"
+          >
+            {children}
+          </main>
         </div>
       </div>
       {mobileNavItems.length > 0 ? (

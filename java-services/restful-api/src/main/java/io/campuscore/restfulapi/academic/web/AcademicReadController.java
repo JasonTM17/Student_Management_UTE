@@ -9,6 +9,7 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.MyCurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListResponse;
@@ -20,6 +21,8 @@ import java.util.Map;
 import java.util.Set;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
+import org.springframework.security.core.annotation.AuthenticationPrincipal;
+import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PathVariable;
@@ -123,6 +126,12 @@ public class AcademicReadController {
     @GetMapping("curricula/{id}")
     public CurriculumResponse getCurriculum(@PathVariable String id) {
         return academic.findCurriculum(id);
+    }
+
+    @GetMapping("me/curriculum")
+    @PreAuthorize("hasRole('STUDENT')")
+    public MyCurriculumResponse getMyCurriculum(@AuthenticationPrincipal Jwt jwt) {
+        return academic.findMyCurriculum(jwt.getClaimAsString("studentId"));
     }
 
     @GetMapping("classrooms")

@@ -9,8 +9,11 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSu
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumBrief;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumResponse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.MyCurriculumCourse;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.MyCurriculumResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentLecturerSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.DepartmentResponse;
@@ -135,6 +138,72 @@ public class AcademicReadService {
         CurriculumResponse curriculum = academic.findCurriculumById(id)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curriculum not found"));
         return hydrateCurricula(List.of(curriculum), true).getFirst();
+    }
+
+    /**
+     * The student's full study program: every curriculum course plus the
+     * student's own progress (COMPLETED / IN_PROGRESS / NOT_STARTED).
+     */
+    @Transactional(readOnly = true)
+    public MyCurriculumResponse findMyCurriculum(String studentId) {
+        if (studentId == null || studentId.isBlank()) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "An active student profile is required");
+        }
+        String curriculumId = academic.findStudentCurriculumId(studentId)
+                .orElseThrow(() -> new ResponseStatusException(
+                        HttpStatus.NOT_FOUND, "No study program is assigned to this student"));
+        CurriculumResponse curriculum = academic.findCurriculumById(curriculumId)
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Curriculum not found"));
+        List<CurriculumCourseSummary> plan = academic.findCurriculumCoursesByCurriculumIds(List.of(curriculumId));
+        Map<String, AcademicReadRepository.CourseBriefRow> coursesById = academic
+                .findCourseBriefsByIds(plan.stream().map(CurriculumCourseSummary::courseId).toList())
+                .stream()
+                .collect(Collectors.toMap(AcademicReadRepository.CourseBriefRow::id, row -> row));
+        Map<String, AcademicReadRepository.CourseProgressRow> progressByCourse = academic
+                .findCourseProgressByStudentId(studentId)
+                .stream()
+                .collect(Collectors.toMap(AcademicReadRepository.CourseProgressRow::courseId, row -> row));
+
+        List<MyCurriculumCourse> courses = plan.stream()
+                .map(item -> toCurriculumCourse(item, coursesById.get(item.courseId()), progressByCourse.get(item.courseId())))
+                .sorted(java.util.Comparator.comparingInt(MyCurriculumCourse::year)
+                        .thenComparingInt(MyCurriculumCourse::semester)
+                        .thenComparing(MyCurriculumCourse::code))
+                .toList();
+
+        return new MyCurriculumResponse(
+                new CurriculumBrief(
+                        curriculum.id(),
+                        curriculum.code(),
+                        curriculum.name(),
+                        curriculum.nameEn(),
+                        curriculum.nameVi(),
+                        curriculum.totalCredits()),
+                courses);
+    }
+
+    private static MyCurriculumCourse toCurriculumCourse(
+            CurriculumCourseSummary item,
+            AcademicReadRepository.CourseBriefRow course,
+            AcademicReadRepository.CourseProgressRow progress) {
+        String status = switch (progress == null ? 0 : progress.progressLevel()) {
+            case 2 -> "COMPLETED";
+            case 1 -> "IN_PROGRESS";
+            default -> "NOT_STARTED";
+        };
+        return new MyCurriculumCourse(
+                item.courseId(),
+                course == null ? "" : course.code(),
+                course == null ? "" : course.name(),
+                course == null ? null : course.nameEn(),
+                course == null ? null : course.nameVi(),
+                course == null ? 0 : course.credits(),
+                item.year(),
+                item.semester(),
+                item.isMandatory(),
+                status,
+                progress == null ? null : progress.finalGrade(),
+                progress == null ? null : progress.letterGrade());
     }
 
     @Transactional(readOnly = true)

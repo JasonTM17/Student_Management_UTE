@@ -131,11 +131,15 @@ public class AcademicEnrollmentReadController {
     }
 
     @GetMapping("grades/student-grades/enrollment/{enrollmentId}")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER', 'STUDENT')")
     public StudentGradesByEnrollmentResponse getStudentGradesByEnrollment(
             @AuthenticationPrincipal Jwt jwt,
             @PathVariable String enrollmentId) {
-        return academic.findStudentGradesByEnrollment(enrollmentId, jwt.getClaimAsStringList("roles"), jwt.getClaimAsString("lecturerId"));
+        return academic.findStudentGradesByEnrollment(
+                enrollmentId,
+                jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"),
+                jwt.getClaimAsString("studentId"));
     }
 
     private static void requireAllowedQuery(

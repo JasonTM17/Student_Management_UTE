@@ -251,6 +251,37 @@ public final class AcademicReadDtos {
             List<CurriculumCourseSummary> courses) {
     }
 
+    /** Student-scoped study program with per-course completion status. */
+    public record MyCurriculumResponse(
+            CurriculumBrief curriculum,
+            List<MyCurriculumCourse> courses) {
+    }
+
+    public record CurriculumBrief(
+            String id,
+            String code,
+            String name,
+            String nameEn,
+            String nameVi,
+            int totalCredits) {
+    }
+
+    /** Status is COMPLETED, IN_PROGRESS or NOT_STARTED, derived from the student's enrollments. */
+    public record MyCurriculumCourse(
+            String courseId,
+            String code,
+            String name,
+            String nameEn,
+            String nameVi,
+            int credits,
+            int year,
+            int semester,
+            boolean isMandatory,
+            String status,
+            java.math.BigDecimal finalGrade,
+            String letterGrade) {
+    }
+
     public record ClassroomSectionSummary(
             String id,
             String sectionNumber,

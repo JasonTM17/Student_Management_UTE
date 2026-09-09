@@ -21,6 +21,10 @@ import {
   initialState,
   type ChatMessage,
 } from './assistant-reducer';
+import {
+  isStudentAssistantQuery,
+  resolveStudentAssistantQuery,
+} from '@/lib/assistant-student-resolver';
 
 export interface UseAssistantStreamOptions {
   locale: Locale;
@@ -188,6 +192,38 @@ export function useAssistantStream({
       let sawDone = false;
       let terminalReconciled = false;
       try {
+        if (isStudentAssistantQuery(message)) {
+          try {
+            const resolution = await resolveStudentAssistantQuery(message, locale);
+            if (resolution && isCurrentRequest() && !controller.signal.aborted) {
+              applyStreamEvent({
+                type: 'meta',
+                conversationId: requestedConversationId,
+                model: 'CampusCore Student Assistant',
+              });
+              applyStreamEvent({
+                type: 'delta',
+                text: resolution.answer,
+              });
+              applyStreamEvent({
+                type: 'citation',
+                citation: resolution.citation,
+              });
+              applyStreamEvent({
+                type: 'done',
+                messageId: `${Date.now()}-resolved`,
+                reasonCode: 'STOP',
+                degraded: false,
+              });
+              terminalReconciled = true;
+              onReconcileHistory?.();
+              return;
+            }
+          } catch {
+            // Fallback to thesisApi.streamChat if student resolution encounters error
+          }
+        }
+
         await thesisApi.streamChat(message, locale, {
           conversationId: requestedConversationId,
           clientRequestId,

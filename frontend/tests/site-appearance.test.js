@@ -40,8 +40,11 @@ test('portal login and appearance studio files are wired', () => {
   assert.match(login, /portalMatchesUser/);
   assert.match(shell, /data-login-portal/);
   assert.match(home, /login\?portal=student/);
-  assert.match(home, /roleLanes\.lecturer\.href/);
-  assert.match(home, /roleLanes\.admin\.href/);
+  // The landing page renders all three role lanes (student/lecturer/admin)
+  // from the roleCards map, including their localized hrefs.
+  assert.match(home, /roleLanes\[card\.key\]/);
+  assert.match(home, /key: 'lecturer'/);
+  assert.match(home, /key: 'admin'/);
   assert.match(messages, /\/login\?portal=lecturer/);
   assert.match(messages, /\/login\?portal=admin/);
   assert.match(appearance, /broadcastSiteAppearance/);

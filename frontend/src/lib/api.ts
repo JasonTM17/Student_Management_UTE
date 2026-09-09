@@ -23,6 +23,8 @@ import {
   LecturerSection,
   SectionGrades,
   SectionSchedule,
+  MyCurriculumResponse,
+  StudentGradesByEnrollmentResponse,
 } from '@/types/api';
 import { addLocalePrefix, stripLocaleFromPathname } from '@/i18n/paths';
 import { resolvePublicApiBaseUrl } from '@/lib/public-api-url';
@@ -339,6 +341,7 @@ export const authApi = {
     phone?: string;
     dateOfBirth?: string;
     address?: string;
+    avatar?: string;
   }): Promise<User> => {
     const response = await api.put<User>('/auth/profile', data);
     return response.data;
@@ -650,6 +653,23 @@ export const gradesApi = {
       '/enrollments/my/transcript',
       { params: { semesterId } },
     );
+    return response.data;
+  },
+
+  getStudentGradesByEnrollment: async (
+    enrollmentId: string,
+  ): Promise<StudentGradesByEnrollmentResponse> => {
+    const response = await api.get<StudentGradesByEnrollmentResponse>(
+      `/grades/student-grades/enrollment/${enrollmentId}`,
+    );
+    return response.data;
+  },
+};
+
+// Curriculum API
+export const curriculumApi = {
+  getMyCurriculum: async (): Promise<MyCurriculumResponse> => {
+    const response = await api.get<MyCurriculumResponse>('/me/curriculum');
     return response.data;
   },
 };

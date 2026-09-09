@@ -2,8 +2,19 @@ const test = require('node:test');
 const assert = require('node:assert/strict');
 const fs = require('node:fs');
 const path = require('node:path');
+const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
+
+function load(relativePath) {
+  const source = fs.readFileSync(path.join(root, relativePath), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
 
 test('registration E2E fixture refuses developer projects and fails closed on missing seed data', async () => {
   const { pathToFileURL } = require('node:url');
@@ -97,6 +108,72 @@ test('admin user search commits one query per submit instead of per keystroke', 
   assert.match(page, /setPage\(1\)/);
   assert.doesNotMatch(page, /value=\{search\}/);
   assert.doesNotMatch(page, /onChange=\{\(e\) => setSearch\(e\.target\.value\)\}/);
+});
+
+test('feedback polish: registration separates searches, groups classes, and keeps drop nearby', () => {
+  const page = read('src/app/dashboard/register/page.tsx');
+  const messages = read('src/i18n/messages.ts');
+
+  assert.match(page, /courseCodeSearch/);
+  assert.match(page, /courseNameSearch/);
+  // Sections are grouped by course; the student picks a course first and then
+  // sees only that course's class groups (two-level selection).
+  assert.match(page, /courseGroups/);
+  assert.match(page, /selectedCourseId/);
+  assert.match(page, /lg:col-span-9/);
+  assert.match(page, /lg:col-span-3/);
+  assert.match(page, /copy\.courseCodePlaceholder/);
+  assert.match(page, /copy\.courseNamePlaceholder/);
+  assert.match(page, /registered\.map\(\(item\) =>/);
+  assert.match(page, /onClick=\{\(\) => void drop\(item\)\}/);
+  assert.match(messages, /searchByCode/);
+  assert.match(messages, /searchByName/);
+  assert.match(messages, /groupSectionCount/);
+});
+
+test('feedback polish: schedule makes the timetable primary and removes summary cards', () => {
+  const page = read('src/app/dashboard/schedule/page.tsx');
+
+  assert.match(page, /gridTemplateColumns: '72px repeat\(7, minmax\(130px, 1fr\)\)'/);
+  assert.match(page, /min-h-\[105px\]/);
+  assert.doesNotMatch(page, /className="grid gap-4 md:grid-cols-3"/);
+  assert.doesNotMatch(page, /metricToneClass/);
+});
+
+test('feedback polish: profile supports local photo preview and password visibility controls', () => {
+  const page = read('src/app/dashboard/profile/page.tsx');
+  const layout = read('src/app/dashboard/layout.tsx');
+  const api = read('src/lib/api.ts');
+  const types = read('src/types/api.ts');
+  const messages = read('src/i18n/messages.ts');
+
+  assert.match(page, /createProfileAvatarDataUrl/);
+  assert.match(page, /MAX_AVATAR_DATA_URL_LENGTH = 200_000/);
+  assert.match(page, /accept="image\/png,image\/jpeg,image\/webp"/);
+  assert.match(page, /avatar: avatarPreview/);
+  assert.match(layout, /user\?\.avatar/);
+  assert.match(api, /avatar\?: string/);
+  assert.match(types, /avatar\?: string \| null/);
+  assert.match(page, /type=\{visible \? 'text' : 'password'\}/);
+  assert.match(page, /oldPassword: false/);
+  assert.match(page, /newPassword: false/);
+  assert.match(page, /confirmPassword: false/);
+  assert.match(messages, /photoLabel/);
+  assert.match(messages, /uploadPhoto/);
+  assert.match(messages, /removePhoto/);
+  assert.match(messages, /photoUploadFailed/);
+});
+
+test('feedback polish: account creation and admin temporary passwords can be revealed intentionally', () => {
+  const signup = read('src/app/register/page.tsx');
+  const adminUsers = read('src/app/admin/users/page.tsx');
+
+  assert.match(signup, /const \[showPassword, setShowPassword\] = useState\(false\)/);
+  assert.match(signup, /type=\{showPassword \? 'text' : 'password'\}/);
+  assert.match(signup, /messages\.login\.showPassword/);
+  assert.match(adminUsers, /const \[showTemporaryPassword, setShowTemporaryPassword\] = useState\(false\)/);
+  assert.match(adminUsers, /type=\{showTemporaryPassword \? 'text' : 'password'\}/);
+  assert.match(adminUsers, /messages\.login\.hidePassword/);
 });
 
 test('registration idempotency keeps PostgreSQL duplicate claims inside the transaction', () => {
@@ -215,7 +292,7 @@ test('dogfood audit: profile form is gated on the loaded user and keeps local da
 });
 
 test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 7 and lecturer agenda covers full week', () => {
-  const { buildWeeklyGrid } = require(path.join(root, 'src/lib/weekly-grid.ts'));
+  const { buildWeeklyGrid } = load('src/lib/weekly-grid.ts');
   const grid = buildWeeklyGrid([
     { dayOfWeek: 0, startTime: '08:00', endTime: '10:00', courseCode: 'SE499', sectionNumber: 'SE499-01' },
     { dayOfWeek: 7, startTime: '13:00', endTime: '15:00', courseCode: 'SE498', sectionNumber: 'SE498-01' },

@@ -17,6 +17,7 @@ import {
   ErrorState,
   LoadingState,
 } from '@/components/ui/state-block';
+import { GradeDetailModal } from '@/components/dashboard/GradeDetailModal';
 import { useI18n } from '@/i18n';
 
 const gradePoints: Record<string, number> = {
@@ -61,6 +62,7 @@ export default function GradesPage() {
   const [grades, setGrades] = useState<StudentGradeRecord[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
+  const [selectedRecord, setSelectedRecord] = useState<StudentGradeRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const loadGeneration = useRef(0);
@@ -353,8 +355,17 @@ export default function GradesPage() {
                     {records.map((record) => (
                       <article
                         key={`${record.id}-mobile`}
-                        className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
-                        role="listitem"
+                        onClick={() => setSelectedRecord(record)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedRecord(record);
+                          }
+                        }}
+                        className="cursor-pointer rounded-lg border border-border/70 bg-card p-4 shadow-sm transition hover:border-primary/40 hover:bg-secondary/20"
+                        role="button"
+                        tabIndex={0}
+                        aria-label={`${record.courseCode} - ${copy.tableHeaders.score}`}
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -434,7 +445,12 @@ export default function GradesPage() {
                       </thead>
                       <tbody className="divide-y divide-border/60">
                         {records.map((record) => (
-                          <tr key={record.id}>
+                          <tr
+                            key={record.id}
+                            onClick={() => setSelectedRecord(record)}
+                            className="cursor-pointer transition-colors hover:bg-secondary/30"
+                            title={locale === 'vi' ? 'Nhấp để xem chi tiết điểm GK & CK' : 'Click to view Midterm & Final breakdown'}
+                          >
                             <td className="px-2 py-4">
                               <div className="font-medium text-foreground">
                                 {record.courseCode}
@@ -458,7 +474,7 @@ export default function GradesPage() {
                             <td className="px-2 py-4 text-center text-muted-foreground">
                               {formatNumber(record.credits)}
                             </td>
-                            <td className="px-2 py-4 text-center text-foreground">
+                            <td className="px-2 py-4 text-center text-foreground font-semibold">
                               {record.finalGrade !== null
                                 ? record.finalGrade.toFixed(1)
                                 : copy.notPublished}
@@ -492,6 +508,12 @@ export default function GradesPage() {
           </div>
         </>
       )}
+
+      <GradeDetailModal
+        isOpen={Boolean(selectedRecord)}
+        onClose={() => setSelectedRecord(null)}
+        record={selectedRecord}
+      />
     </div>
   );
 }

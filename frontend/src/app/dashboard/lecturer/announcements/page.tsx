@@ -14,6 +14,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { statusToneClass } from '@/components/ui/status';
+import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
@@ -172,9 +173,9 @@ export default function LecturerAnnouncementsPage() {
                       </span>
                     ) : null}
                   </div>
-                  <p className="max-w-3xl whitespace-pre-line text-sm leading-7 text-muted-foreground">
-                    {announcement.content}
-                  </p>
+                  <div className="max-w-3xl text-sm leading-7 text-muted-foreground">
+                    <RichContentRenderer content={announcement.content} />
+                  </div>
                   <div className="flex flex-wrap gap-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                     {announcementSemesterName(announcement) ? (
                       <span>

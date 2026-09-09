@@ -10,6 +10,7 @@ interface ModalProps {
   isOpen: boolean;
   onClose: () => void;
   title?: string;
+  description?: string;
   children: React.ReactNode;
   className?: string;
   closeLabel?: string;
@@ -19,6 +20,7 @@ export function Modal({
   isOpen,
   onClose,
   title,
+  description,
   children,
   className,
   closeLabel,
@@ -122,16 +124,25 @@ export function Modal({
             className,
           )}
         >
-          {title && (
-            <div className="flex shrink-0 items-center justify-between border-b border-border/70 px-5 py-4">
-              <h3 id={titleId} className="text-lg font-semibold text-foreground">
-                {title}
-              </h3>
+          {(title || description) && (
+            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4">
+              <div className="min-w-0 pr-2">
+                {title && (
+                  <h3 id={titleId} className="text-lg font-semibold text-foreground">
+                    {title}
+                  </h3>
+                )}
+                {description && (
+                  <p className="mt-1 text-sm text-muted-foreground">
+                    {description}
+                  </p>
+                )}
+              </div>
               <button
                 ref={closeButtonRef}
                 type="button"
                 onClick={onClose}
-                className="flex h-11 w-11 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 aria-label={closeLabel || messages.common.states.closeModal}
               >
                 <X className="h-5 w-5" />

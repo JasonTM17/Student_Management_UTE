@@ -270,34 +270,33 @@ export default function LoginPage() {
                 {portalCopy.officeSupport}.
               </span>
             </div>
-            <div className="relative">
-              <Input
-                id="password"
-                type={showPassword ? 'text' : 'password'}
-                value={password}
-                onChange={(e) => setPassword(e.target.value)}
-                placeholder={messages.login.passwordPlaceholder}
-                autoComplete="current-password"
-                icon={<Lock className="h-4 w-4" />}
-                className="pr-12"
-                required
-              />
-              <button
-                type="button"
-                onClick={() => setShowPassword((current) => !current)}
-                className="absolute right-0 top-1/2 flex h-11 w-11 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
-                title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
-                aria-pressed={showPassword}
-                disabled={!isClientReady}
-              >
-                {showPassword ? (
-                  <EyeOff className="h-4 w-4" />
-                ) : (
-                  <Eye className="h-4 w-4" />
-                )}
-              </button>
-            </div>
+            <Input
+              id="password"
+              type={showPassword ? 'text' : 'password'}
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder={messages.login.passwordPlaceholder}
+              autoComplete="current-password"
+              icon={<Lock className="h-4 w-4" />}
+              required
+              endAction={
+                <button
+                  type="button"
+                  onClick={() => setShowPassword((current) => !current)}
+                  className="flex h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary/60 hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  aria-pressed={showPassword}
+                  disabled={!isClientReady}
+                >
+                  {showPassword ? (
+                    <EyeOff className="h-4 w-4" />
+                  ) : (
+                    <Eye className="h-4 w-4" />
+                  )}
+                </button>
+              }
+            />
           </div>
 
           <Button type="submit" className="w-full" disabled={isLoading || !isClientReady}>

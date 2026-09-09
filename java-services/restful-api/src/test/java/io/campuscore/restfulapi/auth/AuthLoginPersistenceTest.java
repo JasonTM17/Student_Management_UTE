@@ -306,6 +306,62 @@ class AuthLoginPersistenceTest {
         org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
     }
 
+    /**
+     * Regression for the P0 logout bug: a second login used to delete every
+     * earlier refresh session (replaceRefreshSession wiped all rows per user),
+     * so the first device was kicked out at its next access-token expiry.
+     */
+    @Test
+    void secondLoginKeepsTheFirstSessionRefreshable() throws Exception {
+        MvcResult firstLogin = loginStudent().andReturn();
+        JsonNode firstBody = objectMapper.readTree(firstLogin.getResponse().getContentAsString());
+        String firstRefreshToken = firstBody.get("refreshToken").asText();
+        Cookie firstRefreshCookie = firstLogin.getResponse().getCookie("cc_refresh_token");
+        Cookie firstCsrfCookie = firstLogin.getResponse().getCookie("cc_csrf");
+
+        MvcResult secondLogin = loginStudent().andReturn();
+        JsonNode secondBody = objectMapper.readTree(secondLogin.getResponse().getContentAsString());
+        String secondRefreshToken = secondBody.get("refreshToken").asText();
+        assertNotEquals(firstRefreshToken, secondRefreshToken);
+
+        Integer sessionsAfterSecondLogin = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(2, sessionsAfterSecondLogin);
+
+        MvcResult firstDeviceRefresh = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(firstRefreshCookie, firstCsrfCookie)
+                        .header("X-CSRF-Token", firstCsrfCookie.getValue())
+                        .header("User-Agent", "jest-java-first-device"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.id").value("student-user"))
+                .andExpect(jsonPath("$.refreshToken", notNullValue()))
+                .andReturn();
+
+        String rotatedRefreshToken = objectMapper
+                .readTree(firstDeviceRefresh.getResponse().getContentAsString())
+                .get("refreshToken")
+                .asText();
+
+        Integer sessionsAfterFirstRotation = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        Integer rotatedSessionStored = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'"
+                        + " AND \"refreshToken\" = ?",
+                Integer.class,
+                sha256(rotatedRefreshToken));
+        Integer secondSessionStillActive = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'"
+                        + " AND \"refreshToken\" = ?",
+                Integer.class,
+                sha256(secondRefreshToken));
+
+        org.junit.jupiter.api.Assertions.assertEquals(2, sessionsAfterFirstRotation);
+        org.junit.jupiter.api.Assertions.assertEquals(1, rotatedSessionStored);
+        org.junit.jupiter.api.Assertions.assertEquals(1, secondSessionStillActive);
+    }
+
     @Test
     void refreshAcceptsBodyRefreshTokenWithoutCookieForMobileClients() throws Exception {
         MvcResult login = loginStudent().andReturn();

@@ -115,17 +115,19 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.doesNotMatch(messages, /nhóm hoặc phản biện|groups, or reviews/i);
 });
 
-test('the mobile student context drawer traps focus and inerts the portal shell', () => {
+test('the sidebar drawer locks scroll, inerts the shell, and the context rail stays removed', () => {
   const layout = read('src/app/dashboard/layout.tsx');
-  const rail = read('src/components/dashboard/StudentContextRail.tsx');
 
-  assert.match(layout, /studentRailRef/);
-  assert.match(layout, /studentRailTriggerRef/);
-  assert.match(layout, /studentRailOpen \\|\\| sidebarOpen/);
-  assert.match(layout, /querySelectorAll<HTMLElement>\(focusableSelector\)/);
-  assert.match(layout, /event\.key !== 'Tab'/);
-  assert.match(layout, /aria-controls="student-context-rail"/);
-  assert.match(layout, /containerRef=\{studentRailRef\}/);
-  assert.match(rail, /ref=\{containerRef\}/);
-  assert.match(rail, /id=\{mobile \? 'student-context-rail' : undefined\}/);
+  // The mobile sidebar drawer still traps interaction: body scroll lock while
+  // open, Escape restores focus to the open trigger, and the shell is inert.
+  assert.match(layout, /const drawerOpen = sidebarOpen;/);
+  assert.match(layout, /document\.body\.style\.overflow = 'hidden'/);
+  assert.match(layout, /document\.body\.style\.overflow = previousOverflow/);
+  assert.match(layout, /event\.key !== 'Escape'/);
+  assert.match(layout, /sidebarCloseRef\.current\?\.focus/);
+  assert.match(layout, /inert=\{!isDesktopSidebar && sidebarOpen \? true : undefined\}/);
+  // Feedback #1/#5/#6: the right-hand student context rail (and its broken
+  // collapsed state) was removed entirely, component file included.
+  assert.doesNotMatch(layout, /StudentContextRail|studentRail|student-context-rail/);
+  assert.equal(fs.existsSync(path.join(root, 'src/components/dashboard/StudentContextRail.tsx')), false);
 });

@@ -4,12 +4,13 @@ import { cn } from '@/lib/utils';
 export interface InputProps
   extends React.InputHTMLAttributes<HTMLInputElement> {
   icon?: React.ReactNode
+  endAction?: React.ReactNode
   error?: string
   hint?: string
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, icon, error, hint, ...props }, ref) => {
+  ({ className, type, icon, endAction, error, hint, ...props }, ref) => {
     return (
       <div className="w-full">
         <div className="relative">
@@ -23,12 +24,18 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
             className={cn(
               'flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-base text-foreground ring-offset-background transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm',
               icon && 'pl-10',
+              endAction && 'pr-11',
               error && 'border-destructive focus-visible:ring-destructive',
               className
             )}
             ref={ref}
             {...props}
           />
+          {endAction && (
+            <div className="absolute inset-y-0 right-0 flex items-center pr-2">
+              {endAction}
+            </div>
+          )}
         </div>
         {error && (
           <p className="mt-1 text-sm text-destructive">{error}</p>

@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.repository;
 
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
+import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupMemberResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisGroupReadDtos.GroupResponse;
 import java.sql.ResultSet;
 import java.sql.SQLException;
@@ -59,9 +60,27 @@ public class ThesisGroupReadRepository {
     private List<GroupResponse> hydrate(List<GroupRow> rows) {
         if (rows.isEmpty()) return List.of();
         Map<UUID, List<String>> members = new LinkedHashMap<>();
-        for (GroupRow row : rows) members.put(row.id(), new ArrayList<>());
-        jdbc.query("SELECT group_id, student_id FROM thesis.thesis_group_member WHERE group_id IN (:ids) ORDER BY group_id, member_order", new MapSqlParameterSource("ids", members.keySet()), (RowCallbackHandler) rs -> members.get(rs.getObject("group_id", UUID.class)).add(rs.getString("student_id")));
-        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())))).toList();
+        Map<UUID, List<GroupMemberResponse>> memberDetails = new LinkedHashMap<>();
+        for (GroupRow row : rows) {
+            members.put(row.id(), new ArrayList<>());
+            memberDetails.put(row.id(), new ArrayList<>());
+        }
+        jdbc.query("SELECT group_id, student_id, display_name, contact, is_external, is_leader, member_order FROM thesis.thesis_group_member WHERE group_id IN (:ids) ORDER BY group_id, member_order", new MapSqlParameterSource("ids", members.keySet()), (RowCallbackHandler) rs -> {
+            UUID groupId = rs.getObject("group_id", UUID.class);
+            String studentId = rs.getString("student_id");
+            boolean external = rs.getBoolean("is_external");
+            String displayName = rs.getString("display_name");
+            String contact = rs.getString("contact");
+            members.get(groupId).add(studentId);
+            memberDetails.get(groupId).add(new GroupMemberResponse(
+                    studentId,
+                    external ? displayName : null,
+                    external ? contact : null,
+                    external,
+                    rs.getBoolean("is_leader"),
+                    rs.getInt("member_order")));
+        });
+        return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())))).toList();
     }
 
     private static GroupRow row(ResultSet rs, int ignored) throws SQLException {

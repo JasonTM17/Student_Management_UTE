@@ -45,6 +45,15 @@ export interface ThesisTopic {
   createdBy: string;
 }
 
+export interface ThesisGroupMember {
+  studentId: string;
+  displayName?: string | null;
+  contact?: string | null;
+  isExternal?: boolean;
+  isLeader?: boolean;
+  memberOrder?: number;
+}
+
 export interface ThesisGroup {
   id: string;
   roundId: string;
@@ -54,6 +63,18 @@ export interface ThesisGroup {
   approvalStatus: ThesisApprovalStatus;
   rejectionReason?: string | null;
   memberStudentIds: string[];
+  members?: ThesisGroupMember[];
+}
+
+/** Minimal directory entry used when a leader invites a member into a thesis group. */
+export interface ThesisStudentResult {
+  studentId: string;
+  studentNumber: string;
+  email: string;
+  firstName: string;
+  lastName: string;
+  curriculumCode?: string | null;
+  curriculumName?: string | null;
 }
 
 export interface AssistantCitation {
@@ -278,11 +299,12 @@ export const thesisApi = {
 
   addMember: async (
     groupId: string,
-    studentId: string,
+    member: string | { studentId?: string; displayName?: string; contact?: string },
   ): Promise<ThesisGroup> => {
+    const payload = typeof member === 'string' ? { studentId: member } : member;
     const response = await api.post<ThesisGroup>(
       '/thesis/groups/' + groupId + '/members',
-      { studentId },
+      payload,
     );
     return response.data;
   },
@@ -293,6 +315,14 @@ export const thesisApi = {
   ): Promise<ThesisGroup> => {
     const response = await api.delete<ThesisGroup>(
       '/thesis/groups/' + groupId + '/members/' + studentId,
+    );
+    return response.data;
+  },
+
+  searchStudents: async (query: string): Promise<ThesisStudentResult[]> => {
+    const response = await api.get<ThesisStudentResult[]>(
+      '/thesis/students/search',
+      { params: { q: query } },
     );
     return response.data;
   },

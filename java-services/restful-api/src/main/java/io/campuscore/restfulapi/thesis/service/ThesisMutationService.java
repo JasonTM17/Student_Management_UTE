@@ -14,6 +14,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupCreateRequest
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.MemberRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.ProgressRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.RoundCreateRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
@@ -190,16 +191,47 @@ public class ThesisMutationService {
         authorizeLeaderOrAdmin(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
         requireMutableMembership(group, actor);
-        String studentId = normalize(request == null ? null : request.studentId());
-        requireActiveStudent(studentId);
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
             throw conflict("GROUP_FULL", "A thesis group can have at most three members");
         }
+        String studentId = normalize(request == null ? null : request.studentId());
+        if (studentId.isBlank()) {
+            addExternalMember(group, request);
+            return groups.findById(groupId);
+        }
+        requireActiveStudent(studentId);
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = :roundId AND student_id = :studentId", group.roundId(), studentId) > 0) {
             throw conflict("STUDENT_ALREADY_IN_GROUP", "Student already belongs to a group in this round");
         }
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) + 1));
         return groups.findById(groupId);
+    }
+
+    /**
+     * Members from a different department or school have no student profile to
+     * reference; their declared identity is stored on the membership row so the
+     * reviewer can verify it, and a synthetic student_id keeps the round's
+     * one-group-per-member uniqueness intact.
+     */
+    private void addExternalMember(GroupRow group, MemberRequest request) {
+        String displayName = normalize(request == null ? null : request.displayName());
+        String contact = normalize(request == null ? null : request.contact());
+        if (displayName.isBlank() || displayName.length() > 150) {
+            throw invalid("displayName is required for members without a student profile (max 150 characters)");
+        }
+        if (contact.length() > 150) {
+            throw invalid("contact must contain at most 150 characters");
+        }
+        String syntheticId = "external-" + UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader, display_name, contact, is_external) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE, :displayName, :contact, TRUE)",
+                params()
+                        .addValue("id", UUID.randomUUID())
+                        .addValue("groupId", group.id())
+                        .addValue("roundId", group.roundId())
+                        .addValue("studentId", syntheticId)
+                        .addValue("memberOrder", count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", group.id()) + 1)
+                        .addValue("displayName", displayName)
+                        .addValue("contact", contact.isBlank() ? null : contact));
     }
 
     @Transactional
@@ -301,6 +333,38 @@ public class ThesisMutationService {
                 params().addValue("id", groupId).addValue("reason", reason));
         if (changed != 1) throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only pending groups can be rejected");
         return groups.findById(groupId);
+    }
+
+    /**
+     * Directory lookup used by group leaders to invite classmates: matches
+     * active students by student number, email or full name (max 8 hits).
+     */
+    public List<StudentSearchResponse> searchStudents(String query) {
+        String normalized = normalize(query).toLowerCase(java.util.Locale.ROOT);
+        if (normalized.length() < 2) {
+            return List.of();
+        }
+        String pattern = "%" + normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
+        return jdbc.query(
+                "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"email\", u.\"firstName\", u.\"lastName\","
+                        + " cur.\"code\" AS curriculum_code, cur.\"name\" AS curriculum_name"
+                        + " FROM campuscore_auth.\"Student\" s"
+                        + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\""
+                        + " LEFT JOIN academic.\"Curriculum\" cur ON cur.\"id\" = s.\"curriculumId\""
+                        + " WHERE s.\"status\" = 'ACTIVE'"
+                        + " AND (LOWER(s.\"studentId\") LIKE :pattern ESCAPE '\\'"
+                        + "   OR LOWER(u.\"email\") LIKE :pattern ESCAPE '\\'"
+                        + "   OR LOWER(u.\"firstName\" || ' ' || u.\"lastName\") LIKE :pattern ESCAPE '\\')"
+                        + " ORDER BY s.\"studentId\" LIMIT 8",
+                params().addValue("pattern", pattern),
+                (rs, ignored) -> new StudentSearchResponse(
+                        rs.getString("id"),
+                        rs.getString("student_number"),
+                        rs.getString("email"),
+                        rs.getString("firstName"),
+                        rs.getString("lastName"),
+                        rs.getString("curriculum_code"),
+                        rs.getString("curriculum_name")));
     }
 
     private GroupRow lockGroup(UUID id) {

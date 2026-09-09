@@ -1,13 +1,17 @@
 'use client';
 
-import { useCallback, useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   ArrowUpRight,
+  Building2,
   CalendarDays,
   Check,
   CircleDot,
   FileStack,
   Plus,
+  Shield,
+  Trash2,
+  UserPlus,
   UsersRound,
   X,
 } from 'lucide-react';
@@ -16,6 +20,8 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Modal } from '@/components/ui/modal';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -31,9 +37,21 @@ import type { Department } from '@/types/api';
 import {
   thesisApi,
   type ThesisGroup,
+  type ThesisGroupMember,
   type ThesisRound,
+  type ThesisStudentResult,
   type ThesisTopic,
 } from '@/lib/thesis-api';
+
+/** Shape of the API error envelope (`{ code, message }`) used for domain conflicts. */
+interface ThesisApiErrorShape {
+  response?: { data?: { code?: string; message?: string } | null } | null;
+}
+
+function getThesisErrorCode(error: unknown): string {
+  const data = (error as ThesisApiErrorShape | undefined)?.response?.data;
+  return data?.code ?? '';
+}
 
 export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin } = useAuth();
@@ -63,6 +81,17 @@ export default function ThesisPage() {
   const [rejectGroupId, setRejectGroupId] = useState('');
   const [rejectReason, setRejectReason] = useState('');
   const [rejectError, setRejectError] = useState('');
+
+  // Add member modal state
+  const [isAddMemberModalOpen, setIsAddMemberModalOpen] = useState(false);
+  const [memberType, setMemberType] = useState<'internal' | 'external'>('internal');
+  const [memberName, setMemberName] = useState('');
+  const [memberContact, setMemberContact] = useState('');
+  const [addMemberError, setAddMemberError] = useState('');
+  const [studentQuery, setStudentQuery] = useState('');
+  const [studentResults, setStudentResults] = useState<ThesisStudentResult[]>([]);
+  const [isSearching, setIsSearching] = useState(false);
+  const [hasSearched, setHasSearched] = useState(false);
 
   useEffect(() => {
     let cancelled = false;
@@ -169,8 +198,31 @@ export default function ThesisPage() {
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
   const studentId = user?.studentId ?? '';
   const currentGroup = groups.find(
-    (group) => group.leaderStudentId === studentId || group.memberStudentIds.includes(studentId),
+    (group) =>
+      group.leaderStudentId === studentId ||
+      group.memberStudentIds.includes(studentId) ||
+      Boolean(group.members?.some((m) => m.studentId === studentId)),
   );
+
+  const groupMemberList: ThesisGroupMember[] = useMemo(() => {
+    if (!currentGroup) return [];
+    if (currentGroup.members && currentGroup.members.length > 0) {
+      return currentGroup.members;
+    }
+    return currentGroup.memberStudentIds.map((id) => ({
+      studentId: id,
+      isLeader: id === currentGroup.leaderStudentId,
+      isExternal: false,
+    }));
+  }, [currentGroup]);
+
+  const canManageMembers = useMemo(() => {
+    if (!currentGroup || !user?.studentId) return false;
+    const isLeader = currentGroup.leaderStudentId === user.studentId;
+    const isRoundOpen = selectedRound?.status === 'REGISTRATION_OPEN';
+    const isNotApproved = currentGroup.approvalStatus !== 'APPROVED';
+    return isLeader && isRoundOpen && isNotApproved;
+  }, [currentGroup, user, selectedRound]);
 
   const myTopics = isSupervisorOrAdmin
     ? topics.filter(
@@ -200,6 +252,35 @@ export default function ThesisPage() {
     messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
     messages.common.statuses.UNKNOWN;
 
+  const memberCopy =
+    locale === 'vi'
+      ? ({
+          searchLabel: 'Tìm sinh viên trong trường',
+          searchPlaceholder: 'Nhập tên, MSSV hoặc email...',
+          searchButton: 'Tìm',
+          searchHint: 'Nhập ít nhất 2 ký tự để tìm theo tên, MSSV hoặc email.',
+          searching: 'Đang tìm...',
+          searchNoResults: 'Không tìm thấy sinh viên phù hợp.',
+          addShort: 'Thêm',
+          addedShort: 'Đã trong nhóm',
+          curriculumLabel: 'CTĐT',
+          groupFull: 'Nhóm đã đủ 3 thành viên, không thể thêm mới.',
+          studentAlreadyInGroup: 'Sinh viên này đã thuộc một nhóm trong đợt này.',
+        } as const)
+      : ({
+          searchLabel: 'Search internal students',
+          searchPlaceholder: 'Enter name, student ID or email...',
+          searchButton: 'Search',
+          searchHint: 'Type at least 2 characters to search by name, student ID or email.',
+          searching: 'Searching...',
+          searchNoResults: 'No matching students found.',
+          addShort: 'Add',
+          addedShort: 'Already in group',
+          curriculumLabel: 'Curriculum',
+          groupFull: 'The group already has the maximum of 3 members.',
+          studentAlreadyInGroup: 'This student already belongs to a group in this round.',
+        } as const);
+
   const refreshGroups = async () => {
     if (!selectedRoundId) return;
     setGroups(await thesisApi.listGroups(selectedRoundId));
@@ -213,6 +294,116 @@ export default function ThesisPage() {
     try {
       await thesisApi.createGroup(selectedRoundId);
       await refreshGroups();
+    } catch {
+      setActionError(messages.thesis.actionFailed);
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleAddMember = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!currentGroup) return;
+
+    if (!memberName.trim()) {
+      setAddMemberError(messages.thesis.allFieldsRequired);
+      return;
+    }
+
+    setIsActionPending(true);
+    setAddMemberError('');
+    setActionSuccess('');
+    setActionError('');
+
+    try {
+      await thesisApi.addMember(currentGroup.id, {
+        displayName: memberName.trim(),
+        contact: memberContact.trim() || undefined,
+      });
+      await refreshGroups();
+      setIsAddMemberModalOpen(false);
+      setMemberName('');
+      setMemberContact('');
+      setActionSuccess(messages.thesis.memberAdded);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'GROUP_FULL') {
+        setAddMemberError(memberCopy.groupFull);
+      } else if (code === 'STUDENT_ALREADY_IN_GROUP') {
+        setAddMemberError(memberCopy.studentAlreadyInGroup);
+      } else {
+        setAddMemberError(messages.thesis.actionFailed);
+      }
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const resetStudentSearch = () => {
+    setStudentQuery('');
+    setStudentResults([]);
+    setHasSearched(false);
+    setAddMemberError('');
+  };
+
+  const handleSearchStudents = async () => {
+    const query = studentQuery.trim();
+    if (query.length < 2) {
+      setAddMemberError(memberCopy.searchHint);
+      return;
+    }
+    setIsSearching(true);
+    setHasSearched(true);
+    setAddMemberError('');
+    try {
+      setStudentResults(await thesisApi.searchStudents(query));
+    } catch {
+      setStudentResults([]);
+      setAddMemberError(messages.thesis.actionFailed);
+    } finally {
+      setIsSearching(false);
+    }
+  };
+
+  const handleAddInternalMember = async (student: ThesisStudentResult) => {
+    if (!currentGroup) return;
+    setIsActionPending(true);
+    setAddMemberError('');
+    setActionSuccess('');
+    setActionError('');
+
+    try {
+      await thesisApi.addMember(currentGroup.id, { studentId: student.studentId });
+      await refreshGroups();
+      setIsAddMemberModalOpen(false);
+      resetStudentSearch();
+      setActionSuccess(messages.thesis.memberAdded);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'GROUP_FULL') {
+        setAddMemberError(memberCopy.groupFull);
+      } else if (code === 'STUDENT_ALREADY_IN_GROUP') {
+        setAddMemberError(memberCopy.studentAlreadyInGroup);
+      } else {
+        setAddMemberError(messages.thesis.actionFailed);
+      }
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleRemoveMember = async (targetStudentId: string) => {
+    if (!currentGroup) return;
+    if (!window.confirm(messages.thesis.removeMemberConfirm)) return;
+
+    setIsActionPending(true);
+    setActionError('');
+    setActionSuccess('');
+
+    try {
+      await thesisApi.removeMember(currentGroup.id, targetStudentId);
+      await refreshGroups();
+      setActionSuccess(messages.thesis.memberRemoved);
     } catch {
       setActionError(messages.thesis.actionFailed);
     } finally {
@@ -401,39 +592,39 @@ export default function ThesisPage() {
         />
       ) : (
         <>
-          <Card className="overflow-hidden border-foreground/10 bg-[hsl(var(--foreground))] text-[hsl(var(--background))]">
+          <Card className="overflow-hidden border border-border/80 bg-card text-card-foreground shadow-sm">
             <CardContent className="relative grid gap-8 p-6 sm:p-8 lg:grid-cols-[1.2fr_0.8fr] lg:items-end">
               <div className="space-y-4">
-                <div className="inline-flex items-center gap-2 rounded-full border border-white/15 bg-white/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-white/75">
-                  <CircleDot className="h-3.5 w-3.5 text-[hsl(var(--accent-warm))]" />
+                <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                  <CircleDot className="h-3.5 w-3.5" />
                   {selectedRound.thesisType}
                 </div>
                 <div>
-                  <p className="text-sm text-white/65">{messages.thesis.roundStatus}</p>
-                  <h2 className="mt-2 text-3xl font-semibold tracking-tight sm:text-4xl">
+                  <p className="text-sm font-medium text-muted-foreground">{messages.thesis.roundStatus}</p>
+                  <h2 className="mt-2 text-3xl font-semibold tracking-tight text-foreground sm:text-4xl">
                     {selectedRound.name}
                   </h2>
                 </div>
               </div>
               <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-1">
-                <div className="border-l border-white/20 pl-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                <div className="border-l-2 border-primary/30 pl-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     {messages.thesis.roundStatus}
                   </p>
-                  <p className="mt-2 text-lg font-semibold">{statusLabel(selectedRound.status)}</p>
+                  <p className="mt-2 text-lg font-semibold text-foreground">{statusLabel(selectedRound.status)}</p>
                 </div>
-                <div className="border-l border-white/20 pl-4">
-                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-white/55">
+                <div className="border-l-2 border-primary/30 pl-4">
+                  <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                     {messages.thesis.registrationWindow}
                   </p>
-                  <p className="mt-2 text-sm leading-6 text-white/75">
+                  <p className="mt-2 text-sm leading-6 text-foreground/90">
                     {formatDateTime(selectedRound.registrationStart)}
-                    <span className="mx-1 text-white/40">→</span>
+                    <span className="mx-1 text-muted-foreground">→</span>
                     {formatDateTime(selectedRound.registrationEnd)}
                   </p>
                 </div>
               </div>
-              <div className="pointer-events-none absolute -bottom-16 right-8 h-48 w-48 rounded-full border border-white/10 sm:right-24" />
+              <div className="pointer-events-none absolute -bottom-16 right-8 h-48 w-48 rounded-full border border-primary/10 sm:right-24" />
             </CardContent>
           </Card>
 
@@ -599,21 +790,114 @@ export default function ThesisPage() {
                   />
                 ) : (
                   <div className="space-y-5">
-                    <div className="flex items-start justify-between gap-4 rounded-xl border border-border/70 bg-card p-4">
-                      <div>
-                        <p className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                          {messages.thesis.groupsTitle}
+                    <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
+                      <div className="min-w-0 space-y-1">
+                        <div className="flex flex-wrap items-center gap-2">
+                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+                            {messages.thesis.groupsTitle}
+                          </span>
+                          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-foreground">
+                            {messages.thesis.status[currentGroup.status] ?? currentGroup.status}
+                          </span>
+                          <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
+                        </div>
+                        <h4 className="text-sm font-semibold text-foreground truncate">
+                          {currentGroup.topicId ? getTopicTitle(currentGroup.topicId) : messages.thesis.chooseTopic}
+                        </h4>
+                        <p className="font-mono text-xs text-muted-foreground">
+                          ID: {currentGroup.id.slice(0, 8)}…{currentGroup.id.slice(-4)}
                         </p>
-                        <p className="mt-2 break-all font-mono text-xs text-muted-foreground">{currentGroup.id}</p>
                       </div>
-                      <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
+
+                      {canManageMembers && groupMemberList.length < 3 ? (
+                        <Button
+                          type="button"
+                          size="sm"
+                          onClick={() => {
+                            resetStudentSearch();
+                            setIsAddMemberModalOpen(true);
+                          }}
+                          disabled={isActionPending}
+                          className="shrink-0 gap-1.5"
+                        >
+                          <UserPlus className="h-4 w-4" />
+                          {messages.thesis.addMember}
+                        </Button>
+                      ) : null}
                     </div>
+
+                    {/* Member List Header & Count */}
                     <div className="space-y-3">
                       <div className="flex items-center justify-between text-sm">
-                        <span className="text-muted-foreground">{messages.thesis.memberCount.replace('{count}', String(currentGroup.memberStudentIds.length))}</span>
-                        <span className="font-medium text-foreground">{currentGroup.topicId ? (messages.thesis.status[currentGroup.status] ?? messages.thesis.status.SUBMITTED) : messages.thesis.chooseTopic}</span>
+                        <span className="font-medium text-foreground">
+                          {messages.thesis.memberCount.replace('{count}', String(groupMemberList.length))}
+                        </span>
+                        <span className="text-xs text-muted-foreground">
+                          {groupMemberList.length >= 3 ? messages.thesis.maxMembersReached : ''}
+                        </span>
                       </div>
-                      <MemberAvatars memberIds={currentGroup.memberStudentIds} max={3} />
+
+                      {/* Detailed member items */}
+                      <div className="space-y-2">
+                        {groupMemberList.map((member) => (
+                          <div
+                            key={member.studentId || member.displayName}
+                            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-3 shadow-2xs transition-colors hover:border-primary/40"
+                          >
+                            <div className="flex items-center gap-3 min-w-0">
+                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
+                                {(member.displayName || member.studentId || 'SV').slice(0, 2).toUpperCase()}
+                              </div>
+                              <div className="min-w-0 space-y-0.5">
+                                <div className="flex flex-wrap items-center gap-1.5">
+                                  <span className="font-semibold text-sm text-foreground truncate">
+                                    {member.displayName || member.studentId}
+                                  </span>
+                                  {member.isLeader ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                                      <Shield className="h-3 w-3" />
+                                      {messages.thesis.leaderBadge}
+                                    </span>
+                                  ) : (
+                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                      {messages.thesis.memberBadge}
+                                    </span>
+                                  )}
+                                  {member.isExternal ? (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                                      <Building2 className="h-3 w-3" />
+                                      {messages.thesis.externalBadge}
+                                    </span>
+                                  ) : null}
+                                </div>
+                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
+                                  {member.studentId && !member.isExternal ? (
+                                    <span>MSSV: <strong className="font-mono text-foreground/80">{member.studentId}</strong></span>
+                                  ) : null}
+                                  {member.contact ? (
+                                    <span>{member.contact}</span>
+                                  ) : null}
+                                </div>
+                              </div>
+                            </div>
+
+                            {/* Remove button for leader during open registration */}
+                            {canManageMembers && !member.isLeader ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => void handleRemoveMember(member.studentId)}
+                                disabled={isActionPending}
+                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
+                                title={messages.thesis.removeMember}
+                              >
+                                <Trash2 className="h-4 w-4" />
+                              </Button>
+                            ) : null}
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 )}
@@ -716,9 +1000,9 @@ export default function ThesisPage() {
                           <h3 className="mt-4 line-clamp-2 text-base font-semibold leading-6 text-foreground">
                             {topic.title}
                           </h3>
-                          <p className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
-                            {topic.description}
-                          </p>
+                          <div className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
+                            <RichContentRenderer content={topic.description} />
+                          </div>
                           <div className="mt-auto pt-3 flex flex-wrap gap-2">
                             {currentGroup &&
                             !selected &&
@@ -838,13 +1122,14 @@ export default function ThesisPage() {
             <label className="mb-1 block text-sm font-medium text-foreground">
               {messages.thesis.topicDescriptionLabel}
             </label>
-            <Textarea
+            <RichTextEditor
               value={proposeDescription}
-              onChange={(e) => setProposeDescription(e.target.value)}
+              onChange={setProposeDescription}
               placeholder={messages.thesis.topicDescriptionLabel}
-              rows={4}
-              required
+              minHeight="140px"
               disabled={isActionPending}
+              locale={locale}
+              showTemplates={true}
             />
           </div>
           <label className="flex cursor-pointer items-center gap-2 text-sm text-foreground">
@@ -921,6 +1206,200 @@ export default function ThesisPage() {
               {isActionPending ? messages.common.states.loading : messages.thesis.reject}
             </Button>
           </div>
+        </div>
+      </Modal>
+
+      {/* Add Group Member Modal */}
+      <Modal
+        isOpen={isAddMemberModalOpen}
+        onClose={() => {
+          if (!isActionPending) setIsAddMemberModalOpen(false);
+        }}
+        title={messages.thesis.addMemberModalTitle}
+        description={messages.thesis.addMemberModalDescription}
+      >
+        <div className="space-y-4">
+          {addMemberError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {addMemberError}
+            </div>
+          ) : null}
+
+          {/* Type switcher: Internal (search) vs External / Cross-major */}
+          <div className="flex rounded-lg border border-border/80 bg-muted/40 p-1 text-xs font-medium">
+            <button
+              type="button"
+              onClick={() => {
+                setMemberType('internal');
+                resetStudentSearch();
+              }}
+              className={cn(
+                'flex-1 rounded-md py-1.5 px-3 text-center transition-colors',
+                memberType === 'internal'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {messages.thesis.memberTypeInternal}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                setMemberType('external');
+                resetStudentSearch();
+              }}
+              className={cn(
+                'flex-1 rounded-md py-1.5 px-3 text-center transition-colors',
+                memberType === 'external'
+                  ? 'bg-background text-foreground shadow-xs font-semibold'
+                  : 'text-muted-foreground hover:text-foreground',
+              )}
+            >
+              {messages.thesis.memberTypeExternal}
+            </button>
+          </div>
+
+          {memberType === 'internal' ? (
+            <div className="space-y-3">
+              <label className="block text-sm font-medium text-foreground" htmlFor="thesis-student-search">
+                {memberCopy.searchLabel}
+              </label>
+              <div className="flex gap-2">
+                <Input
+                  id="thesis-student-search"
+                  value={studentQuery}
+                  onChange={(e) => setStudentQuery(e.target.value)}
+                  onKeyDown={(e) => {
+                    if (e.key === 'Enter') {
+                      e.preventDefault();
+                      void handleSearchStudents();
+                    }
+                  }}
+                  placeholder={memberCopy.searchPlaceholder}
+                  disabled={isActionPending || isSearching}
+                  className="h-10"
+                />
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => void handleSearchStudents()}
+                  disabled={isActionPending || isSearching}
+                  className="h-10 shrink-0"
+                >
+                  {memberCopy.searchButton}
+                </Button>
+              </div>
+              <p className="text-xs text-muted-foreground">{memberCopy.searchHint}</p>
+
+              {isSearching ? (
+                <p className="text-xs text-muted-foreground">{memberCopy.searching}</p>
+              ) : hasSearched && studentResults.length === 0 ? (
+                <p className="text-xs text-muted-foreground">{memberCopy.searchNoResults}</p>
+              ) : null}
+
+              {studentResults.length > 0 ? (
+                <ul className="max-h-64 divide-y divide-border/60 overflow-y-auto rounded-lg border border-border/70 bg-card">
+                  {studentResults.map((student) => {
+                    const inGroup = groupMemberList.some(
+                      (member) => member.studentId === student.studentId,
+                    );
+                    const fullName =
+                      locale === 'vi'
+                        ? `${student.lastName} ${student.firstName}`.trim()
+                        : `${student.firstName} ${student.lastName}`.trim();
+                    const curriculumLabel = [student.curriculumCode, student.curriculumName]
+                      .filter(Boolean)
+                      .join(' - ');
+                    return (
+                      <li
+                        key={student.studentId}
+                        className="flex items-center justify-between gap-3 p-3"
+                      >
+                        <div className="min-w-0 space-y-0.5">
+                          <p className="truncate text-sm font-semibold text-foreground">{fullName}</p>
+                          <p className="truncate text-xs text-muted-foreground">
+                            MSSV: <span className="font-mono">{student.studentNumber}</span> · {student.email}
+                          </p>
+                          {curriculumLabel ? (
+                            <p className="truncate text-xs text-muted-foreground">
+                              {memberCopy.curriculumLabel}: {curriculumLabel}
+                            </p>
+                          ) : null}
+                        </div>
+                        <Button
+                          type="button"
+                          size="sm"
+                          variant={inGroup ? 'ghost' : 'outline'}
+                          onClick={() => void handleAddInternalMember(student)}
+                          disabled={inGroup || isActionPending}
+                          className="shrink-0"
+                        >
+                          {inGroup ? memberCopy.addedShort : memberCopy.addShort}
+                        </Button>
+                      </li>
+                    );
+                  })}
+                </ul>
+              ) : null}
+
+              <div className="flex justify-end pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddMemberModalOpen(false)}
+                  disabled={isActionPending}
+                >
+                  {messages.common.actions.cancel}
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <form onSubmit={handleAddMember} className="space-y-4">
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  {messages.thesis.memberNameLabel} <span className="text-destructive">*</span>
+                </label>
+                <Input
+                  value={memberName}
+                  onChange={(e) => setMemberName(e.target.value)}
+                  placeholder={messages.thesis.memberNamePlaceholder}
+                  required
+                  disabled={isActionPending}
+                  className="h-10"
+                />
+              </div>
+              <div>
+                <label className="mb-1 block text-sm font-medium text-foreground">
+                  {messages.thesis.memberContactLabel}
+                </label>
+                <Input
+                  value={memberContact}
+                  onChange={(e) => setMemberContact(e.target.value)}
+                  placeholder={messages.thesis.memberContactPlaceholder}
+                  disabled={isActionPending}
+                  className="h-10"
+                />
+                <p className="mt-1 text-xs text-muted-foreground">
+                  {locale === 'vi'
+                    ? 'Áp dụng cho thành viên khác ngành hoặc đến từ trường đại học khác.'
+                    : 'For members from another major or a different university.'}
+                </p>
+              </div>
+              <div className="flex justify-end gap-2 pt-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => setIsAddMemberModalOpen(false)}
+                  disabled={isActionPending}
+                >
+                  {messages.common.actions.cancel}
+                </Button>
+                <Button type="submit" disabled={isActionPending}>
+                  {isActionPending ? messages.common.states.loading : messages.thesis.addMember}
+                </Button>
+              </div>
+            </form>
+          )}
         </div>
       </Modal>
     </div>

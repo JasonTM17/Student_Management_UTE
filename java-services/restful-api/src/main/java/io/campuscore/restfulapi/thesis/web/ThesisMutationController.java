@@ -11,20 +11,24 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentReq
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.GroupRejectionRequest;
+import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.StudentSearchResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
+import java.util.List;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.web.bind.annotation.DeleteMapping;
+import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
+import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
 @RestController
@@ -100,6 +104,12 @@ public class ThesisMutationController {
             @RequestBody MemberRequest request,
             @AuthenticationPrincipal Jwt actor) {
         return mutations.addMember(id, request, actor);
+    }
+
+    @GetMapping("/students/search")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
+    public List<StudentSearchResponse> searchStudents(@RequestParam String q) {
+        return mutations.searchStudents(q);
     }
 
     @DeleteMapping("/groups/{id}/members/{studentId}")
