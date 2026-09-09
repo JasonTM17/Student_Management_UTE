@@ -75,3 +75,22 @@ Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiế
   - OpenGraph / Twitter Banner: Tự động render 1200x630 chuẩn nhận diện tại `/opengraph-image`.
   - Sitemap: Tự động cập nhật tại `/sitemap.xml`.
   - Robots: `/robots.txt` cho phép các trang công khai và bảo vệ các khu vực nội bộ.
+
+---
+
+## 5. Nhật Ký Kiểm Thử Sản Xuất Trực Tiếp (Live Verification Log)
+
+- **Thời gian xác minh**: 09/09/2026 13:15 (UTC+7)
+- **Git Commit**: `b235693f` (`origin/main`)
+- **Vercel Production**:
+  - URL triển khai: `https://www.campusute.io.vn` / `https://campusute.io.vn`
+  - HTTP Status: `200 OK`
+  - Build: Next.js SSG + SSR hoàn thành sạch sẽ (`dpl_9XDwgFeGJJqXFDrvci1qzL8rhNNa`).
+- **Render Backend REST API**:
+  - URL: `https://campuscore-backend-p4em.onrender.com`
+  - Endpoint liveness: `{"service":"restful-api","status":"ok"}`
+  - Endpoint actuator: `{"status":"UP","groups":["liveness","readiness"]}`
+- **Supabase PostgreSQL**:
+  - Host: `https://kbptwmwitojjjwvwckom.supabase.co`
+  - Trạng thái xác thực thực tế: Gọi trực tiếp `/api/v1/auth/login` bằng tài khoản sinh viên demo (`student@campuscore.edu`), phản hồi định danh thành công với đầy đủ hồ sơ người dùng.
+
