@@ -158,26 +158,23 @@ export default function AdminDashboardPage() {
         <LoadingState label={messages.admin.loading} />
       ) : (
         <div className="space-y-6">
-          <section className="rounded-lg border-l-4 border-[var(--portal-yellow)] bg-primary p-5 text-primary-foreground">
-            <h2 className="text-xl font-semibold leading-7">
+          <section aria-labelledby="admin-overview-title" className="min-w-0">
+            <h2 id="admin-overview-title" className="sr-only">
               {messages.admin.overviewTitle}
             </h2>
-            <p className="mt-2 max-w-3xl text-sm leading-6 text-primary-foreground/85">
-              {messages.admin.description}
-            </p>
+            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+              {statCards.map((stat) => (
+                <AdminMetricCard
+                  key={stat.label}
+                  label={stat.label}
+                  value={formatNumber(stat.value)}
+                  icon={<stat.icon className="h-5 w-5" />}
+                  detail={stat.detail}
+                  toneClassName={stat.tone}
+                />
+              ))}
+            </div>
           </section>
-          <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
-            {statCards.map((stat) => (
-              <AdminMetricCard
-                key={stat.label}
-                label={stat.label}
-                value={formatNumber(stat.value)}
-                icon={<stat.icon className="h-5 w-5" />}
-                detail={stat.detail}
-                toneClassName={stat.tone}
-              />
-            ))}
-          </div>
 
           <section aria-labelledby="admin-management-title" className="min-w-0">
             <div className="mb-3 border-b border-border pb-3">

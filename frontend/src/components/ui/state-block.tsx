@@ -22,7 +22,7 @@ export function EmptyState({
   return (
     <div
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center border border-dashed border-border bg-[var(--portal-surface)] px-6 py-10 text-center',
+        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-dashed border-border bg-[var(--portal-surface)] px-6 py-10 text-center shadow-xs',
         className,
       )}
     >
@@ -61,7 +61,7 @@ export function ErrorState({
     <div
       role="alert"
       className={cn(
-        'border border-destructive/35 bg-destructive/5 p-6',
+        'rounded-xl border border-destructive/35 bg-destructive/5 p-6 shadow-xs',
         className,
       )}
     >
@@ -107,7 +107,7 @@ export function LoadingState({
       role="status"
       aria-live="polite"
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center gap-4 border border-border bg-[var(--portal-surface)] px-6 py-10',
+        'flex min-h-[220px] flex-col items-center justify-center gap-4 rounded-xl border border-border bg-[var(--portal-surface)] px-6 py-10 shadow-xs',
         className,
       )}
     >
@@ -140,7 +140,7 @@ export function ForbiddenState({
     <div
       role="alert"
       className={cn(
-        'flex min-h-[220px] flex-col items-center justify-center border border-[var(--portal-rule)] bg-[var(--portal-surface)] px-6 py-10 text-center',
+        'flex min-h-[220px] flex-col items-center justify-center rounded-xl border border-[var(--portal-rule)] bg-[var(--portal-surface)] px-6 py-10 text-center shadow-xs',
         className,
       )}
     >
