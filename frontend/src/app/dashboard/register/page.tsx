@@ -144,6 +144,10 @@ export default function RegisterPage() {
     courseGroups.find((group) => group.courseId === selectedCourseId) ?? courseGroups[0] ?? null;
 
   const registered = enrollments.filter((item) => ACTIVE_ENROLLMENT_STATUSES.has(item.status));
+  const totalRegisteredCredits = registered.reduce(
+    (sum, item) => sum + (item.section?.course?.credits ?? 0),
+    0,
+  );
 
   /** Human-readable section label so confirmation dialogs name the exact class. */
   const sectionLabel = (
@@ -385,8 +389,13 @@ export default function RegisterPage() {
           </Card>
         </div>
         <Card className="min-w-0 lg:col-span-3">
-          <CardHeader>
+          <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
             <CardTitle>{copy.enrolledRail}</CardTitle>
+            {registered.length > 0 ? (
+              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                {formatNumber(totalRegisteredCredits)} {copy.creditsUnit}
+              </span>
+            ) : null}
           </CardHeader>
           <CardContent className="space-y-3">
             {registered.length === 0 ? (
@@ -395,7 +404,7 @@ export default function RegisterPage() {
               registered.map((item) => {
                 const section = item.section;
                 return (
-                  <div key={item.id} className="rounded-md border border-border/70 px-3 py-3 text-sm">
+                  <div key={item.id} className="rounded-md border border-border/70 p-3 text-sm transition-colors hover:border-primary/30">
                     <div className="flex items-start justify-between gap-2">
                       <div className="min-w-0">
                         <div className="font-semibold text-foreground">
@@ -404,6 +413,11 @@ export default function RegisterPage() {
                         </div>
                         {section?.course?.name ? (
                           <div className="mt-1 truncate text-muted-foreground">{section.course.name}</div>
+                        ) : null}
+                        {section?.course?.credits ? (
+                          <div className="mt-1 text-xs text-muted-foreground">
+                            {formatNumber(section.course.credits)} {copy.creditsUnit}
+                          </div>
                         ) : null}
                       </div>
                       <Button

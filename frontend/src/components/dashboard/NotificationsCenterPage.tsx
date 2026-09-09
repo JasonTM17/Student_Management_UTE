@@ -177,7 +177,7 @@ export default function NotificationsCenterPage() {
         }
       />
 
-      <div className="flex flex-col gap-3 border border-border/70 bg-card p-3 sm:flex-row sm:items-center sm:justify-between sm:p-4">
+      <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-3 shadow-xs sm:flex-row sm:items-center sm:justify-between sm:p-4">
         <div className="flex flex-wrap gap-2" role="tablist" aria-label={copy.title}>
           {(['all', 'unread'] as const).map((tab) => {
             const selected = filter === tab;
@@ -259,7 +259,7 @@ export default function NotificationsCenterPage() {
             }
           />
         ) : (
-          <div className="divide-y divide-border/70 border border-border/80 bg-card">
+          <div className="divide-y divide-border/70 overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
               {visibleItems.map((item) => {
               const title = item.title || copy.fallbackTitle;
               const content = item.content || item.message || copy.fallbackContent;
@@ -269,10 +269,10 @@ export default function NotificationsCenterPage() {
                   <article
                   key={item.id}
                   className={cn(
-                    'bg-card px-4 py-4 transition-colors sm:px-5',
+                    'bg-card px-4 py-4 transition-colors hover:bg-secondary/20 sm:px-5',
                     item.isRead
                       ? ''
-                      : 'border-l-2 border-l-primary bg-primary/[0.035]',
+                      : 'border-l-4 border-l-primary bg-primary/[0.035]',
                   )}
                 >
                   <div className="flex items-start gap-3 sm:gap-4">
