@@ -139,9 +139,9 @@ public class AuthLoginService {
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
         IssuedRefreshToken nextRefreshToken = tokens.issueRefreshToken(principal);
-        users.replaceRefreshSession(
+        users.rotateRefreshSession(
                 user.id(),
-                UUID.randomUUID().toString(),
+                refreshTokenHash,
                 hash(nextRefreshToken.refreshToken()),
                 ipAddress,
                 userAgent,
@@ -167,8 +167,24 @@ public class AuthLoginService {
                 request != null && request.lastName() != null ? request.lastName() : user.lastName(),
                 request != null && request.phone() != null ? request.phone() : user.phone(),
                 request != null && request.dateOfBirth() != null ? parseDate(request.dateOfBirth()) : user.dateOfBirth(),
-                request != null && request.address() != null ? request.address() : user.address());
+                request != null && request.address() != null ? request.address() : user.address(),
+                request != null && request.avatar() != null ? normalizeAvatar(request.avatar()) : user.avatar());
         return requireActiveUser(user.id()).toResponse();
+    }
+
+    /** Only inline image data URLs are accepted; anything else would be unusable in <img src>. */
+    private static String normalizeAvatar(String avatar) {
+        String trimmed = avatar.trim();
+        if (trimmed.isBlank()) {
+            return null;
+        }
+        String lowered = trimmed.toLowerCase(java.util.Locale.ROOT);
+        if (!lowered.startsWith("data:image/png;")
+                && !lowered.startsWith("data:image/jpeg;")
+                && !lowered.startsWith("data:image/webp;")) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "avatar must be a png, jpeg or webp data URL");
+        }
+        return trimmed;
     }
 
     @Transactional
@@ -241,7 +257,7 @@ public class AuthLoginService {
         AuthPrincipal principal = principal(user);
         IssuedAccessToken accessToken = tokens.issueAccessToken(principal);
         IssuedRefreshToken refreshToken = tokens.issueRefreshToken(principal);
-        users.replaceRefreshSession(
+        users.insertRefreshSession(
                 user.id(),
                 UUID.randomUUID().toString(),
                 hash(refreshToken.refreshToken()),

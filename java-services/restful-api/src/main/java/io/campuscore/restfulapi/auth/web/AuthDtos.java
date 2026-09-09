@@ -34,12 +34,14 @@ public final class AuthDtos {
     public record LogoutRequest(String refreshToken) {
     }
 
+    /** Avatar accepts a base64 data URL produced by the client-side resize (≤ ~150 KB). */
     public record UpdateProfileRequest(
             String firstName,
             String lastName,
             String phone,
             String dateOfBirth,
-            String address) {
+            String address,
+            @Size(max = 200_000, message = "avatar must be a data URL of at most 200k characters") String avatar) {
     }
 
     public record ChangePasswordRequest(

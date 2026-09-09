@@ -4,6 +4,8 @@ FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb836
 WORKDIR /app
 
 COPY frontend/package*.json ./
+# postinstall runs scripts/copy-tinymce.mjs, so the scripts folder must exist here.
+COPY frontend/scripts ./scripts
 RUN npm ci
 
 # Build stage

@@ -183,7 +183,12 @@ public class AuthUserRepository {
                         .addValue("loggedInAt", localDateTime(loggedInAt)));
     }
 
-    public void replaceRefreshSession(
+    /**
+     * Persists a brand-new session at login without touching the user's other
+     * active sessions: signing in on a second device must never invalidate the
+     * first one. Expired rows for the same user are pruned to bound growth.
+     */
+    public void insertRefreshSession(
             String userId,
             String sessionId,
             String refreshTokenHash,
@@ -197,7 +202,10 @@ public class AuthUserRepository {
                 .addValue("ipAddress", ipAddress)
                 .addValue("userAgent", userAgent)
                 .addValue("expiresAt", localDateTime(expiresAt));
-        jdbc.update("DELETE FROM " + SESSION_TABLE + " WHERE \"userId\" = :userId", parameters);
+        jdbc.update(
+                "DELETE FROM " + SESSION_TABLE
+                        + " WHERE \"userId\" = :userId AND \"expiresAt\" <= CURRENT_TIMESTAMP",
+                parameters);
         jdbc.update(
                 "INSERT INTO " + SESSION_TABLE
                         + " (\"id\", \"userId\", \"refreshToken\", \"userAgent\", \"ipAddress\", \"expiresAt\", \"createdAt\")"
@@ -207,6 +215,37 @@ public class AuthUserRepository {
                 "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :userId",
                 parameters);
+    }
+
+    /**
+     * Rotates exactly the session identified by its previous refresh-token hash.
+     * Other active sessions (other devices/tabs) stay valid.
+     */
+    public int rotateRefreshSession(
+            String userId,
+            String previousRefreshTokenHash,
+            String refreshTokenHash,
+            String ipAddress,
+            String userAgent,
+            Instant expiresAt) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("userId", userId)
+                .addValue("previousRefreshToken", previousRefreshTokenHash)
+                .addValue("refreshToken", refreshTokenHash)
+                .addValue("ipAddress", ipAddress)
+                .addValue("userAgent", userAgent)
+                .addValue("expiresAt", localDateTime(expiresAt));
+        int rotated = jdbc.update(
+                "UPDATE " + SESSION_TABLE
+                        + " SET \"refreshToken\" = :refreshToken, \"userAgent\" = :userAgent,"
+                        + " \"ipAddress\" = :ipAddress, \"expiresAt\" = :expiresAt"
+                        + " WHERE \"userId\" = :userId AND \"refreshToken\" = :previousRefreshToken",
+                parameters);
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"refreshToken\" = :refreshToken, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :userId",
+                parameters);
+        return rotated;
     }
 
     public void deleteRefreshSession(String userId, String refreshTokenHash) {
@@ -237,7 +276,8 @@ public class AuthUserRepository {
             String lastName,
             String phone,
             Instant dateOfBirth,
-            String address) {
+            String address,
+            String avatar) {
         jdbc.update(
                 "UPDATE " + USER_TABLE
                         + " SET \"firstName\" = :firstName,"
@@ -245,6 +285,7 @@ public class AuthUserRepository {
                         + " \"phone\" = :phone,"
                         + " \"dateOfBirth\" = :dateOfBirth,"
                         + " \"address\" = :address,"
+                        + " \"avatar\" = :avatar,"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP"
                         + " WHERE \"id\" = :userId",
                 new MapSqlParameterSource()
@@ -253,7 +294,8 @@ public class AuthUserRepository {
                         .addValue("lastName", lastName)
                         .addValue("phone", phone)
                         .addValue("dateOfBirth", localDateTime(dateOfBirth))
-                        .addValue("address", address));
+                        .addValue("address", address)
+                        .addValue("avatar", avatar));
     }
 
     public void changePassword(String userId, String passwordHash, Instant passwordChangedAt) {

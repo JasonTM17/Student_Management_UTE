@@ -39,21 +39,37 @@ public class ThesisAssistantController {
     private static final Logger LOG = LoggerFactory.getLogger(ThesisAssistantController.class);
     private final ThesisAssistantService assistant;
     private final RagAssistantGateway ragGateway;
+    private final AssistantPersonalContextAdvisor personalContext;
 
     /** Compatibility constructor for focused controller tests. */
     public ThesisAssistantController(ThesisAssistantService assistant) {
-        this(assistant, null);
+        this(assistant, null, null);
+    }
+
+    /** Compatibility constructor for focused controller tests. */
+    public ThesisAssistantController(ThesisAssistantService assistant, RagAssistantGateway ragGateway) {
+        this(assistant, ragGateway, null);
     }
 
     @Autowired
-    public ThesisAssistantController(ThesisAssistantService assistant, RagAssistantGateway ragGateway) {
+    public ThesisAssistantController(
+            ThesisAssistantService assistant,
+            RagAssistantGateway ragGateway,
+            AssistantPersonalContextAdvisor personalContext) {
         this.assistant = assistant;
         this.ragGateway = ragGateway;
+        this.personalContext = personalContext;
     }
 
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
+        if (personalContext != null && personalContext.handles(request.message())) {
+            ChatResponse personal = personalContext.answer(request, actor);
+            if (personal != null) {
+                return personal;
+            }
+        }
         String owner = subject(actor);
         if (remoteRag()) {
             return ragGateway.chat(request, owner);
@@ -77,7 +93,10 @@ public class ThesisAssistantController {
         String owner = subject(actor);
         Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
-            if (remoteRag()) {
+            if (personalContext != null && personalContext.handles(request.message())
+                    && personalContext.answer(request, actor) != null) {
+                personalContext.stream(request, actor, sink);
+            } else if (remoteRag()) {
                 ragGateway.stream(request, owner, sink);
             } else {
                 assistant.stream(request.message(), request.locale(), request.conversationId(), owner,

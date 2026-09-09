@@ -685,6 +685,75 @@ public class AcademicReadRepository {
                 resultSet.getString("status"));
     }
 
+    /** Curriculum a student profile is attached to (nullable column). */
+    public Optional<String> findStudentCurriculumId(String studentId) {
+        List<String> ids = jdbc.query(
+                "SELECT \"curriculumId\" FROM \"academic\".\"Student\" WHERE \"id\" = :studentId",
+                new MapSqlParameterSource("studentId", studentId),
+                (rs, ignored) -> rs.getString("curriculumId"));
+        return ids.stream().findFirst();
+    }
+
+    public List<CourseBriefRow> findCourseBriefsByIds(List<String> courseIds) {
+        if (courseIds.isEmpty()) {
+            return List.of();
+        }
+        return jdbc.query(
+                "SELECT c.\"id\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\", c.\"credits\""
+                        + " FROM \"academic\".\"Course\" c WHERE c.\"id\" IN (:courseIds)",
+                new MapSqlParameterSource("courseIds", courseIds),
+                (rs, ignored) -> new CourseBriefRow(
+                        rs.getString("id"),
+                        rs.getString("code"),
+                        rs.getString("name"),
+                        rs.getString("nameEn"),
+                        rs.getString("nameVi"),
+                        rs.getInt("credits")));
+    }
+
+    /**
+     * Best progress per course for a student: 2 = passed/completed, 1 = active
+     * enrollment, 0 = touched but not running (dropped/cancelled/failed).
+     */
+    public List<CourseProgressRow> findCourseProgressByStudentId(String studentId) {
+        return jdbc.query(
+                "SELECT e.\"courseId\" AS course_id,"
+                        + " MAX(CASE"
+                        + "   WHEN e.\"status\" = 'COMPLETED'"
+                        + "        OR (e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F') THEN 2"
+                        + "   WHEN e.\"status\" IN ('ENROLLED', 'CONFIRMED', 'PENDING') THEN 1"
+                        + "   ELSE 0 END) AS progress_level,"
+                        + " MAX(CASE WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F'"
+                        + "          THEN e.\"finalGrade\" END) AS passed_grade,"
+                        + " MAX(CASE WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F'"
+                        + "          THEN e.\"letterGrade\" END) AS passed_letter"
+                        + " FROM \"academic\".\"Enrollment\" e"
+                        + " WHERE e.\"studentId\" = :studentId"
+                        + " GROUP BY e.\"courseId\"",
+                new MapSqlParameterSource("studentId", studentId),
+                (rs, ignored) -> new CourseProgressRow(
+                        rs.getString("course_id"),
+                        rs.getInt("progress_level"),
+                        rs.getBigDecimal("passed_grade"),
+                        rs.getString("passed_letter")));
+    }
+
+    public record CourseBriefRow(
+            String id,
+            String code,
+            String name,
+            String nameEn,
+            String nameVi,
+            int credits) {
+    }
+
+    public record CourseProgressRow(
+            String courseId,
+            int progressLevel,
+            java.math.BigDecimal finalGrade,
+            String letterGrade) {
+    }
+
     private static Instant instant(Timestamp timestamp) {
         if (timestamp == null) {
             return null;

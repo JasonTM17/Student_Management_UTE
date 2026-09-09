@@ -214,13 +214,30 @@ public class AcademicEnrollmentReadService {
 
     @Transactional(readOnly = true)
     public StudentGradesByEnrollmentResponse findStudentGradesByEnrollment(String enrollmentId, List<String> roles, String lecturerId) {
+        return findStudentGradesByEnrollment(enrollmentId, roles, lecturerId, null);
+    }
+
+    /**
+     * Grade components of one enrollment. Admins see everything, lecturers only
+     * their own sections, and students only their own enrollment (404 otherwise).
+     */
+    @Transactional(readOnly = true)
+    public StudentGradesByEnrollmentResponse findStudentGradesByEnrollment(
+            String enrollmentId, List<String> roles, String lecturerId, String studentId) {
         String normalizedEnrollmentId = normalizeRequired("enrollmentId", enrollmentId);
-        List<StudentGradeSectionRow> rows = studentGradeRows(
-                isAdmin(roles)
-                        ? academic.findStudentGradesByEnrollment(normalizedEnrollmentId)
-                        : academic.findStudentGradesByEnrollmentAndLecturer(
-                                normalizedEnrollmentId,
-                                requireProfileId("lecturerId", lecturerId)));
+        List<StudentGradeSectionRow> rows;
+        if (isAdmin(roles)) {
+            rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
+        } else if (roles != null && roles.contains("LECTURER")) {
+            rows = studentGradeRows(academic.findStudentGradesByEnrollmentAndLecturer(
+                    normalizedEnrollmentId,
+                    requireProfileId("lecturerId", lecturerId)));
+        } else {
+            academic.findEnrollmentById(normalizedEnrollmentId)
+                    .filter(row -> row.studentId().equals(normalizeOptional("studentId", studentId)))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
+            rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
+        }
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found");
         }

@@ -36,7 +36,11 @@ public final class ThesisMutationDtos {
     public record GroupCreateRequest(UUID roundId) {
     }
 
-    public record MemberRequest(String studentId) {
+    /**
+     * Internal member: studentId of an active student profile. External member
+     * (different department or school): studentId blank, displayName required.
+     */
+    public record MemberRequest(String studentId, String displayName, String contact) {
     }
 
     public record TopicAssignmentRequest(UUID topicId) {
@@ -46,5 +50,16 @@ public final class ThesisMutationDtos {
     }
 
     public record GroupRejectionRequest(String reason) {
+    }
+
+    /** Minimal directory entry so a leader can invite a classmate into the group. */
+    public record StudentSearchResponse(
+            String studentId,
+            String studentNumber,
+            String email,
+            String firstName,
+            String lastName,
+            String curriculumCode,
+            String curriculumName) {
     }
 }

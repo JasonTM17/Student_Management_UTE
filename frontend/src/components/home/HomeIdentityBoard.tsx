@@ -58,7 +58,7 @@ export function HomeIdentityBoard() {
           >
             <span className="font-semibold tabular-nums">{row.code}</span>
             <span className="min-w-0 truncate">{row.label}</span>
-            <span className="tabular-nums text-[var(--portal-sidebar-text)]/80">{row.meta}</span>
+            <span className="hidden text-right tabular-nums text-[var(--portal-sidebar-text)]/80 sm:block">{row.meta}</span>
           </div>
         ))}
       </div>

@@ -1,6 +1,6 @@
 'use client';
 
-import { ArrowRight } from 'lucide-react';
+import { ArrowRight, GraduationCap, Settings, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
@@ -8,11 +8,31 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { LinkButton } from '@/components/ui/link-button';
 import { SectionEyebrow } from '@/components/ui/page-header';
+import { metricToneClass } from '@/components/ui/status';
 import { HomeIdentityBoard } from '@/components/home/HomeIdentityBoard';
 import { buildSiteUrl } from '@/lib/site';
 import { useI18n } from '@/i18n';
 import { buildCanonicalPath } from '@/i18n/paths';
 import { useSiteAppearance } from '@/components/providers/SiteAppearanceProvider';
+import { cn } from '@/lib/utils';
+
+const roleCards = [
+  {
+    key: 'student',
+    icon: GraduationCap,
+    tone: metricToneClass('info'),
+  },
+  {
+    key: 'lecturer',
+    icon: Users,
+    tone: metricToneClass('success'),
+  },
+  {
+    key: 'admin',
+    icon: Settings,
+    tone: metricToneClass('warning'),
+  },
+] as const;
 
 export default function HomePage() {
   const {
@@ -23,6 +43,16 @@ export default function HomePage() {
   } = useAuth();
   const { locale, messages } = useI18n();
   const { appearance } = useSiteAppearance();
+  const copy =
+    locale === 'vi'
+      ? {
+          heroDescription: 'Một cổng duy nhất cho đăng ký, thời khóa biểu và điểm số.',
+          footerDescription: 'Một cổng học vụ cho sinh viên, giảng viên và quản trị.',
+        } as const
+      : {
+          heroDescription: 'One portal for registration, schedules, and grades.',
+          footerDescription: 'One campus portal for students, lecturers, and admins.',
+        } as const;
   const hero = appearance.hero[locale];
   const currentYear = new Date().getFullYear();
   const workspaceHref = isAdmin || isSuperAdmin
@@ -34,7 +64,6 @@ export default function HomePage() {
   const primaryLabel = user
     ? messages.common.actions.openDashboard
     : messages.common.actions.signIn;
-  const proofRows = messages.home.publicProof;
   const homepageStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
@@ -102,7 +131,7 @@ export default function HomePage() {
               {hero.title || messages.home.title}
             </h1>
             <p className="max-w-xl text-base leading-7 text-foreground/80 lg:text-lg">
-              {hero.description || messages.home.description}
+              {hero.description || copy.heroDescription}
             </p>
             <div>
               <LinkButton
@@ -119,64 +148,46 @@ export default function HomePage() {
           <HomeIdentityBoard />
         </section>
 
-        <section className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
-          <div className="grid gap-12 lg:grid-cols-[2fr_1fr_1fr] lg:gap-12">
-            <article className="min-w-0">
-              <h2 className="text-3xl font-semibold leading-9 text-foreground">
-                {messages.home.roleLanes.student.title}
-              </h2>
-              <ul className="mt-6 divide-y divide-border border-y border-border">
-                {messages.home.roleLanes.student.rows.map((row) => (
-                  <li key={row} className="py-3 text-base leading-6 text-muted-foreground">
-                    {row}
-                  </li>
-                ))}
-              </ul>
-              <LocalizedLink
-                href={messages.home.roleLanes.student.href}
-                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {messages.home.roleLanes.student.action}
-              </LocalizedLink>
-            </article>
-
-            <article className="min-w-0 border-t border-border pt-8 lg:border-t-0 lg:pt-0">
-              <h2 className="text-xl font-semibold leading-7 text-foreground">
-                {messages.home.roleLanes.lecturer.title}
-              </h2>
-              <ul className="mt-6 space-y-3">
-                {messages.home.roleLanes.lecturer.rows.map((row) => (
-                  <li key={row} className="text-sm leading-6 text-muted-foreground">
-                    {row}
-                  </li>
-                ))}
-              </ul>
-              <LocalizedLink
-                href={messages.home.roleLanes.lecturer.href}
-                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {messages.home.roleLanes.lecturer.action}
-              </LocalizedLink>
-            </article>
-
-            <article className="min-w-0 border-t border-border pt-8 lg:border-t-0 lg:pt-0">
-              <h2 className="text-xl font-semibold leading-7 text-foreground">
-                {messages.home.roleLanes.admin.title}
-              </h2>
-              <ul className="mt-6 space-y-3">
-                {messages.home.roleLanes.admin.rows.map((row) => (
-                  <li key={row} className="text-sm leading-6 text-muted-foreground">
-                    {row}
-                  </li>
-                ))}
-              </ul>
-              <LocalizedLink
-                href={messages.home.roleLanes.admin.href}
-                className="mt-4 inline-flex min-h-11 items-center text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-              >
-                {messages.home.roleLanes.admin.action}
-              </LocalizedLink>
-            </article>
+        <section className="mx-auto max-w-[1280px] px-4 pb-10 sm:px-6 lg:px-12 lg:pb-14">
+          <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+            {roleCards.map((card) => {
+              const lane = messages.home.roleLanes[card.key];
+              return (
+                <article
+                  key={card.key}
+                  className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-6 transition-colors hover:border-primary/40"
+                >
+                  <div className="flex items-center gap-3">
+                    <span
+                      className={cn(
+                        'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg',
+                        card.tone,
+                      )}
+                    >
+                      <card.icon className="h-5 w-5" />
+                    </span>
+                    <h2 className="text-lg font-semibold text-foreground">{lane.title}</h2>
+                  </div>
+                  <ul className="flex flex-wrap gap-2">
+                    {lane.rows.map((row) => (
+                      <li
+                        key={row}
+                        className="rounded-full bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground"
+                      >
+                        {row}
+                      </li>
+                    ))}
+                  </ul>
+                  <LocalizedLink
+                    href={lane.href}
+                    className="group mt-auto inline-flex min-h-10 items-center gap-1.5 text-sm font-semibold text-primary underline-offset-4 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  >
+                    {lane.action}
+                    <ArrowRight className="h-4 w-4 transition-transform duration-150 motion-safe:group-hover:translate-x-0.5" />
+                  </LocalizedLink>
+                </article>
+              );
+            })}
           </div>
         </section>
 
@@ -207,19 +218,6 @@ export default function HomePage() {
             </ol>
           </div>
         </section>
-
-        <section className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-14">
-          <ul className="divide-y divide-border border-y border-border">
-            {proofRows.map((row) => (
-              <li key={row.title} className="grid gap-2 py-6 md:grid-cols-[1fr_2fr] md:gap-8">
-                <h2 className="text-base font-semibold leading-6 text-foreground">
-                  {row.title}
-                </h2>
-                <p className="text-sm leading-6 text-muted-foreground">{row.description}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
       </main>
 
       <footer className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
@@ -235,7 +233,7 @@ export default function HomePage() {
                 subtitle={messages.home.footerSubtitle}
               />
               <p className="max-w-sm text-sm leading-6 text-[var(--portal-sidebar-muted)]">
-                {messages.home.footerDescription}
+                {copy.footerDescription}
               </p>
             </div>
             <div className="space-y-2">

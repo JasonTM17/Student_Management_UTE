@@ -1,5 +1,7 @@
 import { expect, test, type Page } from '@playwright/test';
 
+test.describe.configure({ timeout: 90_000 });
+
 // Browser rendering regression with controlled API responses; no database writes.
 const terms = [2, 1].map((number) => ({
   id: `term-${number}`, name: `Term ${number}`, nameEn: `Semester ${number}`,
@@ -35,12 +37,37 @@ async function mockStudent(page: Page, singleTerm = false) {
       '/api/v1/auth/me': { id: 'demo-student', email: 'demo@example.test', firstName: 'Demo', lastName: 'Student', roles: ['STUDENT'] },
       '/api/v1/semesters': { data: terms },
       '/api/v1/notifications/my': { data: [] },
+      '/api/v1/registration/rounds': [{
+        id: 'round-demo', semesterId: 'term-2', name: 'Registration',
+        kind: 'REGISTRATION', status: 'OPEN', windowStart: '2026-09-01T00:00:00Z',
+        windowEnd: '2026-09-30T00:00:00Z', creditLimit: 18,
+      }],
+      '/api/v1/me/registration/sections': [
+        {
+          id: 'section-se101-01', sectionNumber: '01', courseId: 'course-se101',
+          courseCode: 'SE101', courseName: 'Software Engineering', credits: 3,
+          capacity: 40, enrolledCount: 28, remainingSeats: 12, status: 'OPEN',
+          scheduleConflict: false, alreadyEnrolled: true,
+        },
+        {
+          id: 'section-se101-02', sectionNumber: '02', courseId: 'course-se101',
+          courseCode: 'SE101', courseName: 'Software Engineering', credits: 3,
+          capacity: 40, enrolledCount: 30, remainingSeats: 10, status: 'OPEN',
+          scheduleConflict: false, alreadyEnrolled: false,
+        },
+        {
+          id: 'section-ai201-01', sectionNumber: '01', courseId: 'course-ai201',
+          courseCode: 'AI201', courseName: 'Applied AI', credits: 3,
+          capacity: 35, enrolledCount: 18, remainingSeats: 17, status: 'OPEN',
+          scheduleConflict: false, alreadyEnrolled: false,
+        },
+      ],
       '/api/v1/enrollments/my/transcript': {
         summary: { cumulativeGpa: 3.15, totalCreditsEarned: 6, totalCreditsAttempted: 6 },
         semesters: singleTerm ? transcriptTerms.slice(0, 1) : transcriptTerms,
       },
       '/api/v1/enrollments/my': [6, 7, 7].map((day, index) => ({
-        id: `meeting-${index}`, status: 'CONFIRMED',
+        id: `meeting-${index}`, sectionId: index === 0 ? 'section-se101-01' : `weekend-${index}`, status: 'CONFIRMED',
         section: {
           sectionNumber: `SECTION-${index}`, course: { code: `WEEKEND${index}`, name: 'Weekend course' },
           schedules: [{ dayOfWeek: day, startTime: '07:00', endTime: '09:30' }],
@@ -80,9 +107,49 @@ test('demo polish: weekend meetings remain visible in both languages', async ({ 
         await expect(grid.getByText(code, { exact: true })).toBeVisible();
       }
     }
-    await expect(page.getByText(`${sunday} - ${locale === 'en' ? 'Class' : 'Lớp học phần'} SECTION-1`, { exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /WEEKEND1 - Weekend course/ })).toBeVisible();
+    await expect(page.getByText(new RegExp(`${sunday} \\(07:00 - 09:30\\)`)).first()).toBeVisible();
     await noOverflow(page);
   }
+  expect(errors).toEqual([]);
+});
+
+test('demo polish: feedback surfaces stay scannable on registration and schedule', async ({ page }, testInfo) => {
+  const errors = await mockStudent(page);
+  const width = testInfo.project.use.viewport?.width ?? 1280;
+
+  await page.goto('/en/dashboard/register');
+  await expect(page.getByLabel('Course code or class')).toBeVisible();
+  await expect(page.getByLabel('Course name')).toBeVisible();
+  await expect(page.getByText('SE101', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByText('2 classes').filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Drop course' }).first()).toBeVisible();
+  await noOverflow(page);
+
+  await page.goto('/en/dashboard/schedule');
+  await expect(page.getByText('Weekly meetings')).toHaveCount(0);
+  if (width >= 768) {
+    const timetable = page.getByRole('table', { name: 'Weekly timetable grid' });
+    await expect(timetable).toBeVisible();
+    const timetableBox = await timetable.boundingBox();
+    const listBox = await page.getByRole('heading', { name: 'Class section list' }).boundingBox();
+    if (width >= 1280) {
+      expect(timetableBox?.width ?? 0).toBeGreaterThan(listBox?.width ?? Number.MAX_SAFE_INTEGER);
+    }
+  } else {
+    await expect(page.getByText('Saturday', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+    await expect(page.getByText(/WEEKEND0/).filter({ visible: true }).first()).toBeVisible();
+  }
+  await noOverflow(page);
+  expect(errors).toEqual([]);
+});
+
+test('demo polish: profile exposes photo upload and password visibility controls', async ({ page }) => {
+  const errors = await mockStudent(page);
+  await page.goto('/en/dashboard/profile');
+  await expect(page.getByText('Upload photo')).toBeVisible();
+  await expect(page.getByRole('button', { name: 'Show password' })).toHaveCount(3);
+  await noOverflow(page);
   expect(errors).toEqual([]);
 });
 
@@ -91,18 +158,18 @@ for (const singleTerm of [false, true]) {
     const errors = await mockStudent(page, singleTerm);
     for (const locale of ['en', 'vi']) {
       await page.goto(`/${locale}/dashboard/transcript`);
-      const chart = page.getByRole('img', { name: /GPA trend by semester|Xu hướng GPA theo học kỳ/ });
+      const chart = page.getByRole('img', { name: /GPA trend|Xu hướng GPA/ });
       await expect(chart).toBeVisible();
       await expect(chart.locator('circle')).toHaveCount(singleTerm ? 1 : 2);
-      await expect(chart.locator('polyline')).toHaveCount(singleTerm ? 0 : 1);
+      await expect(chart.locator('polyline')).toHaveCount(singleTerm ? 0 : 2);
       await expect(chart.locator('circle title')).toHaveText(
         (singleTerm ? [2] : [1, 2]).map((number) => `${locale === 'en' ? 'Semester' : 'Học kỳ'} ${number}: ${number === 1 ? '3.00' : '3.30'}`),
       );
       if (!singleTerm) {
-        await page.getByRole('combobox', { name: /Select semester for transcript|Chọn học kỳ cho bảng điểm/ }).selectOption('term-1');
+        await page.getByRole('combobox', { name: /Select semester for transcript|Chọn học kỳ cho bảng điểm/ }).first().selectOption('term-1');
         const distribution = page.getByRole('img', { name: /Grade distribution|Phân bố xếp loại/ });
         await expect(distribution.locator('rect title')).toHaveText(['B: 1']);
-        await expect(chart.locator('circle')).toHaveCount(2);
+        await expect(chart.locator('circle')).toHaveCount(3);
       }
       await noOverflow(page);
     }

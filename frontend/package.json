@@ -6,13 +6,16 @@
   "homepage": "https://github.com/JasonTM17/CampusCore_FullStack_Individual",
   "private": true,
   "scripts": {
+    "postinstall": "node scripts/copy-tinymce.mjs",
+    "predev": "node scripts/copy-tinymce.mjs",
+    "prebuild": "node scripts/copy-tinymce.mjs",
     "dev": "next dev",
     "build": "next build",
     "start": "next start",
     "start:standalone": "node scripts/start-standalone.mjs",
     "lint": "eslint . --ext .js,.jsx,.ts,.tsx --max-warnings=0",
     "typecheck": "next typegen && tsc --noEmit --incremental false",
-    "test": "node --test tests/frontend-smoke.test.js tests/portal-shell.test.js tests/phase-six-repair.test.js tests/assistant-contract.test.js tests/docker-browser-api-origin.test.js tests/site-appearance.test.js tests/campus-error.test.js tests/leftover-professional.test.js tests/ui-copy-polish.test.js tests/project-scan-fixes.test.js tests/announcement-governance.test.js tests/demo-polish.test.js"
+    "test": "node --test tests/frontend-smoke.test.js tests/portal-shell.test.js tests/phase-six-repair.test.js tests/assistant-contract.test.js tests/docker-browser-api-origin.test.js tests/site-appearance.test.js tests/campus-error.test.js tests/leftover-professional.test.js tests/ui-copy-polish.test.js tests/project-scan-fixes.test.js tests/announcement-governance.test.js tests/demo-polish.test.js tests/rich-editor.test.js"
   },
   "dependencies": {
     "@fontsource/be-vietnam-pro": "5.3.0",
@@ -20,6 +23,7 @@
     "@hookform/resolvers": "^3.9.0",
     "@radix-ui/react-slot": "^1.2.4",
     "@tanstack/react-query": "^5.51.1",
+    "@tinymce/tinymce-react": "^6.3.0",
     "axios": "^1.15.0",
     "class-variance-authority": "^0.7.0",
     "clsx": "^2.1.1",
@@ -32,6 +36,7 @@
     "sonner": "^1.5.0",
     "tailwind-merge": "^2.4.0",
     "tailwindcss-animate": "^1.0.7",
+    "tinymce": "^8.9.0",
     "zod": "^3.23.8"
   },
   "devDependencies": {

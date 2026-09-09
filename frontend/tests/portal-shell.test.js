@@ -15,7 +15,9 @@ test('public home and login copy stays campus-facing', () => {
   const messages = read('src/i18n/messages.ts');
   const rendered = `${home}\n${login}\n${messages}`;
 
-  assert.match(home, /messages\.home\.publicProof/);
+  // Feedback #1: the landing page must not repeat verbose proof paragraphs —
+  // the publicProof section was removed from the rendered page.
+  assert.doesNotMatch(home, /messages\.home\.publicProof/);
   assert.doesNotMatch(home, /whyPoints|pillars\[2\]/);
   assert.match(messages, /publicProof:/);
   assert.match(messages, /One campus portal/);
@@ -55,7 +57,7 @@ test('public homepage keeps navy chrome so dark mode cannot invert the hero pane
   );
 });
 
-test('portal tokens and page ribbon define the institutional visual grammar', () => {
+test('portal tokens and page tab define the institutional visual grammar', () => {
   const globals = read('src/app/globals.css');
   const pageHeader = read('src/components/ui/page-header.tsx');
 
@@ -64,8 +66,10 @@ test('portal tokens and page ribbon define the institutional visual grammar', ()
   assert.match(globals, /--portal-canvas:\s*oklch\(/);
   assert.match(globals, /\.portal-page-ribbon/);
   assert.match(globals, /prefers-reduced-motion:\s*reduce/);
-  assert.match(pageHeader, /portal-page-ribbon/);
-  assert.match(pageHeader, /portal-page-actions/);
+  // Feedback #2: page headers use a compact web-style tab, not the tall ribbon.
+  assert.match(pageHeader, /portal-page-tab/);
+  assert.match(pageHeader, /rounded-t-lg bg-primary/);
+  assert.match(pageHeader, /border-b border-border/);
 });
 
 test('login chrome is role-specific and admin can publish live appearance', () => {
@@ -106,8 +110,11 @@ test('student and lecturer routes share one accessible responsive sidebar', () =
   assert.match(layout, /aria-current=\{isActive \? 'page'/);
   assert.match(layout, /inert=\{!isDesktopSidebar && !sidebarOpen/);
   assert.match(layout, /id="dashboard-main-content"/);
-  assert.match(layout, /xl:grid-cols/);
-  assert.match(layout, /hidden xl:block/);
+  // Feedback #1/#5/#6: the right-hand context rail is gone — content owns the
+  // full width and the collapsed-rail dead zone no longer exists.
+  assert.doesNotMatch(layout, /StudentContextRail/);
+  assert.doesNotMatch(layout, /student-rail|studentRail/);
+  assert.doesNotMatch(layout, /hidden xl:block/);
   assert.match(layout, /WorkspaceForbiddenState/);
   assert.doesNotMatch(layout, /mobileMenuItems/);
   assert.doesNotMatch(

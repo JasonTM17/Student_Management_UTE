@@ -19,6 +19,7 @@ export interface User {
   gender?: 'MALE' | 'FEMALE' | 'OTHER';
   dateOfBirth?: string;
   address?: string;
+  avatar?: string | null;
   status: string;
   role?: 'ADMIN' | 'SUPER_ADMIN' | 'LECTURER' | 'STUDENT';
   roles?: string[];
@@ -351,4 +352,63 @@ export interface SectionGrades {
     gradeStatus?: 'DRAFT' | 'PUBLISHED' | 'APPEALED';
     enrollmentStatus?: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
   }[];
+}
+
+export interface CurriculumBrief {
+  id: string;
+  code: string;
+  name: string;
+  nameEn?: string | null;
+  nameVi?: string | null;
+  totalCredits: number;
+}
+
+export interface MyCurriculumCourse {
+  courseId: string;
+  code: string;
+  name: string;
+  nameEn?: string | null;
+  nameVi?: string | null;
+  credits: number;
+  year: number;
+  semester: number;
+  isMandatory: boolean;
+  status: 'COMPLETED' | 'IN_PROGRESS' | 'NOT_STARTED';
+  finalGrade?: number | null;
+  letterGrade?: string | null;
+}
+
+export interface MyCurriculumResponse {
+  curriculum: CurriculumBrief;
+  courses: MyCurriculumCourse[];
+}
+
+export interface StudentGradeLine {
+  id: string;
+  gradeItemId: string;
+  gradeItemName: string;
+  gradeItemType: string;
+  score?: number | null;
+  maxScore?: number | null;
+  weight?: number | null;
+}
+
+export interface EnrollmentGradeDetail {
+  id: string;
+  studentId: string;
+  studentName?: string;
+  courseCode: string;
+  courseName: string;
+  courseNameEn?: string;
+  courseNameVi?: string;
+  semester?: string;
+  semesterNameEn?: string;
+  semesterNameVi?: string;
+}
+
+export interface StudentGradesByEnrollmentResponse {
+  enrollment: EnrollmentGradeDetail;
+  grades: StudentGradeLine[];
+  calculatedTotal?: number | null;
+  totalWeight?: number | null;
 }

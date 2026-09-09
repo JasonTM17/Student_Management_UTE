@@ -314,6 +314,10 @@
     color: hsl(var(--foreground));
   }
 
+  .portal-page-tab {
+    border-bottom: 0.1875rem solid var(--portal-yellow);
+  }
+
   .portal-page-actions {
     border: 1px solid var(--portal-rule);
     border-left: 0.25rem solid var(--portal-yellow);

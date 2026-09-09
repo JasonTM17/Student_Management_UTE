@@ -42,6 +42,8 @@ import { Select } from '@/components/ui/select';
 import { statusToneClass } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { Textarea } from '@/components/ui/textarea';
+import { RichTextEditor } from '@/components/ui/rich-text-editor';
+import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
@@ -881,8 +883,14 @@ export default function AdminAnnouncementsPage() {
                   <AdminFormField label={`${vi ? 'Tiêu đề' : 'Title'} · ${copy.required}`}>
                     <Input autoFocus value={draft.title} maxLength={240} required onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} />
                   </AdminFormField>
-                  <AdminFormField label={`${vi ? 'Nội dung' : 'Content'} · ${copy.required}`} description={vi ? 'Nội dung cập nhật ngay trên bảng tin; không tạo thêm thông báo đẩy.' : 'Changes appear in the feed immediately; no new push notification is created.'}>
-                    <Textarea className="min-h-[150px]" value={draft.content} required onChange={(event) => setDraft((current) => ({ ...current, content: event.target.value }))} />
+                  <AdminFormField label={`${vi ? 'Nội dung' : 'Content'} · ${copy.required}`} description={vi ? 'Nội dung cập nhật ngay trên bảng tin; hỗ trợ định dạng Markdown, bảng biểu, liên kết và hộp ghi chú callout.' : 'Changes appear in the feed immediately; supports Markdown, tables, links and alert callouts.'}>
+                    <RichTextEditor
+                      value={draft.content}
+                      onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
+                      locale={locale}
+                      minHeight="220px"
+                      placeholder={vi ? 'Soạn thảo nội dung thông báo... (Hỗ trợ tiêu đề, in đậm, bảng biểu, ghi chú khẩn)' : 'Compose announcement body... (Supports headings, bold, tables, alert callouts)'}
+                    />
                   </AdminFormField>
                 </AdminFormSection>
 
@@ -984,8 +992,12 @@ export default function AdminAnnouncementsPage() {
                         <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusToneClass(announcementPriorityTone(draft.priority))}`}>{announcementPriorityLabel(draft.priority, locale)}</span>
                         <span className="text-xs font-medium text-muted-foreground">{previewVisible ? copy.visible : copy.notVisible}</span>
                       </div>
-                      <h3 className="mt-3 text-base font-semibold text-foreground">{draft.title || (vi ? 'Tiêu đề thông báo' : 'Announcement title')}</h3>
-                      <p className="mt-2 whitespace-pre-line text-sm leading-6 text-muted-foreground">{draft.content || (vi ? 'Nội dung xem trước sẽ hiển thị tại đây.' : 'Preview content will appear here.')}</p>
+                      <div className="mt-3">
+                        <RichContentRenderer
+                          content={draft.content}
+                          fallbackText={vi ? 'Nội dung xem trước sẽ hiển thị tại đây.' : 'Preview content will appear here.'}
+                        />
+                      </div>
                       {previewMeta.length > 0 ? <p className="mt-3 text-xs text-muted-foreground">{previewMeta.join(' · ')}</p> : null}
                     </div>
                     <div className="rounded-md border border-border/70 bg-background/70 p-4 text-sm">

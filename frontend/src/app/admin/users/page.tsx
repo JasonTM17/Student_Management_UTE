@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
+import { Eye, EyeOff, Pencil, Plus, Search, Trash2, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
@@ -84,6 +84,7 @@ export default function AdminUsersPage() {
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [showCreateModal, setShowCreateModal] = useState(false);
+  const [showTemporaryPassword, setShowTemporaryPassword] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
@@ -280,6 +281,7 @@ export default function AdminUsersPage() {
 
   const resetForm = () => {
     setEditingUser(null);
+    setShowTemporaryPassword(false);
     setFormError('');
     setFormData({ email: '', password: '', firstName: '', lastName: '', role: defaultRole });
   };
@@ -299,6 +301,7 @@ export default function AdminUsersPage() {
       return;
     }
     setEditingUser(userRecord);
+    setShowTemporaryPassword(false);
     setFormError('');
     setFormData({
       email: userRecord.email,
@@ -704,12 +707,29 @@ export default function AdminUsersPage() {
               label={copy.temporaryPassword}
               description={copy.temporaryPasswordHint}
             >
-              <Input
-                type="password"
-                value={formData.password}
-                onChange={(e) => setFormData((current) => ({ ...current, password: e.target.value }))}
-                required
-              />
+              <div className="relative">
+                <Input
+                  type={showTemporaryPassword ? 'text' : 'password'}
+                  value={formData.password}
+                  onChange={(e) => setFormData((current) => ({ ...current, password: e.target.value }))}
+                  className="pr-12"
+                  required
+                />
+                <button
+                  type="button"
+                  className="absolute right-2 top-[22px] inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  onClick={() => setShowTemporaryPassword((current) => !current)}
+                  aria-label={showTemporaryPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  title={showTemporaryPassword ? messages.login.hidePassword : messages.login.showPassword}
+                  aria-pressed={showTemporaryPassword}
+                >
+                  {showTemporaryPassword ? (
+                    <EyeOff className="h-4 w-4" aria-hidden="true" />
+                  ) : (
+                    <Eye className="h-4 w-4" aria-hidden="true" />
+                  )}
+                </button>
+              </div>
             </AdminFormField>
           ) : null}
 
