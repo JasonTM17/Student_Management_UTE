@@ -403,7 +403,7 @@ export default function AdminCoursesPage() {
             >
               <div className="grid w-full gap-4 xl:max-w-3xl xl:grid-cols-[minmax(0,1fr)_260px]">
                 <div>
-                  <label className="mb-2 block text-sm font-medium text-foreground">
+                  <label className="mb-1 block text-sm font-medium text-foreground">
                     {copy.searchLabel}
                   </label>
                   <Input

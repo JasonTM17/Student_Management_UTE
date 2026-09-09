@@ -314,8 +314,8 @@ export function AssistantPanel() {
             >
               {state.messages.length === 0 ? (
                 <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl bg-primary/10 text-primary shadow-inner">
-                    <Bot className="h-5 w-5 animate-bounce" aria-hidden="true" />
+                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-xs">
+                    <Bot className="h-5 w-5" aria-hidden="true" />
                   </div>
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">

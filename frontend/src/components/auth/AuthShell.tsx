@@ -133,7 +133,7 @@ export function AuthShell({
                       key={feature.label}
                       className="grid grid-cols-[2rem_1fr] gap-4 py-4"
                     >
-                      <div className="flex h-8 w-8 items-center justify-center border border-white/15 text-[var(--portal-yellow)]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-[var(--portal-yellow)]">
                         <span className="text-xs font-semibold">
                           {String(index + 1).padStart(2, '0')}
                         </span>
@@ -166,7 +166,7 @@ export function AuthShell({
             <LanguageToggle />
             <ThemeToggle />
           </div>
-          <div className={cn('w-full max-w-md space-y-8 border-0 bg-transparent p-0 sm:rounded-md sm:border sm:border-border/80 sm:bg-card sm:p-8 sm:panel-shadow', className)}>
+          <div className={cn('w-full max-w-md space-y-8 border-0 bg-transparent p-0 sm:rounded-2xl sm:border sm:border-border/80 sm:bg-card sm:p-8 sm:shadow-lg sm:panel-shadow', className)}>
             <div className="border-b border-border/70 pb-6 lg:hidden">
               <BrandMark
                 href="/"

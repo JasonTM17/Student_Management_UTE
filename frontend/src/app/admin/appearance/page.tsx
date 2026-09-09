@@ -163,7 +163,7 @@ export default function AdminAppearancePage() {
       ) : (
         <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
           <div className="space-y-8">
-            <section className="space-y-4 rounded-md border border-border/80 bg-card p-5">
+            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
               <div className="flex flex-wrap items-center justify-between gap-3">
                 <h2 className="text-lg font-semibold text-foreground">{copy.heroTitle}</h2>
                 <div className="inline-flex rounded-md border border-border/80 p-1" role="tablist">
@@ -285,7 +285,7 @@ export default function AdminAppearancePage() {
               </label>
             </section>
 
-            <section className="space-y-4 rounded-md border border-border/80 bg-card p-5">
+            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
               <h2 className="text-lg font-semibold text-foreground">{copy.accent}</h2>
               <div className="grid gap-3 sm:grid-cols-3">
                 {SITE_APPEARANCE_ACCENTS.map((accent) => (
@@ -312,7 +312,7 @@ export default function AdminAppearancePage() {
               </div>
             </section>
 
-            <section className="space-y-4 rounded-md border border-border/80 bg-card p-5">
+            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">{copy.postsTitle}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.postsDescription}</p>

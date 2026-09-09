@@ -323,7 +323,7 @@ export default function ProfilePage() {
           description={messages.profile.profileDescription}
           contentClassName="space-y-6"
         >
-            <div className="flex flex-col gap-4 rounded-lg border border-border/70 bg-secondary/35 p-5 sm:flex-row sm:items-center">
+            <div className="flex flex-col gap-4 rounded-xl border border-border/70 bg-secondary/35 p-5 shadow-xs sm:flex-row sm:items-center">
               <div className="flex h-20 w-20 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xl font-semibold text-primary-foreground">
                 {avatarPreview ? (
                   // eslint-disable-next-line @next/next/no-img-element

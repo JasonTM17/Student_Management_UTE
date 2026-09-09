@@ -155,7 +155,7 @@ export default function HomePage() {
               return (
                 <article
                   key={card.key}
-                  className="flex min-w-0 flex-col gap-4 rounded-lg border border-border bg-card p-6 transition-colors hover:border-primary/40"
+                  className="flex min-w-0 flex-col gap-4 rounded-xl border border-border bg-card p-6 shadow-xs transition hover:border-primary/40 hover:shadow-md"
                 >
                   <div className="flex items-center gap-3">
                     <span
