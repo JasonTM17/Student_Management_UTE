@@ -221,18 +221,21 @@ export default function DashboardPage() {
     Math.round((activeCredits / TERM_CREDIT_CAP) * 100),
   );
 
-  // Next class meetings derived from active sections: dayOfWeek 0 (Sunday)
-  // is normalized to 7 so Monday..Sunday sorts as 1..7 from today.
-  const todayDow = ((new Date().getDay() + 6) % 7) + 1;
+  // Next class meetings derived from active sections.
+  // DB schedule.dayOfWeek: 1=Sunday, 2=Monday, ..., 7=Saturday (0=Sunday).
+  // Normalize to ISO standard: 1=Monday .. 7=Sunday so daysUntil sorts from today.
+  const jsDay = new Date().getDay(); // 0 = Sun, 1 = Mon ... 6 = Sat
+  const todayDow = jsDay === 0 ? 7 : jsDay; // 1 = Monday ... 7 = Sunday
   const upcomingMeetings: UpcomingMeeting[] = [];
   activeCourses.forEach((enrollment) => {
     const section = enrollment.section;
     section?.schedules?.forEach((schedule, index) => {
-      const dayOfWeek = schedule.dayOfWeek === 0 ? 7 : schedule.dayOfWeek;
+      const rawDay = schedule.dayOfWeek;
+      const isoDay = rawDay === 0 || rawDay === 1 ? 7 : rawDay - 1;
       upcomingMeetings.push({
         id: `${enrollment.id}-${index}`,
-        dayOfWeek,
-        daysUntil: (dayOfWeek - todayDow + 7) % 7,
+        dayOfWeek: isoDay,
+        daysUntil: (isoDay - todayDow + 7) % 7,
         startTime: schedule.startTime,
         endTime: schedule.endTime,
         courseCode: section.course?.code ?? '',
@@ -253,10 +256,10 @@ export default function DashboardPage() {
   );
   const nextMeetings = upcomingMeetings.slice(0, 3);
 
-  const dayBadgeLabels =
+  const dayBadgeLabels: Record<number, string> =
     locale === 'vi'
-      ? ['CN', 'T2', 'T3', 'T4', 'T5', 'T6', 'T7']
-      : ['Sun', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat'];
+      ? { 1: 'T2', 2: 'T3', 3: 'T4', 4: 'T5', 5: 'T6', 6: 'T7', 7: 'CN' }
+      : { 1: 'Mon', 2: 'Tue', 3: 'Wed', 4: 'Thu', 5: 'Fri', 6: 'Sat', 7: 'Sun' };
 
   const enrollmentStatusLabel = (status: string) =>
     messages.common.statuses[status as keyof typeof messages.common.statuses] ??
@@ -379,25 +382,48 @@ export default function DashboardPage() {
                     .filter(Boolean)
                     .join(' ');
 
+                  const badgeText =
+                    meeting.daysUntil === 0
+                      ? copy.today
+                      : meeting.daysUntil === 1
+                        ? locale === 'vi'
+                          ? 'Ngày mai'
+                          : 'Tomorrow'
+                        : undefined;
+
                   return (
-                    <div
+                    <LocalizedLink
                       key={meeting.id}
-                      className="flex items-center gap-3 rounded-lg border border-border/70 bg-card p-3 transition-colors hover:border-primary/40"
+                      href="/dashboard/schedule"
+                      className="group flex items-center gap-3 rounded-lg border border-border/70 bg-card p-3 transition-all hover:border-primary/40 hover:shadow-xs"
                     >
                       <span
-                        title={meeting.daysUntil === 0 ? copy.today : undefined}
                         className={cn(
-                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold',
+                          'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg text-xs font-bold transition-colors',
                           meeting.daysUntil === 0
                             ? metricToneClass('info')
-                            : 'bg-secondary/60 text-foreground',
+                            : 'bg-secondary/60 text-foreground group-hover:bg-primary/10 group-hover:text-primary',
                         )}
                       >
-                        {dayBadgeLabels[meeting.dayOfWeek % 7]}
+                        {dayBadgeLabels[meeting.dayOfWeek]}
                       </span>
                       <div className="min-w-0 flex-1">
-                        <div className="truncate text-sm font-semibold text-foreground">
-                          {meeting.courseCode} — {meeting.courseName}
+                        <div className="flex items-center gap-2">
+                          <span className="truncate text-sm font-semibold text-foreground group-hover:text-primary">
+                            {meeting.courseCode} — {meeting.courseName}
+                          </span>
+                          {badgeText ? (
+                            <span
+                              className={cn(
+                                'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                meeting.daysUntil === 0
+                                  ? 'bg-primary/15 text-primary'
+                                  : 'bg-secondary text-muted-foreground',
+                              )}
+                            >
+                              {badgeText}
+                            </span>
+                          ) : null}
                         </div>
                         <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
                           <span className="inline-flex items-center gap-1 tabular-nums">
@@ -412,7 +438,8 @@ export default function DashboardPage() {
                           ) : null}
                         </div>
                       </div>
-                    </div>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/50 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </LocalizedLink>
                   );
                 })
               )}

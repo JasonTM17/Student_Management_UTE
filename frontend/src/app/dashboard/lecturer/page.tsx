@@ -263,7 +263,7 @@ export default function LecturerDashboardPage() {
                             )}
                           </div>
                           <div className="mt-1 text-sm text-muted-foreground">
-                            Section {section.sectionNumber} - {getLocalizedFlatLabel(
+                            {messages.lecturerDashboard.sectionPrefix} {section.sectionNumber} - {getLocalizedFlatLabel(
                               locale,
                               section.departmentName,
                               section.departmentNameEn,

@@ -164,15 +164,15 @@ export default function LecturerAnnouncementsPage() {
                     >
                       {announcementPriorityLabel(announcement.priority, locale)}
                     </span>
-                    <h2 className="text-lg font-semibold text-foreground">
-                      {announcement.title}
-                    </h2>
                     {announcementIsUpdated(announcement) ? (
-                      <span className="rounded-full bg-secondary px-2 py-1 text-xs text-muted-foreground">
+                      <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">
                         {locale === 'vi' ? 'Đã cập nhật' : 'Updated'}
                       </span>
                     ) : null}
                   </div>
+                  <h2 className="text-lg font-semibold text-foreground">
+                    {announcement.title}
+                  </h2>
                   <div className="max-w-3xl text-sm leading-7 text-muted-foreground">
                     <RichContentRenderer content={announcement.content} />
                   </div>

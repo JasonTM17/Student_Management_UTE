@@ -1,7 +1,8 @@
 'use client';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { Award, BookOpen, FileText, GraduationCap, Info, TrendingUp } from 'lucide-react';
+import { Award, BookOpen, FileText, GraduationCap, Info, Printer, TrendingUp } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
+import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import { GpaTrendChart, GradeDistributionChart } from '@/components/dashboard/TranscriptCharts';
@@ -249,6 +250,7 @@ export default function TranscriptPage() {
           selectSemester: 'Chọn học kỳ cho bảng điểm',
           allSemesters: 'Tất cả học kỳ',
           openGrades: 'Mở điểm số',
+          printTranscript: 'In bảng điểm',
           loading: 'Đang tải bảng điểm',
           unavailableTitle: 'Bảng điểm chưa sẵn sàng',
           emptyTitle: 'Chưa có hồ sơ bảng điểm',
@@ -301,6 +303,7 @@ export default function TranscriptPage() {
           selectSemester: 'Select semester for transcript',
           allSemesters: 'All semesters',
           openGrades: 'Open grades',
+          printTranscript: 'Print transcript',
           loading: 'Loading transcript',
           unavailableTitle: 'Transcript unavailable',
           emptyTitle: 'No transcript records yet',
@@ -423,6 +426,14 @@ export default function TranscriptPage() {
             <LinkButton href="/dashboard/grades" variant="outline">
               {copy.openGrades}
             </LinkButton>
+            <Button
+              variant="outline"
+              onClick={() => window.print()}
+              className="print:hidden"
+            >
+              <Printer className="mr-1.5 h-4 w-4" />
+              {copy.printTranscript}
+            </Button>
           </div>
         }
       />
