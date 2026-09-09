@@ -180,10 +180,10 @@ export const en = {
   },
   home: {
     navSubtitle: 'Campus academic portal',
-    eyebrow: 'A portal shaped around each role',
-    title: 'Academic work, from registration to thesis.',
+    eyebrow: 'Ho Chi Minh City University of Technology and Education',
+    title: 'Academic Portal & Student Management',
     description:
-      'Students, lecturers, and admins share one CampusCore portal.',
+      'Centralized academic management system for students, lecturers, and university administrators.',
     skipToContent: 'Skip to content',
     metricCards: [
       {
@@ -202,7 +202,7 @@ export const en = {
           'Each task points to a clear person or team instead of leaving responsibility unclear.',
       },
     ],
-    snapshotEyebrow: 'Academic snapshot',
+    snapshotEyebrow: 'Direct campus access',
     snapshotTitle: 'A calmer way to keep campus work moving',
     snapshotChecks: [
       'Students, lecturers, and admins start from one steady portal',
@@ -310,25 +310,33 @@ export const en = {
         { href: '/admin', label: 'Admin' },
       ],
     },
-    processKicker: 'Academic path',
-    processSteps: ['Register', 'Schedule', 'Grades', 'Thesis'],
+    processKicker: 'Core academic pillars',
+    processSteps: [
+      'Credit-based Curriculum',
+      'Timetable & Attendance',
+      'Gradebook & Transcripts',
+      'Thesis & Capstone',
+    ],
     roleLanes: {
       student: {
-        title: 'Student',
-        rows: ['Register', 'Schedule', 'Grades'],
-        action: 'Sign in to register',
+        title: 'Student Portal',
+        description: 'Course registration, class timetable, semester grades, and thesis defense.',
+        rows: ['Registration', 'Schedule', 'Grades'],
+        action: 'Enter Student Portal',
         href: '/login?portal=student',
       },
       lecturer: {
-        title: 'Lecturer',
+        title: 'Lecturer Portal',
+        description: 'Teaching schedule, section gradebook, and capstone group supervision.',
         rows: ['Gradebook', 'Teaching schedule'],
-        action: 'Open faculty sign-in',
+        action: 'Enter Lecturer Portal',
         href: '/login?portal=lecturer',
       },
       admin: {
-        title: 'Admin',
+        title: 'Admin Operations',
+        description: 'Academic departments, curriculum management, and campus notices.',
         rows: ['People', 'Course catalog'],
-        action: 'Open operations sign-in',
+        action: 'Enter Admin Portal',
         href: '/login?portal=admin',
       },
     },
@@ -1480,10 +1488,10 @@ export const vi: I18nMessages = {
   },
   home: {
     navSubtitle: 'Cổng học vụ CampusCore',
-    eyebrow: 'Cổng học vụ theo vai trò',
-    title: 'Học vụ thông suốt, từ đăng ký đến luận văn.',
+    eyebrow: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH',
+    title: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     description:
-      'Sinh viên, giảng viên và quản trị dùng chung một cổng CampusCore.',
+      'Hệ thống quản lý học vụ số tập trung dành cho Sinh viên, Giảng viên và Cán bộ Quản trị.',
     skipToContent: 'Bỏ qua đến nội dung',
     metricCards: [
       {
@@ -1502,7 +1510,7 @@ export const vi: I18nMessages = {
           'Giao diện bám theo người phụ trách rõ ràng thay vì dồn mọi việc vào một nơi.',
       },
     ],
-    snapshotEyebrow: 'Tổng quan học vụ',
+    snapshotEyebrow: 'Truy cập học vụ trực tiếp',
     snapshotTitle: 'Một cách bình tĩnh hơn để giữ campus luôn chạy',
     snapshotChecks: [
       'Sinh viên, giảng viên và quản trị cùng đi vào một cổng học vụ ổn định',
@@ -1609,25 +1617,33 @@ export const vi: I18nMessages = {
         { href: '/admin', label: 'Quản trị' },
       ],
     },
-    processKicker: 'Lộ trình học vụ',
-    processSteps: ['Đăng ký', 'Thời khóa biểu', 'Điểm', 'Luận văn'],
+    processKicker: 'Trọng tâm học vụ',
+    processSteps: [
+      'Đào tạo Tín chỉ',
+      'Thời khóa biểu',
+      'Điểm & Bảng điểm',
+      'Đồ án Tốt nghiệp',
+    ],
     roleLanes: {
       student: {
-        title: 'Sinh viên',
-        rows: ['Đăng ký', 'Thời khóa biểu', 'Điểm'],
-        action: 'Đăng nhập để đăng ký',
+        title: 'Cổng Sinh viên',
+        description: 'Đăng ký học phần, thời khóa biểu học kỳ, tra cứu điểm và làm đồ án tốt nghiệp.',
+        rows: ['Đăng ký học phần', 'Thời khóa biểu', 'Bảng điểm'],
+        action: 'Truy cập Cổng Sinh viên',
         href: '/login?portal=student',
       },
       lecturer: {
-        title: 'Giảng viên',
-        rows: ['Sổ điểm', 'Lịch giảng'],
-        action: 'Mở đăng nhập giảng viên',
+        title: 'Cổng Giảng viên',
+        description: 'Quản lý lịch giảng dạy, nhập điểm quá trình, kết thúc học phần và duyệt nhóm đồ án.',
+        rows: ['Lịch giảng dạy', 'Nhập điểm môn'],
+        action: 'Truy cập Cổng Giảng viên',
         href: '/login?portal=lecturer',
       },
       admin: {
-        title: 'Quản trị',
-        rows: ['Người dùng', 'Danh mục môn'],
-        action: 'Mở đăng nhập quản trị',
+        title: 'Cổng Quản trị',
+        description: 'Quản trị hồ sơ người dùng, phân công giảng dạy, đợt đăng ký môn và thông báo toàn trường.',
+        rows: ['Hồ sơ đào tạo', 'Danh mục môn học'],
+        action: 'Truy cập Cổng Quản trị',
         href: '/login?portal=admin',
       },
     },
