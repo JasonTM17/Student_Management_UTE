@@ -155,7 +155,7 @@ export default function LecturerAnnouncementsPage() {
             {orderedItems.map((announcement) => (
               <article
                 key={announcement.id}
-                className="rounded-lg border border-border/70 bg-card px-5 py-5"
+                className="rounded-xl border border-border/70 bg-card px-5 py-5 shadow-xs"
               >
                 <div className="space-y-3">
                   <div className="flex flex-wrap items-center gap-2">

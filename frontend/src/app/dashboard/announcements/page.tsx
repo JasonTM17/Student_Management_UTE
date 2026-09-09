@@ -148,7 +148,7 @@ export default function StudentAnnouncementsPage() {
             {orderedItems.map((announcement) => (
               <article
                 key={announcement.id}
-                className="rounded-lg border border-border/70 bg-card px-5 py-5"
+                className="rounded-xl border border-border/70 bg-card px-5 py-5 shadow-xs"
               >
                 <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
                   <div className="space-y-3">

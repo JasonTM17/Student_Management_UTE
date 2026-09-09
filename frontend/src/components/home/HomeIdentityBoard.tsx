@@ -21,7 +21,7 @@ export function HomeIdentityBoard() {
   const rows = lanes[activeIndex] ?? messages.home.identityRows;
 
   return (
-    <aside className="flex flex-col rounded-lg border-l-4 border-[var(--portal-yellow)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)]">
+    <aside className="flex flex-col rounded-xl border-l-4 border-[var(--portal-yellow)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)] shadow-xs">
       <p className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-yellow)]">
         {messages.home.snapshotEyebrow}
       </p>

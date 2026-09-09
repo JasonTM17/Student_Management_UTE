@@ -155,7 +155,7 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="grid grid-cols-3 gap-1 rounded-md border border-border/80 bg-secondary/40 p-1"
+          className="grid grid-cols-3 gap-1 rounded-xl border border-border/80 bg-secondary/40 p-1"
           role="tablist"
           aria-label={messages.login.portals.groupLabel}
         >
@@ -168,7 +168,7 @@ export default function LoginPage() {
                 role="tab"
                 aria-selected={selected}
                 className={cn(
-                  'inline-flex min-h-11 items-center justify-center rounded-sm px-2 text-center text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-center text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   selected
                     ? 'bg-card text-foreground shadow-sm'
                     : 'text-muted-foreground hover:text-foreground',
@@ -181,7 +181,7 @@ export default function LoginPage() {
         </div>
         <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
 
-        <div className="rounded-md border border-primary/20 bg-primary/5 p-3 text-xs space-y-2">
+        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground">
               {locale === 'vi' ? 'Tài khoản demo sẵn có:' : 'Demo account for this role:'}
@@ -208,7 +208,7 @@ export default function LoginPage() {
         </div>
 
         {notice ? (
-          <div role="status" className="rounded-md border border-border/80 bg-secondary/50 px-4 py-3">
+          <div role="status" className="rounded-xl border border-border/80 bg-secondary/50 px-4 py-3 shadow-xs">
             <div className="text-sm font-semibold text-foreground">
               {notice.title}
             </div>
@@ -225,7 +225,7 @@ export default function LoginPage() {
             role="alert"
             aria-live="assertive"
             tabIndex={-1}
-            className="rounded-md border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive"
+            className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-destructive shadow-xs"
           >
             {formError}
           </div>
