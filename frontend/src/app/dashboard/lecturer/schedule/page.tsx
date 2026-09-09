@@ -233,37 +233,68 @@ export default function LecturerSchedulePage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
-        title={copy.title}
-        description={copy.description}
-        actions={
-          <div className="flex flex-wrap items-center gap-3">
-            <div className="min-w-0 sm:min-w-[260px]">
-              <Select
-                aria-label={copy.selectSemester}
-                value={selectedSemester}
-                onChange={(event) => setSelectedSemester(event.target.value)}
-                options={[
-                  { value: '', label: copy.allSemesters },
-                  ...semesters.map((semester) => ({
-                    value: semester.id,
-                    label: getLocalizedName(locale, semester, semester.name),
-                  })),
-                ]}
-              />
+      <div className="print:hidden">
+        <PageHeader
+          eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
+          title={copy.title}
+          description={copy.description}
+          actions={
+            <div className="flex flex-wrap items-center gap-3">
+              <div className="min-w-0 sm:min-w-[260px]">
+                <Select
+                  aria-label={copy.selectSemester}
+                  value={selectedSemester}
+                  onChange={(event) => setSelectedSemester(event.target.value)}
+                  options={[
+                    { value: '', label: copy.allSemesters },
+                    ...semesters.map((semester) => ({
+                      value: semester.id,
+                      label: getLocalizedName(locale, semester, semester.name),
+                    })),
+                  ]}
+                />
+              </div>
+              <Button
+                variant="outline"
+                onClick={() => window.print()}
+                className="flex items-center gap-2"
+              >
+                <Printer className="h-4 w-4" />
+                <span>{copy.printSchedule}</span>
+              </Button>
             </div>
-            <Button
-              variant="outline"
-              onClick={() => window.print()}
-              className="flex items-center gap-2"
-            >
-              <Printer className="h-4 w-4" />
-              <span>{copy.printSchedule}</span>
-            </Button>
-          </div>
-        }
-      />
+          }
+        />
+      </div>
+
+      {/* Official University Letterhead for Print */}
+      <div className="hidden print:block text-center border-b-2 border-primary pb-4 mb-6">
+        <div className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+          {locale === 'vi'
+            ? 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH'
+            : 'HCMC UNIVERSITY OF TECHNOLOGY AND EDUCATION'}
+        </div>
+        <div className="text-sm font-extrabold text-foreground">
+          {locale === 'vi'
+            ? 'PHÒNG ĐÀO TẠO — HỆ THỐNG QUẢN LÝ ĐÀO TẠO CAMPUSCORE'
+            : 'ACADEMIC AFFAIRS OFFICE — CAMPUSCORE SYSTEM'}
+        </div>
+        <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
+          {locale === 'vi' ? 'LỊCH GIẢNG DẠY HỌC KỲ' : 'OFFICIAL TEACHING TIMETABLE'}
+        </h1>
+        <div className="flex flex-wrap justify-center gap-6 mt-3 text-xs text-foreground font-medium">
+          <span><strong>{locale === 'vi' ? 'Học kỳ:' : 'Semester:'}</strong> {selectedSemesterName}</span>
+          {user ? (
+            <>
+              <span><strong>{locale === 'vi' ? 'Giảng viên:' : 'Lecturer:'}</strong> {user.lastName} {user.firstName}</span>
+              <span><strong>Email:</strong> {user.email}</span>
+            </>
+          ) : null}
+          <span><strong>{copy.teachingSlots}:</strong> {slots.length}</span>
+          <span><strong>{copy.assignedSections}:</strong> {sections.length}</span>
+          <span><strong>{copy.studentsInScope}:</strong> {sections.reduce((sum, s) => sum + s.enrolledCount, 0)}</span>
+        </div>
+      </div>
 
       {error ? (
         <ErrorState
@@ -429,8 +460,25 @@ export default function LecturerSchedulePage() {
                                   {slot.courseCode}
                                 </span>
                               </div>
-                              <div className="mt-1 text-sm text-muted-foreground">
-                                {copy.sectionPrefix} {slot.sectionNumber}
+                              <div className="mt-1 flex items-center justify-between text-sm text-muted-foreground">
+                                <span>{copy.sectionPrefix} {slot.sectionNumber}</span>
+                                {slot.startTime && (
+                                  <span
+                                    className={`rounded-full border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider ${
+                                      slot.startTime < '12:00'
+                                        ? 'border-amber-300 bg-amber-100 text-amber-900 dark:border-amber-800 dark:bg-amber-950/60 dark:text-amber-300'
+                                        : slot.startTime < '18:00'
+                                        ? 'border-blue-300 bg-blue-100 text-blue-900 dark:border-blue-800 dark:bg-blue-950/60 dark:text-blue-300'
+                                        : 'border-purple-300 bg-purple-100 text-purple-900 dark:border-purple-800 dark:bg-purple-950/60 dark:text-purple-300'
+                                    }`}
+                                  >
+                                    {slot.startTime < '12:00'
+                                      ? (locale === 'vi' ? 'Ca Sáng' : 'Morning')
+                                      : slot.startTime < '18:00'
+                                      ? (locale === 'vi' ? 'Ca Chiều' : 'Afternoon')
+                                      : (locale === 'vi' ? 'Ca Tối' : 'Evening')}
+                                  </span>
+                                )}
                               </div>
                               <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 <span className="inline-flex items-center gap-1.5">
@@ -504,6 +552,21 @@ export default function LecturerSchedulePage() {
                 ))}
               </CardContent>
             </Card>
+          </div>
+
+          {/* Official Signatures for Print View */}
+          <div className="hidden print:grid grid-cols-2 gap-8 pt-8 mt-6 border-t border-border/80 text-center text-xs">
+            <div>
+              <p className="font-semibold">{locale === 'vi' ? 'TRƯỞNG KHOA / BỘ MÔN' : 'DEAN / DEPARTMENT HEAD'}</p>
+              <p className="text-muted-foreground mt-1">{locale === 'vi' ? '(Ký và ghi rõ họ tên)' : '(Signature & Full name)'}</p>
+              <div className="h-16" />
+            </div>
+            <div>
+              <p className="font-semibold">{locale === 'vi' ? 'GIẢNG VIÊN GIẢNG DẠY' : 'COURSE INSTRUCTOR'}</p>
+              <p className="text-muted-foreground mt-1">{locale === 'vi' ? '(Ký và ghi rõ họ tên)' : '(Signature & Full name)'}</p>
+              <div className="h-16" />
+              {user ? <p className="font-medium text-foreground">{user.lastName} {user.firstName}</p> : null}
+            </div>
           </div>
         </>
       )}
