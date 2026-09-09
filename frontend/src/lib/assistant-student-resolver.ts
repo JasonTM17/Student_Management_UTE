@@ -1,4 +1,4 @@
-import { enrollmentsApi } from '@/lib/api';
+import { enrollmentsApi, sectionsApi } from '@/lib/api';
 import type { Enrollment } from '@/types/api';
 import type { AssistantCitation } from '@/lib/thesis-api';
 
@@ -7,48 +7,49 @@ export interface StudentAssistantResolution {
   citation: AssistantCitation;
 }
 
-const SCHEDULE_REGEX = /(lịch học|thời khóa biểu|\btkb\b|tiết học|buổi học|\bschedule\b|\btimetable\b|\bclasses\b)/i;
+const SCHEDULE_REGEX =
+  /(lịch\s*(?:học|dạy|giảng\s*dạy|tuần|hôm\s*nay|ngày\s*mai|của\s*tôi|thứ\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\s*nhật|t[2-7]|cn)?|lich\s*(?:hoc|day|giang\s*day|tuan|hom\s*nay|ngay\s*mai|cua\s*toi|thu\s*[2-7]|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\s*nhat|t[2-7]|cn)?|thời\s*(?:khoá|khóa|khoa)\s*biểu|thoi\s*khoa\s*bieu|\btkb\b|tiết\s*học|buổi\s*học|ca\s*học|ca\s*dạy|tiết\s*dạy|(?:thứ\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\s*nay|ngày\s*mai|chủ\s*nhật)\s*(?:tôi\s*)?(?:có\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca)|\bschedule\b|\btimetable\b|\bclasses\b)/i;
 const MATERIALS_REGEX = /(học liệu|tài liệu|giáo trình|\bslide\b|bài giảng|\bmaterials\b|course material|lecture notes)/i;
 
 const DAY_NAMES_VI: Record<number, string> = {
-  1: 'Thứ Hai',
-  2: 'Thứ Ba',
-  3: 'Thứ Tư',
-  4: 'Thứ Năm',
-  5: 'Thứ Sáu',
-  6: 'Thứ Bảy',
-  7: 'Chủ Nhật',
+  1: 'Chủ Nhật',
+  2: 'Thứ Hai',
+  3: 'Thứ Ba',
+  4: 'Thứ Tư',
+  5: 'Thứ Năm',
+  6: 'Thứ Sáu',
+  7: 'Thứ Bảy',
 };
 
 const DAY_NAMES_EN: Record<number, string> = {
-  1: 'Monday',
-  2: 'Tuesday',
-  3: 'Wednesday',
-  4: 'Thursday',
-  5: 'Friday',
-  6: 'Saturday',
-  7: 'Sunday',
+  1: 'Sunday',
+  2: 'Monday',
+  3: 'Tuesday',
+  4: 'Wednesday',
+  5: 'Thursday',
+  6: 'Friday',
+  7: 'Saturday',
 };
 
 function detectRequestedDay(message: string): number | null {
   const lower = message.toLowerCase();
 
-  if (lower.includes('hôm nay') || lower.includes('today')) {
+  if (lower.includes('hôm nay') || lower.includes('hom nay') || lower.includes('today')) {
     const jsDay = new Date().getDay();
-    return jsDay === 0 ? 7 : jsDay;
+    return jsDay === 0 ? 1 : jsDay + 1;
   }
-  if (lower.includes('ngày mai') || lower.includes('tomorrow')) {
+  if (lower.includes('ngày mai') || lower.includes('ngay mai') || lower.includes('tomorrow')) {
     const jsDay = (new Date().getDay() + 1) % 7;
-    return jsDay === 0 ? 7 : jsDay;
+    return jsDay === 0 ? 1 : jsDay + 1;
   }
 
-  if (/thứ\s*(?:hai|2)|\bt2\b|monday/i.test(lower)) return 1;
-  if (/thứ\s*(?:ba|3)|\bt3\b|tuesday/i.test(lower)) return 2;
-  if (/thứ\s*(?:tư|bốn|4)|\bt4\b|wednesday/i.test(lower)) return 3;
-  if (/thứ\s*(?:năm|5)|\bt5\b|thursday/i.test(lower)) return 4;
-  if (/thứ\s*(?:sáu|6)|\bt6\b|friday/i.test(lower)) return 5;
-  if (/thứ\s*(?:bảy|7)|\bt7\b|saturday/i.test(lower)) return 6;
-  if (/chủ\s*nhật|\bcn\b|sunday/i.test(lower)) return 7;
+  if (/thứ\s*(?:hai|2)|\bt2\b|monday/i.test(lower)) return 2;
+  if (/thứ\s*(?:ba|3)|\bt3\b|tuesday/i.test(lower)) return 3;
+  if (/thứ\s*(?:tư|bốn|4)|\bt4\b|wednesday/i.test(lower)) return 4;
+  if (/thứ\s*(?:năm|5)|\bt5\b|thursday/i.test(lower)) return 5;
+  if (/thứ\s*(?:sáu|6)|\bt6\b|friday/i.test(lower)) return 6;
+  if (/thứ\s*(?:bảy|7)|\bt7\b|saturday/i.test(lower)) return 7;
+  if (/chủ\s*nhật|chu\s*nhat|\bcn\b|sunday/i.test(lower)) return 1;
 
   return null;
 }
@@ -66,6 +67,7 @@ interface ScheduleMeeting {
   endTime: string;
   room?: string;
   lecturerName?: string;
+  isTeaching?: boolean;
 }
 
 function extractMeetings(enrollments: Enrollment[], locale: 'vi' | 'en'): ScheduleMeeting[] {
@@ -94,7 +96,7 @@ function extractMeetings(enrollments: Enrollment[], locale: 'vi' | 'en'): Schedu
     if (sec.schedules && sec.schedules.length > 0) {
       for (const sch of sec.schedules) {
         const rawDay = sch.dayOfWeek;
-        const normalizedDay = rawDay === 0 ? 7 : rawDay;
+        const normalizedDay = rawDay === 0 ? 1 : rawDay;
         const room =
           sch.classroom?.roomNumber ??
           (sch.classroom?.building ? `${sch.classroom.building}-${sch.classroom.roomNumber ?? ''}` : undefined) ??
@@ -114,6 +116,38 @@ function extractMeetings(enrollments: Enrollment[], locale: 'vi' | 'en'): Schedu
     }
   }
 
+  return meetings.sort((a, b) => {
+    if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
+    return a.startTime.localeCompare(b.startTime);
+  });
+}
+
+function extractLecturerMeetings(sections: any[], locale: 'vi' | 'en'): ScheduleMeeting[] {
+  const meetings: ScheduleMeeting[] = [];
+  for (const sec of sections) {
+    const courseCode = sec.courseCode ?? 'MH';
+    const courseName =
+      (locale === 'vi' ? sec.courseNameVi : sec.courseNameEn) ?? sec.courseName ?? courseCode;
+    for (const sch of sec.schedules ?? []) {
+      const rawDay = sch.dayOfWeek;
+      const normalizedDay = rawDay === 0 ? 1 : rawDay;
+      const room = sch.roomNumber
+        ? sch.building
+          ? `${sch.building}-${sch.roomNumber}`
+          : sch.roomNumber
+        : undefined;
+      meetings.push({
+        courseCode,
+        courseName,
+        sectionNumber: sec.sectionNumber,
+        dayOfWeek: normalizedDay,
+        startTime: sch.startTime ?? '',
+        endTime: sch.endTime ?? '',
+        room,
+        isTeaching: true,
+      });
+    }
+  }
   return meetings.sort((a, b) => {
     if (a.dayOfWeek !== b.dayOfWeek) return a.dayOfWeek - b.dayOfWeek;
     return a.startTime.localeCompare(b.startTime);
@@ -174,8 +208,30 @@ export async function resolveStudentAssistantQuery(
 
   // Handle Schedule / Timetable queries
   try {
-    const enrollments = await enrollmentsApi.getMyEnrollments();
-    const meetings = extractMeetings(enrollments, locale);
+    let meetings: ScheduleMeeting[] = [];
+    let isLecturer = false;
+
+    try {
+      const enrollments = await enrollmentsApi.getMyEnrollments();
+      if (enrollments && enrollments.length > 0) {
+        meetings = extractMeetings(enrollments, locale);
+      }
+    } catch {
+      // If student enrollment fetch fails, could be lecturer
+    }
+
+    if (meetings.length === 0) {
+      try {
+        const teachingSections = await sectionsApi.getMySchedule();
+        if (teachingSections && teachingSections.length > 0) {
+          meetings = extractLecturerMeetings(teachingSections, locale);
+          isLecturer = true;
+        }
+      } catch {
+        // Not a lecturer or unauthenticated
+      }
+    }
+
     const requestedDay = detectRequestedDay(message);
 
     if (requestedDay !== null) {
@@ -186,53 +242,64 @@ export async function resolveStudentAssistantQuery(
         const lines = dayMeetings.map((m) => {
           const roomPart = m.room ? ` - Phòng: ${m.room}` : '';
           const lecturerPart = m.lecturerName ? ` (GV: ${m.lecturerName})` : '';
-          return `• **${m.courseCode} - ${m.courseName}** (Lớp ${m.sectionNumber})\n  - Giờ học: ${m.startTime} - ${m.endTime}${roomPart}${lecturerPart}`;
+          const prefix = isLecturer ? 'Ca dạy' : 'Giờ học';
+          return `• **${m.courseCode} - ${m.courseName}** (Lớp ${m.sectionNumber})\n  - ${prefix}: ${m.startTime} - ${m.endTime}${roomPart}${lecturerPart}`;
         });
+
+        const targetUrl = isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
+        const targetLabel = isLecturer
+          ? (locale === 'vi' ? 'Lịch giảng dạy' : 'Teaching Schedule')
+          : (locale === 'vi' ? 'Thời khóa biểu' : 'Schedule');
 
         const answer =
           locale === 'vi'
-            ? `Lịch học **${dayName}** của bạn trong học kỳ hiện tại gồm có:\n\n` +
+            ? `${isLecturer ? 'Lịch giảng dạy' : 'Lịch học'} **${dayName}** của bạn gồm có:\n\n` +
               lines.join('\n\n') +
-              '\n\n💡 Bạn có thể xem toàn bộ thời khóa biểu trực quan theo tuần tại mục **Thời khóa biểu** (/dashboard/schedule).'
-            : `Here is your **${dayName}** schedule for the current semester:\n\n` +
+              `\n\n💡 Bạn có thể xem toàn bộ lịch trực quan theo tuần tại mục **${targetLabel}** (${targetUrl}).`
+            : `Here is your **${dayName}** ${isLecturer ? 'teaching schedule' : 'schedule'}:\n\n` +
               lines.join('\n\n') +
-              '\n\n💡 You can view your full visual weekly timetable under **Schedule** (/dashboard/schedule).';
+              `\n\n💡 You can view your full visual weekly timetable under **${targetLabel}** (${targetUrl}).`;
 
         return {
           answer,
           citation: {
             id: 'personal-schedule-guide',
             slug: 'schedule-overview',
-            title: locale === 'vi' ? `Lịch học ${dayName} của sinh viên` : `Student ${dayName} Schedule`,
+            title: locale === 'vi' ? `${isLecturer ? 'Lịch dạy' : 'Lịch học'} ${dayName}` : `${dayName} Schedule`,
             source: 'academic-catalog',
             locale,
             excerpt:
               locale === 'vi'
-                ? `Thời khóa biểu cá nhân được tự động tổng hợp từ các lớp học phần đăng ký thành công.`
-                : 'Personal schedule automatically compiled from active enrolled class sections.',
+                ? `Thời khóa biểu cá nhân được tự động tổng hợp từ dữ liệu học vụ.`
+                : 'Personal timetable compiled from academic records.',
             domain: 'ACADEMIC_CATALOG',
           },
         };
       } else {
+        const targetUrl = isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
+        const targetLabel = isLecturer
+          ? (locale === 'vi' ? 'Lịch giảng dạy' : 'Teaching Schedule')
+          : (locale === 'vi' ? 'Thời khóa biểu' : 'Schedule');
+
         const answer =
           locale === 'vi'
-            ? `Theo thời khóa biểu hiện tại, bạn **không có lịch học** vào **${dayName}**.\n\n` +
-              '💡 Để xem lịch học các ngày khác trong tuần hoặc kiểm tra danh sách lớp học phần đã đăng ký, bạn hãy truy cập mục **Thời khóa biểu** (/dashboard/schedule).'
-            : `According to your current timetable, you have **no scheduled classes** on **${dayName}**.\n\n` +
-              '💡 To check your schedule for other days, visit **Schedule** (/dashboard/schedule).';
+            ? `Theo lịch hiện tại, bạn **không có ${isLecturer ? 'ca giảng dạy nào' : 'lịch học'}** vào **${dayName}**.\n\n` +
+              `💡 Để xem lịch các ngày khác trong tuần, bạn hãy truy cập mục **${targetLabel}** (${targetUrl}).`
+            : `According to your current schedule, you have **no ${isLecturer ? 'teaching sessions' : 'scheduled classes'}** on **${dayName}**.\n\n` +
+              `💡 To check your schedule for other days, visit **${targetLabel}** (${targetUrl}).`;
 
         return {
           answer,
           citation: {
             id: 'personal-schedule-guide',
             slug: 'schedule-overview',
-            title: locale === 'vi' ? `Thời khóa biểu ${dayName}` : `${dayName} Schedule`,
+            title: locale === 'vi' ? `Lịch ${dayName}` : `${dayName} Schedule`,
             source: 'academic-catalog',
             locale,
             excerpt:
               locale === 'vi'
-                ? `Không có lớp học phần nào được xếp lịch vào ${dayName}.`
-                : `No classes scheduled on ${dayName}.`,
+                ? `Không có lịch hoạt động vào ${dayName}.`
+                : `No activities scheduled on ${dayName}.`,
             domain: 'ACADEMIC_CATALOG',
           },
         };
@@ -241,7 +308,7 @@ export async function resolveStudentAssistantQuery(
 
     // General schedule question (e.g. "thời khóa biểu của tôi", "xem lịch học ở đâu")
     if (meetings.length > 0) {
-      const dayGroups = [1, 2, 3, 4, 5, 6, 7]
+      const dayGroups = [2, 3, 4, 5, 6, 7, 1]
         .map((d) => ({
           day: d,
           dayName: locale === 'vi' ? DAY_NAMES_VI[d] : DAY_NAMES_EN[d],
@@ -254,39 +321,55 @@ export async function resolveStudentAssistantQuery(
         return `• **${g.dayName}:** ${courseNames}`;
       });
 
+      const targetUrl = isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
+      const targetLabel = isLecturer
+        ? (locale === 'vi' ? 'Lịch giảng dạy' : 'Teaching Schedule')
+        : (locale === 'vi' ? 'Thời khóa biểu' : 'Schedule');
+
       const answer =
         locale === 'vi'
-          ? 'Thời khóa biểu tổng quan các ngày học trong tuần của bạn:\n\n' +
+          ? `${isLecturer ? 'Lịch giảng dạy' : 'Thời khóa biểu'} tổng quan các ngày trong tuần của bạn:\n\n` +
             summaryLines.join('\n') +
-            '\n\n💡 Bạn có thể xem chi tiết phòng học, giảng viên và thời khóa biểu trực quan tại trang **Thời khóa biểu** (/dashboard/schedule).'
-          : 'Summary of your weekly class schedule:\n\n' +
+            `\n\n💡 Bạn có thể xem chi tiết phòng học, giảng viên và thời khóa biểu trực quan tại trang **${targetLabel}** (${targetUrl}).`
+          : `Summary of your weekly ${isLecturer ? 'teaching' : 'class'} schedule:\n\n` +
             summaryLines.join('\n') +
-            '\n\n💡 View your visual weekly timetable and classrooms under **Schedule** (/dashboard/schedule).';
+            `\n\n💡 View your visual weekly timetable and classrooms under **${targetLabel}** (${targetUrl}).`;
 
       return {
         answer,
         citation: {
           id: 'personal-schedule-guide',
           slug: 'schedule-overview',
-          title: locale === 'vi' ? 'Thời khóa biểu sinh viên' : 'Student Schedule',
+          title: locale === 'vi' ? `${isLecturer ? 'Lịch giảng dạy' : 'Thời khóa biểu'}` : 'Schedule',
           source: 'academic-catalog',
           locale,
           excerpt:
             locale === 'vi'
-              ? 'Thời khóa biểu sinh viên hiển thị đầy đủ các ngày trong tuần từ Thứ Hai đến Chủ Nhật tại /dashboard/schedule.'
-              : 'Student schedule displays weekly meetings Monday through Sunday at /dashboard/schedule.',
+              ? 'Thời khóa biểu hiển thị đầy đủ các ngày trong tuần từ Thứ Hai đến Chủ Nhật.'
+              : 'Schedule displays weekly meetings Monday through Sunday.',
           domain: 'ACADEMIC_CATALOG',
         },
       };
     } else {
+      const targetUrl = isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
+      const targetLabel = isLecturer
+        ? (locale === 'vi' ? 'Lịch giảng dạy' : 'Teaching Schedule')
+        : (locale === 'vi' ? 'Thời khóa biểu' : 'Schedule');
+
       const answer =
         locale === 'vi'
-          ? 'Hiện tại bạn chưa có môn học nào trong thời khóa biểu học kỳ này.\n\n' +
-            '• Nếu đang trong đợt đăng ký học phần, bạn hãy vào mục **Đăng ký học phần** (/dashboard/register) để chọn và đăng ký các lớp học phần.\n' +
-            '• Sau khi đăng ký thành công, thời khóa biểu sẽ tự động cập nhật tại mục **Thời khóa biểu** (/dashboard/schedule).'
-          : 'You currently have no scheduled classes for this semester.\n\n' +
-            '• If registration is open, register for classes under **Course Registration** (/dashboard/register).\n' +
-            '• Enrolled classes will automatically appear on your visual timetable under **Schedule** (/dashboard/schedule).';
+          ? (isLecturer
+              ? 'Hiện tại bạn chưa có ca giảng dạy nào được xếp lịch trong học kỳ này.\n\n' +
+                `• Khi có phân công chính thức, lịch dạy sẽ tự động hiển thị tại mục **${targetLabel}** (${targetUrl}).`
+              : 'Hiện tại bạn chưa có môn học nào trong thời khóa biểu học kỳ này.\n\n' +
+                '• Nếu đang trong đợt đăng ký học phần, bạn hãy vào mục **Đăng ký học phần** (/dashboard/register) để chọn và đăng ký các lớp học phần.\n' +
+                `• Sau khi đăng ký thành công, thời khóa biểu sẽ tự động cập nhật tại mục **${targetLabel}** (${targetUrl}).`)
+          : (isLecturer
+              ? 'You currently have no teaching assignments scheduled for this semester.\n\n' +
+                `• Teaching slots will appear automatically under **${targetLabel}** (${targetUrl}) once assigned.`
+              : 'You currently have no scheduled classes for this semester.\n\n' +
+                '• If registration is open, register for classes under **Course Registration** (/dashboard/register).\n' +
+                `• Enrolled classes will automatically appear on your visual timetable under **${targetLabel}** (${targetUrl}).`);
 
       return {
         answer,
@@ -298,8 +381,8 @@ export async function resolveStudentAssistantQuery(
           locale,
           excerpt:
             locale === 'vi'
-              ? 'Sinh viên đăng ký lớp học phần để tự động tạo thời khóa biểu.'
-              : 'Students enroll in section classes to generate their personal schedule.',
+              ? 'Dữ liệu thời khóa biểu cá nhân được cập nhật tự động từ hệ thống.'
+              : 'Personal schedule is updated automatically from academic records.',
           domain: 'ACADEMIC_CATALOG',
         },
       };
