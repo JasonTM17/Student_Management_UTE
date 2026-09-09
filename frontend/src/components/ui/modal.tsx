@@ -108,7 +108,7 @@ export function Modal({
   return (
     <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
       <div
-        className="absolute inset-0 bg-black/55"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
         onClick={onClose}
         aria-hidden="true"
       />
@@ -120,7 +120,7 @@ export function Modal({
           aria-labelledby={title ? titleId : undefined}
           tabIndex={-1}
           className={cn(
-            'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-md border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',
+            'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-xl border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',
             className,
           )}
         >
