@@ -658,7 +658,7 @@ export default function TranscriptPage() {
                             setSelectedRecord(record);
                           }
                         }}
-                        className="cursor-pointer rounded-lg border border-border/70 bg-card p-4 shadow-sm transition hover:border-primary/50 hover:bg-muted/30"
+                        className="cursor-pointer rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-primary/50 hover:bg-muted/30"
                       >
                         <div className="flex items-start justify-between gap-3">
                           <div className="min-w-0">
@@ -737,14 +737,14 @@ export default function TranscriptPage() {
                     <table className="w-full min-w-[840px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">
-                          <th className="px-2 py-3 font-medium">{copy.headers.course}</th>
-                          <th className="px-2 py-3 font-medium">{copy.headers.section}</th>
-                          <th className="px-2 py-3 text-center font-medium">{copy.headers.credits}</th>
-                          <th className="px-2 py-3 text-center font-medium">{copy.headers.score}</th>
-                          <th className="px-2 py-3 text-center font-medium">{copy.headers.grade}</th>
-                          <th className="px-2 py-3 text-center font-medium">{copy.headers.points}</th>
-                          <th className="px-2 py-3 text-center font-medium">{copy.headers.enrollment}</th>
-                          <th className="px-2 py-3 text-right font-medium">{copy.headers.gradeStatus}</th>
+                          <th className="px-4 py-3.5 font-medium">{copy.headers.course}</th>
+                          <th className="px-4 py-3.5 font-medium">{copy.headers.section}</th>
+                          <th className="px-4 py-3.5 text-center font-medium">{copy.headers.credits}</th>
+                          <th className="px-4 py-3.5 text-center font-medium">{copy.headers.score}</th>
+                          <th className="px-4 py-3.5 text-center font-medium">{copy.headers.grade}</th>
+                          <th className="px-4 py-3.5 text-center font-medium">{copy.headers.points}</th>
+                          <th className="px-4 py-3.5 text-center font-medium">{copy.headers.enrollment}</th>
+                          <th className="px-4 py-3.5 text-right font-medium">{copy.headers.gradeStatus}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
@@ -763,7 +763,7 @@ export default function TranscriptPage() {
                             className="group cursor-pointer transition-colors hover:bg-muted/50"
                             title={copy.clickToViewDetail}
                           >
-                            <td className="px-2 py-4">
+                            <td className="px-4 py-3.5">
                               <div className="font-medium text-foreground group-hover:text-primary transition-colors">
                                 {record.courseCode}
                               </div>
@@ -777,18 +777,18 @@ export default function TranscriptPage() {
                                 )}
                               </div>
                             </td>
-                            <td className="px-2 py-4 text-muted-foreground">
+                            <td className="px-4 py-3.5 text-muted-foreground">
                               {record.sectionCode}
                             </td>
-                            <td className="px-2 py-4 text-center text-muted-foreground">
+                            <td className="px-4 py-3.5 text-center text-muted-foreground">
                               {formatNumber(record.credits)}
                             </td>
-                            <td className="px-2 py-4 text-center text-foreground font-semibold">
+                            <td className="px-4 py-3.5 text-center text-foreground font-semibold">
                               {typeof record.finalGrade === 'number'
                                 ? record.finalGrade.toFixed(1)
                                 : '-'}
                             </td>
-                            <td className="px-2 py-4 text-center">
+                            <td className="px-4 py-3.5 text-center">
                               {record.letterGrade ? (
                                 <span
                                   className={`inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(
@@ -801,17 +801,17 @@ export default function TranscriptPage() {
                                 <span className="text-muted-foreground">-</span>
                               )}
                             </td>
-                            <td className="px-2 py-4 text-center text-muted-foreground">
+                            <td className="px-4 py-3.5 text-center text-muted-foreground">
                               {typeof getGradePoint(record) === 'number'
                                 ? getGradePoint(record)?.toFixed(1)
                                 : '-'}
                             </td>
-                            <td className="px-2 py-4 text-center">
+                            <td className="px-4 py-3.5 text-center">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                 {statusLabel(record.enrollmentStatus)}
                               </span>
                             </td>
-                            <td className="px-2 py-4 text-right">
+                            <td className="px-4 py-3.5 text-right">
                               <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                 {statusLabel(record.gradeStatus)}
                               </span>

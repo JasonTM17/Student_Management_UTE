@@ -409,7 +409,7 @@ export default function AdminDepartmentsPage() {
                   return (
                     <article
                       key={`${department.id}-mobile`}
-                      className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                      className="rounded-xl border border-border/80 bg-card p-4 shadow-xs"
                       role="listitem"
                     >
                       <div className="flex items-start justify-between gap-3">
@@ -454,12 +454,12 @@ export default function AdminDepartmentsPage() {
               <AdminTableScroll className="hidden md:block">
                 <table className="w-full min-w-[720px] text-sm">
                   <thead>
-                    <tr className="bg-secondary text-left text-muted-foreground">
-                      <th className="px-2 py-3 font-medium">{copy.headers.code}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.name}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.description}</th>
-                      <th className="px-2 py-3 font-medium">{copy.headers.status}</th>
-                      <th className="px-2 py-3 text-right font-medium">{copy.headers.actions}</th>
+                    <tr className="border-b border-border/70 bg-secondary/50 text-left text-muted-foreground">
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.code}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.name}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.description}</th>
+                      <th className="px-4 py-3.5 font-medium">{copy.headers.status}</th>
+                      <th className="px-4 py-3.5 text-right font-medium">{copy.headers.actions}</th>
                     </tr>
                   </thead>
                   <tbody className="divide-y divide-border/60">
@@ -476,11 +476,11 @@ export default function AdminDepartmentsPage() {
                       );
 
                       return (
-                      <tr key={department.id}>
-                        <td className="px-2 py-4 font-medium text-foreground">
+                      <tr key={department.id} className="transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3.5 font-medium text-foreground">
                           {department.code}
                         </td>
-                        <td className="px-2 py-4 text-foreground">
+                        <td className="px-4 py-3.5 text-foreground">
                           <div className="space-y-1">
                             <div>{departmentLabel}</div>
                             {department.nameEn && department.nameVi ? (
@@ -492,15 +492,15 @@ export default function AdminDepartmentsPage() {
                             ) : null}
                           </div>
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {departmentDescription}
                         </td>
-                        <td className="px-2 py-4">
+                        <td className="px-4 py-3.5">
                           <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(department.isActive ? 'success' : 'neutral')}`}>
                             {department.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>
-                        <td className="px-2 py-4">
+                        <td className="px-4 py-3.5">
                           <AdminRowActions>
                             <Button
                               size="icon"

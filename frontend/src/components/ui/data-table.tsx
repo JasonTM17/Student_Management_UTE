@@ -111,10 +111,10 @@ export function DataTable<T extends Record<string, unknown>>({
         )}
       </div>
 
-      <div className="rounded-md border overflow-hidden">
+      <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-xs">
         <div className="overflow-x-auto">
           <table className="w-full">
-            <thead className="bg-muted">
+            <thead className="border-b border-border/70 bg-muted/50">
               <tr>
                 {columns.map((column) => (
                   <th
@@ -124,7 +124,7 @@ export function DataTable<T extends Record<string, unknown>>({
                         ? sortOrder === 'asc' ? 'ascending' : 'descending'
                         : 'none'
                     }
-                    className="px-4 py-3 text-left text-sm font-medium text-muted-foreground cursor-pointer hover:bg-secondary"
+                    className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer hover:bg-secondary/60"
                   >
                     {column.sortable ? (
                       <button
@@ -145,29 +145,36 @@ export function DataTable<T extends Record<string, unknown>>({
                 ))}
               </tr>
             </thead>
-            <tbody className="divide-y divide-border">
+            <tbody className="divide-y divide-border/60">
               {loading ? (
-                <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                    <div className="flex justify-center">
-                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
-                    </div>
-                  </td>
-                </tr>
+                Array.from({ length: 4 }).map((_, idx) => (
+                  <tr key={`loading-${idx}`} className="animate-pulse">
+                    {columns.map((col) => (
+                      <td key={col.key} className="px-4 py-4">
+                        <div className="h-4 w-3/4 rounded bg-muted/80" />
+                      </td>
+                    ))}
+                  </tr>
+                ))
               ) : paginatedData.length === 0 ? (
                 <tr>
-                  <td colSpan={columns.length} className="px-4 py-8 text-center text-muted-foreground">
-                    {emptyMessage || messages.common.states.noDataFound}
+                  <td colSpan={columns.length} className="px-4 py-12 text-center text-muted-foreground">
+                    <div className="mx-auto flex flex-col items-center justify-center space-y-2">
+                      <div className="flex h-10 w-10 items-center justify-center rounded-full bg-muted text-muted-foreground">
+                        <Search className="h-5 w-5" />
+                      </div>
+                      <p className="text-sm font-medium">{emptyMessage || messages.common.states.noDataFound}</p>
+                    </div>
                   </td>
                 </tr>
               ) : (
                 paginatedData.map((item) => (
                   <tr
                     key={String(item[keyField])}
-                    className="hover:bg-muted/60"
+                    className="transition-colors hover:bg-muted/40"
                   >
                     {columns.map((column) => (
-                      <td key={column.key} className="px-4 py-3 text-sm">
+                      <td key={column.key} className="px-4 py-3.5 text-sm text-foreground">
                         {column.render ? column.render(item) : String(item[column.key] ?? '-')}
                       </td>
                     ))}

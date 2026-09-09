@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
+import { CheckCircle, ChevronDown, FileText, Save, Send, Users } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
@@ -567,7 +567,7 @@ export default function SectionGradingPage() {
                 return (
                   <article
                     key={`${enrollment.id}-mobile`}
-                    className="rounded-lg border border-border/70 bg-card p-4 shadow-sm"
+                    className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-primary/40"
                     role="listitem"
                   >
                     <div className="flex items-start justify-between gap-3">
@@ -619,27 +619,30 @@ export default function SectionGradingPage() {
                         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
                           {copy.headers.grade}
                         </span>
-                        <select
-                          className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                          value={current.letterGrade}
-                          onChange={(event) =>
-                            handleGradeChange(
-                              enrollment.id,
-                              event.target.value,
-                            )
-                          }
-                          disabled={isPublished}
-                          aria-label={copy.letterGradeLabel(enrollment.studentName)}
-                        >
-                          <option value="">{copy.noLetterGrade}</option>
-                          {letterGrades.map((grade) => (
-                            grade === '' ? null : (
-                            <option key={grade} value={grade}>
-                              {grade}
-                            </option>
-                            )
-                          ))}
-                        </select>
+                        <div className="relative">
+                          <select
+                            className="flex h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 pr-9 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                            value={current.letterGrade}
+                            onChange={(event) =>
+                              handleGradeChange(
+                                enrollment.id,
+                                event.target.value,
+                              )
+                            }
+                            disabled={isPublished}
+                            aria-label={copy.letterGradeLabel(enrollment.studentName)}
+                          >
+                            <option value="">{copy.noLetterGrade}</option>
+                            {letterGrades.map((grade) => (
+                              grade === '' ? null : (
+                              <option key={grade} value={grade}>
+                                {grade}
+                              </option>
+                              )
+                            ))}
+                          </select>
+                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        </div>
                       </label>
                     </div>
                   </article>
@@ -650,12 +653,12 @@ export default function SectionGradingPage() {
               <table className="w-full min-w-[960px] text-sm">
                 <thead>
                   <tr className="border-b border-border/70 text-left text-muted-foreground">
-                    <th className="px-2 py-3 font-medium">{copy.headers.student}</th>
-                    <th className="px-2 py-3 font-medium">{copy.headers.studentId}</th>
-                    <th className="px-2 py-3 font-medium">{copy.headers.email}</th>
-                    <th className="px-2 py-3 text-center font-medium">{copy.headers.score}</th>
-                    <th className="px-2 py-3 text-center font-medium">{copy.headers.grade}</th>
-                    <th className="px-2 py-3 text-right font-medium">{copy.headers.status}</th>
+                    <th className="px-4 py-3.5 font-medium">{copy.headers.student}</th>
+                    <th className="px-4 py-3.5 font-medium">{copy.headers.studentId}</th>
+                    <th className="px-4 py-3.5 font-medium">{copy.headers.email}</th>
+                    <th className="px-4 py-3.5 text-center font-medium">{copy.headers.score}</th>
+                    <th className="px-4 py-3.5 text-center font-medium">{copy.headers.grade}</th>
+                    <th className="px-4 py-3.5 text-right font-medium">{copy.headers.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -668,19 +671,19 @@ export default function SectionGradingPage() {
                     const isPublished = enrollment.gradeStatus === 'PUBLISHED';
 
                     return (
-                      <tr key={enrollment.id}>
-                        <td className="px-2 py-4">
+                      <tr key={enrollment.id} className="transition-colors hover:bg-muted/40">
+                        <td className="px-4 py-3.5">
                           <div className="font-medium text-foreground">
                             {enrollment.studentName}
                           </div>
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {enrollment.studentCode}
                         </td>
-                        <td className="px-2 py-4 text-muted-foreground">
+                        <td className="px-4 py-3.5 text-muted-foreground">
                           {enrollment.email ?? copy.unavailableEmail}
                         </td>
-                        <td className="px-2 py-4 text-center">
+                        <td className="px-4 py-3.5 text-center">
                           <div className="mx-auto max-w-[120px]">
                             <Input
                               type="number"
@@ -705,32 +708,35 @@ export default function SectionGradingPage() {
                             />
                           </div>
                         </td>
-                        <td className="px-2 py-4 text-center">
+                        <td className="px-4 py-3.5 text-center">
                           <div className="mx-auto max-w-[120px]">
-                            <select
-                              className="flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus:outline-none focus:ring-2 focus:ring-ring focus:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                              value={current.letterGrade}
-                              onChange={(event) =>
-                                handleGradeChange(
-                                  enrollment.id,
-                                  event.target.value,
-                                )
-                              }
-                              disabled={isPublished}
-                              aria-label={copy.letterGradeLabel(enrollment.studentName)}
-                            >
-                              <option value="">{copy.noLetterGrade}</option>
-                              {letterGrades.map((grade) => (
-                                grade === '' ? null : (
-                                <option key={grade} value={grade}>
-                                  {grade}
-                                </option>
-                                )
-                              ))}
-                            </select>
+                            <div className="relative">
+                              <select
+                                className="flex h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 pr-9 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
+                                value={current.letterGrade}
+                                onChange={(event) =>
+                                  handleGradeChange(
+                                    enrollment.id,
+                                    event.target.value,
+                                  )
+                                }
+                                disabled={isPublished}
+                                aria-label={copy.letterGradeLabel(enrollment.studentName)}
+                              >
+                                <option value="">{copy.noLetterGrade}</option>
+                                {letterGrades.map((grade) => (
+                                  grade === '' ? null : (
+                                  <option key={grade} value={grade}>
+                                    {grade}
+                                  </option>
+                                  )
+                                ))}
+                              </select>
+                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            </div>
                           </div>
                         </td>
-                        <td className="px-2 py-4 text-right">
+                        <td className="px-4 py-3.5 text-right">
                           <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {isPublished
                               ? copy.publishedStatus

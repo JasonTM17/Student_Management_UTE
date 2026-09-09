@@ -628,12 +628,12 @@ export default function ThesisPage() {
 
           {error ? <ErrorState title={messages.thesis.loadFailed} description={error} /> : null}
           {actionError ? (
-            <div className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+            <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive shadow-xs">
               {actionError}
             </div>
           ) : null}
           {actionSuccess ? (
-            <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 px-4 py-3 text-sm text-emerald-700 dark:text-emerald-300">
+            <div className="rounded-xl border border-status-success/30 bg-status-success/10 px-4 py-3 text-sm text-status-success-foreground shadow-xs">
               {actionSuccess}
             </div>
           ) : null}

@@ -20,7 +20,7 @@ import { Enrollment, MyCurriculumCourse, MyCurriculumResponse } from '@/types/ap
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
-import { metricToneClass } from '@/components/ui/status';
+import { metricToneClass, statusToneClass } from '@/components/ui/status';
 import {
   EmptyState,
   ErrorState,
@@ -480,8 +480,8 @@ export default function EnrollmentsPage() {
                       </h3>
                     </div>
                     <div className="flex items-center gap-3">
-                      <span className="rounded-lg border border-border bg-secondary/40 px-3 py-1.5 text-xs font-medium text-foreground">
-                        {copy.statCompleted}: <strong className="text-emerald-600 dark:text-emerald-400">{completedCurriculum.length}</strong> / {curriculumCourses.length} môn
+                      <span className="rounded-xl border border-border/80 bg-secondary/40 px-3.5 py-1.5 text-xs font-medium text-foreground">
+                        {copy.statCompleted}: <strong className="font-semibold text-primary">{completedCurriculum.length}</strong> / {curriculumCourses.length} môn
                       </span>
                     </div>
                   </div>
@@ -548,22 +548,22 @@ export default function EnrollmentsPage() {
 
                                   <div className="flex shrink-0 items-center gap-2">
                                     {isCompleted ? (
-                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-emerald-500/30 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusToneClass('success')}`}>
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         {copy.filterCompleted}
                                         {course.finalGrade !== null && course.finalGrade !== undefined ? (
-                                          <span className="ml-1 border-l border-emerald-500/30 pl-1 font-bold">
+                                          <span className="ml-1 border-l border-border/80 pl-1 font-bold">
                                             {course.finalGrade.toFixed(1)} {course.letterGrade ? `(${course.letterGrade})` : ''}
                                           </span>
                                         ) : null}
                                       </span>
                                     ) : isInProgress ? (
-                                      <span className="inline-flex items-center gap-1.5 rounded-full border border-blue-500/30 bg-blue-500/10 px-3 py-1 text-xs font-semibold text-blue-700 dark:text-blue-300">
+                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusToneClass('info')}`}>
                                         <Clock className="h-3.5 w-3.5" />
                                         {copy.filterInProgress}
                                       </span>
                                     ) : (
-                                      <span className="inline-flex items-center rounded-full border border-border bg-secondary/50 px-3 py-1 text-xs font-medium text-muted-foreground">
+                                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusToneClass('neutral')}`}>
                                         {copy.filterNotStarted}
                                       </span>
                                     )}
@@ -610,7 +610,7 @@ export default function EnrollmentsPage() {
                       return (
                         <div
                           key={enrollment.id}
-                          className="rounded-lg border border-border/70 bg-card px-5 py-5 shadow-sm"
+                          className="rounded-xl border border-border/80 bg-card px-5 py-5 shadow-xs transition hover:border-primary/40"
                         >
                           <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
                             <div className="space-y-3">
