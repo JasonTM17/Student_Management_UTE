@@ -257,6 +257,19 @@ export default function SchedulePage() {
     return new Set(agenda.map((item) => item.courseCode)).size;
   }, [agenda]);
 
+  // Total credits count
+  const totalCreditsCount = useMemo(() => {
+    const seen = new Set<string>();
+    let sum = 0;
+    for (const item of agenda) {
+      if (!seen.has(item.courseCode)) {
+        seen.add(item.courseCode);
+        sum += item.credits ?? 0;
+      }
+    }
+    return sum;
+  }, [agenda]);
+
   const selectedSemesterName = useMemo(() => {
     return (
       getLocalizedName(
@@ -304,9 +317,19 @@ export default function SchedulePage() {
           viewList: 'Danh sách',
           print: 'In thời khóa biểu',
           totalCourses: 'Môn học',
+          totalCredits: 'Tín chỉ',
           totalMeetings: 'Buổi học / tuần',
           filterDay: 'Chọn ngày trong tuần',
           clickToViewDetails: 'Bấm vào môn học để xem chi tiết đầy đủ',
+          courseCode: 'Mã HP',
+          courseName: 'Tên học phần',
+          credits: 'Số TC',
+          section: 'Lớp HP',
+          day: 'Thứ',
+          time: 'Giờ học',
+          classroom: 'Phòng học',
+          lecturer: 'Giảng viên',
+          actions: 'Chi tiết',
         } as const
       : {
           eyebrow: 'Student area',
@@ -336,9 +359,19 @@ export default function SchedulePage() {
           viewList: 'List View',
           print: 'Print Schedule',
           totalCourses: 'Courses',
+          totalCredits: 'Credits',
           totalMeetings: 'Sessions / week',
           filterDay: 'Select day of week',
           clickToViewDetails: 'Click on any class to view complete details',
+          courseCode: 'Course Code',
+          courseName: 'Course Title',
+          credits: 'Credits',
+          section: 'Section',
+          day: 'Day',
+          time: 'Time',
+          classroom: 'Room',
+          lecturer: 'Instructor',
+          actions: 'Details',
         } as const;
 
   if (authLoading) {
@@ -356,7 +389,7 @@ export default function SchedulePage() {
         title={copy.title}
         description={copy.description}
         actions={
-          <div className="flex flex-col gap-3 sm:flex-row sm:items-center">
+          <div className="flex flex-col gap-3 sm:flex-row sm:items-center print:hidden">
             <div className="min-w-0 sm:min-w-[280px]">
               <Select
                 aria-label={copy.selectSemester}
@@ -397,8 +430,37 @@ export default function SchedulePage() {
         />
       ) : (
         <div className="space-y-6">
+          {/* Printable Official Institutional Header */}
+          <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
+            <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
+              {locale === 'vi'
+                ? 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH'
+                : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND EDUCATION'}
+            </div>
+            <div className="text-sm font-extrabold text-foreground">
+              {locale === 'vi'
+                ? 'PHÒNG ĐÀO TẠO — HỆ THỐNG QUẢN LÝ ĐÀO TẠO CAMPUSCORE'
+                : 'ACADEMIC AFFAIRS OFFICE — CAMPUSCORE SYSTEM'}
+            </div>
+            <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
+              {locale === 'vi' ? 'THỜI KHÓA BIỂU HỌC KỲ' : 'OFFICIAL SEMESTER TIMETABLE'}
+            </h1>
+            <div className="flex flex-wrap justify-center gap-6 mt-3 text-xs text-foreground font-medium">
+              <span><strong>{locale === 'vi' ? 'Học kỳ:' : 'Semester:'}</strong> {selectedSemesterName}</span>
+              {user ? (
+                <>
+                  <span><strong>{locale === 'vi' ? 'Sinh viên:' : 'Student:'}</strong> {user.lastName} {user.firstName}</span>
+                  <span><strong>{locale === 'vi' ? 'MSSV:' : 'Student ID:'}</strong> {user.studentId ?? user.id?.slice(0, 10)}</span>
+                </>
+              ) : null}
+              <span><strong>{copy.totalCourses}:</strong> {uniqueCoursesCount}</span>
+              <span><strong>{copy.totalCredits}:</strong> {totalCreditsCount}</span>
+              <span><strong>{copy.totalMeetings}:</strong> {agenda.length}</span>
+            </div>
+          </div>
+
           {/* Top Control Bar & Quick Highlights */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm print:hidden">
             {/* View Mode Tabs */}
             <div className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1">
               <Button
@@ -441,6 +503,11 @@ export default function SchedulePage() {
                 <span className="flex items-center gap-1.5">
                   <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
                   <strong className="text-foreground">{agenda.length}</strong> {copy.totalMeetings}
+                </span>
+                <span>•</span>
+                <span className="flex items-center gap-1.5">
+                  <span className="font-extrabold text-primary">TC</span>
+                  <strong className="text-foreground">{totalCreditsCount}</strong> {copy.totalCredits}
                 </span>
               </div>
               <Button
@@ -517,10 +584,18 @@ export default function SchedulePage() {
                             const isToday = dayNum === todayDow;
 
                             if (cellItems.length === 0) {
+                              // Skip rendering cell if this time slot is covered by an earlier meeting spanning downwards
+                              const isCoveredByEarlier = agenda.some(
+                                (m) => m.dayOfWeek === dayNum && m.startTime < slot && slot < m.endTime,
+                              );
+                              if (isCoveredByEarlier) {
+                                return null;
+                              }
+
                               return (
                                 <div
                                   key={`cell-${dayNum}-${slot}`}
-                                  className={`min-h-[105px] rounded-lg border border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
+                                  className={`min-h-[105px] rounded-lg border border-dashed border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
                                     isToday ? 'bg-primary/[0.02] border-primary/20' : 'bg-card/60'
                                   }`}
                                   style={{ gridColumn: colIndex + 2, gridRow: slotIndex + 2 }}
@@ -539,6 +614,7 @@ export default function SchedulePage() {
                                 }}
                               >
                                 {cellItems.map((item) => {
+                                  const matchingAgenda = agenda.find((a) => a.id === item.id);
                                   const courseName = getLocalizedName(
                                     locale,
                                     {
@@ -550,11 +626,20 @@ export default function SchedulePage() {
                                     item.courseName,
                                   );
 
+                                  const isMorning = (item.startTime || '').localeCompare('12:00') < 0;
+                                  const isAfternoon =
+                                    (item.startTime || '').localeCompare('12:00') >= 0 &&
+                                    (item.startTime || '').localeCompare('18:00') < 0;
+                                  const shiftBadge = isMorning
+                                    ? (locale === 'vi' ? 'Sáng' : 'AM')
+                                    : isAfternoon
+                                    ? (locale === 'vi' ? 'Chiều' : 'PM')
+                                    : (locale === 'vi' ? 'Tối' : 'Eve');
+
                                   return (
                                     <div
                                       key={item.id}
                                       onClick={() => {
-                                        const matchingAgenda = agenda.find((a) => a.id === item.id);
                                         setSelectedDetail({
                                           courseCode: item.courseCode,
                                           courseName: item.courseName ?? item.courseCode,
@@ -580,9 +665,14 @@ export default function SchedulePage() {
                                         <span className="font-mono text-[11px] font-extrabold tracking-wide">
                                           {item.courseCode}
                                         </span>
-                                        <span className="rounded bg-background/70 px-1.5 py-0.5 text-[9px] font-semibold text-foreground">
-                                          {item.sectionNumber}
-                                        </span>
+                                        <div className="flex items-center gap-1">
+                                          <span className="rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground border border-border/40">
+                                            {item.sectionNumber}
+                                          </span>
+                                          <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-[9px] font-bold">
+                                            {shiftBadge}
+                                          </span>
+                                        </div>
                                       </div>
                                       <div
                                         className="mt-1.5 font-bold text-[12px] leading-snug line-clamp-2 text-foreground"
@@ -590,17 +680,25 @@ export default function SchedulePage() {
                                       >
                                         {courseName}
                                       </div>
-                                      <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[10px] text-muted-foreground border-t border-current/10 pt-1.5">
-                                        <span className="inline-flex items-center gap-1 font-medium">
-                                          <Clock className="h-3 w-3" />
-                                          {item.startTime}-{item.endTime}
-                                        </span>
-                                        {item.roomNumber ? (
-                                          <span className="inline-flex items-center gap-1 font-bold text-foreground">
-                                            <MapPin className="h-3 w-3 text-primary" />
-                                            {item.building ? `${item.building}-` : ''}
-                                            {item.roomNumber}
+                                      <div className="mt-2 space-y-1 text-[10px] text-muted-foreground border-t border-current/10 pt-1.5">
+                                        <div className="flex items-center justify-between gap-1">
+                                          <span className="inline-flex items-center gap-1 font-medium">
+                                            <Clock className="h-3 w-3 text-primary" />
+                                            {item.startTime}-{item.endTime}
                                           </span>
+                                          {item.roomNumber ? (
+                                            <span className="inline-flex items-center gap-1 font-bold text-foreground">
+                                              <MapPin className="h-3 w-3 text-primary" />
+                                              {item.building ? `${item.building}-` : ''}
+                                              {item.roomNumber}
+                                            </span>
+                                          ) : null}
+                                        </div>
+                                        {matchingAgenda?.lecturerName ? (
+                                          <div className="flex items-center gap-1 truncate text-foreground/80 font-medium" title={matchingAgenda.lecturerName}>
+                                            <GraduationCap className="h-3 w-3 shrink-0 text-primary" />
+                                            <span className="truncate">{matchingAgenda.lecturerName}</span>
+                                          </div>
                                         ) : null}
                                       </div>
                                     </div>
@@ -694,66 +792,6 @@ export default function SchedulePage() {
                         </div>
                       );
                     })}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Collapsible Upcoming Section Below */}
-              <Card variant="elevated" className="border-border/70 shadow-sm">
-                <CardHeader className="border-b border-border/70 pb-3">
-                  <div className="flex items-center justify-between">
-                    <CardTitle className="text-base font-bold flex items-center gap-2">
-                      <GraduationCap className="h-4 w-4 text-primary" />
-                      {copy.upcomingClassList}
-                    </CardTitle>
-                    <span className="text-xs text-muted-foreground font-semibold">
-                      {formatNumber(agenda.length)} {agenda.length === 1 ? copy.item : copy.items}
-                    </span>
-                  </div>
-                </CardHeader>
-                <CardContent className="pt-4">
-                  <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                    {agenda.map((item) => (
-                      <div
-                        key={item.id}
-                        onClick={() => setSelectedDetail(item)}
-                        className="rounded-xl border border-border/70 bg-card p-3.5 transition hover:border-primary/50 hover:shadow-md cursor-pointer"
-                      >
-                        <div className="flex items-start justify-between gap-2">
-                          <span className="font-mono text-xs font-bold text-primary">
-                            {item.courseCode}
-                          </span>
-                          <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-medium text-foreground">
-                            {copy.sectionPrefix} {item.sectionNumber}
-                          </span>
-                        </div>
-                        <h4 className="mt-1.5 font-bold text-foreground text-xs line-clamp-2">
-                          {getLocalizedCourseLabel(
-                            locale,
-                            {
-                              code: item.courseCode,
-                              name: item.courseName,
-                              nameEn: item.courseNameEn,
-                              nameVi: item.courseNameVi,
-                            },
-                            `${item.courseCode} - ${item.courseName}`,
-                          )}
-                        </h4>
-                        <div className="mt-2.5 flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
-                          <span className="inline-flex items-center gap-1 font-medium">
-                            <Clock className="h-3 w-3 text-primary" />
-                            {locale === 'vi' ? DAY_LABELS_VI[item.dayOfWeek] : DAY_LABELS_EN[item.dayOfWeek]} ({item.startTime} - {item.endTime})
-                          </span>
-                          {item.roomNumber ? (
-                            <span className="inline-flex items-center gap-1 font-semibold text-foreground">
-                              <MapPin className="h-3 w-3 text-primary" />
-                              {item.building ? `${item.building}-` : ''}
-                              {item.roomNumber}
-                            </span>
-                          ) : null}
-                        </div>
-                      </div>
-                    ))}
                   </div>
                 </CardContent>
               </Card>
@@ -879,46 +917,49 @@ export default function SchedulePage() {
             </div>
           )}
 
-          {/* LIST VIEW AREA */}
+          {/* LIST VIEW AREA: Executive Academic Timetable Table */}
           {viewMode === 'list' && (
-            <Card variant="muted" className="border-border/80 shadow-sm">
-              <CardHeader className="border-b border-border/70 pb-4">
-                <CardTitle className="text-lg font-bold flex items-center gap-2">
-                  <List className="h-5 w-5 text-primary" />
-                  {copy.upcomingClassList}
-                </CardTitle>
+            <Card variant="muted" className="border-border/80 shadow-sm overflow-hidden">
+              <CardHeader className="border-b border-border/70 bg-card/60 pb-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <CardTitle className="text-lg font-bold flex items-center gap-2">
+                    <List className="h-5 w-5 text-primary" />
+                    {copy.upcomingClassList}
+                  </CardTitle>
+                  <span className="text-xs text-muted-foreground font-semibold">
+                    {formatNumber(agenda.length)} {agenda.length === 1 ? copy.item : copy.items}
+                  </span>
+                </div>
               </CardHeader>
-              <CardContent className="p-4 sm:p-6 space-y-6">
-                {ORDERED_DAYS.map((dayNum) => {
-                  const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
-                  const items = agendaByDay[dayNum] ?? [];
-                  if (items.length === 0) return null;
-
-                  return (
-                    <div key={`list-day-${dayNum}`} className="space-y-3">
-                      <div className="flex items-center gap-2 border-b border-border/60 pb-2">
-                        <span className="h-2 w-2 rounded-full bg-primary" />
-                        <h3 className="font-bold text-foreground text-sm">{dayName}</h3>
-                        <span className="text-xs text-muted-foreground font-semibold">
-                          ({items.length} {copy.items})
-                        </span>
-                      </div>
-                      <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
-                        {items.map((item) => (
-                          <div
+              <CardContent className="p-0">
+                <div className="overflow-x-auto">
+                  <table className="w-full text-left text-xs border-collapse">
+                    <thead>
+                      <tr className="border-b border-border/80 bg-secondary/50 font-bold text-muted-foreground uppercase tracking-wider text-[11px]">
+                        <th className="py-3 px-4">#</th>
+                        <th className="py-3 px-4">{copy.courseCode}</th>
+                        <th className="py-3 px-4">{copy.courseName}</th>
+                        <th className="py-3 px-4 text-center">{copy.credits}</th>
+                        <th className="py-3 px-4 text-center">{copy.section}</th>
+                        <th className="py-3 px-4">{copy.day}</th>
+                        <th className="py-3 px-4">{copy.time}</th>
+                        <th className="py-3 px-4">{copy.classroom}</th>
+                        <th className="py-3 px-4">{copy.lecturer}</th>
+                        <th className="py-3 px-4 text-center">{copy.actions}</th>
+                      </tr>
+                    </thead>
+                    <tbody className="divide-y divide-border/60 bg-card">
+                      {agenda.map((item, idx) => {
+                        const dayName = locale === 'vi' ? DAY_LABELS_VI[item.dayOfWeek] : DAY_LABELS_EN[item.dayOfWeek];
+                        const isToday = item.dayOfWeek === todayDow;
+                        return (
+                          <tr
                             key={item.id}
-                            onClick={() => setSelectedDetail(item)}
-                            className="rounded-xl border border-border/70 bg-card p-4 transition hover:border-primary/50 hover:shadow-md cursor-pointer"
+                            className={`transition hover:bg-secondary/30 ${isToday ? 'bg-primary/[0.03]' : ''}`}
                           >
-                            <div className="flex items-center justify-between gap-2">
-                              <span className="font-mono text-xs font-extrabold text-primary">
-                                {item.courseCode}
-                              </span>
-                              <span className="rounded-full bg-secondary px-2 py-0.5 text-[10px] font-semibold text-foreground">
-                                {copy.sectionPrefix} {item.sectionNumber}
-                              </span>
-                            </div>
-                            <h4 className="mt-2 text-xs font-bold text-foreground line-clamp-2">
+                            <td className="py-3 px-4 font-mono text-muted-foreground font-semibold">{idx + 1}</td>
+                            <td className="py-3 px-4 font-mono font-bold text-primary">{item.courseCode}</td>
+                            <td className="py-3 px-4 font-semibold text-foreground max-w-[220px]">
                               {getLocalizedCourseLabel(
                                 locale,
                                 {
@@ -929,26 +970,50 @@ export default function SchedulePage() {
                                 },
                                 item.courseName,
                               )}
-                            </h4>
-                            <div className="mt-3 flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground border-t border-border/60 pt-2">
-                              <span className="inline-flex items-center gap-1 font-medium">
-                                <Clock className="h-3 w-3 text-primary" />
-                                {item.startTime} - {item.endTime}
+                            </td>
+                            <td className="py-3 px-4 text-center font-bold text-foreground">{item.credits ?? '—'}</td>
+                            <td className="py-3 px-4 text-center">
+                              <span className="rounded bg-secondary px-2 py-0.5 font-semibold text-[10px] text-foreground">
+                                {item.sectionNumber}
                               </span>
+                            </td>
+                            <td className="py-3 px-4 font-medium">
+                              <span className={isToday ? 'font-bold text-primary' : 'text-foreground'}>
+                                {dayName}
+                              </span>
+                            </td>
+                            <td className="py-3 px-4 font-mono font-medium text-foreground whitespace-nowrap">
+                              {item.startTime} - {item.endTime}
+                            </td>
+                            <td className="py-3 px-4 font-semibold text-foreground">
                               {item.roomNumber ? (
-                                <span className="inline-flex items-center gap-1 font-semibold text-foreground">
+                                <span className="inline-flex items-center gap-1">
                                   <MapPin className="h-3 w-3 text-primary" />
-                                  {item.building ? `${item.building}-` : ''}
-                                  {item.roomNumber}
+                                  {item.building ? `${item.building}-` : ''}{item.roomNumber}
                                 </span>
-                              ) : null}
-                            </div>
-                          </div>
-                        ))}
-                      </div>
-                    </div>
-                  );
-                })}
+                              ) : (
+                                <span className="text-muted-foreground italic">{copy.roomPending}</span>
+                              )}
+                            </td>
+                            <td className="py-3 px-4 text-muted-foreground max-w-[150px] truncate">
+                              {item.lecturerName || '—'}
+                            </td>
+                            <td className="py-3 px-4 text-center">
+                              <Button
+                                size="sm"
+                                variant="ghost"
+                                onClick={() => setSelectedDetail(item)}
+                                className="h-7 px-2.5 text-xs font-semibold text-primary hover:text-primary hover:bg-primary/10"
+                              >
+                                {copy.actions}
+                              </Button>
+                            </td>
+                          </tr>
+                        );
+                      })}
+                    </tbody>
+                  </table>
+                </div>
               </CardContent>
             </Card>
           )}

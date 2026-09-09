@@ -129,3 +129,70 @@ test('assistant stop-race and quota-retry regressions stay guarded', () => {
   assert.match(afterFallback, /retryRequestIdRef\.current = undefined/);
   assert.match(afterFallback, /retryConversationIdRef\.current = undefined/);
 });
+
+test('personalized student assistant query detection and unaccented day matching', () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  assert.match(source, /export function isStudentAssistantQuery/);
+  assert.match(source, /export function detectRequestedDay/);
+  assert.match(source, /GRADES_REGEX/);
+  assert.match(source, /TUITION_REGEX/);
+  assert.match(source, /THESIS_REGEX/);
+  assert.match(source, /CURRICULUM_REGEX/);
+  assert.match(source, /PROFILE_REGEX/);
+  assert.match(source, /TEACHING_REGEX/);
+
+  // Extract functions for runtime assertion
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  // Mock external API modules imported by assistant-student-resolver
+  const fakeRequire = (moduleName) => {
+    return {};
+  };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, fakeRequire);
+  const { isStudentAssistantQuery, detectRequestedDay } = moduleRecord.exports;
+
+  // 1. Day detection (accented and unaccented)
+  assert.equal(detectRequestedDay('Lịch thứ 2 của tôi là khi nào'), 2);
+  assert.equal(detectRequestedDay('lich thu 2 cua toi la khi nao'), 2);
+  assert.equal(detectRequestedDay('t2 co tiet khong'), 2);
+  assert.equal(detectRequestedDay('monday classes'), 2);
+
+  assert.equal(detectRequestedDay('thứ 3 học phòng nào'), 3);
+  assert.equal(detectRequestedDay('thu 3 hoc o dau'), 3);
+  assert.equal(detectRequestedDay('t3 co mon gi'), 3);
+
+  assert.equal(detectRequestedDay('thứ 4 có học không'), 4);
+  assert.equal(detectRequestedDay('thu tu co lop khong'), 4);
+  assert.equal(detectRequestedDay('thu 4 co tiet khong'), 4);
+
+  assert.equal(detectRequestedDay('thứ 5 học gì'), 5);
+  assert.equal(detectRequestedDay('thu nam hoc gi'), 5);
+
+  assert.equal(detectRequestedDay('thứ 6 có môn gì'), 6);
+  assert.equal(detectRequestedDay('thu 6 co mon gi'), 6);
+
+  assert.equal(detectRequestedDay('thứ 7 học mấy giờ'), 7);
+  assert.equal(detectRequestedDay('thu bay hoc may gio'), 7);
+
+  assert.equal(detectRequestedDay('chủ nhật có học không'), 1);
+  assert.equal(detectRequestedDay('chu nhat co lop khong'), 1);
+  assert.equal(detectRequestedDay('cn co lich khong'), 1);
+
+  // 2. Query detection coverage
+  assert.equal(isStudentAssistantQuery('lịch thứ 2 của tôi là khi nào'), true);
+  assert.equal(isStudentAssistantQuery('lich thu 2 cua toi'), true);
+  assert.equal(isStudentAssistantQuery('điểm của tôi thế nào'), true);
+  assert.equal(isStudentAssistantQuery('diem gpa cua toi'), true);
+  assert.equal(isStudentAssistantQuery('bảng điểm học kỳ'), true);
+  assert.equal(isStudentAssistantQuery('học phí của tôi còn nợ không'), true);
+  assert.equal(isStudentAssistantQuery('hoc phi ky nay bao nhieu'), true);
+  assert.equal(isStudentAssistantQuery('đồ án tốt nghiệp của tôi'), true);
+  assert.equal(isStudentAssistantQuery('do an tot nghiep'), true);
+  assert.equal(isStudentAssistantQuery('thông tin sinh viên của tôi'), true);
+  assert.equal(isStudentAssistantQuery('mssv cua toi la gi'), true);
+  assert.equal(isStudentAssistantQuery('chương trình đào tạo của tôi'), true);
+  assert.equal(isStudentAssistantQuery('lớp tôi đang dạy'), true);
+  assert.equal(isStudentAssistantQuery('lop toi dang day'), true);
+});
