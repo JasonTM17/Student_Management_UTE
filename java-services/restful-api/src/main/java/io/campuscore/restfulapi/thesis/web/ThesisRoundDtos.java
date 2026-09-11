@@ -14,8 +14,11 @@ public final class ThesisRoundDtos {
             UUID id,
             String name,
             String thesisType,
+            Instant lecturerSubmitStart,
+            Instant lecturerSubmitEnd,
             Instant registrationStart,
             Instant registrationEnd,
+            Instant gvpbDeadline,
             Instant proposalPublishAt,
             Instant reportDate,
             RoundStatus status) {
@@ -23,9 +26,10 @@ public final class ThesisRoundDtos {
         public static RoundResponse from(ThesisRegistrationRound round) {
             return new RoundResponse(
                     round.getId(), round.getName(), round.getThesisType(),
+                    round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
-                    round.getProposalPublishAt(), round.getReportDate(),
-                    round.getStatus());
+                    round.getGvpbDeadline(), round.getProposalPublishAt(),
+                    round.getReportDate(), round.getStatus());
         }
     }
 }

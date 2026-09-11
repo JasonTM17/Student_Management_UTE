@@ -15,13 +15,16 @@ public final class ThesisGroupReadDtos {
             List<GroupMemberResponse> members) { }
 
     /**
-     * One group member. Internal members resolve against a student profile;
-     * external members (different department or school) carry a declared
-     * displayName/contact and isExternal = true.
+     * One group member. studentId is the internal profile id used by mutation
+     * endpoints; studentNumber is the campus-facing student code. Internal
+     * members resolve displayName/contact from the student profile, while
+     * external members carry a declared displayName/contact and isExternal =
+     * true.
      */
     @JsonInclude(JsonInclude.Include.NON_NULL)
     public record GroupMemberResponse(
             String studentId,
+            String studentNumber,
             String displayName,
             String contact,
             boolean isExternal,

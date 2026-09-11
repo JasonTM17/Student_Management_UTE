@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.web;
 
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
+import java.math.BigDecimal;
 import java.util.UUID;
 
 public final class ThesisTopicDtos {
@@ -17,7 +18,9 @@ public final class ThesisTopicDtos {
             String description,
             int maxGroups,
             TopicStatus status,
-            String createdBy) {
+            String createdBy,
+            BigDecimal finalScore,
+            String resultStatus) {
 
         public static TopicResponse from(ThesisTopic topic) {
             return new TopicResponse(
@@ -28,7 +31,9 @@ public final class ThesisTopicDtos {
                     topic.getDescription(),
                     topic.getMaxGroups(),
                     topic.getStatus(),
-                    topic.getCreatedBy());
+                    topic.getCreatedBy(),
+                    topic.getFinalScore(),
+                    topic.getResultStatus());
         }
     }
 }

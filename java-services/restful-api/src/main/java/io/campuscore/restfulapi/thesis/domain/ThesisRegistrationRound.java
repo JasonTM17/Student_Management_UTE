@@ -32,6 +32,17 @@ public class ThesisRegistrationRound {
     @Column(name = "proposal_publish_at")
     private Instant proposalPublishAt;
 
+    /** Lecturer topic-submission window (phase one of the brief). */
+    @Column(name = "lecturer_submit_start", nullable = false)
+    private Instant lecturerSubmitStart;
+
+    @Column(name = "lecturer_submit_end", nullable = false)
+    private Instant lecturerSubmitEnd;
+
+    /** GVPB grading deadline; required for TLCN/KLTN rounds, null otherwise. */
+    @Column(name = "gvpb_deadline")
+    private Instant gvpbDeadline;
+
     @Column(name = "report_date")
     private Instant reportDate;
 
@@ -48,6 +59,9 @@ public class ThesisRegistrationRound {
     public Instant getRegistrationStart() { return registrationStart; }
     public Instant getRegistrationEnd() { return registrationEnd; }
     public Instant getProposalPublishAt() { return proposalPublishAt; }
+    public Instant getLecturerSubmitStart() { return lecturerSubmitStart; }
+    public Instant getLecturerSubmitEnd() { return lecturerSubmitEnd; }
+    public Instant getGvpbDeadline() { return gvpbDeadline; }
     public Instant getReportDate() { return reportDate; }
     public RoundStatus getStatus() { return status; }
 }

@@ -56,7 +56,6 @@ public class ThesisGroupReadService {
 
     private static boolean canReadAll(List<String> roles) {
         return roles.contains("ADMIN")
-                || roles.contains("SUPER_ADMIN")
                 || roles.contains("LECTURER");
     }
 

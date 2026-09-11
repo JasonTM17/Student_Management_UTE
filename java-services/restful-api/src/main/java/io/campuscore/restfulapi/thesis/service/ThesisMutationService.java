@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.thesis.domain.ApprovalStatus;
 import io.campuscore.restfulapi.thesis.domain.GroupStatus;
 import io.campuscore.restfulapi.thesis.domain.RoundStatus;
+import io.campuscore.restfulapi.thesis.domain.RoundType;
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
 import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisGroupReadRepository;
@@ -68,21 +69,46 @@ public class ThesisMutationService {
     public RoundResponse createRound(RoundCreateRequest request) {
         requireText(request == null ? null : request.name(), "name");
         requireText(request == null ? null : request.thesisType(), "thesisType");
-        requireDates(request == null ? null : request.registrationStart(), request == null ? null : request.registrationEnd());
+        RoundType roundType = requireRoundType(request.thesisType());
+        if (roundType == RoundType.TLCN && request.gvpbDeadline() == null) {
+            throw invalid("TLCN rounds require a gvpbDeadline");
+        }
+        if (roundType == RoundType.NCKH && request.gvpbDeadline() != null) {
+            throw invalid("NCKH rounds must not specify a gvpbDeadline");
+        }
+        if (roundType == RoundType.KLTN && request.reportDate() == null) {
+            throw invalid("KLTN rounds require a reportDate");
+        }
+        Instant regStart = request.registrationStart();
+        Instant regEnd = request.registrationEnd();
+        requireDates(regStart, regEnd);
+        Instant letStart = request.lecturerSubmitStart() != null ? request.lecturerSubmitStart() : regStart;
+        Instant letEnd = request.lecturerSubmitEnd() != null ? request.lecturerSubmitEnd() : regEnd;
+        if (request.lecturerSubmitStart() != null && request.lecturerSubmitEnd() != null) {
+            requireDates(letStart, letEnd);
+            if (regStart != null && regStart.isBefore(letEnd)) {
+                throw invalid("registrationStart must not be before lecturerSubmitEnd");
+            }
+        }
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO thesis.thesis_registration_round
-                    (id, name, thesis_type, registration_start, registration_end,
-                     proposal_publish_at, report_date, status)
-                VALUES (:id, :name, :thesisType, :registrationStart, :registrationEnd,
-                        :proposalPublishAt, :reportDate, 'DRAFT')
+                    (id, name, thesis_type, lecturer_submit_start, lecturer_submit_end,
+                     registration_start, registration_end,
+                     proposal_publish_at, gvpb_deadline, report_date, status)
+                VALUES (:id, :name, :thesisType, :lecturerSubmitStart, :lecturerSubmitEnd,
+                        :registrationStart, :registrationEnd,
+                        :proposalPublishAt, :gvpbDeadline, :reportDate, 'DRAFT')
                 """, params()
                 .addValue("id", id)
                 .addValue("name", request.name().trim())
-                .addValue("thesisType", request.thesisType().trim())
-                .addValue("registrationStart", request.registrationStart())
-                .addValue("registrationEnd", request.registrationEnd())
+                .addValue("thesisType", roundType.name())
+                .addValue("lecturerSubmitStart", letStart)
+                .addValue("lecturerSubmitEnd", letEnd)
+                .addValue("registrationStart", regStart)
+                .addValue("registrationEnd", regEnd)
                 .addValue("proposalPublishAt", request.proposalPublishAt())
+                .addValue("gvpbDeadline", request.gvpbDeadline())
                 .addValue("reportDate", request.reportDate()));
         return roundReads.get(id);
     }
@@ -99,6 +125,24 @@ public class ThesisMutationService {
         return roundReads.get(id);
     }
 
+    /**
+     * Publishes graded results for the round (brief phase two closure).
+     * Requires at least one graded topic; per-topic publication state is the
+     * aggregate the chair froze on the topic row.
+     */
+    @Transactional
+    public RoundResponse publishResults(UUID id) {
+        roundReadPort.requireExisting(id);
+        Integer graded = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' AND t.final_score IS NOT NULL",
+                params().addValue("id", id), Integer.class);
+        if (graded == null || graded == 0) {
+            throw conflict("RESULTS_NOT_READY", "No topic has been graded yet; the chair must finalize scores first");
+        }
+        return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED);
+    }
+
     @Transactional
     public TopicResponse createTopic(TopicCreateRequest request, Jwt actor) {
         requireText(request == null ? null : request.departmentId(), "departmentId");
@@ -109,6 +153,7 @@ public class ThesisMutationService {
             throw invalid("maxGroups must be between 1 and 20");
         }
         roundReadPort.requireExisting(request.roundId());
+        requireProposalPhase(request.roundId(), actor);
         String actorId = subject(actor);
         ThesisTopic topic = topics.saveAndFlush(new ThesisTopic(
                 request.roundId(),
@@ -159,6 +204,7 @@ public class ThesisMutationService {
     public TopicResponse publishTopic(UUID id, Jwt actor) {
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
         authorizeTopicOwner(topic, actor);
+        requireProposalPhase(topic.getRoundId(), actor);
         try {
             topic.publish();
         } catch (IllegalStateException exception) {
@@ -176,9 +222,7 @@ public class ThesisMutationService {
         requireRoundStatus(roundId, RoundStatus.REGISTRATION_OPEN);
         String studentId = studentId(actor);
         requireActiveStudent(studentId);
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = :roundId AND student_id = :studentId", roundId, studentId) > 0) {
-            throw conflict("STUDENT_ALREADY_IN_GROUP", "Student already belongs to a group in this round");
-        }
+        requireNotInAnotherActiveGroup(roundId, studentId);
         UUID groupId = UUID.randomUUID();
         jdbc.update("INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, status, approval_status) VALUES (:id, :roundId, :studentId, 'DRAFT', 'PENDING')", params().addValue("id", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, 1, TRUE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", roundId).addValue("studentId", studentId));
@@ -200,10 +244,8 @@ public class ThesisMutationService {
             return groups.findById(groupId);
         }
         requireActiveStudent(studentId);
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = :roundId AND student_id = :studentId", group.roundId(), studentId) > 0) {
-            throw conflict("STUDENT_ALREADY_IN_GROUP", "Student already belongs to a group in this round");
-        }
-        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) + 1));
+        requireNotInAnotherActiveGroup(group.roundId(), studentId);
+        jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", nextMemberOrder(groupId)));
         return groups.findById(groupId);
     }
 
@@ -229,7 +271,7 @@ public class ThesisMutationService {
                         .addValue("groupId", group.id())
                         .addValue("roundId", group.roundId())
                         .addValue("studentId", syntheticId)
-                        .addValue("memberOrder", count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", group.id()) + 1)
+                        .addValue("memberOrder", nextMemberOrder(group.id()))
                         .addValue("displayName", displayName)
                         .addValue("contact", contact.isBlank() ? null : contact));
     }
@@ -266,7 +308,7 @@ public class ThesisMutationService {
         if (!group.roundId().equals(topic.get("round_id"))) {
             throw conflict("TOPIC_ROUND_MISMATCH", "Topic belongs to another registration round");
         }
-        if (!TopicStatus.PUBLISHED.name().equals(topic.get("status"))) {
+        if (!TopicStatus.PUBLISHED.name().equals(topic.get("status")) && !TopicStatus.APPROVED.name().equals(topic.get("status"))) {
             throw conflict("TOPIC_NOT_PUBLISHED", "Only published topics can be selected");
         }
         int maxGroups = ((Number) topic.get("max_groups")).intValue();
@@ -313,6 +355,9 @@ public class ThesisMutationService {
         authorizeReviewer(group, actor);
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
+        }
+        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) < 2) {
+            throw conflict("GROUP_TOO_SMALL", "A thesis group needs at least two members before it can be approved");
         }
         int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
                 params().addValue("id", groupId).addValue("actor", subject(actor)));
@@ -447,6 +492,75 @@ public class ThesisMutationService {
     private void requireMutableMembership(GroupRow group, Jwt actor) {
         if (!isAdmin(actor) && group.approvalStatus() == ApprovalStatus.APPROVED) {
             throw conflict("GROUP_STATE_CONFLICT", "An approved group's membership is frozen");
+        }
+    }
+
+    /**
+     * Brief phase one: topic work stays in the proposal phase. Lecturer
+     * submissions additionally obey the configured lecturer submission window;
+     * admins can curate department-governed topics without being registered as
+     * a lecturer participant.
+     */
+    private void requireProposalPhase(UUID id, Jwt actor) {
+        Map<String, Object> round = one(
+                "SELECT status, lecturer_submit_start, lecturer_submit_end FROM thesis.thesis_registration_round WHERE id = :id",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        if (!RoundStatus.PROPOSAL_OPEN.name().equals(round.get("status"))) {
+            throw conflict("ROUND_NOT_ACCEPTING_PROPOSALS",
+                    "Topics can only be submitted while the round is in its lecturer proposal phase");
+        }
+        if (isAdmin(actor)) {
+            return;
+        }
+        Instant now = Instant.now();
+        Instant start = instantOf(round.get("lecturer_submit_start"));
+        Instant end = instantOf(round.get("lecturer_submit_end"));
+        if (start == null || end == null || now.isBefore(start) || !now.isBefore(end)) {
+            throw conflict("LECTURER_WINDOW_CLOSED", "The lecturer topic-submission window is closed for this round");
+        }
+    }
+
+    /**
+     * Brief R4: a student sits in at most one group while their current round
+     * has not finished. Rounds that reached RESULTS_PUBLISHED/CLOSED/CANCELLED
+     * release their members for the next round type (e.g. a course topic this
+     * term and a graduation thesis later).
+     */
+    private void requireNotInAnotherActiveGroup(UUID roundId, String studentId) {
+        Integer sameRound = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE round_id = :roundId AND student_id = :studentId",
+                params().addValue("roundId", roundId).addValue("studentId", studentId), Integer.class);
+        if (sameRound != null && sameRound > 0) {
+            throw conflict("STUDENT_ALREADY_IN_GROUP", "Student already belongs to a group in this round");
+        }
+        Integer otherActive = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = m.round_id "
+                        + "WHERE m.student_id = :studentId AND m.round_id <> :roundId "
+                        + "AND r.status IN ('DRAFT', 'PROPOSAL_OPEN', 'PROPOSALS_PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED')",
+                params().addValue("studentId", studentId).addValue("roundId", roundId), Integer.class);
+        if (otherActive != null && otherActive > 0) {
+            throw conflict("STUDENT_ACTIVE_IN_OTHER_GROUP",
+                    "The student already belongs to a group in another round that has not finished");
+        }
+    }
+
+    /** Highest existing member order plus one; keeps orders unique after removals. */
+    private int nextMemberOrder(UUID groupId) {
+        Integer maxOrder = jdbc.queryForObject(
+                "SELECT COALESCE(MAX(member_order), 0) FROM thesis.thesis_group_member WHERE group_id = :groupId",
+                params().addValue("groupId", groupId), Integer.class);
+        return (maxOrder == null ? 0 : maxOrder) + 1;
+    }
+
+    private static RoundType requireRoundType(String value) {
+        if (value == null || value.isBlank()) {
+            throw invalid("thesisType is required");
+        }
+        try {
+            return RoundType.valueOf(value.trim().toUpperCase(java.util.Locale.ROOT));
+        } catch (IllegalArgumentException exception) {
+            throw invalid("thesisType must be one of MON_HOC, NCKH, TLCN, KLTN");
         }
     }
 
