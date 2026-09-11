@@ -61,15 +61,37 @@ test('admin thesis and home routing distinguish role state explicitly', () => {
 });
 
 test('course-demo copy excludes retired finance and monitoring language', () => {
+  // messages.ts legitimately carries thesis report copy since the course-brief
+  // remediation (nộp báo cáo đề tài is a required R5 feature), so top-level
+  // thesis blocks are excluded from this finance/monitoring sweep instead of
+  // weakening the banned-word list itself.
+  const messagesLines = read('src/i18n/messages.ts').split('\n');
+  const filtered = [];
+  let thesisDepth = 0;
+  for (const line of messagesLines) {
+    if (/^  thesis: \{/.test(line)) {
+      thesisDepth += 1;
+      continue;
+    }
+    if (thesisDepth > 0 && /^  \},$/.test(line)) {
+      thesisDepth -= 1;
+      continue;
+    }
+    if (thesisDepth === 0) {
+      filtered.push(line);
+    }
+  }
+  assert.ok(thesisDepth === 0, 'thesis block scanning must stay balanced');
+
   const copy = [
-    'src/i18n/messages.ts',
-    'src/app/admin/departments/page.tsx',
-    'src/app/admin/semesters/page.tsx',
-    'src/app/dashboard/lecturer/schedule/page.tsx',
-    'src/app/opengraph-image.tsx',
-    'public/screenshots/home-en.svg',
-    'public/screenshots/home-vi.svg',
-  ].map(read).join('\n');
+    filtered.join('\n'),
+    read('src/app/admin/departments/page.tsx'),
+    read('src/app/admin/semesters/page.tsx'),
+    read('src/app/dashboard/lecturer/schedule/page.tsx'),
+    read('src/app/opengraph-image.tsx'),
+    read('public/screenshots/home-en.svg'),
+    read('public/screenshots/home-vi.svg'),
+  ].join('\n');
 
   assert.doesNotMatch(
     copy,
