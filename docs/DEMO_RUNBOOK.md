@@ -132,7 +132,80 @@ npm run lint --prefix frontend
 
 ---
 
-## 5. Hướng Dẫn Xử Lý Tình Huống Sự Cố (Troubleshooting)
+## 5. Demo Mở Rộng: Vòng Đời Đề Tài (NCKH/TLCN/KLTN) — Án Yêu Cầu Đồ Án Cuối Kỳ
+
+Module `thesis` đáp ứng trọn vẹn yêu cầu "Quản lý đề tài" (plans/20260909-pdf-requirements-audit):
+đợt 2 giai đoạn, nhóm ≤3 SV, đề tài 1–2 GVHD, báo cáo do nhóm trưởng nộp, hội đồng
+3–5 GV (chủ tịch + thư ký), điểm cuối = trung bình thành phần, cấm GVHD chấm đề tài
+mình hướng dẫn, công bố kết quả cho sinh viên.
+
+**Tài khoản**: Admin (`admin@campuscore.edu`) giữ vai trò `TRUONG_KHOA` (tạo đợt,
+thành lập hội đồng, công bố kết quả). Giảng viên/Sinh viên dùng tài khoản demo mặc định.
+
+**Cảnh báo trước khi demo**:
+- Dùng **một tab duy nhất** (đa tab có thể gặp race refresh gây đăng xuất nhầm).
+- **Tạo đợt mới**, không dùng lại đợt seed cũ (đợt legacy không có hạn GVPB).
+- **Công thức thời gian cửa sổ** (guards dùng giờ hệ thống — nếu nhập sai, bước sau sẽ
+  dừng giữa buổi): cửa sổ GV `[giờ demo, +10 phút]`, cửa sổ SV `[+10 phút, 23:59 hôm nay]`,
+  hạn GVPB sau khi cửa sổ SV kết thúc (ví dụ tháng sau), ngày báo cáo hội đồng sau hạn GVPB.
+
+**Kịch bản demo 5 bước** (chi tiết đầy đủ: `plans/20260909-pdf-requirements-audit/reports/acceptance-walkthrough.md`):
+
+1. **Admin → Quản trị Luận văn → Tạo đợt**: chọn loại (Môn học/NCKH/TLCN/KLTN),
+   nhập 2 cửa sổ theo công thức thời gian ở trên + hạn GVPB (TLCN/KLTN) + ngày báo cáo
+   hội đồng (KLTN). Sau tạo: bấm "Mở đăng ký đề tài (GV)" (DRAFT → PROPOSAL_OPEN).
+2. **Giảng viên → Khu luận văn**: đề xuất đề tài (chọn GVHD chính/thứ hai),
+   publish. Admin publish-proposals → open-registration.
+3. **Sinh viên → Khu luận văn**: lập nhóm (≤3, có nhóm trưởng), chọn 1 đề tài đã
+   công bố. GVHD duyệt nhóm.
+4. **Nhóm trưởng nộp báo cáo** (thẻ "Báo cáo" trên nhóm đã duyệt; freeze sau hạn GVPB).
+5. **Hội đồng + chấm điểm (Web UI đầy đủ & hỗ trợ API/Swagger)**:
+   - **Giao diện Quản trị Hội đồng (`/admin/thesis`)**:
+     - Admin/Trưởng khoa mở rộng đợt luận văn, bấm **"Tạo Hội đồng"** (nhập tên hội đồng).
+     - Bấm **"Thêm thành viên"** để thêm lần lượt từng ghế (Hệ thống tự động điều phối thứ tự nghiêm ngặt: Ghế 1 = Chủ tịch, Ghế 2 = Thư ký, Ghế 3–5 = Ủy viên).
+     - Khi hội đồng đã đủ 3–5 thành viên hợp lệ, bấm **"Gán đề tài"** để phân công các đề tài đã duyệt vào hội đồng bảo vệ.
+   - **Giao diện Chấm điểm Hội đồng (`/dashboard/thesis`)**:
+     - Giảng viên là thành viên hội đồng đăng nhập vào Khu luận văn, thấy khối **"Chấm điểm Hội đồng Bảo vệ"** liệt kê các hội đồng và đề tài được phân công.
+     - Giảng viên nhập điểm thành phần (thang điểm 0 – 10). *Lưu ý*: Giảng viên hướng dẫn của đề tài sẽ bị hệ thống tự động khóa/báo lỗi theo quy tắc R8 (`SUPERVISOR_CANNOT_GRADE`).
+     - Khi các chấm viên đã cho điểm, Chủ tịch hội đồng (CHAIR) bấm nút **"Tổng hợp & Chốt điểm"** để tự động tính điểm trung bình cộng làm tròn 2 chữ số thập phân (CAS lock bảo vệ chốt 1 lần duy nhất).
+   - **Công bố kết quả**:
+     - Admin đóng đăng ký (`close-registration`) và bấm **"Công bố kết quả"** (`publish-results`).
+     - Sinh viên xem điểm và kết quả xếp loại (Đạt / Không đạt) ngay tại thẻ **"Kết quả"** trong Khu luận văn (`/dashboard/thesis`).
+
+   *(Tùy chọn API/Swagger `http://127.0.0.1:4010/swagger-ui.html` hoặc curl để kiểm thử backend trực tiếp)*:
+
+   ```powershell
+   # 1) Admin lập hội đồng (ADMIN hoặc TRUONG_KHOA), gán đề tài, đủ 3-5 ghế:
+   POST /api/v1/thesis/councils                 {"roundId":"<RID>","name":"Hoi dong KLTN"}
+   POST /api/v1/thesis/councils/{CID}/members   {"lecturerId":"lecturer-profile","memberRole":"CHAIR"}
+   POST /api/v1/thesis/councils/{CID}/members   {"lecturerId":"lecturer-profile-002","memberRole":"SECRETARY"}
+   POST /api/v1/thesis/councils/{CID}/members   {"lecturerId":"lecturer-profile-003","memberRole":"MEMBER"}
+   POST /api/v1/thesis/councils/{CID}/topics    {"topicId":"<TID>"}
+
+   # 2) Ba chấm viên (đăng nhập lần lượt lecturer00X@campuscore.demo / password123)
+   #    nhập điểm thành phần — GVHD của đề tài sẽ bị chặn 403 SUPERVISOR_CANNOT_GRADE:
+   POST /api/v1/thesis/councils/{CID}/topics/{TID}/scores  {"score":7.5}   # theo từng người
+   POST /api/v1/thesis/councils/{CID}/topics/{TID}/scores  {"score":8.0}
+   POST /api/v1/thesis/councils/{CID}/topics/{TID}/scores  {"score":8.5}
+
+   # 3) CHAIR tổng hợp — điểm cuối = trung bình, chốt 1 lần (lần 2 -> 409):
+   POST /api/v1/thesis/councils/{CID}/topics/{TID}/finalize
+
+   # 4) Admin công bố kết quả (trong UI: nút "Công bố kết quả" khi REGISTRATION_CLOSED):
+   POST /api/v1/thesis/rounds/{RID}/close-registration
+   POST /api/v1/thesis/rounds/{RID}/publish-results
+   ```
+
+   Sinh viên sau đó thấy thẻ "Kết quả" (đề tài + hội đồng + điểm cuối) trong Khu luận văn.
+
+*Lưu ý vận hành*: trong Docker Compose, `rag-service` là tiến trình sở hữu Flyway
+và `restful-api` chạy với `FLYWAY_ENABLED=false` để tránh hai service cùng migrate.
+Sau khi thêm migration mới, build/recreate `rag-service`; không áp dụng psql thủ
+công trừ khi đang làm một repair có bằng chứng riêng.
+
+---
+
+## 6. Hướng Dẫn Xử Lý Tình Huống Sự Cố (Troubleshooting)
 
 | Tình huống sự cố | Nguyên nhân có thể | Hướng xử lý nhanh |
 | --- | --- | --- |
