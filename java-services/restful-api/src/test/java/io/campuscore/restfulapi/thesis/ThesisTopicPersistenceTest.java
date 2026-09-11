@@ -269,7 +269,13 @@ class ThesisTopicPersistenceTest {
                 UUID.class,
                 roundId);
 
-        addMember(groupId, "test-member-2").andExpect(status().isOk());
+        addMember(groupId, "test-member-2")
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members[1].studentId").value("test-member-2"))
+                .andExpect(jsonPath("$.members[1].studentNumber").value("CODE-test-member-2"))
+                .andExpect(jsonPath("$.members[1].displayName").value("Test Member"))
+                .andExpect(jsonPath("$.members[1].contact").value("member2@campuscore.edu"))
+                .andExpect(jsonPath("$.members[1].isExternal").value(false));
         addMember(groupId, "test-member-3").andExpect(status().isOk());
         addMember(groupId, "test-member-4")
                 .andExpect(status().isConflict())
@@ -329,31 +335,49 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
-    void roundLifecycleRejectsInvalidTransitionsWithStableConflictCode() throws Exception {
-        String body = "{\"name\":\"2027 Capstone\",\"thesisType\":\"CAPSTONE\"," +
+    void roundLifecycleFollowsTheTwoPhaseBriefOrder() throws Exception {
+        String body = "{\"name\":\"2027 Graduation Thesis\",\"thesisType\":\"KLTN\"," +
+                "\"lecturerSubmitStart\":\"2026-12-01T00:00:00Z\"," +
+                "\"lecturerSubmitEnd\":\"2026-12-31T00:00:00Z\"," +
                 "\"registrationStart\":\"2027-01-01T00:00:00Z\"," +
-                "\"registrationEnd\":\"2027-02-01T00:00:00Z\"}";
+                "\"registrationEnd\":\"2027-02-01T00:00:00Z\"," +
+                "\"gvpbDeadline\":\"2027-03-01T00:00:00Z\"," +
+                "\"reportDate\":\"2027-03-10T00:00:00Z\"}";
         mvc.perform(post("/api/v1/thesis/rounds")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
                         .with(adminJwt()))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("DRAFT"));
+                .andExpect(jsonPath("$.status").value("DRAFT"))
+                .andExpect(jsonPath("$.thesisType").value("KLTN"))
+                .andExpect(jsonPath("$.gvpbDeadline").value("2027-03-01T00:00:00Z"));
 
         UUID roundId = jdbc.queryForObject(
-                "SELECT id FROM thesis.thesis_registration_round WHERE name = '2027 Capstone'",
+                "SELECT id FROM thesis.thesis_registration_round WHERE name = '2027 Graduation Thesis'",
                 UUID.class);
-        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));
+
+        // The two-phase brief order: proposals first, published catalog second,
+        // student registration third. Jumping straight to registration is refused.
         mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("ROUND_STATE_CONFLICT"));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-proposals", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROPOSAL_OPEN"));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-proposals", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PROPOSALS_PUBLISHED"));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/close-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("REGISTRATION_CLOSED"));
     }
 
     @Test
     void topicMutationsEnforceLecturerOwnershipAndDraftState() throws Exception {
-        UUID roundId = insertRound();
+        UUID roundId = insertProposalRound("Ownership Round");
         String createBody = "{\"roundId\":\"" + roundId + "\",\"departmentId\":\"department-demo\"," +
                 "\"title\":\"Deterministic RAG\",\"description\":\"A bounded thesis topic\",\"maxGroups\":2}";
         mvc.perform(post("/api/v1/thesis/topics")
@@ -390,8 +414,7 @@ class ThesisTopicPersistenceTest {
 
     @Test
     void lecturerTopicCreationRegistersSupervisorAndAllowsGroupReview() throws Exception {
-        UUID roundId = UUID.randomUUID();
-        insertRound(roundId, "Open Round 2026", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID roundId = insertProposalRound("Open Round 2026");
         ensureStudent("student-review-1", "user-student-1", "student1@campuscore.edu");
 
         // 1. Lecturer creates topic
@@ -421,6 +444,9 @@ class ThesisTopicPersistenceTest {
                         .with(lecturerJwt("lecturer-supervisor-1")))
                 .andExpect(status().isOk());
 
+        // Open the student phase before groups may register (brief phase two).
+        driveRoundFromProposalToRegistration(roundId);
+
         // 2. Student creates group and assigns topic
         mvc.perform(post("/api/v1/thesis/groups")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -435,6 +461,10 @@ class ThesisTopicPersistenceTest {
                 UUID.class,
                 roundId,
                 "student-review-1");
+
+        // A one-leader group is not a group: add a member before approval.
+        ensureStudent("student-review-1b", "user-student-1b", "student1b@campuscore.edu");
+        addMember(groupId, "student-review-1b").andExpect(status().isOk());
 
         mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -466,8 +496,7 @@ class ThesisTopicPersistenceTest {
 
     @Test
     void lecturerRejectionFlowAndTopicReassignment() throws Exception {
-        UUID roundId = UUID.randomUUID();
-        insertRound(roundId, "Open Round 2026-B", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID roundId = insertProposalRound("Open Round 2026-B");
         ensureStudent("student-review-2", "user-student-2", "student2@campuscore.edu");
 
         // 1. Lecturer creates topic
@@ -486,6 +515,8 @@ class ThesisTopicPersistenceTest {
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
                         .with(lecturerJwt("lecturer-reviewer-2")))
                 .andExpect(status().isOk());
+
+        driveRoundFromProposalToRegistration(roundId);
 
         // 2. Student creates group & assigns topic
         mvc.perform(post("/api/v1/thesis/groups")
@@ -507,6 +538,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(status().isOk());
 
         // 3. Lecturer rejects with blank reason -> 400 VALIDATION_ERROR
+        ensureStudent("student-review-2b", "user-student-2b", "student2b@campuscore.edu");
+        addMember(groupId, "student-review-2b").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/reject", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"   \"}")
@@ -541,8 +574,7 @@ class ThesisTopicPersistenceTest {
 
     @Test
     void approvedGroupCannotChangeTopicAndRejectedSlotIsFreed() throws Exception {
-        UUID roundId = UUID.randomUUID();
-        insertRound(roundId, "Open Round 2026-C", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID roundId = insertProposalRound("Open Round 2026-C");
         ensureStudent("student-review-3", "user-student-3", "student3@campuscore.edu");
         ensureStudent("student-review-4", "user-student-4", "student4@campuscore.edu");
 
@@ -561,6 +593,8 @@ class ThesisTopicPersistenceTest {
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
                         .with(lecturerJwt("lecturer-reviewer-3")))
                 .andExpect(status().isOk());
+
+        driveRoundFromProposalToRegistration(roundId);
 
         // 2. Student 3 creates group and assigns topic (takes the only slot)
         mvc.perform(post("/api/v1/thesis/groups")
@@ -612,6 +646,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$.approvalStatus").value("PENDING"));
 
         // 6. Lecturer approves Group 4
+        ensureStudent("student-review-4b", "user-student-4b", "student4b@campuscore.edu");
+        addMember(group4Id, "student-review-4b").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", group4Id)
                         .with(lecturerJwt("lecturer-reviewer-3")))
                 .andExpect(status().isOk())
@@ -628,8 +664,7 @@ class ThesisTopicPersistenceTest {
 
     @Test
     void coSupervisorCanReviewAndApproveGroup() throws Exception {
-        UUID roundId = UUID.randomUUID();
-        insertRound(roundId, "Open Round 2026-D", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID roundId = insertProposalRound("Open Round 2026-D");
         ensureStudent("student-review-5", "user-student-5", "student5@campuscore.edu");
 
         // 1. Primary supervisor creates topic
@@ -647,6 +682,8 @@ class ThesisTopicPersistenceTest {
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
                         .with(lecturerJwt("lecturer-lead")))
                 .andExpect(status().isOk());
+
+        driveRoundFromProposalToRegistration(roundId);
 
         // 2. Add co-supervisor (order = 2)
         jdbc.update(
@@ -676,6 +713,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$.code").value("GROUP_REVIEWER_REQUIRED"));
 
         // 5. Co-supervisor can review and approve group
+        ensureStudent("student-review-5b", "user-student-5b", "student5b@campuscore.edu");
+        addMember(groupId, "student-review-5b").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
                         .with(lecturerJwt("lecturer-co")))
                 .andExpect(status().isOk())
@@ -684,8 +723,7 @@ class ThesisTopicPersistenceTest {
 
     @Test
     void adminTopicCreationDoesNotRegisterAdminAsSupervisor() throws Exception {
-        UUID roundId = UUID.randomUUID();
-        insertRound(roundId, "Admin Round 2026", Instant.parse("2026-03-01T00:00:00Z"), "REGISTRATION_OPEN");
+        UUID roundId = insertProposalRound("Admin Round 2026");
         ensureStudent("student-review-6", "user-student-6", "student6@campuscore.edu");
 
         // Admin creates topic
@@ -712,6 +750,8 @@ class ThesisTopicPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isOk());
 
+        driveRoundFromProposalToRegistration(roundId);
+
         // Student creates group & assigns topic
         mvc.perform(post("/api/v1/thesis/groups")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -729,6 +769,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(status().isOk());
 
         // Admin can still approve group
+        ensureStudent("student-review-6b", "user-student-6b", "student6b@campuscore.edu");
+        addMember(groupId, "student-review-6b").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
                         .with(adminJwt()))
                 .andExpect(status().isOk())
@@ -741,6 +783,28 @@ class ThesisTopicPersistenceTest {
         return roundId;
     }
 
+    /** A round in its lecturer proposal phase with a live submission window. */
+    private UUID insertProposalRound(String name) {
+        UUID roundId = UUID.randomUUID();
+        insertRound(roundId, name, Instant.now(), "PROPOSAL_OPEN");
+        return roundId;
+    }
+
+    /** Walks DRAFT -> PROPOSAL_OPEN -> PROPOSALS_PUBLISHED -> REGISTRATION_OPEN. */
+    private void driveRoundToRegistration(UUID roundId) throws Exception {
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-proposals", roundId).with(adminJwt()))
+                .andExpect(status().isOk());
+        driveRoundFromProposalToRegistration(roundId);
+    }
+
+    /** Walks PROPOSAL_OPEN -> PROPOSALS_PUBLISHED -> REGISTRATION_OPEN. */
+    private void driveRoundFromProposalToRegistration(UUID roundId) throws Exception {
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-proposals", roundId).with(adminJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
+                .andExpect(status().isOk());
+    }
+
     private void insertRound(UUID roundId, String name, Instant start, String status) {
         // Registration mutations now enforce the stored window, so open rounds
         // are seeded with a valid relative window instead of a past fixture date.
@@ -750,11 +814,14 @@ class ThesisTopicPersistenceTest {
         Instant end = effectiveStart.plusSeconds(31L * 24 * 60 * 60);
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
-                        + "(id, name, thesis_type, registration_start, registration_end, status) "
-                        + "VALUES (?, ?, ?, ?, ?, ?)",
+                        + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
+                        + "registration_start, registration_end, status) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 roundId,
                 name,
-                "CAPSTONE",
+                "KLTN",
+                Timestamp.from(effectiveStart),
+                Timestamp.from(end),
                 Timestamp.from(effectiveStart),
                 Timestamp.from(end),
                 status);
@@ -782,11 +849,13 @@ class ThesisTopicPersistenceTest {
         // Open status but an expired window: registration mutations must fail closed.
         UUID expiredRound = UUID.randomUUID();
         jdbc.update(
-                "INSERT INTO thesis.thesis_registration_round (id, name, thesis_type, registration_start, registration_end, status) "
-                        + "VALUES (?, ?, ?, ?, ?, ?)",
+                "INSERT INTO thesis.thesis_registration_round (id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, registration_start, registration_end, status) "
+                        + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 expiredRound,
                 "Expired window",
-                "CAPSTONE",
+                "KLTN",
+                Timestamp.from(Instant.now().minusSeconds(2 * 86_400)),
+                Timestamp.from(Instant.now().minusSeconds(86_400)),
                 Timestamp.from(Instant.now().minusSeconds(2 * 86_400)),
                 Timestamp.from(Instant.now().minusSeconds(86_400)),
                 "REGISTRATION_OPEN");
@@ -861,7 +930,12 @@ class ThesisTopicPersistenceTest {
         return mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("{\"studentId\":\"" + studentId + "\"}")
-                .with(studentJwt("student-profile")));
+                .with(studentJwt(groupLeader(groupId))));
+    }
+
+    private String groupLeader(UUID groupId) {
+        return jdbc.queryForObject(
+                "SELECT leader_student_id FROM thesis.thesis_group WHERE id = ?", String.class, groupId);
     }
 
     private void ensureStudent(String studentId, String userId, String email) {

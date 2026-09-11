@@ -65,22 +65,40 @@ public class ThesisGroupReadRepository {
             members.put(row.id(), new ArrayList<>());
             memberDetails.put(row.id(), new ArrayList<>());
         }
-        jdbc.query("SELECT group_id, student_id, display_name, contact, is_external, is_leader, member_order FROM thesis.thesis_group_member WHERE group_id IN (:ids) ORDER BY group_id, member_order", new MapSqlParameterSource("ids", members.keySet()), (RowCallbackHandler) rs -> {
+        jdbc.query("SELECT m.group_id, m.student_id, m.display_name, m.contact, m.is_external, m.is_leader, m.member_order, "
+                + "s.\"studentId\" AS student_number, u.\"firstName\" AS first_name, u.\"lastName\" AS last_name, u.\"email\" AS email "
+                + "FROM thesis.thesis_group_member m "
+                + "LEFT JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                + "LEFT JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\" "
+                + "WHERE m.group_id IN (:ids) "
+                + "ORDER BY m.group_id, m.member_order", new MapSqlParameterSource("ids", members.keySet()), (RowCallbackHandler) rs -> {
             UUID groupId = rs.getObject("group_id", UUID.class);
             String studentId = rs.getString("student_id");
             boolean external = rs.getBoolean("is_external");
             String displayName = rs.getString("display_name");
             String contact = rs.getString("contact");
+            String profileName = blankToNull(joinName(rs.getString("first_name"), rs.getString("last_name")));
             members.get(groupId).add(studentId);
             memberDetails.get(groupId).add(new GroupMemberResponse(
                     studentId,
-                    external ? displayName : null,
-                    external ? contact : null,
+                    external ? null : rs.getString("student_number"),
+                    external ? displayName : profileName,
+                    external ? contact : rs.getString("email"),
                     external,
                     rs.getBoolean("is_leader"),
                     rs.getInt("member_order")));
         });
         return rows.stream().map(row -> new GroupResponse(row.id(), row.roundId(), row.leaderStudentId(), row.topicId(), row.status(), row.approvalStatus(), row.rejectionReason(), List.copyOf(members.get(row.id())), List.copyOf(memberDetails.get(row.id())))).toList();
+    }
+
+    private static String joinName(String firstName, String lastName) {
+        String first = firstName == null ? "" : firstName.trim();
+        String last = lastName == null ? "" : lastName.trim();
+        return (first + " " + last).trim();
+    }
+
+    private static String blankToNull(String value) {
+        return value == null || value.isBlank() ? null : value;
     }
 
     private static GroupRow row(ResultSet rs, int ignored) throws SQLException {

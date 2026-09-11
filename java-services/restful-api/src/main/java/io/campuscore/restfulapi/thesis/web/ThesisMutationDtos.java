@@ -12,8 +12,11 @@ public final class ThesisMutationDtos {
     public record RoundCreateRequest(
             String name,
             String thesisType,
+            Instant lecturerSubmitStart,
+            Instant lecturerSubmitEnd,
             Instant registrationStart,
             Instant registrationEnd,
+            Instant gvpbDeadline,
             Instant proposalPublishAt,
             Instant reportDate) {
     }

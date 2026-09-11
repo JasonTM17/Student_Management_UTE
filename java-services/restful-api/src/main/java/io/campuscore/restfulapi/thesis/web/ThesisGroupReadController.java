@@ -26,7 +26,7 @@ public class ThesisGroupReadController {
     }
 
     @GetMapping
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
     public List<GroupResponse> list(
             @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
@@ -34,7 +34,7 @@ public class ThesisGroupReadController {
     }
 
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
     public GroupResponse get(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {

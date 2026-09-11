@@ -36,8 +36,16 @@ public class ThesisTopicService {
         rounds.requireExisting(roundId);
         TopicStatus requestedStatus = status == null ? TopicStatus.PUBLISHED : status;
         List<ThesisTopic> result;
-        if (requestedStatus == TopicStatus.PUBLISHED || isAdmin(actor)) {
-            result = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, requestedStatus);
+        if (requestedStatus == TopicStatus.PUBLISHED || requestedStatus == TopicStatus.APPROVED || isAdmin(actor)) {
+            if (requestedStatus == TopicStatus.PUBLISHED) {
+                List<ThesisTopic> published = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, TopicStatus.PUBLISHED);
+                List<ThesisTopic> approved = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, TopicStatus.APPROVED);
+                result = new java.util.ArrayList<>(published);
+                result.addAll(approved);
+                result.sort(java.util.Comparator.comparing(ThesisTopic::getTitle));
+            } else {
+                result = topics.findAllByRoundIdAndStatusOrderByTitle(roundId, requestedStatus);
+            }
         } else if (!isLecturer(actor)) {
             result = List.of();
         } else {
@@ -61,7 +69,7 @@ public class ThesisTopicService {
         ThesisTopic topic = topics.findById(id)
                 .orElseThrow(() -> new ResponseStatusException(
                         HttpStatus.NOT_FOUND, "Thesis topic not found"));
-        if (topic.getStatus() != TopicStatus.PUBLISHED && !isAdmin(actor) && !isOwner(topic, actor)) {
+        if (topic.getStatus() != TopicStatus.PUBLISHED && topic.getStatus() != TopicStatus.APPROVED && !isAdmin(actor) && !isOwner(topic, actor)) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Thesis topic not found");
         }
         return TopicResponse.from(topic);
@@ -82,7 +90,7 @@ public class ThesisTopicService {
             return false;
         }
         List<String> roles = actor.getClaimAsStringList("roles");
-        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        return roles != null && roles.contains("ADMIN");
     }
 
     private static boolean isLecturer(Jwt actor) {

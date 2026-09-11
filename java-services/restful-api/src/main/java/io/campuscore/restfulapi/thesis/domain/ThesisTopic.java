@@ -41,6 +41,12 @@ public class ThesisTopic {
     @Column(name = "created_by", nullable = false)
     private String createdBy;
 
+    @Column(name = "final_score")
+    private java.math.BigDecimal finalScore;
+
+    @Column(name = "result_status", length = 32)
+    private String resultStatus;
+
     @Version
     private long version;
 
@@ -123,8 +129,8 @@ public class ThesisTopic {
     }
 
     public void publish() {
-        if (status != TopicStatus.DRAFT) {
-            throw new IllegalStateException("Only draft topics can be published");
+        if (status != TopicStatus.DRAFT && status != TopicStatus.APPROVED) {
+            throw new IllegalStateException("Only draft or approved topics can be published");
         }
         status = TopicStatus.PUBLISHED;
     }
@@ -138,5 +144,13 @@ public class ThesisTopic {
 
     public String getCreatedBy() {
         return createdBy;
+    }
+
+    public java.math.BigDecimal getFinalScore() {
+        return finalScore;
+    }
+
+    public String getResultStatus() {
+        return resultStatus;
     }
 }

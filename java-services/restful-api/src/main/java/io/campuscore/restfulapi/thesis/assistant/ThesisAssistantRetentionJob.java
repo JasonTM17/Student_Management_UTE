@@ -8,6 +8,12 @@ import org.springframework.stereotype.Component;
 
 @Component
 @Profile("persistence")
+@org.springframework.boot.autoconfigure.condition.ConditionalOnProperty(
+        prefix = "assistant.retention",
+        name = "enabled",
+        havingValue = "true",
+        matchIfMissing = true
+)
 public class ThesisAssistantRetentionJob {
     private static final Logger log = LoggerFactory.getLogger(ThesisAssistantRetentionJob.class);
 
