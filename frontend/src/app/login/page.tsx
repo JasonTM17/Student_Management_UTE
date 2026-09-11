@@ -3,7 +3,7 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
-import { ArrowRight, Eye, EyeOff, Lock, Mail } from 'lucide-react';
+import { ArrowRight, CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { LocalizedLink } from '@/components/LocalizedLink';
@@ -32,6 +32,7 @@ export default function LoginPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [isClientReady, setIsClientReady] = useState(false);
+  const [noticeDismissed, setNoticeDismissed] = useState(false);
   const [formError, setFormError] = useState('');
   const formErrorRef = useRef<HTMLDivElement>(null);
   const { login, logout } = useAuth();
@@ -207,13 +208,77 @@ export default function LoginPage() {
           </div>
         </div>
 
-        {notice ? (
-          <div role="status" className="rounded-xl border border-border/80 bg-secondary/50 px-4 py-3 shadow-xs">
-            <div className="text-sm font-semibold text-foreground">
-              {notice.title}
-            </div>
-            <div className="mt-1 text-sm text-muted-foreground">
-              {notice.body}
+        {notice && !noticeDismissed ? (
+          <div
+            role="status"
+            className={cn(
+              'relative overflow-hidden rounded-xl border p-4 shadow-sm transition-all duration-200',
+              reason === 'signed-out'
+                ? 'border-emerald-500/30 bg-emerald-500/[0.08] dark:border-emerald-500/30 dark:bg-emerald-950/30'
+                : 'border-border/80 bg-secondary/50'
+            )}
+          >
+            <div className="flex items-start gap-3.5">
+              <div
+                className={cn(
+                  'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg shadow-xs',
+                  reason === 'signed-out'
+                    ? 'bg-emerald-500/15 text-emerald-600 dark:bg-emerald-500/25 dark:text-emerald-400'
+                    : 'bg-primary/10 text-primary'
+                )}
+              >
+                {reason === 'signed-out' ? (
+                  <ShieldCheck className="h-5 w-5" />
+                ) : (
+                  <CheckCircle2 className="h-5 w-5" />
+                )}
+              </div>
+
+              <div className="min-w-0 flex-1 pr-6">
+                <div className="flex items-center gap-2">
+                  <span
+                    className={cn(
+                      'text-sm font-semibold',
+                      reason === 'signed-out'
+                        ? 'text-emerald-950 dark:text-emerald-200'
+                        : 'text-foreground'
+                    )}
+                  >
+                    {reason === 'signed-out'
+                      ? (locale === 'vi' ? 'Đã đăng xuất an toàn' : 'Signed Out Securely')
+                      : notice.title}
+                  </span>
+                  {reason === 'signed-out' && (
+                    <span className="inline-flex items-center rounded-xs bg-emerald-500/15 px-2 py-0.5 text-[10px] font-semibold text-emerald-700 dark:text-emerald-300">
+                      {locale === 'vi' ? 'Bảo mật hệ thống' : 'System Secured'}
+                    </span>
+                  )}
+                </div>
+
+                <p
+                  className={cn(
+                    'mt-1.5 text-xs leading-relaxed',
+                    reason === 'signed-out'
+                      ? 'text-emerald-900/90 dark:text-emerald-300/90'
+                      : 'text-muted-foreground'
+                  )}
+                >
+                  {reason === 'signed-out'
+                    ? (locale === 'vi'
+                        ? 'Bạn đã đăng xuất khỏi cổng học vụ thành công. Phiên làm việc đã kết thúc và dữ liệu bảo mật đã được xóa an toàn khỏi trình duyệt này.'
+                        : 'You have signed out of the academic portal. The session has terminated and security tokens have been safely cleared.')
+                    : notice.body}
+                </p>
+              </div>
+
+              <button
+                type="button"
+                onClick={() => setNoticeDismissed(true)}
+                className="absolute top-3.5 right-3.5 rounded-md p-1 text-muted-foreground hover:bg-black/5 hover:text-foreground dark:hover:bg-white/10"
+                aria-label={locale === 'vi' ? 'Đóng thông báo' : 'Dismiss notice'}
+              >
+                <X className="h-4 w-4" />
+              </button>
             </div>
           </div>
         ) : null}

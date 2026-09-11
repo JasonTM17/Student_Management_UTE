@@ -12,7 +12,7 @@ async function signIn(
   portal: 'student' | 'lecturer' | 'admin' = 'student',
 ) {
   await page.goto(`/login?portal=${portal}`);
-  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
@@ -43,7 +43,7 @@ test.describe('public and auth', () => {
   test('homepage has skip-link, visible sign-in, and no 3-equal metric grid', async ({ page }) => {
     await page.goto('/');
     await expect(page.getByRole('link', { name: /skip to content/i })).toBeAttached();
-    const signIn = page.getByRole('navigation').getByRole('link', { name: /sign in/i });
+    const signIn = page.getByRole('navigation').getByRole('link', { name: /sign in|đăng nhập/i });
     await expect(signIn).toBeVisible();
     const box = await signIn.boundingBox();
     expect(box).not.toBeNull();
@@ -126,12 +126,12 @@ test.describe('public and auth', () => {
 
   test('student credentials are rejected on the admin portal', async ({ page }) => {
     await page.goto('/login?portal=admin');
-    const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+    const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
     await expect(submit).toBeEnabled({ timeout: 20_000 });
     await page.locator('#email').fill(student.email);
     await page.locator('#password').fill(student.password);
     await submit.click();
-    await expect(page.locator('#login-error')).toContainText(/another campus portal/i);
+    await expect(page.locator('#login-error')).toContainText(/another campus portal|cổng khác/i);
     await expect(page).toHaveURL(/\/login/);
   });
 });
@@ -141,11 +141,13 @@ test.describe('student workspace', () => {
     await signIn(page, student);
     await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
     await expect(page.getByRole('main')).toBeVisible();
-    const mobileNav = page.getByRole('navigation', { name: /campus navigation on mobile/i });
+    const mobileNav = page.getByRole('navigation', {
+      name: /campus navigation on mobile|điều hướng cổng học vụ trên điện thoại/i,
+    });
     if (testInfo.project.name === 'mobile-390') {
       await expect(mobileNav).toBeVisible();
       await expect(mobileNav.getByRole('link', { name: /home|trang chủ/i })).toBeVisible();
-      await expect(mobileNav.getByRole('button', { name: /open sidebar/i })).toBeVisible();
+      await expect(mobileNav.getByRole('button', { name: /open sidebar|mở thanh điều hướng/i })).toBeVisible();
     }
   });
 
@@ -244,16 +246,16 @@ test.describe('admin workspace', () => {
   test('admin lands on the tokenized overview and can open users', async ({ page }) => {
     await signIn(page, admin, 'admin');
     await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
-    await expect(page.getByRole('heading', { name: 'Admin dashboard', exact: true })).toBeVisible();
-    await expect(page.getByRole('heading', { name: /campus overview at a glance/i, exact: true })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /admin dashboard|tổng quan quản trị/i })).toBeVisible();
+    await expect(page.getByRole('heading', { name: /campus overview at a glance|tổng quan campus/i })).toBeVisible();
     await page.goto('/admin/users');
-    await expect(page.getByRole('heading', { name: 'User management', exact: true })).toBeVisible({
+    await expect(page.getByRole('heading', { name: /user management|quản lý người dùng/i })).toBeVisible({
       timeout: 15_000,
     });
-    const retry = page.getByRole('button', { name: /try again/i });
+    const retry = page.getByRole('button', { name: /try again|thử lại/i });
     if (await retry.isVisible().catch(() => false)) {
       await retry.click();
-      await expect(page.getByRole('heading', { name: 'User management', exact: true })).toBeVisible();
+      await expect(page.getByRole('heading', { name: /user management|quản lý người dùng/i })).toBeVisible();
     }
   });
 

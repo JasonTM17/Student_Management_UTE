@@ -57,7 +57,7 @@ test('lecturer grading guard tracks records the lecturer actually edited', () =>
   );
   assert.match(
     page,
-    /hasCompletedGrade\(\s*applyScoreDraft\(grades\.get\(enrollment\.id\), scoreDrafts\[enrollment\.id\]\),\s*\)/,
+    /hasCompletedGrade\(grades\.get\(enrollment\.id\)\)/,
   );
   assert.match(page, /markEdited\(/);
   // Seeding every roster row with 0 made the old guard always pass.
@@ -69,19 +69,35 @@ test('lecturer grade saves submit only edited rows, not the seeded roster', () =
   const page = read('src/app/dashboard/lecturer/grades/[id]/page.tsx');
 
   assert.match(page, /\.filter\(\(enrollment\) => editedIds\.has\(enrollment\.id\)\)/);
-  assert.match(page, /applyScoreDraft\(/);
+  assert.match(page, /processScore/);
+  assert.match(page, /finalExamScore/);
   assert.match(page, /updates\.length === 0/);
   assert.doesNotMatch(page, /Array\.from\(grades\.values\(\)\)/);
-  assert.match(read('src/lib/api.ts'), /finalGrade: number \| null/);
+  assert.match(read('src/lib/api.ts'), /processScore: number; finalExamScore: number/);
+  assert.doesNotMatch(read('src/lib/api.ts'), /grades: \{ enrollmentId: string; finalGrade/);
 });
 
-test('grade score inputs keep decimal drafts until they are committed', () => {
+test('grade score inputs use canonical 50-50 components and derive the letter grade', () => {
   const page = read('src/app/dashboard/lecturer/grades/[id]/page.tsx');
 
-  assert.match(page, /scoreDrafts/);
-  assert.match(page, /value=\{\s*scoreDrafts\[enrollment\.id\] \?\?/);
-  assert.match(page, /onBlur=\{\(\) => commitScoreDraft\(enrollment\.id\)\}/);
+  assert.match(page, /'processScore' \| 'finalExamScore'/);
+  assert.match(page, /\(update!\.processScore! \+ update!\.finalExamScore!\) \/ 2/);
+  assert.match(page, /calculateGrade\(totalScore\(current\)!\)/);
+  assert.doesNotMatch(page, /letterGrades/);
   assert.match(page, /step="0\.1"/);
+});
+
+test('student grade views never invent component scores and lecturer notices expose four templates', () => {
+  const gradesPage = read('src/app/dashboard/grades/page.tsx');
+  const detailModal = read('src/components/dashboard/GradeDetailModal.tsx');
+  const notices = read('src/app/dashboard/lecturer/announcements/page.tsx');
+
+  assert.doesNotMatch(gradesPage, /getComponentScores/);
+  assert.doesNotMatch(detailModal, /2 \* finalScore|finalScore - 0\.2/);
+  assert.match(detailModal, /Điểm quá trình \(ĐQT - 50%\)/);
+  for (const label of ['Nghỉ học & Học bù', 'Nhắc nhở nộp bài tập lớn/đồ án', 'Lịch thi & Kiểm tra', 'Thông báo lớp học phần']) {
+    assert.match(notices, new RegExp(label.replace(/[&/]/g, '\\$&')));
+  }
 });
 
 test('semester switching cannot let stale responses overwrite newer grades', () => {
@@ -176,6 +192,46 @@ test('feedback polish: account creation and admin temporary passwords can be rev
   assert.match(adminUsers, /messages\.login\.hidePassword/);
 });
 
+test('feedback polish: curriculum counts stay localized and enrolled schedules use CampusCore weekdays', () => {
+  const page = read('src/app/dashboard/enrollments/page.tsx');
+  const grid = read('src/lib/weekly-grid.ts');
+
+  assert.match(page, /const courseCountLabel = useCallback/);
+  assert.match(page, /value: courseCountLabel\(curriculumCourses\.length\)/);
+  assert.match(page, /value: courseCountLabel\(completedCurriculum\.length\)/);
+  assert.match(page, /value: courseCountLabel\(inProgressCurriculum\.length\)/);
+  assert.match(page, /curriculumCreditPercent/);
+  assert.match(page, /curriculumStatusSummary/);
+  assert.match(page, /aria-label=\{copy\.statusSummaryLabel\}/);
+  assert.match(page, /aria-pressed=\{statusFilter === btn\.key\}/);
+  assert.match(page, /filterNotStarted: 'Not completed'/);
+  assert.match(page, /\{copy\.semesterPrefix\} \{sem\} - \{courseCountLabel\(courses\.length\)\}/);
+  assert.match(page, /DB convention: 1 = Sunday\/Chủ nhật/);
+  assert.match(page, /const normalizedDay = day === 0 \? 1 : day/);
+  assert.doesNotMatch(page, /\$\{formatNumber\(curriculumCourses\.length\)\} môn/);
+  assert.doesNotMatch(page, /\$\{formatNumber\(completedCurriculum\.length\)\} môn/);
+  assert.doesNotMatch(page, /\$\{formatNumber\(inProgressCurriculum\.length\)\} môn/);
+  assert.doesNotMatch(page, /\{curriculumCourses\.length\} môn/);
+  assert.doesNotMatch(page, /filterNotStarted: 'Not Started'/);
+
+  assert.match(grid, /Sunday\(1\) through Saturday\(7\)/);
+  assert.match(grid, /const day = item\.dayOfWeek === 0 \? 1 : item\.dayOfWeek/);
+  assert.doesNotMatch(grid, /item\.dayOfWeek === 0 \? 7/);
+});
+
+test('feedback polish: transcript semester selector is singular and chart controls expose state', () => {
+  const page = read('src/app/dashboard/transcript/page.tsx');
+
+  assert.equal((page.match(/aria-label=\{copy\.selectSemester\}/g) ?? []).length, 1);
+  assert.match(page, /aria-pressed=\{gpaMode === 'cumulative'\}/);
+  assert.match(page, /aria-pressed=\{gpaMode === 'semester'\}/);
+  assert.match(page, /aria-pressed=\{gpaMode === 'both'\}/);
+  assert.match(page, /description: `GPA, credits, and course outcomes for \$\{selectedSemesterName\}\.`/);
+  assert.match(page, /clickToViewDetail: 'Midterm\/final detail'/);
+  assert.doesNotMatch(page, /Click on a course to view Midterm & Final score breakdown/);
+  assert.doesNotMatch(page, /Nhấn vào môn học để xem chi tiết điểm/);
+});
+
 test('registration idempotency keeps PostgreSQL duplicate claims inside the transaction', () => {
   const service = fs.readFileSync(
     path.join(root, '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/registration/RegistrationService.java'),
@@ -217,7 +273,15 @@ test('admin announcement reference lookup stays within the section API page limi
 
 test('deep persona route matrix has a bounded timeout large enough for cold compilation', () => {
   const spec = fs.readFileSync(path.join(root, 'e2e/professional-quality.spec.ts'), 'utf8');
+  const adminEditor = read('src/app/admin/editor/page.tsx');
+  const localizedAdminEditor = read('src/app/[locale]/admin/editor/page.tsx');
+
   assert.match(spec, /test\.describe\.configure\(\{\s*timeout:\s*600_000\s*\}\)/);
+  assert.match(spec, /'\/dashboard\/conduct'/);
+  assert.match(spec, /'\/dashboard\/editor'/);
+  assert.match(spec, /'\/admin\/editor'/);
+  assert.match(adminEditor, /redirect\('\/dashboard\/editor'\)/);
+  assert.match(localizedAdminEditor, /redirect\(`\/\$\{locale\}\/dashboard\/editor`\)/);
 });
 
 test('thesis lecturer-student multi-role flow provides group approval, rejection, and topic proposal', () => {
@@ -251,6 +315,15 @@ test('thesis lecturer-student multi-role flow provides group approval, rejection
   assert.match(thesisPageSource, /topicFilter/);
   assert.match(thesisPageSource, /messages\.thesis\.myProposedTopics/);
   assert.match(thesisApiSource, /listTopics:\s*async\s*\(\s*roundId:\s*string,\s*status\?:/);
+  assert.match(thesisApiSource, /studentNumber\?: string \| null/);
+  assert.match(thesisPageSource, /const memberDisplayName =/);
+  assert.match(thesisPageSource, /member\.displayName \|\| member\.studentNumber \|\| member\.studentId/);
+  assert.match(thesisPageSource, /const memberIdentifier = member\.studentNumber \|\| member\.studentId/);
+  assert.match(thesisPageSource, /aria-pressed=\{memberType === 'internal'\}/);
+  assert.match(thesisPageSource, /aria-pressed=\{memberType === 'external'\}/);
+  assert.match(thesisPageSource, /htmlFor="thesis-external-member-name"/);
+  assert.match(thesisPageSource, /id="thesis-external-member-contact"/);
+  assert.doesNotMatch(thesisPageSource, /MSSV:[\s\S]{0,90}\{member\.studentId\}/);
 });
 
 test('dogfood audit: registration conflicts surface the specific backend code', () => {
@@ -269,10 +342,79 @@ test('dogfood audit: registration conflicts surface the specific backend code', 
   assert.match(messagesSource, /SECTION_FULL: 'Lớp vừa hết chỗ/);
 });
 
+test('registration seat badges keep contrast on selected course rows', () => {
+  const page = read('src/app/dashboard/register/page.tsx');
+
+  assert.match(page, /bg-status-success\/12 text-status-success-foreground/);
+  assert.doesNotMatch(page, /bg-primary\/10 text-status-success/);
+});
+
+test('conduct score page localizes dense records and gives mobile its own cards', () => {
+  const page = read('src/app/dashboard/conduct/page.tsx');
+
+  assert.match(page, /const \{ messages, formatDate, formatNumber, locale \} = useI18n\(\)/);
+  assert.match(page, /const conductCopy =/);
+  assert.match(page, /const activityDetails = \(activity: ConductActivity\)/);
+  assert.match(page, /const selectedActivityDetails = selectedActivity \? activityDetails\(selectedActivity\) : null/);
+  assert.match(page, /copy\.historyTitle/);
+  assert.match(page, /formatSemesterName\(item\.semesterName\)/);
+  assert.match(page, /copy\.classificationScaleTitle/);
+  assert.match(page, /selectedActivity && selectedActivityDetails/);
+  assert.match(page, /copy\.certificateTitle/);
+  assert.match(page, /activityCriterion\(selectedActivity\)/);
+  assert.match(page, /className="divide-y divide-border\/60 sm:hidden"/);
+  assert.match(page, /className="hidden overflow-x-auto sm:block"/);
+  assert.doesNotMatch(page, /Lịch Sử Điểm Rèn Luyện Qua Các Học Kỳ/);
+  assert.doesNotMatch(page, /Khung Xếp Loại Rèn Luyện \(Quy chế UTE\)/);
+  assert.doesNotMatch(page, /aria-label="Đóng"/);
+  assert.doesNotMatch(page, /selectedActivity\.(title|category|organizer|activityDate)/);
+});
+
 test('dogfood audit: admin enrollments section lookup respects the 100 cap', () => {
   const page = read('src/app/admin/enrollments/page.tsx');
   assert.match(page, /sectionsApi\.getAll\(\{\s*courseId,[\s\S]{0,300}?limit: 100,\s*\}\)/);
   assert.doesNotMatch(page, /sectionsApi\.getAll\(\{\s*courseId,\s*limit: ACADEMIC_REFERENCE_LIMIT/);
+});
+
+test('feedback polish: admin enrollment opens a student-focused detail profile', () => {
+  const page = read('src/app/admin/enrollments/page.tsx');
+
+  assert.match(page, /function getLearnerLabel\(enrollment: Enrollment\)/);
+  assert.match(page, /function getStudentCodeLabel\(enrollment: Enrollment\)/);
+  assert.match(page, /viewStudentLabel: \(learnerLabel: string\) =>/);
+  assert.match(page, /type="button"[\s\S]{0,500}?copy\.viewStudentLabel\(learnerLabel\)/);
+  assert.match(page, /title=\{copy\.detail\.title\}/);
+  assert.match(page, /studentProfile: 'Student profile'/);
+  assert.match(page, /studentCode: 'Student code'/);
+  assert.match(page, /enrollmentId: 'Enrollment ID'/);
+  assert.match(page, /getStudentCodeLabel\(selectedEnrollment\)/);
+  assert.match(page, /selectedEnrollment\.finalGrade !== null &&[\s\S]{0,90}?selectedEnrollment\.finalGrade !== undefined/);
+  assert.doesNotMatch(page, /selectedEnrollment\.finalGrade \?/);
+});
+
+test('feedback polish: grade breakdown opens through native controls and guards numeric scores', () => {
+  const page = read('src/app/dashboard/grades/page.tsx');
+  const modal = read('src/components/dashboard/GradeDetailModal.tsx');
+  const spec = read('e2e/demo-polish.spec.ts');
+
+  assert.match(page, /function isFiniteScore\(value: number \| null \| undefined\): value is number/);
+  assert.match(page, /const scoreLabel = \(value: number \| null \| undefined\) =>/);
+  assert.match(page, /componentSummary: 'Component scores by course'/);
+  assert.match(page, /openBreakdown: \(courseCode: string, courseName: string\) =>/);
+  assert.match(page, /type="button"[\s\S]{0,520}?aria-label=\{openLabel\}/);
+  assert.doesNotMatch(page, /<tr[\s\S]{0,140}?onClick=\{\(\) => setSelectedRecord\(record\)\}/);
+  assert.doesNotMatch(page, /record\.finalGrade !== null\s*\?\s*record\.finalGrade\.toFixed\(1\)/);
+
+  assert.match(modal, /getStudentGradesByEnrollment\(record\.id\)/);
+  assert.match(modal, /const emptyValue = locale === 'vi' \? 'Chưa có' : 'N\/A'/);
+  assert.match(modal, /isFiniteScore\(record\.finalGrade\)/);
+  assert.match(modal, /isFiniteScore\(item\.score\)/);
+  assert.doesNotMatch(modal, /'—'/);
+
+  assert.match(spec, /\/api\/v1\/enrollments\/my\/grades/);
+  assert.match(spec, /\/api\/v1\/grades\/student-grades\/enrollment\/grade-row-midterm-final/);
+  assert.match(spec, /Open grade breakdown for AI201 Applied AI/);
+  assert.match(spec, /page\.keyboard\.press\('Enter'\)/);
 });
 
 test('dogfood audit: student group card shows the real group status', () => {
@@ -291,7 +433,7 @@ test('dogfood audit: profile form is gated on the loaded user and keeps local da
   assert.match(page, /function localDateInput/);
 });
 
-test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 7 and lecturer agenda covers full week', () => {
+test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 1 and lecturer agenda covers full week', () => {
   const { buildWeeklyGrid } = load('src/lib/weekly-grid.ts');
   const grid = buildWeeklyGrid([
     { dayOfWeek: 0, startTime: '08:00', endTime: '10:00', courseCode: 'SE499', sectionNumber: 'SE499-01' },
@@ -300,7 +442,7 @@ test('dogfood audit: weekly timetable grid maps Sunday dayOfWeek 0 to day 7 and 
     { dayOfWeek: 99, startTime: '19:00', endTime: '21:00', courseCode: 'SE496', sectionNumber: 'SE496-01' },
   ]);
   assert.deepEqual(grid.slots, ['08:00', '13:00']);
-  assert.equal(grid.cells['7-08:00']?.[0]?.courseCode, 'SE499');
+  assert.equal(grid.cells['1-08:00']?.[0]?.courseCode, 'SE499');
   assert.equal(grid.cells['7-13:00']?.[0]?.courseCode, 'SE498');
   assert.equal(grid.cells['99-19:00'], undefined);
 

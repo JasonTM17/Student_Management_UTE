@@ -58,9 +58,9 @@ const TINYMCE_TEMPLATES = [
     content: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
         <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-          <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM</h4>
+          <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM</h4>
           <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 20px; font-weight: 700;">THÔNG BÁO HỌC VỤ CHÍNH THỨC</h2>
-          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Số: 2026/TB-ĐHSPKT | Học kỳ I - Năm học 2026-2027</p>
+          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Số: 2026/TB-ĐHCNKT | Học kỳ I - Năm học 2026-2027</p>
         </div>
 
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
@@ -107,7 +107,7 @@ const TINYMCE_TEMPLATES = [
     content: `
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
         <h2 style="color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">ĐỀ CƯƠNG ĐỀ TÀI KHÓA LUẬN TỐT NGHIỆP</h2>
-        
+
         <p><strong>1. Tên đề tài (Tiếng Việt):</strong> Hệ thống quản lý học tập và đăng ký tín chỉ thời gian thực CampusCore</p>
         <p><strong>2. Tên đề tài (Tiếng Anh):</strong> Real-time CampusCore Academic Management System</p>
         <p><strong>3. Giảng viên hướng dẫn:</strong> TS. Nguyễn Văn A</p>
@@ -152,6 +152,66 @@ const TINYMCE_TEMPLATES = [
             </tr>
           </tbody>
         </table>
+      </div>
+    `,
+  },
+  {
+    titleVi: 'Quyết định của Hiệu trưởng',
+    titleEn: 'Official Rector Decision',
+    descriptionVi: 'Mẫu quyết định công văn chuẩn hành chính đại học có quốc hiệu, căn cứ và nơi nhận',
+    descriptionEn: 'Official administrative rector decision format with distribution and seal',
+    content: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
+        <div style="text-align: center; border-bottom: 2px solid #0d509d; padding-bottom: 12px; margin-bottom: 20px;">
+          <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM</h4>
+          <h2 style="margin: 8px 0 0 0; color: #0d509d; font-size: 20px; font-weight: 700;">QUYẾT ĐỊNH BAN HÀNH QUY CHẾ HỌC VỤ & ĐÀO TẠO</h2>
+          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Căn cứ Luật Giáo dục Đại học và Đề án phát triển Trường ĐH Công nghệ Kỹ thuật TP.HCM</p>
+        </div>
+
+        <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH QUYẾT ĐỊNH:</strong></p>
+
+        <p><strong>Điều 1.</strong> Ban hành kèm theo Quyết định này Quy định tổ chức đào tạo theo hệ thống tín chỉ và quy chế đánh giá điểm rèn luyện sinh viên.</p>
+        <p><strong>Điều 2.</strong> Quyết định này có hiệu lực kể từ ngày ký và áp dụng cho toàn thể các khóa sinh viên hệ chính quy.</p>
+        <p><strong>Điều 3.</strong> Trưởng phòng Đào tạo, Trưởng khoa Công nghệ Thông tin và các đơn vị liên quan chịu trách nhiệm thi hành Quyết định này.</p>
+
+        <div style="margin-top: 30px; display: flex; justify-content: space-between;">
+          <div style="font-size: 12px; color: #64748b;">
+            <strong>Nơi nhận:</strong><br/>
+            - Như Điều 3;<br/>
+            - Ban Giám hiệu (để báo cáo);<br/>
+            - Lưu: VT, P.ĐT.
+          </div>
+          <div style="text-align: right;">
+            <p style="margin: 0; font-weight: 700; text-transform: uppercase;">HIỆU TRƯỞNG</p>
+            <div style="height: 50px;"></div>
+            <p style="margin: 0; font-weight: 700; color: #0d509d;">PGS. TS. Lê Hiếu Giang</p>
+          </div>
+        </div>
+      </div>
+    `,
+  },
+  {
+    titleVi: 'Thông báo quy chế thi & phúc khảo',
+    titleEn: 'Exam Regulations & Appeal Notice',
+    descriptionVi: 'Quy định phòng thi, phân ca thi và thủ tục nộp đơn phúc khảo trực tuyến',
+    descriptionEn: 'Exam hall regulations, schedule sessions, and online score appeal procedure',
+    content: `
+      <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
+        <h2 style="color: #0d509d; border-bottom: 2px solid #0d509d; padding-bottom: 8px;">KẾ HOẠCH TỔ CHỨC THI KẾT THÚC HỌC PHẦN & PHÚC KHẢO ĐIỂM</h2>
+
+        <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 12px 16px; border-radius: 6px; margin: 16px 0;">
+          <strong style="color: #1d4ed8;">Phòng Khảo thí & Đảm bảo Chất lượng</strong> thông báo lịch thi và quy định dành cho sinh viên tham gia kỳ thi học kỳ.
+        </div>
+
+        <h3 style="color: #0369a1;">1. Quy định khi vào phòng thi</h3>
+        <ul>
+          <li>Sinh viên bắt buộc xuất trình Thẻ sinh viên có ảnh hoặc CCCD còn hạn sử dụng.</li>
+          <li>Tuyệt đối không mang tài liệu, điện thoại di động và thiết bị thu phát sóng vào phòng thi.</li>
+          <li>Có mặt tại phòng thi trước giờ bắt đầu tối thiểu 15 phút.</li>
+        </ul>
+
+        <h3 style="color: #0369a1;">2. Thủ tục nộp đơn phúc khảo điểm thi</h3>
+        <p>Sinh viên có quyền gửi yêu cầu phúc khảo trực tuyến trên cổng học vụ trong vòng <strong>07 ngày làm việc</strong> kể từ ngày giảng viên công bố điểm chính thức.</p>
       </div>
     `,
   },
@@ -243,10 +303,10 @@ export function TinyMceEditor({
         <div className="flex items-center gap-2">
           <div className="flex items-center gap-1.5 font-semibold text-xs text-primary uppercase tracking-wider">
             <Sparkles className="h-4 w-4" />
-            <span>TinyMCE WYSIWYG Editor</span>
+            <span>{isVi ? 'Trình soạn thảo văn bản hành chính' : 'Official Document Editor'}</span>
           </div>
           <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
-            {isVi ? 'Tự lưu trữ 100% Offline' : 'Self-hosted Offline'}
+            {isVi ? 'Lưu trữ nội bộ an toàn' : 'Secure Internal Storage'}
           </span>
         </div>
 
@@ -352,30 +412,150 @@ export function TinyMceEditor({
             }
           }}
           init={{
+            license_key: 'gpl',
             height: isFullscreen ? 'calc(100vh - 120px)' : height,
             menubar: 'file edit view insert format tools table help',
+            menu: {
+              file: { title: 'File', items: 'newdocument restoredraft | preview | print' },
+              edit: { title: 'Edit', items: 'undo redo | cut copy paste pastetext | selectall | searchreplace' },
+              view: { title: 'View', items: 'code | visualaid visualchars visualblocks | preview fullscreen' },
+              insert: { title: 'Insert', items: 'image link media codesample inserttable | charmap emoticons hr | pagebreak nonbreaking anchor | insertdatetime' },
+              format: { title: 'Format', items: 'bold italic underline strikethrough superscript subscript codeformat | styles blocks fontfamily fontsize align lineheight | forecolor backcolor | removeformat' },
+              tools: { title: 'Tools', items: 'code wordcount' },
+              table: { title: 'Table', items: 'inserttable | cell row column | tableprops deletetable' },
+              help: { title: 'Help', items: 'help' },
+            },
             plugins: [
+              'accordion',
               'advlist',
-              'autolink',
-              'lists',
-              'link',
-              'image',
-              'charmap',
-              'preview',
               'anchor',
-              'searchreplace',
-              'visualblocks',
+              'autolink',
+              'autosave',
+              'charmap',
               'code',
+              'codesample',
+              'directionality',
+              'emoticons',
               'fullscreen',
-              'insertdatetime',
-              'media',
-              'table',
               'help',
+              'image',
+              'insertdatetime',
+              'link',
+              'lists',
+              'media',
+              'nonbreaking',
+              'pagebreak',
+              'preview',
+              'quickbars',
+              'searchreplace',
+              'table',
+              'visualblocks',
+              'visualchars',
               'wordcount',
             ],
-            toolbar:
-              'undo redo | blocks fontfamily fontsize | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent | table link image media | removeformat code fullscreen help',
+            toolbar: [
+              'undo redo | blocks fontfamily fontsize lineheight | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent',
+              'table link image media codesample emoticons | accordion pagebreak charmap insertdatetime | visualblocks visualchars searchreplace wordcount | preview fullscreen | code help',
+            ],
             toolbar_mode: 'sliding',
+            font_family_formats:
+              'Be Vietnam Pro=Be Vietnam Pro,sans-serif; Arial=arial,helvetica,sans-serif; Times New Roman=times new roman,times,serif; Calibri=calibri,sans-serif; Roboto=roboto,sans-serif; Segoe UI=Segoe UI,sans-serif; Courier New=courier new,courier,monospace; Tahoma=tahoma,arial,helvetica,sans-serif; Georgia=georgia,palatino;',
+            font_size_formats: '10px 11px 12px 13px 14px 15px 16px 18px 20px 22px 24px 26px 28px 32px 36px 48px',
+            line_height_formats: '1 1.15 1.3 1.5 1.65 1.8 2 2.5',
+            style_formats: [
+              {
+                title: 'Tiêu đề (Headings)',
+                items: [
+                  { title: 'Tiêu đề chính 1 (H1)', format: 'h1' },
+                  { title: 'Tiêu đề mục 2 (H2)', format: 'h2' },
+                  { title: 'Tiêu đề nhỏ 3 (H3)', format: 'h3' },
+                  { title: 'Tiêu đề chi tiết 4 (H4)', format: 'h4' },
+                ],
+              },
+              {
+                title: 'Khối hộp học vụ (Academic Callouts)',
+                items: [
+                  { title: 'Đoạn văn (Paragraph)', format: 'p' },
+                  { title: 'Trích dẫn quy định (Blockquote)', format: 'blockquote' },
+                  {
+                    title: 'Hộp Lưu ý học vụ (Notice Callout)',
+                    block: 'div',
+                    classes: 'academic-callout academic-callout-info',
+                    wrapper: true,
+                  },
+                  {
+                    title: 'Hộp Cảnh báo quan trọng (Warning Callout)',
+                    block: 'div',
+                    classes: 'academic-callout academic-callout-warning',
+                    wrapper: true,
+                  },
+                  {
+                    title: 'Hộp Thành công / Đạt chuẩn (Success Callout)',
+                    block: 'div',
+                    classes: 'academic-callout academic-callout-success',
+                    wrapper: true,
+                  },
+                ],
+              },
+              {
+                title: 'Định dạng ký tự (Inline)',
+                items: [
+                  { title: 'Đậm (Bold)', format: 'bold' },
+                  { title: 'Nghiêng (Italic)', format: 'italic' },
+                  { title: 'Gạch chân (Underline)', format: 'underline' },
+                  { title: 'Gạch ngang (Strikethrough)', format: 'strikethrough' },
+                  { title: 'Chỉ số trên (Superscript)', format: 'superscript' },
+                  { title: 'Chỉ số dưới (Subscript)', format: 'subscript' },
+                  { title: 'Mã nguồn dòng (Inline Code)', format: 'code' },
+                ],
+              },
+            ],
+            image_advtab: true,
+            image_caption: true,
+            image_title: true,
+            automatic_uploads: true,
+            file_picker_types: 'image',
+            images_upload_handler: (blobInfo: any) =>
+              new Promise((resolve) => {
+                resolve(`data:${blobInfo.blob().type};base64,${blobInfo.base64()}`);
+              }),
+            file_picker_callback: (callback: any, _value: any, meta: any) => {
+              if (meta.filetype === 'image') {
+                const input = document.createElement('input');
+                input.setAttribute('type', 'file');
+                input.setAttribute('accept', 'image/*');
+                input.onchange = function () {
+                  const file = (this as HTMLInputElement).files?.[0];
+                  if (file) {
+                    const reader = new FileReader();
+                    reader.onload = function () {
+                      callback(reader.result as string, { title: file.name, alt: file.name });
+                    };
+                    reader.readAsDataURL(file);
+                  }
+                };
+                input.click();
+              }
+            },
+            table_default_attributes: {
+              border: '1',
+            },
+            table_default_styles: {
+              'border-collapse': 'collapse',
+              width: '100%',
+            },
+            table_responsive_width: true,
+            table_advtab: true,
+            table_cell_advtab: true,
+            table_row_advtab: true,
+            table_toolbar:
+              'tableprops tabledelete | tableinsertrowbefore tableinsertrowafter tabledeleterow | tableinsertcolbefore tableinsertcolafter tabledeletecol',
+            quickbars_selection_toolbar: 'bold italic underline | quicklink h2 h3 blockquote | forecolor backcolor',
+            quickbars_insert_toolbar: 'quickimage quicktable | hr',
+            autosave_interval: '30s',
+            autosave_prefix: 'campuscore-tinymce-{path}{query}-{id}-',
+            autosave_restore_when_empty: false,
+            autosave_retention: '60m',
             skin: isDark ? 'oxide-dark' : 'oxide',
             content_css: isDark ? 'dark' : 'default',
             content_style: `
@@ -388,16 +568,23 @@ export function TinyMceEditor({
                 background-color: ${isDark ? '#0f172a' : '#ffffff'};
               }
               table { border-collapse: collapse; width: 100%; margin: 16px 0; }
-              table td, table th { border: 1px solid ${isDark ? '#334155' : '#cbd5e1'}; padding: 8px 12px; }
-              table th { background-color: ${isDark ? '#1e293b' : '#f8fafc'}; font-weight: 600; }
-              img { max-width: 100%; height: auto; border-radius: 6px; }
-              blockquote { border-left: 4px solid #0284c7; padding-left: 12px; margin-left: 0; color: #64748b; font-style: italic; }
+              table td, table th { border: 1px solid ${isDark ? '#334155' : '#cbd5e1'}; padding: 9px 12px; }
+              table th { background-color: ${isDark ? '#1e293b' : '#f8fafc'}; font-weight: 600; text-align: left; }
+              img { max-width: 100%; height: auto; border-radius: 6px; margin: 8px 0; }
+              blockquote { border-left: 4px solid #0284c7; padding-left: 14px; margin-left: 0; color: #64748b; font-style: italic; }
+              .academic-callout { border-radius: 8px; padding: 14px 18px; margin: 16px 0; }
+              .academic-callout-info { background-color: ${isDark ? 'rgba(59, 130, 246, 0.15)' : '#eff6ff'}; border-left: 4px solid #3b82f6; color: ${isDark ? '#93c5fd' : '#1d4ed8'}; }
+              .academic-callout-warning { background-color: ${isDark ? 'rgba(234, 179, 8, 0.15)' : '#fefce8'}; border-left: 4px solid #eab308; color: ${isDark ? '#fde047' : '#a16207'}; }
+              .academic-callout-success { background-color: ${isDark ? 'rgba(34, 197, 94, 0.15)' : '#f0fdf4'}; border-left: 4px solid #22c55e; color: ${isDark ? '#86efac' : '#15803d'}; }
+              pre { background-color: ${isDark ? '#1e293b' : '#f1f5f9'}; border-radius: 6px; padding: 12px; overflow-x: auto; font-family: monospace; }
+              code { background-color: ${isDark ? '#334155' : '#e2e8f0'}; padding: 2px 5px; border-radius: 4px; font-family: monospace; font-size: 0.9em; }
+              details { border: 1px solid ${isDark ? '#334155' : '#cbd5e1'}; border-radius: 6px; padding: 10px 14px; margin: 12px 0; }
+              summary { font-weight: 600; cursor: pointer; color: #0284c7; }
             `,
             branding: false,
             promotion: false,
-            placeholder: placeholder || (isVi ? 'Bắt đầu soạn thảo nội dung với đầy đủ công cụ TinyMCE...' : 'Start composing content with rich TinyMCE tools...'),
-            language_url: undefined, // default en, standard UI
-            quickbars_selection_toolbar: 'bold italic | quicklink h2 h3 blockquote',
+            placeholder: placeholder || (isVi ? 'Bắt đầu soạn thảo nội dung với đầy đủ công cụ TinyMCE chuyên nghiệp...' : 'Start composing content with professional TinyMCE tools...'),
+            language_url: undefined,
             contextmenu: 'link image table',
           }}
         />

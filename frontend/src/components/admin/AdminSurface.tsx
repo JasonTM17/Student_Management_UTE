@@ -3,6 +3,9 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { LocalizedLink } from '@/components/LocalizedLink';
+import { ArrowUpRight } from 'lucide-react';
+
 interface AdminMetricCardProps {
   label: React.ReactNode;
   value: React.ReactNode;
@@ -11,6 +14,7 @@ interface AdminMetricCardProps {
   toneClassName?: string;
   compact?: boolean;
   className?: string;
+  href?: string;
 }
 
 export function AdminMetricCard({
@@ -21,9 +25,17 @@ export function AdminMetricCard({
   toneClassName,
   compact = false,
   className,
+  href,
 }: AdminMetricCardProps) {
-  return (
-    <Card variant="default" className={cn('h-full', className)}>
+  const cardContent = (
+    <Card
+      variant="default"
+      className={cn(
+        'h-full transition-all duration-200',
+        href && 'hover:border-primary/60 hover:shadow-md cursor-pointer group-hover:border-primary/60 group-hover:bg-primary/[0.015]',
+        className,
+      )}
+    >
       <CardContent
         className={cn(
           'flex h-full min-h-[126px] flex-col gap-3 p-4',
@@ -37,13 +49,13 @@ export function AdminMetricCard({
         >
           <div
             className={cn(
-              'order-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl',
+              'order-2 flex h-9 w-9 shrink-0 items-center justify-center rounded-xl transition-transform duration-200 group-hover:scale-105',
               toneClassName,
             )}
           >
             {icon}
           </div>
-          <div className="min-w-0">
+          <div className="min-w-0 flex-1">
             <div
               className={cn(
                 'text-2xl font-semibold leading-8 text-foreground',
@@ -52,15 +64,37 @@ export function AdminMetricCard({
             >
               {value}
             </div>
-            <div className="mt-0.5 text-sm font-medium text-foreground">{label}</div>
+            <div className="mt-0.5 flex items-center gap-1 text-sm font-medium text-foreground">
+              <span>{label}</span>
+              {href ? (
+                <ArrowUpRight className="h-3.5 w-3.5 text-muted-foreground opacity-60 transition-all duration-200 group-hover:text-primary group-hover:opacity-100 group-hover:translate-x-0.5 group-hover:-translate-y-0.5" />
+              ) : null}
+            </div>
           </div>
         </div>
         {detail ? (
-          <p className="mt-auto border-t border-border/70 pt-2 text-xs leading-5 text-muted-foreground">{detail}</p>
+          <div className="mt-auto flex items-center justify-between border-t border-border/70 pt-2 text-xs leading-5 text-muted-foreground">
+            <span>{detail}</span>
+            {href ? (
+              <span className="font-medium text-primary opacity-0 transition-opacity duration-200 group-hover:opacity-100">
+                Chi tiết &rarr;
+              </span>
+            ) : null}
+          </div>
         ) : null}
       </CardContent>
     </Card>
   );
+
+  if (href) {
+    return (
+      <LocalizedLink href={href} className="group block h-full focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-primary rounded-xl">
+        {cardContent}
+      </LocalizedLink>
+    );
+  }
+
+  return cardContent;
 }
 
 interface AdminToolbarCardProps {

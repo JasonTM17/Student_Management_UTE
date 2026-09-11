@@ -32,28 +32,18 @@ interface PageHeaderProps {
 }
 
 export function PageHeader({
-  eyebrow,
+  eyebrow: _eyebrow,
   title,
-  description,
+  description: _description,
   actions,
   className,
 }: PageHeaderProps) {
   return (
     <header className={cn('min-w-0', className)}>
-      {eyebrow ? (
-        <div className="mb-1.5 flex min-w-0 items-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
-          {eyebrow}
-        </div>
-      ) : null}
       <div className="relative flex min-w-0 items-center gap-x-4 border-b border-border">
         <div className="portal-page-tab inline-flex min-w-0 items-center rounded-t-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
           <h1 className="truncate">{title}</h1>
         </div>
-        {description ? (
-          <p className="hidden max-w-xl truncate text-sm text-muted-foreground md:block">
-            {description}
-          </p>
-        ) : null}
         {actions ? (
           <div className="ml-auto flex flex-wrap items-center gap-2 py-1.5">
             {actions}

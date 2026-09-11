@@ -212,28 +212,37 @@ export default function AdminSectionsPage() {
     }
   }, [locale, page, semesterFilter]);
 
-  const dayNames = useMemo(
+  const dayOptions = useMemo(
     () =>
       locale === 'vi'
         ? [
-            'Chủ nhật',
-            'Thứ hai',
-            'Thứ ba',
-            'Thứ tư',
-            'Thứ năm',
-            'Thứ sáu',
-            'Thứ bảy',
+            { value: '2', label: 'Thứ hai' },
+            { value: '3', label: 'Thứ ba' },
+            { value: '4', label: 'Thứ tư' },
+            { value: '5', label: 'Thứ năm' },
+            { value: '6', label: 'Thứ sáu' },
+            { value: '7', label: 'Thứ bảy' },
+            { value: '1', label: 'Chủ nhật' },
           ]
         : [
-            'Sunday',
-            'Monday',
-            'Tuesday',
-            'Wednesday',
-            'Thursday',
-            'Friday',
-            'Saturday',
+            { value: '2', label: 'Monday' },
+            { value: '3', label: 'Tuesday' },
+            { value: '4', label: 'Wednesday' },
+            { value: '5', label: 'Thursday' },
+            { value: '6', label: 'Friday' },
+            { value: '7', label: 'Saturday' },
+            { value: '1', label: 'Sunday' },
           ],
     [locale],
+  );
+
+  const getDayLabel = useCallback(
+    (day: number) => {
+      const normalized = day === 0 ? 1 : day;
+      const match = dayOptions.find((opt) => opt.value === String(normalized));
+      return match ? match.label : `Thứ ${normalized}`;
+    },
+    [dayOptions],
   );
 
   const copy =
@@ -415,7 +424,7 @@ export default function AdminSectionsPage() {
       ...lecturers.map((lecturer) => ({
         value: lecturer.id,
         label: lecturer.user
-          ? `${lecturer.user.firstName} ${lecturer.user.lastName} (${lecturer.employeeId})`
+          ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim() + ` (${lecturer.employeeId})`
           : lecturer.employeeId,
       })),
     ],
@@ -657,7 +666,7 @@ export default function AdminSectionsPage() {
                       )
                     : copy.unassigned;
                   const lecturerLabel = section.lecturer?.user
-                    ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`
+                    ? `${section.lecturer.user.lastName ?? ''} ${section.lecturer.user.firstName ?? ''}`.trim()
                     : copy.unassigned;
 
                   return (
@@ -721,7 +730,7 @@ export default function AdminSectionsPage() {
                                 className="text-sm text-foreground"
                               >
                                 <span className="font-medium">
-                                  {dayNames[schedule.dayOfWeek]}
+                                  {getDayLabel(schedule.dayOfWeek)}
                                 </span>{' '}
                                 <span className="text-muted-foreground">
                                   {schedule.startTime}-{schedule.endTime}
@@ -830,7 +839,7 @@ export default function AdminSectionsPage() {
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground">
                           {section.lecturer?.user
-                            ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`
+                            ? `${section.lecturer.user.lastName ?? ''} ${section.lecturer.user.firstName ?? ''}`.trim()
                             : copy.unassigned}
                         </td>
                         <td className="px-4 py-3.5 text-muted-foreground">
@@ -842,7 +851,7 @@ export default function AdminSectionsPage() {
                               {section.schedules.map((schedule, index) => (
                                 <div key={schedule.id || index} className="text-xs">
                                   <span className="font-medium text-foreground">
-                                    {dayNames[schedule.dayOfWeek]}
+                                    {getDayLabel(schedule.dayOfWeek)}
                                   </span>{' '}
                                   <span className="text-muted-foreground">
                                     {schedule.startTime}-{schedule.endTime}
@@ -1032,10 +1041,7 @@ export default function AdminSectionsPage() {
                       onChange={(event) =>
                         updateSchedule(idx, 'dayOfWeek', Number(event.target.value))
                       }
-                      options={dayNames.map((day, dayIndex) => ({
-                        value: String(dayIndex),
-                        label: day,
-                      }))}
+                      options={dayOptions}
                     />
                     <Input
                       type="time"

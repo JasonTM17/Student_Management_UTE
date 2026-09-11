@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
+import { AdminAnalyticsCharts } from '@/components/admin/AdminAnalyticsCharts';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
@@ -108,6 +109,7 @@ export default function AdminDashboardPage() {
       icon: Users,
       detail: messages.admin.statDetails[0],
       tone: metricToneClass('info'),
+      href: '/admin/users?role=STUDENT',
     },
     {
       label: messages.admin.stats[1],
@@ -115,6 +117,7 @@ export default function AdminDashboardPage() {
       icon: School,
       detail: messages.admin.statDetails[1],
       tone: metricToneClass('neutral'),
+      href: '/admin/lecturers',
     },
     {
       label: messages.admin.stats[2],
@@ -122,6 +125,7 @@ export default function AdminDashboardPage() {
       icon: BookOpen,
       detail: messages.admin.statDetails[2],
       tone: metricToneClass('success'),
+      href: '/admin/courses',
     },
     {
       label: messages.admin.stats[3],
@@ -129,13 +133,14 @@ export default function AdminDashboardPage() {
       icon: TrendingUp,
       detail: messages.admin.statDetails[3],
       tone: metricToneClass('warning'),
+      href: '/admin/enrollments',
     },
   ];
+  const coursesLabel = messages.admin.menuItems[3]?.[0] ?? messages.dashboardShell.menu.myCourses;
 
   return (
     <AdminFrame
       title={messages.admin.title}
-      description={messages.admin.description}
       actions={
         <>
           <LinkButton href="/admin/users" variant="outline">
@@ -143,7 +148,8 @@ export default function AdminDashboardPage() {
             {messages.common.actions.addUser}
           </LinkButton>
           <LinkButton href="/admin/courses">
-            {messages.dashboardShell.menu.myCourses}
+            <BookOpen className="mr-2 h-4 w-4" />
+            {coursesLabel}
           </LinkButton>
         </>
       }
@@ -162,7 +168,7 @@ export default function AdminDashboardPage() {
             <h2 id="admin-overview-title" className="sr-only">
               {messages.admin.overviewTitle}
             </h2>
-            <div className="grid grid-cols-2 gap-3 xl:grid-cols-4">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4">
               {statCards.map((stat) => (
                 <AdminMetricCard
                   key={stat.label}
@@ -171,10 +177,14 @@ export default function AdminDashboardPage() {
                   icon={<stat.icon className="h-5 w-5" />}
                   detail={stat.detail}
                   toneClassName={stat.tone}
+                  href={stat.href}
                 />
               ))}
             </div>
           </section>
+
+          {/* Admin Analytics Charts */}
+          <AdminAnalyticsCharts stats={stats} />
 
           <section aria-labelledby="admin-management-title" className="min-w-0">
             <div className="mb-3 border-b border-border pb-3">

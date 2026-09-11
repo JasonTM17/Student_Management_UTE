@@ -5,6 +5,8 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
@@ -29,6 +31,8 @@ public class AcademicMutationService {
     private static final String ENROLLMENT = "\"academic\".\"Enrollment\"";
     private static final String COURSE = "\"academic\".\"Course\"";
     private static final String USER = "\"campuscore_auth\".\"User\"";
+    private static final String GRADE_ITEM = "\"academic\".\"GradeItem\"";
+    private static final String STUDENT_GRADE = "\"academic\".\"StudentGrade\"";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
@@ -130,17 +134,24 @@ public class AcademicMutationService {
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
+        String processItemId = canonicalGradeItem(sectionId, "PROCESS", "Điểm quá trình (ĐQT - 50%)");
+        String finalItemId = canonicalGradeItem(sectionId, "FINAL", "Điểm cuối kỳ (ĐCK - 50%)");
         for (GradeUpdate grade : grades) {
             Map<String, Object> enrollment = enrollment(grade.enrollmentId());
             if (!sectionId.equals(enrollment.get("section_id"))) {
                 throw problem(HttpStatus.BAD_REQUEST, "GRADE_SECTION_MISMATCH", "Grade enrollment is outside this section");
             }
+            requireScoreRange(grade.processScore(), "processScore");
+            requireScoreRange(grade.finalExamScore(), "finalExamScore");
+            BigDecimal total = calculateFinalGrade(grade.processScore(), grade.finalExamScore());
+            saveComponent(grade.enrollmentId(), processItemId, grade.processScore());
+            saveComponent(grade.enrollmentId(), finalItemId, grade.finalExamScore());
             jdbc.update(
                     "UPDATE " + ENROLLMENT + " SET \"finalGrade\" = :finalGrade, \"letterGrade\" = :letterGrade,"
                             + " \"gradeStatus\" = 'DRAFT', \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                     new MapSqlParameterSource()
-                            .addValue("finalGrade", grade.finalGrade())
-                            .addValue("letterGrade", grade.letterGrade().trim().toUpperCase())
+                            .addValue("finalGrade", total)
+                            .addValue("letterGrade", letterGrade(total))
                             .addValue("id", grade.enrollmentId()));
         }
     }
@@ -151,6 +162,16 @@ public class AcademicMutationService {
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
+        Long incomplete = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
+                        + " AND e.\"status\" NOT IN ('DROPPED', 'CANCELLED') AND (SELECT COUNT(DISTINCT gi.\"type\")"
+                        + " FROM " + STUDENT_GRADE + " sg JOIN " + GRADE_ITEM + " gi ON gi.\"id\" = sg.\"gradeItemId\""
+                        + " WHERE sg.\"enrollmentId\" = e.\"id\" AND sg.\"score\" IS NOT NULL"
+                        + " AND gi.\"type\" IN ('PROCESS', 'FINAL')) < 2",
+                new MapSqlParameterSource("sectionId", sectionId), Long.class);
+        if (incomplete != null && incomplete > 0) {
+            throw problem(HttpStatus.CONFLICT, "GRADE_COMPONENTS_INCOMPLETE", "All students require process and final exam scores before publishing");
+        }
         int updated = jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
@@ -159,6 +180,43 @@ public class AcademicMutationService {
         if (updated == 0) {
             throw problem(HttpStatus.CONFLICT, "GRADES_EMPTY", "No complete grades are ready to publish");
         }
+    }
+
+    private String canonicalGradeItem(String sectionId, String type, String name) {
+        String id = sectionId + "-" + type.toLowerCase() + "-50";
+        jdbc.update("INSERT INTO " + GRADE_ITEM
+                        + " (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
+                        + " VALUES (:id, :sectionId, :name, :type, 10, 50, CURRENT_TIMESTAMP)"
+                        + " ON CONFLICT (\"id\") DO UPDATE SET \"name\" = EXCLUDED.\"name\", \"type\" = EXCLUDED.\"type\","
+                        + " \"maxScore\" = 10, \"weight\" = 50, \"gradedAt\" = CURRENT_TIMESTAMP",
+                new MapSqlParameterSource().addValue("id", id).addValue("sectionId", sectionId)
+                        .addValue("name", name).addValue("type", type));
+        return id;
+    }
+
+    private void saveComponent(String enrollmentId, String gradeItemId, BigDecimal score) {
+        MapSqlParameterSource params = new MapSqlParameterSource().addValue("enrollmentId", enrollmentId)
+                .addValue("gradeItemId", gradeItemId).addValue("score", score);
+        jdbc.update("DELETE FROM " + STUDENT_GRADE + " WHERE \"enrollmentId\" = :enrollmentId AND \"gradeItemId\" = :gradeItemId", params);
+        params.addValue("id", UUID.randomUUID().toString());
+        jdbc.update("INSERT INTO " + STUDENT_GRADE + " (\"id\", \"enrollmentId\", \"gradeItemId\", \"score\")"
+                + " VALUES (:id, :enrollmentId, :gradeItemId, :score)", params);
+    }
+
+    static BigDecimal calculateFinalGrade(BigDecimal processScore, BigDecimal finalExamScore) {
+        return processScore.add(finalExamScore).divide(BigDecimal.valueOf(2), 2, RoundingMode.HALF_UP);
+    }
+
+    static String letterGrade(BigDecimal score) {
+        if (score.compareTo(new BigDecimal("9.0")) >= 0) return "A+";
+        if (score.compareTo(new BigDecimal("8.5")) >= 0) return "A";
+        if (score.compareTo(new BigDecimal("8.0")) >= 0) return "B+";
+        if (score.compareTo(new BigDecimal("7.0")) >= 0) return "B";
+        if (score.compareTo(new BigDecimal("6.5")) >= 0) return "C+";
+        if (score.compareTo(new BigDecimal("5.5")) >= 0) return "C";
+        if (score.compareTo(new BigDecimal("5.0")) >= 0) return "D+";
+        if (score.compareTo(new BigDecimal("4.0")) >= 0) return "D";
+        return "F";
     }
 
     private void requireStudent(String studentId) {
@@ -247,5 +305,12 @@ public class AcademicMutationService {
 
     private static DomainException problem(HttpStatus status, String code, String message) {
         return new DomainException(status, code, message);
+    }
+
+    /** Defense-in-depth score bound; the web DTO also enforces 0..10 via @DecimalMin/@DecimalMax. */
+    private static void requireScoreRange(BigDecimal score, String field) {
+        if (score == null || score.compareTo(BigDecimal.ZERO) < 0 || score.compareTo(BigDecimal.TEN) > 0) {
+            throw problem(HttpStatus.BAD_REQUEST, "GRADE_SCORE_OUT_OF_RANGE", field + " must be between 0 and 10");
+        }
     }
 }

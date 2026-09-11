@@ -23,9 +23,11 @@ const routes: Record<Persona, string[]> = {
     '/dashboard/schedule',
     '/dashboard/grades',
     '/dashboard/transcript',
+    '/dashboard/conduct',
     '/dashboard/announcements',
     '/dashboard/notifications',
     '/dashboard/profile',
+    '/dashboard/editor',
     '/dashboard/thesis',
     '/dashboard/thesis/topics',
     '/dashboard/thesis/topics/22222222-2222-2222-2222-222222222201',
@@ -53,6 +55,7 @@ const routes: Record<Persona, string[]> = {
     '/admin/announcements',
     '/admin/appearance',
     '/admin/assistant-knowledge',
+    '/admin/editor',
     '/admin/thesis',
   ],
 };
@@ -66,7 +69,7 @@ function localized(locale: 'en' | 'vi', route: string) {
 
 async function signIn(page: Page, persona: Persona) {
   await page.goto(`/login?portal=${persona}`);
-  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(accounts[persona].email);
   await page.locator('#password').fill(accounts[persona].password);

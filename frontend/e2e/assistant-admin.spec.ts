@@ -3,13 +3,18 @@ import { test, expect, type Page } from '@playwright/test';
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
 
+const assistantLauncherName = /Open CampusCore assistant|Mở trợ lý CampusCore|CampusCore assistant|Trợ lý CampusCore/i;
+const assistantPanelTitle = /CampusCore assistant|Trợ lý CampusCore/i;
+const assistantCloseName = /Close CampusCore assistant|Đóng trợ lý CampusCore/i;
+const mobileNavigationName = /campus navigation on mobile|điều hướng cổng học vụ trên điện thoại/i;
+
 async function login(
   page: Page,
   account: typeof student,
   portal: 'student' | 'lecturer' | 'admin' = account.email.startsWith('admin') ? 'admin' : 'student',
 ) {
   await page.goto(`/login?portal=${portal}`);
-  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);
   await page.locator('#password').fill(account.password);
@@ -71,24 +76,24 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   await login(page, student);
   await expect(page).toHaveURL(/\/dashboard(?:$|[/?#])/);
 
-  const launcher = page.getByRole('button', { name: 'Open CampusCore assistant' });
+  const launcher = page.getByRole('button', { name: assistantLauncherName }).last();
   await expect(launcher).toBeVisible();
   await launcher.click();
   // Opening the panel is intentionally side-effect free. Sources appear only
   // after a submitted question, so an empty conversation cannot look like a
   // fabricated answer.
-  await expect(page.getByRole('dialog')).toContainText('CampusCore assistant');
-  await page.getByRole('button', { name: 'Conversation history' }).click();
-  await expect(page.getByText('No saved conversations yet.')).toBeVisible();
-  await page.getByRole('button', { name: 'Back to chat' }).click();
+  await expect(page.getByRole('dialog')).toContainText(assistantPanelTitle);
+  await page.getByRole('button', { name: /Conversation history|Lịch sử hội thoại/i }).click();
+  await expect(page.getByText(/No saved conversations yet\.|Chưa có hội thoại nào được lưu\./i)).toBeVisible();
+  await page.getByRole('button', { name: /Back to chat|Quay lại chat/i }).click();
 
-  const composer = page.getByRole('textbox', { name: /Ask about registration, schedules, announcements/ });
-  await composer.fill('How do I choose a thesis topic?');
-  await page.getByRole('button', { name: 'Send message' }).click();
-  await expect(page.getByRole('article', { name: 'Campus helpdesk' })).toContainText('Use the published thesis guide.');
-  await expect(page.getByLabel('Sources').getByText('Thesis guide')).toBeVisible();
+  const composer = page.getByRole('textbox', { name: /Ask about registration, schedules, announcements|Hỏi về đăng ký, lịch học, thông báo/i });
+  await composer.fill('What campus guidance is available for new learners?');
+  await page.getByRole('button', { name: /Send message|Gửi tin nhắn/i }).click();
+  await expect(page.getByRole('article', { name: /Campus helpdesk|Trợ lý học vụ CampusCore/i })).toContainText('Use the published thesis guide.');
+  await expect(page.getByLabel(/Sources|Nguồn tham khảo/i).getByText('Thesis guide')).toBeVisible();
 
-  await page.getByRole('button', { name: 'Mark answer helpful' }).click();
+  await page.getByRole('button', { name: /Mark answer helpful|Đánh dấu câu trả lời hữu ích/i }).click();
   await expect.poll(() => feedbackCalls).toBe(1);
 });
 
@@ -119,16 +124,16 @@ test('authenticated admin can inspect reviewed guidance and public coverage', as
   await expect(page).toHaveURL(/\/admin(?:$|[/?#])/);
   await page.goto('/admin/assistant-knowledge');
 
-  await expect(page.getByRole('heading', { name: 'CampusCore knowledge' })).toBeVisible();
-  await expect(page.getByText('Public CampusCore guidance')).toBeVisible();
+  await expect(page.getByRole('heading', { name: /CampusCore knowledge|Kho kiến thức CampusCore/i })).toBeVisible();
+  await expect(page.getByText(/Public CampusCore guidance|Phạm vi nội dung CampusCore công khai/i)).toBeVisible();
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
-  await expect(page.getByText('Published', { exact: true }).first()).toBeVisible();
+  await expect(page.getByText(/Published|Đã xuất bản/i).first()).toBeVisible();
 
-  await page.getByLabel('Filter status').selectOption('PUBLISHED');
+  await page.getByLabel(/Filter status|Lọc trạng thái/i).selectOption('PUBLISHED');
   await expect(page.getByText('How to use the thesis assistant')).toBeVisible();
-  await page.getByRole('button', { name: 'Archive' }).first().click();
-  await expect(page.getByRole('dialog')).toContainText('Archive guidance?');
-  await page.getByRole('button', { name: 'Cancel' }).click();
+  await page.getByRole('button', { name: /Archive|Lưu trữ/i }).first().click();
+  await expect(page.getByRole('dialog')).toContainText(/Archive guidance\?|Lưu trữ nội dung\?/i);
+  await page.getByRole('button', { name: /Cancel|Hủy/i }).click();
   await expect(page.getByRole('dialog')).toHaveCount(0);
 });
 
@@ -172,7 +177,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       });
       expect(semesterHeight.height).toBeLessThanOrEqual(semesterHeight.lineHeight * 1.25);
     }
-    const launcher = page.getByRole('button', { name: 'Open CampusCore assistant' });
+    const launcher = page.getByRole('button', { name: assistantLauncherName }).last();
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
     expect(launcherBox).not.toBeNull();
@@ -181,7 +186,7 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     expect(launcherBox!.x + launcherBox!.width).toBeLessThanOrEqual(viewport.width);
     expect(launcherBox!.y + launcherBox!.height).toBeLessThanOrEqual(viewport.height);
 
-    const mobileNav = page.getByRole('navigation', { name: /campus navigation on mobile/i });
+    const mobileNav = page.getByRole('navigation', { name: mobileNavigationName });
     if (viewport.width < 768) {
       await expect(mobileNav).toBeVisible();
       const navBox = await mobileNav.boundingBox();
@@ -214,6 +219,6 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       expect(navBox).not.toBeNull();
       expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navBox!.y);
     }
-    await page.getByRole('button', { name: 'Close CampusCore assistant' }).click();
+    await page.getByRole('button', { name: assistantCloseName }).click();
   }
 });

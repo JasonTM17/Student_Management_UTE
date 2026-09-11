@@ -24,7 +24,7 @@ public class AdminUserMutationService {
     private static final String USER_ROLE = "\"campuscore_auth\".\"UserRole\"";
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
-    private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN");
+    private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;

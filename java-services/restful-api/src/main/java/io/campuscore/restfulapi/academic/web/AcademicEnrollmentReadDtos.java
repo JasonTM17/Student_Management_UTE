@@ -90,6 +90,8 @@ public final class AcademicEnrollmentReadDtos {
             String semesterNameEn,
             String semesterNameVi,
             String semesterId,
+            BigDecimal processScore,
+            BigDecimal finalExamScore,
             BigDecimal finalGrade,
             String letterGrade,
             String gradeStatus,

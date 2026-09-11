@@ -58,6 +58,16 @@ public class AnnouncementWriteService {
             String publishedBy,
             String publisherLabel,
             CreateAnnouncementRequest request) {
+        return create(publishedBy, publisherLabel, List.of("ADMIN"), null, request);
+    }
+
+    @Transactional
+    public AnnouncementResponse create(
+            String publishedBy,
+            String publisherLabel,
+            List<String> roles,
+            String lecturerId,
+            CreateAnnouncementRequest request) {
         String publisher = requireText(publishedBy, "publishedBy");
         String actorLabel = requireActorLabel(publisherLabel, "publisherLabel");
         String priority = request.priority() == null ? "NORMAL" : request.priority();
@@ -65,6 +75,10 @@ public class AnnouncementWriteService {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
         }
         List<String> targetRoles = immutableStrings(request.targetRoles(), "targetRoles");
+        boolean lecturer = isLecturerOnly(roles);
+        if (lecturer) {
+            requireLecturerAnnouncement(lecturerId, request.sectionId(), targetRoles, request.isGlobal(), request.lecturerId());
+        }
         List<Integer> targetYears = immutableYears(request.targetYears());
         Instant now = Instant.now(clock);
         AnnouncementResponse created = announcements.create(new CreateAnnouncementCommand(
@@ -80,7 +94,7 @@ public class AnnouncementWriteService {
                 publisher,
                 request.semesterId(),
                 request.sectionId(),
-                request.lecturerId(),
+                lecturer ? lecturerId : request.lecturerId(),
                 now));
         appendAudit("CREATED", publisher, actorLabel, "Announcement created", null, created, now);
         return created;
@@ -92,6 +106,17 @@ public class AnnouncementWriteService {
             String actorLabel,
             String announcementId,
             UpdateAnnouncementRequest request) {
+        return update(actorId, actorLabel, List.of("ADMIN"), null, announcementId, request);
+    }
+
+    @Transactional
+    public AnnouncementResponse update(
+            String actorId,
+            String actorLabel,
+            List<String> roles,
+            String lecturerId,
+            String announcementId,
+            UpdateAnnouncementRequest request) {
         String actor = requireText(actorId, "actor");
         String label = requireActorLabel(actorLabel, "actorLabel");
         String id = requireText(announcementId, "announcement id");
@@ -99,6 +124,18 @@ public class AnnouncementWriteService {
         int expectedVersion = requireVersion(request.expectedVersion());
         AnnouncementResponse before = requireAnnouncementForUpdate(id);
         requireActive(before);
+        boolean lecturer = isLecturerOnly(roles);
+        if (lecturer) {
+            if (lecturerId == null || lecturerId.isBlank() || !lecturerId.equals(before.lecturerId())) {
+                throw forbiddenLecturer();
+            }
+            String effectiveSection = request.has("sectionId") ? request.sectionId() : before.sectionId();
+            List<String> effectiveRoles = request.has("targetRoles")
+                    ? immutableStrings(request.targetRoles(), "targetRoles") : before.targetRoles();
+            Boolean effectiveGlobal = request.has("isGlobal") ? request.isGlobal() : before.isGlobal();
+            String requestedLecturer = request.has("lecturerId") ? request.lecturerId() : lecturerId;
+            requireLecturerAnnouncement(lecturerId, effectiveSection, effectiveRoles, effectiveGlobal, requestedLecturer);
+        }
         if (request.has("priority") && !PRIORITIES.contains(request.priority())) {
             throw new IllegalArgumentException("priority must be LOW, NORMAL, HIGH, or URGENT");
         }
@@ -122,7 +159,7 @@ public class AnnouncementWriteService {
                 patch(request, "expiresAt", request.expiresAt()),
                 patch(request, "semesterId", request.semesterId()),
                 patch(request, "sectionId", request.sectionId()),
-                patch(request, "lecturerId", request.lecturerId()),
+                lecturer ? PatchValue.present(lecturerId) : patch(request, "lecturerId", request.lecturerId()),
                 now,
                 expectedVersion));
         if (changed != 1) {
@@ -131,6 +168,32 @@ public class AnnouncementWriteService {
         AnnouncementResponse after = requireAnnouncement(id);
         appendAudit("UPDATED", actor, label, reason, before, after, now);
         return after;
+    }
+
+    private void requireLecturerAnnouncement(
+            String lecturerId,
+            String sectionId,
+            List<String> targetRoles,
+            Boolean isGlobal,
+            String requestedLecturerId) {
+        if (lecturerId == null || lecturerId.isBlank()
+                || sectionId == null || sectionId.isBlank()
+                || !announcements.sectionBelongsToLecturer(sectionId, lecturerId)
+                || !List.of("STUDENT").equals(targetRoles)
+                || Boolean.TRUE.equals(isGlobal)
+                || (requestedLecturerId != null && !lecturerId.equals(requestedLecturerId))) {
+            throw forbiddenLecturer();
+        }
+    }
+
+    private static boolean isLecturerOnly(List<String> roles) {
+        return roles != null && roles.contains("LECTURER")
+                && !roles.contains("ADMIN") && !roles.contains("SUPER_ADMIN");
+    }
+
+    private static DomainException forbiddenLecturer() {
+        return new DomainException(HttpStatus.FORBIDDEN, "LECTURER_ANNOUNCEMENT_FORBIDDEN",
+                "Lecturers may only manage student announcements for their own sections");
     }
 
     @Transactional

@@ -230,6 +230,8 @@ export interface StudentGradeRecord {
   semesterNameEn?: string;
   semesterNameVi?: string;
   semesterId: string;
+  processScore: number | null;
+  finalExamScore: number | null;
   finalGrade: number | null;
   letterGrade: string | null;
   gradePoint?: number | null;
@@ -269,8 +271,8 @@ export interface StudentGrade {
 
 export interface GradeUpdate {
   enrollmentId: string;
-  finalGrade: number;
-  letterGrade: string;
+  processScore: number;
+  finalExamScore: number;
 }
 
 export interface GradingSection {
@@ -345,8 +347,8 @@ export interface SectionGrades {
     studentName: string;
     studentCode: string;
     email?: string;
-    midtermScore?: number;
-    finalScore?: number;
+    processScore?: number;
+    finalExamScore?: number;
     finalGrade?: number;
     letterGrade?: string;
     gradeStatus?: 'DRAFT' | 'PUBLISHED' | 'APPEALED';

@@ -6,6 +6,7 @@ import {
   Calendar,
   CheckCircle2,
   Clock,
+  ChevronDown,
   GraduationCap,
   Layers,
   MapPin,
@@ -81,7 +82,7 @@ export default function EnrollmentsPage() {
           eyebrow: 'Khu sinh viên',
           title: 'Môn học của tôi',
           description:
-            'Theo dõi lộ trình toàn khóa theo chương trình đào tạo và cập nhật lớp học phần đã đăng ký.',
+            'Theo dõi chương trình đào tạo và các lớp đã đăng ký.',
           browseSections: 'Xem lớp học phần',
           loading: 'Đang tải thông tin môn học & CTĐT',
           unavailableTitle: 'Thông tin môn học chưa sẵn sàng',
@@ -94,6 +95,10 @@ export default function EnrollmentsPage() {
           statCompleted: 'Đã hoàn tất',
           statInProgress: 'Đang học',
           statRemaining: 'Chưa hoàn tất',
+          curriculumProgressLabel: 'Tiến độ tín chỉ',
+          statusSummaryLabel: 'Tóm tắt trạng thái CTĐT',
+          courseWord: 'môn',
+          coursesWord: 'môn',
           filterAll: 'Tất cả môn',
           filterCompleted: 'Đã hoàn tất',
           filterInProgress: 'Đang học',
@@ -106,6 +111,7 @@ export default function EnrollmentsPage() {
           gradeScore: 'Điểm',
           noCurriculumCourses: 'Không có môn học nào thuộc nhóm trạng thái này.',
           recordTitle: 'Hồ sơ đăng ký lớp học phần',
+          detailsLabel: 'Chi tiết lớp',
           sectionPrefix: 'Lớp học phần',
           enrolledOn: 'Đăng ký ngày',
           unknownCourse: 'Môn học',
@@ -126,7 +132,7 @@ export default function EnrollmentsPage() {
           eyebrow: 'Student area',
           title: 'My courses',
           description:
-            'Track your overall study roadmap against the degree curriculum and manage your enrolled class sections.',
+            'Track your curriculum and enrolled class sections.',
           browseSections: 'Browse classes',
           loading: 'Loading courses & study program',
           unavailableTitle: 'Course information unavailable',
@@ -138,11 +144,15 @@ export default function EnrollmentsPage() {
           statCurriculumTotal: 'Total Curriculum Courses',
           statCompleted: 'Completed',
           statInProgress: 'In Progress',
-          statRemaining: 'Not Started',
+          statRemaining: 'Not completed',
+          curriculumProgressLabel: 'Credit progress',
+          statusSummaryLabel: 'Curriculum status summary',
+          courseWord: 'course',
+          coursesWord: 'courses',
           filterAll: 'All courses',
           filterCompleted: 'Completed',
           filterInProgress: 'In Progress',
-          filterNotStarted: 'Not Started',
+          filterNotStarted: 'Not completed',
           yearPrefix: 'Year',
           semesterPrefix: 'Semester',
           mandatory: 'Mandatory',
@@ -151,6 +161,7 @@ export default function EnrollmentsPage() {
           gradeScore: 'Grade',
           noCurriculumCourses: 'No courses found for the selected status filter.',
           recordTitle: 'Enrolled Class Sections',
+          detailsLabel: 'Class details',
           sectionPrefix: 'Class',
           enrolledOn: 'Enrolled',
           unknownCourse: 'Course',
@@ -249,12 +260,72 @@ export default function EnrollmentsPage() {
     [curriculumCourses],
   );
 
+  const curriculumTotalCredits = useMemo(
+    () => curriculumCourses.reduce((sum, c) => sum + (c.credits || 0), 0),
+    [curriculumCourses],
+  );
+
+  const completedCurriculumCredits = useMemo(
+    () => completedCurriculum.reduce((sum, c) => sum + (c.credits || 0), 0),
+    [completedCurriculum],
+  );
+
+  const curriculumCreditTarget =
+    curriculumData?.curriculum.totalCredits || curriculumTotalCredits;
+
+  const curriculumCreditPercent = useMemo(() => {
+    if (curriculumCreditTarget <= 0) return 0;
+    return Math.min(
+      100,
+      Math.round((completedCurriculumCredits / curriculumCreditTarget) * 100),
+    );
+  }, [completedCurriculumCredits, curriculumCreditTarget]);
+
+  const curriculumStatusSummary = useMemo(
+    () => [
+      {
+        key: 'COMPLETED',
+        label: copy.filterCompleted,
+        count: completedCurriculum.length,
+        tone: statusToneClass('success'),
+      },
+      {
+        key: 'IN_PROGRESS',
+        label: copy.filterInProgress,
+        count: inProgressCurriculum.length,
+        tone: statusToneClass('info'),
+      },
+      {
+        key: 'NOT_STARTED',
+        label: copy.filterNotStarted,
+        count: notStartedCurriculum.length,
+        tone: statusToneClass('neutral'),
+      },
+    ],
+    [
+      completedCurriculum.length,
+      copy.filterCompleted,
+      copy.filterInProgress,
+      copy.filterNotStarted,
+      inProgressCurriculum.length,
+      notStartedCurriculum.length,
+    ],
+  );
+
   const activeEnrollments = useMemo(
     () =>
       enrollments.filter(
         (e) => e.status === 'CONFIRMED' || e.status === 'ENROLLED',
       ),
     [enrollments],
+  );
+
+  const courseCountLabel = useCallback(
+    (count: number) =>
+      `${formatNumber(count)} ${
+        count === 1 ? copy.courseWord : copy.coursesWord
+      }`,
+    [copy.courseWord, copy.coursesWord, formatNumber],
   );
 
   const groupedCurriculum = useMemo(() => {
@@ -276,27 +347,24 @@ export default function EnrollmentsPage() {
 
   const summaryCards = useMemo(() => {
     if (curriculumCourses.length > 0) {
-      const totalCredits = curriculumCourses.reduce((sum, c) => sum + (c.credits || 0), 0);
-      const completedCredits = completedCurriculum.reduce((sum, c) => sum + (c.credits || 0), 0);
-
       return [
         {
           label: copy.statCurriculumTotal,
-          value: `${formatNumber(curriculumCourses.length)} môn`,
-          subvalue: `${formatNumber(totalCredits)} ${copy.creditsLabel}`,
+          value: courseCountLabel(curriculumCourses.length),
+          subvalue: `${formatNumber(curriculumTotalCredits)} ${copy.creditsLabel}`,
           tone: metricToneClass('info'),
           icon: GraduationCap,
         },
         {
           label: copy.statCompleted,
-          value: `${formatNumber(completedCurriculum.length)} môn`,
-          subvalue: `${formatNumber(completedCredits)} / ${formatNumber(totalCredits)} ${copy.creditsLabel}`,
+          value: courseCountLabel(completedCurriculum.length),
+          subvalue: `${formatNumber(completedCurriculumCredits)} / ${formatNumber(curriculumCreditTarget)} ${copy.creditsLabel}`,
           tone: metricToneClass('success'),
           icon: CheckCircle2,
         },
         {
           label: copy.statInProgress,
-          value: `${formatNumber(inProgressCurriculum.length)} môn`,
+          value: courseCountLabel(inProgressCurriculum.length),
           subvalue: `${formatNumber(notStartedCurriculum.length)} ${copy.statRemaining.toLowerCase()}`,
           tone: metricToneClass('warning'),
           icon: Clock,
@@ -337,7 +405,11 @@ export default function EnrollmentsPage() {
     copy.statCurriculumTotal,
     copy.statInProgress,
     copy.statRemaining,
+    courseCountLabel,
+    completedCurriculumCredits,
+    curriculumCreditTarget,
     curriculumCourses,
+    curriculumTotalCredits,
     enrollments,
     formatNumber,
     inProgressCurriculum.length,
@@ -448,10 +520,11 @@ export default function EnrollmentsPage() {
                     { key: 'IN_PROGRESS', label: copy.filterInProgress, count: inProgressCurriculum.length },
                     { key: 'NOT_STARTED', label: copy.filterNotStarted, count: notStartedCurriculum.length },
                   ] as const
-                ).map((btn) => (
+                  ).map((btn) => (
                   <button
                     key={btn.key}
                     type="button"
+                    aria-pressed={statusFilter === btn.key}
                     onClick={() => setStatusFilter(btn.key)}
                     className={`rounded-full px-3 py-1 font-medium transition ${
                       statusFilter === btn.key
@@ -470,7 +543,7 @@ export default function EnrollmentsPage() {
             <div className="space-y-8">
               {curriculumData?.curriculum && (
                 <div className="rounded-xl border border-border/70 bg-card/60 p-4 sm:p-5">
-                  <div className="flex flex-wrap items-center justify-between gap-3">
+                  <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(280px,380px)] lg:items-center">
                     <div>
                       <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
                         {curriculumData.curriculum.code}
@@ -479,10 +552,40 @@ export default function EnrollmentsPage() {
                         {getLocalizedName(locale, curriculumData.curriculum, curriculumData.curriculum.name)}
                       </h3>
                     </div>
-                    <div className="flex items-center gap-3">
-                      <span className="rounded-xl border border-border/80 bg-secondary/40 px-3.5 py-1.5 text-xs font-medium text-foreground">
-                        {copy.statCompleted}: <strong className="font-semibold text-primary">{completedCurriculum.length}</strong> / {curriculumCourses.length} môn
-                      </span>
+                    <div
+                      aria-label={copy.statusSummaryLabel}
+                      className="space-y-3"
+                    >
+                      <div className="flex items-center justify-between gap-3 text-xs text-muted-foreground">
+                        <span className="font-medium">{copy.curriculumProgressLabel}</span>
+                        <span className="font-semibold tabular-nums text-foreground">
+                          {formatNumber(completedCurriculumCredits)} /{' '}
+                          {formatNumber(curriculumCreditTarget)} {copy.creditsLabel}
+                          {' · '}
+                          {curriculumCreditPercent}%
+                        </span>
+                      </div>
+                      <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                        <div
+                          className="h-full rounded-full bg-primary transition-all duration-300"
+                          style={{ width: `${curriculumCreditPercent}%` }}
+                        />
+                      </div>
+                      <div className="grid grid-cols-3 gap-2">
+                        {curriculumStatusSummary.map((item) => (
+                          <div
+                            key={item.key}
+                            className={`rounded-lg px-2.5 py-2 text-center ${item.tone}`}
+                          >
+                            <div className="text-base font-bold leading-none tabular-nums">
+                              {formatNumber(item.count)}
+                            </div>
+                            <div className="mt-1 text-[11px] font-medium leading-tight">
+                              {item.label}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
                     </div>
                   </div>
                 </div>
@@ -509,7 +612,7 @@ export default function EnrollmentsPage() {
                         <Card key={`year-${year}-sem-${sem}`} variant="muted" className="overflow-hidden">
                           <CardHeader className="border-b border-border/60 bg-secondary/20 py-3">
                             <CardTitle className="text-sm font-semibold uppercase tracking-wider text-muted-foreground">
-                              {copy.semesterPrefix} {sem} - {courses.length} {copy.creditsLabel === 'credits' ? 'courses' : 'môn'}
+                              {copy.semesterPrefix} {sem} - {courseCountLabel(courses.length)}
                             </CardTitle>
                           </CardHeader>
                           <CardContent className="divide-y divide-border/60 p-0">
@@ -597,7 +700,7 @@ export default function EnrollmentsPage() {
                   <CardHeader>
                     <CardTitle className="text-xl">{copy.recordTitle}</CardTitle>
                   </CardHeader>
-                  <CardContent className="space-y-4">
+                  <CardContent className="space-y-3 sm:space-y-4">
                     {enrollments.map((enrollment) => {
                       const courseCode = enrollment.section?.course?.code ?? copy.unknownCourse;
                       const courseName = getLocalizedName(
@@ -610,12 +713,12 @@ export default function EnrollmentsPage() {
                       return (
                         <div
                           key={enrollment.id}
-                          className="rounded-xl border border-border/80 bg-card px-5 py-5 shadow-xs transition hover:border-primary/40"
+                          className="rounded-xl border border-border/80 bg-card px-3 py-3 shadow-xs transition hover:border-primary/40 sm:px-5 sm:py-5"
                         >
-                          <div className="flex flex-col gap-4 xl:flex-row xl:items-start xl:justify-between">
-                            <div className="space-y-3">
+                          <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between sm:gap-4">
+                            <div className="min-w-0 flex-1">
                               <div className="flex flex-wrap items-center gap-2">
-                                <h2 className="text-lg font-semibold text-foreground">
+                                <h2 className="min-w-0 break-words text-base font-semibold text-foreground sm:text-lg">
                                   {courseCode} - {courseName}
                                 </h2>
                                 <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
@@ -632,44 +735,109 @@ export default function EnrollmentsPage() {
                                 </span>
                               </div>
 
-                              <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
-                                <span className="inline-flex items-center gap-2">
-                                  <Calendar className="h-4 w-4" />
-                                  {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
-                                </span>
-                                <span>
-                                  {enrollment.section?.course?.credits} {copy.creditsLabel}
-                                </span>
-                                {enrollment.section?.lecturer ? (
-                                  <span>
-                                    {enrollment.section.lecturer.user?.firstName}{' '}
-                                    {enrollment.section.lecturer.user?.lastName}
-                                  </span>
-                                ) : null}
-                                {enrollment.section?.classroom ? (
+                              <div className="mt-3 hidden space-y-3 sm:block">
+                                <div className="flex flex-wrap gap-4 text-sm text-muted-foreground">
                                   <span className="inline-flex items-center gap-2">
-                                    <MapPin className="h-4 w-4" />
-                                    {enrollment.section.classroom.building}{' '}
-                                    {enrollment.section.classroom.roomNumber}
+                                    <Calendar className="h-4 w-4" />
+                                    {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
                                   </span>
+                                  <span>
+                                    {enrollment.section?.course?.credits} {copy.creditsLabel}
+                                  </span>
+                                  {enrollment.section?.lecturer ? (
+                                    <span>
+                                      {enrollment.section.lecturer.user?.firstName}{' '}
+                                      {enrollment.section.lecturer.user?.lastName}
+                                    </span>
+                                  ) : null}
+                                  {enrollment.section?.classroom ? (
+                                    <span className="inline-flex items-center gap-2">
+                                      <MapPin className="h-4 w-4" />
+                                      {enrollment.section.classroom.building}{' '}
+                                      {enrollment.section.classroom.roomNumber}
+                                    </span>
+                                  ) : null}
+                                </div>
+
+                                {enrollment.section?.schedules?.length ? (
+                                  <div className="flex flex-wrap gap-2">
+                                    {enrollment.section.schedules.map((schedule, index) => (
+                                      <span
+                                        key={`${enrollment.id}-desktop-${index}`}
+                                        className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
+                                      >
+                                        <Clock className="h-3.5 w-3.5" />
+                                        {getDayName(schedule.dayOfWeek, locale)}{' '}
+                                        {schedule.startTime}-
+                                        {schedule.endTime}
+                                      </span>
+                                    ))}
+                                  </div>
                                 ) : null}
                               </div>
 
-                              {enrollment.section?.schedules?.length ? (
-                                <div className="flex flex-wrap gap-2">
-                                  {enrollment.section.schedules.map((schedule, index) => (
-                                    <span
-                                      key={`${enrollment.id}-${index}`}
-                                      className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
-                                    >
-                                      <Clock className="h-3.5 w-3.5" />
-                                      {getDayName(schedule.dayOfWeek, locale)}{' '}
-                                      {schedule.startTime}-
-                                      {schedule.endTime}
+                              <details className="group mt-3 sm:hidden">
+                                <summary className="flex min-h-11 cursor-pointer list-none items-center justify-between gap-3 rounded-lg bg-secondary/60 px-3 py-2 text-sm font-medium text-foreground outline-none transition-colors hover:bg-secondary focus-visible:ring-2 focus-visible:ring-ring [&::-webkit-details-marker]:hidden">
+                                  <span>{copy.detailsLabel}</span>
+                                  <ChevronDown className="h-4 w-4 shrink-0 transition-transform group-open:rotate-180" />
+                                </summary>
+                                <div className="space-y-3 border-t border-border/70 pt-3">
+                                  <div className="grid grid-cols-2 gap-2 text-xs text-muted-foreground">
+                                    <span className="col-span-2 inline-flex items-center gap-2">
+                                      <Calendar className="h-4 w-4 shrink-0" />
+                                      {copy.enrolledOn} {formatDate(enrollment.enrolledAt)}
                                     </span>
-                                  ))}
+                                    <span>
+                                      {enrollment.section?.course?.credits} {copy.creditsLabel}
+                                    </span>
+                                    {enrollment.section?.lecturer ? (
+                                      <span className="truncate">
+                                        {enrollment.section.lecturer.user?.firstName}{' '}
+                                        {enrollment.section.lecturer.user?.lastName}
+                                      </span>
+                                    ) : null}
+                                    {enrollment.section?.classroom ? (
+                                      <span className="col-span-2 inline-flex items-center gap-2">
+                                        <MapPin className="h-4 w-4 shrink-0" />
+                                        {enrollment.section.classroom.building}{' '}
+                                        {enrollment.section.classroom.roomNumber}
+                                      </span>
+                                    ) : null}
+                                  </div>
+
+                                  {enrollment.section?.schedules?.length ? (
+                                    <div className="flex flex-wrap gap-2">
+                                      {enrollment.section.schedules.map((schedule, index) => (
+                                        <span
+                                          key={`${enrollment.id}-mobile-${index}`}
+                                          className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
+                                        >
+                                          <Clock className="h-3.5 w-3.5" />
+                                          {getDayName(schedule.dayOfWeek, locale)}{' '}
+                                          {schedule.startTime}-
+                                          {schedule.endTime}
+                                        </span>
+                                      ))}
+                                    </div>
+                                  ) : null}
+
+                                  {enrollment.status !== 'DROPPED' &&
+                                  enrollment.status !== 'COMPLETED' ? (
+                                    <Button
+                                      type="button"
+                                      variant="destructive"
+                                      className="w-full"
+                                      onClick={() => void handleDrop(enrollment.id, courseLabel)}
+                                      disabled={isDropping === enrollment.id}
+                                    >
+                                      <Trash2 className="mr-2 h-4 w-4" />
+                                      {isDropping === enrollment.id
+                                        ? copy.droppingCourse
+                                        : copy.dropCourse}
+                                    </Button>
+                                  ) : null}
                                 </div>
-                              ) : null}
+                              </details>
                             </div>
 
                             {enrollment.status !== 'DROPPED' &&
@@ -677,6 +845,7 @@ export default function EnrollmentsPage() {
                               <Button
                                 type="button"
                                 variant="destructive"
+                                className="hidden shrink-0 sm:inline-flex"
                                 onClick={() => void handleDrop(enrollment.id, courseLabel)}
                                 disabled={isDropping === enrollment.id}
                               >

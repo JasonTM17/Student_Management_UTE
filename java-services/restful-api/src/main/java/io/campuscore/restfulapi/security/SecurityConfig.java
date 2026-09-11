@@ -80,7 +80,16 @@ public class SecurityConfig {
         configuration.setAllowedOriginPatterns(List.of(allowedOriginPatterns.split("\\s*,\\s*")));
         configuration.setAllowedMethods(List.of("GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS", "HEAD"));
         configuration.setAllowedHeaders(List.of("*"));
-        configuration.setExposedHeaders(List.of("Authorization", "Content-Disposition", "Deprecation", "Sunset", "Idempotency-Key"));
+        configuration.setExposedHeaders(List.of(
+                "Authorization",
+                "Content-Disposition",
+                "Deprecation",
+                "Sunset",
+                "Idempotency-Key",
+                "X-RateLimit-Limit",
+                "X-RateLimit-Remaining",
+                "X-RateLimit-Reset",
+                "Retry-After"));
         configuration.setAllowCredentials(true);
         configuration.setMaxAge(3600L);
 
@@ -94,6 +103,7 @@ public class SecurityConfig {
             HttpSecurity http,
             CookieOrBearerTokenResolver tokenResolver,
             CsrfCookieFilter csrfCookieFilter,
+            io.campuscore.restfulapi.security.ratelimit.RateLimitFilter rateLimitFilter,
             ApiErrorWriter errorWriter,
             CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
@@ -125,7 +135,8 @@ public class SecurityConfig {
                         .bearerTokenResolver(tokenResolver)
                         .authenticationEntryPoint(authenticationEntryPoint(errorWriter))
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
-                .addFilterAfter(csrfCookieFilter, BearerTokenAuthenticationFilter.class);
+                .addFilterAfter(csrfCookieFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(rateLimitFilter, CsrfCookieFilter.class);
 
         return http.build();
     }

@@ -113,7 +113,9 @@ public class AcademicSectionReadRepository {
         return jdbc.query(
                 "SELECT enrollment.\"id\", enrollment.\"studentId\", student.\"studentId\" AS student_number,"
                         + " student_user.\"email\" AS student_email, student_user.\"firstName\" AS student_first_name,"
-                        + " student_user.\"lastName\" AS student_last_name, enrollment.\"finalGrade\","
+                        + " student_user.\"lastName\" AS student_last_name,"
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = enrollment.\"id\" AND gi.\"type\" = 'PROCESS') AS process_score,"
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = enrollment.\"id\" AND gi.\"type\" = 'FINAL') AS final_exam_score, enrollment.\"finalGrade\","
                         + " enrollment.\"letterGrade\", enrollment.\"gradeStatus\", enrollment.\"status\" AS enrollment_status"
                         + " FROM " + ENROLLMENT + " enrollment"
                         + " JOIN " + STUDENT + " student ON student.\"id\" = enrollment.\"studentId\""
@@ -277,6 +279,8 @@ public class AcademicSectionReadRepository {
                 displayName(rs.getString("student_first_name"), rs.getString("student_last_name")),
                 rs.getString("student_number"),
                 rs.getString("student_email"),
+                rs.getBigDecimal("process_score"),
+                rs.getBigDecimal("final_exam_score"),
                 rs.getBigDecimal("finalGrade"),
                 rs.getString("letterGrade"),
                 rs.getString("gradeStatus"),
@@ -364,6 +368,8 @@ public class AcademicSectionReadRepository {
             String studentName,
             String studentCode,
             String email,
+            BigDecimal processScore,
+            BigDecimal finalExamScore,
             BigDecimal finalGrade,
             String letterGrade,
             String gradeStatus,

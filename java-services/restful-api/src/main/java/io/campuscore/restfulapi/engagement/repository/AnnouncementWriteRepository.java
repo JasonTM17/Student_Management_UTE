@@ -152,6 +152,15 @@ public class AnnouncementWriteRepository {
         return findById(id, false);
     }
 
+    public boolean sectionBelongsToLecturer(String sectionId, String lecturerId) {
+        if (sectionId == null || lecturerId == null) return false;
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = :sectionId AND \"lecturerId\" = :lecturerId",
+                new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                Long.class);
+        return count != null && count > 0;
+    }
+
     /**
      * Loads an announcement while holding its row lock for the surrounding transaction.
      * Mutation services use this read before the CAS write so the audit snapshots cannot

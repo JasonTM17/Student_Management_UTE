@@ -25,10 +25,10 @@ export function CampusUteEmblem({ className, size = 44 }: { className?: string; 
       style={{ width: size, height: size }}
     >
       <Image
-        src="/icon.svg"
-        alt="CampusUTE Logo"
+        src="/hcmute-logo.png"
+        alt="HCMUTE Official Logo"
         width={size}
-        height={size}
+        height={Math.round(size * (342 / 270))}
         priority
         className="h-full w-full object-contain"
       />
@@ -61,7 +61,7 @@ export function BrandMark({
           )}
         >
           <span translate="no">{title}</span>
-          <span className="rounded bg-[var(--portal-yellow,#F59E0B)]/15 px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--portal-yellow,#D97706)]">
+          <span className="rounded bg-[var(--portal-yellow,#F59E0B)] px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--portal-yellow-ink)]">
             HCMUTE
           </span>
         </div>
@@ -84,4 +84,3 @@ export function BrandMark({
     </LocalizedLink>
   );
 }
-

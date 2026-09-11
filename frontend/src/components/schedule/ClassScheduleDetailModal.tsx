@@ -109,17 +109,17 @@ export function ClassScheduleDetailModal({
     >
       <div
         ref={modalRef}
-        className="w-full max-w-lg rounded-2xl border border-border bg-card p-6 shadow-2xl transition-all zoom-in-95"
+        className="w-full max-w-lg rounded-lg border border-border bg-card p-6 shadow-xl transition-all zoom-in-95"
         onClick={(e) => e.stopPropagation()}
       >
         {/* Header */}
         <div className="flex items-start justify-between gap-4 border-b border-border/80 pb-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="rounded-md bg-primary/10 px-2.5 py-1 font-mono text-xs font-bold text-primary">
+              <span className="rounded bg-primary/10 px-2.5 py-1 font-mono text-xs font-bold text-primary">
                 {data.courseCode}
               </span>
-              <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground">
+              <span className="rounded bg-secondary px-2 py-0.5 text-xs font-semibold text-foreground">
                 {locale === 'vi' ? 'Lớp HP' : 'Section'} {data.sectionNumber}
               </span>
               {data.status ? (
@@ -139,16 +139,16 @@ export function ClassScheduleDetailModal({
             type="button"
             onClick={onClose}
             aria-label={locale === 'vi' ? 'Đóng' : 'Close'}
-            className="rounded-lg p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
+            className="rounded p-1.5 text-muted-foreground transition hover:bg-secondary hover:text-foreground"
           >
             <X className="h-5 w-5" />
           </button>
         </div>
 
         {/* Content details grid */}
-        <div className="mt-5 grid gap-4 sm:grid-cols-2">
-          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+        <div className="mt-5 grid gap-3 sm:grid-cols-2">
+          <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
               <Calendar className="h-4 w-4" />
             </div>
             <div>
@@ -159,8 +159,8 @@ export function ClassScheduleDetailModal({
             </div>
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-sky-500/10 text-sky-600 dark:text-sky-400">
+          <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-sky-500/10 text-sky-600 dark:text-sky-400">
               <Clock className="h-4 w-4" />
             </div>
             <div>
@@ -173,8 +173,8 @@ export function ClassScheduleDetailModal({
             </div>
           </div>
 
-          <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
+          <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-emerald-500/10 text-emerald-600 dark:text-emerald-400">
               <MapPin className="h-4 w-4" />
             </div>
             <div>
@@ -197,8 +197,8 @@ export function ClassScheduleDetailModal({
           </div>
 
           {data.lecturerName ? (
-            <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-purple-500/10 text-purple-600 dark:text-purple-400">
+            <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-purple-500/10 text-purple-600 dark:text-purple-400">
                 <GraduationCap className="h-4 w-4" />
               </div>
               <div>
@@ -213,8 +213,8 @@ export function ClassScheduleDetailModal({
           ) : null}
 
           {data.credits ? (
-            <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-amber-500/10 text-amber-600 dark:text-amber-400">
+            <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-amber-500/10 text-amber-600 dark:text-amber-400">
                 <Award className="h-4 w-4" />
               </div>
               <div>
@@ -229,8 +229,8 @@ export function ClassScheduleDetailModal({
           ) : null}
 
           {isLecturer && data.enrolledCount !== undefined ? (
-            <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-teal-500/10 text-teal-600 dark:text-teal-400">
+            <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-teal-500/10 text-teal-600 dark:text-teal-400">
                 <Users className="h-4 w-4" />
               </div>
               <div>
@@ -245,8 +245,8 @@ export function ClassScheduleDetailModal({
           ) : null}
 
           {data.departmentName || data.departmentNameVi || data.departmentNameEn ? (
-            <div className="flex items-start gap-3 rounded-xl border border-border/60 bg-secondary/30 p-3 sm:col-span-2">
-              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-blue-500/10 text-blue-600 dark:text-blue-400">
+            <div className="flex items-start gap-3 rounded-md border border-border/60 bg-secondary/30 p-3 sm:col-span-2">
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-blue-500/10 text-blue-600 dark:text-blue-400">
                 <Building className="h-4 w-4" />
               </div>
               <div>

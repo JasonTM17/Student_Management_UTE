@@ -141,6 +141,8 @@ public class AnnouncementReadRepository {
         }
 
         if (visibility.roles().contains("LECTURER") && visibility.lecturerId() != null) {
+            audience.add("\"lecturerId\" = :lecturerId");
+            conditions.set(0, "(" + String.join(" OR ", audience) + ")");
             conditions.add("(\"lecturerId\" IS NULL OR \"lecturerId\" = :lecturerId)");
             parameters.addValue("lecturerId", visibility.lecturerId());
         }

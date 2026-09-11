@@ -65,6 +65,10 @@ class SecurityConfigTest {
         // Credentialed CORS must not trust a whole public wildcard domain.
         assertFalse(corsConfig.getAllowedOriginPatterns().contains("https://*.vercel.app"));
         assertFalse(corsConfig.getAllowedOriginPatterns().stream().anyMatch(pattern -> pattern.contains("*.")));
+        assertTrue(corsConfig.getExposedHeaders().contains("X-RateLimit-Limit"));
+        assertTrue(corsConfig.getExposedHeaders().contains("X-RateLimit-Remaining"));
+        assertTrue(corsConfig.getExposedHeaders().contains("X-RateLimit-Reset"));
+        assertTrue(corsConfig.getExposedHeaders().contains("Retry-After"));
     }
 
     @Test

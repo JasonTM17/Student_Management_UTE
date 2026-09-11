@@ -111,7 +111,10 @@ export default function AdminLecturersPage() {
       const response = await lecturersApi.getAll({ page, limit: 20 });
       const filteredLecturers = search
         ? response.data.filter((lecturer: Lecturer) => {
-            const fullName = `${lecturer.user?.firstName || ''} ${lecturer.user?.lastName || ''}`
+            const fullNameVi = `${lecturer.user?.lastName || ''} ${lecturer.user?.firstName || ''}`
+              .trim()
+              .toLowerCase();
+            const fullNameEn = `${lecturer.user?.firstName || ''} ${lecturer.user?.lastName || ''}`
               .trim()
               .toLowerCase();
             const query = search.toLowerCase();
@@ -119,7 +122,8 @@ export default function AdminLecturersPage() {
             return (
               lecturer.employeeId.toLowerCase().includes(query) ||
               lecturer.user?.email?.toLowerCase().includes(query) ||
-              fullName.includes(query)
+              fullNameVi.includes(query) ||
+              fullNameEn.includes(query)
             );
           })
         : response.data;
@@ -446,7 +450,7 @@ export default function AdminLecturersPage() {
               <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
                 {lecturers.map((lecturer) => {
                   const lecturerLabel = lecturer.user
-                    ? `${lecturer.user.firstName} ${lecturer.user.lastName}`
+                    ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim()
                     : copy.unlinkedAccount;
                   const departmentLabel = getLocalizedName(
                     locale,
@@ -536,7 +540,7 @@ export default function AdminLecturersPage() {
                         </td>
                         <td className="px-2 py-4 text-foreground">
                           {lecturer.user
-                            ? `${lecturer.user.firstName} ${lecturer.user.lastName}`
+                            ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim()
                             : copy.unlinkedAccount}
                         </td>
                         <td className="px-2 py-4 text-muted-foreground">

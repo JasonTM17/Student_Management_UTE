@@ -66,12 +66,16 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createCourse(Map<String, Object> input) {
         String id = id(input);
         required(input, "name");
+        int credits = number(input, "credits", 3);
+        if (credits <= 0 || credits > 30) {
+            throw new IllegalArgumentException("credits must be between 1 and 30");
+        }
         jdbc.update(
                 "INSERT INTO " + COURSE
                         + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\", \"credits\", \"departmentId\")"
                         + " VALUES (:id, :code, :name, :nameEn, :nameVi, :description, :descriptionEn, :descriptionVi, :credits, :departmentId)",
                 params(input, id)
-                        .addValue("credits", number(input, "credits", 3))
+                        .addValue("credits", credits)
                         .addValue("departmentId", text(input, "departmentId", "department-demo")));
         return get(COURSE, id);
     }

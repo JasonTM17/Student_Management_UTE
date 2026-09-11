@@ -100,6 +100,8 @@ public class AcademicEnrollmentReadRepository {
     public List<GradeSummaryRow> findStudentGradeSummaries(String studentId, String semesterId) {
         return jdbc.query(
                 "SELECT e.\"id\", e.\"semesterId\", e.\"status\", e.\"gradeStatus\", e.\"finalGrade\", e.\"letterGrade\","
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = e.\"id\" AND gi.\"type\" = 'PROCESS') AS process_score,"
+                        + " (SELECT MAX(sg.\"score\") FROM \"academic\".\"StudentGrade\" sg JOIN \"academic\".\"GradeItem\" gi ON gi.\"id\" = sg.\"gradeItemId\" WHERE sg.\"enrollmentId\" = e.\"id\" AND gi.\"type\" = 'FINAL') AS final_exam_score,"
                         + " section.\"sectionNumber\", course.\"code\", course.\"name\", course.\"nameEn\", course.\"nameVi\","
                         + " course.\"credits\", semester.\"name\" AS semester_name, semester.\"nameEn\" AS semester_name_en,"
                         + " semester.\"nameVi\" AS semester_name_vi, lecturer_user.\"firstName\" AS lecturer_first_name,"
@@ -290,7 +292,8 @@ public class AcademicEnrollmentReadRepository {
                 rs.getString("nameEn"), rs.getString("nameVi"), rs.getInt("credits"), rs.getString("sectionNumber"),
                 displayName(rs.getString("lecturer_first_name"), rs.getString("lecturer_last_name")),
                 rs.getString("semester_name"), rs.getString("semester_name_en"), rs.getString("semester_name_vi"),
-                rs.getString("semesterId"), rs.getBigDecimal("finalGrade"), rs.getString("letterGrade"),
+                rs.getString("semesterId"), rs.getBigDecimal("process_score"), rs.getBigDecimal("final_exam_score"),
+                rs.getBigDecimal("finalGrade"), rs.getString("letterGrade"),
                 rs.getString("gradeStatus"), rs.getString("status"));
     }
 
@@ -342,7 +345,8 @@ public class AcademicEnrollmentReadRepository {
 
     public record GradeSummaryRow(String id, String courseCode, String courseName, String courseNameEn, String courseNameVi,
             int credits, String sectionCode, String lecturerName, String semester, String semesterNameEn, String semesterNameVi,
-            String semesterId, BigDecimal finalGrade, String letterGrade, String gradeStatus, String enrollmentStatus) {
+            String semesterId, BigDecimal processScore, BigDecimal finalExamScore, BigDecimal finalGrade,
+            String letterGrade, String gradeStatus, String enrollmentStatus) {
     }
 
     public record GradeItemRow(String id, String sectionId, String name, String type, BigDecimal maxScore, BigDecimal weight,

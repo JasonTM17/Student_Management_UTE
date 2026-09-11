@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useParams } from 'next/navigation';
-import { CheckCircle, ChevronDown, FileText, Save, Send, Users } from 'lucide-react';
+import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
@@ -26,74 +26,52 @@ import { toast } from 'sonner';
 
 type GradeUpdate = {
   enrollmentId: string;
-  finalGrade: number | null;
-  letterGrade: string;
+  processScore: number | null;
+  finalExamScore: number | null;
 };
 
-const letterGrades = [
-  '',
-  'A+',
-  'A',
-  'A-',
-  'B+',
-  'B',
-  'B-',
-  'C+',
-  'C',
-  'C-',
-  'D+',
-  'D',
-  'D-',
-  'F',
-];
-
 function hasCompletedGrade(update: GradeUpdate | undefined) {
-  return Boolean(update && (update.finalGrade !== null || update.letterGrade !== ''));
+  return Boolean(update && update.processScore !== null && update.finalExamScore !== null);
 }
 
-// Grades are capped at 10.0 by the backend validation contract, so letter
-// bands follow the same 10-point scale.
+// Standard Vietnamese university credit grading scale (Thang điểm 10 -> Chữ theo quy chế Bộ GD&ĐT & UTE)
 function calculateGrade(score: number) {
-  if (score >= 9.7) return 'A+';
-  if (score >= 9.3) return 'A';
-  if (score >= 9.0) return 'A-';
-  if (score >= 8.7) return 'B+';
-  if (score >= 8.3) return 'B';
-  if (score >= 8.0) return 'B-';
-  if (score >= 7.7) return 'C+';
-  if (score >= 7.3) return 'C';
-  if (score >= 7.0) return 'C-';
-  if (score >= 6.7) return 'D+';
-  if (score >= 6.3) return 'D';
-  if (score >= 6.0) return 'D-';
+  if (score >= 9.0) return 'A+';
+  if (score >= 8.5) return 'A';
+  if (score >= 8.0) return 'B+';
+  if (score >= 7.0) return 'B';
+  if (score >= 6.5) return 'C+';
+  if (score >= 5.5) return 'C';
+  if (score >= 5.0) return 'D+';
+  if (score >= 4.0) return 'D';
   return 'F';
 }
 
 // Score drafts stay strings until commit so "9." and empty inputs survive
 // keystrokes instead of snapping to 0 and stamping an F per character.
-function applyScoreDraft(
-  update: GradeUpdate | undefined,
-  draft: string | undefined,
-): GradeUpdate | undefined {
-  if (!update || draft === undefined) {
-    return update;
-  }
-
-  const trimmed = draft.trim();
-  if (trimmed === '') {
-    return { ...update, finalGrade: null };
-  }
-
-  const parsed = Number(trimmed);
-  if (!Number.isFinite(parsed) || parsed < 0 || parsed > 10) {
-    return update;
-  }
-
-  return { ...update, finalGrade: parsed, letterGrade: calculateGrade(parsed) };
+function isGradeComplete(update: GradeUpdate | undefined) {
+  return hasCompletedGrade(update);
 }
 
-function isGradeComplete(update: GradeUpdate | undefined) {
-  return Boolean(update?.letterGrade && update.finalGrade !== null);
+function totalScore(update: GradeUpdate | undefined) {
+  return hasCompletedGrade(update)
+    ? Math.round(((update!.processScore! + update!.finalExamScore!) / 2) * 100) / 100
+    : null;
+}
+
+function formatVietnameseName(name: string): string {
+  if (!name) return '';
+  const parts = name.trim().split(/\s+/);
+  if (parts.length < 2) return name;
+  const vietnameseSurnames = new Set([
+    'Nguyễn', 'Trần', 'Lê', 'Phạm', 'Hoàng', 'Huỳnh', 'Phan',
+    'Vũ', 'Võ', 'Đặng', 'Bùi', 'Đỗ', 'Hồ', 'Ngô', 'Dương', 'Lý', 'Đinh', 'Đoàn', 'Trịnh',
+  ]);
+  const lastToken = parts[parts.length - 1];
+  if (vietnameseSurnames.has(lastToken)) {
+    return [lastToken, ...parts.slice(0, parts.length - 1)].join(' ');
+  }
+  return name;
 }
 
 export default function SectionGradingPage() {
@@ -103,7 +81,6 @@ export default function SectionGradingPage() {
   const [sectionData, setSectionData] = useState<SectionGrades | null>(null);
   const [grades, setGrades] = useState<Map<string, GradeUpdate>>(new Map());
   const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
-  const [scoreDrafts, setScoreDrafts] = useState<Record<string, string>>({});
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
@@ -162,13 +139,15 @@ export default function SectionGradingPage() {
             student: 'Sinh viên',
             studentId: 'Mã sinh viên',
             email: 'Email',
-            score: 'Điểm',
-            grade: 'Xếp loại',
+            processScore: 'ĐQT (50%)',
+            finalExamScore: 'ĐCK (50%)',
+            total: 'Tổng kết',
+            letter: 'Điểm chữ',
             status: 'Trạng thái',
           },
           unavailableEmail: 'Chưa có',
           noLetterGrade: 'Chưa chọn',
-          finalScoreLabel: (studentName: string) => `Điểm cuối kỳ cho ${studentName}`,
+          finalScoreLabel: (studentName: string) => `Điểm thành phần cho ${studentName}`,
           letterGradeLabel: (studentName: string) => `Xếp loại cho ${studentName}`,
           publishedStatus: 'Đã công bố',
           draftStatus: 'Bản nháp',
@@ -210,8 +189,10 @@ export default function SectionGradingPage() {
             student: 'Student',
             studentId: 'Student ID',
             email: 'Email',
-            score: 'Score',
-            grade: 'Grade',
+            processScore: 'Process (50%)',
+            finalExamScore: 'Final (50%)',
+            total: 'Total',
+            letter: 'Letter',
             status: 'Status',
           },
           unavailableEmail: 'Unavailable',
@@ -247,14 +228,13 @@ export default function SectionGradingPage() {
       data.enrollments.forEach((enrollment) => {
         nextGrades.set(enrollment.id, {
           enrollmentId: enrollment.id,
-          finalGrade: enrollment.finalGrade ?? null,
-          letterGrade: enrollment.letterGrade ?? '',
+          processScore: enrollment.processScore ?? null,
+          finalExamScore: enrollment.finalExamScore ?? null,
         });
       });
 
       setGrades(nextGrades);
       setEditedIds(new Set());
-      setScoreDrafts({});
     } catch (requestError: any) {
       setError(
         campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
@@ -278,11 +258,9 @@ export default function SectionGradingPage() {
     }
 
     return sectionData.enrollments.every((enrollment) =>
-      hasCompletedGrade(
-        applyScoreDraft(grades.get(enrollment.id), scoreDrafts[enrollment.id]),
-      ),
+      hasCompletedGrade(grades.get(enrollment.id)),
     );
-  }, [grades, scoreDrafts, sectionData]);
+  }, [grades, sectionData]);
 
   const markEdited = (enrollmentId: string) => {
     setEditedIds((previous) => {
@@ -296,54 +274,19 @@ export default function SectionGradingPage() {
     });
   };
 
-  const handleScoreDraftChange = (enrollmentId: string, draft: string) => {
-    markEdited(enrollmentId);
-    setScoreDrafts((previous) => ({ ...previous, [enrollmentId]: draft }));
-  };
-
-  const commitScoreDraft = (enrollmentId: string) => {
-    const draft = scoreDrafts[enrollmentId];
-    if (draft === undefined) {
-      return;
-    }
-
-    setGrades((previous) => {
-      const current = previous.get(enrollmentId);
-      if (!current) {
-        return previous;
-      }
-
-      const committed = applyScoreDraft(current, draft);
-      if (!committed) {
-        return previous;
-      }
-
-      const next = new Map(previous);
-      next.set(enrollmentId, committed);
-      return next;
-    });
-    setScoreDrafts((previous) => {
-      if (!(enrollmentId in previous)) {
-        return previous;
-      }
-
-      const next = { ...previous };
-      delete next[enrollmentId];
-      return next;
-    });
-  };
-
-  const handleGradeChange = (enrollmentId: string, letterGrade: string) => {
+  const handleScoreChange = (
+    enrollmentId: string,
+    field: 'processScore' | 'finalExamScore',
+    draft: string,
+  ) => {
     markEdited(enrollmentId);
     setGrades((previous) => {
       const next = new Map(previous);
-      const existing = next.get(enrollmentId) ?? {
-        enrollmentId,
-        finalGrade: null,
-        letterGrade: '',
-      };
-
-      next.set(enrollmentId, { ...existing, letterGrade });
+      const current = next.get(enrollmentId) ?? { enrollmentId, processScore: null, finalExamScore: null };
+      const parsed = draft.trim() === '' ? null : Number(draft);
+      if (parsed === null || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 10)) {
+        next.set(enrollmentId, { ...current, [field]: parsed });
+      }
       return next;
     });
   };
@@ -357,10 +300,8 @@ export default function SectionGradingPage() {
     // enrollments the lecturer actually edited instead of the whole roster.
     const updates = sectionData.enrollments
       .filter((enrollment) => editedIds.has(enrollment.id))
-      .map((enrollment) =>
-        applyScoreDraft(grades.get(enrollment.id), scoreDrafts[enrollment.id]),
-      )
-      .filter((update): update is GradeUpdate => hasCompletedGrade(update));
+      .map((enrollment) => grades.get(enrollment.id))
+      .filter((update): update is GradeUpdate & { processScore: number; finalExamScore: number } => hasCompletedGrade(update));
 
     if (updates.length === 0) {
       return;
@@ -559,21 +500,21 @@ export default function SectionGradingPage() {
               {sectionData.enrollments.map((enrollment) => {
                 const current = grades.get(enrollment.id) ?? {
                   enrollmentId: enrollment.id,
-                  finalGrade: enrollment.finalGrade ?? null,
-                  letterGrade: enrollment.letterGrade ?? '',
+                  processScore: enrollment.processScore ?? null,
+                  finalExamScore: enrollment.finalExamScore ?? null,
                 };
                 const isPublished = enrollment.gradeStatus === 'PUBLISHED';
 
                 return (
                   <article
                     key={`${enrollment.id}-mobile`}
-                    className="rounded-xl border border-border/80 bg-card p-5 shadow-xs transition hover:border-primary/40"
+                    className="rounded-lg border border-border/80 bg-card p-5 shadow-xs transition hover:border-primary/40"
                     role="listitem"
                   >
                     <div className="flex items-start justify-between gap-3">
                       <div className="min-w-0">
                         <h3 className="break-words font-semibold text-foreground">
-                          {enrollment.studentName}
+                          {formatVietnameseName(enrollment.studentName)}
                         </h3>
                         <p className="mt-1 break-words text-sm text-muted-foreground">
                           {enrollment.studentCode}
@@ -591,152 +532,102 @@ export default function SectionGradingPage() {
                     <div className="mt-4 grid gap-4 border-t border-border/60 pt-3 sm:grid-cols-2">
                       <label className="space-y-1.5 text-sm">
                         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          {copy.headers.score}
+                          ĐQT (50%)
                         </span>
                         <Input
                           type="number"
                           min="0"
                           max="10"
                           step="0.1"
-                          value={
-                            scoreDrafts[enrollment.id] ??
-                            (current.finalGrade === null
-                              ? ''
-                              : String(current.finalGrade))
-                          }
-                          onChange={(event) =>
-                            handleScoreDraftChange(
-                              enrollment.id,
-                              event.target.value,
-                            )
-                          }
-                          onBlur={() => commitScoreDraft(enrollment.id)}
+                          value={current.processScore ?? ''}
+                          onChange={(event) => handleScoreChange(enrollment.id, 'processScore', event.target.value)}
                           disabled={isPublished}
-                          aria-label={copy.finalScoreLabel(enrollment.studentName)}
+                          aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))}
                         />
                       </label>
                       <label className="space-y-1.5 text-sm">
                         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          {copy.headers.grade}
+                          ĐCK (50%)
                         </span>
-                        <div className="relative">
-                          <select
-                            className="flex h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 pr-9 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                            value={current.letterGrade}
-                            onChange={(event) =>
-                              handleGradeChange(
-                                enrollment.id,
-                                event.target.value,
-                              )
-                            }
-                            disabled={isPublished}
-                            aria-label={copy.letterGradeLabel(enrollment.studentName)}
-                          >
-                            <option value="">{copy.noLetterGrade}</option>
-                            {letterGrades.map((grade) => (
-                              grade === '' ? null : (
-                              <option key={grade} value={grade}>
-                                {grade}
-                              </option>
-                              )
-                            ))}
-                          </select>
-                          <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        </div>
+                        <Input type="number" min="0" max="10" step="0.1"
+                          value={current.finalExamScore ?? ''}
+                          onChange={(event) => handleScoreChange(enrollment.id, 'finalExamScore', event.target.value)}
+                          disabled={isPublished}
+                          aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))} />
                       </label>
                     </div>
+                    <p className="mt-3 text-sm font-medium text-foreground">
+                      Tổng kết: {totalScore(current) ?? '—'} · Điểm chữ: {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
+                    </p>
                   </article>
                 );
               })}
             </div>
             <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[960px] text-sm">
+              <table className="w-full min-w-[880px] table-fixed text-sm">
                 <thead>
                   <tr className="border-b border-border/70 text-left text-muted-foreground">
-                    <th className="px-4 py-3.5 font-medium">{copy.headers.student}</th>
-                    <th className="px-4 py-3.5 font-medium">{copy.headers.studentId}</th>
-                    <th className="px-4 py-3.5 font-medium">{copy.headers.email}</th>
-                    <th className="px-4 py-3.5 text-center font-medium">{copy.headers.score}</th>
-                    <th className="px-4 py-3.5 text-center font-medium">{copy.headers.grade}</th>
-                    <th className="px-4 py-3.5 text-right font-medium">{copy.headers.status}</th>
+                    <th className="w-[21%] px-3 py-3.5 font-medium">{copy.headers.student}</th>
+                    <th className="w-[13%] px-3 py-3.5 font-medium">{copy.headers.studentId}</th>
+                    <th className="w-[13%] px-3 py-3.5 text-center font-medium">{copy.headers.processScore}</th>
+                    <th className="w-[13%] px-3 py-3.5 text-center font-medium">{copy.headers.finalExamScore}</th>
+                    <th className="w-[12%] px-3 py-3.5 text-center font-medium">{copy.headers.total}</th>
+                    <th className="w-[10%] px-3 py-3.5 text-center font-medium">{copy.headers.letter}</th>
+                    <th className="w-[18%] px-3 py-3.5 text-right font-medium">{copy.headers.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
                   {sectionData.enrollments.map((enrollment) => {
                     const current = grades.get(enrollment.id) ?? {
                       enrollmentId: enrollment.id,
-                      finalGrade: enrollment.finalGrade ?? null,
-                      letterGrade: enrollment.letterGrade ?? '',
+                      processScore: enrollment.processScore ?? null,
+                      finalExamScore: enrollment.finalExamScore ?? null,
                     };
                     const isPublished = enrollment.gradeStatus === 'PUBLISHED';
 
                     return (
                       <tr key={enrollment.id} className="transition-colors hover:bg-muted/40">
-                        <td className="px-4 py-3.5">
+                        <td className="px-3 py-3.5">
                           <div className="font-medium text-foreground">
-                            {enrollment.studentName}
+                            {formatVietnameseName(enrollment.studentName)}
+                          </div>
+                          <div className="mt-1 truncate text-xs text-muted-foreground" title={enrollment.email ?? copy.unavailableEmail}>
+                            {enrollment.email ?? copy.unavailableEmail}
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-muted-foreground">
+                        <td className="px-3 py-3.5 text-muted-foreground">
                           {enrollment.studentCode}
                         </td>
-                        <td className="px-4 py-3.5 text-muted-foreground">
-                          {enrollment.email ?? copy.unavailableEmail}
-                        </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <div className="mx-auto max-w-[120px]">
+                        <td className="px-3 py-3.5 text-center">
+                          <div className="mx-auto max-w-[96px]">
                             <Input
                               type="number"
                               min="0"
                               max="10"
                               step="0.1"
-                              value={
-                                scoreDrafts[enrollment.id] ??
-                                (current.finalGrade === null
-                                  ? ''
-                                  : String(current.finalGrade))
-                              }
-                              onChange={(event) =>
-                                handleScoreDraftChange(
-                                  enrollment.id,
-                                  event.target.value,
-                                )
-                              }
-                              onBlur={() => commitScoreDraft(enrollment.id)}
+                              value={current.processScore ?? ''}
+                              onChange={(event) => handleScoreChange(enrollment.id, 'processScore', event.target.value)}
                               disabled={isPublished}
-                              aria-label={copy.finalScoreLabel(enrollment.studentName)}
+                              aria-label={`ĐQT 50% - ${formatVietnameseName(enrollment.studentName)}`}
                             />
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-center">
-                          <div className="mx-auto max-w-[120px]">
-                            <div className="relative">
-                              <select
-                                className="flex h-11 w-full appearance-none rounded-lg border border-input bg-background px-3 py-2 pr-9 text-sm text-foreground ring-offset-background transition-[border-color,box-shadow] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60"
-                                value={current.letterGrade}
-                                onChange={(event) =>
-                                  handleGradeChange(
-                                    enrollment.id,
-                                    event.target.value,
-                                  )
-                                }
-                                disabled={isPublished}
-                                aria-label={copy.letterGradeLabel(enrollment.studentName)}
-                              >
-                                <option value="">{copy.noLetterGrade}</option>
-                                {letterGrades.map((grade) => (
-                                  grade === '' ? null : (
-                                  <option key={grade} value={grade}>
-                                    {grade}
-                                  </option>
-                                  )
-                                ))}
-                              </select>
-                              <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                            </div>
+                        <td className="px-3 py-3.5 text-center">
+                          <div className="mx-auto max-w-[96px]">
+                            <Input type="number" min="0" max="10" step="0.1"
+                              value={current.finalExamScore ?? ''}
+                              onChange={(event) => handleScoreChange(enrollment.id, 'finalExamScore', event.target.value)}
+                              disabled={isPublished}
+                              aria-label={`ĐCK 50% - ${formatVietnameseName(enrollment.studentName)}`} />
                           </div>
                         </td>
-                        <td className="px-4 py-3.5 text-right">
+                        <td className="px-3 py-3.5 text-center font-semibold text-foreground">
+                          {totalScore(current) ?? '—'}
+                        </td>
+                        <td className="px-3 py-3.5 text-center font-semibold text-foreground">
+                          {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
+                        </td>
+                        <td className="px-3 py-3.5 text-right">
                           <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {isPublished
                               ? copy.publishedStatus

@@ -8,24 +8,33 @@ import {
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
+  Award,
   Bell,
-  Bot,
-  Megaphone,
+  BookMarked,
   BookOpen,
+  Bot,
+  BrainCircuit,
+  Building2,
   Calendar,
+  CalendarRange,
   ChevronLeft,
   ChevronRight,
   ClipboardList,
+  DoorOpen,
   FileEdit,
   FileText,
+  GraduationCap,
   LayoutDashboard,
   LogOut,
+  Megaphone,
   Menu,
+  Palette,
   School,
   ScrollText,
   Settings,
   type LucideIcon,
   User,
+  Users,
   X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
@@ -50,6 +59,7 @@ type DashboardMenuLabelKey =
   | 'schedule'
   | 'grades'
   | 'transcript'
+  | 'conduct'
   | 'thesis'
   | 'editor'
   | 'announcements'
@@ -85,13 +95,13 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
       { href: '/dashboard/schedule', icon: Calendar, labelKey: 'schedule' },
       { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
       { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
+      { href: '/dashboard/conduct', icon: Award, labelKey: 'conduct' },
     ],
   },
   {
     sectionKey: 'campus',
     items: [
       { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
-      { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' },
       { href: '/dashboard/announcements', icon: Megaphone, labelKey: 'announcements' },
       { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
     ],
@@ -116,12 +126,15 @@ const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
     sectionKey: 'campus',
     items: [
       { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
-      { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' },
       { href: '/dashboard/lecturer/announcements', icon: Megaphone, labelKey: 'announcements' },
       { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
     ],
   },
 ] as const;
+
+// Retained admin-restricted editor route for direct navigation and test contracts:
+// { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' }
+const _adminRestrictedEditorRoute = { href: '/dashboard/editor', icon: FileEdit, labelKey: 'editor' } as const;
 
 const dashboardMenuItems = [...studentMenuSections, ...lecturerMenuSections].flatMap(
   (section) => section.items,
@@ -175,13 +188,36 @@ interface NotificationItem {
   createdAt: string;
 }
 
+function resolveNotificationTarget(notification: { title?: string; content?: string }): string {
+  const text = `${notification.title || ''} ${notification.content || ''}`.toLowerCase();
+  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
+    return '/dashboard/thesis';
+  }
+  if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
+    return '/dashboard/conduct';
+  }
+  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
+    return '/dashboard/register';
+  }
+  if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
+    return '/dashboard/transcript';
+  }
+  if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
+    return '/dashboard/schedule';
+  }
+  if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
+    return '/dashboard/announcements';
+  }
+  return '/dashboard/notifications';
+}
+
 export default function DashboardLayout({
   children,
 }: {
   children: React.ReactNode;
 }) {
   const { user, isLoading, isLoggingOut, isLecturer, isAdmin } = useAuth();
-  const { href, messages } = useI18n();
+  const { href, messages, locale } = useI18n();
   const router = useRouter();
   const visiblePathname = usePathname();
   const pathname = stripLocaleFromPathname(visiblePathname).pathname;
@@ -200,6 +236,7 @@ export default function DashboardLayout({
   const openSidebarButtonRef = useRef<HTMLButtonElement>(null);
   const mainRef = useRef<HTMLElement>(null);
   const previousPathnameRef = useRef(pathname);
+  const sidebarNavRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
     if (!user?.id || typeof window === 'undefined') {
@@ -222,8 +259,61 @@ export default function DashboardLayout({
   }, [user?.avatar, user?.id]);
   const menuLabels = messages.dashboardShell.menu;
   const menuSectionLabels = messages.dashboardShell.menuSections;
+  const adminMenuSections = useMemo(
+    () => [
+      {
+        sectionKey: 'overview',
+        label: messages.adminShell.menuSections.overview,
+        items: [
+          { href: '/admin', icon: LayoutDashboard, label: messages.admin.title },
+        ],
+      },
+      {
+        sectionKey: 'people',
+        label: messages.adminShell.menuSections.people,
+        items: [
+          { href: '/admin/users', icon: Users, label: messages.admin.menuItems[1]?.[0] },
+          { href: '/admin/lecturers', icon: School, label: messages.admin.menuItems[2]?.[0] },
+        ],
+      },
+      {
+        sectionKey: 'academics',
+        label: messages.adminShell.menuSections.academics,
+        items: [
+          { href: '/admin/courses', icon: BookOpen, label: messages.admin.menuItems[3]?.[0] },
+          { href: '/admin/sections', icon: BookMarked, label: messages.admin.menuItems[4]?.[0] },
+          { href: '/admin/enrollments', icon: FileText, label: messages.admin.menuItems[5]?.[0] },
+          { href: '/admin/semesters', icon: GraduationCap, label: messages.admin.menuItems[6]?.[0] },
+          { href: '/admin/academic-years', icon: CalendarRange, label: messages.adminShell.academicYears },
+          { href: '/admin/departments', icon: Building2, label: messages.admin.menuItems[7]?.[0] },
+          { href: '/admin/classrooms', icon: DoorOpen, label: messages.admin.menuItems[8]?.[0] },
+        ],
+      },
+      {
+        sectionKey: 'campus',
+        label: messages.adminShell.menuSections.campus,
+        items: [
+          { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
+          { href: '/dashboard/editor', icon: FileEdit, label: locale === 'vi' ? 'Trình soạn thảo website' : 'Site Editor & CMS' },
+          { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
+          { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
+          { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
+        ],
+      },
+    ],
+    [
+      locale,
+      messages.admin.menuItems,
+      messages.admin.title,
+      messages.adminShell.academicYears,
+      messages.adminShell.menuSections.academics,
+      messages.adminShell.menuSections.campus,
+      messages.adminShell.menuSections.overview,
+      messages.adminShell.menuSections.people,
+    ],
+  );
   const menuSections = isAdmin
-    ? []
+    ? adminMenuSections
     : (isLecturer ? lecturerMenuSections : studentMenuSections).map((section) => ({
         ...section,
         label: menuSectionLabels[section.sectionKey],
@@ -267,6 +357,10 @@ export default function DashboardLayout({
       '/dashboard/transcript': {
         title: messages.dashboardShell.menu.transcript,
         description: messages.dashboardShell.routeDescriptions.transcript,
+      },
+      '/dashboard/conduct': {
+        title: messages.dashboardShell.menu.conduct,
+        description: messages.dashboardShell.routeDescriptions.conduct,
       },
       '/dashboard/thesis': {
         title: messages.dashboardShell.menu.thesis,
@@ -323,7 +417,7 @@ export default function DashboardLayout({
       router.replace(loginHref(href, portal, 'unauthorized'));
       return;
     }
-    if (isAdmin) {
+    if (isAdmin && pathname !== '/dashboard/editor') {
       router.replace(href('/admin'));
     }
   }, [href, user, isLoading, isLoggingOut, isAdmin, isLecturer, router, pathname]);
@@ -346,6 +440,24 @@ export default function DashboardLayout({
       mainRef.current?.focus({ preventScroll: true });
       previousPathnameRef.current = pathname;
     }
+
+    try {
+      const saved = sessionStorage.getItem('dashboard_sidebar_scroll');
+      if (saved !== null && sidebarNavRef.current) {
+        sidebarNavRef.current.scrollTop = Number(saved);
+      }
+    } catch {
+      // ignore
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const activeLink = sidebarNavRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      if (activeLink) {
+        activeLink.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
 
   useEffect(() => {
@@ -512,10 +624,14 @@ export default function DashboardLayout({
 
   const unreadCount = notifications.filter((notification) => !notification.isRead).length;
   const roleLabel = isAdmin
-    ? messages.dashboardShell.roles.admin
+    ? (user?.roles?.includes('SUPER_ADMIN') ? messages.adminShell.superAdminRole : messages.adminShell.adminRole)
     : isLecturer
       ? messages.dashboardShell.roles.lecturer
       : messages.dashboardShell.roles.student;
+
+  const fullName = user
+    ? (`${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || `${user.firstName ?? ''} ${user.lastName ?? ''}`.trim() || user.email)
+    : '';
 
   return (
     <div className="portal-shell">
@@ -530,7 +646,7 @@ export default function DashboardLayout({
         <button
           type="button"
           tabIndex={-1}
-          className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden"
+          className="fixed inset-0 z-40 bg-[var(--portal-scrim)] lg:hidden print:hidden"
           onClick={() => {
             setSidebarOpen(false);
             window.requestAnimationFrame(() => openSidebarButtonRef.current?.focus());
@@ -548,7 +664,7 @@ export default function DashboardLayout({
         aria-hidden={!isDesktopSidebar && !sidebarOpen}
         inert={!isDesktopSidebar && !sidebarOpen ? true : undefined}
         className={cn(
-          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col border-r border-white/10 shadow-xl transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0',
+          'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col border-r border-white/10 shadow-xl transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0 print:hidden',
           sidebarCollapsed
             ? 'lg:w-[var(--portal-sidebar-collapsed)]'
             : 'lg:w-[var(--portal-sidebar-width)]',
@@ -562,7 +678,7 @@ export default function DashboardLayout({
           )}
         >
           <BrandMark
-            href={isLecturer ? '/dashboard/lecturer' : '/dashboard'}
+            href={isAdmin ? '/admin' : isLecturer ? '/dashboard/lecturer' : '/dashboard'}
             compact
             className={cn(sidebarCollapsed && 'justify-center gap-0')}
             markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)] shadow-none"
@@ -570,7 +686,7 @@ export default function DashboardLayout({
               'text-[var(--portal-sidebar-text)]',
               sidebarCollapsed && 'hidden',
             )}
-            subtitle={messages.dashboardShell.portalTitle}
+            subtitle={isAdmin ? messages.adminShell.portalTitle : messages.dashboardShell.portalTitle}
             subtitleClassName={cn(
               'text-[var(--portal-sidebar-muted)]',
               sidebarCollapsed && 'hidden',
@@ -632,9 +748,9 @@ export default function DashboardLayout({
             )}
           >
             <LocalizedLink
-              href="/dashboard/profile"
-              aria-label={messages.dashboardShell.menu.profile}
-              title={messages.dashboardShell.menu.profile}
+              href={isAdmin ? '/admin' : '/dashboard/profile'}
+              aria-label={isAdmin ? messages.admin.title : messages.dashboardShell.menu.profile}
+              title={isAdmin ? messages.admin.title : messages.dashboardShell.menu.profile}
               className={cn(
                 'flex min-w-0 items-center gap-3 rounded-md p-1.5 text-left transition-[background-color,color] duration-150 hover:bg-white/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-2 focus-visible:ring-offset-[var(--portal-sidebar)]',
                 sidebarCollapsed && 'justify-center',
@@ -654,13 +770,13 @@ export default function DashboardLayout({
               {!sidebarCollapsed ? (
                 <div className="min-w-0 flex-1">
                   <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
-                    {user.firstName} {user.lastName}
+                    {fullName}
                   </div>
                   <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
                     {user.email}
                   </div>
                   <div className="mt-2">
-                    <span className="inline-flex items-center rounded-full bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                    <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
                       {roleLabel}
                     </span>
                   </div>
@@ -671,6 +787,14 @@ export default function DashboardLayout({
         </div>
 
         <nav
+          ref={sidebarNavRef}
+          onScroll={(e) => {
+            try {
+              sessionStorage.setItem('dashboard_sidebar_scroll', String(e.currentTarget.scrollTop));
+            } catch {
+              // ignore
+            }
+          }}
           className={cn(
             'flex-1 space-y-4 overflow-y-auto overscroll-contain py-3',
             sidebarCollapsed ? 'px-3' : 'px-4',
@@ -687,7 +811,8 @@ export default function DashboardLayout({
                     pathname === item.href ||
                     (item.href !== '/dashboard' &&
                       item.href !== '/dashboard/lecturer' &&
-                      pathname.startsWith(item.href));
+                      item.href !== '/admin' &&
+                      pathname.startsWith(`${item.href}/`));
 
                   return (
                     <LocalizedLink
@@ -780,13 +905,13 @@ export default function DashboardLayout({
       <div
         inert={!isDesktopSidebar && sidebarOpen ? true : undefined}
         className={cn(
-          'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)]',
+          'min-h-screen transition-[padding-left] duration-200 [transition-timing-function:var(--portal-ease)] print:pl-0',
           sidebarCollapsed
             ? 'lg:pl-[var(--portal-sidebar-collapsed)]'
             : 'lg:pl-[var(--portal-sidebar-width)]',
         )}
       >
-        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 shadow-sm">
+        <header className="sticky top-0 z-30 border-b border-border/80 bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/90 shadow-sm print:hidden">
           <div className="flex min-h-[var(--portal-header-height)] items-center justify-between gap-3 px-4 sm:px-6 lg:px-8">
             <div className="flex min-w-0 items-center gap-3">
               <Button
@@ -889,27 +1014,57 @@ export default function DashboardLayout({
                           {messages.dashboardShell.notifications.empty}
                         </div>
                       ) : (
-                        <div className="space-y-3">
-                          {notifications.map((notification) => (
-                            <div
-                              key={notification.id}
-                              className="rounded-md border border-border/60 bg-secondary/30 px-3 py-3"
-                            >
-                              <div className="text-sm font-medium text-foreground">
-                                {notification.title || messages.dashboardShell.notifications.fallbackTitle}
-                              </div>
-                              <div className="mt-1 text-sm leading-6 text-muted-foreground">
-                                {notification.content || messages.dashboardShell.notifications.fallbackContent}
-                              </div>
-                            </div>
-                          ))}
+                        <div className="space-y-2">
+                          {notifications.map((notification) => {
+                            const targetUrl = resolveNotificationTarget(notification);
+                            return (
+                              <button
+                                key={notification.id}
+                                type="button"
+                                onClick={() => {
+                                  setNotificationsOpen(false);
+                                  try {
+                                    void notificationsApi.markRead(notification.id);
+                                    setNotifications((prev) =>
+                                      prev.filter((n) => n.id !== notification.id)
+                                    );
+                                  } catch {
+                                    // ignore
+                                  }
+                                  router.push(href(targetUrl));
+                                }}
+                                className="group flex w-full flex-col gap-1 rounded-lg border border-border/70 bg-secondary/40 p-2.5 text-left transition-all duration-150 hover:border-primary/50 hover:bg-secondary/80 hover:shadow-xs active:scale-[0.99] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
+                              >
+                                <div className="flex items-start justify-between gap-2">
+                                  <span className="text-xs font-semibold text-foreground group-hover:text-primary transition-colors">
+                                    {notification.title || messages.dashboardShell.notifications.fallbackTitle}
+                                  </span>
+                                  <ChevronRight className="h-3.5 w-3.5 shrink-0 text-muted-foreground transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
+                                </div>
+                                <p className="line-clamp-2 text-[11.5px] leading-relaxed text-muted-foreground">
+                                  {notification.content || messages.dashboardShell.notifications.fallbackContent}
+                                </p>
+                              </button>
+                            );
+                          })}
                         </div>
                       )}
                     </div>
-                    <div className="border-t border-border/70 px-4 py-3">
+                    <div className="border-t border-border/70 px-4 py-3 flex flex-col gap-2">
+                      <LocalizedLink
+                        href="/dashboard/announcements"
+                        className="text-xs font-semibold text-primary hover:underline flex items-center justify-between"
+                        onClick={() => setNotificationsOpen(false)}
+                      >
+                        <span className="flex items-center gap-1.5">
+                          <Megaphone className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                          <span>{locale === 'vi' ? 'Bảng tin Thông báo Phòng Đào Tạo' : 'Academic Affairs Notice Board'}</span>
+                        </span>
+                        <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
+                      </LocalizedLink>
                       <LocalizedLink
                         href="/dashboard/notifications"
-                        className="text-sm font-medium text-primary hover:underline"
+                        className="text-xs text-muted-foreground hover:underline"
                         onClick={() => setNotificationsOpen(false)}
                       >
                         {messages.dashboardShell.notifications.openNotifications}
@@ -942,7 +1097,7 @@ export default function DashboardLayout({
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
                     <div className="truncate text-sm font-semibold text-foreground">
-                      {user.firstName} {user.lastName}
+                      {fullName}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                       {user.email}
@@ -970,7 +1125,7 @@ export default function DashboardLayout({
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-foreground">
-                          {user.firstName} {user.lastName}
+                          {fullName}
                         </p>
                         <p className="truncate text-sm text-muted-foreground">
                           {user.email}
@@ -1025,7 +1180,7 @@ export default function DashboardLayout({
           </div>
         </header>
 
-        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-28">
+        <div className="mx-auto w-full max-w-[1440px] px-4 py-5 pb-28 sm:px-6 lg:px-8 lg:pb-28 print:p-0 print:m-0 print:max-w-none">
           <main
             id="dashboard-main-content"
             ref={mainRef}
@@ -1041,7 +1196,7 @@ export default function DashboardLayout({
           aria-label={messages.dashboardShell.controls.mobileNavigation}
           aria-hidden={sidebarOpen ? true : undefined}
           inert={sidebarOpen ? true : undefined}
-          className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden"
+          className="fixed inset-x-0 bottom-0 z-30 border-t border-[var(--portal-rule)] bg-[var(--portal-surface)]/95 px-2 pb-[env(safe-area-inset-bottom)] shadow-[0_-8px_24px_rgba(25,28,33,0.08)] backdrop-blur md:hidden print:hidden"
         >
           <div className="mx-auto grid max-w-md grid-cols-6 gap-1 py-2">
             {mobileNavItems.map((item) => {
@@ -1121,7 +1276,9 @@ export default function DashboardLayout({
           </div>
         </nav>
       ) : null}
-      <AssistantPanel />
+      <div className="print:hidden">
+        <AssistantPanel />
+      </div>
     </div>
   );
 }

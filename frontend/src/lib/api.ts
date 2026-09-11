@@ -420,7 +420,7 @@ export const sectionsApi = {
 
   updateSectionGrades: async (
     sectionId: string,
-    grades: { enrollmentId: string; finalGrade: number | null; letterGrade: string }[],
+    grades: { enrollmentId: string; processScore: number; finalExamScore: number }[],
   ): Promise<{ message: string }> => {
     const response = await api.put<{ message: string }>(
       `/sections/${sectionId}/grades`,
@@ -932,6 +932,69 @@ export const notificationsApi = {
       '/notifications/my/read-all',
       {},
     );
+    return response.data;
+  },
+};
+
+// Student Conduct / Training Points ("Điểm rèn luyện" - DRL) API
+export interface ConductCriteriaScore {
+  code: string;
+  nameVi: string;
+  nameEn: string;
+  maxScore: number;
+  score: number;
+  description: string;
+}
+
+export interface ConductActivity {
+  id: string;
+  title: string;
+  category: string;
+  points: number;
+  activityDate: string;
+  organizer: string;
+  certificateUrl?: string;
+}
+
+export interface ConductSemesterScore {
+  id: string;
+  semesterId: string;
+  semesterName: string;
+  criteria1Score: number;
+  criteria2Score: number;
+  criteria3Score: number;
+  criteria4Score: number;
+  criteria5Score: number;
+  totalScore: number;
+  classification: string;
+  classificationVi: string;
+  status: string;
+  evaluatorName?: string;
+  criteria: ConductCriteriaScore[];
+  activities: ConductActivity[];
+}
+
+export interface StudentConductSummary {
+  studentId: string;
+  studentCode: string;
+  fullName: string;
+  cumulativeAverageScore: number;
+  cumulativeClassificationVi: string;
+  currentSemester: ConductSemesterScore | null;
+  history: ConductSemesterScore[];
+}
+
+export const conductApi = {
+  getMyConduct: async (): Promise<StudentConductSummary> => {
+    const response = await api.get<StudentConductSummary>('/conduct/my');
+    return response.data;
+  },
+  getSemesterScore: async (semesterId: string): Promise<ConductSemesterScore> => {
+    const response = await api.get<ConductSemesterScore>(`/conduct/my/semester/${semesterId}`);
+    return response.data;
+  },
+  getStudentConduct: async (studentId: string): Promise<StudentConductSummary> => {
+    const response = await api.get<StudentConductSummary>(`/conduct/student/${studentId}`);
     return response.data;
   },
 };

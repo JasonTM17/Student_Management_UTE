@@ -68,3 +68,49 @@ test('shared modal keeps typing focus when a parent callback changes', () => {
   assert.match(modal, /\}, \[isOpen\]\);/);
   assert.match(modal, /re-running this effect would steal focus/);
 });
+
+test('dual-domain announcement reader coordinates editorial magazine and official dispatch layouts', () => {
+  const reader = read('src/components/announcements/AnnouncementReaderModal.tsx');
+  const toolbar = read('src/components/announcements/reader/ReadingToolbar.tsx');
+  const progressBar = read('src/components/announcements/reader/ReadingProgressBar.tsx');
+  const magazine = read('src/components/announcements/reader/layouts/EditorialArticleMagazine.tsx');
+  const dispatch = read('src/components/announcements/reader/layouts/AdministrativeDispatchSheet.tsx');
+  const toc = read('src/components/announcements/reader/TableOfContents.tsx');
+  const attachments = read('src/components/announcements/reader/DocumentAttachmentsList.tsx');
+  const feedCard = read('src/components/announcements/feed/AnnouncementFeedCard.tsx');
+  const homeSection = read('src/components/home/HomeNewsSection.tsx');
+  const homePage = read('src/app/page.tsx');
+
+  // Reader master coordinator
+  assert.match(reader, /resolveAnnouncementDomain/);
+  assert.match(reader, /ReadingToolbar/);
+  assert.match(reader, /ReadingProgressBar/);
+  assert.match(reader, /EditorialArticleMagazine/);
+  assert.match(reader, /AdministrativeDispatchSheet/);
+
+  // ReadingToolbar controls
+  assert.match(toolbar, /EDITORIAL/);
+  assert.match(toolbar, /OFFICIAL/);
+  assert.match(toolbar, /sepia/);
+  assert.match(toolbar, /serif/);
+  assert.match(toolbar, /handleDecreaseFont/);
+  assert.match(toolbar, /handleIncreaseFont/);
+
+  // Layouts & Utilities
+  assert.match(magazine, /RichContentRenderer/);
+  assert.match(magazine, /DocumentAttachmentsList/);
+  assert.match(magazine, /TableOfContents/);
+  assert.match(dispatch, /ShieldCheck/);
+  assert.match(dispatch, /eSealOrg/);
+  assert.match(toc, /extractTocHeadings/);
+  assert.match(attachments, /extractAttachmentsFromContent/);
+
+  // Feed card & Homepage
+  assert.match(feedCard, /aspect-video/);
+  assert.match(feedCard, /calculateReadingTime/);
+  assert.match(feedCard, /extractAnnouncementExcerpt/);
+  assert.match(homeSection, /HomeNewsSection/);
+  assert.match(homeSection, /AnnouncementReaderModal/);
+  assert.match(homePage, /<HomeNewsSection \/>/);
+});
+
