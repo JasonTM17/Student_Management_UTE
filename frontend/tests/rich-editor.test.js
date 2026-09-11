@@ -179,4 +179,32 @@ test('assistant stream hook integrates student resolver for personal schedules a
   assert.match(resolver, /export async function resolveStudentAssistantQuery/);
 });
 
+test('sortablejs integration empowers admin block building and announcement reordering', () => {
+  const pkg = JSON.parse(read('package.json'));
+  const sortableComponent = read('src/components/ui/sortable-list.tsx');
+  const editorPage = read('src/app/dashboard/editor/page.tsx');
+  const appearancePage = read('src/app/admin/appearance/page.tsx');
+  const announcementsPage = read('src/app/admin/announcements/page.tsx');
+
+  // Package dependencies
+  assert.ok(pkg.dependencies['sortablejs'], 'sortablejs must be installed');
+
+  // SortableList component exports and properties
+  assert.match(sortableComponent, /export function SortableList/);
+  assert.match(sortableComponent, /export function DragHandle/);
+  assert.match(sortableComponent, /handle:\s*`\.\$\{handleClassName\}`/);
+  assert.match(sortableComponent, /ghostClass:\s*'sortable-ghost'/);
+
+  // Dashboard Editor integration: Sortable Content Blocks and Announcements Table
+  assert.match(editorPage, /import \{ SortableList, DragHandle \} from '@\/components\/ui\/sortable-list'/);
+  assert.match(editorPage, /handleCompileBlocksToTinyMce/);
+  assert.match(editorPage, /handleSortableNoticeReorder/);
+  assert.match(editorPage, /handleSaveNoticeOrder/);
+
+  // Appearance and Announcements page integration
+  assert.match(appearancePage, /<SortableList/);
+  assert.match(announcementsPage, /<SortableList/);
+  assert.match(announcementsPage, /modal === 'reorder'/);
+});
+
 

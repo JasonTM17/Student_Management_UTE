@@ -25,7 +25,7 @@ export interface WeeklyGridItem {
 }
 
 export interface WeeklyGrid {
-  /** ISO-style day numbers present in the grid, Monday(1) through Sunday(7). */
+  /** CampusCore day numbers present in the grid: Sunday(1) through Saturday(7). */
   days: number[];
   /** Sorted unique start times; each becomes one grid row. */
   slots: string[];
@@ -34,16 +34,18 @@ export interface WeeklyGrid {
 }
 
 /**
- * Builds a deterministic weekly grid from flat schedule items. Items with a
- * dayOfWeek outside 1..7 or a missing start time are ignored; every accepted
- * item appears exactly once in `cells`, augmented with a computed `span`
- * describing how many slot rows its [startTime, endTime) window covers.
+ * Builds a deterministic weekly grid from flat schedule items. The backend
+ * stores Sunday as 1; legacy JS-shaped records may still send Sunday as 0.
+ * Items with a dayOfWeek outside 1..7 or a missing start time are ignored.
+ * Every accepted item appears exactly once in `cells`, augmented with a
+ * computed `span` describing how many slot rows its [startTime, endTime)
+ * window covers.
  */
 export function buildWeeklyGrid(items: WeeklyGridItem[]): WeeklyGrid {
   const days = [1, 2, 3, 4, 5, 6, 7];
   const acceptedItems = items
     .map((item) => {
-      const day = item.dayOfWeek === 0 ? 7 : item.dayOfWeek;
+      const day = item.dayOfWeek === 0 ? 1 : item.dayOfWeek;
       const startTime = typeof item.startTime === 'string' ? item.startTime.trim() : '';
       const endTime = typeof item.endTime === 'string' ? item.endTime.trim() : '';
       return { ...item, dayOfWeek: day, startTime, endTime };

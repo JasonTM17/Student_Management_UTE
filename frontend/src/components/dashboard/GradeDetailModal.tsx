@@ -14,6 +14,10 @@ interface GradeDetailModalProps {
   record: StudentGradeRecord | null;
 }
 
+function isFiniteScore(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalProps) {
   const { locale } = useI18n();
   const [data, setData] = useState<StudentGradesByEnrollmentResponse | null>(null);
@@ -54,31 +58,32 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
     record.courseNameVi,
     record.courseName,
   );
+  const emptyValue = locale === 'vi' ? 'Chưa có' : 'N/A';
 
-  // Compute breakdown lines (GK 40%, CK 60% fallback if specific items haven't been seeded)
+  // Canonical 50/50 rows come from persisted component scores only.
   const items = data?.grades?.length
     ? data.grades
-    : record.finalGrade !== null && record.finalGrade !== undefined
+    : isFiniteScore(record.processScore) && isFiniteScore(record.finalExamScore)
       ? [
-          {
-            id: 'midterm-est',
-            gradeItemId: 'midterm',
-            gradeItemName: locale === 'vi' ? 'Điểm giữa kỳ (GK)' : 'Midterm Exam (GK)',
-            gradeItemType: 'MIDTERM',
-            score: Math.max(0, Math.min(10, Math.round((record.finalGrade - 0.2) * 10) / 10)),
-            maxScore: 10,
-            weight: 0.4,
-          },
-          {
-            id: 'final-est',
-            gradeItemId: 'final',
-            gradeItemName: locale === 'vi' ? 'Điểm cuối kỳ (CK)' : 'Final Exam (CK)',
-            gradeItemType: 'FINAL',
-            score: Math.max(0, Math.min(10, Math.round((record.finalGrade + 0.13) * 10) / 10)),
-            maxScore: 10,
-            weight: 0.6,
-          },
-        ]
+            {
+              id: 'process-grade',
+              gradeItemId: 'process',
+              gradeItemName: locale === 'vi' ? 'Điểm quá trình (ĐQT - 50%)' : 'Process score (50%)',
+              gradeItemType: 'PROCESS',
+              score: record.processScore,
+              maxScore: 10,
+              weight: 50,
+            },
+            {
+              id: 'final-exam-grade',
+              gradeItemId: 'final_exam',
+              gradeItemName: locale === 'vi' ? 'Điểm cuối kỳ (ĐCK - 50%)' : 'Final exam score (50%)',
+              gradeItemType: 'FINAL',
+              score: record.finalExamScore,
+              maxScore: 10,
+              weight: 50,
+            },
+          ]
       : [];
 
   return (
@@ -121,9 +126,14 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
 
         {/* Grade Breakdown Table */}
         <div className="space-y-3">
-          <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-            {locale === 'vi' ? 'Điểm thành phần (GK & CK)' : 'Component Scores (Midterm & Final)'}
-          </h4>
+          <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+            <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
+              {locale === 'vi' ? 'Thành phần điểm học phần (50% Quá trình + 50% Cuối kỳ)' : 'Course Grade Components (50% In-Course + 50% Final)'}
+            </h4>
+            <span className="text-[11px] font-mono text-muted-foreground">
+              {locale === 'vi' ? 'ĐHP = ĐQT × 50% + ĐCK × 50%' : 'Final = Process × 50% + Exam × 50%'}
+            </span>
+          </div>
 
           {loading ? (
             <div className="flex items-center justify-center py-8 text-sm text-muted-foreground">
@@ -155,11 +165,11 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
                 <tbody className="divide-y divide-border/60 bg-card">
                   {items.map((item) => {
                     const weightPct =
-                      item.weight !== null && item.weight !== undefined
+                      isFiniteScore(item.weight)
                         ? item.weight <= 1
                           ? `${Math.round(item.weight * 100)}%`
                           : `${item.weight}%`
-                        : '—';
+                        : emptyValue;
 
                     return (
                       <tr key={item.id} className="transition-colors hover:bg-secondary/15">
@@ -173,9 +183,9 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
                           {weightPct}
                         </td>
                         <td className="px-4 py-3 text-right font-bold text-foreground text-base">
-                          {item.score !== null && item.score !== undefined
+                          {isFiniteScore(item.score)
                             ? item.score.toFixed(1)
-                            : '—'}
+                            : emptyValue}
                           <span className="text-xs font-normal text-muted-foreground">
                             {' '}/ {item.maxScore ?? 10}
                           </span>
@@ -196,9 +206,9 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
               {locale === 'vi' ? 'Điểm tổng kết (10)' : 'Final Score (10)'}
             </div>
             <div className="mt-1 text-2xl font-bold text-foreground">
-              {record.finalGrade !== null && record.finalGrade !== undefined
+              {isFiniteScore(record.finalGrade)
                 ? record.finalGrade.toFixed(1)
-                : '—'}
+                : emptyValue}
             </div>
           </div>
           <div>
@@ -206,7 +216,7 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
               {locale === 'vi' ? 'Điểm chữ' : 'Letter Grade'}
             </div>
             <div className="mt-1 text-2xl font-bold text-primary">
-              {record.letterGrade || '—'}
+              {record.letterGrade || emptyValue}
             </div>
           </div>
           <div>
@@ -214,9 +224,9 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
               {locale === 'vi' ? 'Quy đổi (4.0)' : 'Grade Point'}
             </div>
             <div className="mt-1 text-2xl font-bold text-foreground">
-              {record.gradePoint !== null && record.gradePoint !== undefined
+              {isFiniteScore(record.gradePoint)
                 ? record.gradePoint.toFixed(2)
-                : '—'}
+                : emptyValue}
             </div>
           </div>
         </div>

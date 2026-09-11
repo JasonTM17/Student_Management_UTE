@@ -33,6 +33,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
+import { StudentUteProfileGradeView } from '@/components/dashboard/StudentUteProfileGradeView';
 
 function getGradeTone(letterGrade: string | null) {
   if (!letterGrade) {
@@ -246,7 +247,7 @@ export default function TranscriptPage() {
       ? {
           eyebrow: 'Khu sinh viên',
           title: 'Bảng điểm',
-          description: `Xem hồ sơ học tập dài hạn cho ${selectedSemesterName}, bao gồm GPA tích lũy và kết quả theo từng học kỳ.`,
+          description: `GPA, tín chỉ và kết quả môn học cho ${selectedSemesterName}.`,
           selectSemester: 'Chọn học kỳ cho bảng điểm',
           allSemesters: 'Tất cả học kỳ',
           openGrades: 'Mở điểm số',
@@ -269,7 +270,7 @@ export default function TranscriptPage() {
           gpaSemesterTrend: 'Theo học kỳ',
           gpaBothTrend: 'Song song',
           avgTenScale: 'ĐTB hệ 10',
-          clickToViewDetail: 'Nhấn vào môn học để xem chi tiết điểm Quá trình (GK) và Cuối kỳ (CK)',
+          clickToViewDetail: 'Chi tiết GK/CK',
           distribution: 'Phân bố xếp loại',
           programTitle: 'Chương trình đào tạo',
           programLoading: 'Đang tải chương trình đào tạo',
@@ -299,7 +300,7 @@ export default function TranscriptPage() {
       : {
           eyebrow: 'Student area',
           title: 'Transcript',
-          description: `Review the long-form academic record for ${selectedSemesterName}, including cumulative GPA and semester-by-semester outcomes.`,
+          description: `GPA, credits, and course outcomes for ${selectedSemesterName}.`,
           selectSemester: 'Select semester for transcript',
           allSemesters: 'All semesters',
           openGrades: 'Open grades',
@@ -322,7 +323,7 @@ export default function TranscriptPage() {
           gpaSemesterTrend: 'By semester',
           gpaBothTrend: 'Both',
           avgTenScale: '10-scale average',
-          clickToViewDetail: 'Click on a course to view Midterm & Final score breakdown',
+          clickToViewDetail: 'Midterm/final detail',
           distribution: 'Grade distribution',
           programTitle: 'Study program',
           programLoading: 'Loading study program',
@@ -457,6 +458,44 @@ export default function TranscriptPage() {
         />
       ) : (
         <>
+          {/* Printable Official Institutional Header */}
+          <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
+            <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
+              {locale === 'vi'
+                ? 'BỘ GIÁO DỤC VÀ ĐÀO TẠO — ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH'
+                : 'MINISTRY OF EDUCATION AND TRAINING — HCMC UNIVERSITY OF TECHNOLOGY AND ENGINEERING'}
+            </div>
+            <div className="text-sm font-extrabold text-foreground">
+              {locale === 'vi'
+                ? 'PHÒNG ĐÀO TẠO — HỆ THỐNG QUẢN LÝ ĐÀO TẠO TÍN CHỈ CAMPUSUTE'
+                : 'ACADEMIC AFFAIRS OFFICE — CAMPUSUTE CREDIT SYSTEM'}
+            </div>
+            <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
+              {locale === 'vi' ? 'BẢNG ĐIỂM TỔNG HỢP KẾT QUẢ HỌC TẬP TÍCH LŨY' : 'OFFICIAL CUMULATIVE ACADEMIC TRANSCRIPT'}
+            </h1>
+            <p className="text-xs italic text-muted-foreground mt-0.5">
+              {locale === 'vi' ? '(Dành cho sinh viên trình độ Đại học hệ Chính quy theo học chế tín chỉ)' : '(Undergraduate Full-time Credit Program)'}
+            </p>
+            <div className="flex flex-wrap justify-center gap-6 mt-4 text-xs text-foreground font-medium border-t border-border/40 pt-3">
+              <span><strong>{locale === 'vi' ? 'Họ và tên:' : 'Full Name:'}</strong> {user?.firstName && user?.lastName ? `${user.lastName} ${user.firstName}` : 'Nguyễn Tiến Sơn'}</span>
+              <span><strong>{locale === 'vi' ? 'Mã số SV:' : 'Student ID:'}</strong> 24110054</span>
+              <span><strong>{locale === 'vi' ? 'Ngành đào tạo:' : 'Major:'}</strong> Công nghệ Thông tin</span>
+              <span><strong>{locale === 'vi' ? 'Khóa học:' : 'Batch:'}</strong> 2024 - 2028</span>
+              <span><strong>{locale === 'vi' ? 'Học kỳ in:' : 'Selected Term:'}</strong> {selectedSemesterName}</span>
+            </div>
+          </div>
+
+          <StudentUteProfileGradeView
+            transcriptSemesters={transcriptSemesters}
+            curriculumData={curriculumData}
+            selectedSemesterId={selectedSemester}
+            onSemesterChange={setSelectedSemester}
+            availableSemesters={semesters.map((s) => ({
+              id: s.id,
+              name: getLocalizedName(locale, s, s.name),
+            }))}
+          />
+
           <div className="grid gap-4 md:grid-cols-4">
             <Card variant="elevated">
               <CardContent className="flex items-center justify-between gap-4 pt-6">
@@ -534,6 +573,7 @@ export default function TranscriptPage() {
                   <div className="flex items-center rounded-lg border border-border/80 bg-muted/40 p-0.5 text-xs font-medium">
                     <button
                       type="button"
+                      aria-pressed={gpaMode === 'cumulative'}
                       onClick={() => setGpaMode('cumulative')}
                       className={cn(
                         'rounded-md px-2 py-1 transition-colors',
@@ -546,6 +586,7 @@ export default function TranscriptPage() {
                     </button>
                     <button
                       type="button"
+                      aria-pressed={gpaMode === 'semester'}
                       onClick={() => setGpaMode('semester')}
                       className={cn(
                         'rounded-md px-2 py-1 transition-colors',
@@ -558,6 +599,7 @@ export default function TranscriptPage() {
                     </button>
                     <button
                       type="button"
+                      aria-pressed={gpaMode === 'both'}
                       onClick={() => setGpaMode('both')}
                       className={cn(
                         'rounded-md px-2 py-1 transition-colors',
@@ -569,23 +611,6 @@ export default function TranscriptPage() {
                       {copy.gpaBothTrend}
                     </button>
                   </div>
-                  {(gpaMode === 'semester' || gpaMode === 'both') && (
-                    <div className="min-w-[140px]">
-                      <Select
-                        aria-label={copy.selectSemester}
-                        value={selectedSemester}
-                        onChange={(event) => setSelectedSemester(event.target.value)}
-                        options={[
-                          { value: '', label: copy.allSemesters },
-                          ...semesters.map((semester) => ({
-                            value: semester.id,
-                            label: getLocalizedName(locale, semester, semester.name),
-                          })),
-                        ]}
-                        className="h-8 text-xs"
-                      />
-                    </div>
-                  )}
                 </div>
               </CardHeader>
               <CardContent>
@@ -975,6 +1000,34 @@ export default function TranscriptPage() {
               className="min-h-[120px] border-none bg-transparent px-0 py-0"
             />
           )}
+
+          {/* Official Institutional Sign-off Block for Print Document */}
+          <div className="hidden print:block mt-10 pt-6 border-t border-border/80">
+            <div className="text-[11px] text-muted-foreground mb-4 space-y-1">
+              <p><strong>Ghi chú quy đổi thang điểm tín chỉ UTE / Bộ GD&ĐT:</strong></p>
+              <p>Thang điểm chữ: A+ (9.0-10: 4.0), A (8.5-8.9: 4.0), B+ (8.0-8.4: 3.5), B (7.0-7.9: 3.0), C+ (6.5-6.9: 2.5), C (5.5-6.4: 2.0), D+ (5.0-5.4: 1.5), D (4.0-4.9: 1.0), F (&lt;4.0: 0.0 - Chưa tích lũy, phải học lại).</p>
+            </div>
+            <div className="grid grid-cols-3 gap-6 text-center text-xs">
+              <div>
+                <p className="font-bold uppercase tracking-wider">NGƯỜI LẬP BẢNG ĐIỂM</p>
+                <p className="italic text-muted-foreground mt-1">(Ký và ghi rõ họ tên)</p>
+                <div className="h-20" />
+              </div>
+              <div>
+                <p className="font-bold uppercase tracking-wider">TRƯỞNG KHOA CNTT</p>
+                <p className="italic text-muted-foreground mt-1">(Ký và ghi rõ họ tên)</p>
+                <div className="h-20" />
+                <p className="font-semibold text-foreground">PGS. TS. Hoàng Văn Dũng</p>
+              </div>
+              <div>
+                <p className="text-[11px] italic text-muted-foreground">TP. Hồ Chí Minh, ngày ... tháng ... năm 2026</p>
+                <p className="font-bold uppercase tracking-wider mt-1">KT. HIỆU TRƯỞNG<br />PHÓ HIỆU TRƯỞNG</p>
+                <p className="italic text-muted-foreground mt-1">(Ký, đóng dấu và ghi rõ họ tên)</p>
+                <div className="h-16" />
+                <p className="font-semibold text-foreground">TS. Quách Thanh Hải</p>
+              </div>
+            </div>
+          </div>
 
           {/* Grade Detail Modal for GK / CK Breakdown */}
           <GradeDetailModal

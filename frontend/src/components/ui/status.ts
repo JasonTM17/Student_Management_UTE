@@ -9,10 +9,10 @@ const STATUS_TONE_CLASS: Record<StatusTone, string> = {
 };
 
 const METRIC_TONE_CLASS: Record<StatusTone, string> = {
-  success: 'bg-status-success/12 text-status-success',
-  warning: 'bg-status-warning/12 text-status-warning',
-  danger: 'bg-status-danger/12 text-status-danger',
-  info: 'bg-status-info/12 text-status-info',
+  success: 'bg-status-success/12 text-status-success-foreground',
+  warning: 'bg-status-warning/12 text-status-warning-foreground',
+  danger: 'bg-status-danger/12 text-status-danger-foreground',
+  info: 'bg-status-info/12 text-status-info-foreground',
   neutral: 'bg-status-neutral/12 text-status-neutral',
 };
 

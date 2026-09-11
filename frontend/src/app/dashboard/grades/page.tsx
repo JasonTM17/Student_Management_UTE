@@ -56,6 +56,10 @@ function getGradeTone(letterGrade: string | null) {
   return metricToneClass('danger');
 }
 
+function isFiniteScore(value: number | null | undefined): value is number {
+  return typeof value === 'number' && Number.isFinite(value);
+}
+
 export default function GradesPage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber, messages } = useI18n();
@@ -142,7 +146,7 @@ export default function GradesPage() {
       courseCount: grades.length,
       gradedCount: gradedCourses.length,
       completedCredits: grades
-        .filter((grade) => grade.enrollmentStatus === 'COMPLETED')
+        .filter((grade) => grade.enrollmentStatus === 'COMPLETED' && grade.letterGrade !== 'F')
         .reduce((sum, grade) => sum + grade.credits, 0),
     };
   }, [grades]);
@@ -186,13 +190,18 @@ export default function GradesPage() {
           courseWord: 'môn',
           coursesWord: 'môn',
           creditsWord: 'tín chỉ',
+          componentSummary: 'Điểm thành phần theo từng môn',
+          openBreakdown: (courseCode: string, courseName: string) =>
+            `Mở chi tiết điểm cho ${courseCode} ${courseName}`,
           tableHeaders: {
             course: 'Môn học',
             section: 'Lớp học phần',
             lecturer: 'Giảng viên',
             credits: 'Tín chỉ',
-            score: 'Điểm',
-            grade: 'Xếp loại',
+            processScore: 'Quá trình (50%)',
+            finalExamScore: 'Cuối kỳ (50%)',
+            score: 'Điểm HP (10)',
+            grade: 'Điểm chữ',
             status: 'Trạng thái',
           },
           pendingAssignment: 'Chờ phân công',
@@ -216,12 +225,17 @@ export default function GradesPage() {
           courseWord: 'course',
           coursesWord: 'courses',
           creditsWord: 'credits',
+          componentSummary: 'Component scores by course',
+          openBreakdown: (courseCode: string, courseName: string) =>
+            `Open grade breakdown for ${courseCode} ${courseName}`,
           tableHeaders: {
             course: 'Course',
             section: 'Class',
             lecturer: 'Lecturer',
             credits: 'Credits',
-            score: 'Score',
+            processScore: 'In-Course (50%)',
+            finalExamScore: 'Final Exam (50%)',
+            score: 'Total (10)',
             grade: 'Grade',
             status: 'Status',
           },
@@ -233,6 +247,9 @@ export default function GradesPage() {
     messages.common.statuses[
       (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
     ] ?? messages.common.statuses.UNKNOWN;
+
+  const scoreLabel = (value: number | null | undefined) =>
+    isFiniteScore(value) ? value.toFixed(1) : copy.notPublished;
 
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
@@ -341,7 +358,7 @@ export default function GradesPage() {
                   <div>
                     <CardTitle className="text-xl">{semesterName}</CardTitle>
                     <div className="mt-0.5 text-xs text-muted-foreground hidden sm:block">
-                      {locale === 'vi' ? 'Nhấp vào môn học để xem chi tiết điểm quá trình và cuối kỳ' : 'Click any course to view midterm and final component breakdown'}
+                      {copy.componentSummary}
                     </div>
                   </div>
                   <div className="text-sm text-muted-foreground">
@@ -357,118 +374,154 @@ export default function GradesPage() {
                     role="list"
                     aria-label={copy.tableHeaders.course}
                   >
-                    {records.map((record) => (
-                      <article
-                        key={`${record.id}-mobile`}
-                        onClick={() => setSelectedRecord(record)}
-                        onKeyDown={(e) => {
-                          if (e.key === 'Enter' || e.key === ' ') {
-                            e.preventDefault();
-                            setSelectedRecord(record);
-                          }
-                        }}
-                        className="cursor-pointer rounded-lg border border-border/70 bg-card p-4 shadow-sm transition hover:border-primary/40 hover:bg-secondary/20"
-                        role="button"
-                        tabIndex={0}
-                        aria-label={`${record.courseCode} - ${copy.tableHeaders.score}`}
-                      >
-                        <div className="flex items-start justify-between gap-3">
-                          <div className="min-w-0">
-                            <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                              {record.courseCode}
-                            </p>
-                            <h3 className="mt-1 break-words font-semibold text-foreground">
-                              {getLocalizedFlatLabel(
-                                locale,
-                                record.courseName,
-                                record.courseNameEn,
-                                record.courseNameVi,
-                                record.courseName,
-                              )}
-                            </h3>
-                            <p className="mt-1 text-sm text-muted-foreground">
-                              {record.sectionCode}
-                            </p>
+                    {records.map((record) => {
+                      const courseName = getLocalizedFlatLabel(
+                        locale,
+                        record.courseName,
+                        record.courseNameEn,
+                        record.courseNameVi,
+                        record.courseName,
+                      );
+                      const openLabel = copy.openBreakdown(record.courseCode, courseName);
+
+                      return (
+                        <button
+                          key={`${record.id}-mobile`}
+                          type="button"
+                          onClick={() => setSelectedRecord(record)}
+                          className="group w-full rounded-lg border border-border/70 bg-card p-4 text-left shadow-sm transition-[background-color,border-color,box-shadow] duration-150 hover:border-primary/40 hover:bg-secondary/20 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                          aria-label={openLabel}
+                        >
+                          <div className="flex items-start justify-between gap-3">
+                            <div className="min-w-0">
+                              <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                                {record.courseCode}
+                              </p>
+                              <h3 className="mt-1 break-words font-semibold text-foreground">
+                                {courseName}
+                              </h3>
+                              <p className="mt-1 text-sm text-muted-foreground">
+                                {record.sectionCode}
+                              </p>
+                            </div>
+                            <span className="flex shrink-0 items-center gap-2">
+                              <span
+                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
+                              >
+                                {record.letterGrade || '-'}
+                              </span>
+                              <ChevronRight
+                                aria-hidden="true"
+                                className="h-4 w-4 text-muted-foreground/70 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary"
+                              />
+                            </span>
                           </div>
-                          <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
-                          >
-                            {record.letterGrade || '-'}
-                          </span>
-                        </div>
-                        <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
-                          <div className="min-w-0">
-                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              {copy.tableHeaders.lecturer}
-                            </dt>
-                            <dd className="mt-1 break-words text-foreground">
-                              {record.lecturerName ?? copy.pendingAssignment}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              {copy.tableHeaders.credits}
-                            </dt>
-                            <dd className="mt-1 text-foreground">
-                              {formatNumber(record.credits)}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              {copy.tableHeaders.score}
-                            </dt>
-                            <dd className="mt-1 text-foreground">
-                              {record.finalGrade !== null
-                                ? record.finalGrade.toFixed(1)
-                                : copy.notPublished}
-                            </dd>
-                          </div>
-                          <div>
-                            <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                              {copy.tableHeaders.status}
-                            </dt>
-                            <dd className="mt-1 break-words text-foreground">
-                              {statusLabel(record.gradeStatus)}
-                            </dd>
-                          </div>
-                        </dl>
-                      </article>
-                    ))}
+                          <dl className="mt-4 grid grid-cols-2 gap-3 border-t border-border/60 pt-3 text-sm">
+                            <div className="min-w-0">
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.lecturer}
+                              </dt>
+                              <dd className="mt-1 break-words text-foreground">
+                                {record.lecturerName ?? copy.pendingAssignment}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.credits}
+                              </dt>
+                              <dd className="mt-1 text-foreground">
+                                {formatNumber(record.credits)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.processScore}
+                              </dt>
+                              <dd className="mt-1 text-foreground font-medium">
+                                {scoreLabel(record.processScore)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.finalExamScore}
+                              </dt>
+                              <dd className="mt-1 text-foreground font-medium">
+                                {scoreLabel(record.finalExamScore)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.score}
+                              </dt>
+                              <dd className="mt-1 text-foreground font-bold text-base text-primary">
+                                {scoreLabel(record.finalGrade)}
+                              </dd>
+                            </div>
+                            <div>
+                              <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                                {copy.tableHeaders.status}
+                              </dt>
+                              <dd className="mt-1 break-words text-foreground">
+                                {statusLabel(record.gradeStatus)}
+                              </dd>
+                            </div>
+                          </dl>
+                        </button>
+                      );
+                    })}
                   </div>
                   <div className="hidden overflow-x-auto md:block">
-                    <table className="w-full min-w-[760px] text-sm">
+                    <table className="w-full min-w-[840px] text-sm">
                       <thead>
                         <tr className="border-b border-border/70 text-left text-muted-foreground">
                           <th className="px-2 py-3 font-medium">{copy.tableHeaders.course}</th>
                           <th className="px-2 py-3 font-medium">{copy.tableHeaders.section}</th>
                           <th className="px-2 py-3 font-medium">{copy.tableHeaders.lecturer}</th>
                           <th className="px-2 py-3 text-center font-medium">{copy.tableHeaders.credits}</th>
+                          <th className="px-2 py-3 text-center font-medium">{copy.tableHeaders.processScore}</th>
+                          <th className="px-2 py-3 text-center font-medium">{copy.tableHeaders.finalExamScore}</th>
                           <th className="px-2 py-3 text-center font-medium">{copy.tableHeaders.score}</th>
                           <th className="px-2 py-3 text-center font-medium">{copy.tableHeaders.grade}</th>
                           <th className="px-2 py-3 text-right font-medium">{copy.tableHeaders.status}</th>
                         </tr>
                       </thead>
                       <tbody className="divide-y divide-border/60">
-                        {records.map((record) => (
+                        {records.map((record) => {
+                          const courseName = getLocalizedFlatLabel(
+                            locale,
+                            record.courseName,
+                            record.courseNameEn,
+                            record.courseNameVi,
+                            record.courseName,
+                          );
+                          const openLabel = copy.openBreakdown(record.courseCode, courseName);
+                          const { processScore, finalExamScore } = record;
+
+                          return (
                           <tr
                             key={record.id}
-                            onClick={() => setSelectedRecord(record)}
-                            className="group cursor-pointer transition-colors hover:bg-secondary/30"
-                            title={locale === 'vi' ? 'Nhấp để xem chi tiết điểm GK & CK' : 'Click to view Midterm & Final breakdown'}
+                            className="group transition-colors hover:bg-secondary/30"
                           >
-                            <td className="px-2 py-4">
-                              <div className="font-medium text-foreground">
-                                {record.courseCode}
-                              </div>
-                              <div className="text-muted-foreground">
-                                {getLocalizedFlatLabel(
-                                  locale,
-                                  record.courseName,
-                                  record.courseNameEn,
-                                  record.courseNameVi,
-                                  record.courseName,
-                                )}
-                              </div>
+                            <td className="px-2 py-2">
+                              <button
+                                type="button"
+                                onClick={() => setSelectedRecord(record)}
+                                className="flex min-h-11 w-full items-center justify-between gap-3 rounded-md px-2 py-2 text-left transition-[background-color,color,box-shadow] duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                                aria-label={openLabel}
+                              >
+                                <span className="min-w-0">
+                                  <span className="block font-medium text-foreground">
+                                    {record.courseCode}
+                                  </span>
+                                  <span className="block truncate text-muted-foreground">
+                                    {courseName}
+                                  </span>
+                                </span>
+                                <ChevronRight
+                                  aria-hidden="true"
+                                  className="h-4 w-4 shrink-0 text-muted-foreground/70 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary"
+                                />
+                              </button>
                             </td>
                             <td className="px-2 py-4 text-muted-foreground">
                               {record.sectionCode}
@@ -479,10 +532,14 @@ export default function GradesPage() {
                             <td className="px-2 py-4 text-center text-muted-foreground">
                               {formatNumber(record.credits)}
                             </td>
-                            <td className="px-2 py-4 text-center text-foreground font-semibold">
-                              {record.finalGrade !== null
-                                ? record.finalGrade.toFixed(1)
-                                : copy.notPublished}
+                            <td className="px-2 py-4 text-center text-foreground font-medium">
+                              {scoreLabel(processScore)}
+                            </td>
+                            <td className="px-2 py-4 text-center text-foreground font-medium">
+                              {scoreLabel(finalExamScore)}
+                            </td>
+                            <td className="px-2 py-4 text-center text-foreground font-bold">
+                              {scoreLabel(record.finalGrade)}
                             </td>
                             <td className="px-2 py-4 text-center">
                               {record.letterGrade ? (
@@ -502,11 +559,11 @@ export default function GradesPage() {
                                 <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                   {statusLabel(record.gradeStatus)}
                                 </span>
-                                <ChevronRight className="h-4 w-4 text-muted-foreground/60 transition-transform duration-150 group-hover:translate-x-0.5 group-hover:text-primary" />
                               </div>
                             </td>
                           </tr>
-                        ))}
+                          );
+                        })}
                       </tbody>
                     </table>
                   </div>

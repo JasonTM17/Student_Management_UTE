@@ -14,6 +14,8 @@ interface ModalProps {
   children: React.ReactNode;
   className?: string;
   closeLabel?: string;
+  showCloseButton?: boolean;
+  printable?: boolean;
 }
 
 export function Modal({
@@ -24,6 +26,8 @@ export function Modal({
   children,
   className,
   closeLabel,
+  showCloseButton = false,
+  printable = false,
 }: ModalProps) {
   const { messages } = useI18n();
   const titleId = React.useId();
@@ -106,26 +110,39 @@ export function Modal({
   if (!isOpen) return null;
 
   return (
-    <div className="fixed inset-0 z-50 overflow-y-auto overscroll-contain">
+    <div className={cn('fixed inset-0 z-50 overflow-y-auto overscroll-contain', printable && 'printable-backdrop')}>
       <div
-        className="absolute inset-0 bg-black/55 backdrop-blur-sm"
+        className="absolute inset-0 bg-black/55 backdrop-blur-sm print:hidden"
         onClick={onClose}
         aria-hidden="true"
       />
-      <div className="relative z-50 flex min-h-full items-start justify-center px-4 py-4 sm:py-8">
+      <div className="relative z-50 flex min-h-full items-start justify-center px-4 py-4 sm:py-8 print:p-0">
         <div
           ref={dialogRef}
           role="dialog"
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
+          aria-label={!title ? (closeLabel || messages.common.states.closeModal) : undefined}
           tabIndex={-1}
           className={cn(
-            'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-xl border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',
+            'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-lg border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',
+            printable && 'printable-document',
             className,
           )}
         >
+          {showCloseButton && !title && !description && (
+            <button
+              ref={closeButtonRef}
+              type="button"
+              onClick={onClose}
+              className="absolute right-3 top-3 z-20 flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-secondary/80 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 print:hidden shadow-xs"
+              aria-label={closeLabel || messages.common.states.closeModal}
+            >
+              <X className="h-5 w-5" />
+            </button>
+          )}
           {(title || description) && (
-            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4">
+            <div className="flex shrink-0 items-start justify-between border-b border-border/70 px-5 py-4 print:hidden">
               <div className="min-w-0 pr-2">
                 {title && (
                   <h3 id={titleId} className="text-lg font-semibold text-foreground">
@@ -149,7 +166,7 @@ export function Modal({
               </button>
             </div>
           )}
-          <div className="min-h-0 overflow-y-auto p-5">{children}</div>
+          <div className="min-h-0 overflow-y-auto p-5 print:p-0 print:overflow-visible">{children}</div>
         </div>
       </div>
     </div>

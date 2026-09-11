@@ -59,12 +59,15 @@ test('public homepage keeps navy chrome so dark mode cannot invert the hero pane
 
 test('portal tokens and page tab define the institutional visual grammar', () => {
   const globals = read('src/app/globals.css');
+  const brand = read('src/components/BrandMark.tsx');
   const pageHeader = read('src/components/ui/page-header.tsx');
 
   assert.match(globals, /--portal-sidebar:\s*oklch\(/);
   assert.match(globals, /--portal-yellow:\s*oklch\(/);
+  assert.match(brand, /text-\[var\(--portal-yellow-ink\)\]/);
   assert.match(globals, /--portal-canvas:\s*oklch\(/);
   assert.match(globals, /\.portal-page-ribbon/);
+  assert.match(globals, /\.portal-shell\s*\{[\s\S]*overflow-x:\s*clip;/);
   assert.match(globals, /prefers-reduced-motion:\s*reduce/);
   // Feedback #2: page headers use a compact web-style tab, not the tall ribbon.
   assert.match(pageHeader, /portal-page-tab/);
@@ -87,6 +90,9 @@ test('login chrome is role-specific and admin can publish live appearance', () =
   assert.match(messages, /Đăng nhập giảng viên/);
   assert.match(messages, /Đăng nhập quản trị/);
   assert.match(appearance, /Site appearance|copy\.postsTitle/);
+  assert.match(appearance, /grid min-w-0 gap-8/);
+  assert.match(appearance, /flex min-w-0 flex-col gap-3 sm:flex-row/);
+  assert.match(appearance, /grid w-full grid-cols-2 rounded-md/);
   assert.match(globals, /data-accent='campus-gold'/);
   assert.match(globals, /data-accent='river-blue'/);
 });
@@ -97,6 +103,8 @@ test('student dashboard does not repeat the welcome title in a second hero band'
 
   assert.match(dashboard, /PageHeader/);
   assert.doesNotMatch(dashboard, /section className="[^"]*bg-primary/);
+  assert.match(dashboard, /text-\[hsl\(var\(--status-warning-foreground\)\)\]/);
+  assert.doesNotMatch(dashboard, /bg-amber-500\/10 text-amber-600/);
   assert.match(layout, /hidden sm:flex/);
 });
 
@@ -210,6 +218,10 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
   assert.match(globals, /--portal-yellow:/);
   assert.match(status, /export function statusToneClass/);
   assert.match(status, /export function metricToneClass/);
+  assert.match(status, /success: 'bg-status-success\/12 text-status-success-foreground'/);
+  assert.match(status, /warning: 'bg-status-warning\/12 text-status-warning-foreground'/);
+  assert.doesNotMatch(status, /bg-status-warning\/12 text-status-warning'/);
+  assert.doesNotMatch(status, /bg-status-success\/12 text-status-success'/);
   assert.doesNotMatch(badge, /bg-emerald-500/);
   assert.doesNotMatch(status, /bg-emerald-500/);
   assert.doesNotMatch(badge, /bg-(red|amber|blue|violet)-500/);

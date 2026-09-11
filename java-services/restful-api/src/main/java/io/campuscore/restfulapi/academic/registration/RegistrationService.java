@@ -208,7 +208,7 @@ public class RegistrationService {
         if (replay != null) {
             return reads.findEnrollment(String.valueOf(replay.get("enrollment_id")), roles, studentId);
         }
-        Map<String, Object> student = requireStudent(studentId);
+        Map<String, Object> student = lockStudent(studentId);
         Map<String, Object> section = lockSection(sectionId);
         String semesterId = String.valueOf(section.get("semester_id"));
         String courseId = String.valueOf(section.get("course_id"));
@@ -296,6 +296,8 @@ public class RegistrationService {
         } catch (EmptyResultDataAccessException exception) {
             throw problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found");
         }
+        String targetStudentId = String.valueOf(enrollment.get("student_id"));
+        lockStudent(targetStudentId);
         boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
         if (!admin && !studentId.equals(String.valueOf(enrollment.get("student_id")))) {
             throw problem(HttpStatus.FORBIDDEN, "ENROLLMENT_FORBIDDEN", "Enrollment does not belong to the current student");
@@ -423,6 +425,21 @@ public class RegistrationService {
             Map<String, Object> student = jdbc.queryForMap(
                     "SELECT \"id\", \"curriculumId\" AS curriculum_id, \"year\", \"status\" FROM " + STUDENT
                             + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", studentId));
+            if (!"ACTIVE".equals(String.valueOf(student.get("status")))) {
+                throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is not active");
+            }
+            return student;
+        } catch (EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is required");
+        }
+    }
+
+    private Map<String, Object> lockStudent(String studentId) {
+        try {
+            Map<String, Object> student = jdbc.queryForMap(
+                    "SELECT \"id\", \"curriculumId\" AS curriculum_id, \"year\", \"status\" FROM " + STUDENT
+                            + " WHERE \"id\" = :id FOR UPDATE",
                     new MapSqlParameterSource("id", studentId));
             if (!"ACTIVE".equals(String.valueOf(student.get("status")))) {
                 throw problem(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED", "Student profile is not active");

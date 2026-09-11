@@ -1,5 +1,6 @@
 'use client';
 
+import Image from 'next/image';
 import { ArrowRight, GraduationCap, Settings, Users } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { ThemeToggle } from '@/components/ThemeToggle';
@@ -10,6 +11,7 @@ import { LinkButton } from '@/components/ui/link-button';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { metricToneClass } from '@/components/ui/status';
 import { HomeIdentityBoard } from '@/components/home/HomeIdentityBoard';
+import { HomeNewsSection } from '@/components/home/HomeNewsSection';
 import { buildSiteUrl } from '@/lib/site';
 import { useI18n } from '@/i18n';
 import { buildCanonicalPath } from '@/i18n/paths';
@@ -126,7 +128,24 @@ export default function HomePage() {
       <main id="main-content" tabIndex={-1}>
         <section className="mx-auto grid max-w-[1280px] items-stretch gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-12 lg:py-14">
           <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-yellow)] pl-6">
-            <SectionEyebrow>{hero.eyebrow || messages.home.eyebrow}</SectionEyebrow>
+            <div className="flex items-center gap-3.5">
+              <div className="relative h-14 w-11 shrink-0">
+                <Image
+                  src="/hcmute-logo.png"
+                  alt="Logo Trường Đại học Công nghệ Kỹ thuật TP.HCM"
+                  width={56}
+                  height={71}
+                  priority
+                  className="h-full w-full object-contain drop-shadow-xs"
+                />
+              </div>
+              <div className="space-y-1">
+                <SectionEyebrow>{hero.eyebrow || messages.home.eyebrow}</SectionEyebrow>
+                <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  Trường Đại học Công nghệ Kỹ thuật TP.HCM • HCM-UTE
+                </p>
+              </div>
+            </div>
             <h1 className="max-w-xl text-4xl font-bold leading-[2.75rem] text-foreground lg:text-[2.75rem] lg:leading-[3.1rem]">
               {hero.title || messages.home.title}
             </h1>
@@ -195,6 +214,9 @@ export default function HomePage() {
             })}
           </div>
         </section>
+
+        {/* Campus News & Press Section */}
+        <HomeNewsSection />
 
         <section className="bg-[var(--portal-sidebar)] text-[var(--portal-sidebar-text)]">
           <div className="mx-auto max-w-[1280px] px-4 py-10 sm:px-6 lg:px-12 lg:py-12">

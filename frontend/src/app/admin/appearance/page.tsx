@@ -8,6 +8,7 @@ import { useAuth } from '@/context/AuthContext';
 import { announcementsApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { Button } from '@/components/ui/button';
+import { DragHandle, SortableList } from '@/components/ui/sortable-list';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { LinkButton } from '@/components/ui/link-button';
@@ -128,6 +129,19 @@ export default function AdminAppearancePage() {
     });
   }, [draft.postOrder, posts]);
 
+  const handleSortableReorder = useCallback(
+    (_newItems: AnnouncementRow[], newKeys: string[]) => {
+      const next = {
+        ...draft,
+        postOrder: newKeys,
+      };
+      setDraft(next);
+      broadcastSiteAppearance(next);
+      void persist(next);
+    },
+    [draft, persist],
+  );
+
   const preview = draft.hero[locale];
   const fallbackHero = messages.home;
 
@@ -161,12 +175,12 @@ export default function AdminAppearancePage() {
       ) : isLoading ? (
         <LoadingState label={copy.title} />
       ) : (
-        <div className="grid gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
-          <div className="space-y-8">
-            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
-              <div className="flex flex-wrap items-center justify-between gap-3">
+        <div className="grid min-w-0 gap-8 xl:grid-cols-[minmax(0,1fr)_24rem]">
+          <div className="min-w-0 space-y-8">
+            <section className="min-w-0 space-y-4 rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
+              <div className="flex min-w-0 flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                 <h2 className="text-lg font-semibold text-foreground">{copy.heroTitle}</h2>
-                <div className="inline-flex rounded-md border border-border/80 p-1" role="tablist">
+                <div className="grid w-full grid-cols-2 rounded-md border border-border/80 p-1 sm:inline-flex sm:w-auto" role="tablist">
                   {(['en', 'vi'] as const).map((item) => (
                     <button
                       key={item}
@@ -285,7 +299,7 @@ export default function AdminAppearancePage() {
               </label>
             </section>
 
-            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+            <section className="min-w-0 space-y-4 rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
               <h2 className="text-lg font-semibold text-foreground">{copy.accent}</h2>
               <div className="grid gap-3 sm:grid-cols-3">
                 {SITE_APPEARANCE_ACCENTS.map((accent) => (
@@ -312,7 +326,7 @@ export default function AdminAppearancePage() {
               </div>
             </section>
 
-            <section className="space-y-4 rounded-xl border border-border/80 bg-card p-5 shadow-xs">
+            <section className="min-w-0 space-y-4 rounded-xl border border-border/80 bg-card p-4 shadow-xs sm:p-5">
               <div>
                 <h2 className="text-lg font-semibold text-foreground">{copy.postsTitle}</h2>
                 <p className="mt-1 text-sm text-muted-foreground">{copy.postsDescription}</p>
@@ -327,9 +341,16 @@ export default function AdminAppearancePage() {
                   }
                 />
               ) : (
-                <ol className="divide-y divide-border border-y border-border">
-                  {orderedPosts.map((post, index) => (
-                    <li key={post.id} className="flex items-center gap-3 py-3">
+                <SortableList
+                  tag="ol"
+                  items={orderedPosts}
+                  keyExtractor={(post) => post.id}
+                  onOrderChange={handleSortableReorder}
+                  className="min-w-0 divide-y divide-border border-y border-border"
+                  itemClassName="transition-colors hover:bg-muted/30"
+                  renderItem={(post, index) => (
+                    <div className="flex items-center gap-2 py-3">
+                      <DragHandle className="shrink-0 cursor-grab" title="Kéo thả để sắp xếp vị trí" />
                       <span className="w-8 text-sm font-semibold tabular-nums text-muted-foreground">
                         {String(index + 1).padStart(2, '0')}
                       </span>
@@ -374,14 +395,14 @@ export default function AdminAppearancePage() {
                           <ArrowDown className="h-4 w-4" />
                         </Button>
                       </div>
-                    </li>
-                  ))}
-                </ol>
+                    </div>
+                  )}
+                />
               )}
             </section>
           </div>
 
-          <aside className="space-y-3">
+          <aside className="min-w-0 space-y-3">
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {copy.preview}
             </h2>

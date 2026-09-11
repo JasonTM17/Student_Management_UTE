@@ -12,6 +12,7 @@ import {
   Building2,
   CalendarRange,
   DoorOpen,
+  FileEdit,
   FileText,
   GraduationCap,
   LayoutDashboard,
@@ -36,7 +37,7 @@ import { cn } from '@/lib/utils';
 
 interface AdminFrameProps {
   title: string;
-  description: string;
+  description?: string;
   eyebrow?: string;
   backHref?: string;
   backLabel?: string;
@@ -54,7 +55,7 @@ export function AdminFrame({
   children,
 }: AdminFrameProps) {
   const { user, logout } = useAuth();
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
   const [isDesktopSidebar, setIsDesktopSidebar] = React.useState(false);
@@ -62,14 +63,35 @@ export function AdminFrame({
   const openSidebarButtonRef = React.useRef<HTMLButtonElement>(null);
   const mainRef = React.useRef<HTMLElement>(null);
   const previousPathnameRef = React.useRef(pathname);
+  const navRef = React.useRef<HTMLElement | null>(null);
+  const [profileOpen, setProfileOpen] = React.useState(false);
+  const profileRef = React.useRef<HTMLDivElement>(null);
+
+  React.useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      if (profileRef.current && !profileRef.current.contains(event.target as Node)) {
+        setProfileOpen(false);
+      }
+    }
+    function handleKeyDown(event: KeyboardEvent) {
+      if (event.key === 'Escape') {
+        setProfileOpen(false);
+      }
+    }
+    if (profileOpen) {
+      document.addEventListener('mousedown', handleClickOutside);
+      document.addEventListener('keydown', handleKeyDown);
+      return () => {
+        document.removeEventListener('mousedown', handleClickOutside);
+        document.removeEventListener('keydown', handleKeyDown);
+      };
+    }
+  }, [profileOpen]);
 
   useDocumentTitle(title);
 
   const resolvedEyebrow = eyebrow || messages.adminShell.eyebrow;
   const resolvedBackLabel = backLabel || messages.adminShell.backToDashboard;
-  const roleLabel = user?.roles?.includes('SUPER_ADMIN')
-    ? messages.adminShell.superAdminRole
-    : messages.adminShell.adminRole;
   const adminMenuSections = [
     {
       key: 'overview',
@@ -104,6 +126,7 @@ export function AdminFrame({
       label: messages.adminShell.menuSections.campus,
       items: [
         { href: '/admin/thesis', icon: GraduationCap, label: messages.admin.menuItems[0]?.[0] },
+        { href: '/dashboard/editor', icon: FileEdit, label: locale === 'vi' ? 'Trình soạn thảo website' : 'Site Editor & CMS' },
         { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
         { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
@@ -126,6 +149,24 @@ export function AdminFrame({
       mainRef.current?.focus({ preventScroll: true });
       previousPathnameRef.current = pathname;
     }
+
+    try {
+      const savedScroll = sessionStorage.getItem('admin_sidebar_scroll');
+      if (savedScroll !== null && navRef.current) {
+        navRef.current.scrollTop = Number(savedScroll);
+      }
+    } catch {
+      // ignore
+    }
+
+    const frame = window.requestAnimationFrame(() => {
+      const activeLink = navRef.current?.querySelector<HTMLElement>('[aria-current="page"]');
+      if (activeLink) {
+        activeLink.scrollIntoView({ block: 'nearest', behavior: 'auto' });
+      }
+    });
+
+    return () => window.cancelAnimationFrame(frame);
   }, [pathname]);
 
   React.useEffect(() => {
@@ -219,27 +260,36 @@ export function AdminFrame({
 
         <div className="border-b border-white/10 bg-[var(--portal-sidebar-strong)] px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-white/10 text-xs font-bold text-[var(--portal-sidebar-text)]">
-              {user?.firstName?.[0]}
-              {user?.lastName?.[0]}
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--portal-yellow)] text-xs font-bold text-[var(--portal-yellow-ink)] shadow-xs">
+              PĐT
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
-                {user?.firstName} {user?.lastName}
+                {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
               </div>
               <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
-                {user?.email}
+                {user?.email ?? 'daotao@hcmute.edu.vn'}
               </div>
               <div className="mt-2">
-                <span className="inline-flex items-center rounded-full bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
-                  {roleLabel}
+                <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                  {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
                 </span>
               </div>
             </div>
           </div>
         </div>
 
-        <nav className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3">
+        <nav
+          ref={navRef}
+          onScroll={(e) => {
+            try {
+              sessionStorage.setItem('admin_sidebar_scroll', String(e.currentTarget.scrollTop));
+            } catch {
+              // ignore
+            }
+          }}
+          className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3"
+        >
           {adminMenuSections.map((section) => (
             <div key={section.key} className="space-y-2">
               <div className="portal-menu-label px-3">{section.label}</div>
@@ -320,16 +370,97 @@ export function AdminFrame({
               <div className="flex items-center">
                 <ThemeToggle className="h-10 w-10 text-muted-foreground hover:bg-secondary/60 hover:text-foreground" />
               </div>
-              <Button
-                type="button"
-                variant="outline"
-                size="icon"
-                onClick={() => void logout()}
-                aria-label={messages.common.actions.signOut}
-                title={messages.common.actions.signOut}
-              >
-                <LogOut className="h-4 w-4" aria-hidden="true" />
-              </Button>
+              {/* Profile Card Frame matching Student & Lecturer dashboards */}
+              <div className="relative" ref={profileRef}>
+                <button
+                  type="button"
+                  onClick={() => setProfileOpen((current) => !current)}
+                  className="flex min-h-11 items-center gap-3 rounded-md border border-border/70 bg-card px-1.5 py-1 transition-[background-color,border-color] duration-150 hover:bg-secondary/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 sm:px-3"
+                  aria-label={locale === 'vi' ? 'Mở thông tin Phòng Đào tạo' : 'Toggle Academic Affairs Profile'}
+                  aria-expanded={profileOpen}
+                  aria-controls="admin-profile-menu"
+                  aria-haspopup="menu"
+                >
+                  <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
+                    PĐT
+                  </div>
+                  <div className="hidden min-w-0 text-left md:block">
+                    <div className="truncate text-sm font-semibold text-foreground">
+                      {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                      {user?.email ?? 'daotao@hcmute.edu.vn'}
+                    </div>
+                  </div>
+                </button>
+
+                {profileOpen ? (
+                  <div
+                    id="admin-profile-menu"
+                    role="menu"
+                    className="absolute right-0 mt-2 w-[min(19rem,calc(100vw-2rem))] rounded-md border border-border/80 bg-card shadow-2xl z-50"
+                  >
+                    <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
+                      <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
+                        PĐT
+                      </div>
+                      <div className="min-w-0 flex-1">
+                        <p className="truncate font-semibold text-foreground text-sm">
+                          {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
+                        </p>
+                        <p className="truncate text-xs text-muted-foreground">
+                          {user?.email ?? 'daotao@hcmute.edu.vn'}
+                        </p>
+                        <div className="mt-1.5 inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">
+                          {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
+                        </div>
+                      </div>
+                    </div>
+                    <div className="px-2 py-2">
+                      <LocalizedLink
+                        href="/admin"
+                        role="menuitem"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <LayoutDashboard className="h-4 w-4" aria-hidden="true" />
+                        {messages.admin.title}
+                      </LocalizedLink>
+                      <LocalizedLink
+                        href="/dashboard/editor"
+                        role="menuitem"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Megaphone className="h-4 w-4" aria-hidden="true" />
+                        {locale === 'vi' ? 'Soạn thông báo & Công văn' : 'Announcements & Editor'}
+                      </LocalizedLink>
+                      <LocalizedLink
+                        href="/admin/users"
+                        role="menuitem"
+                        className="flex items-center gap-3 rounded-lg px-3 py-2 text-sm text-muted-foreground transition-colors hover:bg-secondary/70 hover:text-foreground"
+                        onClick={() => setProfileOpen(false)}
+                      >
+                        <Users className="h-4 w-4" aria-hidden="true" />
+                        {locale === 'vi' ? 'Quản trị Người dùng' : 'User Management'}
+                      </LocalizedLink>
+                      <div className="my-1 border-t border-border/70" />
+                      <button
+                        type="button"
+                        role="menuitem"
+                        className="flex w-full items-center gap-3 rounded-lg px-3 py-2 text-sm text-red-600 transition-colors hover:bg-red-500/10 dark:text-red-400 cursor-pointer"
+                        onClick={() => {
+                          setProfileOpen(false);
+                          void logout();
+                        }}
+                      >
+                        <LogOut className="h-4 w-4" aria-hidden="true" />
+                        {messages.common.actions.signOut}
+                      </button>
+                    </div>
+                  </div>
+                ) : null}
+              </div>
             </div>
           </div>
         </header>

@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ArrowUpRight,
   Bell,
   Check,
   CheckCheck,
@@ -9,6 +10,7 @@ import {
   RefreshCw,
 } from 'lucide-react';
 import { LinkButton } from '@/components/ui/link-button';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
@@ -33,6 +35,29 @@ type NotificationItem = {
 };
 
 type Filter = 'all' | 'unread';
+
+function resolveNotificationTarget(notification: { title?: string; content?: string; message?: string }): string {
+  const text = `${notification.title || ''} ${notification.content || notification.message || ''}`.toLowerCase();
+  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
+    return '/dashboard/thesis';
+  }
+  if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
+    return '/dashboard/conduct';
+  }
+  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
+    return '/dashboard/register';
+  }
+  if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
+    return '/dashboard/transcript';
+  }
+  if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
+    return '/dashboard/schedule';
+  }
+  if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
+    return '/dashboard/announcements';
+  }
+  return '/dashboard';
+}
 
 export default function NotificationsCenterPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
@@ -312,21 +337,33 @@ export default function NotificationsCenterPage() {
                       <p className="whitespace-pre-line text-sm leading-6 text-muted-foreground">
                         {content}
                       </p>
-                      {!item.isRead ? (
-                        <Button
-                          type="button"
-                          variant="ghost"
-                          size="sm"
-                          onClick={() => void markRead(item.id)}
-                          disabled={isBusy}
-                          className="px-0 text-primary hover:bg-transparent hover:text-primary/80"
+                      <div className="flex flex-wrap items-center gap-4 pt-1">
+                        <LocalizedLink
+                          href={resolveNotificationTarget(item)}
+                          className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                          onClick={() => {
+                            if (!item.isRead) void markRead(item.id);
+                          }}
                         >
-                          <Check className="mr-2 h-4 w-4" aria-hidden="true" />
-                          {isBusy ? messages.common.states.loading : copy.markRead}
-                        </Button>
-                      ) : (
-                        <span className="text-xs text-muted-foreground">{copy.read}</span>
-                      )}
+                          <span>{copy.title === 'Thông báo' || copy.all === 'Tất cả' ? 'Mở tính năng liên quan' : 'Open related feature'}</span>
+                          <ArrowUpRight className="h-3.5 w-3.5" />
+                        </LocalizedLink>
+                        {!item.isRead ? (
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => void markRead(item.id)}
+                            disabled={isBusy}
+                            className="px-0 text-muted-foreground hover:bg-transparent hover:text-foreground text-xs"
+                          >
+                            <Check className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                            {isBusy ? messages.common.states.loading : copy.markRead}
+                          </Button>
+                        ) : (
+                          <span className="text-xs text-muted-foreground">{copy.read}</span>
+                        )}
+                      </div>
                     </div>
                   </div>
                   </article>

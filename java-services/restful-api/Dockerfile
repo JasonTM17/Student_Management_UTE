@@ -5,6 +5,7 @@ WORKDIR /workspace
 COPY java-services/pom.xml java-services/pom.xml
 COPY java-services/restful-api/pom.xml java-services/restful-api/pom.xml
 
+
 COPY java-services/restful-api/src java-services/restful-api/src
 RUN mvn -q -f java-services/pom.xml -pl restful-api -am package -DskipTests -Dstyle.color=never
 
@@ -23,4 +24,6 @@ COPY --from=build --chown=campuscore:campuscore /workspace/java-services/restful
 USER 10001:10001
 EXPOSE 4010
 
-ENTRYPOINT ["java", "-jar", "/app/app.jar"]
+ENV JAVA_OPTS="-XX:MaxRAMPercentage=65.0 -XX:InitialRAMPercentage=40.0 -XX:+UseSerialGC -Xss512k -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:+ExitOnOutOfMemoryError"
+
+ENTRYPOINT ["sh", "-c", "exec java $JAVA_OPTS -jar /app/app.jar"]

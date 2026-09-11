@@ -196,3 +196,109 @@ test('personalized student assistant query detection and unaccented day matching
   assert.equal(isStudentAssistantQuery('lớp tôi đang dạy'), true);
   assert.equal(isStudentAssistantQuery('lop toi dang day'), true);
 });
+
+test('student assistant resolves schedules and materials from portal APIs', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const calls = { enrollments: 0, announcements: 0 };
+  const currentEnrollments = [
+    {
+      id: 'enrollment-se101',
+      sectionId: 'section-se101-01',
+      status: 'CONFIRMED',
+      section: {
+        sectionNumber: '01',
+        course: {
+          code: 'SE101',
+          name: 'Software Engineering',
+          nameVi: 'Kỹ thuật phần mềm',
+        },
+        schedules: [
+          {
+            dayOfWeek: 2,
+            startTime: '07:00',
+            endTime: '09:30',
+            classroom: { roomNumber: 'A101' },
+          },
+        ],
+      },
+    },
+    {
+      id: 'dropped-course',
+      sectionId: 'section-old',
+      status: 'DROPPED',
+      section: {
+        sectionNumber: '99',
+        course: { code: 'OLD101', name: 'Old course' },
+        schedules: [{ dayOfWeek: 2, startTime: '13:00', endTime: '15:00' }],
+      },
+    },
+  ];
+  const fakeRequire = (moduleName) => {
+    if (moduleName === '@/lib/api') {
+      return {
+        authApi: { me: async () => ({ id: 'student-user', roles: ['STUDENT'] }) },
+        enrollmentsApi: {
+          getMyEnrollments: async () => {
+            calls.enrollments += 1;
+            return currentEnrollments;
+          },
+        },
+        announcementsApi: {
+          getMy: async () => {
+            calls.announcements += 1;
+            return {
+              data: [
+                {
+                  id: 'notice-slide-week-2',
+                  title: 'Slide tuần 2',
+                  content: '<p>Tải slide và bài giảng trong thông báo lớp.</p>',
+                  priority: 'NORMAL',
+                  createdAt: '2026-09-09T00:00:00Z',
+                  isGlobal: false,
+                  sectionId: 'section-se101-01',
+                  courseCode: 'SE101',
+                },
+                {
+                  id: 'notice-unrelated',
+                  title: 'Sinh hoạt lớp',
+                  content: 'Không phải tài liệu môn học.',
+                  priority: 'NORMAL',
+                  createdAt: '2026-09-09T00:00:00Z',
+                  sectionId: 'section-other',
+                  courseCode: 'OTHER',
+                },
+              ],
+            };
+          },
+        },
+        sectionsApi: { getMySchedule: async () => [] },
+        curriculumApi: {},
+        gradesApi: {},
+        registrationApi: {},
+      };
+    }
+    return {};
+  };
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, fakeRequire);
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
+
+  const schedule = await resolveStudentAssistantQuery('lịch thứ 2 của tôi ở phòng nào', 'vi');
+  assert.match(schedule.answer, /SE101 - Kỹ thuật phần mềm/);
+  assert.match(schedule.answer, /07:00 - 09:30/);
+  assert.match(schedule.answer, /A101/);
+  assert.doesNotMatch(schedule.answer, /OLD101/);
+
+  const materials = await resolveStudentAssistantQuery('Tài liệu môn học và slide ở đâu?', 'vi');
+  assert.match(materials.answer, /SE101 - Kỹ thuật phần mềm/);
+  assert.match(materials.answer, /Slide tuần 2 \(SE101\)/);
+  assert.match(materials.answer, /Tải slide và bài giảng/);
+  assert.doesNotMatch(materials.answer, /<p>/);
+  assert.equal(materials.citation.source, 'academic-records');
+  assert.equal(materials.citation.slug, 'materials-from-enrollments-announcements');
+  assert.ok(calls.enrollments >= 2);
+  assert.equal(calls.announcements, 1);
+});

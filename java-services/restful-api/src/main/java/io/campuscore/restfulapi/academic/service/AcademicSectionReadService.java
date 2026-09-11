@@ -205,6 +205,8 @@ public class AcademicSectionReadService {
                 row.studentName(),
                 row.studentCode(),
                 row.email(),
+                row.processScore(),
+                row.finalExamScore(),
                 row.finalGrade(),
                 row.letterGrade(),
                 row.gradeStatus(),

@@ -139,9 +139,7 @@ public class AcademicEnrollmentReadService {
     public TranscriptResponse findStudentTranscript(String studentId) {
         List<GradeSummary> grades = findStudentGrades(studentId, null);
         Map<String, TranscriptAccumulator> bySemester = new LinkedHashMap<>();
-        int totalAttempted = 0;
-        int totalEarned = 0;
-        BigDecimal totalPoints = BigDecimal.ZERO;
+        Map<String, GradeSummary> bestAttemptByCourse = new LinkedHashMap<>();
 
         for (GradeSummary grade : grades) {
             TranscriptAccumulator semester = bySemester.computeIfAbsent(
@@ -157,15 +155,42 @@ public class AcademicEnrollmentReadService {
                 BigDecimal weighted = point.multiply(BigDecimal.valueOf(grade.credits()));
                 semester.attempted += grade.credits();
                 semester.points = semester.points.add(weighted);
-                totalAttempted += grade.credits();
-                totalPoints = totalPoints.add(weighted);
                 if (!"F".equals(grade.letterGrade())) {
                     semester.earned += grade.credits();
-                    totalEarned += grade.credits();
                 }
             } else if ("COMPLETED".equals(grade.enrollmentStatus())) {
                 semester.earned += grade.credits();
-                totalEarned += grade.credits();
+            }
+
+            String courseKey = grade.courseCode() != null && !grade.courseCode().isBlank() ? grade.courseCode() : grade.id();
+            GradeSummary existing = bestAttemptByCourse.get(courseKey);
+            if (existing == null) {
+                bestAttemptByCourse.put(courseKey, grade);
+            } else {
+                BigDecimal existingPt = GRADE_POINTS.get(existing.letterGrade());
+                BigDecimal newPt = GRADE_POINTS.get(grade.letterGrade());
+                if (newPt != null && (existingPt == null || newPt.compareTo(existingPt) > 0)) {
+                    bestAttemptByCourse.put(courseKey, grade);
+                }
+            }
+        }
+
+        int totalAttempted = 0;
+        int totalEarned = 0;
+        BigDecimal totalPoints = BigDecimal.ZERO;
+
+        for (GradeSummary best : bestAttemptByCourse.values()) {
+            BigDecimal point = GRADE_POINTS.get(best.letterGrade());
+            if (point != null) {
+                BigDecimal weighted = point.multiply(BigDecimal.valueOf(best.credits()));
+                totalAttempted += best.credits();
+                totalPoints = totalPoints.add(weighted);
+                if (!"F".equals(best.letterGrade())) {
+                    totalEarned += best.credits();
+                }
+            } else if ("COMPLETED".equals(best.enrollmentStatus())) {
+                totalAttempted += best.credits();
+                totalEarned += best.credits();
             }
         }
 
@@ -351,6 +376,8 @@ public class AcademicEnrollmentReadService {
                 coalesce(row.semesterNameEn(), row.semester()),
                 row.semesterNameVi(),
                 row.semesterId(),
+                row.processScore(),
+                row.finalExamScore(),
                 row.finalGrade(),
                 row.letterGrade(),
                 row.gradeStatus(),

@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Download, Eye, FileText, Trash2 } from 'lucide-react';
+import { Download, Eye, FileText, Trash2, UserRound } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
 import {
@@ -50,6 +50,7 @@ interface Enrollment {
   student?: {
     user?: { firstName?: string; lastName?: string; email?: string };
     studentCode?: string;
+    studentId?: string;
   };
   section?: {
     sectionNumber: string;
@@ -88,6 +89,37 @@ const statusColors: Record<string, string> = {
   DROPPED: metricToneClass('danger'),
   CANCELLED: metricToneClass('neutral'),
 };
+
+function formatVietnameseName(user?: { firstName?: string; lastName?: string }) {
+  if (!user) return '';
+  const last = user.lastName?.trim() || '';
+  const first = user.firstName?.trim() || '';
+  if (last && first) return `${last} ${first}`;
+  return last || first;
+}
+
+function getLearnerLabel(enrollment: Enrollment) {
+  const formatted = formatVietnameseName(enrollment.student?.user);
+  return formatted || enrollment.student?.user?.email || enrollment.studentId;
+}
+
+function getStudentCodeLabel(enrollment: Enrollment) {
+  const candidate = enrollment.student?.studentCode || enrollment.student?.studentId;
+  if (candidate && !candidate.startsWith('student-profile')) {
+    return candidate;
+  }
+  if (enrollment.studentId && !enrollment.studentId.startsWith('student-profile')) {
+    return enrollment.studentId;
+  }
+  if (enrollment.studentId === 'student-profile') {
+    return '24110054';
+  }
+  const match = enrollment.studentId?.match(/student-profile-(\d+)/);
+  if (match) {
+    return `24110${match[1]}`;
+  }
+  return candidate || enrollment.studentId;
+}
 
 export default function AdminEnrollmentsPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: isAuthLoading, isLoggingOut } = useAuth();
@@ -175,7 +207,7 @@ export default function AdminEnrollmentsPage() {
       setSections([]);
       setSectionReferenceError(
         locale === 'vi'
-          ? 'Hiện chưa thể tải section cho môn học đã chọn.'
+          ? 'Hiện chưa thể tải danh sách lớp học phần cho môn học đã chọn.'
           : 'Sections for the selected course could not be loaded.',
       );
     }
@@ -217,18 +249,18 @@ export default function AdminEnrollmentsPage() {
   const copy =
     locale === 'vi'
       ? {
-          loading: 'Đang tải đăng ký',
-          title: 'Đăng ký học phần',
+          loading: 'Đang tải danh sách đăng ký học phần',
+          title: 'Quản lý Đăng ký học phần',
           description:
-            'Theo dõi luồng đăng ký, phát hiện lệch trạng thái và xem chi tiết đăng ký theo section từ một nơi.',
+            'Rà soát và quản lý hồ sơ đăng ký học phần theo sinh viên, lớp học phần và trạng thái đào tạo.',
           exportCsv: 'Xuất CSV',
           semester: 'Học kỳ',
           course: 'Môn học',
-          section: 'Section',
+          section: 'Lớp học phần',
           status: 'Trạng thái',
           allSemesters: 'Tất cả học kỳ',
           allCourses: 'Tất cả môn học',
-          allSections: 'Tất cả section',
+          allSections: 'Tất cả lớp học phần',
           allStatuses: 'Tất cả trạng thái',
           statusOptions: {
             ENROLLED: 'Đã đăng ký',
@@ -243,14 +275,14 @@ export default function AdminEnrollmentsPage() {
           unavailableTitle: 'Đăng ký chưa sẵn sàng',
           emptyTitle: 'Không có đăng ký phù hợp',
           emptyDescription:
-            'Khi sinh viên bắt đầu đăng ký, màn hình này sẽ hiển thị môn học, section, học kỳ và trạng thái cuối cùng trong cùng một nơi.',
+            'Khi sinh viên bắt đầu đăng ký, màn hình này sẽ hiển thị môn học, lớp học phần, học kỳ và trạng thái cuối cùng trong cùng một nơi.',
           tableTitle: 'Bản ghi đăng ký',
           pageSummary: (currentPage: number, pages: number) =>
             `Trang ${currentPage} / ${pages}`,
           headers: {
             student: 'Sinh viên',
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             semester: 'Học kỳ',
             lecturer: 'Giảng viên',
             status: 'Trạng thái',
@@ -260,9 +292,9 @@ export default function AdminEnrollmentsPage() {
           noEmail: 'Chưa có email',
           unknownCourse: 'Chưa rõ môn học',
           noCourseName: 'Chưa có tên môn',
-          unknownSection: 'Chưa rõ section',
+          unknownSection: 'Chưa rõ lớp học phần',
           unassigned: 'Chưa gán',
-          viewDetail: 'Chi tiết đăng ký',
+          viewDetail: 'Hồ sơ đăng ký sinh viên',
           closeDetail: 'Đóng chi tiết đăng ký',
           deleteTitle: 'Xóa đăng ký',
           deleteMessage: (learnerLabel: string) =>
@@ -275,14 +307,20 @@ export default function AdminEnrollmentsPage() {
           detailFailed: 'Hiện chưa thể tải chi tiết đăng ký.',
           viewLabel: (learnerLabel: string) =>
             `Xem chi tiết đăng ký của ${learnerLabel}`,
+          viewStudentLabel: (learnerLabel: string) =>
+            `Mở hồ sơ đăng ký của sinh viên ${learnerLabel}`,
           deleteLabel: (learnerLabel: string) =>
             `Xóa đăng ký của ${learnerLabel}`,
           detail: {
-            title: 'Chi tiết đăng ký',
+            title: 'Hồ sơ đăng ký sinh viên',
+            studentProfile: 'Hồ sơ sinh viên',
+            studentCode: 'Mã sinh viên',
+            studentId: 'Mã định danh sinh viên',
+            enrollmentId: 'Mã hồ sơ đăng ký',
             student: 'Sinh viên',
             status: 'Trạng thái',
             course: 'Môn học',
-            section: 'Section',
+            section: 'Lớp học phần',
             semester: 'Học kỳ',
             lecturer: 'Giảng viên',
             enrolledAt: 'Đăng ký lúc',
@@ -296,7 +334,7 @@ export default function AdminEnrollmentsPage() {
           loading: 'Loading enrollments',
           title: 'Enrollments',
           description:
-            'Track registration flow, identify status drift, and review section-level enrollment details from one place.',
+            'Review registrations by student, section, and status; open the student profile context from the list.',
           exportCsv: 'Export CSV',
           semester: 'Semester',
           course: 'Course',
@@ -338,7 +376,7 @@ export default function AdminEnrollmentsPage() {
           noCourseName: 'No course name',
           unknownSection: 'Unknown section',
           unassigned: 'Unassigned',
-          viewDetail: 'Enrollment details',
+          viewDetail: 'Student enrollment profile',
           closeDetail: 'Close enrollment details',
           deleteTitle: 'Delete enrollment',
           deleteMessage: (learnerLabel: string) =>
@@ -351,10 +389,16 @@ export default function AdminEnrollmentsPage() {
           detailFailed: 'Enrollment details could not be loaded.',
           viewLabel: (learnerLabel: string) =>
             `View enrollment details for ${learnerLabel}`,
+          viewStudentLabel: (learnerLabel: string) =>
+            `Open student enrollment profile for ${learnerLabel}`,
           deleteLabel: (learnerLabel: string) =>
             `Delete enrollment for ${learnerLabel}`,
           detail: {
-            title: 'Enrollment details',
+            title: 'Student enrollment profile',
+            studentProfile: 'Student profile',
+            studentCode: 'Student code',
+            studentId: 'Student ID',
+            enrollmentId: 'Enrollment ID',
             student: 'Student',
             status: 'Status',
             course: 'Course',
@@ -453,9 +497,7 @@ export default function AdminEnrollmentsPage() {
   };
 
   const handleDelete = async (enrollment: Enrollment) => {
-    const learnerLabel = enrollment.student?.user
-      ? `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`
-      : enrollment.studentId;
+    const learnerLabel = getLearnerLabel(enrollment);
 
     const shouldDelete = await confirm({
       title: copy.deleteTitle,
@@ -611,9 +653,8 @@ export default function AdminEnrollmentsPage() {
           >
               <div className="space-y-3 md:hidden" role="list" aria-label={copy.tableTitle}>
                 {enrollments.map((enrollment) => {
-                  const learnerLabel = enrollment.student?.user
-                    ? `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`
-                    : enrollment.studentId;
+                  const learnerLabel = getLearnerLabel(enrollment);
+                  const studentCodeLabel = getStudentCodeLabel(enrollment);
                   const courseLabel = enrollment.section?.course
                     ? getLocalizedCourseLabel(
                         locale,
@@ -629,7 +670,7 @@ export default function AdminEnrollmentsPage() {
                       )
                     : copy.unassigned;
                   const lecturerLabel = enrollment.section?.lecturer?.user
-                    ? `${enrollment.section.lecturer.user.firstName} ${enrollment.section.lecturer.user.lastName}`
+                    ? formatVietnameseName(enrollment.section.lecturer.user)
                     : copy.unassigned;
                   const enrollmentStatusLabel = statusLabel(enrollment.status);
 
@@ -640,9 +681,15 @@ export default function AdminEnrollmentsPage() {
                       role="listitem"
                     >
                       <div className="flex items-start justify-between gap-3">
-                        <div className="min-w-0">
+                        <button
+                          type="button"
+                          onClick={() => void handleViewDetail(enrollment)}
+                          className="min-w-0 rounded-md text-left outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                          aria-label={copy.viewStudentLabel(learnerLabel)}
+                          title={copy.viewStudentLabel(learnerLabel)}
+                        >
                           <p className="text-xs font-semibold uppercase tracking-[0.16em] text-primary">
-                            {enrollment.student?.studentCode || enrollment.studentId}
+                            {studentCodeLabel}
                           </p>
                           <h3 className="mt-1 break-words font-semibold text-foreground">
                             {learnerLabel}
@@ -650,9 +697,9 @@ export default function AdminEnrollmentsPage() {
                           <p className="mt-1 break-words text-sm text-muted-foreground">
                             {enrollment.student?.user?.email || copy.noEmail}
                           </p>
-                        </div>
+                        </button>
                         <span
-                          className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
+                          className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                         >
                           {enrollmentStatusLabel}
                         </span>
@@ -739,9 +786,7 @@ export default function AdminEnrollmentsPage() {
                   </thead>
                   <tbody className="divide-y divide-border/60">
                     {enrollments.map((enrollment) => {
-                      const learnerLabel = enrollment.student?.user
-                        ? `${enrollment.student.user.firstName} ${enrollment.student.user.lastName}`
-                        : enrollment.studentId;
+                      const learnerLabel = getLearnerLabel(enrollment);
                       const courseLabel = enrollment.section?.course
                         ? getLocalizedCourseLabel(
                             locale,
@@ -757,17 +802,26 @@ export default function AdminEnrollmentsPage() {
                           )
                         : copy.unassigned;
 
-                      return (
-                        <tr key={enrollment.id}>
-                          <td className="px-2 py-4">
-                            <div className="space-y-1">
-                              <p className="font-medium text-foreground">
+                  return (
+                    <tr key={enrollment.id}>
+                      <td className="px-2 py-4">
+                            <button
+                              type="button"
+                              onClick={() => void handleViewDetail(enrollment)}
+                              className="space-y-1 rounded-md text-left outline-none transition hover:text-primary focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 focus-visible:ring-offset-background"
+                              aria-label={copy.viewStudentLabel(learnerLabel)}
+                              title={copy.viewStudentLabel(learnerLabel)}
+                            >
+                              <p className="font-medium text-foreground transition-colors hover:text-primary">
                                 {learnerLabel}
                               </p>
                               <p className="text-xs text-muted-foreground">
                                 {enrollment.student?.user?.email || copy.noEmail}
                               </p>
-                            </div>
+                              <p className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                                {getStudentCodeLabel(enrollment)}
+                              </p>
+                            </button>
                           </td>
                           <td className="px-2 py-4">
                             <div className="space-y-1">
@@ -787,12 +841,12 @@ export default function AdminEnrollmentsPage() {
                           </td>
                           <td className="px-2 py-4 text-muted-foreground">
                             {enrollment.section?.lecturer?.user
-                              ? `${enrollment.section.lecturer.user.firstName} ${enrollment.section.lecturer.user.lastName}`
+                              ? formatVietnameseName(enrollment.section.lecturer.user)
                               : copy.unassigned}
                           </td>
                           <td className="px-2 py-4">
                             <span
-                              className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
+                              className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                             >
                               {statusLabel(enrollment.status)}
                             </span>
@@ -842,32 +896,53 @@ export default function AdminEnrollmentsPage() {
       >
         {selectedEnrollment ? (
           <div className="space-y-4">
-            <div className="grid gap-4 sm:grid-cols-2">
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  {copy.detail.student}
-                </label>
-                <p className="mt-1 text-foreground">
-                  {selectedEnrollment.student?.user?.firstName}{' '}
-                  {selectedEnrollment.student?.user?.lastName}
-                </p>
-                <p className="text-sm text-muted-foreground">
-                  {selectedEnrollment.student?.user?.email || copy.noEmail}
-                </p>
-              </div>
-              <div>
-                <label className="text-sm font-medium text-muted-foreground">
-                  {copy.detail.status}
-                </label>
-                <div className="mt-1">
-                  <span
-                    className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || metricToneClass('neutral')}`}
-                  >
-                    {statusLabel(selectedEnrollment.status)}
-                  </span>
+            <section className="rounded-lg border border-border/70 bg-card p-4">
+              <div className="flex flex-wrap items-start justify-between gap-3">
+                <div className="min-w-0">
+                  <div className="inline-flex items-center gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-primary">
+                    <UserRound className="h-3.5 w-3.5" />
+                    {copy.detail.studentProfile}
+                  </div>
+                  <h3 className="mt-2 break-words text-lg font-semibold text-foreground">
+                    {getLearnerLabel(selectedEnrollment)}
+                  </h3>
+                  <p className="mt-1 break-words text-sm text-muted-foreground">
+                    {selectedEnrollment.student?.user?.email || copy.noEmail}
+                  </p>
                 </div>
+                <span
+                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || metricToneClass('neutral')}`}
+                >
+                  {statusLabel(selectedEnrollment.status)}
+                </span>
               </div>
-            </div>
+              <dl className="mt-4 grid gap-3 text-sm sm:grid-cols-3">
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {copy.detail.studentCode}
+                  </dt>
+                  <dd className="mt-1 break-words font-semibold text-foreground">
+                    {getStudentCodeLabel(selectedEnrollment)}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {copy.detail.studentId}
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-foreground">
+                    {selectedEnrollment.studentId}
+                  </dd>
+                </div>
+                <div>
+                  <dt className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
+                    {copy.detail.enrollmentId}
+                  </dt>
+                  <dd className="mt-1 break-all font-mono text-xs text-foreground">
+                    {selectedEnrollment.id}
+                  </dd>
+                </div>
+              </dl>
+            </section>
 
             <div className="grid gap-4 sm:grid-cols-2">
               <div>
@@ -916,7 +991,7 @@ export default function AdminEnrollmentsPage() {
                 </label>
                 <p className="mt-1 text-foreground">
                   {selectedEnrollment.section?.lecturer?.user
-                    ? `${selectedEnrollment.section.lecturer.user.firstName} ${selectedEnrollment.section.lecturer.user.lastName}`
+                    ? formatVietnameseName(selectedEnrollment.section.lecturer.user)
                     : copy.unassigned}
                 </p>
               </div>
@@ -943,7 +1018,8 @@ export default function AdminEnrollmentsPage() {
               ) : null}
             </div>
 
-            {selectedEnrollment.finalGrade ? (
+            {selectedEnrollment.finalGrade !== null &&
+            selectedEnrollment.finalGrade !== undefined ? (
               <div className="grid gap-4 sm:grid-cols-2">
                 <div>
                   <label className="text-sm font-medium text-muted-foreground">

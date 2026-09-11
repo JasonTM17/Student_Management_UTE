@@ -73,7 +73,7 @@ function getMeetingShift(startTime: string, locale: string) {
   if (hour < 12) {
     return {
       label: locale === 'vi' ? 'Ca Sáng' : 'Morning',
-      tone: 'border-amber-500/25 bg-amber-500/10 text-amber-600 dark:text-amber-400',
+      tone: 'border-[hsl(var(--status-warning)/0.35)] bg-[hsl(var(--status-warning)/0.12)] text-[hsl(var(--status-warning-foreground))]',
     };
   }
   if (hour < 17) {
@@ -141,7 +141,7 @@ export default function DashboardPage() {
   const copy =
     locale === 'vi'
       ? {
-          description: 'Bức tranh nhanh về học kỳ đang diễn ra.',
+          description: 'Tổng quan thông tin học vụ và tiến độ học kỳ hiện tại.',
           stats: {
             courses: 'Môn học kỳ này',
             active: 'Đang học',
@@ -362,7 +362,7 @@ export default function DashboardPage() {
         <>
           <div
             data-dashboard-metrics="student-overview"
-            className="grid grid-cols-2 gap-3 xl:grid-cols-4"
+            className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
           >
             {statChips.map((chip) => (
               <div

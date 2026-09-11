@@ -10,13 +10,13 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
   const organizationSchema = {
     '@context': 'https://schema.org',
     '@type': 'CollegeOrUniversity',
-    name: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM',
-    alternateName: ['HCMUTE', 'CampusUTE', 'UTE'],
+    name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
+    alternateName: ['HCM-UTE', 'HCMUTE', 'CampusUTE', 'UTE'],
     url: siteUrl,
     logo: `${siteUrl}/icon.png`,
     image: `${siteUrl}/icon.png`,
     description:
-      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Sư phạm Kỹ thuật TP.HCM.',
+      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM.',
     address: {
       '@type': 'PostalAddress',
       streetAddress: '01 Võ Văn Ngân, Phường Linh Chiểu',
@@ -46,7 +46,7 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
     },
     author: {
       '@type': 'EducationalOrganization',
-      name: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM',
+      name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
     },
   };
 
@@ -58,7 +58,7 @@ export function JsonLd({ locale = 'vi' }: JsonLdProps) {
     inLanguage: ['vi-VN', 'en-US'],
     publisher: {
       '@type': 'CollegeOrUniversity',
-      name: 'Trường Đại học Sư phạm Kỹ thuật TP.HCM',
+      name: 'Trường Đại học Công nghệ Kỹ thuật TP.HCM',
     },
   };
 

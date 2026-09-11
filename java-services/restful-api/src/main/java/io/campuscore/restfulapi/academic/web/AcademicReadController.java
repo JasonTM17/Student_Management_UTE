@@ -57,7 +57,7 @@ public class AcademicReadController {
     }
 
     @GetMapping("faculties")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public FacultyListResponse getFaculties(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit,
@@ -67,12 +67,13 @@ public class AcademicReadController {
     }
 
     @GetMapping("faculties/{id}")
+    @PreAuthorize("isAuthenticated()")
     public FacultyResponse getFaculty(@PathVariable String id) {
         return academic.findFaculty(id);
     }
 
     @GetMapping("departments")
-    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @PreAuthorize("isAuthenticated()")
     public DepartmentListResponse getDepartments(
             @RequestParam(defaultValue = "1") int page,
             @RequestParam(defaultValue = "20") int limit,
@@ -82,6 +83,7 @@ public class AcademicReadController {
     }
 
     @GetMapping("departments/{id}")
+    @PreAuthorize("isAuthenticated()")
     public DepartmentResponse getDepartment(@PathVariable String id) {
         return academic.findDepartment(id);
     }

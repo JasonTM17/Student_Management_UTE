@@ -351,9 +351,29 @@ class AcademicSectionReadPersistenceTest {
                     "updatedAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."GradeItem" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "sectionId" VARCHAR(120) NOT NULL,
+                    "name" VARCHAR(180) NOT NULL,
+                    "type" VARCHAR(60) NOT NULL,
+                    "maxScore" DECIMAL(5, 2) NOT NULL,
+                    "weight" DECIMAL(5, 2) NOT NULL
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."StudentGrade" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "enrollmentId" VARCHAR(120) NOT NULL,
+                    "gradeItemId" VARCHAR(120) NOT NULL,
+                    "score" DECIMAL(5, 2)
+                )
+                """);
     }
 
     private void clearTables() {
+        jdbc.update("DELETE FROM \"academic\".\"StudentGrade\"");
+        jdbc.update("DELETE FROM \"academic\".\"GradeItem\"");
         jdbc.update("DELETE FROM \"academic\".\"Enrollment\"");
         jdbc.update("DELETE FROM \"academic\".\"SectionSchedule\"");
         jdbc.update("DELETE FROM \"academic\".\"Section\"");

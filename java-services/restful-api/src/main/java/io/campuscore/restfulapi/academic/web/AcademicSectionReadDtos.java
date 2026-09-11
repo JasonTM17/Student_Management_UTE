@@ -147,6 +147,8 @@ public final class AcademicSectionReadDtos {
             String studentName,
             String studentCode,
             String email,
+            BigDecimal processScore,
+            BigDecimal finalExamScore,
             BigDecimal finalGrade,
             String letterGrade,
             String gradeStatus,

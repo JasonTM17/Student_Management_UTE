@@ -42,24 +42,26 @@ public class AnnouncementWriteController {
 
     @PostMapping
     @ResponseStatus(HttpStatus.CREATED)
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public AnnouncementResponse create(
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody JsonNode request) {
-        return announcements.create(subject(jwt), actorLabel(jwt), CreateAnnouncementRequest.from(request));
+        return announcements.create(subject(jwt), actorLabel(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), CreateAnnouncementRequest.from(request));
     }
 
     @PutMapping("{id}")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public AnnouncementResponse update(
             @PathVariable String id,
             @AuthenticationPrincipal Jwt jwt,
             @RequestBody JsonNode request) {
-        return announcements.update(subject(jwt), actorLabel(jwt), id, UpdateAnnouncementRequest.from(request));
+        return announcements.update(subject(jwt), actorLabel(jwt), jwt.getClaimAsStringList("roles"),
+                jwt.getClaimAsString("lecturerId"), id, UpdateAnnouncementRequest.from(request));
     }
 
     @GetMapping("{id}/history")
-    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('LECTURER', 'ADMIN', 'SUPER_ADMIN')")
     public AnnouncementHistoryListResponse history(
             @PathVariable String id,
             @RequestParam(defaultValue = "1") int page,

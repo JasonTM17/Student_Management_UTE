@@ -10,7 +10,7 @@ async function login(page: Page) {
     throw new Error('E2E_ADMIN_PASSCODE must be provided by the disposable test environment.');
   }
   await page.goto('/login?portal=admin');
-  const submit = page.locator('form').getByRole('button', { name: /sign in/i });
+  const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(admin.email);
   await page.locator('#password').fill(admin.passcode);

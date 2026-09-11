@@ -16,6 +16,11 @@ async function handle(request: NextRequest, context: RouteContext) {
   headers.delete('host');
   headers.set('accept-encoding', 'identity');
 
+  const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || (request as any).ip;
+  if (clientIp && !headers.has('x-forwarded-for')) {
+    headers.set('x-forwarded-for', clientIp);
+  }
+
   const upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
 
   const response = await fetch(upstreamUrl, {

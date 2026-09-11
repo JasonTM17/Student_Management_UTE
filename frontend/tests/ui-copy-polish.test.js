@@ -106,6 +106,22 @@ test('student and admin surfaces keep copy task-focused', () => {
   assert.doesNotMatch(source, /\{sectionData\.status/);
 });
 
+test('student enrollment cards progressively disclose dense class details on mobile', () => {
+  const page = read('src/app/dashboard/enrollments/page.tsx');
+
+  assert.match(page, /detailsLabel: 'Chi tiết lớp'/);
+  assert.match(page, /detailsLabel: 'Class details'/);
+  assert.match(page, /<details className="group mt-3 sm:hidden">/);
+  assert.match(page, /className="mt-3 hidden space-y-3 sm:block"/);
+  assert.match(page, /className="hidden shrink-0 sm:inline-flex"/);
+  assert.match(page, /className="w-full"/);
+  assert.match(page, /Theo dõi chương trình đào tạo và các lớp đã đăng ký\./);
+  assert.doesNotMatch(
+    page,
+    /Theo dõi lộ trình toàn khóa theo chương trình đào tạo và cập nhật lớp học phần đã đăng ký\./,
+  );
+});
+
 test('enrollment and thesis status fallbacks stay human-readable', () => {
   const enrollmentPage = read('src/app/admin/enrollments/page.tsx');
   assert.match(enrollmentPage, /ENROLLED: 'Đã đăng ký'/);

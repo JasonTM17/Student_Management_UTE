@@ -4,6 +4,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   Archive,
+  ArrowUpDown,
   Bell,
   CalendarClock,
   History,
@@ -44,10 +45,17 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-bloc
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
+import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
 import { campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
+import { cn } from '@/lib/utils';
+import {
+  fetchSiteAppearance,
+  saveSiteAppearance,
+  broadcastSiteAppearance,
+} from '@/lib/site-appearance-client';
 import {
   ANNOUNCEMENT_PRIORITIES,
   ANNOUNCEMENT_ROLES,
@@ -70,7 +78,7 @@ import { useOrderedPosts } from '@/components/providers/SiteAppearanceProvider';
 import type { Lecturer, Section, Semester } from '@/types/api';
 
 type StatusFilter = 'ACTIVE' | 'ARCHIVED' | 'ALL';
-type ModalKind = 'editor' | 'history' | 'lifecycle' | null;
+type ModalKind = 'editor' | 'history' | 'lifecycle' | 'reorder' | null;
 type LifecycleAction = 'archive' | 'restore';
 
 type AnnouncementDraft = {
@@ -214,6 +222,29 @@ export default function AdminAnnouncementsPage() {
   const [previewYear, setPreviewYear] = useState('1');
   const [busy, setBusy] = useState(false);
   const editorSnapshot = useRef('');
+  const [reorderList, setReorderList] = useState<AnnouncementRecord[]>([]);
+  const [isSavingOrder, setIsSavingOrder] = useState(false);
+
+  const handleSaveReorder = async () => {
+    setIsSavingOrder(true);
+    try {
+      const newOrder = reorderList.map((item) => item.id);
+      const currentAppearance = await fetchSiteAppearance();
+      const updated = {
+        ...currentAppearance,
+        postOrder: newOrder,
+      };
+      await saveSiteAppearance(updated);
+      broadcastSiteAppearance(updated);
+      toast.success(vi ? 'Đã cập nhật thứ tự hiển thị thông báo thành công!' : 'Announcement order updated!');
+      setModal(null);
+      void fetchAnnouncements();
+    } catch {
+      toast.error(vi ? 'Không thể lưu thứ tự thông báo.' : 'Could not save announcement order.');
+    } finally {
+      setIsSavingOrder(false);
+    }
+  };
 
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
   const copy = vi
@@ -643,7 +674,7 @@ export default function AdminAnnouncementsPage() {
     { value: '', label: copy.noSelection },
     ...lecturers.map((lecturer) => ({
       value: lecturer.id,
-      label: lecturer.user ? `${lecturer.user.firstName} ${lecturer.user.lastName}`.trim() : lecturer.employeeId,
+      label: lecturer.user ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim() : lecturer.employeeId,
     })),
   ], [copy.noSelection, lecturers]);
 
@@ -662,7 +693,7 @@ export default function AdminAnnouncementsPage() {
   const previewMeta = [
     previewSemester ? getLocalizedName(locale, previewSemester, previewSemester.name) : '',
     previewSection ? `${previewSection.course?.code ?? ''} · ${previewSection.sectionNumber}`.trim() : '',
-    previewLecturer?.user ? `${previewLecturer.user.firstName} ${previewLecturer.user.lastName}`.trim() : '',
+    previewLecturer?.user ? `${previewLecturer.user.lastName ?? ''} ${previewLecturer.user.firstName ?? ''}`.trim() : '',
   ].filter(Boolean);
 
   const historyFieldLabel = (field: HistoryField) => {
@@ -716,7 +747,7 @@ export default function AdminAnnouncementsPage() {
     }
     if (field === 'lecturerId') {
       const lecturer = lecturers.find((row) => row.id === value);
-      if (lecturer) return lecturer.user ? `${lecturer.user.firstName} ${lecturer.user.lastName}`.trim() : lecturer.employeeId;
+      if (lecturer) return lecturer.user ? `${lecturer.user.lastName ?? ''} ${lecturer.user.firstName ?? ''}`.trim() : lecturer.employeeId;
       return typeof snapshot?.lecturerDisplayName === 'string' && snapshot.lecturerDisplayName
         ? snapshot.lecturerDisplayName
         : copy.selectionUnavailable;
@@ -745,6 +776,19 @@ export default function AdminAnnouncementsPage() {
         description={copy.description}
         actions={
           <div className="flex flex-wrap gap-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setReorderList([...orderedItems]);
+                setModal('reorder');
+              }}
+              disabled={isLoading || orderedItems.length < 2}
+              title={vi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Reorder feed announcements'}
+            >
+              <ArrowUpDown className="mr-2 h-4 w-4" aria-hidden="true" />
+              {vi ? 'Sắp xếp thứ tự ghim' : 'Reorder feed'}
+            </Button>
             <Button type="button" variant="outline" onClick={() => void fetchAnnouncements()} disabled={isLoading}>
               <RefreshCw className={`mr-2 h-4 w-4 motion-reduce:animate-none ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
               {copy.refresh}
@@ -1081,6 +1125,90 @@ export default function AdminAnnouncementsPage() {
             ) : null}
             <AdminDialogFooter>
               <Button type="button" variant="outline" onClick={closeModal}>{copy.close}</Button>
+            </AdminDialogFooter>
+          </div>
+        </Modal>
+      ) : null}
+
+      {modal === 'reorder' ? (
+        <Modal
+          isOpen
+          onClose={closeModal}
+          title={vi ? 'Sắp xếp thứ tự hiển thị thông báo' : 'Reorder Announcement Feed'}
+          closeLabel={copy.cancel}
+          className="max-w-2xl"
+        >
+          <div className="space-y-4">
+            <p className="text-xs text-muted-foreground">
+              {vi
+                ? 'Dùng chuột giữ biểu tượng tay cầm ⠿ để kéo thả sắp xếp thứ tự ưu tiên của các thông báo trên Bảng tin. Thông báo ở vị trí đầu tiên (Top 1) sẽ được ưu tiên hiển thị trước.'
+                : 'Drag items using the handle ⠿ to set priority order. Top items will appear first in campus feeds.'}
+            </p>
+            <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-2">
+              <SortableList<AnnouncementRecord>
+                tag="ul"
+                items={reorderList}
+                keyExtractor={(item) => item.id}
+                onOrderChange={(newList) => setReorderList(newList)}
+                itemClassName="rounded-md border border-border/70 bg-card p-3 shadow-xs hover:border-primary/40 transition-colors"
+                renderItem={(item, index) => (
+                  <div className="flex items-center justify-between gap-3">
+                    <div className="flex items-center gap-3 min-w-0">
+                      <DragHandle className="cursor-grab active:cursor-grabbing hover:text-primary shrink-0" />
+                      <span
+                        className={cn(
+                          'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
+                          index === 0
+                            ? 'bg-amber-500/20 text-amber-700 dark:text-amber-300'
+                            : 'bg-muted text-muted-foreground'
+                        )}
+                      >
+                        {String(index + 1).padStart(2, '0')}
+                      </span>
+                      <div className="min-w-0">
+                        <p className="text-xs font-semibold text-foreground truncate">
+                          {item.title}
+                        </p>
+                        <div className="flex items-center gap-2 mt-0.5 text-[11px] text-muted-foreground">
+                          <span
+                            className={cn(
+                              'rounded px-1.5 py-0.5 font-medium',
+                              item.priority === 'URGENT'
+                                ? 'text-red-600 bg-red-500/10'
+                                : item.priority === 'HIGH'
+                                ? 'text-amber-600 bg-amber-500/10'
+                                : 'text-blue-600 bg-blue-500/10'
+                            )}
+                          >
+                            {announcementPriorityLabel(item.priority, locale)}
+                          </span>
+                          <span>•</span>
+                          <span>
+                            {item.isGlobal
+                              ? vi
+                                ? 'Toàn trường'
+                                : 'All'
+                              : announcementAudienceLabel(item, locale)}
+                          </span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                )}
+              />
+            </div>
+            <AdminDialogFooter className="border-t border-border/70 pt-4">
+              <Button type="button" variant="outline" onClick={closeModal} disabled={isSavingOrder}>
+                {copy.cancel}
+              </Button>
+              <Button
+                type="button"
+                onClick={() => void handleSaveReorder()}
+                disabled={isSavingOrder}
+                className="bg-primary text-primary-foreground font-semibold shadow-xs"
+              >
+                {isSavingOrder ? (vi ? 'Đang lưu…' : 'Saving…') : (vi ? 'Lưu thứ tự hiển thị' : 'Save Feed Order')}
+              </Button>
             </AdminDialogFooter>
           </div>
         </Modal>

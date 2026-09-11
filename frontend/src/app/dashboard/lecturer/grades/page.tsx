@@ -164,9 +164,9 @@ export default function LecturerGradesPage() {
               />
             ) : (
               sections.map((section) => (
-                <div
+                <article
                   key={section.id}
-                  className="rounded-lg border border-border/70 bg-card px-5 py-5"
+                  className="rounded-lg border border-border/70 bg-card px-5 py-5 transition hover:border-primary/40"
                 >
                   <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                     <div className="space-y-3">
@@ -231,7 +231,7 @@ export default function LecturerGradesPage() {
                       </LinkButton>
                     </div>
                   </div>
-                </div>
+                </article>
               ))
             )}
           </WorkspacePanel>

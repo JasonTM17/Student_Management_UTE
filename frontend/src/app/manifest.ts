@@ -2,10 +2,10 @@ import type { MetadataRoute } from 'next';
 
 export default function manifest(): MetadataRoute.Manifest {
   return {
-    name: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE',
+    name: 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCM-UTE',
     short_name: 'CampusUTE',
     description:
-      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Sư phạm Kỹ thuật TP.HCM.',
+      'Cổng thông tin đào tạo và học vụ trực tuyến CampusUTE - Trường Đại học Công nghệ Kỹ thuật TP.HCM.',
     id: '/vi',
     start_url: '/vi',
     display: 'standalone',

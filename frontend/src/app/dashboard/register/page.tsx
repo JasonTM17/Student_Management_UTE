@@ -41,6 +41,7 @@ export default function RegisterPage() {
   const [courseCodeSearch, setCourseCodeSearch] = useState('');
   const [courseNameSearch, setCourseNameSearch] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState('');
+  const [creditLimit, setCreditLimit] = useState(28);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState('');
@@ -60,6 +61,12 @@ export default function RegisterPage() {
         if (generation !== loadGeneration.current) return;
         const open = rounds.some((round) => round.status === 'OPEN');
         setRoundOpen(open);
+        const currentRound = rounds.find((round) => round.status === 'OPEN');
+        if (currentRound && typeof currentRound.creditLimit === 'number' && currentRound.creditLimit > 0) {
+          setCreditLimit(currentRound.creditLimit);
+        } else {
+          setCreditLimit(28);
+        }
         if (!open) {
           setSections([]);
           return;
@@ -102,6 +109,17 @@ export default function RegisterPage() {
       map.set(enrollment.sectionId, enrollment);
     }
     return map;
+  }, [enrollments]);
+
+  const enrolledCourseIds = useMemo(() => {
+    const set = new Set<string>();
+    for (const enrollment of enrollments) {
+      if (!ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status)) continue;
+      if (enrollment.section?.courseId) {
+        set.add(enrollment.section.courseId);
+      }
+    }
+    return set;
   }, [enrollments]);
 
   const filteredSections = useMemo(() => {
@@ -164,6 +182,11 @@ export default function RegisterPage() {
   /** Confirms and submits one section enrollment, then refreshes the live catalog. */
   const register = async (sectionId: string) => {
     const section = sections.find((item) => item.id === sectionId);
+    const creditsToAdd = section?.credits ?? 0;
+    if (totalRegisteredCredits + creditsToAdd > creditLimit) {
+      toast.error(`Đăng ký học phần này sẽ vượt giới hạn tối đa ${creditLimit} tín chỉ của học kỳ.`);
+      return;
+    }
     const ok = await confirm({
       title: copy.confirmRegister,
       message: copy.confirmRegisterMessage.replace(
@@ -305,11 +328,11 @@ export default function RegisterPage() {
                               {copy.groupSectionCount.replace('{count}', formatNumber(group.sections.length))}
                             </span>
                             <span
-                              className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
-                                openSeats > 0
-                                  ? 'bg-primary/10 text-status-success'
-                                  : 'bg-secondary text-muted-foreground'
-                              }`}
+                                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                  openSeats > 0
+                                    ? 'bg-status-success/12 text-status-success-foreground'
+                                    : 'bg-secondary text-muted-foreground'
+                                }`}
                             >
                               {copy.seatsOpen.replace('{count}', formatNumber(openSeats))}
                             </span>
@@ -367,18 +390,32 @@ export default function RegisterPage() {
                               <CheckCircle2 className="mr-2 h-4 w-4" />
                               {pending === enrollment.id ? copy.working : copy.drop}
                             </Button>
-                          ) : (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="registration"
-                              onClick={() => void register(section.id)}
-                              disabled={!roundOpen || seats === 0 || pending === section.id || section.status !== 'OPEN'}
-                            >
-                              <UserPlus className="mr-2 h-4 w-4" />
-                              {pending === section.id ? copy.working : copy.register}
-                            </Button>
-                          )}
+                          ) : (() => {
+                            const willExceedLimit = totalRegisteredCredits + (section.credits ?? 0) > creditLimit;
+                            const isConflict = Boolean(section.scheduleConflict);
+                            const alreadyHasCourse = enrolledCourseIds.has(section.courseId);
+                            const isDisabled = !roundOpen || seats === 0 || pending === section.id || section.status !== 'OPEN' || willExceedLimit || isConflict || alreadyHasCourse;
+                            const disabledTitle = willExceedLimit
+                              ? `Vượt quá giới hạn tối đa ${creditLimit} tín chỉ/học kỳ`
+                              : isConflict
+                                ? 'Trùng thời khóa biểu với môn đã đăng ký'
+                                : alreadyHasCourse
+                                  ? 'Bạn đã đăng ký một lớp học phần khác của môn học này'
+                                  : undefined;
+                            return (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="registration"
+                                onClick={() => void register(section.id)}
+                                disabled={isDisabled}
+                                title={disabledTitle}
+                              >
+                                <UserPlus className="mr-2 h-4 w-4" />
+                                {pending === section.id ? copy.working : copy.register}
+                              </Button>
+                            );
+                          })()}
                         </div>
                       </article>
                     );
@@ -391,13 +428,34 @@ export default function RegisterPage() {
         <Card className="min-w-0 lg:col-span-3">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
             <CardTitle>{copy.enrolledRail}</CardTitle>
-            {registered.length > 0 ? (
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
-                {formatNumber(totalRegisteredCredits)} {copy.creditsUnit}
-              </span>
-            ) : null}
+            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              {formatNumber(totalRegisteredCredits)} / {formatNumber(creditLimit)} {copy.creditsUnit}
+            </span>
           </CardHeader>
           <CardContent className="space-y-3">
+            <div className="rounded-lg border border-border/70 bg-secondary/30 p-3 space-y-2">
+              <div className="flex items-center justify-between text-xs">
+                <span className="font-medium text-muted-foreground">Định mức học kỳ:</span>
+                <span className="font-bold text-foreground">
+                  {totalRegisteredCredits}/{creditLimit} {copy.creditsUnit}
+                </span>
+              </div>
+              <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
+                <div
+                  className={`h-full transition-all duration-300 ${
+                    totalRegisteredCredits >= creditLimit
+                      ? 'bg-amber-500'
+                      : 'bg-primary'
+                  }`}
+                  style={{ width: `${Math.min(100, (totalRegisteredCredits / creditLimit) * 100)}%` }}
+                />
+              </div>
+              <p className="text-[11px] text-muted-foreground">
+                {totalRegisteredCredits >= creditLimit
+                  ? `Đã đạt hạn mức tối đa ${creditLimit} tín chỉ cho học kỳ này.`
+                  : `Còn có thể đăng ký thêm ${creditLimit - totalRegisteredCredits} tín chỉ.`}
+              </p>
+            </div>
             {registered.length === 0 ? (
               <p className="text-sm text-muted-foreground">{copy.railEmpty}</p>
             ) : (

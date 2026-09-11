@@ -315,10 +315,17 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.meta.total").value(2))
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
 
+        // Faculties are catalog data: any authenticated role may list them now,
+        // while anonymous callers still get rejected by the security chain.
         mvc.perform(get("/api/v1/faculties")
                         .with(studentJwt()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/faculties")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "1"))
+                .andExpect(status().isUnauthorized());
 
         mvc.perform(get("/api/v1/faculties/faculty-cs")
                         .with(studentJwt()))
@@ -376,10 +383,11 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.data[1].id").value("department-se"))
                 .andExpect(jsonPath("$.meta.total").value(2));
 
+        // Catalog data: authenticated students may list departments as well.
         mvc.perform(get("/api/v1/departments")
                         .with(studentJwt()))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(2));
 
         mvc.perform(get("/api/v1/departments/department-se")
                         .with(studentJwt()))

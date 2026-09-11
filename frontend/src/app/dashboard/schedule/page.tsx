@@ -76,26 +76,13 @@ const DAY_LABELS_EN: Record<number, string> = {
 const ORDERED_DAYS = [2, 3, 4, 5, 6, 7, 1];
 
 /**
- * Token-based accent pairs that stay readable in light and dark themes. The
- * palette starts with the semantic primary pair and then uses hue pairs whose
- * text color swaps to a lighter step in dark mode.
+ * Unified enterprise academic theme for all class blocks across all roles.
+ * Clean, consistent, and distraction-free institutional styling without rainbow colors.
  */
-const weeklyAccents = [
-  'bg-primary/15 text-primary border-primary/30',
-  'bg-emerald-600/15 text-emerald-700 dark:text-emerald-300 border-emerald-600/30',
-  'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-  'bg-sky-600/15 text-sky-700 dark:text-sky-300 border-sky-600/30',
-  'bg-violet-600/15 text-violet-700 dark:text-violet-300 border-violet-600/30',
-] as const;
+const UNIFIED_COURSE_ACCENT =
+  'bg-primary/[0.04] dark:bg-primary/[0.08] text-foreground border-primary/25 dark:border-primary/35 hover:border-primary/60 hover:bg-primary/[0.08] dark:hover:bg-primary/[0.12]';
 
-/** Stable accent per course: char-code hash of the course code, deterministic across reloads. */
-const accentForCourse = (courseCode: string): string => {
-  let hash = 0;
-  for (let index = 0; index < courseCode.length; index += 1) {
-    hash += courseCode.charCodeAt(index);
-  }
-  return weeklyAccents[hash % weeklyAccents.length];
-};
+const accentForCourse = (_courseCode?: string): string => UNIFIED_COURSE_ACCENT;
 
 export default function SchedulePage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
@@ -210,7 +197,7 @@ export default function SchedulePage() {
         const lecturerName =
           (section?.lecturer as { fullName?: string } | undefined)?.fullName ??
           (section?.lecturer?.user
-            ? `${section.lecturer.user.firstName} ${section.lecturer.user.lastName}`.trim()
+            ? `${section.lecturer.user.lastName ?? ''} ${section.lecturer.user.firstName ?? ''}`.trim()
             : undefined);
 
         section?.schedules?.forEach((schedule, index) => {
@@ -292,7 +279,7 @@ export default function SchedulePage() {
       ? {
           eyebrow: 'Khu sinh viên',
           title: 'Thời khóa biểu',
-          description: `Giữ lịch học theo tuần cho ${selectedSemesterName} trong tầm tay cùng các tiện ích sinh viên cần dùng mỗi ngày.`,
+          description: `Thời khóa biểu học tập của sinh viên trong ${selectedSemesterName}.`,
           selectSemester: 'Chọn học kỳ cho thời khóa biểu',
           allSemesters: 'Tất cả học kỳ',
           openCourses: 'Mở môn học của tôi',
@@ -434,8 +421,8 @@ export default function SchedulePage() {
           <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
             <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
               {locale === 'vi'
-                ? 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH'
-                : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND EDUCATION'}
+                ? 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH'
+                : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING'}
             </div>
             <div className="text-sm font-extrabold text-foreground">
               {locale === 'vi'
@@ -460,10 +447,16 @@ export default function SchedulePage() {
           </div>
 
           {/* Top Control Bar & Quick Highlights */}
-          <div className="flex flex-wrap items-center justify-between gap-4 rounded-xl border border-border/80 bg-card p-4 shadow-sm print:hidden">
+          <div className="flex flex-wrap items-center justify-between gap-4 rounded-lg border border-border/80 bg-card p-4 shadow-sm print:hidden">
             {/* View Mode Tabs */}
-            <div className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1">
+            <div
+              role="tablist"
+              aria-label={locale === 'vi' ? 'Chế độ xem thời khóa biểu' : 'Schedule view mode'}
+              className="flex items-center gap-1 rounded-lg bg-secondary/60 p-1"
+            >
               <Button
+                role="tab"
+                aria-selected={viewMode === 'grid'}
                 variant={viewMode === 'grid' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('grid')}
@@ -473,6 +466,8 @@ export default function SchedulePage() {
                 {copy.viewGrid}
               </Button>
               <Button
+                role="tab"
+                aria-selected={viewMode === 'day'}
                 variant={viewMode === 'day' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('day')}
@@ -482,6 +477,8 @@ export default function SchedulePage() {
                 {copy.viewDay}
               </Button>
               <Button
+                role="tab"
+                aria-selected={viewMode === 'list'}
                 variant={viewMode === 'list' ? 'default' : 'ghost'}
                 size="sm"
                 onClick={() => setViewMode('list')}
@@ -656,7 +653,7 @@ export default function SchedulePage() {
                                           status: matchingAgenda?.status,
                                         });
                                       }}
-                                      className={`flex-1 rounded-xl border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                                      className={`flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
                                         item.courseCode,
                                       )}`}
                                       title={`${item.courseCode} - ${item.startTime}-${item.endTime} (${copy.clickToViewDetails})`}
@@ -722,7 +719,7 @@ export default function SchedulePage() {
                       return (
                         <div
                           key={`mobile-day-${dayNum}`}
-                          className={`rounded-xl border p-4 transition-all ${
+                          className={`rounded-lg border p-4 transition-all ${
                             isToday
                               ? 'border-primary/50 bg-primary/[0.04]'
                               : 'border-border/70 bg-card'
@@ -814,7 +811,7 @@ export default function SchedulePage() {
                       key={`day-tab-${dayNum}`}
                       type="button"
                       onClick={() => setSelectedDayTab(dayNum)}
-                      className={`flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all ${
+                      className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all ${
                         isSelected
                           ? 'bg-primary text-primary-foreground shadow-md'
                           : 'border border-border bg-card text-foreground hover:bg-secondary'
@@ -863,7 +860,7 @@ export default function SchedulePage() {
                         <div
                           key={item.id}
                           onClick={() => setSelectedDetail(item)}
-                          className={`rounded-2xl border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
+                          className={`rounded-lg border p-4 transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
                             item.courseCode,
                           )}`}
                         >
