@@ -6,6 +6,8 @@ import jakarta.servlet.ServletException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
 import java.io.IOException;
+import java.util.Locale;
+import java.util.Set;
 import org.springframework.http.HttpStatus;
 import org.springframework.security.authentication.AnonymousAuthenticationToken;
 import org.springframework.security.core.Authentication;
@@ -33,6 +35,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
         this.errorWriter = errorWriter;
     }
 
+    private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -44,9 +48,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return;
         }
 
-        // Only enforce on POST requests (and mutating actions)
+        // Enforce on mutating requests (POST, PUT, PATCH, DELETE)
         String method = request.getMethod();
-        if (!"POST".equalsIgnoreCase(method)) {
+        if (method == null || !MUTATING_METHODS.contains(method.toUpperCase(java.util.Locale.ROOT))) {
             filterChain.doFilter(request, response);
             return;
         }
@@ -114,6 +118,11 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     private String resolveClientIp(HttpServletRequest request) {
+        String xRealIp = request.getHeader("X-Real-IP");
+        if (xRealIp != null && !xRealIp.isBlank()) {
+            return xRealIp.trim();
+        }
+
         String xForwardedFor = request.getHeader("X-Forwarded-For");
         if (xForwardedFor != null && !xForwardedFor.isBlank()) {
             String[] parts = xForwardedFor.split(",");
@@ -123,11 +132,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
                     return candidate;
                 }
             }
-        }
-
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
         }
 
         String remoteAddr = request.getRemoteAddr();

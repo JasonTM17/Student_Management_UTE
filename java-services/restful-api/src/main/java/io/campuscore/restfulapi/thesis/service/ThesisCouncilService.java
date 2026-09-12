@@ -223,10 +223,10 @@ public class ThesisCouncilService {
                 && !SCORE_COMPONENT.equals(component.trim().toUpperCase(java.util.Locale.ROOT))) {
             throw invalid("component must be " + SCORE_COMPONENT);
         }
-        Integer finalized = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM thesis.thesis_topic WHERE id = :topicId AND final_score IS NOT NULL",
-                params().addValue("topicId", topicId), Integer.class);
-        if (finalized != null && finalized > 0) {
+        Map<String, Object> topicRow = one(
+                "SELECT id, final_score FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
+        if (topicRow.get("final_score") != null) {
             throw conflict("SCORE_ALREADY_FINALIZED", "The topic score has been finalized by the chair");
         }
         jdbc.update(

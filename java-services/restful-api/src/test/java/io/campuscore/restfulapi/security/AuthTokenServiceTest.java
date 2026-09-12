@@ -26,9 +26,9 @@ class AuthTokenServiceTest {
     void issuedAccessTokenDecodesIntoTheSharedClaimContract() {
         SecurityConfig config = new SecurityConfig();
         AuthTokenService service = new AuthTokenService(
-                config.jwtEncoder(SECRET),
-                config.jwtEncoder(REFRESH_SECRET),
-                config.jwtDecoder(REFRESH_SECRET),
+                config.jwtEncoder(SECRET, true),
+                config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -45,7 +45,7 @@ class AuthTokenServiceTest {
                 2,
                 null));
 
-        Jwt decoded = config.jwtDecoder(SECRET).decode(issued.accessToken());
+        Jwt decoded = config.jwtDecoder(SECRET, true).decode(issued.accessToken());
         assertEquals("user-1", decoded.getSubject());
         assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
         assertEquals(List.of("STUDENT"), decoded.getClaimAsStringList("roles"));
@@ -64,9 +64,9 @@ class AuthTokenServiceTest {
     void issuedRefreshTokenUsesDedicatedSecretAndMinimalClaims() {
         SecurityConfig config = new SecurityConfig();
         AuthTokenService service = new AuthTokenService(
-                config.jwtEncoder(SECRET),
-                config.jwtEncoder(REFRESH_SECRET),
-                config.jwtDecoder(REFRESH_SECRET),
+                config.jwtEncoder(SECRET, true),
+                config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -83,7 +83,7 @@ class AuthTokenServiceTest {
                 2,
                 null));
 
-        Jwt decoded = config.jwtDecoder(REFRESH_SECRET).decode(issued.refreshToken());
+        Jwt decoded = config.jwtDecoder(REFRESH_SECRET, true).decode(issued.refreshToken());
         assertEquals("user-1", decoded.getSubject());
         assertEquals("student@campuscore.edu", decoded.getClaimAsString("email"));
         assertEquals("refresh", decoded.getClaimAsString("tokenType"));
@@ -97,9 +97,9 @@ class AuthTokenServiceTest {
     void tokenIssuerRejectsInvalidIdentityAndAuthorityClaims() {
         SecurityConfig config = new SecurityConfig();
         AuthTokenService service = new AuthTokenService(
-                config.jwtEncoder(SECRET),
-                config.jwtEncoder(REFRESH_SECRET),
-                config.jwtDecoder(REFRESH_SECRET),
+                config.jwtEncoder(SECRET, true),
+                config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ofDays(7));
@@ -134,17 +134,17 @@ class AuthTokenServiceTest {
         SecurityConfig config = new SecurityConfig();
 
         assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
-                config.jwtEncoder(SECRET),
-                config.jwtEncoder(REFRESH_SECRET),
-                config.jwtDecoder(REFRESH_SECRET),
+                config.jwtEncoder(SECRET, true),
+                config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ZERO,
                 Duration.ofDays(7)));
 
         assertThrows(IllegalArgumentException.class, () -> new AuthTokenService(
-                config.jwtEncoder(SECRET),
-                config.jwtEncoder(REFRESH_SECRET),
-                config.jwtDecoder(REFRESH_SECRET),
+                config.jwtEncoder(SECRET, true),
+                config.jwtEncoder(REFRESH_SECRET, true),
+                config.jwtDecoder(REFRESH_SECRET, true),
                 Clock.fixed(NOW, ZoneOffset.UTC),
                 Duration.ofMinutes(15),
                 Duration.ZERO));

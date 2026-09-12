@@ -59,6 +59,16 @@ public class ThesisSupervisorService {
             if (!lecturerExists(lecturerId)) {
                 throw invalid("Unknown or inactive lecturer: " + lecturerId);
             }
+            Integer chairCount = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM thesis.thesis_council_topic ct "
+                            + "JOIN thesis.thesis_council_member cm ON cm.council_id = ct.council_id "
+                            + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId AND cm.member_role = 'CHAIR'",
+                    new MapSqlParameterSource().addValue("topicId", topicId).addValue("lecturerId", lecturerId),
+                    Integer.class);
+            if (chairCount != null && chairCount > 0) {
+                throw conflict("SUPERVISOR_CANNOT_CHAIR_COUNCIL",
+                        "The topic supervisor cannot chair the defense council for this topic");
+            }
         }
 
         // The creator may stay as a supervisor but never becomes the reason a

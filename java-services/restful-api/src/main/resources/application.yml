@@ -108,10 +108,10 @@ spring:
     username: ${SPRING_DATASOURCE_USERNAME:campuscore}
     password: ${SPRING_DATASOURCE_PASSWORD:}
     hikari:
-      maximum-pool-size: ${DB_POOL_MAX:5}
+      maximum-pool-size: ${DB_POOL_MAX:8}
       minimum-idle: ${DB_POOL_MIN:2}
-      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:5000}
-      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:1000}
+      connection-timeout: ${DB_CONNECTION_TIMEOUT_MS:15000}
+      validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
   jpa:
     hibernate:
       # Flyway owns the schema; Hibernate must not reject focused fixture tests
