@@ -712,7 +712,7 @@ export async function resolveStudentAssistantQuery(
 
     const answer =
       locale === 'vi'
-        ? `Quy định chuẩn đầu ra và điều kiện xét tốt nghiệp tại Trường ĐH Sư phạm Kỹ thuật TP.HCM (HCMUTE):\n\n` +
+        ? `Quy định chuẩn đầu ra và điều kiện xét tốt nghiệp tại Trường ĐH Công nghệ Kỹ thuật TP.HCM (HCM-UTE):\n\n` +
           `1. **Tích lũy đầy đủ tín chỉ chương trình đào tạo:**\n` +
           `   • Yêu cầu tối thiểu: **${totalCredits} tín chỉ**\n` +
           `   • Tiến độ hiện tại của bạn: Đã hoàn thành **${completedCredits}/${totalCredits} tín chỉ** (${percent}%)\n\n` +
@@ -796,7 +796,7 @@ export async function resolveStudentAssistantQuery(
 
     const answer =
       locale === 'vi'
-        ? `Thông tin về Học bổng Khuyến khích học tập (KKHT) tại Trường ĐH Sư phạm Kỹ thuật TP.HCM:\n\n` +
+        ? `Thông tin về Học bổng Khuyến khích học tập (KKHT) tại Trường ĐH Công nghệ Kỹ thuật TP.HCM:\n\n` +
           `• **Khung tiêu chuẩn phân loại học bổng:**\n` +
           `   - **Loại Xuất sắc:** Điểm GPA >= 3.6 / 4.0 và Điểm rèn luyện >= 90 điểm (Xuất sắc)\n` +
           `   - **Loại Giỏi:** Điểm GPA >= 3.2 / 4.0 và Điểm rèn luyện >= 80 điểm (Tốt trở lên)\n` +
@@ -811,7 +811,7 @@ export async function resolveStudentAssistantQuery(
               `   - **Đánh giá triển vọng:** Với điểm số hiện tại, bạn ${numericGpa >= 2.5 && (conductScore ?? 0) >= 70 ? `đủ điều kiện nằm trong diện xem xét **${scholarshipLevel}** của Khoa!` : 'chưa đạt ngưỡng điểm tối thiểu để xét học bổng kỳ này.'}\n\n`
             : `• **Hồ sơ học vụ của bạn:** Chưa ghi nhận đủ dữ liệu điểm GPA hoặc điểm rèn luyện chính thức của học kỳ gần nhất để đối chiếu tự động.\n\n`) +
           `💡 Danh sách sinh viên nhận học bổng chính thức theo từng kỳ được Hội đồng xét duyệt và công bố tại mục **Thông báo** (/dashboard/announcements).`
-        : `Academic Scholarship Information (KKHT) at HCMUTE:\n\n` +
+        : `Academic Scholarship Information (KKHT) at HCM-UTE:\n\n` +
           `• **Criteria:**\n` +
           `   - Excellent: GPA >= 3.6 & Conduct >= 90 (120% tuition)\n` +
           `   - Very Good: GPA >= 3.2 & Conduct >= 80 (100% tuition)\n` +
@@ -821,7 +821,6 @@ export async function resolveStudentAssistantQuery(
             ? `• **Your Profile:** GPA: **${gpa}**, Conduct: **${conductScore}** (${scholarshipLevel}).\n\n`
             : `• **Your Profile:** Transcript or conduct records for the target term are not finalized yet.\n\n`) +
           `💡 Official recipient lists are published under **Announcements** (/dashboard/announcements).`;
-          `💡 Official awarded student lists are posted under **Announcements** (/dashboard/announcements).`;
 
     return {
       answer,
@@ -833,7 +832,7 @@ export async function resolveStudentAssistantQuery(
         locale,
         excerpt:
           locale === 'vi'
-            ? 'Quy chế cấp học bổng khuyến khích học tập cho sinh viên theo Nghị định 84 và quy định HCMUTE.'
+            ? 'Quy chế cấp học bổng khuyến khích học tập cho sinh viên theo Nghị định 84 và quy định của Trường ĐH Công nghệ Kỹ thuật TP.HCM.'
             : 'Institutional merit-based scholarship regulations and evaluation criteria.',
         domain: 'POLICY',
       },
@@ -844,7 +843,7 @@ export async function resolveStudentAssistantQuery(
   if (RETAKE_POLICY_REGEX.test(message)) {
     const answer =
       locale === 'vi'
-        ? `Quy định về học lại môn, học cải thiện điểm và cảnh báo học vụ tại Trường ĐH Sư phạm Kỹ thuật TP.HCM:\n\n` +
+        ? `Quy định về học lại môn, học cải thiện điểm và cảnh báo học vụ tại Trường ĐH Công nghệ Kỹ thuật TP.HCM:\n\n` +
           `1. **Quy định học cải thiện điểm (áp dụng cho điểm C, C+, D, D+):**\n` +
           `   • Sinh viên có điểm tổng kết môn đạt từ **D đến C+** được phép đăng ký học lại để nâng cao điểm trung bình.\n` +
           `   • Khi học cải thiện, **điểm số cao hơn** giữa hai lần học sẽ được chọn để tính điểm trung bình tích lũy (GPA).\n` +

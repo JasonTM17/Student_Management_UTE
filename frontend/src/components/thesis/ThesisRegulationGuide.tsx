@@ -184,7 +184,7 @@ export function ThesisRegulationGuide() {
             <strong>Công thức tính:</strong> Điểm cuối cùng của đề tài = <strong>Trung bình cộng số học</strong> của các điểm thành phần hợp lệ do các thành viên Hội đồng chấm (thang điểm 10, làm tròn đến 2 chữ số thập phân).
           </div>
           <p className="text-muted-foreground">
-            Điểm số sau đó được quy đổi sang điểm chữ (A, B+, B, C+, C, D+, D, F) và xếp loại tốt nghiệp chính thức theo thang điểm tín chỉ của Trường ĐH Sư phạm Kỹ thuật TP.HCM.
+            Điểm số sau đó được quy đổi sang điểm chữ (A, B+, B, C+, C, D+, D, F) và xếp loại tốt nghiệp chính thức theo thang điểm tín chỉ của Trường ĐH Công nghệ Kỹ thuật TP.HCM.
           </p>
         </div>
       ),

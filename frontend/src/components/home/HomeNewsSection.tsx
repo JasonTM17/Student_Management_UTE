@@ -22,8 +22,8 @@ import { cn } from '@/lib/utils';
 const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   {
     id: 'notice-home-01',
-    title: 'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCMUTE',
-    content: `<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo.</p>
+    title: 'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
+    content: `<p>Khoa Công nghệ Thông tin - Trường Đại học Công nghệ Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo.</p>
 <ul>
   <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core, hệ thống lưu trữ phân tán Ceph 500TB và mạng InfiniBand 200Gbps.</li>
   <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
