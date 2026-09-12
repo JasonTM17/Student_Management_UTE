@@ -15,7 +15,12 @@ does not mean that CampusCore is running in production.
 4. Provision `ops/secrets/*` with mode `0600`; rotate any key ever pasted into
    chat or committed history. Keep DeepSeek disabled until a newly rotated key
    has been loaded and a live smoke is explicitly approved.
-5. Confirm a recent PostgreSQL backup and test its checksum before startup.
+5. Generate the signing secrets with `openssl rand -base64 48` — one value each
+   for `ops/secrets/jwt_secret` and `ops/secrets/jwt_refresh_secret`. They must
+   differ from each other and from every value committed to this repository.
+   `docker-compose.prod.yml` sets `SECURITY_JWT_REJECT_KNOWN_DEFAULTS=true`, so
+   the API aborts startup when it detects a secret published here.
+6. Confirm a recent PostgreSQL backup and test its checksum before startup.
 
 ## Start and smoke
 

@@ -40,11 +40,12 @@ public class AuthTokenService {
             JwtEncoder jwtEncoder,
             @Value("${security.jwt.refresh-secret:${security.jwt.secret}}") String refreshSecret,
             @Value("${security.jwt.access-token-ttl-seconds:900}") long accessTokenTtlSeconds,
-            @Value("${security.jwt.refresh-token-ttl-seconds:604800}") long refreshTokenTtlSeconds) {
+            @Value("${security.jwt.refresh-token-ttl-seconds:604800}") long refreshTokenTtlSeconds,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
         this(
                 jwtEncoder,
-                refreshEncoder(refreshSecret),
-                refreshDecoder(refreshSecret),
+                refreshEncoder(refreshSecret, rejectKnownDefaults),
+                refreshDecoder(refreshSecret, rejectKnownDefaults),
                 Clock.systemUTC(),
                 Duration.ofSeconds(accessTokenTtlSeconds),
                 Duration.ofSeconds(refreshTokenTtlSeconds));
@@ -163,18 +164,14 @@ public class AuthTokenService {
         }
     }
 
-    private static JwtEncoder refreshEncoder(String secret) {
-        if (secret == null || secret.length() < 32) {
-            throw new IllegalStateException("JWT_REFRESH_SECRET must contain at least 32 characters");
-        }
+    private static JwtEncoder refreshEncoder(String secret, boolean rejectKnownDefaults) {
+        JwtSecretPolicy.enforce("JWT_REFRESH_SECRET", secret, rejectKnownDefaults);
         SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         return new NimbusJwtEncoder(new ImmutableSecret<>(key));
     }
 
-    private static JwtDecoder refreshDecoder(String secret) {
-        if (secret == null || secret.length() < 32) {
-            throw new IllegalStateException("JWT_REFRESH_SECRET must contain at least 32 characters");
-        }
+    private static JwtDecoder refreshDecoder(String secret, boolean rejectKnownDefaults) {
+        JwtSecretPolicy.enforce("JWT_REFRESH_SECRET", secret, rejectKnownDefaults);
         SecretKeySpec key = new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
         return NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)

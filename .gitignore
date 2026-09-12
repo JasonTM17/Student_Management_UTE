@@ -94,3 +94,5 @@ database/backups/
 .mimosa/
 .video_agent/
 frontend/.mimosa/
+scratch/
+.workbuddy-ai/

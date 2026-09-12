@@ -46,6 +46,8 @@ services:
       SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/postgres_password
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
+      # Refuse to boot when a signing secret published in this repository is used.
+      SECURITY_JWT_REJECT_KNOWN_DEFAULTS: "true"
       HEALTH_READINESS_KEY_FILE: /run/secrets/readiness_key
       ASSISTANT_RAG_SERVICE_TOKEN_FILE: /run/secrets/rag_service_token
       ASSISTANT_RAG_SERVICE_MODE: "true"
@@ -107,6 +109,8 @@ services:
       SPRING_DATASOURCE_PASSWORD_FILE: /run/secrets/postgres_password
       JWT_SECRET_FILE: /run/secrets/jwt_secret
       JWT_REFRESH_SECRET_FILE: /run/secrets/jwt_refresh_secret
+      # Refuse to boot when a signing secret published in this repository is used.
+      SECURITY_JWT_REJECT_KNOWN_DEFAULTS: "true"
       HEALTH_READINESS_KEY_FILE: /run/secrets/readiness_key
       ASSISTANT_RAG_BASE_URL: http://rag-service:4011/internal/rag/assistant
       ASSISTANT_RAG_SERVICE_TOKEN_FILE: /run/secrets/rag_service_token

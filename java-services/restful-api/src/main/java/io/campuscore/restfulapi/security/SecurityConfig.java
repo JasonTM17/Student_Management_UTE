@@ -39,16 +39,20 @@ import org.springframework.web.cors.UrlBasedCorsConfigurationSource;
 public class SecurityConfig {
 
     @Bean
-    JwtDecoder jwtDecoder(@Value("${security.jwt.secret}") String secret) {
-        SecretKeySpec key = jwtSecretKey(secret);
+    JwtDecoder jwtDecoder(
+            @Value("${security.jwt.secret}") String secret,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
+        SecretKeySpec key = jwtSecretKey("JWT_SECRET", secret, rejectKnownDefaults);
         return NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
     }
 
     @Bean
-    JwtEncoder jwtEncoder(@Value("${security.jwt.secret}") String secret) {
-        return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey(secret)));
+    JwtEncoder jwtEncoder(
+            @Value("${security.jwt.secret}") String secret,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
+        return new NimbusJwtEncoder(new ImmutableSecret<>(jwtSecretKey("JWT_SECRET", secret, rejectKnownDefaults)));
     }
 
     @Bean
@@ -56,10 +60,8 @@ public class SecurityConfig {
         return new BCryptPasswordEncoder();
     }
 
-    private static SecretKeySpec jwtSecretKey(String secret) {
-        if (secret == null || secret.length() < 32) {
-            throw new IllegalStateException("JWT_SECRET must contain at least 32 characters");
-        }
+    private static SecretKeySpec jwtSecretKey(String variable, String secret, boolean rejectKnownDefaults) {
+        JwtSecretPolicy.enforce(variable, secret, rejectKnownDefaults);
         return new SecretKeySpec(secret.getBytes(StandardCharsets.UTF_8), "HmacSHA256");
     }
 
