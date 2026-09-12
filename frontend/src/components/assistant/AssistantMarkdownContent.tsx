@@ -71,27 +71,34 @@ export function AssistantMarkdownContent({
         // [Label](url)
         const label = match[2];
         const rawUrl = match[3];
-        const isInternal = rawUrl.startsWith('/');
-        elements.push(
-          <a
-            key={key++}
-            href={isInternal ? href(rawUrl) : rawUrl}
-            onClick={(e) => {
-              if (isInternal) {
-                e.preventDefault();
-                router.push(href(rawUrl));
-              }
-            }}
-            target={isInternal ? undefined : '_blank'}
-            rel={isInternal ? undefined : 'noopener noreferrer'}
-            className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-4 transition-colors hover:text-primary/80"
-          >
-            {label}
-            {!isInternal && (
-              <ExternalLink className="inline h-3 w-3 opacity-70" />
-            )}
-          </a>,
-        );
+        const isInternal = rawUrl.startsWith('/') && !rawUrl.startsWith('//');
+        const isSafeExternal = /^https?:\/\//i.test(rawUrl) || /^mailto:/i.test(rawUrl);
+
+        if (!isInternal && !isSafeExternal) {
+          // Guard against javascript:, data:, and other unsafe schemes
+          elements.push(label);
+        } else {
+          elements.push(
+            <a
+              key={key++}
+              href={isInternal ? href(rawUrl) : rawUrl}
+              onClick={(e) => {
+                if (isInternal) {
+                  e.preventDefault();
+                  router.push(href(rawUrl));
+                }
+              }}
+              target={isInternal ? undefined : '_blank'}
+              rel={isInternal ? undefined : 'noopener noreferrer'}
+              className="inline-flex items-center gap-1 font-semibold text-primary underline underline-offset-4 transition-colors hover:text-primary/80"
+            >
+              {label}
+              {!isInternal && (
+                <ExternalLink className="inline h-3 w-3 opacity-70" />
+              )}
+            </a>,
+          );
+        }
       } else if (match[4]) {
         // `code`
         elements.push(
@@ -210,6 +217,22 @@ export function AssistantMarkdownContent({
         }
 
         const text = block.lines[0];
+        const orderedMatch = text.match(/^(\d+)\.\s+(.*)$/);
+        if (orderedMatch) {
+          const num = orderedMatch[1];
+          const itemText = orderedMatch[2];
+          return (
+            <div key={bIdx} className="flex items-start gap-2 pl-1 py-0.5">
+              <span className="mt-0.5 flex h-4 w-4 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[10px] font-semibold text-primary">
+                {num}
+              </span>
+              <div className="flex-1 leading-6">
+                {renderInline(itemText)}
+              </div>
+            </div>
+          );
+        }
+
         if (text.startsWith('• ') || text.startsWith('- ')) {
           return (
             <div key={bIdx} className="flex items-start gap-2 pl-1">

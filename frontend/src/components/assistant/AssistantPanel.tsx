@@ -400,7 +400,7 @@ export function AssistantPanel() {
                 />
               )}
 
-              {isSending ? (
+              {isSending && !state.messages.some((m) => m.pending) ? (
                 <div
                   className="flex items-center gap-2 text-xs text-muted-foreground pl-9"
                   role="status"
