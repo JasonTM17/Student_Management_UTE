@@ -2055,7 +2055,7 @@ export default function ThesisPage() {
                     {myResultItem?.councilName || 'Hội đồng Khoa CNTT'}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Trường ĐH SPKT TP.HCM
+                    Trường ĐH Công nghệ Kỹ thuật TP.HCM
                   </p>
                 </div>
               </div>

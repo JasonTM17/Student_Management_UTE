@@ -29,14 +29,14 @@ public class OpenApiConfig {
 
         return new OpenAPI()
                 .info(new Info()
-                        .title("TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH (HCMUTE) - RESTful API")
+                        .title("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH (HCM-UTE) - RESTful API")
                         .description("""
                                 ### Hệ thống Quản trị Đào tạo & Khóa luận Tốt nghiệp CampusUTE
-                                Tài liệu đặc tả kỹ thuật RESTful API theo tiêu chuẩn đào tạo và quy chế quản lý khóa luận của Trường Đại học Sư phạm Kỹ thuật TP.HCM.
+                                Tài liệu đặc tả kỹ thuật RESTful API theo tiêu chuẩn đào tạo và quy chế quản lý khóa luận của Trường Đại học Công nghệ Kỹ thuật TP.HCM.
 
                                 #### Các phân hệ nghiệp vụ chính:
                                 - **Xác thực & Định danh (Auth)**: JWT Token, đăng nhập đa vai trò (Sinh viên, Giảng viên, Phòng Đào tạo).
-                                - **Quản lý Học vụ & CTĐT (Academic)**: 8 Khoa đào tạo HCMUTE, học phần, thời khóa biểu tuần, cơ chế điểm 50% Quá trình + 50% Cuối kỳ.
+                                - **Quản lý Học vụ & CTĐT (Academic)**: 8 Khoa đào tạo HCM-UTE, học phần, thời khóa biểu tuần, cơ chế điểm 50% Quá trình + 50% Cuối kỳ.
                                 - **Đăng ký Học phần (Registration)**: Kiểm tra xung đột lịch học, sĩ số lớp, giới hạn tối đa 28 tín chỉ/học kỳ.
                                 - **Điểm Rèn Luyện (Conduct - ĐRL)**: 5 tiêu chí rèn luyện chính thức theo Quyết định số 24/2020/QĐ-BGDĐT.
                                 - **Khóa luận Tốt nghiệp & Đồ án (Thesis Lifecycle)**:
@@ -56,12 +56,12 @@ public class OpenApiConfig {
                                 """)
                         .version("2.4.0 (Enterprise Architecture)")
                         .contact(new Contact()
-                                .name("Phòng Đào tạo - Trường ĐH Sư phạm Kỹ thuật TP.HCM")
-                                .email("daotao@hcmute.edu.vn")
-                                .url("https://hcmute.edu.vn"))
+                                .name("Phòng Đào tạo - Trường ĐH Công nghệ Kỹ thuật TP.HCM")
+                                .email("daotao@ute.edu.vn")
+                                .url("https://ute.edu.vn"))
                         .license(new License()
-                                .name("HCMUTE Educational License - Nghiêm cấm sao chép trái phép")
-                                .url("https://hcmute.edu.vn/ban-quyen")))
+                                .name("HCM-UTE Educational License - Nghiêm cấm sao chép trái phép")
+                                .url("https://ute.edu.vn/ban-quyen")))
                 .servers(List.of(
                         new Server()
                                 .url("http://127.0.0.1:" + serverPort)

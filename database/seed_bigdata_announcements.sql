@@ -19,8 +19,8 @@ INSERT INTO engagement."Announcement" (
 ) VALUES
 (
     'announcement-ute-bigdata-ai-center',
-    'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCMUTE',
-    '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo:</p>
+    'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
+    '<p>Khoa Công nghệ Thông tin - Trường Đại học Công nghệ Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo:</p>
 <ul>
   <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core, hệ thống lưu trữ phân tán Ceph 500TB và mạng InfiniBand 200Gbps.</li>
   <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và các đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
@@ -145,7 +145,7 @@ INSERT INTO engagement."Announcement" (
     '<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp phần mềm hàng đầu tổ chức Ngày hội Việc làm UTE Tech Career Expo:</p>
 <ul>
   <li><strong>Thời gian:</strong> 07:30 - 16:30 thứ Sáu ngày 23/10/2026.</li>
-  <li><strong>Địa điểm:</strong> Quảng trường trung tâm Khu A và Hội trường Trịnh Công Sơn, Trường ĐH Sư phạm Kỹ thuật TP.HCM.</li>
+  <li><strong>Địa điểm:</strong> Quảng trường trung tâm Khu A và Hội trường Trịnh Công Sơn, Trường ĐH Công nghệ Kỹ thuật TP.HCM.</li>
   <li><strong>Doanh nghiệp tham gia:</strong> FPT Software, Viettel, VNPT, VNG, KMS Technology, Bosch Global Software, Renesas, Shopee, NAB Innovation Centre Vietnam...</li>
   <li><strong>Cơ hội dành cho sinh viên:</strong>
     <ul>

@@ -79,7 +79,7 @@ INSERT INTO academic.conduct_activity (
 SELECT seed.id, 'student-profile', 'semester-demo', seed.title, seed.category, seed.points, seed.activity_date::DATE, seed.organizer
 FROM (VALUES
     ('act-drl-001', 'Tham gia Ngày hội việc làm UTE Career Expo 2026', 'Kỹ năng & Hướng nghiệp', 5.0, '2026-09-02', 'Trung tâm Dịch vụ Sinh viên & Hướng nghiệp'),
-    ('act-drl-002', 'Hiến máu tình nguyện "Giọt hồng Sư phạm Kỹ thuật" đợt 1', 'Tình nguyện vì cộng đồng', 8.0, '2026-08-25', 'Đoàn Thanh niên - Hội Chữ thập đỏ UTE'),
+    ('act-drl-002', 'Hiến máu tình nguyện "Giọt hồng Công nghệ Kỹ thuật" đợt 1', 'Tình nguyện vì cộng đồng', 8.0, '2026-08-25', 'Đoàn Thanh niên - Hội Chữ thập đỏ UTE'),
     ('act-drl-003', 'Hội thảo Trí tuệ Nhân tạo & Dữ liệu lớn trong chuyển đổi số', 'Học thuật & Nghiên cứu khoa học', 5.0, '2026-08-18', 'Khoa Công nghệ Thông tin'),
     ('act-drl-004', 'Chiến dịch Mùa hè xanh và Tiếp sức đến trường 2026', 'Tình nguyện vì cộng đồng', 7.0, '2026-08-05', 'Hội Sinh viên ĐH Công nghệ Kỹ thuật TP.HCM')
 ) AS seed(id, title, category, points, activity_date, organizer)

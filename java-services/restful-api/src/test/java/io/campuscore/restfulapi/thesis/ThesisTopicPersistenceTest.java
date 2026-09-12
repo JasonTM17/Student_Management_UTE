@@ -845,7 +845,7 @@ class ThesisTopicPersistenceTest {
     private void insertRound(UUID roundId, String name, Instant start, String status) {
         // Registration mutations now enforce the stored window, so open rounds
         // are seeded with a valid relative window instead of a past fixture date.
-        Instant effectiveStart = "REGISTRATION_OPEN".equals(status) && !start.isAfter(Instant.now())
+        Instant effectiveStart = ("REGISTRATION_OPEN".equals(status) || "PROPOSAL_OPEN".equals(status)) && !start.isAfter(Instant.now())
                 ? Instant.now().minusSeconds(3_600)
                 : start;
         Instant end = effectiveStart.plusSeconds(31L * 24 * 60 * 60);

@@ -46,7 +46,7 @@
 
 **CampusCore** là hệ thống quản lý học vụ đại học cấp độ doanh nghiệp (Enterprise Academic Information System) đáp ứng đồng thời nhu cầu của **Sinh viên**, **Giảng viên** và **Cán bộ Quản trị đào tạo**.
 
-Dự án lấy cảm hứng từ nhận diện và quy trình đào tạo tín chỉ của **Trường Đại học Sư phạm Kỹ thuật TP.HCM (HCMUTE)**, mang đến một không gian học vụ song ngữ (Tiếng Việt & Tiếng Anh) hiện đại, đồng thời giải quyết các thách thức kỹ thuật phức tạp trong môi trường học đường: **tắc nghẽn đăng ký học phần giờ cao điểm**, **an toàn dữ liệu điểm thi**, **quản lý vòng đời khóa luận tốt nghiệp** và **hỗ trợ học vụ tự động thông minh bằng mô hình Retrieval-Augmented Generation (RAG)**.
+Dự án lấy cảm hứng từ nhận diện và quy trình đào tạo tín chỉ của **Trường Đại học Công nghệ Kỹ thuật TP.HCM (HCM-UTE)**, mang đến một không gian học vụ song ngữ (Tiếng Việt & Tiếng Anh) hiện đại, đồng thời giải quyết các thách thức kỹ thuật phức tạp trong môi trường học đường: **tắc nghẽn đăng ký học phần giờ cao điểm**, **an toàn dữ liệu điểm thi**, **quản lý vòng đời khóa luận tốt nghiệp** và **hỗ trợ học vụ tự động thông minh bằng mô hình Retrieval-Augmented Generation (RAG)**.
 
 ```
 Next.js Web Portal (:3000) ────┐
