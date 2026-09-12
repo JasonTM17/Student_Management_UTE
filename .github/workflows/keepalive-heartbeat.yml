@@ -1,0 +1,37 @@
+name: Supabase & Render Keep-Alive Heartbeat
+
+on:
+  schedule:
+    # Runs every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC)
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  heartbeat:
+    name: Mutual Keep-Alive & Health Ping
+    runs-on: ubuntu-latest
+    steps:
+      - name: Wake & Ping Render Backend
+        run: |
+          echo "Pinging Render Backend (campuscore-backend)..."
+          # Render free tier might take ~45s to cold boot if sleeping
+          curl -sSf -m 60 https://campuscore-backend-p4em.onrender.com/actuator/health || echo "Render ping retry 1"
+          sleep 5
+          curl -sSf -m 30 https://campuscore-backend-p4em.onrender.com/api/v1/health/liveness || echo "Render liveness ping finished"
+
+      - name: Ping Supabase Gateway & Database
+        env:
+          SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
+        run: |
+          echo "Pinging Supabase REST Gateway (kbptwmwitojjjwvwckom)..."
+          if [ -n "$SUPABASE_KEY" ]; then
+            curl -sSf -m 30 -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY" \
+              https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/ -o /dev/null || echo "Supabase auth ping completed"
+          else
+            curl -sSf -m 30 https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/ -o /dev/null || echo "Supabase gateway ping completed"
+          fi
+
+      - name: Ping Frontend Production (Vercel)
+        run: |
+          echo "Pinging Vercel Frontend (campusute.io.vn)..."
+          curl -sSf -m 30 https://campusute.io.vn -o /dev/null || echo "Vercel ping completed"
