@@ -777,6 +777,43 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$.approvalStatus").value("APPROVED"));
     }
 
+    /**
+     * Regression guard for the PostgreSQL failure
+     * {@code PSQLException: Can't infer the SQL type to use for an instance of java.time.Instant}
+     * that made {@code POST /api/v1/thesis/rounds} return HTTP 500 for every payload — found by
+     * the Wukong adversarial pass on 2026-09-12. The service must bind {@link java.sql.Timestamp}
+     * (see {@code ThesisMutationService.tsOf}) rather than a raw {@link Instant}.
+     *
+     * <p>Caveat: this suite runs on H2 in PostgreSQL mode, whose driver is more permissive than
+     * the real PostgreSQL driver, so this test is a contract guard, not sufficient proof. The
+     * authoritative evidence is the live PostgreSQL probe recorded in
+     * {@code plans/20260911-active-students-bigdata-and-thesis-lifecycle/reports/acceptance-walkthrough.md}.
+     */
+    @Test
+    void roundCreationThroughTheApiPersistsTheRoundAndItsWindow() throws Exception {
+        mvc.perform(post("/api/v1/thesis/rounds")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "name": "Regression Round",
+                                  "thesisType": "TLCN",
+                                  "registrationStart": "2026-09-01T00:00:00Z",
+                                  "registrationEnd": "2026-12-31T00:00:00Z",
+                                  "gvpbDeadline": "2027-03-01T00:00:00Z"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.name").value("Regression Round"))
+                .andExpect(jsonPath("$.thesisType").value("TLCN"))
+                .andExpect(jsonPath("$.status").value("DRAFT"));
+
+        Integer persisted = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_registration_round WHERE name = 'Regression Round'",
+                Integer.class);
+        assertEquals(1, persisted);
+    }
+
     private UUID insertRound() {
         UUID roundId = UUID.randomUUID();
         insertRound(roundId, "2026 Capstone", Instant.parse("2026-01-01T00:00:00Z"), "DRAFT");
