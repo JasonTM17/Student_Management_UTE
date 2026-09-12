@@ -62,7 +62,7 @@ export function AdministrativeDispatchSheet({
   const copy = isVi
     ? {
         ministryName: 'BỘ GIÁO DỤC VÀ ĐÀO TẠO',
-        universityName: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
+        universityName: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH',
         departmentName: 'KHOA CÔNG NGHỆ THÔNG TIN & PHÒNG ĐÀO TẠO',
         nationalMotto1: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM',
         nationalMotto2: 'Độc lập - Tự do - Hạnh phúc',
@@ -124,13 +124,13 @@ export function AdministrativeDispatchSheet({
         signatureTitle: loc === 'vi' ? 'HIỆU TRƯỞNG' : 'RECTOR',
         role:
           loc === 'vi'
-            ? 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM'
-            : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING',
+            ? 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP.HCM'
+            : 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND EDUCATION',
         name: 'PGS. TS. LÊ HIẾU GIANG',
         sealUnit:
           loc === 'vi'
-            ? 'Ban Giám hiệu - Trường ĐH Công nghệ Kỹ thuật TP.HCM'
-            : 'Board of Rectors - HCM-UTE',
+            ? 'Ban Giám hiệu - Trường ĐH Sư phạm Kỹ thuật TP.HCM'
+            : 'Board of Rectors - HCMUTE',
       };
     }
 

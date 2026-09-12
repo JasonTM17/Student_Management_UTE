@@ -132,7 +132,7 @@ const conductCopy = {
       `The conduct report for "${semesterName ?? 'the selected semester'}" (${studentCode ?? 'student'}) is ready to print or save.`,
   },
   vi: {
-    institution: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
+    institution: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH',
     office: 'PHÒNG CÔNG TÁC SINH VIÊN • CAMPUSCORE',
     printTitle: 'PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN SINH VIÊN',
     pageEyebrow: 'HCMUTE • PHÒNG CTSV',

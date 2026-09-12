@@ -211,7 +211,7 @@ export function useAssistantStream({
               });
               applyStreamEvent({
                 type: 'done',
-                messageId: `${Date.now()}-resolved`,
+                messageId: `local-resolved-${Date.now()}`,
                 reasonCode: 'STOP',
                 degraded: false,
               });
