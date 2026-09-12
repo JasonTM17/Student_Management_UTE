@@ -103,13 +103,13 @@ public class ThesisMutationService {
                 .addValue("id", id)
                 .addValue("name", request.name().trim())
                 .addValue("thesisType", roundType.name())
-                .addValue("lecturerSubmitStart", letStart)
-                .addValue("lecturerSubmitEnd", letEnd)
-                .addValue("registrationStart", regStart)
-                .addValue("registrationEnd", regEnd)
-                .addValue("proposalPublishAt", request.proposalPublishAt())
-                .addValue("gvpbDeadline", request.gvpbDeadline())
-                .addValue("reportDate", request.reportDate()));
+                .addValue("lecturerSubmitStart", tsOf(letStart))
+                .addValue("lecturerSubmitEnd", tsOf(letEnd))
+                .addValue("registrationStart", tsOf(regStart))
+                .addValue("registrationEnd", tsOf(regEnd))
+                .addValue("proposalPublishAt", tsOf(request.proposalPublishAt()))
+                .addValue("gvpbDeadline", tsOf(request.gvpbDeadline()))
+                .addValue("reportDate", tsOf(request.reportDate())));
         return roundReads.get(id);
     }
 
@@ -572,6 +572,17 @@ public class ThesisMutationService {
         if (value instanceof java.time.LocalDateTime localDateTime) return localDateTime.toInstant(java.time.ZoneOffset.UTC);
         if (value instanceof java.util.Date date) return date.toInstant();
         return null;
+    }
+
+    /**
+     * Binds an {@link Instant} to JDBC. The PostgreSQL driver cannot infer a SQL type for
+     * {@code java.time.Instant} ("Can't infer the SQL type to use for an instance of
+     * java.time.Instant"), which previously made {@code POST /thesis/rounds} fail with HTTP 500.
+     * The rest of the codebase binds timestamps as {@link java.sql.Timestamp} (see
+     * RegistrationService), so we follow the same convention here.
+     */
+    private static java.sql.Timestamp tsOf(Instant value) {
+        return value == null ? null : java.sql.Timestamp.from(value);
     }
 
     private void requireActiveStudent(String studentId) {

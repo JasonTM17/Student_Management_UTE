@@ -1,5 +1,12 @@
 -- Seed Active Students Big Data for CampusUTE
--- Ensures all 226 students have 5 active enrollments in uncompleted courses in semester-demo.
+-- Ensures all 226 students have exactly 5 active enrollments in uncompleted courses in semester-demo.
+--
+-- NOTE (2026-09-12 remediation): V26__enrich_demo_campus_population.sql seeds up to 7 active
+-- sections per student (generate_series(0,6) with per-course dedup). Students whose picks never
+-- collided therefore kept 7 active courses, which violates the "4 to 6 active sections" contract
+-- of plans/20260911-active-students-bigdata-and-thesis-lifecycle. Step 4 below normalizes every
+-- student down to exactly 5 active enrollments so the population stays inside the contract no
+-- matter how many rows the migrations created.
 
 BEGIN;
 
@@ -84,7 +91,25 @@ BEGIN
     END LOOP;
 END $$;
 
--- 4. Update section enrolled counts
+-- 4. Normalize: no student may exceed 5 active enrollments in semester-demo.
+--    Keeps the 5 oldest (deterministic by enrolledAt, then id) and removes the excess created
+--    by migration V26 for students whose generated picks never collided on the same course.
+WITH ranked AS (
+    SELECT e.id,
+           row_number() OVER (
+               PARTITION BY e."studentId"
+               ORDER BY e."enrolledAt" ASC, e.id ASC
+           ) AS rn
+    FROM "academic"."Enrollment" e
+    WHERE e."semesterId" = 'semester-demo'
+      AND e.status IN ('ENROLLED', 'CONFIRMED')
+)
+DELETE FROM "academic"."Enrollment" e
+USING ranked r
+WHERE e.id = r.id
+  AND r.rn > 5;
+
+-- 5. Update section enrolled counts
 UPDATE "academic"."Section" s
 SET "enrolledCount" = (
     SELECT COUNT(*) FROM "academic"."Enrollment" e
