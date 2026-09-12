@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import {
+  ArrowDown,
   Bot,
   History,
   LoaderCircle,
@@ -48,6 +49,7 @@ export function AssistantPanel() {
     useState<AssistantHistoryStatus>('idle');
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
+  const [userScrolled, setUserScrolled] = useState(false);
 
   // Focus returns to whichever control opened the panel (header or sidebar launcher)
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -58,8 +60,6 @@ export function AssistantPanel() {
   const userScrolledRef = useRef(false);
 
   const reconcileHistory = useCallback(() => {
-    // A server-created conversation remains hidden until its terminal commit;
-    // clear the one-fetch latch so the next render observes the committed row.
     historyFetchedRef.current = false;
     selectedHistoryRef.current = false;
     setHistoryStatus('idle');
@@ -67,6 +67,7 @@ export function AssistantPanel() {
 
   const handleNewExchange = useCallback(() => {
     userScrolledRef.current = false;
+    setUserScrolled(false);
   }, []);
 
   const {
@@ -137,8 +138,6 @@ export function AssistantPanel() {
   useEffect(() => {
     const node = logRef.current;
     if (!node) return;
-    // Respect the reader's position while streaming: never yank them back to
-    // the bottom once they scrolled up to reread earlier messages.
     if (userScrolledRef.current) return;
     node.scrollTo({
       top: node.scrollHeight,
@@ -149,8 +148,21 @@ export function AssistantPanel() {
   const handleLogScroll = () => {
     const node = logRef.current;
     if (!node) return;
-    userScrolledRef.current =
+    const isScrolledUp =
       node.scrollHeight - node.scrollTop - node.clientHeight > 48;
+    userScrolledRef.current = isScrolledUp;
+    setUserScrolled(isScrolledUp);
+  };
+
+  const scrollToBottom = () => {
+    const node = logRef.current;
+    if (!node) return;
+    userScrolledRef.current = false;
+    setUserScrolled(false);
+    node.scrollTo({
+      top: node.scrollHeight,
+      behavior: 'smooth',
+    });
   };
 
   const closePanel = () => {
@@ -237,7 +249,7 @@ export function AssistantPanel() {
         className={cn(
           'fixed z-50',
           open
-            ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(23rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
+            ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(24rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
             : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
         )}
       >
@@ -247,50 +259,80 @@ export function AssistantPanel() {
             aria-modal="false"
             aria-labelledby="assistant-panel-title"
             aria-describedby="assistant-panel-description"
-            className="flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
+            className="relative flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
           >
-            <header className="flex items-start justify-between gap-4 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
-              <div className="flex min-w-0 items-start gap-3">
-                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
-                  <Bot className="h-5 w-5" aria-hidden="true" />
+            {/* Header with quick New Chat, live status indicator, and V4 Flash badge */}
+            <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
+              <div className="flex min-w-0 items-center gap-2.5">
+                <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
+                  <Bot className="h-4 w-4" aria-hidden="true" />
+                  <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
+                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
+                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
+                  </span>
                 </div>
                 <div className="min-w-0">
-                  <h2 id="assistant-panel-title" className="font-semibold text-white text-base">
-                    {messages.assistant.title}
+                  <h2
+                    id="assistant-panel-title"
+                    className="flex items-center gap-1.5 font-semibold text-white text-sm"
+                  >
+                    <span>{messages.assistant.title}</span>
+                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
+                      V4 Flash
+                    </span>
                   </h2>
                   <p
                     id="assistant-panel-description"
-                    className="mt-0.5 text-xs leading-5 text-white/85"
+                    className="truncate text-[11px] text-white/85"
                   >
                     {messages.assistant.description}
                   </p>
                 </div>
               </div>
-              <div className="flex shrink-0 items-center gap-1">
+
+              <div className="flex shrink-0 items-center gap-0.5">
+                {/* Direct New Chat button */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
+                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                  onClick={() => void createConversation()}
+                  aria-label="Cuộc trò chuyện mới"
+                  title="Cuộc trò chuyện mới"
+                >
+                  <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+
+                {/* History Drawer toggle */}
+                <Button
+                  type="button"
+                  variant="ghost"
+                  size="icon"
+                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={() => setShowHistory((current) => !current)}
                   aria-label={messages.assistant.history}
                   aria-expanded={showHistory}
+                  title={messages.assistant.history}
                 >
-                  <History className="h-4 w-4" aria-hidden="true" />
+                  <History className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
+
+                {/* Close panel */}
                 <Button
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="text-white/80 hover:bg-white/15 hover:text-white rounded-lg h-9 w-9"
+                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={closePanel}
                   aria-label={messages.assistant.close}
                   title={messages.assistant.close}
                 >
-                  <X className="h-4 w-4" aria-hidden="true" />
+                  <X className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
               </div>
             </header>
+
             {showHistory ? (
               <AssistantHistoryPanel
                 history={history}
@@ -298,11 +340,17 @@ export function AssistantPanel() {
                 deletingConversationId={deletingConversationId}
                 onBack={() => setShowHistory(false)}
                 onCreate={() => void createConversation()}
-                onSelect={(conversation) => void selectConversation(conversation)}
-                onDelete={(conversationId) => void deleteConversation(conversationId)}
+                onSelect={(conversation) =>
+                  void selectConversation(conversation)
+                }
+                onDelete={(conversationId) =>
+                  void deleteConversation(conversationId)
+                }
                 onRetry={loadHistory}
               />
             ) : null}
+
+            {/* Scrollable chat body */}
             <div
               ref={logRef}
               onScroll={handleLogScroll}
@@ -310,7 +358,7 @@ export function AssistantPanel() {
               aria-live="polite"
               aria-relevant="additions text"
               aria-busy={isSending}
-              className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3 py-3"
+              className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
             >
               {state.messages.length === 0 ? (
                 <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
@@ -330,7 +378,7 @@ export function AssistantPanel() {
                       <button
                         key={suggestion}
                         type="button"
-                        onClick={() => setInput(suggestion)}
+                        onClick={() => void sendMessage(undefined, suggestion)}
                         className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 hover:border-primary/40 transition-colors"
                       >
                         {suggestion}
@@ -341,27 +389,33 @@ export function AssistantPanel() {
               ) : (
                 <AssistantMessages
                   messageList={state.messages}
-                  onFeedback={(messageId, rating) => void setFeedback(messageId, rating)}
+                  onFeedback={(messageId, rating) =>
+                    void setFeedback(messageId, rating)
+                  }
                   followUps={isSending ? undefined : messages.assistant.suggestions}
                   followUpsLabel={messages.assistant.followUpsLabel}
-                  onFollowUp={(suggestion) => setInput(suggestion)}
+                  onFollowUp={(suggestion) =>
+                    void sendMessage(undefined, suggestion)
+                  }
                 />
               )}
+
               {isSending ? (
                 <div
-                  className="flex items-center gap-2 text-xs text-muted-foreground"
+                  className="flex items-center gap-2 text-xs text-muted-foreground pl-9"
                   role="status"
                 >
                   <LoaderCircle
-                    className="h-4 w-4 animate-spin motion-reduce:animate-none"
+                    className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none text-primary"
                     aria-hidden="true"
                   />
-                  {messages.assistant.thinking}
+                  <span>{messages.assistant.thinking}</span>
                 </div>
               ) : null}
+
               {state.error ? (
                 <div
-                  className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
+                  className="rounded-xl border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive"
                   role="alert"
                 >
                   <p>{errorLabel}</p>
@@ -370,16 +424,31 @@ export function AssistantPanel() {
                       type="button"
                       variant="ghost"
                       size="sm"
-                      className="mt-2 min-h-11 px-0 text-destructive hover:bg-transparent hover:underline"
+                      className="mt-2 min-h-10 px-0 text-destructive hover:bg-transparent hover:underline"
                       onClick={(event) => void sendMessage(event, lastPrompt)}
                     >
-                      <RotateCcw className="mr-1 h-4 w-4" aria-hidden="true" />
+                      <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                       {messages.assistant.retry}
                     </Button>
                   ) : null}
                 </div>
               ) : null}
             </div>
+
+            {/* Floating scroll-to-bottom action */}
+            {userScrolled ? (
+              <button
+                type="button"
+                onClick={scrollToBottom}
+                className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full border border-primary/20 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
+                aria-label="Cuộn xuống tin mới"
+              >
+                <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                <span>Tin mới</span>
+              </button>
+            ) : null}
+
+            {/* Message composer */}
             <AssistantComposer
               input={input}
               inputRef={inputRef}

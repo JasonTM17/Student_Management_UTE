@@ -437,25 +437,33 @@ export async function resolveStudentAssistantQuery(
       const conduct = await conductApi.getMyConduct();
       if (conduct) {
         const cur = conduct.currentSemester;
-        const curScore = cur?.totalScore != null ? cur.totalScore : 88.0;
-        const curRank = cur?.classificationVi || 'Tốt';
-        const cumAvg = conduct.cumulativeAverageScore != null ? conduct.cumulativeAverageScore : 88.3;
-        const cumRank = conduct.cumulativeClassificationVi || 'Tốt';
-        const semName = cur?.semesterName || 'Học kỳ 1 năm học 2026-2027';
+        const curScore = cur?.totalScore != null ? cur.totalScore : conduct.cumulativeAverageScore;
+        const curRank = cur?.classificationVi || conduct.cumulativeClassificationVi || 'Đang cập nhật';
+        const cumAvg = conduct.cumulativeAverageScore != null ? conduct.cumulativeAverageScore : curScore;
+        const cumRank = conduct.cumulativeClassificationVi || curRank;
+        const semName = cur?.semesterName || 'Học kỳ hiện tại';
+
+        const hasScore = curScore != null;
 
         const answer =
           locale === 'vi'
-            ? `Đánh giá Điểm rèn luyện sinh viên (ĐRL) của bạn:\n\n` +
-              `• **Học kỳ hiện tại (${semName}):** **${curScore} / 100 điểm** (Xếp loại: **${curRank}**)\n` +
-              `• **Điểm trung bình toàn khóa (tích lũy):** **${cumAvg} / 100 điểm** (Xếp loại: **${cumRank}**)\n` +
-              `• **Trạng thái phê duyệt:** **${cur?.status === 'APPROVED' ? 'Đã phê duyệt chính thức' : 'Đang xử lý'}**\n` +
-              `• **Số minh chứng phong trào Đoàn - Hội:** **${cur?.activities?.length ?? 4} hoạt động** (+26.0 điểm thưởng)\n\n` +
-              `💡 Bạn có thể xem chi tiết 5 tiêu chí chuẩn của Bộ GD&ĐT, minh chứng phong trào và xuất phiếu rèn luyện PDF tại mục **Điểm rèn luyện** (/dashboard/conduct).`
-            : `Your Student Conduct Points (DRL) summary:\n\n` +
-              `• **Current Semester (${semName}):** **${curScore} / 100** (Rating: **${curRank}**)\n` +
-              `• **Cumulative Average:** **${cumAvg} / 100** (Rating: **${cumRank}**)\n` +
-              `• **Approval Status:** **${cur?.status === 'APPROVED' ? 'Officially Approved' : 'In Progress'}**\n\n` +
-              `💡 View the 5 standard criteria breakdown and download your PDF evaluation under **Conduct Points** (/dashboard/conduct).`;
+            ? hasScore
+              ? `Đánh giá Điểm rèn luyện sinh viên (ĐRL) của bạn:\n\n` +
+                `• **Học kỳ hiện tại (${semName}):** **${curScore} / 100 điểm** (Xếp loại: **${curRank}**)\n` +
+                `• **Điểm trung bình toàn khóa (tích lũy):** **${cumAvg ?? curScore} / 100 điểm** (Xếp loại: **${cumRank}**)\n` +
+                `• **Trạng thái phê duyệt:** **${cur?.status === 'APPROVED' ? 'Đã phê duyệt chính thức' : 'Đang xử lý'}**\n` +
+                `• **Số minh chứng phong trào Đoàn - Hội:** **${cur?.activities?.length ?? 0} hoạt động**\n\n` +
+                `💡 Bạn có thể xem chi tiết 5 tiêu chí chuẩn của Bộ GD&ĐT, minh chứng phong trào và xuất phiếu rèn luyện PDF tại mục **Điểm rèn luyện** (/dashboard/conduct).`
+              : `Hiện tại hệ thống chưa ghi nhận điểm rèn luyện chính thức cho học kỳ này của bạn.\n\n` +
+                `💡 Bạn có thể tự đánh giá điểm rèn luyện, tải lên minh chứng hoạt động và theo dõi kết quả tại mục **Điểm rèn luyện** (/dashboard/conduct).`
+            : hasScore
+              ? `Your Student Conduct Points (DRL) summary:\n\n` +
+                `• **Current Semester (${semName}):** **${curScore} / 100** (Rating: **${curRank}**)\n` +
+                `• **Cumulative Average:** **${cumAvg ?? curScore} / 100** (Rating: **${cumRank}**)\n` +
+                `• **Approval Status:** **${cur?.status === 'APPROVED' ? 'Officially Approved' : 'In Progress'}**\n\n` +
+                `💡 View the 5 standard criteria breakdown and download your PDF evaluation under **Conduct Points** (/dashboard/conduct).`
+              : `No official conduct record has been published for this semester yet.\n\n` +
+                `💡 You can evaluate your conduct score and submit proof under **Conduct Points** (/dashboard/conduct).`;
 
         return {
           answer,
@@ -670,8 +678,8 @@ export async function resolveStudentAssistantQuery(
   if (GRADUATION_REQUIREMENTS_REGEX.test(message)) {
     let completedCredits = 0;
     let totalCredits = 140;
-    let gpa = '3.42';
-    let conductScore = 88.0;
+    let gpa: string | null = null;
+    let conductScore: number | null = null;
     try {
       const curriculum = await curriculumApi.getMyCurriculum();
       if (curriculum?.curriculum) {
@@ -710,10 +718,10 @@ export async function resolveStudentAssistantQuery(
           `   • Tiến độ hiện tại của bạn: Đã hoàn thành **${completedCredits}/${totalCredits} tín chỉ** (${percent}%)\n\n` +
           `2. **Điểm trung bình tích lũy toàn khóa (GPA):**\n` +
           `   • Yêu cầu: Đạt từ **2.0 / 4.0** trở lên (thang điểm 4)\n` +
-          `   • GPA tích lũy hiện tại của bạn: **${gpa} / 4.0** (Đạt chuẩn)\n\n` +
+          `   • GPA tích lũy hiện tại của bạn: **${gpa != null ? `${gpa} / 4.0` : 'Đang cập nhật'}** ${gpa != null && Number(gpa) >= 2.0 ? '(Đạt chuẩn)' : ''}\n\n` +
           `3. **Điểm rèn luyện toàn khóa (ĐRL):**\n` +
           `   • Yêu cầu: Đạt từ loại **Trung bình (>= 50 điểm)** trở lên\n` +
-          `   • Điểm rèn luyện tích lũy của bạn: **${conductScore} / 100 điểm** (Đạt chuẩn)\n\n` +
+          `   • Điểm rèn luyện tích lũy của bạn: **${conductScore != null ? `${conductScore} / 100 điểm` : 'Đang cập nhật'}** ${conductScore != null && conductScore >= 50 ? '(Đạt chuẩn)' : ''}\n\n` +
           `4. **Chuẩn đầu ra Ngoại ngữ & Tin học:**\n` +
           `   • Ngoại ngữ: Chứng chỉ TOEIC Quốc tế tối thiểu 500+ (hoặc IELTS 5.0+, TOEFL tương đương)\n` +
           `   • Tin học: Chứng chỉ Ứng dụng CNTT nâng cao theo quy định\n\n` +
@@ -727,8 +735,8 @@ export async function resolveStudentAssistantQuery(
           `💡 Bạn có thể kiểm tra danh mục môn học còn thiếu tại mục **Chương trình đào tạo** (/dashboard/curriculum) và theo dõi đợt xét tốt nghiệp tại **Thông báo** (/dashboard/announcements).`
         : `Graduation Requirements and Exit Standards at HCMUTE:\n\n` +
           `1. **Curriculum Credits:** Complete all **${totalCredits} credits** (Your progress: **${completedCredits}/${totalCredits}**, ${percent}%).\n` +
-          `2. **Cumulative GPA:** Minimum **2.0 / 4.0** (Your current GPA: **${gpa} / 4.0**).\n` +
-          `3. **Conduct Points:** Minimum **50 / 100** (Your cumulative score: **${conductScore} / 100**).\n` +
+          `2. **Cumulative GPA:** Minimum **2.0 / 4.0** (Your current GPA: **${gpa != null ? `${gpa} / 4.0` : 'In progress'}**).\n` +
+          `3. **Conduct Points:** Minimum **50 / 100** (Your cumulative score: **${conductScore != null ? `${conductScore} / 100` : 'In progress'}**).\n` +
           `4. **Certificates:** Foreign Language (TOEIC 500+ / IELTS 5.0+), Advanced IT certificate, Physical Education & Defense Training.\n` +
           `5. **Graduation Capstone:** Successfully defend graduation thesis or capstone courses.\n\n` +
           `💡 Track remaining courses under **Curriculum** (/dashboard/curriculum).`;
@@ -752,9 +760,9 @@ export async function resolveStudentAssistantQuery(
 
   // D2. Handle Scholarship queries
   if (SCHOLARSHIP_REGEX.test(message)) {
-    let gpa = '3.42';
-    let conductScore = 88.0;
-    let conductRank = 'Tốt';
+    let gpa: string | null = null;
+    let conductScore: number | null = null;
+    let conductRank = 'Đang cập nhật';
     try {
       const transcript = await gradesApi.getMyTranscript();
       if (transcript?.summary?.cumulativeGpa != null) {
@@ -766,21 +774,24 @@ export async function resolveStudentAssistantQuery(
     try {
       const conduct = await conductApi.getMyConduct();
       if (conduct) {
-        conductScore = conduct.currentSemester?.totalScore ?? conduct.cumulativeAverageScore ?? 88.0;
-        conductRank = conduct.currentSemester?.classificationVi ?? conduct.cumulativeClassificationVi ?? 'Tốt';
+        conductScore = conduct.currentSemester?.totalScore ?? conduct.cumulativeAverageScore ?? null;
+        conductRank = conduct.currentSemester?.classificationVi ?? conduct.cumulativeClassificationVi ?? 'Đang cập nhật';
       }
     } catch {
       // fallback
     }
 
-    const numericGpa = parseFloat(gpa);
+    const hasData = gpa != null && conductScore != null;
+    const numericGpa = gpa != null ? parseFloat(gpa) : 0;
     let scholarshipLevel = 'Chưa đạt khung xét';
-    if (numericGpa >= 3.6 && conductScore >= 90) {
-      scholarshipLevel = 'Học bổng XUẤT SẮC (Mức 120% học phí)';
-    } else if (numericGpa >= 3.2 && conductScore >= 80) {
-      scholarshipLevel = 'Học bổng GIỎI (Mức 100% học phí)';
-    } else if (numericGpa >= 2.5 && conductScore >= 70) {
-      scholarshipLevel = 'Học bổng KHÁ (Mức học bổng cơ bản)';
+    if (hasData) {
+      if (numericGpa >= 3.6 && (conductScore ?? 0) >= 90) {
+        scholarshipLevel = 'Học bổng XUẤT SẮC (Mức 120% học phí)';
+      } else if (numericGpa >= 3.2 && (conductScore ?? 0) >= 80) {
+        scholarshipLevel = 'Học bổng GIỎI (Mức 100% học phí)';
+      } else if (numericGpa >= 2.5 && (conductScore ?? 0) >= 70) {
+        scholarshipLevel = 'Học bổng KHÁ (Mức học bổng cơ bản)';
+      }
     }
 
     const answer =
@@ -793,10 +804,12 @@ export async function resolveStudentAssistantQuery(
           `• **Điều kiện tiên quyết:**\n` +
           `   - Đăng ký và tích lũy tối thiểu **14 tín chỉ** trong học kỳ xét (không tính GDTC, GDQP-AN).\n` +
           `   - Không có môn học nào bị điểm F hoặc vi phạm kỷ luật trong kỳ.\n\n` +
-          `• **Đối chiếu hồ sơ cá nhân của bạn hiện tại:**\n` +
-          `   - **Điểm GPA tích lũy:** **${gpa} / 4.0**\n` +
-          `   - **Điểm rèn luyện:** **${conductScore} / 100 điểm** (Xếp loại: **${conductRank}**)\n` +
-          `   - **Đánh giá triển vọng:** Với điểm số hiện tại, bạn đủ điều kiện nằm trong diện xem xét **${scholarshipLevel}** của Khoa!\n\n` +
+          (hasData
+            ? `• **Đối chiếu hồ sơ cá nhân của bạn hiện tại:**\n` +
+              `   - **Điểm GPA tích lũy:** **${gpa} / 4.0**\n` +
+              `   - **Điểm rèn luyện:** **${conductScore} / 100 điểm** (Xếp loại: **${conductRank}**)\n` +
+              `   - **Đánh giá triển vọng:** Với điểm số hiện tại, bạn ${numericGpa >= 2.5 && (conductScore ?? 0) >= 70 ? `đủ điều kiện nằm trong diện xem xét **${scholarshipLevel}** của Khoa!` : 'chưa đạt ngưỡng điểm tối thiểu để xét học bổng kỳ này.'}\n\n`
+            : `• **Hồ sơ học vụ của bạn:** Chưa ghi nhận đủ dữ liệu điểm GPA hoặc điểm rèn luyện chính thức của học kỳ gần nhất để đối chiếu tự động.\n\n`) +
           `💡 Danh sách sinh viên nhận học bổng chính thức theo từng kỳ được Hội đồng xét duyệt và công bố tại mục **Thông báo** (/dashboard/announcements).`
         : `Academic Scholarship Information (KKHT) at HCMUTE:\n\n` +
           `• **Criteria:**\n` +
@@ -804,7 +817,10 @@ export async function resolveStudentAssistantQuery(
           `   - Very Good: GPA >= 3.2 & Conduct >= 80 (100% tuition)\n` +
           `   - Good: GPA >= 2.5 & Conduct >= 70\n` +
           `• **Prerequisites:** Min 14 credits enrolled, no F grades, no disciplinary records.\n` +
-          `• **Your Profile:** GPA: **${gpa}**, Conduct: **${conductScore}** (${scholarshipLevel}).\n\n` +
+          (hasData
+            ? `• **Your Profile:** GPA: **${gpa}**, Conduct: **${conductScore}** (${scholarshipLevel}).\n\n`
+            : `• **Your Profile:** Transcript or conduct records for the target term are not finalized yet.\n\n`) +
+          `💡 Official recipient lists are published under **Announcements** (/dashboard/announcements).`;
           `💡 Official awarded student lists are posted under **Announcements** (/dashboard/announcements).`;
 
     return {
@@ -1134,17 +1150,30 @@ export async function resolveStudentAssistantQuery(
         mssv = '24110054';
       }
 
+      const lecturerCode =
+        currentUser.lecturerId ||
+        currentUser.lecturerCode ||
+        (currentUser.email === 'lecturer@campuscore.edu' ? 'GV-1029' : currentUser.id);
+      const lecturerTitle =
+        currentUser.title ||
+        currentUser.academicTitle ||
+        (currentUser.email === 'lecturer@campuscore.edu'
+          ? (locale === 'vi' ? 'Phó Giáo sư, Tiến sĩ (PGS.TS)' : 'Associate Professor, Ph.D.')
+          : (locale === 'vi' ? 'Giảng viên' : 'Lecturer'));
+      const lecturerDept =
+        currentUser.department ||
+        (locale === 'vi' ? 'Kỹ thuật Phần mềm, Khoa CNTT - HCMUTE' : 'Software Engineering, Faculty of IT - HCMUTE');
+
       const answer =
         locale === 'vi'
           ? `Thông tin hồ sơ cá nhân của bạn:\n\n` +
             `• **Họ và tên:** **${fullName}**\n` +
             `• **Vai trò:** **${roleName}**\n` +
             (isStudent ? `• **Mã số sinh viên (MSSV):** **${mssv || '24110054'}**\n` : '') +
-            (isStudent ? `• **Lớp sinh hoạt:** **241100-CNTT** (Khóa 2024)\n` : '') +
             (isStudent ? `• **Khoa:** **Khoa Công nghệ Thông tin - HCMUTE**\n` : '') +
-            (isLecturer ? `• **Mã cán bộ / Giảng viên:** **GV-1029**\n` : '') +
-            (isLecturer ? `• **Học hàm / Học vị:** **Phó Giáo sư, Tiến sĩ (PGS.TS)**\n` : '') +
-            (isLecturer ? `• **Bộ môn:** **Kỹ thuật Phần mềm, Khoa CNTT**\n` : '') +
+            (isLecturer ? `• **Mã cán bộ / Giảng viên:** **${lecturerCode}**\n` : '') +
+            (isLecturer ? `• **Học hàm / Học vị:** **${lecturerTitle}**\n` : '') +
+            (isLecturer ? `• **Bộ môn:** **${lecturerDept}**\n` : '') +
             `• **Email:** **${currentUser.email}**\n` +
             (currentUser.phone ? `• **Số điện thoại:** ${currentUser.phone}\n` : '') +
             `\n💡 Bạn có thể cập nhật thông tin liên hệ và ảnh đại diện tại trang **Hồ sơ cá nhân** (/dashboard/profile).`
@@ -1152,7 +1181,11 @@ export async function resolveStudentAssistantQuery(
             `• **Full Name:** **${fullName}**\n` +
             `• **Role:** **${roleName}**\n` +
             (isStudent ? `• **Student ID (MSSV):** **${mssv || '24110054'}**\n` : '') +
+            (isLecturer ? `• **Lecturer ID:** **${lecturerCode}**\n` : '') +
+            (isLecturer ? `• **Title / Academic Rank:** **${lecturerTitle}**\n` : '') +
+            (isLecturer ? `• **Department:** **${lecturerDept}**\n` : '') +
             `• **Email:** **${currentUser.email}**\n` +
+            (currentUser.phone ? `• **Phone:** ${currentUser.phone}\n` : '') +
             `\n💡 Manage your profile details and settings under **Profile** (/dashboard/profile).`;
 
       return {

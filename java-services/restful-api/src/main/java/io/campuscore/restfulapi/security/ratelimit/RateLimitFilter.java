@@ -154,6 +154,9 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (uri.startsWith("/api/v1/academic/me/enrollments") || uri.startsWith("/api/v1/academic/enrollments")) {
             return new RateLimitPolicy(RateLimitCategory.ENROLLMENT_MUTATION, 15, 60);
         }
+        if (uri.startsWith("/api/v1/assistant/") || uri.startsWith("/api/v1/thesis/assistant")) {
+            return new RateLimitPolicy(RateLimitCategory.ANNOUNCEMENT_MUTATION, 20, 60);
+        }
         if (uri.startsWith("/api/v1/thesis/")) {
             return new RateLimitPolicy(RateLimitCategory.THESIS_MUTATION, 20, 60);
         }
@@ -161,9 +164,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
             return new RateLimitPolicy(RateLimitCategory.GRADING_MUTATION, 20, 60);
         }
         if (uri.startsWith("/api/v1/announcements")) {
-            return new RateLimitPolicy(RateLimitCategory.ANNOUNCEMENT_MUTATION, 20, 60);
-        }
-        if (uri.startsWith("/api/v1/assistant/")) {
             return new RateLimitPolicy(RateLimitCategory.ANNOUNCEMENT_MUTATION, 20, 60);
         }
         if (uri.startsWith("/api/v1/notifications")) {
