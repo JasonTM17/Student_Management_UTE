@@ -156,7 +156,7 @@ export default function LoginPage() {
         </div>
 
         <div
-          className="grid grid-cols-3 gap-1 rounded-xl border border-border/80 bg-secondary/40 p-1"
+          className="grid grid-cols-3 gap-1 rounded-xl border border-border/80 bg-slate-100/90 dark:bg-muted/70 p-1.5 shadow-inner"
           role="tablist"
           aria-label={messages.login.portals.groupLabel}
         >
@@ -169,10 +169,10 @@ export default function LoginPage() {
                 role="tab"
                 aria-selected={selected}
                 className={cn(
-                  'inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-center text-sm font-semibold focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                  'inline-flex min-h-11 items-center justify-center rounded-lg px-2 text-center text-sm font-semibold transition-all duration-200 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                   selected
-                    ? 'bg-card text-foreground shadow-sm'
-                    : 'text-muted-foreground hover:text-foreground',
+                    ? 'bg-white dark:bg-card text-foreground font-bold shadow-md ring-1 ring-black/10 dark:ring-white/15'
+                    : 'text-muted-foreground hover:text-foreground hover:bg-white/60 dark:hover:bg-card/40',
                 )}
               >
                 {messages.login.portals[item].tab}

@@ -298,24 +298,32 @@ export default function DashboardPage() {
       value: formatNumber(enrollments.length),
       icon: BookOpen,
       tone: metricToneClass('info'),
+      href: '/dashboard/enrollments',
+      tooltip: locale === 'vi' ? 'Xem danh sách học phần' : 'View enrolled courses',
     },
     {
       label: copy.stats.active,
       value: formatNumber(activeCourses.length),
       icon: GraduationCap,
       tone: metricToneClass('success'),
+      href: '/dashboard/enrollments',
+      tooltip: locale === 'vi' ? 'Xem các môn đang học' : 'View active courses',
     },
     {
       label: copy.stats.pending,
       value: formatNumber(pendingCourses.length),
       icon: ClipboardList,
       tone: metricToneClass('warning'),
+      href: '/dashboard/register',
+      tooltip: locale === 'vi' ? 'Đến trang đăng ký học phần' : 'Go to course registration',
     },
     {
       label: copy.stats.term,
       value: currentSemesterName,
       icon: Calendar,
       tone: metricToneClass('neutral'),
+      href: '/dashboard/schedule',
+      tooltip: locale === 'vi' ? 'Xem thời khóa biểu học kỳ' : 'View semester schedule',
     },
   ];
 
@@ -365,27 +373,32 @@ export default function DashboardPage() {
             className="grid grid-cols-1 gap-3 sm:grid-cols-2 xl:grid-cols-4"
           >
             {statChips.map((chip) => (
-              <div
+              <LocalizedLink
                 key={chip.label}
-                className="flex min-w-0 items-center gap-3 rounded-lg border border-border/70 bg-card p-3.5"
+                href={chip.href}
+                title={chip.tooltip}
+                className="group relative flex min-w-0 items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-3.5 shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:bg-muted/30 hover:shadow-md focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring cursor-pointer"
               >
-                <span
-                  className={cn(
-                    'flex h-9 w-9 shrink-0 items-center justify-center rounded-md',
-                    chip.tone,
-                  )}
-                >
-                  <chip.icon className="h-5 w-5" />
-                </span>
-                <div className="min-w-0">
-                  <div className="truncate text-xl font-semibold leading-6 text-foreground">
-                    {chip.value}
-                  </div>
-                  <div className="truncate text-xs font-medium text-muted-foreground">
-                    {chip.label}
+                <div className="flex min-w-0 items-center gap-3">
+                  <span
+                    className={cn(
+                      'flex h-10 w-10 shrink-0 items-center justify-center rounded-lg transition-transform duration-200 group-hover:scale-105',
+                      chip.tone,
+                    )}
+                  >
+                    <chip.icon className="h-5 w-5" />
+                  </span>
+                  <div className="min-w-0">
+                    <div className="truncate text-xl font-bold leading-6 text-foreground group-hover:text-primary transition-colors">
+                      {chip.value}
+                    </div>
+                    <div className="truncate text-xs font-medium text-muted-foreground">
+                      {chip.label}
+                    </div>
                   </div>
                 </div>
-              </div>
+                <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/40 opacity-0 transition-all duration-200 group-hover:translate-x-0.5 group-hover:text-primary group-hover:opacity-100" />
+              </LocalizedLink>
             ))}
           </div>
 
