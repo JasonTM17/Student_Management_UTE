@@ -206,7 +206,7 @@ export function AnnouncementFeedCard({
                 onClick={handleShare}
                 className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
                 title={isVi ? 'Sao chép liên kết' : 'Copy link'}
-                aria-label="Share"
+                aria-label={isVi ? 'Chia sẻ' : 'Share'}
               >
                 {copied ? <Check className="h-3.5 w-3.5 text-emerald-500" /> : <Share2 className="h-3.5 w-3.5" />}
               </button>
@@ -328,7 +328,7 @@ export function AnnouncementFeedCard({
               onClick={handleShare}
               className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               title={isVi ? 'Sao chép liên kết' : 'Copy link'}
-              aria-label="Share"
+              aria-label={isVi ? 'Chia sẻ' : 'Share'}
             >
               {copied ? <Check className="h-3 w-3 text-emerald-500" /> : <Share2 className="h-3 w-3" />}
             </button>
