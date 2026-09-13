@@ -94,7 +94,10 @@ test('assistant follow-up chips render from panel state, not markdown', () => {
     path.join(root, 'src/components/assistant/AssistantPanel.tsx'),
     'utf8',
   );
-  assert.match(panelSource, /followUps=\{isSending \? undefined : messages\.assistant\.suggestions\}/);
+  // Follow-ups are still panel-computed (never parsed from model markdown),
+  // and now adapt to the domain of the last grounded answer.
+  assert.match(panelSource, /followUps=\{followUps\}/);
+  assert.match(panelSource, /followUpsByDomain/);
   assert.doesNotMatch(panelSource, /dangerouslySetInnerHTML/);
   const messagesSource = fs.readFileSync(
     path.join(root, 'src/components/assistant/AssistantMessages.tsx'),

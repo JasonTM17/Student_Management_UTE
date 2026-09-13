@@ -3,8 +3,10 @@
 import { useState } from 'react';
 import {
   Bot,
+  Check,
   ChevronDown,
   ChevronUp,
+  Copy,
   FileText,
   ShieldCheck,
   Sparkles,
@@ -19,9 +21,26 @@ import type { AssistantCitation } from '@/lib/thesis-api';
 import type { ChatMessage } from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
 
+type FeedbackReason =
+  | 'INCORRECT'
+  | 'OUTDATED'
+  | 'NOT_RELEVANT'
+  | 'UNSAFE';
+
+const FEEDBACK_REASONS: FeedbackReason[] = [
+  'INCORRECT',
+  'OUTDATED',
+  'NOT_RELEVANT',
+  'UNSAFE',
+];
+
 interface AssistantMessagesProps {
   messageList: ChatMessage[];
-  onFeedback: (messageId: string, rating: 'UP' | 'DOWN') => void;
+  onFeedback: (
+    messageId: string,
+    rating: 'UP' | 'DOWN',
+    reason?: FeedbackReason,
+  ) => void;
   /** Suggested follow-up questions shown under the latest answer. */
   followUps?: readonly string[];
   followUpsLabel?: string;
@@ -38,13 +57,20 @@ export function reasonLabel(
       ? messages.assistant.cancelled
       : message.reasonCode === 'PROMPT_INJECTION'
         ? messages.assistant.blockedLabel
-        : message.degraded
-          ? messages.assistant.degraded
-          : message.reasonCode === 'NO_MATCH'
-            ? messages.assistant.noMatch
-            : message.reasonCode === 'ANSWERED'
-              ? messages.assistant.answered
-              : messages.assistant.answered;
+        : message.reasonCode === 'SENSITIVE_EMAIL' ||
+            message.reasonCode === 'SENSITIVE_PHONE' ||
+            message.reasonCode === 'SENSITIVE_STUDENT_ID' ||
+            message.reasonCode === 'SENSITIVE_CREDENTIAL'
+          ? messages.assistant.blockedLabel
+          : message.reasonCode === 'PERSONAL_CONTEXT'
+            ? messages.assistant.personalContext
+            : message.degraded
+              ? messages.assistant.degraded
+              : message.reasonCode === 'NO_MATCH'
+                ? messages.assistant.noMatch
+                : message.reasonCode === 'ANSWERED'
+                  ? messages.assistant.answered
+                  : messages.assistant.answered;
 }
 
 function citationDomainLabel(
@@ -60,6 +86,22 @@ function citationDomainLabel(
   );
 }
 
+function messageTimeLabel(
+  createdAt: string | undefined,
+  locale: string,
+): string | null {
+  if (!createdAt) return null;
+  const date = new Date(createdAt);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(date);
+}
+
 export function AssistantMessages({
   messageList,
   onFeedback,
@@ -67,11 +109,24 @@ export function AssistantMessages({
   followUpsLabel,
   onFollowUp,
 }: AssistantMessagesProps) {
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const [openCitations, setOpenCitations] = useState<Record<string, boolean>>({});
+  const [copiedId, setCopiedId] = useState<string | null>(null);
 
   const toggleCitation = (messageId: string) => {
     setOpenCitations((prev) => ({ ...prev, [messageId]: !prev[messageId] }));
+  };
+
+  const copyMessage = async (message: ChatMessage) => {
+    try {
+      await navigator.clipboard.writeText(message.content);
+      setCopiedId(message.id);
+      window.setTimeout(() => {
+        setCopiedId((current) => (current === message.id ? null : current));
+      }, 1500);
+    } catch {
+      /* clipboard unavailable (insecure context or permission denied) */
+    }
   };
 
   const lastAssistantIndex = (() => {
@@ -89,6 +144,7 @@ export function AssistantMessages({
       {messageList.map((message, index) => {
         const isUser = message.role === 'user';
         const isCitationOpen = Boolean(openCitations[message.id]);
+        const timeLabel = messageTimeLabel(message.createdAt, locale);
 
         return (
           <div key={message.id} className="space-y-2">
@@ -150,7 +206,10 @@ export function AssistantMessages({
                       </span>
                     </div>
                   ) : (
-                    <AssistantMarkdownContent content={message.content} />
+                    <AssistantMarkdownContent
+                      content={message.content}
+                      streaming={Boolean(message.pending)}
+                    />
                   )}
 
                   {/* Reason Code Badge */}
@@ -187,6 +246,8 @@ export function AssistantMessages({
                       <button
                         type="button"
                         onClick={() => toggleCitation(message.id)}
+                        aria-expanded={isCitationOpen}
+                        aria-controls={`assistant-citations-${message.id}`}
                         className="flex w-full items-center justify-between py-1 text-xs font-semibold text-primary transition-opacity hover:opacity-80"
                       >
                         <span className="flex items-center gap-1.5">
@@ -201,7 +262,10 @@ export function AssistantMessages({
                       </button>
 
                       {isCitationOpen && (
-                        <div className="mt-2 space-y-2 rounded-xl bg-secondary/50 p-2.5 text-xs">
+                        <div
+                          id={`assistant-citations-${message.id}`}
+                          className="mt-2 space-y-2 rounded-xl bg-secondary/50 p-2.5 text-xs"
+                        >
                           {message.citations.map((citation) => (
                             <div
                               key={citation.id}
@@ -230,9 +294,7 @@ export function AssistantMessages({
                   ) : null}
 
                   {/* Feedback Buttons */}
-                  {message.role === 'assistant' &&
-                  !message.pending &&
-                  !message.id.startsWith('local-') ? (
+                  {message.role === 'assistant' && !message.pending ? (
                     <div
                       data-assistant-feedback={message.id}
                       className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-1"
@@ -241,38 +303,89 @@ export function AssistantMessages({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className={cn(
-                          'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-primary',
-                          message.feedback === 'UP' &&
-                            'bg-secondary text-primary',
-                        )}
-                        aria-label={messages.assistant.feedbackUp}
-                        aria-pressed={message.feedback === 'UP'}
-                        onClick={() => onFeedback(message.id, 'UP')}
+                        className="min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-primary"
+                        aria-label={
+                          copiedId === message.id
+                            ? messages.assistant.copiedMessage
+                            : messages.assistant.copyMessage
+                        }
+                        onClick={() => void copyMessage(message)}
                       >
-                        <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
-                      </Button>
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className={cn(
-                          'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-destructive',
-                          message.feedback === 'DOWN' &&
-                            'bg-secondary text-destructive',
+                        {copiedId === message.id ? (
+                          <Check className="h-3.5 w-3.5 text-emerald-600" aria-hidden="true" />
+                        ) : (
+                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
-                        aria-label={messages.assistant.feedbackDown}
-                        aria-pressed={message.feedback === 'DOWN'}
-                        onClick={() => onFeedback(message.id, 'DOWN')}
-                      >
-                        <ThumbsDown
-                          className="h-3.5 w-3.5"
-                          aria-hidden="true"
-                        />
                       </Button>
+                      {!message.id.startsWith('local-') ? (
+                        <>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-primary',
+                              message.feedback === 'UP' &&
+                                'bg-secondary text-primary',
+                            )}
+                            aria-label={messages.assistant.feedbackUp}
+                            aria-pressed={message.feedback === 'UP'}
+                            onClick={() => onFeedback(message.id, 'UP')}
+                          >
+                            <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
+                          </Button>
+                          <Button
+                            type="button"
+                            variant="ghost"
+                            size="icon"
+                            className={cn(
+                              'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-destructive',
+                              message.feedback === 'DOWN' &&
+                                'bg-secondary text-destructive',
+                            )}
+                            aria-label={messages.assistant.feedbackDown}
+                            aria-pressed={message.feedback === 'DOWN'}
+                            onClick={() => onFeedback(message.id, 'DOWN')}
+                          >
+                            <ThumbsDown
+                              className="h-3.5 w-3.5"
+                              aria-hidden="true"
+                            />
+                          </Button>
+                        </>
+                      ) : null}
+                    </div>
+                  ) : null}
+
+                  {/* A thumbs-down opens a one-tap reason row so the quality
+                      loop captures why the answer failed, not just that it did. */}
+                  {message.role === 'assistant' &&
+                  !message.pending &&
+                  message.feedback === 'DOWN' &&
+                  !message.feedbackReason &&
+                  !message.id.startsWith('local-') ? (
+                    <div className="ml-9 mt-1 flex flex-wrap items-center gap-1.5">
+                      <span className="text-[11px] font-medium text-muted-foreground">
+                        {messages.assistant.feedbackReasonPrompt}
+                      </span>
+                      {FEEDBACK_REASONS.map((reason) => (
+                        <button
+                          key={reason}
+                          type="button"
+                          onClick={() => onFeedback(message.id, 'DOWN', reason)}
+                          className="rounded-full border border-border/80 bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+                        >
+                          {messages.assistant.feedbackReasons[reason]}
+                        </button>
+                      ))}
                     </div>
                   ) : null}
                 </div>
+                {timeLabel && !message.pending ? (
+                  <p className="mt-0.5 px-1 text-[10px] leading-none text-muted-foreground/80">
+                    {timeLabel}
+                  </p>
+                ) : null}
               </div>
             </div>
 

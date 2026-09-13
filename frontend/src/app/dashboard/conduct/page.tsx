@@ -641,7 +641,15 @@ export default function StudentConductPage() {
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
               <span>{copy.verifiedBy} <strong className="text-foreground">{copy.verified}</strong></span>
-              <span className="text-primary font-medium cursor-pointer hover:underline">{copy.viewCertificates}</span>
+              <button
+                type="button"
+                onClick={() => {
+                  document.getElementById('conduct-activities-section')?.scrollIntoView({ behavior: 'smooth' });
+                }}
+                className="text-primary font-medium cursor-pointer hover:underline focus:outline-none"
+              >
+                {copy.viewCertificates}
+              </button>
             </div>
           </CardContent>
         </Card>
@@ -733,7 +741,7 @@ export default function StudentConductPage() {
         </div>
       </div>
 
-      <Card className="border-border/70 shadow-sm overflow-hidden">
+      <Card id="conduct-activities-section" className="border-border/70 shadow-sm overflow-hidden scroll-mt-6">
         <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))] py-3.5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2">

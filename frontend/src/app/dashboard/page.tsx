@@ -567,14 +567,15 @@ export default function DashboardPage() {
                   );
 
                   return (
-                    <div
+                    <LocalizedLink
                       key={enrollment.id}
-                      className="group flex items-center gap-3.5 rounded-lg border border-border/70 bg-card p-3.5 transition-all hover:border-primary/40 hover:shadow-xs"
+                      href="/dashboard/enrollments"
+                      className="group flex items-center gap-3.5 rounded-lg border border-border/70 bg-card p-3.5 transition-all hover:border-primary/40 hover:bg-secondary/20 hover:shadow-xs"
                     >
-                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                      <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary transition-transform group-hover:scale-105">
                         <BookMarked className="h-5 w-5" />
                       </div>
-                      <div className="min-w-0 flex-1 truncate font-semibold text-foreground">
+                      <div className="min-w-0 flex-1 truncate font-semibold text-foreground transition-colors group-hover:text-primary">
                         {enrollment.section?.course?.code} - {localizedCourseName}
                       </div>
                       <span
@@ -583,7 +584,8 @@ export default function DashboardPage() {
                       >
                         {enrollmentStatusLabel(enrollment.status)}
                       </span>
-                    </div>
+                      <ArrowRight className="h-4 w-4 shrink-0 text-muted-foreground/40 transition-transform group-hover:translate-x-0.5 group-hover:text-primary" />
+                    </LocalizedLink>
                   );
                 })}
               </div>

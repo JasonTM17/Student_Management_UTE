@@ -25,6 +25,7 @@ import {
   isStudentAssistantQuery,
   resolveStudentAssistantQuery,
 } from '@/lib/assistant-student-resolver';
+import { inspectAssistantInput, isSensitiveGuardReason } from '@/lib/assistant-input-guard';
 
 export interface UseAssistantStreamOptions {
   locale: Locale;
@@ -33,6 +34,7 @@ export interface UseAssistantStreamOptions {
     unavailable: string;
     quotaExceeded: string;
     blocked: string;
+    sensitiveBlocked: string;
   };
   onReconcileHistory?: () => void;
   onNewExchange?: () => void;
@@ -104,7 +106,9 @@ export function useAssistantStream({
           dispatch({
             type: 'complete',
             reply: {
-              content: assistantMessages.blocked,
+              content: isSensitiveGuardReason(event.code)
+                ? assistantMessages.sensitiveBlocked
+                : assistantMessages.blocked,
               degraded: true,
               reasonCode: event.code,
             },
@@ -132,7 +136,12 @@ export function useAssistantStream({
         throw new Error(event.code ?? 'assistant stream error');
       }
     },
-    [assistantMessages.blocked, assistantMessages.cancelled, assistantMessages.unavailable],
+    [
+      assistantMessages.blocked,
+      assistantMessages.cancelled,
+      assistantMessages.sensitiveBlocked,
+      assistantMessages.unavailable,
+    ],
   );
 
   const sendMessage = useCallback(
@@ -153,7 +162,12 @@ export function useAssistantStream({
       } else {
         dispatch({
           type: 'user',
-          message: { id: `${Date.now()}-user`, role: 'user', content: message },
+          message: {
+            id: `${Date.now()}-user`,
+            role: 'user',
+            content: message,
+            createdAt: new Date().toISOString(),
+          },
         });
         dispatch({
           type: 'assistant-start',
@@ -192,6 +206,24 @@ export function useAssistantStream({
       let sawDone = false;
       let terminalReconciled = false;
       try {
+        // The student resolver answers locally, so the server guard never
+        // sees those turns. Run the same deterministic checks first so a
+        // blocked or sensitive message cannot reach a canned answer.
+        const localGuard = inspectAssistantInput(message);
+        if (!localGuard.allowed) {
+          dispatch({ type: 'replace', text: '' });
+          dispatch({
+            type: 'complete',
+            reply: {
+              content: isSensitiveGuardReason(localGuard.reasonCode)
+                ? assistantMessages.sensitiveBlocked
+                : assistantMessages.blocked,
+              degraded: true,
+              reasonCode: localGuard.reasonCode,
+            },
+          });
+          return;
+        }
         if (isStudentAssistantQuery(message)) {
           try {
             const resolution = await resolveStudentAssistantQuery(message, locale);
@@ -212,7 +244,7 @@ export function useAssistantStream({
               applyStreamEvent({
                 type: 'done',
                 messageId: `local-resolved-${Date.now()}`,
-                reasonCode: 'STOP',
+                reasonCode: 'PERSONAL_CONTEXT',
                 degraded: false,
               });
               terminalReconciled = true;
@@ -348,8 +380,10 @@ export function useAssistantStream({
     },
     [
       applyStreamEvent,
+      assistantMessages.blocked,
       assistantMessages.cancelled,
       assistantMessages.quotaExceeded,
+      assistantMessages.sensitiveBlocked,
       assistantMessages.unavailable,
       input,
       isSending,
@@ -416,10 +450,20 @@ export function useAssistantStream({
   }, []);
 
   const setFeedback = useCallback(
-    async (messageId: string, rating: 'UP' | 'DOWN') => {
-      dispatch({ type: 'feedback', messageId, rating });
+    async (
+      messageId: string,
+      rating: 'UP' | 'DOWN',
+      reason?:
+        | 'HELPFUL'
+        | 'CLEAR'
+        | 'INCORRECT'
+        | 'OUTDATED'
+        | 'NOT_RELEVANT'
+        | 'UNSAFE',
+    ) => {
+      dispatch({ type: 'feedback', messageId, rating, reason });
       try {
-        await thesisApi.setMessageFeedback(messageId, rating);
+        await thesisApi.setMessageFeedback(messageId, rating, reason);
       } catch {
         /* feedback is best effort and never changes answer state */
       }

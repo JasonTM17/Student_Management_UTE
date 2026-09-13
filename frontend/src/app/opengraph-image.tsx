@@ -1,5 +1,6 @@
 import { ImageResponse } from 'next/og';
 
+export const dynamic = 'force-dynamic';
 export const alt = 'CampusUTE - Cổng Thông Tin Đào Tạo & Quản Lý Sinh Viên HCMUTE';
 export const size = {
   width: 1200,

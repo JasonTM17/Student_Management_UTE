@@ -1,7 +1,8 @@
 /* eslint-disable @next/next/no-img-element */
 'use client';
 
-import React, { useState, useMemo } from 'react';
+import React, { useState, useMemo, useRef } from 'react';
+import { toast } from 'sonner';
 import {
   Award,
   BarChart2,
@@ -35,6 +36,51 @@ export function StudentUteProfileGradeView({
   const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
   const [activeCurriculum, setActiveCurriculum] = useState('24110CTN');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
+  const [isRefreshing, setIsRefreshing] = useState(false);
+  const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
+
+  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (file) {
+      if (file.size > 5 * 1024 * 1024) {
+        toast.error('Kích thước ảnh không được vượt quá 5MB');
+        return;
+      }
+      const reader = new FileReader();
+      reader.onload = () => {
+        setAvatarPreview(reader.result as string);
+        toast.success('Đã cập nhật ảnh đại diện thẻ sinh viên');
+      };
+      reader.readAsDataURL(file);
+    }
+  };
+
+  const handleRefreshChart = () => {
+    setIsRefreshing(true);
+    setTimeout(() => {
+      setIsRefreshing(false);
+      toast.success('Đã làm mới dữ liệu biểu đồ học tập');
+    }, 600);
+  };
+
+  const handleDownloadChart = () => {
+    const svg = document.getElementById('grade-combo-chart');
+    if (svg) {
+      const serializer = new XMLSerializer();
+      const source = serializer.serializeToString(svg);
+      const blob = new Blob([source], { type: 'image/svg+xml;charset=utf-8' });
+      const url = URL.createObjectURL(blob);
+      const link = document.createElement('a');
+      link.href = url;
+      link.download = `bieu-do-hoc-tap-${studentInfo.studentId}.svg`;
+      link.click();
+      URL.revokeObjectURL(url);
+      toast.success('Đã tải xuống biểu đồ kết quả học tập (SVG)');
+    } else {
+      window.print();
+    }
+  };
 
   // Student details with high-fidelity UTE defaults
   const studentInfo = useMemo(() => {
@@ -155,7 +201,7 @@ export function StudentUteProfileGradeView({
             <div className="relative mb-3">
               <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#0d509d]/30 bg-slate-100 flex items-center justify-center shadow-inner">
                 <img
-                  src={user?.avatar || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80"}
+                  src={avatarPreview || user?.avatar || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80"}
                   alt={studentInfo.name}
                   className="w-full h-full object-cover"
                 />
@@ -164,8 +210,16 @@ export function StudentUteProfileGradeView({
             <h3 className="font-bold text-base text-slate-800 tracking-tight text-center">
               {studentInfo.name}
             </h3>
+            <input
+              type="file"
+              ref={fileInputRef}
+              accept="image/*"
+              className="hidden"
+              onChange={handleAvatarChange}
+            />
             <button
               type="button"
+              onClick={() => fileInputRef.current?.click()}
               className="mt-2 text-xs text-[#0d509d] hover:underline font-medium cursor-pointer"
             >
               Cập nhật ảnh thẻ
@@ -325,15 +379,17 @@ export function StudentUteProfileGradeView({
                   </button>
                   <button
                     type="button"
+                    onClick={handleRefreshChart}
                     className="p-1 rounded hover:bg-slate-100 transition-colors"
                     title="Làm mới"
                   >
-                    <RotateCw className="w-3.5 h-3.5" />
+                    <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#0d509d]")} />
                   </button>
                   <button
                     type="button"
+                    onClick={handleDownloadChart}
                     className="p-1 rounded hover:bg-slate-100 transition-colors"
-                    title="Tải xuống"
+                    title="Tải xuống biểu đồ (SVG)"
                   >
                     <Download className="w-3.5 h-3.5" />
                   </button>
@@ -343,6 +399,7 @@ export function StudentUteProfileGradeView({
               {/* SVG Responsive Bar & Line Combo Chart */}
               <div className="w-full overflow-x-auto">
                 <svg
+                  id="grade-combo-chart"
                   viewBox={`0 0 ${chartWidth} ${chartHeight}`}
                   className="w-full h-auto min-w-[420px]"
                 >

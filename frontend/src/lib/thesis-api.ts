@@ -61,7 +61,9 @@ export interface ThesisCouncil {
   id: string;
   roundId: string;
   name: string;
+  status?: string;
   members?: ThesisCouncilMember[];
+  topicIds?: string[];
 }
 
 export interface ThesisGroupReport {
@@ -95,6 +97,35 @@ export interface ThesisRoundResult {
   finalScore: number;
   councilName: string;
   leaderStudentId: string;
+}
+
+export interface ThesisSupervisedTopic {
+  topicId: string;
+  title: string;
+  topicStatus: string;
+  roundId: string;
+  roundName: string;
+  roundStatus: string;
+  reportDate?: string | null;
+  groupCount: number;
+  pendingGroupCount: number;
+}
+
+export interface ThesisCouncilAssignment {
+  councilId: string;
+  name: string;
+  memberRole: string;
+  roundId: string;
+  roundName: string;
+  roundStatus: string;
+  reportDate?: string | null;
+  gvpbDeadline?: string | null;
+  topicCount: number;
+}
+
+export interface ThesisLecturerWorkload {
+  topics: ThesisSupervisedTopic[];
+  councils: ThesisCouncilAssignment[];
 }
 
 export interface ThesisTopic {
@@ -598,6 +629,19 @@ export const thesisApi = {
     return response.data;
   },
 
+  updateTopic: async (
+    topicId: string,
+    data: {
+      departmentId?: string;
+      title?: string;
+      description?: string;
+      maxGroups?: number;
+    },
+  ): Promise<ThesisTopic> => {
+    const response = await api.put<ThesisTopic>('/thesis/topics/' + topicId, data);
+    return response.data;
+  },
+
   setSupervisors: async (
     topicId: string,
     supervisorIds: string[],
@@ -613,6 +657,11 @@ export const thesisApi = {
     const response = await api.get<ThesisTopicSupervisor[]>(
       '/thesis/topics/' + topicId + '/supervisors',
     );
+    return response.data;
+  },
+
+  myWorkload: async (): Promise<ThesisLecturerWorkload> => {
+    const response = await api.get<ThesisLecturerWorkload>('/thesis/me/workload');
     return response.data;
   },
 

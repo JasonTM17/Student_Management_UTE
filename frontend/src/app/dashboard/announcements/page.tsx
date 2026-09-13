@@ -571,7 +571,7 @@ export default function StudentAnnouncementsPage() {
         onSelectAnnouncement={(ann) => setReadingNotice(ann)}
         onEdit={
           isAdmin
-            ? (ann) => router.push(`/admin/editor?editId=${encodeURIComponent(ann.id)}`)
+            ? (ann) => router.push(`/dashboard/editor?editId=${encodeURIComponent(ann.id)}`)
             : undefined
         }
       />

@@ -1366,9 +1366,46 @@ export const en = {
     cancelled: 'Generation stopped. You can retry when you are ready.',
     feedbackUp: 'Mark answer helpful',
     feedbackDown: 'Mark answer not helpful',
+    copyMessage: 'Copy answer',
+    copiedMessage: 'Copied',
+    feedbackReasonPrompt: 'What was wrong?',
+    feedbackReasons: {
+      INCORRECT: 'Incorrect',
+      OUTDATED: 'Outdated',
+      NOT_RELEVANT: 'Not relevant',
+      UNSAFE: 'Unsafe',
+    },
     offline: 'No network connection. Check your connection and try again.',
     sessionExpired: 'Your session has expired. Please sign in again.',
     forbidden: 'This account is not allowed to use the assistant.',
+    sensitiveBlocked:
+      'Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant.',
+    personalContext: 'Answered from your personal academic records',
+    composerHint: 'Enter to send · Shift+Enter for a new line',
+    scrollToLatest: 'Jump to the newest message',
+    modelBadgeKnowledge: 'Knowledge base',
+    modelBadgePersonal: 'Your records',
+    modelBadgeModel: 'V4 Flash',
+    followUpsByDomain: {
+      THESIS: [
+        'Thesis topic criteria',
+        'Thesis group rules',
+        'How many members on a defense council?',
+      ],
+      REGISTRATION: [
+        'Credit cap this semester?',
+        'Where is my schedule?',
+        'How do I drop a course?',
+      ],
+      ACADEMIC_CATALOG: [
+        'How many credits do I still need?',
+        'Where is my curriculum?',
+        'What are prerequisites?',
+      ],
+      ANNOUNCEMENT: ['Latest announcements?', 'Where are published grades?'],
+      POLICY: ['How are conduct points graded?', 'Retake and grade improvement rules?'],
+      GENERAL_FAQ: ['How to register courses?', 'Where is my schedule?'],
+    },
   },
 } as const;
 
@@ -2749,9 +2786,46 @@ export const vi: I18nMessages = {
     cancelled: 'Đã dừng tạo câu trả lời. Bạn có thể thử lại khi sẵn sàng.',
     feedbackUp: 'Đánh dấu câu trả lời hữu ích',
     feedbackDown: 'Đánh dấu câu trả lời chưa hữu ích',
+    copyMessage: 'Sao chép câu trả lời',
+    copiedMessage: 'Đã sao chép',
+    feedbackReasonPrompt: 'Câu trả lời chưa ổn ở điểm nào?',
+    feedbackReasons: {
+      INCORRECT: 'Sai thông tin',
+      OUTDATED: 'Đã lỗi thời',
+      NOT_RELEVANT: 'Không liên quan',
+      UNSAFE: 'Không an toàn',
+    },
     offline: 'Không có kết nối mạng. Hãy kiểm tra mạng rồi thử lại.',
     sessionExpired: 'Lần đăng nhập đã hết hạn. Vui lòng đăng nhập lại.',
     forbidden: 'Tài khoản hiện không được phép dùng trợ lý.',
+    sensitiveBlocked:
+      'Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý.',
+    personalContext: 'Trả lời từ dữ liệu học vụ cá nhân của bạn',
+    composerHint: 'Enter để gửi · Shift+Enter xuống dòng',
+    scrollToLatest: 'Xem tin mới nhất',
+    modelBadgeKnowledge: 'Kiến thức đã duyệt',
+    modelBadgePersonal: 'Dữ liệu cá nhân',
+    modelBadgeModel: 'V4 Flash',
+    followUpsByDomain: {
+      THESIS: [
+        'Tiêu chí chọn đề tài luận văn',
+        'Quy định về nhóm đồ án',
+        'Hội đồng bảo vệ gồm mấy thành viên?',
+      ],
+      REGISTRATION: [
+        'Hạn mức tín chỉ học kỳ này?',
+        'Xem thời khóa biểu ở đâu?',
+        'Rút học phần thế nào?',
+      ],
+      ACADEMIC_CATALOG: [
+        'Còn nợ bao nhiêu tín chỉ?',
+        'Xem chương trình đào tạo ở đâu?',
+        'Môn tiên quyết là gì?',
+      ],
+      ANNOUNCEMENT: ['Thông báo mới nhất?', 'Điểm đã công bố xem ở đâu?'],
+      POLICY: ['Điểm rèn luyện tính thế nào?', 'Quy định học lại, cải thiện điểm?'],
+      GENERAL_FAQ: ['Đăng ký học phần thế nào?', 'Xem thời khóa biểu ở đâu?'],
+    },
   },
 };
 

@@ -84,7 +84,7 @@ export function AssistantComposer({
         )}
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground px-1">
-        <span>Enter để gửi · Shift+Enter xuống dòng</span>
+        <span>{messages.assistant.composerHint}</span>
         <span>{input.length}/2000</span>
       </div>
     </form>

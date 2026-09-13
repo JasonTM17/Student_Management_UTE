@@ -151,16 +151,20 @@ public class RateLimitFilter extends OncePerRequestFilter {
         if (uri.startsWith("/api/v1/auth/refresh")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_REFRESH, 30, 60);
         }
-        if (uri.startsWith("/api/v1/academic/me/enrollments") || uri.startsWith("/api/v1/academic/enrollments")) {
+        if (uri.startsWith("/api/v1/academic/me/enrollments")
+                || uri.startsWith("/api/v1/academic/enrollments")
+                || uri.startsWith("/api/v1/me/enrollments")
+                || uri.startsWith("/api/v1/enrollments")) {
             return new RateLimitPolicy(RateLimitCategory.ENROLLMENT_MUTATION, 15, 60);
         }
         if (uri.startsWith("/api/v1/assistant/") || uri.startsWith("/api/v1/thesis/assistant")) {
-            return new RateLimitPolicy(RateLimitCategory.ANNOUNCEMENT_MUTATION, 20, 60);
+            return new RateLimitPolicy(RateLimitCategory.ASSISTANT_CHAT, 20, 60);
         }
         if (uri.startsWith("/api/v1/thesis/")) {
             return new RateLimitPolicy(RateLimitCategory.THESIS_MUTATION, 20, 60);
         }
-        if (uri.startsWith("/api/v1/academic/sections/") && uri.contains("grades")) {
+        if ((uri.startsWith("/api/v1/academic/sections/") || uri.startsWith("/api/v1/sections/"))
+                && uri.contains("grades")) {
             return new RateLimitPolicy(RateLimitCategory.GRADING_MUTATION, 20, 60);
         }
         if (uri.startsWith("/api/v1/announcements")) {

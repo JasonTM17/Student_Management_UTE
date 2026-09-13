@@ -89,7 +89,8 @@ export function useThesisWorkspace(initialRoundId = '') {
       groups.find(
         (group) =>
           group.leaderStudentId === studentId ||
-          group.memberStudentIds.includes(studentId),
+          group.memberStudentIds.includes(studentId) ||
+          group.members?.some((m) => m.studentId === studentId),
       ),
     [groups, studentId],
   );

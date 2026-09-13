@@ -1,6 +1,7 @@
 'use client';
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import {
   ArrowUpRight,
   Award,
@@ -142,11 +143,13 @@ export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin } = useAuth();
   const isSupervisorOrAdmin = Boolean(isLecturer || isAdmin);
   const { locale, formatDateTime, messages } = useI18n();
+  const searchParams = useSearchParams();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [selectedRoundId, setSelectedRoundId] = useState('');
+  const [viewingTopic, setViewingTopic] = useState<ThesisTopic | null>(null);
   const [isLoading, setIsLoading] = useState(true);
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState('');
@@ -628,6 +631,16 @@ export default function ThesisPage() {
     }
   }, [selectedRoundId, supervisedGroups.length, visibleCouncils.length]);
 
+  useEffect(() => {
+    const topicId = searchParams.get('topicId');
+    if (topicId && topics.length > 0) {
+      const found = topics.find((t) => t.id === topicId);
+      if (found) {
+        setViewingTopic(found);
+      }
+    }
+  }, [searchParams, topics]);
+
   const studentTopicSupervisors = useMemo(() => {
     return currentTopicSupervisors.map((lid) => {
       const lect = lecturers.find((l) => l.id === lid);
@@ -691,6 +704,27 @@ export default function ThesisPage() {
       await refreshGroups();
     } catch {
       setActionError(messages.thesis.actionFailed);
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const handleCreateGroupWithTopic = async (topicId: string) => {
+    if (!selectedRoundId) return;
+    setIsActionPending(true);
+    setActionError('');
+    setActionSuccess('');
+    try {
+      const newGroup = await thesisApi.createGroup(selectedRoundId);
+      if (newGroup && newGroup.id) {
+        await thesisApi.assignTopic(newGroup.id, topicId);
+      }
+      await refreshGroups();
+      toast.success(locale === 'vi' ? 'Đã tạo nhóm và đăng ký đề tài thành công!' : 'Group created and topic registered successfully!');
+      setViewingTopic(null);
+    } catch {
+      setActionError(messages.thesis.actionFailed);
+      toast.error(messages.thesis.actionFailed);
     } finally {
       setIsActionPending(false);
     }
@@ -1374,16 +1408,26 @@ export default function ThesisPage() {
                       const selected = currentGroup?.topicId === topic.id;
                       const isMine =
                         isSupervisorOrAdmin &&
-                        (topic.createdBy === user?.id ||
+                        (isAdmin ||
+                          topic.createdBy === user?.id ||
                           (user?.lecturerId && topic.createdBy === user.lecturerId));
                       return (
                         <article
                           key={topic.id}
+                          tabIndex={0}
+                          role="button"
+                          onClick={() => setViewingTopic(topic)}
+                          onKeyDown={(e) => {
+                            if (e.key === 'Enter' || e.key === ' ') {
+                              e.preventDefault();
+                              setViewingTopic(topic);
+                            }
+                          }}
                           className={cn(
-                            'group flex min-h-[190px] flex-col rounded-xl border p-4 transition-colors',
+                            'group flex min-h-[200px] flex-col rounded-xl border p-4 transition-all cursor-pointer select-none text-left focus:outline-none focus:ring-2 focus:ring-primary/40',
                             selected
-                              ? 'border-primary bg-primary/5'
-                              : 'border-border/70 bg-card hover:border-primary/45 hover:bg-secondary/30',
+                              ? 'border-primary bg-primary/5 shadow-xs ring-1 ring-primary/30'
+                              : 'border-border/70 bg-card hover:border-primary/60 hover:bg-secondary/30 hover:shadow-xs',
                           )}
                         >
                           <div className="flex items-start justify-between gap-3">
@@ -1408,17 +1452,22 @@ export default function ThesisPage() {
                               <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />
                             )}
                           </div>
-                          <h3 className="mt-4 line-clamp-2 text-base font-semibold leading-6 text-foreground">
+                          <h3 className="mt-4 line-clamp-2 text-base font-semibold leading-6 text-foreground group-hover:text-primary transition-colors">
                             {topic.title}
                           </h3>
                           <div className="mt-2 line-clamp-3 text-sm leading-6 text-muted-foreground">
                             <RichContentRenderer content={topic.description} />
                           </div>
-                          <div className="mt-auto pt-3 flex flex-wrap gap-2">
-                            {currentGroup &&
-                            !selected &&
-                            currentGroup.approvalStatus !== 'APPROVED' &&
-                            topic.status === 'PUBLISHED' ? (
+                          <div className="mt-auto pt-3 flex flex-col gap-2" onClick={(e) => e.stopPropagation()}>
+                            {selected ? (
+                              <div className="flex w-full items-center justify-center gap-1.5 py-1.5 text-xs font-semibold text-emerald-600 dark:text-emerald-400 bg-emerald-500/10 rounded-lg">
+                                <Check className="h-3.5 w-3.5" />
+                                {locale === 'vi' ? 'Đang chọn đề tài này' : 'Selected topic'}
+                              </div>
+                            ) : currentGroup &&
+                              !selected &&
+                              currentGroup.approvalStatus !== 'APPROVED' &&
+                              topic.status === 'PUBLISHED' ? (
                               <Button
                                 type="button"
                                 size="sm"
@@ -1429,7 +1478,29 @@ export default function ThesisPage() {
                               >
                                 {messages.thesis.chooseTopic}
                               </Button>
-                            ) : null}
+                            ) : isStudent && !currentGroup && topic.status === 'PUBLISHED' ? (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="w-full text-xs"
+                                onClick={() => void handleCreateGroupWithTopic(topic.id)}
+                                disabled={isActionPending}
+                              >
+                                {locale === 'vi' ? 'Tạo nhóm & Đăng ký đề tài' : 'Create group & Select topic'}
+                              </Button>
+                            ) : (
+                              <Button
+                                type="button"
+                                size="sm"
+                                variant="ghost"
+                                className="w-full text-xs text-primary justify-between px-2 hover:bg-primary/10"
+                                onClick={() => setViewingTopic(topic)}
+                              >
+                                <span>{locale === 'vi' ? 'Xem chi tiết đề tài' : 'View topic details'}</span>
+                                <ArrowUpRight className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
                             {isSupervisorOrAdmin &&
                             isMine &&
                             topic.status === 'DRAFT' ? (
@@ -2516,6 +2587,96 @@ export default function ThesisPage() {
           )}
         </div>
       </Modal>
+
+      {/* Topic Detail & Selection Modal */}
+      {viewingTopic ? (
+        <Modal
+          isOpen={Boolean(viewingTopic)}
+          onClose={() => setViewingTopic(null)}
+          title={viewingTopic.title}
+          description={`${viewingTopic.maxGroups} ${messages.thesis.groups.toLowerCase()} • ${statusLabel(viewingTopic.status)}`}
+        >
+          <div className="space-y-4">
+            {viewingTopic.departmentId ? (
+              <div className="flex items-center gap-2 rounded-lg border border-border/60 bg-muted/40 p-2.5 text-xs text-muted-foreground">
+                <Building2 className="h-4 w-4 shrink-0 text-primary" />
+                <span>
+                  <strong>{locale === 'vi' ? 'Đơn vị chuyên môn:' : 'Department:'}</strong>{' '}
+                  {departments.find((d) => d.id === viewingTopic.departmentId)?.name || viewingTopic.departmentId}
+                </span>
+              </div>
+            ) : null}
+
+            <div className="rounded-lg border border-border/70 bg-card p-4 text-sm leading-relaxed text-foreground max-h-[50vh] overflow-y-auto">
+              <h4 className="mb-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {locale === 'vi' ? 'Mô tả & Yêu cầu học thuật' : 'Description & Academic Requirements'}
+              </h4>
+              <RichContentRenderer content={viewingTopic.description} />
+            </div>
+
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
+              <LocalizedLink
+                href={`/dashboard/thesis/topics/${viewingTopic.id}?roundId=${selectedRoundId}`}
+                className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
+              >
+                <ExternalLink className="h-3.5 w-3.5" />
+                {locale === 'vi' ? 'Mở trang chuyên sâu' : 'Open dedicated topic page'}
+              </LocalizedLink>
+
+              <div className="flex flex-wrap items-center gap-2">
+                <Button
+                  type="button"
+                  variant="outline"
+                  size="sm"
+                  onClick={() => setViewingTopic(null)}
+                >
+                  {locale === 'vi' ? 'Đóng' : 'Close'}
+                </Button>
+
+                {currentGroup &&
+                currentGroup.topicId !== viewingTopic.id &&
+                currentGroup.approvalStatus !== 'APPROVED' &&
+                viewingTopic.status === 'PUBLISHED' ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      void chooseTopic(viewingTopic.id);
+                      setViewingTopic(null);
+                    }}
+                    disabled={isActionPending}
+                  >
+                    {messages.thesis.chooseTopic}
+                  </Button>
+                ) : isStudent && !currentGroup && viewingTopic.status === 'PUBLISHED' ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => void handleCreateGroupWithTopic(viewingTopic.id)}
+                    disabled={isActionPending}
+                  >
+                    {locale === 'vi' ? 'Tạo nhóm & Đăng ký đề tài' : 'Create group & Select topic'}
+                  </Button>
+                ) : isSupervisorOrAdmin &&
+                  (isAdmin || viewingTopic.createdBy === user?.id || (user?.lecturerId && viewingTopic.createdBy === user.lecturerId)) &&
+                  viewingTopic.status === 'DRAFT' ? (
+                  <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                      void handlePublishTopic(viewingTopic.id);
+                      setViewingTopic(null);
+                    }}
+                    disabled={isActionPending}
+                  >
+                    {messages.thesis.publish}
+                  </Button>
+                ) : null}
+              </div>
+            </div>
+          </div>
+        </Modal>
+      ) : null}
     </div>
   );
 }

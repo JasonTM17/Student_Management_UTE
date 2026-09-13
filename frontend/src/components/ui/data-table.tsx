@@ -6,6 +6,7 @@ import { Button } from './button';
 import { Input } from './input';
 import { Select } from './select';
 import { useI18n } from '@/i18n';
+import { cn } from '@/lib/utils';
 
 interface Column<T> {
   key: string;
@@ -124,7 +125,10 @@ export function DataTable<T extends Record<string, unknown>>({
                         ? sortOrder === 'asc' ? 'ascending' : 'descending'
                         : 'none'
                     }
-                    className="px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground cursor-pointer hover:bg-secondary/60"
+                    className={cn(
+                      'px-4 py-3.5 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+                      column.sortable && 'cursor-pointer hover:bg-secondary/60',
+                    )}
                   >
                     {column.sortable ? (
                       <button

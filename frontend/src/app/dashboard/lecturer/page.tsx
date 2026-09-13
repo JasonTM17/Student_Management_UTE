@@ -20,6 +20,7 @@ import {
   WorkspaceMetricCard,
   WorkspacePanel,
 } from '@/components/dashboard/WorkspaceSurface';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
@@ -193,9 +194,10 @@ export default function LecturerDashboardPage() {
                   />
                 ) : (
                   gradingSections.slice(0, 4).map((section) => (
-                    <div
+                    <LocalizedLink
                       key={section.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
+                      href="/dashboard/grades"
+                      className="block rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/60 hover:shadow-xs hover:bg-secondary/30"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -240,7 +242,7 @@ export default function LecturerDashboardPage() {
                           </div>
                         </div>
                       </div>
-                    </div>
+                    </LocalizedLink>
                   ))
                 )}
             </WorkspacePanel>
@@ -261,9 +263,10 @@ export default function LecturerDashboardPage() {
                   />
                 ) : (
                   scheduleSections.slice(0, 5).map((section) => (
-                    <div
+                    <LocalizedLink
                       key={section.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
+                      href="/dashboard/lecturer/schedule"
+                      className="block rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/60 hover:shadow-xs hover:bg-secondary/30"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -291,7 +294,7 @@ export default function LecturerDashboardPage() {
                           <div className="mt-1">{statusLabel(section.status)}</div>
                         </div>
                       </div>
-                    </div>
+                    </LocalizedLink>
                   ))
                 )}
             </WorkspacePanel>
