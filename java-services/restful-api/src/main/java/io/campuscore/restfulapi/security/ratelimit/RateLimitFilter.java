@@ -117,19 +117,28 @@ public class RateLimitFilter extends OncePerRequestFilter {
         return "ip:" + clientIp + ":" + category.name();
     }
 
+    /**
+     * X-Real-IP / X-Forwarded-For are client-controlled unless the request
+     * arrives through a trusted reverse proxy. When proxy-header trust is
+     * disabled (the default for direct deployments and local dev), fall back
+     * to the socket address so attackers cannot rotate spoofed forwarded
+     * headers to evade IP-keyed limits.
+     */
     private String resolveClientIp(HttpServletRequest request) {
-        String xRealIp = request.getHeader("X-Real-IP");
-        if (xRealIp != null && !xRealIp.isBlank()) {
-            return xRealIp.trim();
-        }
+        if (properties.isTrustProxyHeaders()) {
+            String xRealIp = request.getHeader("X-Real-IP");
+            if (xRealIp != null && !xRealIp.isBlank()) {
+                return xRealIp.trim();
+            }
 
-        String xForwardedFor = request.getHeader("X-Forwarded-For");
-        if (xForwardedFor != null && !xForwardedFor.isBlank()) {
-            String[] parts = xForwardedFor.split(",");
-            if (parts.length > 0) {
-                String candidate = parts[0].trim();
-                if (!candidate.isBlank()) {
-                    return candidate;
+            String xForwardedFor = request.getHeader("X-Forwarded-For");
+            if (xForwardedFor != null && !xForwardedFor.isBlank()) {
+                String[] parts = xForwardedFor.split(",");
+                if (parts.length > 0) {
+                    String candidate = parts[0].trim();
+                    if (!candidate.isBlank()) {
+                        return candidate;
+                    }
                 }
             }
         }
