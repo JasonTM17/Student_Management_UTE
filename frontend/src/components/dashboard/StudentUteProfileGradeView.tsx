@@ -220,7 +220,7 @@ export function StudentUteProfileGradeView({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="mt-2 text-xs text-[#0d509d] hover:underline font-medium cursor-pointer"
+              className="mt-2 inline-flex min-h-8 items-center text-xs text-[#0d509d] hover:underline font-medium cursor-pointer"
             >
               Cập nhật ảnh thẻ
             </button>
@@ -264,7 +264,7 @@ export function StudentUteProfileGradeView({
                 </span>
                 <span className="col-span-3 font-bold text-emerald-700 flex items-center justify-between">
                   <span>88.0 (Tốt)</span>
-                  <LocalizedLink href="/dashboard/conduct" className="text-[11px] text-[#0d509d] hover:underline font-normal">Chi tiết &rarr;</LocalizedLink>
+                  <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] text-[#0d509d] hover:underline font-normal">Chi tiết &rarr;</LocalizedLink>
                 </span>
               </div>
             </div>
@@ -352,6 +352,8 @@ export function StudentUteProfileGradeView({
                       chartType === 'line' && 'text-[#0d509d] bg-blue-50',
                     )}
                     title="Dạng đường"
+                    aria-label="Dạng đường"
+                    aria-pressed={chartType === 'line'}
                   >
                     <LineChart className="w-4 h-4" />
                   </button>
@@ -363,6 +365,8 @@ export function StudentUteProfileGradeView({
                       chartType === 'bar' && 'text-[#0d509d] bg-blue-50',
                     )}
                     title="Dạng cột"
+                    aria-label="Dạng cột"
+                    aria-pressed={chartType === 'bar'}
                   >
                     <BarChart2 className="w-4 h-4" />
                   </button>
@@ -382,6 +386,7 @@ export function StudentUteProfileGradeView({
                     onClick={handleRefreshChart}
                     className="p-1 rounded hover:bg-slate-100 transition-colors"
                     title="Làm mới"
+                    aria-label="Làm mới biểu đồ"
                   >
                     <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#0d509d]")} />
                   </button>
@@ -390,6 +395,7 @@ export function StudentUteProfileGradeView({
                     onClick={handleDownloadChart}
                     className="p-1 rounded hover:bg-slate-100 transition-colors"
                     title="Tải xuống biểu đồ (SVG)"
+                    aria-label="Tải xuống biểu đồ (SVG)"
                   >
                     <Download className="w-3.5 h-3.5" />
                   </button>

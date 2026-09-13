@@ -581,6 +581,25 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
   assert.equal(policy, null);
 });
 
+test('assistant history paginates with the server cursor', () => {
+  const apiSource = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
+  assert.match(apiSource, /listConversationsPage/);
+  assert.match(apiSource, /x-next-cursor/);
+
+  const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(panelSource, /historyCursor/);
+  assert.match(panelSource, /listConversationsPage\(\{\s*limit: 20,\s*cursor: historyCursor,\s*\}\)/);
+  assert.match(panelSource, /onLoadMore=\{\(\) => void loadMoreHistory\(\)\}/);
+
+  const historySource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantHistoryPanel.tsx'), 'utf8');
+  assert.match(historySource, /nextCursor && historyStatus === 'loaded'/);
+  assert.match(historySource, /messages\.assistant\.loadMoreHistory/);
+
+  const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+  assert.match(messagesSource, /loadMoreHistory: 'Load more conversations'/);
+  assert.match(messagesSource, /loadMoreHistory: 'Tải thêm hội thoại'/);
+});
+
 test('assistant message tools expose copy and feedback reasons', () => {
   const messagesComponent = fs.readFileSync(
     path.join(root, 'src/components/assistant/AssistantMessages.tsx'),
@@ -742,4 +761,32 @@ test('thesis knowledge release covers the faculty process rules', () => {
   // The release must be projected and activated like V20/V23.
   assert.match(migration, /local-demo-v38/);
   assert.match(migration, /active_release_id = EXCLUDED\.active_release_id/);
+});
+
+test('assistant markdown links reject unsafe schemes (javascript:, data:)', () => {
+  const componentSource = fs.readFileSync(
+    path.join(root, 'src/components/assistant/AssistantMarkdownContent.tsx'),
+    'utf8',
+  );
+  // The link renderer must whitelist internal paths and safe external
+  // schemes; javascript:, data:, and anything else renders as plain text.
+  assert.ok(
+    componentSource.includes("rawUrl.startsWith('/') && !rawUrl.startsWith('//')"),
+    'internal-path detection missing',
+  );
+  assert.ok(
+    componentSource.includes('/^https?:\\/\\//i.test(rawUrl)'),
+    'http(s) scheme check missing',
+  );
+  assert.ok(
+    componentSource.includes('/^mailto:/i.test(rawUrl)'),
+    'mailto scheme check missing',
+  );
+  assert.ok(
+    componentSource.includes('Guard against javascript:, data:, and other unsafe schemes'),
+    'scheme-guard rationale comment missing',
+  );
+  // Unsafe schemes fall back to the plain label, never an anchor element.
+  assert.match(componentSource, /elements\.push\(label\)/);
+  assert.doesNotMatch(componentSource, /elements\.push\(\s*createAnchor\(/);
 });

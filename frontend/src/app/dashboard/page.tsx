@@ -389,10 +389,16 @@ export default function DashboardPage() {
                     <chip.icon className="h-5 w-5" />
                   </span>
                   <div className="min-w-0">
-                    <div className="truncate text-xl font-bold leading-6 text-foreground group-hover:text-primary transition-colors">
+                    <div
+                      className="truncate text-xl font-bold leading-6 text-foreground group-hover:text-primary transition-colors"
+                      title={chip.value}
+                    >
                       {chip.value}
                     </div>
-                    <div className="truncate text-xs font-medium text-muted-foreground">
+                    <div
+                      className="truncate text-xs font-medium text-muted-foreground"
+                      title={chip.label}
+                    >
                       {chip.label}
                     </div>
                   </div>
