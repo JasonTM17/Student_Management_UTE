@@ -526,6 +526,26 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
                 topicCount: 2,
               },
             ],
+            gradingTasks: [
+              {
+                topicId: 't1',
+                title: 'Nền tảng quản lý phòng lab',
+                councilId: 'c1',
+                councilName: 'Hội đồng 01',
+                roundName: 'Đồ án tốt nghiệp 2026-2027',
+                roundStatus: 'REGISTRATION_OPEN',
+                myScoreRows: 0,
+              },
+              {
+                topicId: 't3',
+                title: 'Hệ thống chấm điểm tự động',
+                councilId: 'c1',
+                councilName: 'Hội đồng 01',
+                roundName: 'Đồ án tốt nghiệp 2026-2027',
+                roundStatus: 'REGISTRATION_OPEN',
+                myScoreRows: 4,
+              },
+            ],
           }),
         },
       };
@@ -546,6 +566,11 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
   assert.match(workload.answer, /2 đề tài được phân công/);
   assert.match(workload.answer, /hạn nộp điểm: 10\/12\/2026/);
   assert.match(workload.answer, /ngày bảo vệ: 15\/12\/2026/);
+  // Grading workload per council topic with live score status.
+  assert.match(workload.answer, /Đề tài hội đồng phân công cho bạn \(2\)/);
+  assert.match(workload.answer, /⏳ Chưa nhập điểm/);
+  assert.match(workload.answer, /✓ Đã nhập điểm/);
+  assert.match(workload.answer, /Còn 1 đề tài chưa nhập điểm/);
   assert.equal(workload.citation.domain, 'THESIS');
 
   // Regulation questions from a lecturer still go to the knowledge base.
@@ -601,6 +626,54 @@ test('client guard and server guard stay pattern-synced (drift gate)', () => {
     assert.ok(serverGuard.includes(code), `server guard lost code ${code}`);
     assert.ok(clientGuard.includes(code), `client guard lost code ${code}`);
   }
+});
+
+test('assistant markdown groups wrapped sentences into single paragraphs', () => {
+  const { splitAssistantBlocks } = load('src/lib/assistant-inline-markdown-regex.ts');
+
+  // A model that wraps mid-sentence must render as ONE paragraph.
+  const wrapped = splitAssistantBlocks('Mỗi nhóm có tối đa\n03 thành viên, gồm một nhóm trưởng.');
+  assert.equal(wrapped.length, 1);
+  assert.equal(wrapped[0].type, 'text');
+  assert.equal(wrapped[0].lines[0], 'Mỗi nhóm có tối đa 03 thành viên, gồm một nhóm trưởng.');
+
+  // Blank lines separate paragraphs; lists/headings/quotes stay line-scoped.
+  const mixed = splitAssistantBlocks(
+    'Đoạn một dòng a\ndòng b\n\n- mục 1\n- mục 2\n### Tiêu đề\n\nĐoạn hai',
+  );
+  assert.deepEqual(mixed.map((block) => block.lines[0]), [
+    'Đoạn một dòng a dòng b',
+    '- mục 1',
+    '- mục 2',
+    '### Tiêu đề',
+    'Đoạn hai',
+  ]);
+
+  // Tables remain their own block and are not merged with text.
+  const tabled = splitAssistantBlocks(
+    'Xem bảng:\n| Môn | Tín chỉ |\n| SE101 | 3 |\n| SE102 | 2 |',
+  );
+  assert.equal(tabled[0].type, 'text');
+  assert.equal(tabled[1].type, 'table');
+  assert.equal(tabled[1].lines.length, 3);
+
+  // Fenced code blocks preserve multiline indentation and language tag.
+  const coded = splitAssistantBlocks(
+    'Mã nguồn ví dụ:\n```json\n{\n  "status": "PASS"\n}\n```\nKết thúc.',
+  );
+  assert.equal(coded[0].type, 'text');
+  assert.equal(coded[1].type, 'code');
+  assert.equal(coded[1].language, 'json');
+  assert.equal(coded[1].code, '{\n  "status": "PASS"\n}');
+  assert.equal(coded[2].type, 'text');
+
+  // Asterisk bullets are preserved as list items and not joined to paragraph text.
+  const asteriskList = splitAssistantBlocks(
+    'Danh sách môn:\n* Môn A\n* Môn B',
+  );
+  assert.equal(asteriskList.length, 3);
+  assert.equal(asteriskList[1].lines[0], '* Môn A');
+  assert.equal(asteriskList[2].lines[0], '* Môn B');
 });
 
 test('assistant renders headings, blockquotes, and message timestamps', () => {

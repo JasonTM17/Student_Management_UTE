@@ -225,4 +225,26 @@ class ThesisAssistantServiceTest {
         assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
                 && replace.text().isEmpty() && "TURN_TERMINAL_RACE".equals(replace.reasonCode())));
     }
+
+    @Test
+    void providerNumberGlueIsRepairedWithoutTouchingCodes() {
+        // The model drops spaces around Vietnamese function words: "từ03 đến05".
+        assertEquals("Mỗi hội đồng bảo vệ gồm từ 03 đến 05 thành viên",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Mỗi hội đồng bảo vệ gồm từ03 đến05 thành viên"));
+        assertEquals("Tối đa 28 tín chỉ / học kỳ",
+                ThesisAssistantService.normalizeNumberSpacing("Tối đa28 tín chỉ / học kỳ"));
+        assertEquals("còn 13 tín chỉ",
+                ThesisAssistantService.normalizeNumberSpacing("còn13 tín chỉ"));
+        assertEquals("đạt 8.5 điểm rèn luyện và 3 môn tích lũy",
+                ThesisAssistantService.normalizeNumberSpacing("đạt8.5 điểm rèn luyện và 3môn tích lũy"));
+        assertEquals("mức 4 tín chỉ, học 3 tiết",
+                ThesisAssistantService.normalizeNumberSpacing("mức4 tín chỉ, học 3tiết"));
+        // Course codes and already-spaced text are untouched.
+        assertEquals("Lớp SE101 học kỳ 2026 - 2027, phòng A101",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Lớp SE101 học kỳ 2026 - 2027, phòng A101"));
+        assertEquals("KLTN 2026-2027",
+                ThesisAssistantService.normalizeNumberSpacing("KLTN 2026-2027"));
+    }
 }

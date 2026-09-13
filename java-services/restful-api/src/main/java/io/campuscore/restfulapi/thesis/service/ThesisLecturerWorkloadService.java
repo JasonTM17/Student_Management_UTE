@@ -72,7 +72,32 @@ public class ThesisLecturerWorkloadService {
                         instantOf(rs, "report_date"),
                         instantOf(rs, "gvpb_deadline"),
                         rs.getInt("topic_count")));
-        return new LecturerWorkload(List.copyOf(topics), List.copyOf(councils));
+        // Grading tasks: council-assigned topics with whether this lecturer has
+        // already entered scores, so the assistant can answer "what is still
+        // ungraded?" without any client-side fan-out.
+        List<GradingTask> gradingTasks = jdbc.query(
+                "SELECT ct.topic_id, t.title, ct.council_id, c.name AS council_name, "
+                        + "r.name AS round_name, r.status AS round_status, "
+                        + "(SELECT COUNT(*) FROM thesis.thesis_topic_score s "
+                        + "  WHERE s.topic_id = ct.topic_id AND s.council_id = ct.council_id "
+                        + "  AND s.lecturer_id = cm.lecturer_id) AS my_score_rows "
+                        + "FROM thesis.thesis_council_member cm "
+                        + "JOIN thesis.thesis_council_topic ct ON ct.council_id = cm.council_id "
+                        + "JOIN thesis.thesis_topic t ON t.id = ct.topic_id "
+                        + "JOIN thesis.thesis_council c ON c.id = ct.council_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = c.round_id "
+                        + "WHERE cm.lecturer_id = :lecturerId "
+                        + "ORDER BY r.created_at DESC, t.title ASC LIMIT 100",
+                new MapSqlParameterSource("lecturerId", lecturerId),
+                (rs, ignored) -> new GradingTask(
+                        rs.getObject("topic_id", UUID.class),
+                        rs.getString("title"),
+                        rs.getObject("council_id", UUID.class),
+                        rs.getString("council_name"),
+                        rs.getString("round_name"),
+                        rs.getString("round_status"),
+                        rs.getInt("my_score_rows")));
+        return new LecturerWorkload(List.copyOf(topics), List.copyOf(councils), List.copyOf(gradingTasks));
     }
 
     private static java.time.Instant instantOf(java.sql.ResultSet rs, String column) throws java.sql.SQLException {
@@ -102,7 +127,17 @@ public class ThesisLecturerWorkloadService {
             java.time.Instant gvpbDeadline,
             int topicCount) { }
 
+    public record GradingTask(
+            UUID topicId,
+            String title,
+            UUID councilId,
+            String councilName,
+            String roundName,
+            String roundStatus,
+            int myScoreRows) { }
+
     public record LecturerWorkload(
             List<SupervisedTopic> topics,
-            List<CouncilAssignment> councils) { }
+            List<CouncilAssignment> councils,
+            List<GradingTask> gradingTasks) { }
 }

@@ -34,6 +34,28 @@ public class ThesisAssistantService {
     static final int TOP_K = 5;
     private static final String DEFAULT_LOCALE = "vi";
 
+    /**
+     * The provider intermittently glues numbers to adjacent Vietnamese words
+     * ("gồm từ03 đến05"). A deterministic, whitelist-bounded spacing repair
+     * runs at the provider boundary before the answer is streamed/committed.
+     * Course-code style tokens (SE101, KLTN2026) are safe because only the
+     * listed function words trigger the letter→digit direction, and the
+     * digit→letter direction requires a complete following word.
+     */
+    private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_WORD = java.util.regex.Pattern.compile(
+            "(?<![\\p{L}\\p{N}_])(từ|đến|tới|đa|thiểu|khoảng|hơn|dưới|trên|gồm|bằng|tổng|cộng|còn|điểm|mức|đạt)(?=\\p{N})",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern NUMBER_GLUE_BEFORE_WORD = java.util.regex.Pattern.compile(
+            "(?<=\\p{N})(thành|người|tín|chỉ|nhóm|đề|ngày|giờ|phút|tuần|năm|tháng|buổi|ca|giảng|viên|sinh|phân|điểm|tiết|môn|lớp)(?![\\p{L}])",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+
+    static String normalizeNumberSpacing(String text) {
+        if (text == null || text.isBlank()) return text;
+        String out = NUMBER_GLUE_AFTER_WORD.matcher(text).replaceAll("$1 ");
+        out = NUMBER_GLUE_BEFORE_WORD.matcher(out).replaceAll(" $1");
+        return out;
+    }
+
     private final ThesisAssistantKnowledgeRepository knowledge;
     private final DeepSeekClient provider;
     private final ThesisAssistantRepository legacyHistory;
@@ -272,6 +294,15 @@ public class ThesisAssistantService {
                         if (emittedSegments.isEmpty()) throw new InvalidSegmentException();
                         answer = emittedSegments.stream().map(ProviderSegment::text).collect(Collectors.joining()).trim();
                         if (answer.isBlank()) throw new InvalidSegmentException();
+                        // Deterministic spacing repair at the provider boundary.
+                        // The streamed deltas may carry glued numbers; emit one
+                        // replace frame so the rendered answer matches the
+                        // committed one, then commit the repaired text.
+                        String repaired = normalizeNumberSpacing(answer);
+                        if (!repaired.equals(answer)) {
+                            answer = repaired;
+                            emit(sink, new StreamReplace(answer, lexical.sourceIds(), "ANSWERED"));
+                        }
                         reason = "ANSWERED";
                         degraded = false;
                     } catch (CancellationException | DeepSeekClient.ProviderCancelledException cancelled) {
@@ -396,7 +427,7 @@ public class ThesisAssistantService {
         }
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
-        String answer = documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content();
+        String answer = normalizeNumberSpacing(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content());
         String context = citations.stream().map(c -> c.title() + "\n" + c.excerpt()).collect(Collectors.joining("\n\n"));
         if (properties != null && context.length() > properties.maxContextChars()) context = context.substring(0, properties.maxContextChars());
         List<String> sourceIds = citations.stream().map(Citation::sourceId).filter(value -> value != null && !value.isBlank()).toList();

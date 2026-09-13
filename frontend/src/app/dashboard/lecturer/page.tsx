@@ -314,20 +314,21 @@ export default function LecturerDashboardPage() {
                   />
                 ) : (
                   orderedAnnouncements.map((announcement) => (
-                    <div
+                    <LocalizedLink
                       key={announcement.id}
-                      className="rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs"
+                      href="/dashboard/lecturer/announcements"
+                      className="block rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/40 hover:shadow-xs group"
                     >
-                      <div className="font-medium text-foreground">
+                      <div className="font-medium text-foreground group-hover:text-primary transition-colors">
                         {announcement.title}
                       </div>
-                      <p className="mt-2 text-sm leading-6 text-muted-foreground">
-                        {announcement.content}
+                      <p className="mt-2 text-sm leading-6 text-muted-foreground line-clamp-2">
+                        {announcement.content.replace(/<[^>]*>/g, '').trim()}
                       </p>
                       <div className="mt-3 text-xs uppercase tracking-[0.16em] text-muted-foreground">
                         {formatDateTime(announcement.createdAt)}
                       </div>
-                    </div>
+                    </LocalizedLink>
                   ))
                 )}
             </WorkspacePanel>

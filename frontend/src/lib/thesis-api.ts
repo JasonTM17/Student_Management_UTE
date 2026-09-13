@@ -123,9 +123,20 @@ export interface ThesisCouncilAssignment {
   topicCount: number;
 }
 
+export interface ThesisGradingTask {
+  topicId: string;
+  title: string;
+  councilId: string;
+  councilName: string;
+  roundName: string;
+  roundStatus: string;
+  myScoreRows: number;
+}
+
 export interface ThesisLecturerWorkload {
   topics: ThesisSupervisedTopic[];
   councils: ThesisCouncilAssignment[];
+  gradingTasks?: ThesisGradingTask[];
 }
 
 export interface ThesisTopic {
@@ -783,6 +794,20 @@ export const thesisApi = {
       { params },
     );
     return response.data;
+  },
+
+  listConversationsPage: async (params?: {
+    limit?: number;
+    cursor?: string;
+  }): Promise<{ items: AssistantConversation[]; nextCursor?: string }> => {
+    const response = await api.get<AssistantConversation[]>(
+      '/assistant/conversations',
+      { params },
+    );
+    const rawCursor = response.headers?.['x-next-cursor'];
+    const nextCursor =
+      typeof rawCursor === 'string' && rawCursor ? rawCursor : undefined;
+    return { items: response.data, nextCursor };
   },
 
   getConversationMessages: async (
