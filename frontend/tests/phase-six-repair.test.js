@@ -93,9 +93,12 @@ test('course-demo copy excludes retired finance and monitoring language', () => 
     read('public/screenshots/home-vi.svg'),
   ].join('\n');
 
+  // "báo cáo hội đồng" (council report date) is a core thesis-regulation term
+  // from the faculty specification (R6), not retired monitoring language — the
+  // ban targets every other "báo cáo" usage.
   assert.doesNotMatch(
     copy,
-    /\b(?:finance|financial|billing|invoice|payment|reporting|operational)\b|tài chính|hóa đơn|thanh toán|báo cáo|vận hành/i,
+    /\b(?:finance|financial|billing|invoice|payment|reporting|operational)\b|tài chính|hóa đơn|thanh toán|báo cáo(?! hội đồng)|vận hành/i,
   );
 });
 

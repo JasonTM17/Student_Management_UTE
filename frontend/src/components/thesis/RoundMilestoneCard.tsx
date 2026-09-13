@@ -11,6 +11,7 @@ import {
   Users,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { useI18n } from '@/i18n';
 import type { ThesisRound } from '@/lib/thesis-api';
 
 interface RoundMilestoneCardProps {
@@ -24,36 +25,38 @@ export function RoundMilestoneCard({
   formatDateTime,
   statusLabel,
 }: RoundMilestoneCardProps) {
+  const { messages } = useI18n();
+  const rm = messages.roundMilestone;
   const isKLTN = round.thesisType === 'KLTN';
   const isTLCN = round.thesisType === 'TLCN';
   const isHasGVPB = isKLTN || isTLCN;
 
   const typeConfig: Record<string, { label: string; sub: string; badgeClass: string }> = {
     KLTN: {
-      label: 'Khóa luận tốt nghiệp (KLTN)',
-      sub: 'Hình thức tốt nghiệp cao nhất · Yêu cầu Hội đồng 3-5 GV',
+      label: rm.typeKLTN,
+      sub: rm.typeKLTNSub,
       badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
     },
     TLCN: {
-      label: 'Tiểu luận chuyên ngành (TLCN)',
-      sub: 'Học phần chuyên sâu · Yêu cầu Giảng viên phản biện (GVPB)',
+      label: rm.typeTLCN,
+      sub: rm.typeTLCNSub,
       badgeClass: 'bg-indigo-500/15 text-indigo-700 dark:text-indigo-300 border-indigo-500/30',
     },
     NCKH: {
-      label: 'Nghiên cứu khoa học (NCKH)',
-      sub: 'Đề tài nghiên cứu ứng dụng sinh viên',
+      label: rm.typeNCKH,
+      sub: rm.typeNCKHSub,
       badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
     },
     MON_HOC: {
-      label: 'Đồ án môn học (MON_HOC)',
-      sub: 'Đồ án thực hành theo học phần chuyên ngành',
+      label: rm.typeMonHoc,
+      sub: rm.typeMonHocSub,
       badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
     },
   };
 
   const currentType = typeConfig[round.thesisType] || {
     label: round.thesisType,
-    sub: 'Đợt đăng ký đề tài học vụ',
+    sub: rm.typeFallbackSub,
     badgeClass: 'bg-primary/10 text-primary border-primary/20',
   };
 
@@ -87,7 +90,7 @@ export function RoundMilestoneCard({
           <div className="flex shrink-0 items-center gap-3">
             <div className="rounded-xl border border-primary/20 bg-background/80 px-4 py-2.5 shadow-2xs text-right">
               <p className="text-[11px] font-bold uppercase tracking-wider text-muted-foreground">
-                Trạng thái đợt
+                {rm.statusLabel}
               </p>
               <p className="text-sm font-bold text-primary">{statusLabel(round.status)}</p>
             </div>
@@ -101,16 +104,16 @@ export function RoundMilestoneCard({
         <div className="p-4 sm:p-5 space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <CalendarDays className="h-4 w-4 text-primary" />
-            <span>Giai đoạn 1 (GV nộp)</span>
+            <span>{rm.phase1}</span>
           </div>
           <p className="text-xs text-foreground/90 font-medium leading-relaxed">
             {formatDateTime(round.lecturerSubmitStart)}
             <br />
-            <span className="text-muted-foreground">đến</span>{' '}
+            <span className="text-muted-foreground">{rm.to}</span>{' '}
             {formatDateTime(round.lecturerSubmitEnd)}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            GV bộ môn gửi đề tài (Điều R1, R2)
+            {rm.phase1Desc}
           </p>
         </div>
 
@@ -118,16 +121,16 @@ export function RoundMilestoneCard({
         <div className="p-4 sm:p-5 space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <Users className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
-            <span>Giai đoạn 2 (SV đăng ký)</span>
+            <span>{rm.phase2}</span>
           </div>
           <p className="text-xs text-foreground/90 font-medium leading-relaxed">
             {formatDateTime(round.registrationStart)}
             <br />
-            <span className="text-muted-foreground">đến</span>{' '}
+            <span className="text-muted-foreground">{rm.to}</span>{' '}
             {formatDateTime(round.registrationEnd)}
           </p>
           <p className="text-[11px] text-muted-foreground">
-            Nhóm ≤ 3 SV chọn 1 đề tài (Điều R4)
+            {rm.phase2Desc}
           </p>
         </div>
 
@@ -135,7 +138,7 @@ export function RoundMilestoneCard({
         <div className="p-4 sm:p-5 space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <Clock className="h-4 w-4 text-amber-600 dark:text-amber-400" />
-            <span>Hạn nộp điểm GVPB</span>
+            <span>{rm.gvpbDeadline}</span>
           </div>
           {isHasGVPB && round.gvpbDeadline ? (
             <>
@@ -143,16 +146,16 @@ export function RoundMilestoneCard({
                 {formatDateTime(round.gvpbDeadline)}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                GVPB nộp điểm về Khoa (Điều R1)
+                {rm.gvpbDesc}
               </p>
             </>
           ) : (
             <>
               <p className="text-xs text-muted-foreground italic">
-                {isHasGVPB ? 'Chưa xếp lịch cụ thể' : 'Không áp dụng cho đợt này'}
+                {isHasGVPB ? rm.notScheduled : rm.notApplicable}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {isHasGVPB ? 'Áp dụng cho TLCN & KLTN' : 'Chỉ áp dụng cho TLCN & KLTN'}
+                {isHasGVPB ? rm.gvpbScope : rm.gvpbScopeOnly}
               </p>
             </>
           )}
@@ -162,7 +165,7 @@ export function RoundMilestoneCard({
         <div className="p-4 sm:p-5 space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <GraduationCap className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
-            <span>Ngày Báo Cáo Hội Đồng</span>
+            <span>{rm.councilReport}</span>
           </div>
           {isKLTN && round.reportDate ? (
             <>
@@ -170,16 +173,16 @@ export function RoundMilestoneCard({
                 {formatDateTime(round.reportDate)}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                Hội đồng 3-5 GV chấm bảo vệ (Điều R1, R6)
+                {rm.councilDesc}
               </p>
             </>
           ) : (
             <>
               <p className="text-xs text-muted-foreground italic">
-                {isKLTN ? 'Chưa xếp lịch cụ thể' : 'Không áp dụng cho đợt này'}
+                {isKLTN ? rm.notScheduled : rm.notApplicable}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {isKLTN ? 'Hội đồng bảo vệ KLTN' : 'Chỉ áp dụng cho KLTN'}
+                {isKLTN ? rm.councilScope : rm.councilScopeOnly}
               </p>
             </>
           )}
