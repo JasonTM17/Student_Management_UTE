@@ -613,7 +613,8 @@ public class RegistrationService {
         Long count = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + ENROLLMENT
                         + " WHERE \"studentId\" = :studentId AND \"courseId\" = :courseId"
-                        + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')",
+                        + " AND \"gradeStatus\" IN ('COMPLETED', 'PUBLISHED')"
+                        + " AND (\"letterGrade\" IS NULL OR \"letterGrade\" NOT IN ('F', 'W'))",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("courseId", courseId),
                 Long.class);
         return count != null && count > 0;

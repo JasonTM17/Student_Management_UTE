@@ -18,6 +18,26 @@ export interface StudentAssistantResolution {
   citation: AssistantCitation;
 }
 
+// 0. GREETING & CASUAL HELLO REGEX
+const GREETING_REGEX =
+  /^(?:hello|hi|hey|alo|halo|xin\s*chào|xin\s*chao|chào\s*(?:bạn|ban|em|anh|chị|chi|thầy|cô|bot|ad|admin|cậu|cau)?|chào|chao|good\s*(?:morning|afternoon|evening|day)|chào\s*buổi\s*(?:sáng|chiều|tối))\b/i;
+
+// 0.1 ASSISTANT CAPABILITIES & SELF INTRODUCTION
+const CAPABILITIES_REGEX =
+  /(?:bạn|ban|em|cậu|bot)\s*(?:là\s*ai|la\s*ai|tên\s*gì|ten\s*gi|có\s*thể\s*làm\s*gì|giúp\s*(?:được\s*)?gì|hỗ\s*trợ\s*gì|chức\s*năng\s*gì)|hướng\s*dẫn\s*(?:sử\s*dụng|dùng)?|làm\s*được\s*gì|giới\s*thiệu\s*(?:về\s*)?(?:bạn|mình|bot)|giúp\s*(?:tôi|mình)|trợ\s*lý\s*(?:này|học\s*vụ)|\bwho\s*are\s*you\b|\bwhat\s*can\s*you\s*do\b|\bhow\s*to\s*use\b|\bhelp\b/i;
+
+// 0.2 THANK YOU & APPRECIATION
+const THANK_YOU_REGEX =
+  /(?:cảm\s*ơn|cam\s*on|cám\s*ơn|thank\s*you|thanks|tuyệt\s*vời|tuyet\s*voi|quá\s*tốt|qua\s*tot|ok\s*cảm\s*ơn|ok\s*thanks|cảm\s*ơn\s*nhiều|tốt\s*lắm)/i;
+
+// 0.3 GOODBYE & FAREWELL
+const GOODBYE_REGEX =
+  /(?:tạm\s*biệt|tam\s*biet|bye|goodbye|hẹn\s*gặp\s*lại|hen\s*gap\s*lai|chào\s*tạm\s*biệt)/i;
+
+// 0.4 UNIVERSITY / CAMPUS GENERAL INFO
+const CAMPUS_INFO_REGEX =
+  /(?:trường|truong)\s*(?:ở\s*đâu|o\s*dau|tên\s*gì|địa\s*chỉ|dia\s*chi|website|liên\s*hệ|lien\s*he|ở\s*quận\s*mấy|thành\s*lập)|(?:đại\s*học\s*công\s*nghệ\s*kỹ\s*thuật|hcmute|campusute|địa\s*chỉ\s*trường)/i;
+
 // 1. SCHEDULE & TIMETABLE REGEX (both accented and unaccented)
 const SCHEDULE_REGEX =
   /(?:lịch|lich)\s*(?:học|hoc|dạy|day|giảng\s*dạy|giang\s*day|tuần|tuan|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|của\s*tôi|cua\s*toi|thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|chủ\s*nhật|chu\s*nhat|t[2-7]|cn)?|thời\s*(?:khoá|khóa|khoa)\s*biểu|thoi\s*khoa\s*bieu|\btkb\b|tiết\s*học|tiet\s*hoc|buổi\s*học|buoi\s*hoc|ca\s*học|ca\s*hoc|ca\s*dạy|ca\s*day|tiết\s*dạy|tiet\s*day|(?:thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|chủ\s*nhật|chu\s*nhat)\s*(?:tôi\s*)?(?:có\s*)?(?:học|hoc|dạy|day|lịch|lich|tiết|tiet|môn|mon|buổi|buoi|ca|ở\s*đâu|o\s*dau|mấy\s*giờ|may\s*gio|khi\s*nào|khi\s*nao)|\bschedule\b|\btimetable\b|\bclasses\b/i;
@@ -44,7 +64,21 @@ const TUITION_REGEX =
 
 // 5. THESIS & GRADUATION CAPSTONE REGEX
 const THESIS_REGEX =
-  /(?:đồ\s*án|do\s*an|khóa\s*luận|khoa\s*luan|tốt\s*nghiệp|tot\s*nghiep|bảo\s*vệ\s*đồ\s*án|bao\s*ve\s*do\s*an|hướng\s*dẫn\s*đồ\s*án|huong\s*dan\s*do\s*an|giảng\s*viên\s*hướng\s*dẫn|giang\s*vien\s*huong\s*dan|\bthesis\b|\bcapstone\b|\bgraduation\s*project\b)/i;
+  /(?:đồ\s*án|do\s*an|khóa\s*luận|khoa\s*luan|tốt\s*nghiệp|tot\s*nghiep|bảo\s*vệ\s*đồ\s*án|bao\s*ve\s*do\s*an|hướng\s*dẫn\s*đồ\s*án|huong\s*dan\s*do\s*an|giảng\s*viên\s*hướng\s*dẫn|giang\s*vien\s*huong\s*dan|(?:khi\s*nào|chừng\s*nào|ngày\s*nào|when).{0,24}bảo\s*vệ|bảo\s*vệ|bao\s*ve\b|\bthesis\b|\bcapstone\b|\bgraduation\s*project\b)/i;
+
+// 5b. Lecturer thesis-work intents (GVHD/GVPB duties from the faculty process
+// spec): supervised topics, groups awaiting approval, council assignments.
+// Requires a thesis-domain noun so generic "hướng dẫn …" how-to questions do
+// not trigger it.
+const LECTURER_THESIS_WORK_REGEX =
+  /(?:đồ\s*án|do\s*an|khóa\s*luận|khoa\s*luan|đề\s*tài|de\s*ta|nhóm|nhom|hội\s*đồng|hoi\s*dong|chấm|cham|phản\s*biện|phan\s*bien|bảo\s*vệ|bao\s*ve|duyệt|duyet|\bcouncil\b|\bthesis\b|\bcapstone\b|supervis|\bapprove\b|\bgrade\b)/i;
+
+const COUNCIL_ROLE_LABELS: Record<string, [string, string]> = {
+  CHAIR: ['Chủ tịch hội đồng', 'Council chair'],
+  SECRETARY: ['Thư ký hội đồng', 'Council secretary'],
+  REVIEWER: ['Ủy viên phản biện', 'Opponent member'],
+  MEMBER: ['Ủy viên', 'Member'],
+};
 
 // 6. CURRICULUM & DEGREE PROGRESS REGEX
 const CURRICULUM_REGEX =
@@ -77,6 +111,89 @@ const SCHOLARSHIP_REGEX =
 // 13. EXAM SCHEDULE REGEX
 const EXAM_REGEX =
   /(?:lịch\s*thi|lich\s*thi|ngày\s*thi|ngay\s*thi|thi\s*kết\s*thúc|thi\s*ket\s*thuc|\bexam\b|\bexam\s*schedule\b)/i;
+
+// Policy-vs-personal disambiguation. The resolver answers with the asker's own
+// records, so a regulation question ("Một nhóm đồ án được tối đa bao nhiêu
+// thành viên?") must fall through to the server knowledge base instead of
+// returning a personal status card. A question counts as policy-only when it
+// asks about rules and contains no first-person marker.
+const POLICY_QUESTION_REGEX =
+  /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed)/i;
+const PERSONAL_MARKER_REGEX =
+  /(của\s+(?:tôi|mình|em|anh|chị)|tôi\s+(?:có|đang|được|cần|thiếu|là|vừa|muốn)|em\s+(?:có|đang|được|muốn|vừa)|anh\s+(?:có|đang|muốn)|chị\s+(?:có|đang|muốn)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
+
+export function isPolicyQuestion(message: string): boolean {
+  return POLICY_QUESTION_REGEX.test(message) && !PERSONAL_MARKER_REGEX.test(message);
+}
+
+function formatAssistantDate(
+  value: string | null | undefined,
+  locale: 'vi' | 'en',
+): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(date);
+}
+
+function formatAssistantDateTime(
+  value: string | null | undefined,
+  locale: 'vi' | 'en',
+): string | null {
+  if (!value) return null;
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return null;
+  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    timeZone: 'Asia/Ho_Chi_Minh',
+  }).format(date);
+}
+
+const THESIS_ROUND_STATUS_LABELS: Record<string, [string, string]> = {
+  DRAFT: ['Bản nháp', 'Draft'],
+  PROPOSAL_OPEN: ['Đang mở nhận đề cương', 'Proposal intake open'],
+  PROPOSALS_PUBLISHED: ['Đã công bố danh sách đề tài', 'Topic list published'],
+  REGISTRATION_OPEN: ['Đang mở đăng ký', 'Registration open'],
+  REGISTRATION_CLOSED: ['Đã đóng đăng ký', 'Registration closed'],
+  RESULTS_PUBLISHED: ['Đã công bố kết quả', 'Results published'],
+  CLOSED: ['Đã kết thúc', 'Closed'],
+  CANCELLED: ['Đã hủy', 'Cancelled'],
+};
+
+const THESIS_GROUP_STATUS_LABELS: Record<string, [string, string]> = {
+  DRAFT: ['Bản nháp', 'Draft'],
+  SUBMITTED: ['Đã nộp, chờ duyệt', 'Submitted, awaiting approval'],
+  APPROVED: ['Đã duyệt', 'Approved'],
+  REJECTED: ['Bị từ chối', 'Rejected'],
+  COMPLETED: ['Hoàn thành', 'Completed'],
+  CANCELLED: ['Đã hủy', 'Cancelled'],
+};
+
+const THESIS_APPROVAL_STATUS_LABELS: Record<string, [string, string]> = {
+  PENDING: ['Chờ duyệt', 'Pending'],
+  APPROVED: ['Đã duyệt', 'Approved'],
+  REJECTED: ['Từ chối', 'Rejected'],
+};
+
+function localizedStatus(
+  table: Record<string, [string, string]>,
+  status: string | null | undefined,
+  locale: 'vi' | 'en',
+): string {
+  if (!status) return locale === 'vi' ? 'Chưa xác định' : 'Unknown';
+  const labels = table[status];
+  if (!labels) return status;
+  return locale === 'vi' ? labels[0] : labels[1];
+}
 
 const DAY_NAMES_VI: Record<number, string> = {
   1: 'Chủ Nhật',
@@ -131,6 +248,11 @@ export function detectRequestedDay(message: string): number | null {
 
 export function isStudentAssistantQuery(message: string): boolean {
   return (
+    GREETING_REGEX.test(message) ||
+    CAPABILITIES_REGEX.test(message) ||
+    THANK_YOU_REGEX.test(message) ||
+    GOODBYE_REGEX.test(message) ||
+    CAMPUS_INFO_REGEX.test(message) ||
     SCHEDULE_REGEX.test(message) ||
     MATERIALS_REGEX.test(message) ||
     CONDUCT_REGEX.test(message) ||
@@ -138,6 +260,10 @@ export function isStudentAssistantQuery(message: string): boolean {
     ANNOUNCEMENT_REGEX.test(message) ||
     TUITION_REGEX.test(message) ||
     THESIS_REGEX.test(message) ||
+    // Council/defense/grading wording can be a personal lecturer workload
+    // question ("Tôi có hội đồng bảo vệ nào?") even without the words
+    // "đồ án/thesis"; the branch itself still requires the LECTURER role.
+    LECTURER_THESIS_WORK_REGEX.test(message) ||
     CURRICULUM_REGEX.test(message) ||
     PROFILE_REGEX.test(message) ||
     REGISTRATION_REGEX.test(message) ||
@@ -313,6 +439,10 @@ export async function resolveStudentAssistantQuery(
     // Unauthenticated or background fallback
   }
 
+  // Regulation questions are answered from the curated knowledge base on the
+  // server; the resolver only owns personal-record answers.
+  const policyQuestion = isPolicyQuestion(message);
+
   const isStudent = currentUser?.roles?.includes('STUDENT') || currentUser?.role === 'STUDENT';
   const isLecturer = currentUser?.roles?.includes('LECTURER') || currentUser?.role === 'LECTURER';
   const isAdmin =
@@ -320,6 +450,184 @@ export async function resolveStudentAssistantQuery(
     currentUser?.roles?.includes('SUPER_ADMIN') ||
     currentUser?.role === 'ADMIN' ||
     currentUser?.role === 'SUPER_ADMIN';
+
+  const displayName = currentUser?.firstName
+    ? `${currentUser.lastName ? currentUser.lastName + ' ' : ''}${currentUser.firstName}`.trim()
+    : (currentUser?.fullName ?? (locale === 'vi' ? 'bạn' : 'there'));
+
+  // 0. GREETING & CASUAL HELLO
+  if (
+    GREETING_REGEX.test(message) &&
+    !SCHEDULE_REGEX.test(message) &&
+    !GRADES_REGEX.test(message) &&
+    !CONDUCT_REGEX.test(message) &&
+    !THESIS_REGEX.test(message) &&
+    !TUITION_REGEX.test(message) &&
+    !REGISTRATION_REGEX.test(message)
+  ) {
+    const greetingHeader =
+      locale === 'vi'
+        ? `Chào bạn **${displayName}**! 👋 Mình là **Trợ lý Học vụ Thông minh CampusCore** của **Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*).`
+        : `Hello **${displayName}**! 👋 I am the **CampusCore Academic Assistant** of **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*).`;
+
+    const answer =
+      locale === 'vi'
+        ? `${greetingHeader}\n\n` +
+          `Mình luôn sẵn sàng đồng hành và hỗ trợ bạn tra cứu mọi thông tin học vụ và quy chế đào tạo 24/7. Dưới đây là những nội dung bạn có thể hỏi mình ngay:\n\n` +
+          `1. 📅 **Thời khóa biểu & Lịch học**: Tra cứu lịch học hôm nay, ngày mai, phòng học và giảng viên phụ trách.\n` +
+          `2. 📊 **Bảng điểm & GPA**: Xem điểm học phần, GPA tích lũy, điều kiện xét học bổng khuyến khích học tập.\n` +
+          `3. ⭐ **Điểm rèn luyện (ĐRL)**: Xem chi tiết 5 tiêu chí ĐRL, hướng dẫn minh chứng và xuất phiếu rèn luyện.\n` +
+          `4. 📝 **Đăng ký học phần**: Tra cứu hạn mức 28 tín chỉ, thời hạn đăng ký và môn tiên quyết.\n` +
+          `5. 🎓 **Khóa luận tốt nghiệp**: Tiến độ đồ án, xem danh mục đề tài, phân công hội đồng bảo vệ.\n` +
+          `6. 📜 **Quy chế & Chính sách**: Chuẩn đầu ra tốt nghiệp, quy định học lại/cải thiện điểm F/C, miễn giảm học phí.\n\n` +
+          `💡 **Bạn cần mình hỗ trợ thông tin gì hôm nay?** Bạn có thể gõ câu hỏi cụ thể hoặc nhấn nhanh vào các gợi ý bên dưới nhé!`
+        : `${greetingHeader}\n\n` +
+          `I am always here to assist you 24/7 with academic regulations, courses, and schedules. Here is what I can help you with:\n\n` +
+          `1. 📅 **Schedule & Classes**: View class timetable, classrooms, and lecturers.\n` +
+          `2. 📊 **Grades & GPA**: Check your course grades, cumulative GPA, and scholarship eligibility.\n` +
+          `3. ⭐ **Conduct Points**: Review your 5 conduct criteria and export certificates.\n` +
+          `4. 📝 **Course Registration**: Check the 28-credit cap, enrollment deadlines, and prerequisites.\n` +
+          `5. 🎓 **Graduation Thesis**: Monitor thesis progress, explore topics, and check defense councils.\n` +
+          `6. 📜 **Academic Regulations**: Graduation requirements, retake policies, and academic rules.\n\n` +
+          `💡 **How may I assist you today?** Feel free to type your question below!`;
+
+    return {
+      answer,
+      citation: {
+        id: 'campuscore-assistant-welcome',
+        slug: 'assistant-introduction',
+        title: locale === 'vi' ? 'Trợ lý Học vụ Thông minh CampusCore' : 'CampusCore Academic Assistant',
+        source: 'academic-catalog',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Trợ lý ảo hỗ trợ 24/7 tra cứu thời khóa biểu, điểm số, điểm rèn luyện, đăng ký học phần và khóa luận tại CampusUTE.'
+            : '24/7 intelligent assistant supporting schedule, grades, conduct points, registration, and thesis at CampusUTE.',
+        domain: 'ACADEMIC_CATALOG',
+      },
+    };
+  }
+
+  // 0.1 CAPABILITIES / WHO ARE YOU / HELP
+  if (CAPABILITIES_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Mình là **Trợ lý Học vụ Thông minh CampusCore** – hệ thống trí tuệ nhân tạo học vụ chính thức của **Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*).\n\n` +
+          `🎯 **Năng lực cốt lõi của mình:**\n` +
+          `- **Tự động cá nhân hóa**: Nhận diện hồ sơ của bạn (**${displayName}**) để cung cấp chính xác lịch học, điểm số và tiến độ học tập thực tế tức thời.\n` +
+          `- **Căn cứ quy chế minh bạch**: Toàn bộ câu trả lời về học vụ đều trích xuất trực tiếp từ Quy chế Đào tạo đại học, Quy định Khóa luận tốt nghiệp và Quyết định ĐRL của Nhà trường.\n` +
+          `- **Đa vai trò**: Hỗ trợ tối ưu cho cả Sinh viên (lịch học, điểm, học bổng, đồ án) và Giảng viên (lịch giảng dạy, phân công lớp học phần, chấm điểm bảo vệ).\n\n` +
+          `Bạn có thể thử hỏi mình ngay: *"Hôm nay tôi có lịch học không?"*, *"Điểm GPA tích lũy của tôi là bao nhiêu?"*, hoặc *"Quy định đăng ký tối đa bao nhiêu tín chỉ?"* nhé!`
+        : `I am the **CampusCore Academic Assistant** – the official intelligent academic companion at **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*).\n\n` +
+          `🎯 **Key Capabilities:**\n` +
+          `- **Personalized Records**: Real-time integration with your student record (${displayName}) for schedules, grades, and degree progress.\n` +
+          `- **Official Regulations**: Grounded in university credit policies, scholarship criteria, and thesis guidelines.\n` +
+          `- **Multi-Role Support**: Assists both Students and Lecturers seamlessly.\n\n` +
+          `Try asking me: *"Do I have classes today?"* or *"What is my GPA?"*!`;
+
+    return {
+      answer,
+      citation: {
+        id: 'campuscore-assistant-capabilities',
+        slug: 'assistant-capabilities',
+        title: locale === 'vi' ? 'Năng lực Trợ lý CampusCore' : 'CampusCore Capabilities',
+        source: 'academic-catalog',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Trợ lý học vụ thông minh hỗ trợ sinh viên và giảng viên CampusUTE với độ chính xác cao.'
+            : 'Intelligent academic assistant supporting CampusUTE students and faculty.',
+        domain: 'ACADEMIC_CATALOG',
+      },
+    };
+  }
+
+  // 0.2 THANK YOU / PRAISE
+  if (THANK_YOU_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Dạ không có gì ạ! 😊 Rất vui được đồng hành và hỗ trợ bạn **${displayName}**.\n\n` +
+          `Nếu trong quá trình học tập tại **Trường Đại học Công nghệ Kỹ thuật TP.HCM** bạn có bất kỳ thắc mắc nào về lịch học, điểm thi, học bổng hay đồ án tốt nghiệp, đừng ngần ngại nhắn cho mình bất kỳ lúc nào nhé.\n\n` +
+          `Chúc bạn một ngày học tập và làm việc thật hiệu quả, tràn đầy năng lượng và gặt hái kết quả xuất sắc! 🚀🎓`
+        : `You're very welcome, **${displayName}**! 😊 It's always my pleasure to assist you.\n\n` +
+          `Feel free to reach out anytime you need help with your schedule, grades, courses, or graduation thesis.\n\n` +
+          `Wishing you a productive and successful day ahead! 🚀🎓`;
+
+    return {
+      answer,
+      citation: {
+        id: 'campuscore-assistant-thanks',
+        slug: 'assistant-appreciation',
+        title: locale === 'vi' ? 'Phản hồi Trợ lý CampusCore' : 'CampusCore Appreciation',
+        source: 'academic-catalog',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Trợ lý CampusCore luôn sẵn sàng phục vụ 24/7.'
+            : 'CampusCore Assistant is always ready to help 24/7.',
+        domain: 'ACADEMIC_CATALOG',
+      },
+    };
+  }
+
+  // 0.3 GOODBYE / FAREWELL
+  if (GOODBYE_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Tạm biệt bạn **${displayName}** nhé! 👋 Chúc bạn luôn giữ vững phong độ học tập thật tốt. Hẹn gặp lại bạn bất cứ khi nào bạn cần hỗ trợ học vụ!`
+        : `Goodbye **${displayName}**! 👋 Have a wonderful day and see you next time whenever you need academic guidance!`;
+
+    return {
+      answer,
+      citation: {
+        id: 'campuscore-assistant-goodbye',
+        slug: 'assistant-farewell',
+        title: locale === 'vi' ? 'Chào tạm biệt' : 'Farewell',
+        source: 'academic-catalog',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Hẹn gặp lại bạn tại Cổng thông tin học vụ CampusUTE.'
+            : 'See you again at CampusUTE Academic Portal.',
+        domain: 'ACADEMIC_CATALOG',
+      },
+    };
+  }
+
+  // 0.4 GENERAL UNIVERSITY / CAMPUS INFO
+  if (CAMPUS_INFO_REGEX.test(message) && !SCHEDULE_REGEX.test(message) && !THESIS_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `🏫 **Thông tin Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*):\n\n` +
+          `- 📍 **Trụ sở chính**: Số 1 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh.\n` +
+          `- 🌐 **Cổng thông tin đào tạo điện tử**: CampusUTE Portal (\`http://127.0.0.1:3100\`).\n` +
+          `- 🏢 **Phòng Đào tạo**: Tòa nhà Trung tâm - Phụ trách kế hoạch đào tạo, mở lớp học phần, cấp bảng điểm và xét tốt nghiệp.\n` +
+          `- 🎖️ **Phòng Công tác Sinh viên**: Phụ trách đánh giá điểm rèn luyện (ĐRL), quản lý học bổng và hỗ trợ sinh viên.\n` +
+          `- 📚 **Thư viện số & Trung tâm Học liệu**: Tòa nhà Thư viện trung tâm, phục vụ tài liệu học tập và nghiên cứu khoa học.\n\n` +
+          `💡 Bạn có thể hỏi mình thêm về lịch học, đăng ký môn hoặc đồ án tốt nghiệp của bạn nhé!`
+        : `🏫 **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*):\n\n` +
+          `- 📍 **Main Campus**: 1 Vo Van Ngan Street, Linh Chieu Ward, Thu Duc City, Ho Chi Minh City.\n` +
+          `- 🌐 **Academic Portal**: CampusUTE Portal (\`http://127.0.0.1:3100\`).\n` +
+          `- 🏢 **Academic Affairs Office**: Main Building - Course planning, transcripts, and graduation.\n` +
+          `- 🎖️ **Student Affairs Office**: Conduct assessment, student support, and scholarships.\n\n` +
+          `💡 You can ask me anytime about your class schedule, transcript, or thesis!`;
+
+    return {
+      answer,
+      citation: {
+        id: 'campuscore-campus-info',
+        slug: 'campus-overview',
+        title: locale === 'vi' ? 'Thông tin Trường Đại học Công nghệ Kỹ thuật TP.HCM' : 'CampusUTE University Overview',
+        source: 'academic-catalog',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Địa chỉ, phòng ban chức năng và thông tin liên hệ Trường Đại học Công nghệ Kỹ thuật TP.HCM.'
+            : 'Address, offices, and contact details for CampusUTE.',
+        domain: 'ACADEMIC_CATALOG',
+      },
+    };
+  }
 
   // A. Handle Learning Materials queries
   if (MATERIALS_REGEX.test(message) && !SCHEDULE_REGEX.test(message)) {
@@ -432,7 +740,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // B1. Handle Student Conduct / Training Points (ĐRL) queries
-  if (CONDUCT_REGEX.test(message)) {
+  if (CONDUCT_REGEX.test(message) && !policyQuestion) {
     try {
       const conduct = await conductApi.getMyConduct();
       if (conduct) {
@@ -550,8 +858,136 @@ export async function resolveStudentAssistantQuery(
     }
   }
 
+  // B2b. Lecturer thesis workload: supervised topics, groups awaiting the
+  // asker's approval, and defense-council assignments. Mirrors the GVHD/GVPB
+  // duties in the faculty process specification so lecturers can ask "what do
+  // I have to do for thesis right now?" instead of digging through the portal.
+  // The server aggregates this across all rounds in one request (the earlier
+  // client-side scan guessed a single "active" round and missed data).
+  if (isLecturer && LECTURER_THESIS_WORK_REGEX.test(message) && !policyQuestion) {
+    try {
+      const workload = await thesisApi.myWorkload();
+      if (workload) {
+        const vi = locale === 'vi';
+        const topics = workload.topics ?? [];
+        const councils = workload.councils ?? [];
+        const pendingTopics = topics.filter((topic) => topic.pendingGroupCount > 0);
+
+        const lines: string[] = [
+          vi
+            ? 'Đầu việc đồ án của bạn (tổng hợp từ hệ thống, mọi đợt đang hoạt động):\n'
+            : 'Your thesis workload (compiled from the system across all active rounds):\n',
+        ];
+        if (topics.length > 0) {
+          lines.push(
+            vi
+              ? `\n📌 **Đề tài bạn hướng dẫn (${topics.length}):**`
+              : `\n📌 **Topics you supervise (${topics.length}):**`,
+          );
+          for (const topic of topics.slice(0, 5)) {
+            const groupNote =
+              topic.groupCount > 0
+                ? vi
+                  ? ` — ${topic.groupCount} nhóm đã đăng ký`
+                  : ` — ${topic.groupCount} group(s) registered`
+                : vi
+                  ? ' — chưa có nhóm đăng ký'
+                  : ' — no group registered yet';
+            const pendingNote =
+              topic.pendingGroupCount > 0
+                ? vi
+                  ? ` (${topic.pendingGroupCount} chờ duyệt)`
+                  : ` (${topic.pendingGroupCount} awaiting approval)`
+                : '';
+            lines.push(
+              `\n• "${topic.title}" (${topic.roundName})${groupNote}${pendingNote}`,
+            );
+          }
+          if (topics.length > 5) {
+            lines.push(
+              vi
+                ? `\n• … và ${topics.length - 5} đề tài khác`
+                : `\n• …and ${topics.length - 5} more`,
+            );
+          }
+        } else {
+          lines.push(
+            vi
+              ? '\n📌 Bạn chưa được phân công hướng dẫn đề tài nào.'
+              : '\n📌 You are not supervising any topic yet.',
+          );
+        }
+        if (pendingTopics.length > 0) {
+          lines.push(
+            vi
+              ? '\n⏳ **Bạn có nhóm đang chờ xét duyệt** — vào mục **Đồ án tốt nghiệp** (/dashboard/thesis) để duyệt.'
+              : '\n⏳ **Groups are awaiting your approval** — review them under **Thesis & Capstone** (/dashboard/thesis).',
+          );
+        }
+        if (councils.length > 0) {
+          lines.push(
+            vi
+              ? `\n🏛️ **Hội đồng bảo vệ của bạn (${councils.length}):**`
+              : `\n🏛️ **Your defense councils (${councils.length}):**`,
+          );
+          for (const council of councils.slice(0, 5)) {
+            const roleLabels = COUNCIL_ROLE_LABELS[council.memberRole];
+            const roleLabel = roleLabels
+              ? vi
+                ? roleLabels[0]
+                : roleLabels[1]
+              : council.memberRole;
+            const topicNote =
+              council.topicCount > 0
+                ? vi
+                  ? ` — ${council.topicCount} đề tài được phân công`
+                  : ` — ${council.topicCount} assigned topic(s)`
+                : vi
+                  ? ' — chưa có đề tài được phân công'
+                  : ' — no topics assigned yet';
+            const deadlineText = formatAssistantDate(council.gvpbDeadline, locale);
+            const defenseText = formatAssistantDate(council.reportDate, locale);
+            const dateNote =
+              deadlineText || defenseText
+                ? (vi
+                    ? (deadlineText ? ` — hạn nộp điểm: ${deadlineText}` : '') +
+                      (defenseText ? `, ngày bảo vệ: ${defenseText}` : '')
+                    : (deadlineText ? ` — score deadline: ${deadlineText}` : '') +
+                      (defenseText ? `, defense date: ${defenseText}` : ''))
+                : '';
+            lines.push(
+              `\n• ${council.name} (${council.roundName}) — ${roleLabel}${topicNote}${dateNote}`,
+            );
+          }
+          lines.push(
+            vi
+              ? '\n💡 Vào **Đồ án tốt nghiệp** (/dashboard/thesis) để nhập điểm phản biện đúng hạn.'
+              : '\n💡 Enter your review scores on time under **Thesis & Capstone** (/dashboard/thesis).',
+          );
+        }
+
+        return {
+          answer: lines.join('\n'),
+          citation: {
+            id: 'lecturer-thesis-workload',
+            slug: 'lecturer-thesis-workload',
+            title: vi ? 'Đầu việc đồ án của giảng viên' : 'Lecturer Thesis Workload',
+            source: 'academic-records',
+            locale,
+            excerpt: vi
+              ? 'Đề tài hướng dẫn, nhóm chờ duyệt và hội đồng bảo vệ tổng hợp trực tiếp từ hệ thống.'
+              : 'Supervised topics, pending approvals, and council assignments compiled live.',
+            domain: 'THESIS',
+          },
+        };
+      }
+    } catch {
+      // Fall through to the generic thesis/portal guidance below.
+    }
+  }
+
   // B3. Handle Grades, GPA & Transcript queries
-  if (GRADES_REGEX.test(message)) {
+  if (GRADES_REGEX.test(message) && !policyQuestion) {
     try {
       const transcript = await gradesApi.getMyTranscript();
       const grades = await gradesApi.getMyGrades();
@@ -627,7 +1063,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // C. Handle Tuition & Financial queries
-  if (TUITION_REGEX.test(message)) {
+  if (TUITION_REGEX.test(message) && !policyQuestion) {
     let enrolledCredits = 0;
     try {
       const enrollments = await enrollmentsApi.getMyEnrollments();
@@ -759,7 +1195,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // D2. Handle Scholarship queries
-  if (SCHOLARSHIP_REGEX.test(message)) {
+  if (SCHOLARSHIP_REGEX.test(message) && !policyQuestion) {
     let gpa: string | null = null;
     let conductScore: number | null = null;
     let conductRank = 'Đang cập nhật';
@@ -879,7 +1315,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // D4. Handle Exam Schedule queries
-  if (EXAM_REGEX.test(message)) {
+  if (EXAM_REGEX.test(message) && !policyQuestion) {
     const answer =
       locale === 'vi'
         ? `Thông tin về Lịch thi và Quy chế thi kết thúc học phần tại HCMUTE:\n\n` +
@@ -918,23 +1354,41 @@ export async function resolveStudentAssistantQuery(
   }
 
   // E. Handle Thesis / Capstone Graduation queries
-  if (THESIS_REGEX.test(message)) {
+  if (THESIS_REGEX.test(message) && !policyQuestion) {
     try {
       const rounds = await thesisApi.listRounds();
-      const activeRound = rounds?.find(
-        (r) => r.status === 'REGISTRATION_OPEN' || r.status === 'PROPOSALS_PUBLISHED',
-      ) ?? rounds?.[0];
+      // Multiple rounds can be open at once; the student's group may live in
+      // any of them. Scan (bounded) for the round that actually contains the
+      // asker's group before falling back to the first open round.
+      let activeRound: (typeof rounds)[number] | undefined;
+      let myGroup: Awaited<ReturnType<typeof thesisApi.listGroups>>[number] | undefined;
+      const fallbackRound =
+        rounds?.find(
+          (r) => r.status === 'REGISTRATION_OPEN' || r.status === 'PROPOSALS_PUBLISHED',
+        ) ?? rounds?.[0];
+      for (const round of (rounds ?? []).slice(0, 6)) {
+        try {
+          const groups = await thesisApi.listGroups(round.id);
+          const mine = groups?.find((g) => {
+            if (!currentUser?.id) return false;
+            return (
+              g.leaderStudentId === currentUser.id ||
+              g.memberStudentIds?.includes(currentUser.id) ||
+              g.members?.some((m) => m.studentId === currentUser.id)
+            );
+          });
+          if (mine) {
+            activeRound = round;
+            myGroup = mine;
+            break;
+          }
+        } catch {
+          // A round that fails to list is simply skipped.
+        }
+      }
+      if (!activeRound) activeRound = fallbackRound;
 
       if (activeRound) {
-        const groups = await thesisApi.listGroups(activeRound.id);
-        const myGroup = groups?.find((g) => {
-          if (!currentUser?.id) return false;
-          return (
-            g.leaderStudentId === currentUser.id ||
-            g.memberStudentIds?.includes(currentUser.id) ||
-            g.members?.some((m) => m.studentId === currentUser.id)
-          );
-        });
 
         let topicTitle = '';
         if (myGroup?.topicId) {
@@ -946,25 +1400,59 @@ export async function resolveStudentAssistantQuery(
           }
         }
 
+        // Published results reveal the defense council and final score for
+        // this student's group; the endpoint 404s until results are published.
+        let councilName = '';
+        let finalScore: number | null = null;
+        if (myGroup) {
+          try {
+            const results = await thesisApi.myResults(activeRound.id);
+            const result = results?.find((item) => item.groupId === myGroup.id);
+            if (result) {
+              councilName = result.councilName ?? '';
+              finalScore = result.finalScore ?? null;
+            }
+          } catch {
+            // Results not published yet — omit the council lines.
+          }
+        }
+
+        const reportDateText = formatAssistantDate(activeRound.reportDate, locale);
+        const roundStatusText = localizedStatus(
+          THESIS_ROUND_STATUS_LABELS,
+          activeRound.status,
+          locale,
+        );
+        const groupStatusText = myGroup
+          ? localizedStatus(THESIS_GROUP_STATUS_LABELS, myGroup.status, locale)
+          : '';
+        const approvalText = myGroup
+          ? localizedStatus(THESIS_APPROVAL_STATUS_LABELS, myGroup.approvalStatus, locale)
+          : '';
+
         const answer =
           locale === 'vi'
             ? `Thông tin đồ án tốt nghiệp / khóa luận của bạn:\n\n` +
               `• **Đợt đồ án:** **${activeRound.name}** (Loại: ${activeRound.thesisType})\n` +
-              `• **Trạng thái đợt:** ${activeRound.status}\n` +
+              `• **Trạng thái đợt:** ${roundStatusText}\n` +
               (topicTitle ? `• **Đề tài đăng ký:** **${topicTitle}**\n` : '') +
               (myGroup
-                ? `• **Trạng thái nhóm:** ${myGroup.status} (Duyệt: ${myGroup.approvalStatus})\n`
+                ? `• **Trạng thái nhóm:** ${groupStatusText} (Xét duyệt: ${approvalText})\n`
                 : '• **Nhóm đồ án:** Bạn chưa tham gia nhóm đồ án nào trong đợt này.\n') +
-              (activeRound.reportDate ? `• **Ngày báo cáo dự kiến:** ${activeRound.reportDate}\n` : '') +
+              (reportDateText ? `• **Ngày báo cáo / bảo vệ dự kiến:** ${reportDateText}\n` : '') +
+              (councilName ? `• **Hội đồng bảo vệ:** ${councilName}\n` : '') +
+              (finalScore != null ? `• **Điểm tổng kết:** **${finalScore}/10**\n` : '') +
               `\n💡 Xem chi tiết danh sách đề tài, đăng ký nhóm và nộp báo cáo tại mục **Đồ án tốt nghiệp** (/dashboard/thesis).`
             : `Here is your graduation thesis/capstone information:\n\n` +
               `• **Active Round:** **${activeRound.name}** (${activeRound.thesisType})\n` +
-              `• **Round Status:** ${activeRound.status}\n` +
+              `• **Round Status:** ${roundStatusText}\n` +
               (topicTitle ? `• **Registered Topic:** **${topicTitle}**\n` : '') +
               (myGroup
-                ? `• **Group Status:** ${myGroup.status} (Approval: ${myGroup.approvalStatus})\n`
+                ? `• **Group Status:** ${groupStatusText} (Approval: ${approvalText})\n`
                 : '• **Group Status:** You have not joined a thesis group for this round yet.\n') +
-              (activeRound.reportDate ? `• **Target Defense Date:** ${activeRound.reportDate}\n` : '') +
+              (reportDateText ? `• **Target Defense Date:** ${reportDateText}\n` : '') +
+              (councilName ? `• **Defense Council:** ${councilName}\n` : '') +
+              (finalScore != null ? `• **Final Score:** **${finalScore}/10**\n` : '') +
               `\n💡 Manage your thesis proposals and groups under **Thesis & Capstone** (/dashboard/thesis).`;
 
         return {
@@ -1011,7 +1499,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // F. Handle Course Registration Eligibility & Credit Cap queries
-  if (REGISTRATION_REGEX.test(message)) {
+  if (REGISTRATION_REGEX.test(message) && !policyQuestion) {
     try {
       const eligibility = await registrationApi.eligibility();
       if (eligibility) {
@@ -1022,6 +1510,19 @@ export async function resolveStudentAssistantQuery(
         const creditLimit = eligibility.creditLimit || 28;
         const creditsUsed = eligibility.creditsUsed ?? 0;
         const creditsRemaining = eligibility.creditsRemaining ?? Math.max(0, creditLimit - creditsUsed);
+        const windowStartText = formatAssistantDateTime(eligibility.windowStart, locale);
+        const windowEndText = formatAssistantDateTime(eligibility.windowEnd, locale);
+        const windowTextVi =
+          windowStartText && windowEndText
+            ? `Từ ${windowStartText} đến ${windowEndText}`
+            : windowStartText
+              ? `Bắt đầu từ ${windowStartText}`
+              : '';
+        const windowTextEn = windowStartText && windowEndText
+          ? `From ${windowStartText} to ${windowEndText}`
+          : windowStartText
+            ? `Opens ${windowStartText}`
+            : '';
 
         const answer =
           locale === 'vi'
@@ -1031,13 +1532,14 @@ export async function resolveStudentAssistantQuery(
               `• **Số tín chỉ tối thiểu:** **14 tín chỉ** (đối với sinh viên học lực bình thường) hoặc **10 tín chỉ** (đối với sinh viên bị cảnh cáo học vụ)\n` +
               `• **Số tín chỉ bạn đã đăng ký:** **${creditsUsed}** tín chỉ\n` +
               `• **Số tín chỉ còn lại có thể đăng ký bổ sung:** **${creditsRemaining}** tín chỉ\n` +
-              (eligibility.windowStart ? `• **Thời gian mở đợt:** Từ ${eligibility.windowStart} đến ${eligibility.windowEnd}\n` : '') +
+              (windowTextVi ? `• **Thời gian mở đợt:** ${windowTextVi}\n` : '') +
               `\n💡 Để chọn môn, đổi lớp học phần hoặc rút môn, bạn hãy truy cập ngay mục **Đăng ký học phần** (/dashboard/register).`
             : `Here is your course registration eligibility status:\n\n` +
               `• **Status:** **${statusText}**\n` +
               `• **Credit Limit:** Maximum **${creditLimit}** credits / semester (HCMUTE Credit Regulations)\n` +
               `• **Credits Used:** **${creditsUsed}** credits\n` +
               `• **Credits Remaining:** **${creditsRemaining}** credits\n` +
+              (windowTextEn ? `• **Registration Window:** ${windowTextEn}\n` : '') +
               `\n💡 Register or modify course sections under **Course Registration** (/dashboard/register).`;
 
         return {
@@ -1062,7 +1564,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // G. Handle Degree Progress & Curriculum queries
-  if (CURRICULUM_REGEX.test(message)) {
+  if (CURRICULUM_REGEX.test(message) && !policyQuestion) {
     try {
       const curriculum = await curriculumApi.getMyCurriculum();
       if (curriculum) {
@@ -1257,6 +1759,11 @@ export async function resolveStudentAssistantQuery(
   }
 
   // J. Handle Schedule / Timetable queries (Student & Lecturer)
+  // This branch used to be an unconditional catch-all that returned a
+  // timetable for anything that fell through earlier branches (including
+  // regulation questions). It now requires an actual schedule intent and a
+  // non-policy question, so unmatched questions fall through to the server.
+  if (!policyQuestion && SCHEDULE_REGEX.test(message)) {
   try {
     let meetings: ScheduleMeeting[] = [];
     let isLecturerSchedule = false;
@@ -1478,4 +1985,9 @@ export async function resolveStudentAssistantQuery(
       },
     };
   }
+  }
+
+  // Nothing the local resolver can answer: let the caller fall through to the
+  // server knowledge base.
+  return null;
 }

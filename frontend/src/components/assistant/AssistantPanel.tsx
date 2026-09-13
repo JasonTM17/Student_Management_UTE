@@ -4,6 +4,7 @@ import {
   type FormEvent,
   useCallback,
   useEffect,
+  useMemo,
   useRef,
   useState,
 } from 'react';
@@ -88,6 +89,44 @@ export function AssistantPanel() {
     onReconcileHistory: reconcileHistory,
     onNewExchange: handleNewExchange,
   });
+
+  // The header badge must reflect the engine that actually answered the last
+  // turn (meta/done carries model), not a fixed marketing label.
+  const modelBadge = useMemo(() => {
+    const model = state.model;
+    if (!model) return null;
+    if (model === 'curated-lexical-rag') return messages.assistant.modelBadgeKnowledge;
+    if (
+      model === 'campuscore-personal-context' ||
+      model === 'CampusCore Student Assistant'
+    ) {
+      return messages.assistant.modelBadgePersonal;
+    }
+    const lower = model.toLowerCase();
+    if (lower.includes('deepseek') || lower.includes('flash')) {
+      return messages.assistant.modelBadgeModel;
+    }
+    return null;
+  }, [state.model, messages]);
+
+  // Follow-up chips follow the domain of the last grounded answer instead of
+  // repeating the empty-state suggestions after every reply.
+  const followUps = useMemo(() => {
+    if (isSending) return undefined;
+    const lastGrounded = [...state.messages]
+      .reverse()
+      .find(
+        (message) =>
+          message.role === 'assistant' && !message.pending && message.citations?.length,
+      );
+    const rawDomain = lastGrounded?.citations?.[0]?.domain?.toUpperCase();
+    const domain = rawDomain === 'ANNOUNCEMENTS' ? 'ANNOUNCEMENT' : rawDomain;
+    const byDomain = messages.assistant.followUpsByDomain as Record<
+      string,
+      readonly string[]
+    >;
+    return (domain && byDomain[domain]) || messages.assistant.suggestions;
+  }, [state.messages, isSending, messages]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -249,7 +288,8 @@ export function AssistantPanel() {
         className={cn(
           'fixed z-50',
           open
-            ? 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 w-[min(24rem,calc(100vw-2rem))] md:bottom-6 md:right-6'
+            ? // Mobile: full-screen sheet; desktop: floating card bottom-right.
+              'inset-0 md:inset-auto md:bottom-6 md:right-6 md:w-[min(24rem,calc(100vw-2rem))]'
             : 'bottom-[calc(5.5rem+env(safe-area-inset-bottom))] right-4 md:bottom-6 md:right-6',
         )}
       >
@@ -259,7 +299,7 @@ export function AssistantPanel() {
             aria-modal="false"
             aria-labelledby="assistant-panel-title"
             aria-describedby="assistant-panel-description"
-            className="relative flex max-h-[min(42rem,calc(100dvh-6.5rem-env(safe-area-inset-bottom)))] flex-col overflow-hidden rounded-2xl border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] md:max-h-[min(42rem,calc(100dvh-2rem))]"
+            className="relative flex h-full flex-col overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
           >
             {/* Header with quick New Chat, live status indicator, and V4 Flash badge */}
             <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
@@ -277,9 +317,11 @@ export function AssistantPanel() {
                     className="flex items-center gap-1.5 font-semibold text-white text-sm"
                   >
                     <span>{messages.assistant.title}</span>
-                    <span className="rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
-                      V4 Flash
-                    </span>
+                    {modelBadge ? (
+                      <span className="shrink-0 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
+                        {modelBadge}
+                      </span>
+                    ) : null}
                   </h2>
                   <p
                     id="assistant-panel-description"
@@ -298,8 +340,8 @@ export function AssistantPanel() {
                   size="icon"
                   className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={() => void createConversation()}
-                  aria-label="Cuộc trò chuyện mới"
-                  title="Cuộc trò chuyện mới"
+                  aria-label={messages.assistant.newConversation}
+                  title={messages.assistant.newConversation}
                 >
                   <RotateCcw className="h-3.5 w-3.5" aria-hidden="true" />
                 </Button>
@@ -355,7 +397,9 @@ export function AssistantPanel() {
               ref={logRef}
               onScroll={handleLogScroll}
               role="log"
-              aria-live="polite"
+              // Announce only settled answers; streaming deltas would flood
+              // screen readers with partial tokens.
+              aria-live={isSending ? 'off' : 'polite'}
               aria-relevant="additions text"
               aria-busy={isSending}
               className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
@@ -389,10 +433,10 @@ export function AssistantPanel() {
               ) : (
                 <AssistantMessages
                   messageList={state.messages}
-                  onFeedback={(messageId, rating) =>
-                    void setFeedback(messageId, rating)
+                  onFeedback={(messageId, rating, reason) =>
+                    void setFeedback(messageId, rating, reason)
                   }
-                  followUps={isSending ? undefined : messages.assistant.suggestions}
+                  followUps={followUps}
                   followUpsLabel={messages.assistant.followUpsLabel}
                   onFollowUp={(suggestion) =>
                     void sendMessage(undefined, suggestion)
@@ -441,10 +485,10 @@ export function AssistantPanel() {
                 type="button"
                 onClick={scrollToBottom}
                 className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full border border-primary/20 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
-                aria-label="Cuộn xuống tin mới"
+                aria-label={messages.assistant.scrollToLatest}
               >
                 <ArrowDown className="h-3 w-3" aria-hidden="true" />
-                <span>Tin mới</span>
+                <span>{messages.assistant.scrollToLatest}</span>
               </button>
             ) : null}
 

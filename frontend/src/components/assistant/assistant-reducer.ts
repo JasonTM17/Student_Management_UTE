@@ -10,6 +10,8 @@ export interface ChatMessage {
   model?: string;
   pending?: boolean;
   feedback?: 'UP' | 'DOWN';
+  feedbackReason?: string;
+  createdAt?: string;
 }
 
 export type AssistantError =
@@ -45,14 +47,21 @@ export type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' }
+  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN'; reason?: string }
   | { type: 'clear-error' };
 
 /**
  * Deterministic guard refusals: the same input is always blocked again, so
- * the stream ends locally without a JSON replay round trip.
+ * the stream ends locally without a JSON replay round trip. Mirrors the
+ * reason codes produced by the server AssistantInputGuard.
  */
-export const GUARD_BLOCKED_CODES = new Set(['PROMPT_INJECTION']);
+export const GUARD_BLOCKED_CODES = new Set([
+  'PROMPT_INJECTION',
+  'SENSITIVE_EMAIL',
+  'SENSITIVE_PHONE',
+  'SENSITIVE_STUDENT_ID',
+  'SENSITIVE_CREDENTIAL',
+]);
 
 export const TRANSIENT_TERMINAL_CODES = new Set([
   'TURN_CANCELLED',
@@ -158,6 +167,7 @@ export function assistantReducer(
         model: action.reply.model ?? current.model,
         pending: false,
         id: action.reply.messageId ?? current.id,
+        createdAt: current.createdAt ?? new Date().toISOString(),
       };
       return {
         ...state,
@@ -173,7 +183,11 @@ export function assistantReducer(
     case 'feedback': {
       const messages = state.messages.map((message) =>
         message.id === action.messageId
-          ? { ...message, feedback: action.rating }
+          ? {
+              ...message,
+              feedback: action.rating,
+              ...(action.reason ? { feedbackReason: action.reason } : {}),
+            }
           : message,
       );
       return { ...state, messages };
@@ -194,6 +208,8 @@ export function fromHistoryMessage(message: {
   reasonCode?: string | null;
   model?: string | null;
   feedback?: 'UP' | 'DOWN' | null;
+  feedbackReason?: string | null;
+  createdAt?: string;
 }): ChatMessage {
   const role = message.role.toLowerCase() === 'user' ? 'user' : 'assistant';
   return {
@@ -205,5 +221,7 @@ export function fromHistoryMessage(message: {
     reasonCode: message.reasonCode ?? undefined,
     model: message.model ?? undefined,
     feedback: message.feedback ?? undefined,
+    feedbackReason: message.feedbackReason ?? undefined,
+    createdAt: message.createdAt,
   };
 }

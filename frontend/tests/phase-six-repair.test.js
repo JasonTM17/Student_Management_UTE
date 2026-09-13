@@ -119,10 +119,15 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   assert.match(assistant, /bottom-\[calc\(5\.5rem/);
   assert.match(assistant, /right-4/);
   assert.match(assistant, /role="dialog"/);
-  assert.match(assistant, /max-h-\[min\(42rem,calc\(100dvh-6\.5rem-env\(safe-area-inset-bottom\)\)\)\]/);
+  // Mobile opens a full-screen sheet (inset-0 + h-full + safe-area padding);
+  // desktop keeps the floating bottom-right card.
+  assert.match(assistant, /inset-0 md:inset-auto/);
+  assert.match(assistant, /h-full/);
+  assert.match(assistant, /pb-\[env\(safe-area-inset-bottom\)\]/);
   assert.match(assistant, /md:max-h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/);
   assert.match(assistant, /role="log"/);
-  assert.match(assistant, /aria-live="polite"/);
+  // Streaming deltas must not flood screen readers; announcements resume on settle.
+  assert.match(assistant, /aria-live=\{isSending \? 'off' : 'polite'\}/);
   assert.match(assistant, /event\.key !== 'Escape'/);
   assert.match(assistant, /triggerRef\.current\?\.focus\(\)/);
   assert.match(assistant, /thesisApi\.chat\(message, locale\)/);

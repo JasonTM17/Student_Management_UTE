@@ -5,23 +5,31 @@ import { useRouter } from 'next/navigation';
 import { ExternalLink } from 'lucide-react';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
+import {
+  ASSISTANT_INLINE_MARKDOWN_REGEX,
+  sanitizeStreamingMarkdown,
+} from '@/lib/assistant-inline-markdown-regex';
 
 interface AssistantMarkdownContentProps {
   content: string;
   className?: string;
+  /** True while the message is still streaming; trims unclosed markers. */
+  streaming?: boolean;
 }
 
 export function AssistantMarkdownContent({
   content,
   className,
+  streaming = false,
 }: AssistantMarkdownContentProps) {
   const { href } = useI18n();
   const router = useRouter();
+  const safeContent = streaming ? sanitizeStreamingMarkdown(content) : content;
 
   // Split into structural blocks: tables vs text lines
   const blocks = React.useMemo(() => {
-    if (!content) return [];
-    const lines = content.split('\n');
+    if (!safeContent) return [];
+    const lines = safeContent.split('\n');
     const parsedBlocks: { type: 'table' | 'text'; lines: string[] }[] = [];
     let currentTable: string[] = [];
 
@@ -43,9 +51,9 @@ export function AssistantMarkdownContent({
       parsedBlocks.push({ type: 'table', lines: [...currentTable] });
     }
     return parsedBlocks;
-  }, [content]);
+  }, [safeContent]);
 
-  if (!content) return null;
+  if (!safeContent) return null;
 
   const renderInline = (text: string): React.ReactNode[] => {
     // Regex matching:
@@ -54,9 +62,11 @@ export function AssistantMarkdownContent({
     // 3. ***bold-italic***
     // 4. **bold**
     // 5. *italic*
-    // 6. Direct internal routes: /dashboard/... or /admin/...
-    const regex =
-      /(!?\[([^\]]+)\]\(([^)]+)\))|(`([^`]+)`)|(\*\*\*([^*]+)\*\*\*)|(\*\*([^*]+)\*\*)|(\*([^*]+)\*)|(\b\/(?:dashboard|admin)(?:\/[a-z0-9\-_]+)*\b)/g;
+    // Fresh instance per call: the shared pattern carries lastIndex state.
+    const regex = new RegExp(
+      ASSISTANT_INLINE_MARKDOWN_REGEX.source,
+      ASSISTANT_INLINE_MARKDOWN_REGEX.flags,
+    );
     const elements: React.ReactNode[] = [];
     let lastIndex = 0;
     let match: RegExpExecArray | null;
@@ -244,14 +254,39 @@ export function AssistantMarkdownContent({
           );
         }
 
-        if (text.startsWith('### ')) {
+        if (text.startsWith('#### ') || text.startsWith('### ')) {
+          const heading = text.replace(/^#{3,4}\s*/, '');
           return (
             <h4
               key={bIdx}
               className="mt-3 font-semibold text-foreground text-sm tracking-tight"
             >
-              {renderInline(text.replace(/^###\s*/, ''))}
+              {renderInline(heading)}
             </h4>
+          );
+        }
+
+        if (text.startsWith('## ') || text.startsWith('# ')) {
+          const heading = text.replace(/^#{1,2}\s*/, '');
+          return (
+            <h3
+              key={bIdx}
+              className="mt-3 font-semibold text-foreground text-[15px] tracking-tight"
+            >
+              {renderInline(heading)}
+            </h3>
+          );
+        }
+
+        if (text.startsWith('> ') || text.startsWith('>')) {
+          const quote = text.replace(/^>\s?/, '');
+          return (
+            <blockquote
+              key={bIdx}
+              className="border-l-2 border-primary/40 bg-primary/5 py-1 pl-2.5 pr-2 text-muted-foreground italic"
+            >
+              {renderInline(quote)}
+            </blockquote>
           );
         }
 

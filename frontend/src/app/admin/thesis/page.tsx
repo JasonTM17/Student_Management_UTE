@@ -8,6 +8,7 @@ import {
   ChevronUp,
   CircleDot,
   FileStack,
+  ExternalLink,
   Plus,
   Trash2,
   UserPlus,
@@ -17,6 +18,7 @@ import {
 import { useAuth } from '@/context/AuthContext';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
+import { LocalizedLink } from '@/components/LocalizedLink';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
@@ -52,7 +54,7 @@ export default function AdminThesisPage() {
     isLoggingOut,
     isSuperAdmin,
   } = useAuth();
-  const { messages } = useI18n();
+  const { locale, messages } = useI18n();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -435,32 +437,42 @@ export default function AdminThesisPage() {
                   </CardHeader>
                   {isExpanded ? (
                     <CardContent className="space-y-4 border-t border-border/60 bg-secondary/20">
-                      <div className="flex flex-wrap gap-2 pt-2">
-                        {round.status === 'DRAFT' ? (
-                          <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'open-proposals')} disabled={isSaving}>
-                            {messages.thesis.admin.openProposals}
-                          </Button>
-                        ) : null}
-                        {round.status === 'PROPOSAL_OPEN' ? (
-                          <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish')} disabled={isSaving}>
-                            {messages.thesis.admin.publishProposals}
-                          </Button>
-                        ) : null}
-                        {round.status === 'PROPOSALS_PUBLISHED' ? (
-                          <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'open')} disabled={isSaving}>
-                            {messages.thesis.admin.openRegistration}
-                          </Button>
-                        ) : null}
-                        {round.status === 'REGISTRATION_OPEN' ? (
-                          <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'close')} disabled={isSaving}>
-                            {messages.thesis.admin.closeRegistration}
-                          </Button>
-                        ) : null}
-                        {round.status === 'REGISTRATION_CLOSED' ? (
-                          <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish-results')} disabled={isSaving}>
-                            {messages.thesis.admin.publishResults}
-                          </Button>
-                        ) : null}
+                      <div className="flex flex-wrap items-center justify-between gap-2 pt-2">
+                        <div className="flex flex-wrap gap-2">
+                          {round.status === 'DRAFT' ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'open-proposals')} disabled={isSaving}>
+                              {messages.thesis.admin.openProposals}
+                            </Button>
+                          ) : null}
+                          {round.status === 'PROPOSAL_OPEN' ? (
+                            <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish')} disabled={isSaving}>
+                              {messages.thesis.admin.publishProposals}
+                            </Button>
+                          ) : null}
+                          {round.status === 'PROPOSALS_PUBLISHED' ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'open')} disabled={isSaving}>
+                              {messages.thesis.admin.openRegistration}
+                            </Button>
+                          ) : null}
+                          {round.status === 'REGISTRATION_OPEN' ? (
+                            <Button type="button" size="sm" variant="outline" onClick={() => void transitionRound(round.id, 'close')} disabled={isSaving}>
+                              {messages.thesis.admin.closeRegistration}
+                            </Button>
+                          ) : null}
+                          {round.status === 'REGISTRATION_CLOSED' ? (
+                            <Button type="button" size="sm" onClick={() => void transitionRound(round.id, 'publish-results')} disabled={isSaving}>
+                              {messages.thesis.admin.publishResults}
+                            </Button>
+                          ) : null}
+                        </div>
+
+                        <LocalizedLink
+                          href={`/dashboard/thesis?roundId=${round.id}`}
+                          className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-primary hover:bg-secondary/60 hover:border-primary/40 transition-all shadow-2xs"
+                        >
+                          <ExternalLink className="h-3.5 w-3.5" />
+                          <span>{locale === 'vi' ? 'Quản lý Đề tài & Nhóm trong Workspace →' : 'Manage Topics & Groups in Workspace →'}</span>
+                        </LocalizedLink>
                       </div>
 
                       {/* Defense Councils Management Section */}

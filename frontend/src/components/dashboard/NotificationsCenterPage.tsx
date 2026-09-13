@@ -38,7 +38,7 @@ type Filter = 'all' | 'unread';
 
 function resolveNotificationTarget(notification: { title?: string; content?: string; message?: string }): string {
   const text = `${notification.title || ''} ${notification.content || notification.message || ''}`.toLowerCase();
-  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
+  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài') || text.includes('đồ án') || text.includes('hội đồng')) {
     return '/dashboard/thesis';
   }
   if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {

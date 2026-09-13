@@ -142,5 +142,42 @@ class RateLimitFilterTest {
         MockHttpServletResponse adminRes = new MockHttpServletResponse();
         filter.doFilter(adminReq, adminRes, mock(FilterChain.class));
         assertEquals("30", adminRes.getHeader("X-RateLimit-Limit"));
+
+        // Enrollment limit is 15 on /api/v1/me/enrollments and /api/v1/enrollments/enroll
+        MockHttpServletRequest enrollReq = new MockHttpServletRequest("POST", "/api/v1/me/enrollments");
+        enrollReq.setRemoteAddr("10.0.0.2");
+        MockHttpServletResponse enrollRes = new MockHttpServletResponse();
+        filter.doFilter(enrollReq, enrollRes, mock(FilterChain.class));
+        assertEquals("15", enrollRes.getHeader("X-RateLimit-Limit"));
+
+        // Grading limit is 20 on /api/v1/sections/{id}/grades
+        MockHttpServletRequest gradeReq = new MockHttpServletRequest("PUT", "/api/v1/sections/sec-01/grades");
+        gradeReq.setRemoteAddr("10.0.0.3");
+        MockHttpServletResponse gradeRes = new MockHttpServletResponse();
+        filter.doFilter(gradeReq, gradeRes, mock(FilterChain.class));
+        assertEquals("20", gradeRes.getHeader("X-RateLimit-Limit"));
+    }
+
+    @Test
+    void assistantChatUsesItsOwnRateLimitBucket() throws Exception {
+        // Assistant chat is a dedicated category, not a reuse of the
+        // announcement bucket, so a chatty assistant cannot exhaust the
+        // announcement quota and vice versa.
+        MockHttpServletRequest assistantReq = new MockHttpServletRequest("POST", "/api/v1/assistant/chat/stream");
+        assistantReq.setRemoteAddr("10.0.0.7");
+        MockHttpServletResponse assistantRes = new MockHttpServletResponse();
+        filter.doFilter(assistantReq, assistantRes, mock(FilterChain.class));
+        assertEquals("20", assistantRes.getHeader("X-RateLimit-Limit"));
+        assertEquals("19", assistantRes.getHeader("X-RateLimit-Remaining"));
+
+        MockHttpServletRequest announcementReq = new MockHttpServletRequest("POST", "/api/v1/announcements");
+        announcementReq.setRemoteAddr("10.0.0.7");
+        MockHttpServletResponse announcementRes = new MockHttpServletResponse();
+        filter.doFilter(announcementReq, announcementRes, mock(FilterChain.class));
+        assertEquals("20", announcementRes.getHeader("X-RateLimit-Limit"));
+        assertEquals("19", announcementRes.getHeader("X-RateLimit-Remaining"));
+
+        // Two distinct buckets for the same caller identity.
+        assertEquals(2, limiterService.getActiveKeyCount());
     }
 }

@@ -27,7 +27,7 @@ function getProgressIndex(
 
 export default function ThesisProgressPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
-  const { messages } = useI18n();
+  const { locale, messages } = useI18n();
   const workspace = useThesisWorkspace();
   const selectedRound = workspace.selectedRound;
   const progressIndex = getProgressIndex(
@@ -154,7 +154,7 @@ export default function ThesisProgressPage() {
               <div>
                 <p className="font-semibold text-foreground">{messages.thesis.groupsTitle}</p>
                 <p className="mt-1 text-sm text-muted-foreground">
-                  {workspace.currentGroup.memberStudentIds.length} {messages.thesis.groups.toLowerCase()} · {workspace.statusLabel(workspace.currentGroup.status)}
+                  {workspace.currentGroup.memberStudentIds.length} {locale === 'vi' ? 'thành viên' : 'members'} · {workspace.statusLabel(workspace.currentGroup.status)}
                 </p>
               </div>
             </div>
