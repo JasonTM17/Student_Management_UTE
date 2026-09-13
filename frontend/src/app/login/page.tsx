@@ -194,7 +194,7 @@ export default function LoginPage() {
                 setEmail(creds.email);
                 setPassword(creds.password);
               }}
-              className="text-primary hover:underline font-semibold text-xs flex items-center gap-1"
+              className="inline-flex min-h-8 items-center text-primary hover:underline font-semibold text-xs gap-1"
             >
               <ArrowRight className="h-3.5 w-3.5" />
               {locale === 'vi' ? 'Điền nhanh' : 'Quick fill'}
@@ -382,14 +382,14 @@ export default function LoginPage() {
         {portal === 'student' ? (
           <p className="text-sm text-muted-foreground">
             {messages.signup.needAccount}{' '}
-            <LocalizedLink href="/register" className="font-medium text-primary hover:underline">
+            <LocalizedLink href="/register" className="inline-flex min-h-8 items-center font-medium text-primary hover:underline">
               {messages.signup.submit}
             </LocalizedLink>
           </p>
         ) : null}
         <p className="text-sm text-muted-foreground">
           {messages.login.returnHomeLead}{' '}
-          <LocalizedLink href="/" className="font-medium text-primary hover:underline">
+          <LocalizedLink href="/" className="inline-flex min-h-8 items-center font-medium text-primary hover:underline">
             {messages.common.actions.returnHome}
           </LocalizedLink>
           .

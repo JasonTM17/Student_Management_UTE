@@ -9,11 +9,10 @@ import {
   LineChart,
   RotateCw,
   Download,
-  Camera,
-  CheckCircle2,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
+import { useI18n } from '@/i18n';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StudentTranscriptSemester, MyCurriculumResponse } from '@/types/api';
 
@@ -33,6 +32,8 @@ export function StudentUteProfileGradeView({
   availableSemesters = [],
 }: StudentUteProfileGradeViewProps) {
   const { user } = useAuth();
+  const { messages } = useI18n();
+  const card = messages.studentCard;
   const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
   const [activeCurriculum, setActiveCurriculum] = useState('24110CTN');
   const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
@@ -44,13 +45,13 @@ export function StudentUteProfileGradeView({
     const file = e.target.files?.[0];
     if (file) {
       if (file.size > 5 * 1024 * 1024) {
-        toast.error('Kích thước ảnh không được vượt quá 5MB');
+        toast.error(card.toastPhotoTooLarge);
         return;
       }
       const reader = new FileReader();
       reader.onload = () => {
         setAvatarPreview(reader.result as string);
-        toast.success('Đã cập nhật ảnh đại diện thẻ sinh viên');
+        toast.success(card.toastPhotoUpdated);
       };
       reader.readAsDataURL(file);
     }
@@ -60,7 +61,7 @@ export function StudentUteProfileGradeView({
     setIsRefreshing(true);
     setTimeout(() => {
       setIsRefreshing(false);
-      toast.success('Đã làm mới dữ liệu biểu đồ học tập');
+      toast.success(card.toastRefreshed);
     }, 600);
   };
 
@@ -76,7 +77,7 @@ export function StudentUteProfileGradeView({
       link.download = `bieu-do-hoc-tap-${studentInfo.studentId}.svg`;
       link.click();
       URL.revokeObjectURL(url);
-      toast.success('Đã tải xuống biểu đồ kết quả học tập (SVG)');
+      toast.success(card.toastDownloaded);
     } else {
       window.print();
     }
@@ -179,12 +180,12 @@ export function StudentUteProfileGradeView({
   const remainingPath = `M ${pieCenter} ${pieCenter} L ${x2} ${y2} A ${pieRadius} ${pieRadius} 0 ${1 - largeArcFlag} 1 ${x1} ${y1} Z`;
 
   return (
-    <div className="w-full bg-[#f8fafc] text-[#1e293b] rounded-xl border border-slate-300 shadow-xs overflow-hidden mb-8 font-sans">
+    <div className="w-full bg-muted/30 text-foreground rounded-xl border border-border shadow-xs overflow-hidden mb-8 font-sans">
       {/* 1. Official UTE Header Ribbon */}
       <div className="relative flex items-center bg-[#0d509d] text-white px-5 py-2.5 shadow-xs">
         <div className="flex items-center gap-2 font-extrabold text-sm uppercase tracking-wider">
           <span className="inline-block w-2.5 h-2.5 bg-[#f59e0b] rounded-xs" />
-          THÔNG TIN SINH VIÊN
+          {card.ribbonTitle}
         </div>
         <div
           className="absolute right-[-10px] top-0 bottom-0 w-4 bg-[#0d509d]"
@@ -197,9 +198,9 @@ export function StudentUteProfileGradeView({
         {/* Left Column: Avatar & Student Basic Info (4 cols) */}
         <div className="lg:col-span-4 space-y-4">
           {/* Avatar card */}
-          <div className="bg-white rounded-lg border border-slate-200 p-5 flex flex-col items-center justify-center shadow-2xs">
+          <div className="bg-card rounded-lg border border-border p-5 flex flex-col items-center justify-center shadow-2xs">
             <div className="relative mb-3">
-              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#0d509d]/30 bg-slate-100 flex items-center justify-center shadow-inner">
+              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#0d509d]/30 bg-muted flex items-center justify-center shadow-inner">
                 <img
                   src={avatarPreview || user?.avatar || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80"}
                   alt={studentInfo.name}
@@ -207,7 +208,7 @@ export function StudentUteProfileGradeView({
                 />
               </div>
             </div>
-            <h3 className="font-bold text-base text-slate-800 tracking-tight text-center">
+            <h3 className="font-bold text-base text-foreground tracking-tight text-center">
               {studentInfo.name}
             </h3>
             <input
@@ -220,51 +221,51 @@ export function StudentUteProfileGradeView({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="mt-2 inline-flex min-h-8 items-center text-xs text-[#0d509d] hover:underline font-medium cursor-pointer"
+              className="mt-2 inline-flex min-h-8 items-center text-xs text-[#0d509d] dark:text-sky-400 hover:underline font-medium cursor-pointer"
             >
-              Cập nhật ảnh thẻ
+              {card.updatePhoto}
             </button>
           </div>
 
           {/* Student details table */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-bold text-xs uppercase text-slate-700 tracking-wide flex items-center justify-between">
-              <span>Thông tin sinh viên</span>
-              <span className="text-[10px] text-slate-500 font-semibold bg-slate-200 px-1.5 py-0.5 rounded-sm">Học kỳ 1 • 2026-2027</span>
+          <div className="bg-card rounded-lg border border-border shadow-2xs overflow-hidden">
+            <div className="px-4 py-2.5 bg-muted/60 border-b border-border font-bold text-xs uppercase text-foreground tracking-wide flex items-center justify-between">
+              <span>{card.infoTitle}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{card.semesterBadge}</span>
             </div>
-            <div className="divide-y divide-slate-100 text-xs">
+            <div className="divide-y divide-border text-xs">
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Mã sinh viên</span>
-                <span className="col-span-3 font-semibold text-slate-800">{studentInfo.studentId}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsStudentId}</span>
+                <span className="col-span-3 font-semibold text-foreground">{studentInfo.studentId}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Họ tên</span>
-                <span className="col-span-3 font-semibold text-slate-800">{studentInfo.name}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsFullName}</span>
+                <span className="col-span-3 font-semibold text-foreground">{studentInfo.name}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Ngày sinh</span>
-                <span className="col-span-3 text-slate-700">{studentInfo.dateOfBirth}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsDateOfBirth}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.dateOfBirth}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Nơi sinh</span>
-                <span className="col-span-3 text-slate-700">{studentInfo.placeOfBirth}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsPlaceOfBirth}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.placeOfBirth}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Nơi ĐK khai sinh</span>
-                <span className="col-span-3 text-slate-700">{studentInfo.birthRegistrationPlace}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsBirthRegistration}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.birthRegistrationPlace}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-slate-500 font-medium">Giới tính</span>
-                <span className="col-span-3 text-slate-700">{studentInfo.gender}</span>
+                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsGender}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.gender}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5 bg-emerald-50/70 border-t border-emerald-100">
-                <span className="col-span-2 text-emerald-800 font-semibold flex items-center gap-1">
-                  <Award className="h-3.5 w-3.5 text-emerald-600 shrink-0" />
-                  Điểm rèn luyện
+              <div className="grid grid-cols-5 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20">
+                <span className="col-span-2 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+                  <Award className="h-3.5 w-3.5 shrink-0" />
+                  {card.fieldsConductPoints}
                 </span>
-                <span className="col-span-3 font-bold text-emerald-700 flex items-center justify-between">
+                <span className="col-span-3 font-bold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
                   <span>88.0 (Tốt)</span>
-                  <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] text-[#0d509d] hover:underline font-normal">Chi tiết &rarr;</LocalizedLink>
+                  <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] hover:underline font-normal">{card.fieldsDetails}</LocalizedLink>
                 </span>
               </div>
             </div>
@@ -276,18 +277,18 @@ export function StudentUteProfileGradeView({
           {/* Top Row: Academic Result Combo Chart + Progress Pie Chart */}
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
             {/* Center: Filters & Academic Results Combo Chart (8 cols) */}
-            <div className="xl:col-span-8 bg-white rounded-lg border border-slate-200 p-4 shadow-2xs flex flex-col justify-between">
+            <div className="xl:col-span-8 bg-card rounded-lg border border-border p-4 shadow-2xs flex flex-col justify-between">
               {/* Selectors Bar */}
               <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
                 {/* Curriculum Dropdown */}
                 <div className="flex-1 min-w-[150px]">
-                  <label className="block text-[11px] text-slate-500 mb-0.5 font-medium">
-                    Chương trình đào tạo
+                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
+                    {card.curriculum}
                   </label>
                   <select
                     value={activeCurriculum}
                     onChange={(e) => setActiveCurriculum(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs font-semibold text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
+                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
                   >
                     <option value="24110CTN">24110CTN - Kỹ thuật phần mềm (CLC)</option>
                     <option value="24110TH">24110TH - Công nghệ thông tin</option>
@@ -297,13 +298,13 @@ export function StudentUteProfileGradeView({
 
                 {/* Academic Year Dropdown */}
                 <div className="w-[110px]">
-                  <label className="block text-[11px] text-slate-500 mb-0.5 font-medium">
-                    Năm học
+                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
+                    {card.academicYear}
                   </label>
                   <select
                     value={selectedAcademicYear}
                     onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
+                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
                   >
                     <option value="2025-2026">2025-2026</option>
                     <option value="2024-2025">2024-2025</option>
@@ -313,13 +314,13 @@ export function StudentUteProfileGradeView({
 
                 {/* Semester Dropdown */}
                 <div className="w-[110px]">
-                  <label className="block text-[11px] text-slate-500 mb-0.5 font-medium">
-                    Học kỳ
+                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
+                    {card.semester}
                   </label>
                   <select
                     value={selectedSemesterId || ''}
                     onChange={(e) => onSemesterChange?.(e.target.value)}
-                    className="w-full bg-slate-50 border border-slate-300 rounded px-2 py-1 text-xs text-slate-800 focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
+                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
                   >
                     {availableSemesters.length > 0 ? (
                       availableSemesters.map((s) => (
@@ -329,9 +330,9 @@ export function StudentUteProfileGradeView({
                       ))
                     ) : (
                       <>
-                        <option value="hk1">Học kỳ 1</option>
-                        <option value="hk2">Học kỳ 2</option>
-                        <option value="hk-he">Học kỳ hè</option>
+                        <option value="hk1">{card.hk1}</option>
+                        <option value="hk2">{card.hk2}</option>
+                        <option value="hk-he">{card.hkHe}</option>
                       </>
                     )}
                   </select>
@@ -339,20 +340,20 @@ export function StudentUteProfileGradeView({
               </div>
 
               {/* Chart Header & Action Tools */}
-              <div className="flex items-center justify-between border-b border-slate-100 pb-2 mb-2">
-                <h4 className="font-bold text-sm text-slate-800 tracking-tight">
-                  Kết quả học tập
+              <div className="flex items-center justify-between border-b border-border/70 pb-2 mb-2">
+                <h4 className="font-bold text-sm text-foreground tracking-tight">
+                  {card.chartTitle}
                 </h4>
-                <div className="flex items-center gap-1.5 text-slate-400">
+                <div className="flex items-center gap-1.5 text-muted-foreground/70">
                   <button
                     type="button"
                     onClick={() => setChartType('line')}
                     className={cn(
-                      'p-1 rounded hover:bg-slate-100 transition-colors',
-                      chartType === 'line' && 'text-[#0d509d] bg-blue-50',
+                      'p-1 rounded hover:bg-muted transition-colors',
+                      chartType === 'line' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
                     )}
-                    title="Dạng đường"
-                    aria-label="Dạng đường"
+                    title={card.chartLine}
+                    aria-label={card.chartLine}
                     aria-pressed={chartType === 'line'}
                   >
                     <LineChart className="w-4 h-4" />
@@ -361,11 +362,11 @@ export function StudentUteProfileGradeView({
                     type="button"
                     onClick={() => setChartType('bar')}
                     className={cn(
-                      'p-1 rounded hover:bg-slate-100 transition-colors',
-                      chartType === 'bar' && 'text-[#0d509d] bg-blue-50',
+                      'p-1 rounded hover:bg-muted transition-colors',
+                      chartType === 'bar' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
                     )}
-                    title="Dạng cột"
-                    aria-label="Dạng cột"
+                    title={card.chartBar}
+                    aria-label={card.chartBar}
                     aria-pressed={chartType === 'bar'}
                   >
                     <BarChart2 className="w-4 h-4" />
@@ -374,28 +375,30 @@ export function StudentUteProfileGradeView({
                     type="button"
                     onClick={() => setChartType('combo')}
                     className={cn(
-                      'p-1 rounded hover:bg-slate-100 transition-colors',
-                      chartType === 'combo' && 'text-[#0d509d] bg-blue-50',
+                      'p-1 rounded hover:bg-muted transition-colors',
+                      chartType === 'combo' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
                     )}
-                    title="Dạng kết hợp"
+                    title={card.chartCombo}
+                    aria-label={card.chartCombo}
+                    aria-pressed={chartType === 'combo'}
                   >
                     <span className="text-[10px] font-bold px-1">Combo</span>
                   </button>
                   <button
                     type="button"
                     onClick={handleRefreshChart}
-                    className="p-1 rounded hover:bg-slate-100 transition-colors"
-                    title="Làm mới"
-                    aria-label="Làm mới biểu đồ"
+                    className="p-1 rounded hover:bg-muted transition-colors"
+                    title={card.chartRefresh}
+                    aria-label={card.chartRefresh}
                   >
-                    <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#0d509d]")} />
+                    <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#0d509d] dark:text-sky-400")} />
                   </button>
                   <button
                     type="button"
                     onClick={handleDownloadChart}
-                    className="p-1 rounded hover:bg-slate-100 transition-colors"
-                    title="Tải xuống biểu đồ (SVG)"
-                    aria-label="Tải xuống biểu đồ (SVG)"
+                    className="p-1 rounded hover:bg-muted transition-colors"
+                    title={card.chartDownload}
+                    aria-label={card.chartDownload}
                   >
                     <Download className="w-3.5 h-3.5" />
                   </button>
@@ -419,14 +422,14 @@ export function StudentUteProfileGradeView({
                           y1={y}
                           x2={chartWidth - padding.right}
                           y2={y}
-                          stroke="#e2e8f0"
+                          className="stroke-border"
                           strokeDasharray="3 3"
                         />
                         <text
                           x={padding.left - 6}
                           y={y + 3}
                           fontSize="9"
-                          fill="#94a3b8"
+                          className="fill-muted-foreground"
                           textAnchor="end"
                         >
                           {val}
@@ -441,10 +444,10 @@ export function StudentUteProfileGradeView({
                     y={12}
                     transform="rotate(-90)"
                     fontSize="9"
-                    fill="#64748b"
+                    className="fill-muted-foreground"
                     textAnchor="middle"
                   >
-                    Điểm TB lớp học phần
+                    {card.axisClassAvg}
                   </text>
 
                   {/* Right Axis Label */}
@@ -453,10 +456,10 @@ export function StudentUteProfileGradeView({
                     y={-(chartWidth - 10)}
                     transform="rotate(90)"
                     fontSize="9"
-                    fill="#64748b"
+                    className="fill-muted-foreground"
                     textAnchor="middle"
                   >
-                    Điểm của bạn
+                    {card.axisYourScore}
                   </text>
 
                   {/* Bars: Điểm của bạn */}
@@ -485,7 +488,7 @@ export function StudentUteProfileGradeView({
                             y={y - 4}
                             fontSize="9"
                             fontWeight="bold"
-                            fill="#1e293b"
+                            className="fill-foreground"
                             textAnchor="middle"
                           >
                             {c.studentScore}
@@ -495,7 +498,7 @@ export function StudentUteProfileGradeView({
                             x={x + barWidth / 2}
                             y={padding.top + plotHeight + 15}
                             fontSize="8"
-                            fill="#64748b"
+                            className="fill-muted-foreground"
                             textAnchor="middle"
                           >
                             {c.code}
@@ -534,7 +537,7 @@ export function StudentUteProfileGradeView({
                             cx={cx}
                             cy={cy}
                             r="3.5"
-                            fill="#ffffff"
+                            className="fill-card"
                             stroke="#22c55e"
                             strokeWidth="2"
                           />
@@ -546,37 +549,37 @@ export function StudentUteProfileGradeView({
               </div>
 
               {/* Legend Footer */}
-              <div className="flex items-center justify-center gap-6 pt-2 border-t border-slate-100 text-xs text-slate-600 font-medium">
+              <div className="flex items-center justify-center gap-6 pt-2 border-t border-border/70 text-xs text-muted-foreground font-medium">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full border-2 border-[#22c55e] bg-white inline-block" />
-                  <span>Điểm TB lớp học phần</span>
+                  <span className="w-3 h-3 rounded-full border-2 border-[#22c55e] bg-card inline-block" />
+                  <span>{card.axisClassAvg}</span>
                 </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded bg-[#3b82f6] inline-block" />
-                  <span>Điểm của bạn</span>
+                  <span>{card.axisYourScore}</span>
                 </div>
               </div>
             </div>
 
             {/* Right: Tiến độ học tập Pie Chart (4 cols) */}
-            <div className="xl:col-span-4 bg-white rounded-lg border border-slate-200 p-4 shadow-2xs flex flex-col justify-between items-center text-center">
+            <div className="xl:col-span-4 bg-card rounded-lg border border-border p-4 shadow-2xs flex flex-col justify-between items-center text-center">
               <div className="w-full">
-                <h4 className="font-bold text-sm text-slate-800 tracking-tight mb-0.5 text-left">
-                  Tiến độ học tập
+                <h4 className="font-bold text-sm text-foreground tracking-tight mb-0.5 text-left">
+                  {card.progressTitle}
                 </h4>
-                <p className="text-xs text-slate-500 text-left mb-3">
-                  Tổng số tín chỉ: <span className="font-bold text-slate-800">{earnedCredits}/{totalCredits}</span>
+                <p className="text-xs text-muted-foreground text-left mb-3">
+                  {card.totalCreditsLabel}: <span className="font-bold text-foreground">{earnedCredits}/{totalCredits}</span>
                 </p>
 
                 {/* Legend badges */}
                 <div className="flex items-center justify-center gap-4 text-xs font-semibold mb-2">
                   <div className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-xs bg-[#3b82f6] inline-block" />
-                    <span className="text-slate-700">Đã học</span>
+                    <span className="text-muted-foreground">{card.earned}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
                     <span className="w-3 h-3 rounded-xs bg-[#84cc16] inline-block" />
-                    <span className="text-slate-700">Còn lại</span>
+                    <span className="text-muted-foreground">{card.remaining}</span>
                   </div>
                 </div>
               </div>
@@ -585,17 +588,17 @@ export function StudentUteProfileGradeView({
               <div className="py-2">
                 <svg width="160" height="160" viewBox="0 0 160 160">
                   {/* Đã học Slice (Blue) */}
-                  <path d={earnedPath} fill="#3b82f6" stroke="#ffffff" strokeWidth="2" />
+                  <path d={earnedPath} fill="#3b82f6" className="stroke-card" strokeWidth="2" />
                   {/* Còn lại Slice (Green) */}
-                  <path d={remainingPath} fill="#84cc16" stroke="#ffffff" strokeWidth="2" />
+                  <path d={remainingPath} fill="#84cc16" className="stroke-card" strokeWidth="2" />
                   {/* Center percentage badge */}
-                  <circle cx="80" cy="80" r="28" fill="#ffffff" />
+                  <circle cx="80" cy="80" r="28" className="fill-card" />
                   <text
                     x="80"
                     y="84"
                     fontSize="13"
                     fontWeight="bold"
-                    fill="#1e293b"
+                    className="fill-foreground"
                     textAnchor="middle"
                   >
                     {Math.round(earnedRatio * 100)}%
@@ -603,30 +606,30 @@ export function StudentUteProfileGradeView({
                 </svg>
               </div>
 
-              <div className="w-full pt-2 border-t border-slate-100 flex justify-between text-xs text-slate-500">
-                <span>Tích lũy: <strong>{earnedCredits} TC</strong></span>
-                <span>Cần thêm: <strong>{remainingCredits} TC</strong></span>
+              <div className="w-full pt-2 border-t border-border/70 flex justify-between text-xs text-muted-foreground">
+                <span>{card.accumulated}: <strong>{earnedCredits} TC</strong></span>
+                <span>{card.needMore}: <strong>{remainingCredits} TC</strong></span>
               </div>
             </div>
           </div>
 
           {/* Bottom Row: Contact Information Card */}
-          <div className="bg-white rounded-lg border border-slate-200 shadow-2xs overflow-hidden">
-            <div className="px-4 py-2.5 bg-slate-50 border-b border-slate-200 font-bold text-xs uppercase text-slate-700 tracking-wide">
-              Thông tin liên lạc
+          <div className="bg-card rounded-lg border border-border shadow-2xs overflow-hidden">
+            <div className="px-4 py-2.5 bg-muted/60 border-b border-border font-bold text-xs uppercase text-foreground tracking-wide">
+              {card.contactTitle}
             </div>
-            <div className="divide-y divide-slate-100 text-xs">
+            <div className="divide-y divide-border text-xs">
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-slate-500 font-medium">Quốc gia</span>
-                <span className="col-span-3 text-slate-800">{studentInfo.country}</span>
+                <span className="text-muted-foreground font-medium">{card.country}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.country}</span>
               </div>
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-slate-500 font-medium">Tỉnh thành</span>
-                <span className="col-span-3 text-slate-800">{studentInfo.province}</span>
+                <span className="text-muted-foreground font-medium">{card.province}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.province}</span>
               </div>
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-slate-500 font-medium">Phường/xã</span>
-                <span className="col-span-3 text-slate-800">{studentInfo.ward}</span>
+                <span className="text-muted-foreground font-medium">{card.ward}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.ward}</span>
               </div>
             </div>
           </div>

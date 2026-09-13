@@ -127,7 +127,7 @@ export function HomeNewsSection() {
 
           <LocalizedLink
             href="/dashboard/announcements"
-            className="group inline-flex items-center gap-1.5 font-bold text-sm text-primary hover:underline self-start sm:self-end"
+            className="group inline-flex min-h-8 items-center gap-1.5 font-bold text-sm text-primary hover:underline self-start sm:self-end"
           >
             <span>{isVi ? 'Xem tất cả thông báo' : 'View all announcements'}</span>
             <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
