@@ -133,6 +133,10 @@ spring:
 app:
   rate-limit:
     enabled: ${RATE_LIMIT_ENABLED:true}
+    # Enable only when behind a trusted reverse proxy that sets X-Real-IP /
+    # X-Forwarded-For (e.g. Render). Direct/local deployments must keep this
+    # false so spoofed forwarded headers cannot evade IP-keyed limits.
+    trust-proxy-headers: ${RATE_LIMIT_TRUST_PROXY_HEADERS:false}
     login-limit: ${RATE_LIMIT_LOGIN:15}
     register-limit: ${RATE_LIMIT_REGISTER:10}
     default-limit: ${RATE_LIMIT_DEFAULT:40}

@@ -14,6 +14,10 @@ services:
         value: "true"
       - key: COOKIE_SECURE
         value: "true"
+      # Render's proxy sets the real client IP in forwarded headers; trusting
+      # them here keeps per-client limits accurate (anti-brute-force).
+      - key: RATE_LIMIT_TRUST_PROXY_HEADERS
+        value: "true"
       - key: JAVA_TOOL_OPTIONS
         value: "-XX:+UseSerialGC -Xmx350m -Xss512k -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:+ExitOnOutOfMemoryError"
       - key: SECURITY_JWT_REJECT_KNOWN_DEFAULTS

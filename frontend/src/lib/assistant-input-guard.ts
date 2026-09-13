@@ -26,7 +26,7 @@ const UUID_TOKEN =
 const STUDENT_ID =
   /\b(?:student\s*id|mssv|ma\s*sv|sinh\s*vien)\s*[:#-]?\s*[a-z0-9-]*\d[a-z0-9-]{3,20}\b/i;
 const SECRET =
-  /\b(?:bearer\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\s*[:=]|token\s*[:=]|password\s*[:=])/i;
+  /\b(?:bearer\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\s*[:：=]|token\s*[:：=]|pass(?:word|wd)\s*[:：=])/i;
 
 const PROMPT_INJECTION = new RegExp(
   [
