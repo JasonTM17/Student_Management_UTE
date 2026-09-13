@@ -8,6 +8,7 @@ import { cn } from '@/lib/utils';
 import {
   ASSISTANT_INLINE_MARKDOWN_REGEX,
   sanitizeStreamingMarkdown,
+  splitAssistantBlocks,
 } from '@/lib/assistant-inline-markdown-regex';
 
 interface AssistantMarkdownContentProps {
@@ -26,32 +27,12 @@ export function AssistantMarkdownContent({
   const router = useRouter();
   const safeContent = streaming ? sanitizeStreamingMarkdown(content) : content;
 
-  // Split into structural blocks: tables vs text lines
-  const blocks = React.useMemo(() => {
-    if (!safeContent) return [];
-    const lines = safeContent.split('\n');
-    const parsedBlocks: { type: 'table' | 'text'; lines: string[] }[] = [];
-    let currentTable: string[] = [];
-
-    for (let i = 0; i < lines.length; i++) {
-      const line = lines[i].trim();
-      const isPipeLine = line.startsWith('|') && line.endsWith('|');
-
-      if (isPipeLine) {
-        currentTable.push(line);
-      } else {
-        if (currentTable.length > 0) {
-          parsedBlocks.push({ type: 'table', lines: [...currentTable] });
-          currentTable = [];
-        }
-        parsedBlocks.push({ type: 'text', lines: [lines[i]] });
-      }
-    }
-    if (currentTable.length > 0) {
-      parsedBlocks.push({ type: 'table', lines: [...currentTable] });
-    }
-    return parsedBlocks;
-  }, [safeContent]);
+  // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
+  // lines merge into one paragraph (see splitAssistantBlocks).
+  const blocks = React.useMemo(
+    () => splitAssistantBlocks(safeContent),
+    [safeContent],
+  );
 
   if (!safeContent) return null;
 
@@ -226,6 +207,24 @@ export function AssistantMarkdownContent({
           );
         }
 
+        if (block.type === 'code') {
+          return (
+            <div
+              key={bIdx}
+              className="my-2.5 overflow-x-auto rounded-lg border border-border/80 bg-muted/60 p-3 font-mono text-xs"
+            >
+              {block.language && (
+                <div className="mb-1 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
+                  {block.language}
+                </div>
+              )}
+              <pre className="whitespace-pre overflow-x-auto font-mono text-[12px] text-foreground/90 leading-normal">
+                <code>{block.code}</code>
+              </pre>
+            </div>
+          );
+        }
+
         const text = block.lines[0];
         const orderedMatch = text.match(/^(\d+)\.\s+(.*)$/);
         if (orderedMatch) {
@@ -243,12 +242,12 @@ export function AssistantMarkdownContent({
           );
         }
 
-        if (text.startsWith('• ') || text.startsWith('- ')) {
+        if (text.startsWith('• ') || text.startsWith('- ') || text.startsWith('* ')) {
           return (
             <div key={bIdx} className="flex items-start gap-2 pl-1">
               <span className="mt-2 h-1.5 w-1.5 shrink-0 rounded-full bg-primary" />
               <div className="flex-1">
-                {renderInline(text.replace(/^[•\-]\s*/, ''))}
+                {renderInline(text.replace(/^[*•\-]\s*/, ''))}
               </div>
             </div>
           );

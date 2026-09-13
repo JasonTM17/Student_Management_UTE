@@ -48,6 +48,8 @@ export function AssistantPanel() {
   const [history, setHistory] = useState<AssistantConversation[]>([]);
   const [historyStatus, setHistoryStatus] =
     useState<AssistantHistoryStatus>('idle');
+  const [historyCursor, setHistoryCursor] = useState<string>();
+  const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
   const [userScrolled, setUserScrolled] = useState(false);
@@ -159,14 +161,32 @@ export function AssistantPanel() {
     if (historyStatus === 'loading') return;
     setHistoryStatus('loading');
     void thesisApi
-      .listConversations({ limit: 20 })
-      .then((items) => {
+      .listConversationsPage({ limit: 20 })
+      .then(({ items, nextCursor }) => {
         setHistory(items);
+        setHistoryCursor(nextCursor);
         setHistoryStatus('loaded');
         historyFetchedRef.current = true;
       })
       .catch(() => setHistoryStatus('error'));
   }, [historyStatus]);
+
+  const loadMoreHistory = useCallback(async () => {
+    if (!historyCursor || loadingMoreHistory) return;
+    setLoadingMoreHistory(true);
+    try {
+      const { items, nextCursor } = await thesisApi.listConversationsPage({
+        limit: 20,
+        cursor: historyCursor,
+      });
+      setHistory((current) => [...current, ...items]);
+      setHistoryCursor(nextCursor);
+    } catch {
+      setHistoryStatus('error');
+    } finally {
+      setLoadingMoreHistory(false);
+    }
+  }, [historyCursor, loadingMoreHistory]);
 
   useEffect(() => {
     if (!open || historyFetchedRef.current || selectedHistoryRef.current)
@@ -211,6 +231,7 @@ export function AssistantPanel() {
     selectedHistoryRef.current = false;
     historyFetchedRef.current = false;
     setHistoryStatus('idle');
+    setHistoryCursor(undefined);
     requestAnimationFrame(() => triggerRef.current?.focus());
   };
 
@@ -380,6 +401,9 @@ export function AssistantPanel() {
                 history={history}
                 historyStatus={historyStatus}
                 deletingConversationId={deletingConversationId}
+                nextCursor={historyCursor}
+                loadingMore={loadingMoreHistory}
+                onLoadMore={() => void loadMoreHistory()}
                 onBack={() => setShowHistory(false)}
                 onCreate={() => void createConversation()}
                 onSelect={(conversation) =>

@@ -28,7 +28,7 @@ public class ThesisWorkloadController {
     public LecturerWorkload myWorkload(@AuthenticationPrincipal Jwt actor) {
         String lecturerId = actor == null ? null : actor.getClaimAsString("lecturerId");
         if (!StringUtils.hasText(lecturerId)) {
-            return new LecturerWorkload(java.util.List.of(), java.util.List.of());
+            return new LecturerWorkload(java.util.List.of(), java.util.List.of(), java.util.List.of());
         }
         return workloadService.workload(lecturerId);
     }

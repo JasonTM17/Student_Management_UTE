@@ -11,6 +11,10 @@ interface AssistantHistoryPanelProps {
   history: AssistantConversation[];
   historyStatus: AssistantHistoryStatus;
   deletingConversationId?: string;
+  /** Cursor for the next page; a value means more conversations exist. */
+  nextCursor?: string;
+  loadingMore?: boolean;
+  onLoadMore?: () => void;
   onBack: () => void;
   onCreate: () => void;
   onSelect: (conversation: AssistantConversation) => void;
@@ -22,6 +26,9 @@ export function AssistantHistoryPanel({
   history,
   historyStatus,
   deletingConversationId,
+  nextCursor,
+  loadingMore = false,
+  onLoadMore,
   onBack,
   onCreate,
   onSelect,
@@ -113,6 +120,20 @@ export function AssistantHistoryPanel({
           </div>
         ))}
       </div>
+      {nextCursor && historyStatus === 'loaded' && onLoadMore ? (
+        <Button
+          type="button"
+          variant="ghost"
+          size="sm"
+          disabled={loadingMore}
+          className="mt-1 min-h-11 w-full text-muted-foreground"
+          onClick={onLoadMore}
+        >
+          {loadingMore
+            ? messages.assistant.historyLoading
+            : messages.assistant.loadMoreHistory}
+        </Button>
+      ) : null}
     </div>
   );
 }

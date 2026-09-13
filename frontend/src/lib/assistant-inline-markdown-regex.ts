@@ -15,6 +15,105 @@ export const ASSISTANT_INLINE_MARKDOWN_REGEX =
 const countMatches = (text: string, pattern: RegExp) =>
   (text.match(pattern) ?? []).length;
 
+export type AssistantRenderBlock =
+  | { type: 'table'; lines: string[] }
+  | { type: 'code'; language: string; code: string; lines: string[] }
+  | { type: 'text'; lines: string[] };
+
+const SPECIAL_LINE =
+  /^(?:#{1,4}\s|\d+\.\s|[*•\-]\s|>)/;
+
+/**
+ * Split assistant markdown into render blocks. Consecutive plain-text lines
+ * are joined into one paragraph (a model that wraps mid-sentence must not
+ * render as a stack of broken one-line paragraphs); headings, list items,
+ * blockquotes, blank lines, pipe tables, and fenced code blocks stay properly scoped.
+ */
+export function splitAssistantBlocks(content: string): AssistantRenderBlock[] {
+  if (!content) return [];
+  const blocks: AssistantRenderBlock[] = [];
+  let table: string[] = [];
+  let paragraph: string[] = [];
+  let inCode = false;
+  let codeLang = '';
+  let codeLines: string[] = [];
+
+  const flushParagraph = () => {
+    if (paragraph.length > 0) {
+      blocks.push({ type: 'text', lines: [paragraph.join(' ')] });
+      paragraph = [];
+    }
+  };
+  const flushTable = () => {
+    if (table.length > 0) {
+      blocks.push({ type: 'table', lines: [...table] });
+      table = [];
+    }
+  };
+
+  for (const line of content.split('\n')) {
+    const trimmed = line.trim();
+
+    if (trimmed.startsWith('```')) {
+      flushParagraph();
+      flushTable();
+      if (inCode) {
+        const fullCode = codeLines.join('\n');
+        blocks.push({
+          type: 'code',
+          language: codeLang,
+          code: fullCode,
+          lines: [fullCode],
+        });
+        inCode = false;
+        codeLang = '';
+        codeLines = [];
+      } else {
+        inCode = true;
+        codeLang = trimmed.slice(3).trim();
+        codeLines = [];
+      }
+      continue;
+    }
+
+    if (inCode) {
+      codeLines.push(line);
+      continue;
+    }
+
+    if (trimmed.startsWith('|') && trimmed.endsWith('|')) {
+      flushParagraph();
+      table.push(trimmed);
+      continue;
+    }
+    flushTable();
+    if (!trimmed) {
+      flushParagraph();
+      continue;
+    }
+    if (SPECIAL_LINE.test(trimmed)) {
+      flushParagraph();
+      blocks.push({ type: 'text', lines: [trimmed] });
+      continue;
+    }
+    paragraph.push(trimmed);
+  }
+
+  if (inCode) {
+    const fullCode = codeLines.join('\n');
+    blocks.push({
+      type: 'code',
+      language: codeLang,
+      code: fullCode,
+      lines: [fullCode],
+    });
+  }
+
+  flushParagraph();
+  flushTable();
+  return blocks;
+}
+
 /**
  * While a message is still streaming, the newest chunk can end inside an
  * unclosed markdown construct ("**đang", "`code", "[label]("). Rendering the

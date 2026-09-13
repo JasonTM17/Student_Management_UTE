@@ -965,6 +965,33 @@ export async function resolveStudentAssistantQuery(
               : '\n💡 Enter your review scores on time under **Thesis & Capstone** (/dashboard/thesis).',
           );
         }
+        const gradingTasks = workload.gradingTasks ?? [];
+        if (gradingTasks.length > 0) {
+          lines.push(
+            vi
+              ? `\n📝 **Đề tài hội đồng phân công cho bạn (${gradingTasks.length}):**`
+              : `\n📝 **Council topics assigned to you (${gradingTasks.length}):**`,
+          );
+          for (const task of gradingTasks.slice(0, 5)) {
+            const status =
+              task.myScoreRows > 0
+                ? vi
+                  ? '✓ Đã nhập điểm'
+                  : '✓ Score entered'
+                : vi
+                  ? '⏳ Chưa nhập điểm'
+                  : '⏳ Awaiting your score';
+            lines.push(`\n• "${task.title}" (${task.councilName}) — ${status}`);
+          }
+          const ungraded = gradingTasks.filter((task) => task.myScoreRows === 0);
+          if (ungraded.length > 0) {
+            lines.push(
+              vi
+                ? `\n⏳ Còn ${ungraded.length} đề tài chưa nhập điểm — hãy hoàn thành trước hạn nộp điểm của hội đồng.`
+                : `\n⏳ ${ungraded.length} topic(s) still ungraded — finish before the council score deadline.`,
+            );
+          }
+        }
 
         return {
           answer: lines.join('\n'),
