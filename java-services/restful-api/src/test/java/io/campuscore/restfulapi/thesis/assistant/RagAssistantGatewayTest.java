@@ -74,6 +74,41 @@ class RagAssistantGatewayTest {
     }
 
     @Test
+    void chatNormalizesRemoteCopyAndRemovesCitationsFromNoMatch() throws Exception {
+        var citation = """
+                {"id":"doc-1","slug":"registration","title":"Registration","source":"office","locale":"vi","excerpt":"Public guidance","domain":"ACADEMIC","sourceKind":"CURATED","snapshotHash":"hash"}
+                """;
+        startServer(exchange -> {
+            byte[] response = ("""
+                    {"answer":"1. Đăng ký lớp Mở Cổng sinh viên tương đương4.0","model":"deepseek-v4-flash","degraded":false,"reasonCode":"ANSWERED","locale":"vi","citations":[%s]}
+                    """.formatted(citation)).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat");
+
+        var answered = gateway().chat(new ChatRequest("Đăng ký", "vi", UUID.randomUUID(), null), "owner-a");
+        assertEquals("1. Đăng ký lớp\n\nMở Cổng sinh viên tương đương 4.0", answered.answer());
+        assertEquals(1, answered.citations().size());
+
+        stopServer();
+        startServer(exchange -> {
+            byte[] response = ("""
+                    {"answer":"Mình chưa tìm thấy hướng dẫn phù hợp.","model":"curated-lexical-rag","degraded":false,"reasonCode":"NO_MATCH","locale":"vi","citations":[%s]}
+                    """.formatted(citation)).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat");
+
+        var noMatch = gateway().chat(new ChatRequest("Thời tiết", "vi", UUID.randomUUID(), null), "owner-a");
+        assertEquals("NO_MATCH", noMatch.reasonCode());
+        assertTrue(noMatch.citations().isEmpty());
+    }
+
+    @Test
     void streamParsesRemoteSseEventsBackIntoAssistantEvents() throws Exception {
         UUID messageId = UUID.randomUUID();
         startServer(exchange -> {
@@ -136,6 +171,39 @@ class RagAssistantGatewayTest {
                 events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).findFirst().orElseThrow());
         assertEquals("PROVIDER_UNSAFE_OUTPUT", done.reasonCode());
         assertTrue(done.degraded());
+    }
+
+    @Test
+    void streamNormalizesRemoteCopyAndSuppressesNoMatchCitations() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        startServer(exchange -> {
+            byte[] response = ("""
+                    event: delta
+                    data: {"sequence":0,"text":"1. Đăng ký lớp Mở Cổng sinh viên tương đương4.0","sourceIds":["doc-1"],"type":"delta"}
+
+                    event: citation
+                    data: {"citation":{"id":"doc-1","slug":"registration","title":"Registration","source":"office","locale":"vi","excerpt":"Public guidance","domain":"ACADEMIC","sourceKind":"CURATED","snapshotHash":"hash"},"type":"citation"}
+
+                    event: done
+                    data: {"messageId":"%s","reasonCode":"NO_MATCH","degraded":false,"terminalStatus":"COMPLETED","type":"done"}
+
+                    """.formatted(messageId)).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat/stream");
+
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        gateway().stream(new ChatRequest("Thời tiết", "vi", UUID.randomUUID(), null), "owner-a", events::add);
+
+        ThesisAssistantService.StreamDelta delta = assertInstanceOf(
+                ThesisAssistantService.StreamDelta.class,
+                events.stream().filter(ThesisAssistantService.StreamDelta.class::isInstance).findFirst().orElseThrow());
+        assertEquals("1. Đăng ký lớp\n\nMở Cổng sinh viên tương đương 4.0", delta.text());
+        assertTrue(delta.sourceIds().isEmpty());
+        assertTrue(events.stream().noneMatch(ThesisAssistantService.StreamCitation.class::isInstance));
+        assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
     }
 
     private RagAssistantGateway gateway() {
