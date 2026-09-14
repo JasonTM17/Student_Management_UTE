@@ -33,7 +33,7 @@ services:
       - key: JWT_REFRESH_SECRET
         generateValue: true
       - key: DEEPSEEK_ENABLED
-        value: "false"
+        value: "true"
       - key: DEEPSEEK_API_KEY
         sync: false
       - key: DEEPSEEK_MODEL
