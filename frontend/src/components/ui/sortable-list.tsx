@@ -65,28 +65,38 @@ export function SortableList<T>({
    * SortableJS is pointer-only, so the drag handle used to be focusable but not
    * operable — a WCAG 2.1 failure on the announcement reorder dialogs. Arrow
    * keys move the focused row and focus follows the moved item.
+   *
+   * This is a NATIVE listener rather than a React `onKeyDown` prop: the reorder
+   * dialog is rendered through a portal, and React's synthetic keydown never
+   * reached the handler there, so the keyboard path silently did nothing in the
+   * browser while unit tests on the move logic still passed.
    */
-  const handleKeyDown = (event: React.KeyboardEvent) => {
-    if (disabled) return;
-    if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
-    const target = event.target as HTMLElement | null;
-    if (!target?.classList?.contains(handleClassName)) return;
+  useEffect(() => {
     const container = containerRef.current as HTMLElement | null;
-    const row = target.closest('[data-id]');
-    if (!container || !row || !container.contains(row)) return;
-    const rows = Array.from(container.querySelectorAll('[data-id]'));
-    const index = rows.indexOf(row);
-    if (index < 0) return;
-    const nextIndex = event.key === 'ArrowUp' ? index - 1 : index + 1;
-    if (nextIndex < 0 || nextIndex >= itemsRef.current.length) return;
-    event.preventDefault();
-    move(index, nextIndex);
-    requestAnimationFrame(() => {
-      const moved = container.querySelectorAll('[data-id]')[nextIndex];
-      const handle = moved?.querySelector<HTMLElement>(`.${handleClassName}`);
-      handle?.focus();
-    });
-  };
+    if (!container || disabled) return;
+
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'ArrowUp' && event.key !== 'ArrowDown') return;
+      const target = event.target as HTMLElement | null;
+      if (!target?.classList?.contains(handleClassName)) return;
+      const row = target.closest('[data-id]');
+      if (!row || !container.contains(row)) return;
+      const rows = Array.from(container.querySelectorAll('[data-id]'));
+      const index = rows.indexOf(row);
+      if (index < 0) return;
+      const nextIndex = event.key === 'ArrowUp' ? index - 1 : index + 1;
+      if (nextIndex < 0 || nextIndex >= itemsRef.current.length) return;
+      event.preventDefault();
+      move(index, nextIndex);
+      requestAnimationFrame(() => {
+        const moved = container.querySelectorAll('[data-id]')[nextIndex];
+        moved?.querySelector<HTMLElement>(`.${handleClassName}`)?.focus();
+      });
+    };
+
+    container.addEventListener('keydown', onKeyDown);
+    return () => container.removeEventListener('keydown', onKeyDown);
+  }, [disabled, handleClassName, move]);
 
   useEffect(() => {
     if (!containerRef.current || disabled) {
@@ -125,7 +135,7 @@ export function SortableList<T>({
   const defaultSpacing = tag === 'tbody' ? '' : 'space-y-2';
 
   return (
-    <Tag ref={containerRef} className={cn(defaultSpacing, className)} onKeyDown={handleKeyDown}>
+    <Tag ref={containerRef} className={cn(defaultSpacing, className)}>
       {items.map((item, index) => {
         const key = keyExtractor(item);
         return (
