@@ -9,6 +9,87 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
+function loadTs(relativePath) {
+  const ts = require('typescript');
+  const output = ts.transpileModule(read(relativePath), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
+
+test('announcement HTML sanitizer neutralizes stored-XSS payloads', () => {
+  const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');
+
+  // Each entry previously survived the attribute blacklist: its `on\w+` pattern
+  // required a leading whitespace, so a slash worked just as well.
+  const attacks = [
+    ['<img src=x/onerror=alert(1)>', /onerror/i],
+    ['<svg/onload=alert(1)>', /onload|<svg/i],
+    ['<IMG SRC=JaVaScRiPt:alert(1)>', /javascript/i],
+    ['<a href="javas&#99;ript:alert(1)">x</a>', /javascript/i],
+    ['<a href="java\tscript:alert(1)">x</a>', /javascript/i],
+    ['<a href="vbscript:msgbox(1)">x</a>', /vbscript/i],
+    ['<div onclick="alert(1)">x</div>', /onclick/i],
+    ['<p style="background:url(javascript:alert(1))">x</p>', /javascript/i],
+    ['<script>alert(1)</script>', /alert|<script/i],
+    ['<style>body{background:url(javascript:alert(1))}</style>', /style|javascript/i],
+    ['<template><script>alert(1)</script></template>', /script|alert/i],
+    ['<iframe src="https://evil.example"></iframe>', /iframe/i],
+    ['<object data="x"></object>', /object/i],
+    ['<embed src="x">', /embed/i],
+    ['<form action="/x"><input name="y" value="z"></form>', /form|input/i],
+    ['<math><mtext>m</mtext></math>', /math/i],
+  ];
+  for (const [payload, forbidden] of attacks) {
+    const clean = sanitizeAnnouncementHtml(payload);
+    assert.doesNotMatch(clean, forbidden, `payload survived sanitizing: ${payload} -> ${clean}`);
+  }
+
+  // TinyMCE output and legitimate formatting must survive intact.
+  const kept = [
+    '<p>Học phần <strong>tiên quyết</strong> và <em>song hành</em></p>',
+    '<ul><li>Điểm F phải học lại</li></ul>',
+    '<h2>Quy định học phí</h2>',
+    '<table><thead><tr><th colspan="2">Mức</th></tr></thead><tbody><tr><td>1</td><td>2</td></tr></tbody></table>',
+    '<a href="https://campusute.io.vn/vi/dashboard">Cổng học vụ</a>',
+    '<a href="/vi/dashboard/thesis">Đồ án</a>',
+    '<a href="mailto:phongdaotao@campusute.edu.vn">Phòng Đào tạo</a>',
+    '<img src="data:image/png;base64,iVBORw0KGgoAAAANSUhEUg" alt="Sơ đồ quy trình">',
+    '<img src="https://campusute.io.vn/logo.png" alt="Logo" width="120">',
+  ];
+  // A void tag may be re-serialized self-closed; that is equivalent markup and
+  // is the only permitted difference for legitimate content.
+  const withoutVoidSlashes = (html) => html.replace(/\s*\/>/g, '>');
+  for (const legit of kept) {
+    assert.equal(
+      withoutVoidSlashes(sanitizeAnnouncementHtml(legit)),
+      withoutVoidSlashes(legit),
+      `legitimate markup was altered: ${legit} -> ${sanitizeAnnouncementHtml(legit)}`,
+    );
+  }
+
+  // A literal "<" in prose is escaped, and valid entities are not double-escaped.
+  assert.equal(
+    sanitizeAnnouncementHtml('<p>điểm < 4.0 là không đạt</p>'),
+    '<p>điểm &lt; 4.0 là không đạt</p>',
+  );
+  assert.equal(
+    sanitizeAnnouncementHtml('<p>Đào tạo &amp; Khoa học</p>'),
+    '<p>Đào tạo &amp; Khoa học</p>',
+  );
+  assert.equal(sanitizeAnnouncementHtml(''), '');
+});
+
+test('rich-content-renderer delegates HTML sanitizing to the allowlist module', () => {
+  const source = read('src/components/ui/rich-content-renderer.tsx');
+  assert.match(source, /import \{ sanitizeAnnouncementHtml \} from '@\/lib\/html-sanitizer'/);
+  assert.match(source, /return sanitizeAnnouncementHtml\(html\)/);
+  // The bypassable attribute blacklist must not come back.
+  assert.doesNotMatch(source, /\\son\\w\+/);
+});
+
 test('rich-text-editor component provides comprehensive toolbar and view modes', () => {
   const source = read('src/components/ui/rich-text-editor.tsx');
 

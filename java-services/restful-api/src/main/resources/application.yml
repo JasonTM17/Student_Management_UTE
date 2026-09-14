@@ -75,6 +75,9 @@ assistant:
   max-message-chars: ${ASSISTANT_MAX_MESSAGE_CHARS:2000}
   user-daily-quota: ${ASSISTANT_USER_DAILY_QUOTA:20}
   global-daily-quota: ${ASSISTANT_GLOBAL_DAILY_QUOTA:200}
+  # Keep quota enforcement on by default. Local dogfooding may explicitly set
+  # ASSISTANT_QUOTA_ENFORCED=false without changing the production default.
+  quota-enforced: ${ASSISTANT_QUOTA_ENFORCED:true}
   retention-days: ${ASSISTANT_RETENTION_DAYS:90}
   recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
   recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
@@ -152,4 +155,3 @@ deepseek:
   max-response-bytes: ${DEEPSEEK_MAX_RESPONSE_BYTES:512000}
   max-frame-bytes: ${DEEPSEEK_MAX_FRAME_BYTES:64000}
   max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
-

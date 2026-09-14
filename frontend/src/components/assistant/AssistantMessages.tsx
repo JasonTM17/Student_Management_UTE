@@ -22,6 +22,7 @@ import type { ChatMessage } from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
 import {
   isAssistantOutputSafe,
+  normalizeAssistantCopy,
   sanitizeAssistantOutput,
 } from '@/lib/assistant-output-guard';
 
@@ -73,7 +74,9 @@ export function reasonLabel(
           ? messages.assistant.blockedLabel
           : message.reasonCode === 'PERSONAL_CONTEXT'
             ? messages.assistant.personalContext
-            : message.reasonCode === 'PROVIDER_TRUNCATED'
+            : message.reasonCode === 'LOCAL_ASSIST'
+              ? messages.assistant.localAssist
+              : message.reasonCode === 'PROVIDER_TRUNCATED'
               ? messages.assistant.incomplete
             : message.degraded
               ? messages.assistant.degraded
@@ -133,6 +136,7 @@ export function AssistantMessages({
       const visibleContent = sanitizeAssistantOutput(
         message.content,
         messages.assistant.technicalBlocked,
+        locale,
       );
       await navigator.clipboard.writeText(visibleContent);
       setCopiedId(message.id);
@@ -165,6 +169,7 @@ export function AssistantMessages({
           : sanitizeAssistantOutput(
               message.content,
               messages.assistant.technicalBlocked,
+              locale,
             );
         const visibleCitations = isUser
           ? []
@@ -173,7 +178,12 @@ export function AssistantMessages({
                 isAssistantOutputSafe(citation.title) &&
                 isAssistantOutputSafe(citation.excerpt) &&
                 isAssistantOutputSafe(citation.source),
-            );
+            ).map((citation) => ({
+              ...citation,
+              title: normalizeAssistantCopy(citation.title, citation.locale === 'en' ? 'en' : locale),
+              excerpt: normalizeAssistantCopy(citation.excerpt, citation.locale === 'en' ? 'en' : locale),
+              source: normalizeAssistantCopy(citation.source, citation.locale === 'en' ? 'en' : locale),
+            }));
 
         return (
           <div key={message.id} className="space-y-2">

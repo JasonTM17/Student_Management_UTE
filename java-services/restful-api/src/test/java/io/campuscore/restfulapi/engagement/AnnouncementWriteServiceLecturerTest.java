@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.engagement;
 
+import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
@@ -79,6 +80,44 @@ class AnnouncementWriteServiceLecturerTest {
                 "user-1", "Lecturer", List.of("LECTURER"), "lecturer-1", "notice-1", request);
 
         verify(fixture.announcements).update(any());
+    }
+
+    @Test
+    void executableAnnouncementContentIsRefusedAtTheWriteBoundary() throws Exception {
+        Fixture fixture = fixture();
+
+        // Every payload below reached the database before the write gate existed,
+        // because only the frontend renderer tried (and failed) to strip it.
+        for (String unsafe : List.of(
+                "<p>ok</p><script>alert(1)</script>",
+                "<img src=x/onerror=alert(1)>",
+                "<svg/onload=alert(1)>",
+                "<div onclick=\"alert(1)\">x</div>",
+                "<iframe src=\"https://evil.example\"></iframe>",
+                "<a href=\"javascript:alert(1)\">x</a>",
+                "<a href=\"data:text/html;base64,PHNjcmlwdD4=\">x</a>")) {
+            CreateAnnouncementRequest request = new CreateAnnouncementRequest(
+                    "Notice", unsafe, "NORMAL", List.of("STUDENT"), List.of(), false,
+                    null, null, null, null, null);
+            DomainException error = assertThrows(DomainException.class, () -> fixture.service.create(
+                    "user-1", "Admin", List.of("ADMIN"), null, request), unsafe);
+            assertEquals("UNSAFE_ANNOUNCEMENT_CONTENT", error.code(), unsafe);
+        }
+    }
+
+    @Test
+    void formattedAnnouncementContentStillPassesTheWriteBoundary() throws Exception {
+        Fixture fixture = fixture();
+        when(fixture.announcements.create(any())).thenReturn(announcement(null));
+        CreateAnnouncementRequest request = new CreateAnnouncementRequest(
+                "Notice",
+                "<p>Học phần <strong>tiên quyết</strong></p>"
+                        + "<img src=\"data:image/png;base64,iVBORw0KGgo=\" alt=\"sơ đồ\">",
+                "NORMAL", List.of("STUDENT"), List.of(), false, null, null, null, null, null);
+
+        fixture.service.create("user-1", "Admin", List.of("ADMIN"), null, request);
+
+        verify(fixture.announcements).create(any());
     }
 
     private static CreateAnnouncementRequest createRequest(List<String> roles, boolean global, String sectionId) {

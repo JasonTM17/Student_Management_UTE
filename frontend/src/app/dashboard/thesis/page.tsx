@@ -1244,7 +1244,7 @@ export default function ThesisPage() {
                               href={groupReport.url}
                               target="_blank"
                               rel="noreferrer"
-                              className="inline-flex items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+                              className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
                             >
                               {messages.thesis.report.view}
                               <ExternalLink className="h-3.5 w-3.5" />

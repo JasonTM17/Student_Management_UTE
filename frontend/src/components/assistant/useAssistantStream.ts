@@ -265,12 +265,16 @@ export function useAssistantStream({
           try {
             const resolution = await resolveStudentAssistantQuery(message, locale);
             if (resolution && isCurrentRequest() && !controller.signal.aborted) {
+              // Only a personal-record card may claim grounding in the asker's
+              // own data. Greetings, the capability menu and other locally
+              // composed replies carry no citation, so they must not reuse the
+              // server's "answered from approved guidance" badge.
               const localReasonCode = resolution.reasonCode ?? (
                 resolution.citation?.source === 'academic-records' ||
                 resolution.citation?.source === 'academic-conduct' ||
                 resolution.citation?.source === 'academic-announcements'
                   ? 'PERSONAL_CONTEXT'
-                  : 'ANSWERED'
+                  : 'LOCAL_ASSIST'
               );
               applyStreamEvent({
                 type: 'meta',

@@ -37,6 +37,7 @@ import { AnnouncementEditModal } from '@/components/announcements/AnnouncementEd
 import {
   DEFAULT_SITE_APPEARANCE,
   SITE_APPEARANCE_ACCENTS,
+  applyPageOrder,
   orderByIds,
   type SiteAppearance,
   type SiteAppearanceAccent,
@@ -671,7 +672,9 @@ export default function AcademicEditorPage() {
       const newOrder = publishedNotices.map((n) => n.id);
       const updated: SiteAppearance = {
         ...siteAppearance,
-        postOrder: newOrder,
+        // Only the loaded notices are reordered here; applying the order to that
+        // subset keeps pins set for announcements outside this batch.
+        postOrder: applyPageOrder(siteAppearance.postOrder, newOrder),
       };
       await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);

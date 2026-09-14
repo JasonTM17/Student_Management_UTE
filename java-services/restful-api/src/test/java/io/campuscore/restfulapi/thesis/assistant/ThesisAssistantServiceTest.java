@@ -66,7 +66,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
                 new AssistantCancellationRegistry(),
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         ChatResponse response = service.answer("topic", "en", null, "owner-rag", request);
 
@@ -122,7 +122,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
                 new AssistantCancellationRegistry(),
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         ChatResponse response = service.answer("topic compare multiple conditions", "en", null, "owner-length", request, events::add);
 
@@ -245,7 +245,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
                 new AssistantCancellationRegistry(),
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         ChatResponse response = service.answer(hardQuestion, "en", null, "owner-a", request, events::add);
 
@@ -308,7 +308,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
                 new AssistantCancellationRegistry(),
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         ChatResponse response = service.answer("topic compare multiple conditions", "en", null, "owner-b", request, events::add);
 
@@ -364,7 +364,7 @@ class ThesisAssistantServiceTest {
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
                 new AssistantCancellationRegistry(),
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         assertThrows(DomainException.class,
                 () -> service.answer(hardQuestion, "en", null, "owner-race", request, events::add));
@@ -397,6 +397,84 @@ class ThesisAssistantServiceTest {
                         "Lớp SE101 học kỳ 2026 - 2027, phòng A101"));
         assertEquals("KLTN 2026-2027",
                 ThesisAssistantService.normalizeNumberSpacing("KLTN 2026-2027"));
+        assertEquals("minimum of 14 credits, maximum of 24 credits, and up to 28 credits",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "minimum of14 credits, maximum of24 credits, and up to28 credits"));
+        assertEquals("Credit limits: 14 to 24 credits; time 10:30 remains intact",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Credit limits:14 to 24 credits; time 10:30 remains intact"));
+    }
+
+    @Test
+    void generalizedGlueRepairCoversWordsOutsideTheOldAllowlist() {
+        // Function words that were absent from the closed allowlist ("trong",
+        // "thang", "đủ") kept their digits attached in live production answers.
+        assertEquals("phải hoàn thành nghĩa vụ học phí trong 4 tuần đầu tiên",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "phải hoàn thành nghĩa vụ học phí trong4 tuần đầu tiên"));
+        assertEquals("Điểm F (dưới 4.0 thang 10) là không đạt.",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Điểm F (dưới 4.0 thang10) là không đạt."));
+        assertEquals("Tích lũy đủ 100% số tín chỉ của chương trình đào tạo.",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Tích lũy đủ100% số tín chỉ của chương trình đào tạo."));
+        // Identifiers and digit ranges must not gain a space.
+        assertEquals("Môn SE101, phòng A101, lớp K20, mức 1- 2, từ 5 - 7 ngày",
+                ThesisAssistantService.normalizeNumberSpacing(
+                        "Môn SE101, phòng A101, lớp K20, mức 1- 2, từ 5 - 7 ngày"));
+
+        // A heading glued to the following block is split back into two blocks.
+        assertEquals("# Hạn nộp, hình thức nộp và gia hạn học phí\n\n**Hạn nộp học phí**",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "# Hạn nộp, hình thức nộp và gia hạn học phí**Hạn nộp học phí**", "vi"));
+        assertEquals("## Xử lý điểm F – học lại\n\n- Điểm F (dưới 4.0 thang 10) là không đạt.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "## Xử lý điểm F – học lại- Điểm F (dưới 4.0 thang10) là không đạt.", "vi"));
+        assertEquals("**Học phần tiên quyết**\n- Phải học và thi đạt",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "**Học phần tiên quyết**  - Phải học và thi đạt", "vi"));
+        // A heading concatenated with a bullet via two spaces would otherwise
+        // pull the bullet into the heading text.
+        assertEquals("## Điều kiện tốt nghiệp\n- Tích lũy đủ 100% số tín chỉ.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "## Điều kiện tốt nghiệp  - Tích lũy đủ 100% số tín chỉ.", "vi"));
+        // Heading markers and closing emphasis glued to running text regain their
+        // block boundary.
+        assertEquals("gia hạn học phí\n\n## Thời hạn nộp học phí",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "gia hạn học phí## Thời hạn nộp học phí", "vi"));
+        assertEquals("**Hậu quả khi không đóng đúng hạn**\n\nSinh viên sẽ bị khóa đăng ký.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "**Hậu quả khi không đóng đúng hạn**Sinh viên sẽ bị khóa đăng ký.", "vi"));
+
+        // A closing emphasis marker and an inline bold run stay untouched.
+        assertEquals("đạt **4.0**/10 mới qua",
+                ThesisAssistantService.normalizeAssistantCopy("đạt **4.0**/10 mới qua", "vi"));
+        assertEquals("Quy định **quan trọng** cần lưu ý",
+                ThesisAssistantService.normalizeAssistantCopy("Quy định **quan trọng** cần lưu ý", "vi"));
+
+        // Counterexamples raised by an adversarial review of the first version of
+        // these rules: identifiers, addresses, anchors and closing markers must
+        // survive untouched.
+        for (String preserved : java.util.List.of(
+                "Môn IS101 (Hệ thống thông tin) là học phần bắt buộc",
+                "Liên hệ hoten2020@student.hcmute.edu.vn để được hỗ trợ",
+                "xem https://portal.example.vn/x?nam2026=1&page2. để biết thêm",
+                "xem mục #muc4 trong quy chế",
+                "**Điểm**4.0 là mức tối thiểu",
+                "Nhóm SV- K20 tham gia báo cáo",
+                "sinh viên self- study tại nhà",
+                "TP.HCM - Thủ Đức là địa bàn chính",
+                "Môn SE101 - Kỹ thuật phần mềm, phòng A101, lớp K20",
+                "TOEIC 450 và chứng chỉ MOS/IC3",
+                "thời hạn từ 5 - 7 ngày làm việc",
+                "ca học 07:00 - 09:30 tại A101",
+                "## Học phí - Học bổng là hai nội dung khác nhau",
+                "C# là ngôn ngữ lập trình được dùng trong môn học",
+                "xem mục #muc4 trong quy chế quy định")) {
+            assertEquals(preserved,
+                    ThesisAssistantService.normalizeAssistantCopy(preserved, "vi"), preserved);
+        }
     }
 
     @Test
@@ -410,11 +488,58 @@ class ThesisAssistantServiceTest {
         assertEquals("When the main window ends but the add/drop period remains open, check the catalog.",
                 ThesisAssistantService.normalizeAssistantCopy(
                         "When the main window ends but the ADD_DROP remains open, check the catalog.", "en"));
+        assertEquals("Check whether the registration period window remains open.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Check whether the REGISTRATION period period period window remains open.", "en"));
         assertEquals("Khi đợt đăng ký chính kết thúc nhưng đợt bổ sung/rút học phần vẫn mở.",
                 ThesisAssistantService.normalizeAssistantCopy(
                         "Khi đợt REGISTRATION chính kết thúc nhưng đợt ADD_DROP vẫn mở.", "vi"));
         assertEquals("3. Xử lý các thông báo từ hệ thống\n\nNếu lớp đã đóng, hãy chọn lớp khác.",
                 ThesisAssistantService.normalizeAssistantCopy(
                         "3. Xử lý các thông báo từ hệ thống Nếu lớp đã đóng, hãy chọn lớp khác.", "vi"));
+        assertEquals("# Đăng ký học phần trên CampusCore\n\nMở Cổng sinh viên, vào mục Đăng ký học phần.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "# Đăng ký học phần trên CampusCoreMở Cổng sinh viên, vào mục Đăng ký học phần.", "vi"));
+        assertEquals("## When you see a system message\n\nIf the section is closed, choose another one.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "## When you see a system messageIf the section is closed, choose another one.", "en"));
+        assertEquals("## Prerequisites and Corequisites\n\n- Prerequisite: pass the earlier course.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "## Prerequisites and Corequisites- Prerequisite: pass the earlier course.", "en"));
+        assertEquals("**Thời gian đăng ký**\n\nCần kiểm tra thời gian trước khi xác nhận.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "**Thời gian đăng ký**Cần kiểm tra thời gian trước khi xác nhận.", "vi"));
+        assertEquals("# Cách đăng ký học phần\n\nMở Cổng sinh viên, vào mục Đăng ký học phần.\n\n"
+                        + "## Các bước đăng ký\n\n- Chọn đúng học kỳ cần đăng ký.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "# Cách đăng ký học phầnMở Cổng sinh viên, vào mục Đăng ký học phần.\n\n"
+                                + "## Các bước đăng ký- Chọn đúng học kỳ cần đăng ký.", "vi"));
+        assertEquals("## Khi gặp thông báo từ hệ thống\n\n- Nếu lớp đã đóng, hãy chọn lớp khác.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "## Khi gặp thông báo từ hệ thống- Nếu lớp đã đóng, hãy chọn lớp khác.", "vi"));
+        Citation citation = new Citation("doc", "registration-window", "Đợt đăng ký", "registrar",
+                "vi", "CampusCore hiển thị lớp thuộc đợt REGISTRATION. Đợt ADD_DROP vẫn mở.");
+        Citation normalized = ThesisAssistantService.normalizeCitation(citation, "vi");
+        assertEquals("CampusCore hiển thị lớp thuộc đợt đăng ký. Đợt bổ sung/rút học phần vẫn mở.",
+                normalized.excerpt());
+        assertEquals("# Registering for a Course\n\nOpen the Student Portal.\n\n"
+                        + "## During Add/Drop\n\nWhile the main window has ended.\n\n"
+                        + "## What Happens During Add/Drop\n\nSections are listed only while a registration period is active.\n\n"
+                        + "## Related Rules to Keep in Mind\n\n- Prerequisites may block registration.\n\n"
+                        + "## Prerequisites and Retakes\n\n- A prerequisite must be passed before enrollment.\n\n"
+                        + "## If Registration Is Blocked\n\nThe system may report a closed section.\n\n"
+                        + "Withdrawal is allowed during the first 2 weeks of a regular semester.\n\n"
+                        + "## Credit Load Rules\n\n- The maximum is 24 credits.\n\n"
+                        + "Credit limits: minimum of 14 credits and up to 28 credits. Summer terms allow 8 to 10 credits.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "# Registering for a CourseOpen the Student Portal.\n\n"
+                                + "## During Add/DropWhile the main window has ended.\n\n"
+                                + "## What Happens During Add/DropSections are listed only while a registration period is active.\n\n"
+                                + "## Related Rules to Keep in Mind- Prerequisites may block registration.\n\n"
+                                + "## Prerequisites and Retakes- A prerequisite must be passed before enrollment.\n\n"
+                                + "## If Registration Is BlockedThe system may report a closed section.\n\n"
+                                + "Withdrawal is allowed during the first2 weeks of a regular semester.\n\n"
+                                + "## Credit Load Rules- The maximum is24 credits.\n\n"
+                                + "Credit limits: minimum of14 credits and up to28 credits. Summer terms allow8 to 10 credits.", "en"));
     }
 }

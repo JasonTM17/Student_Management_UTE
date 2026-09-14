@@ -56,6 +56,7 @@ import {
   saveSiteAppearance,
   broadcastSiteAppearance,
 } from '@/lib/site-appearance-client';
+import { applyPageOrder } from '@/lib/site-appearance';
 import {
   ANNOUNCEMENT_PRIORITIES,
   ANNOUNCEMENT_ROLES,
@@ -232,7 +233,9 @@ export default function AdminAnnouncementsPage() {
       const currentAppearance = await fetchSiteAppearance();
       const updated = {
         ...currentAppearance,
-        postOrder: newOrder,
+        // The reorder dialog only covers the current filtered page, so the new
+        // relative order is applied to that page while pins outside it are kept.
+        postOrder: applyPageOrder(currentAppearance.postOrder, newOrder),
       };
       await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);

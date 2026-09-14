@@ -23,7 +23,7 @@ class ThesisAssistantOwnershipTest {
         when(history.consumeQuota(anyString(), anyInt(), anyInt())).thenReturn(false);
         ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history,
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         var response = service.answer("topic?", "vi", null, "owner-a");
         assertEquals("QUOTA_EXCEEDED", response.reasonCode());
@@ -44,7 +44,7 @@ class ThesisAssistantOwnershipTest {
                 .thenThrow(new DataAccessResourceFailureException("history unavailable"));
         ThesisAssistantService service = new ThesisAssistantService(knowledge, mock(DeepSeekClient.class), history,
                 new DeepSeekProperties(false, "", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
-                new AssistantProperties(6000, 2000, 20, 200, 90));
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
 
         var response = service.answer("topic?", "vi", null, "owner-a");
         assertEquals("HISTORY_UNAVAILABLE", response.reasonCode());

@@ -8,7 +8,8 @@ public record AssistantProperties(
         int maxMessageChars,
         int userDailyQuota,
         int globalDailyQuota,
-        int retentionDays) {
+        int retentionDays,
+        boolean quotaEnforced) {
 
     public AssistantProperties {
         maxContextChars = clamp(maxContextChars, 256, 6_000);

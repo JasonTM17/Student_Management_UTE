@@ -17,7 +17,7 @@ import { useI18n } from '@/i18n';
 import {
   DEFAULT_SITE_APPEARANCE,
   SITE_APPEARANCE_ACCENTS,
-  mergePostOrder,
+  applyPageOrder,
   movePostOrder,
   sanitizeSiteAppearance,
   type SiteAppearance,
@@ -78,7 +78,7 @@ export default function AdminAppearancePage() {
       }));
       const next = sanitizeSiteAppearance({
         ...appearance,
-        postOrder: mergePostOrder(appearance.postOrder, rows.map((row) => row.id)),
+        postOrder: applyPageOrder(appearance.postOrder, rows.map((row) => row.id)),
       });
       setPosts(rows);
       setDraft(next);

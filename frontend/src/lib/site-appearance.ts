@@ -133,9 +133,31 @@ export function movePostOrder(order: string[], id: string, direction: -1 | 1): s
   return next;
 }
 
-export function mergePostOrder(existing: string[], ids: string[]): string[] {
-  const known = new Set(ids);
-  const kept = existing.filter((id) => known.has(id));
-  const extras = ids.filter((id) => !kept.includes(id));
-  return [...kept, ...extras];
+/**
+ * Applies a new relative order for a subset of the pinned list while preserving
+ * every id outside that subset.
+ *
+ * `keepExistingOrder`-style helpers cannot do this: keeping the *existing* order
+ * for ids that are present and only appending unknown ones silently discards the
+ * user's drag. Reorder save paths must use this instead.
+ *
+ * Ids in `pageIds` are seated, in the given order, into the positions the
+ * previously pinned members of that page occupied; ids the list does not
+ * already contain are appended, and pins outside the page never move.
+ */
+export function applyPageOrder(existing: string[], pageIds: string[]): string[] {
+  const inPage = new Set(pageIds);
+  const result: string[] = [];
+  let cursor = 0;
+  for (const id of existing) {
+    if (!inPage.has(id)) {
+      result.push(id);
+      continue;
+    }
+    // Consume one incoming id per previously pinned slot so the new relative
+    // order lands in the same region of the list.
+    if (cursor < pageIds.length) result.push(pageIds[cursor++]);
+  }
+  for (; cursor < pageIds.length; cursor += 1) result.push(pageIds[cursor]);
+  return result;
 }

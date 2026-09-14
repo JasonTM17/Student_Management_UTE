@@ -27,11 +27,11 @@ export function AssistantMarkdownContent({
   streaming = false,
   guardOutput = true,
 }: AssistantMarkdownContentProps) {
-  const { href, messages } = useI18n();
+  const { href, locale, messages } = useI18n();
   const router = useRouter();
   const renderedContent = streaming ? sanitizeStreamingMarkdown(content) : content;
   const safeContent = guardOutput
-    ? sanitizeAssistantOutput(renderedContent, messages.assistant.technicalBlocked)
+    ? sanitizeAssistantOutput(renderedContent, messages.assistant.technicalBlocked, locale)
     : renderedContent;
 
   // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
