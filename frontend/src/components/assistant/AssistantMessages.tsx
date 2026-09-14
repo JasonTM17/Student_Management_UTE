@@ -60,9 +60,11 @@ export function reasonLabel(
   }
   return message.reasonCode === 'QUOTA_EXCEEDED'
     ? messages.assistant.quotaExceeded
-    : message.reasonCode === 'CANCELLED'
-      ? messages.assistant.cancelled
-      : message.reasonCode === 'PROMPT_INJECTION'
+      : message.reasonCode === 'CANCELLED'
+        ? messages.assistant.cancelled
+        : message.reasonCode === 'TURN_IN_PROGRESS'
+          ? messages.assistant.turnInProgress
+        : message.reasonCode === 'PROMPT_INJECTION'
         ? messages.assistant.blockedLabel
         : message.reasonCode === 'SENSITIVE_EMAIL' ||
             message.reasonCode === 'SENSITIVE_PHONE' ||
@@ -71,6 +73,8 @@ export function reasonLabel(
           ? messages.assistant.blockedLabel
           : message.reasonCode === 'PERSONAL_CONTEXT'
             ? messages.assistant.personalContext
+            : message.reasonCode === 'PROVIDER_TRUNCATED'
+              ? messages.assistant.incomplete
             : message.degraded
               ? messages.assistant.degraded
               : message.reasonCode === 'NO_MATCH'
@@ -249,7 +253,7 @@ export function AssistantMessages({
                       ) : message.reasonCode === 'RAG_GROUNDED' ? (
                         <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary">
                           <ShieldCheck className="h-3 w-3" />
-                          {messages.assistant.domains.POLICY}
+                          {messages.assistant.answered}
                         </span>
                       ) : (
                         <span
@@ -398,7 +402,7 @@ export function AssistantMessages({
                           key={reason}
                           type="button"
                           onClick={() => onFeedback(message.id, 'DOWN', reason)}
-                          className="rounded-full border border-border/80 bg-background px-2 py-0.5 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+                          className="min-h-11 rounded-full border border-border/80 bg-background px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
                         >
                           {messages.assistant.feedbackReasons[reason]}
                         </button>

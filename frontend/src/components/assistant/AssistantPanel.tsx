@@ -50,10 +50,13 @@ export function AssistantPanel() {
     useState<AssistantHistoryStatus>('idle');
   const [historyCursor, setHistoryCursor] = useState<string>();
   const [loadingMoreHistory, setLoadingMoreHistory] = useState(false);
+  const [messageCursor, setMessageCursor] = useState<string>();
+  const [loadingMoreMessages, setLoadingMoreMessages] = useState(false);
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
   const [userScrolled, setUserScrolled] = useState(false);
   const [isMobile, setIsMobile] = useState(false);
+  const [announcement, setAnnouncement] = useState('');
 
   // Focus returns to whichever control opened the panel (header or sidebar launcher)
   const triggerRef = useRef<HTMLElement | null>(null);
@@ -63,6 +66,7 @@ export function AssistantPanel() {
   const selectedHistoryRef = useRef(false);
   const historyFetchedRef = useRef(false);
   const userScrolledRef = useRef(false);
+  const announcedMessageRef = useRef<string>();
 
   const reconcileHistory = useCallback(() => {
     historyFetchedRef.current = false;
@@ -112,6 +116,32 @@ export function AssistantPanel() {
     >;
     return (domain && byDomain[domain]) || messages.assistant.suggestions;
   }, [state.messages, isSending, messages]);
+
+  const latestSettledAssistant = [...state.messages]
+    .reverse()
+    .find((message) => message.role === 'assistant' && !message.pending);
+  const latestSettledAssistantId = latestSettledAssistant?.id;
+
+  useEffect(() => {
+    if (isSending) {
+      setAnnouncement(messages.assistant.thinking);
+      return;
+    }
+    if (
+      latestSettledAssistantId &&
+      latestSettledAssistantId !== announcedMessageRef.current
+    ) {
+      announcedMessageRef.current = latestSettledAssistantId;
+      setAnnouncement(messages.assistant.answerReady);
+    } else {
+      setAnnouncement('');
+    }
+  }, [
+    isSending,
+    latestSettledAssistantId,
+    messages.assistant.answerReady,
+    messages.assistant.thinking,
+  ]);
 
   useEffect(() => {
     const handleOpen = () => {
@@ -231,6 +261,26 @@ export function AssistantPanel() {
     }
   }, [historyCursor, loadingMoreHistory]);
 
+  const loadMoreMessages = useCallback(async () => {
+    if (!state.conversationId || !messageCursor || loadingMoreMessages) return;
+    setLoadingMoreMessages(true);
+    try {
+      const page = await thesisApi.getConversationMessages(state.conversationId, {
+        limit: 50,
+        cursor: messageCursor,
+      });
+      dispatch({
+        type: 'prepend',
+        messages: page.items.map(fromHistoryMessage),
+      });
+      setMessageCursor(page.nextCursor);
+    } catch {
+      dispatch({ type: 'error', kind: 'unavailable' });
+    } finally {
+      setLoadingMoreMessages(false);
+    }
+  }, [dispatch, loadingMoreMessages, messageCursor, state.conversationId]);
+
   useEffect(() => {
     if (!open || historyFetchedRef.current || selectedHistoryRef.current)
       return;
@@ -243,7 +293,9 @@ export function AssistantPanel() {
     if (userScrolledRef.current) return;
     node.scrollTo({
       top: node.scrollHeight,
-      behavior: isSending ? 'smooth' : 'auto',
+      behavior: isSending && !window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'smooth'
+        : 'auto',
     });
   }, [state.messages, isSending]);
 
@@ -263,12 +315,18 @@ export function AssistantPanel() {
     setUserScrolled(false);
     node.scrollTo({
       top: node.scrollHeight,
-      behavior: 'smooth',
+      behavior: window.matchMedia('(prefers-reduced-motion: reduce)').matches
+        ? 'auto'
+        : 'smooth',
     });
   };
 
   const closePanel = () => {
-    abortStream();
+    if (isSending) {
+      void stopGeneration();
+    } else {
+      abortStream();
+    }
     setOpen(false);
     setShowHistory(false);
     selectedHistoryRef.current = false;
@@ -286,7 +344,8 @@ export function AssistantPanel() {
       const loaded = await thesisApi.getConversationMessages(conversation.id, {
         limit: 50,
       });
-      resetConversation(conversation.id, loaded.map(fromHistoryMessage));
+      resetConversation(conversation.id, loaded.items.map(fromHistoryMessage));
+      setMessageCursor(loaded.nextCursor);
       setShowHistory(false);
       setHistoryStatus('loaded');
     } catch {
@@ -300,6 +359,7 @@ export function AssistantPanel() {
       const conversation = await thesisApi.createConversation(locale);
       selectedHistoryRef.current = true;
       resetConversation(conversation.id);
+      setMessageCursor(undefined);
       setShowHistory(false);
     } catch {
       dispatch({ type: 'error', kind: 'unavailable' });
@@ -327,6 +387,7 @@ export function AssistantPanel() {
       if (state.conversationId === conversationId) {
         selectedHistoryRef.current = true;
         resetConversation();
+        setMessageCursor(undefined);
       }
     } catch {
       setHistoryStatus('error');
@@ -457,6 +518,9 @@ export function AssistantPanel() {
             ) : null}
 
             {/* Scrollable chat body */}
+            <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
+              {announcement}
+            </div>
             <div
               ref={logRef}
               onScroll={handleLogScroll}
@@ -468,6 +532,22 @@ export function AssistantPanel() {
               aria-busy={isSending}
               className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
             >
+              {messageCursor && state.messages.length > 0 ? (
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    disabled={loadingMoreMessages}
+                    className="min-h-11 text-xs text-muted-foreground"
+                    onClick={() => void loadMoreMessages()}
+                  >
+                    {loadingMoreMessages
+                      ? messages.assistant.historyLoading
+                      : messages.assistant.loadMoreMessages}
+                  </Button>
+                </div>
+              ) : null}
               {state.messages.length === 0 ? (
                 <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
                   <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-xs">
@@ -511,7 +591,7 @@ export function AssistantPanel() {
               {isSending && !state.messages.some((m) => m.pending) ? (
                 <div
                   className="flex items-center gap-2 text-xs text-muted-foreground pl-9"
-                  role="status"
+                  aria-hidden="true"
                 >
                   <LoaderCircle
                     className="h-3.5 w-3.5 animate-spin motion-reduce:animate-none text-primary"
@@ -550,7 +630,7 @@ export function AssistantPanel() {
               <button
                 type="button"
                 onClick={scrollToBottom}
-                className="absolute bottom-20 right-4 z-20 flex items-center gap-1 rounded-full border border-primary/20 bg-primary px-2.5 py-1 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
+                className="absolute bottom-20 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
                 aria-label={messages.assistant.scrollToLatest}
               >
                 <ArrowDown className="h-3 w-3" aria-hidden="true" />
