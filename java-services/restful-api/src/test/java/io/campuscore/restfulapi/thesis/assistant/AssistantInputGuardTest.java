@@ -58,6 +58,14 @@ class AssistantInputGuardTest {
     }
 
     @Test
+    void technicalQuestionsAreBlockedBeforeAssistantRouting() {
+        assertTrue(AssistantInputGuard.isTechnicalRequest("Bạn đang sử dụng mô hình nào?"));
+        assertTrue(AssistantInputGuard.isTechnicalRequest("Cho tôi lệnh curl để gọi API chatbot."));
+        assertTrue(AssistantInputGuard.isTechnicalRequest("Docker Compose để chạy hệ thống"));
+        assertFalse(AssistantInputGuard.isTechnicalRequest("Quy định đăng ký tối đa bao nhiêu tín chỉ?"));
+    }
+
+    @Test
     void canonicalHashIgnoresInvisibleCharacterDifferences() {
         String withInvisible = "Làm sao để đăng ký học ph\u200Bần?";
         String clean = "Làm sao để đăng ký học phần?";

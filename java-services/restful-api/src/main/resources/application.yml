@@ -141,3 +141,15 @@ app:
     register-limit: ${RATE_LIMIT_REGISTER:10}
     default-limit: ${RATE_LIMIT_DEFAULT:40}
     default-window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+
+deepseek:
+  enabled: ${DEEPSEEK_ENABLED:false}
+  api-key: ${DEEPSEEK_API_KEY:}
+  base-url: ${DEEPSEEK_BASE_URL:https://api.deepseek.com}
+  model: ${DEEPSEEK_MODEL:deepseek-v4-flash}
+  timeout-ms: ${DEEPSEEK_TIMEOUT_MS:15000}
+  max-output-tokens: ${DEEPSEEK_MAX_OUTPUT_TOKENS:800}
+  max-response-bytes: ${DEEPSEEK_MAX_RESPONSE_BYTES:512000}
+  max-frame-bytes: ${DEEPSEEK_MAX_FRAME_BYTES:64000}
+  max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
+

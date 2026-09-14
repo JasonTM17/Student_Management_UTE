@@ -17,6 +17,13 @@ public final class AssistantInputGuard {
             "(?i)(?<![A-Za-z0-9])[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}(?![A-Za-z0-9])");
     private static final Pattern STUDENT_ID = Pattern.compile("(?i)\\b(?:student\\s*id|mssv|ma\\s*sv|sinh\\s*vien)\\s*[:#-]?\\s*[a-z0-9-]*\\d[a-z0-9-]{3,20}\\b");
     private static final Pattern SECRET = Pattern.compile("(?i)\\b(?:bearer\\s+|sk-[a-z0-9_-]{12,}|api[_ -]?key\\s*[:=＝]|token\\s*[:=＝]|pass(?:word|wd)\\s*[:：=＝])");
+    private static final Pattern TECHNICAL_REQUEST = Pattern.compile(
+            "(?i)(?:"
+                    + "\\b(?:curl|wget|invoke-webrequest|iwr|docker(?:\\s+compose)?|docker-compose|kubectl|helm|psql|mysql|redis-cli|npm|pnpm|yarn|bun|npx|mvnw?|gradlew?|git|powershell|pwsh|bash|sh)\\b"
+                    + "|\\b(?:api\\s+(?:endpoint|endpoints|chatbot)|api\\s+key|system\\s+prompt|developer\\s+message|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider|llm|jwt|database\\s+(?:password|credentials?))\\b"
+                    + "|\\b(?:cho\\s+(?:tôi|ta)|xin|give\\s+me|show|provide|send)\\b.{0,80}\\b(?:api|endpoint|system\\s+prompt|developer\\s+message|câu\\s+lệnh|lệnh|command|model|mô\\s+hình|provider)\\b"
+                    + "|\\b(?:bạn|bot|trợ\\s+lý|hệ\\s+thống|you|assistant)\\b.{0,40}\\b(?:đang\\s+(?:sử\\s+dụng|dùng|chạy)\\s+)?(?:mô\\s+hình|model|llm|provider|deepseek)\\b"
+                    + ")");
     // Vietnamese phrasing matters because the assistant audience is bilingual:
     // the English-only list let "bỏ qua tất cả hướng dẫn..." reach the provider.
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
@@ -55,6 +62,15 @@ public final class AssistantInputGuard {
         if (sensitiveReason != null) return new GuardResult(false, sensitiveReason, normalized);
         if (PROMPT_INJECTION.matcher(normalized).find()) return new GuardResult(false, "PROMPT_INJECTION", normalized);
         return new GuardResult(true, null, normalized);
+    }
+
+    /**
+     * Technical implementation questions are outside the academic assistant's
+     * public scope. Keep this separate from privacy/injection inspection so the
+     * same input guard can still be used for provider text and knowledge rows.
+     */
+    public static boolean isTechnicalRequest(String value) {
+        return value != null && TECHNICAL_REQUEST.matcher(normalizeMessage(value)).find();
     }
 
     /**

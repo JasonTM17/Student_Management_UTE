@@ -64,6 +64,11 @@ public class ThesisAssistantController {
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
+        if (AssistantInputGuard.isTechnicalRequest(request.message())) {
+            return new ChatResponse(ThesisAssistantService.technicalOutputMessage(request.locale()),
+                    "curated-lexical-rag", true, "TECHNICAL_REQUEST_BLOCKED",
+                    AssistantInputGuard.normalizeLocale(request.locale()), List.of());
+        }
         if (personalContext != null && personalContext.handles(request.message())) {
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
@@ -93,6 +98,11 @@ public class ThesisAssistantController {
         String owner = subject(actor);
         Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
+            if (AssistantInputGuard.isTechnicalRequest(request.message())) {
+                sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
+                emitter.complete();
+                return emitter;
+            }
             if (personalContext != null && personalContext.handles(request.message())
                     && personalContext.answer(request, actor) != null) {
                 personalContext.stream(request, actor, sink);

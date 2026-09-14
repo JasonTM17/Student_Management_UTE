@@ -17,19 +17,22 @@ interface AssistantMarkdownContentProps {
   className?: string;
   /** True while the message is still streaming; trims unclosed markers. */
   streaming?: boolean;
+  /** Only assistant output is sanitized; user messages remain verbatim. */
+  guardOutput?: boolean;
 }
 
 export function AssistantMarkdownContent({
   content,
   className,
   streaming = false,
+  guardOutput = true,
 }: AssistantMarkdownContentProps) {
   const { href, messages } = useI18n();
   const router = useRouter();
-  const safeContent = sanitizeAssistantOutput(
-    streaming ? sanitizeStreamingMarkdown(content) : content,
-    messages.assistant.technicalBlocked,
-  );
+  const renderedContent = streaming ? sanitizeStreamingMarkdown(content) : content;
+  const safeContent = guardOutput
+    ? sanitizeAssistantOutput(renderedContent, messages.assistant.technicalBlocked)
+    : renderedContent;
 
   // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
   // lines merge into one paragraph (see splitAssistantBlocks).

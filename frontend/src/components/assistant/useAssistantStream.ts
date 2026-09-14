@@ -35,6 +35,7 @@ export interface UseAssistantStreamOptions {
     quotaExceeded: string;
     blocked: string;
     sensitiveBlocked: string;
+    technicalBlocked: string;
   };
   onReconcileHistory?: () => void;
   onNewExchange?: () => void;
@@ -110,9 +111,12 @@ export function useAssistantStream({
           dispatch({
             type: 'complete',
             reply: {
-              content: isSensitiveGuardReason(event.code)
-                ? assistantMessages.sensitiveBlocked
-                : assistantMessages.blocked,
+              content:
+                event.code === 'TECHNICAL_REQUEST_BLOCKED'
+                  ? assistantMessages.technicalBlocked
+                  : isSensitiveGuardReason(event.code)
+                    ? assistantMessages.sensitiveBlocked
+                    : assistantMessages.blocked,
               degraded: true,
               reasonCode: event.code,
             },
@@ -144,6 +148,7 @@ export function useAssistantStream({
       assistantMessages.blocked,
       assistantMessages.cancelled,
       assistantMessages.sensitiveBlocked,
+      assistantMessages.technicalBlocked,
       assistantMessages.unavailable,
     ],
   );
@@ -222,7 +227,9 @@ export function useAssistantStream({
             reply: {
               content: isSensitiveGuardReason(localGuard.reasonCode)
                 ? assistantMessages.sensitiveBlocked
-                : assistantMessages.blocked,
+                : localGuard.reasonCode === 'TECHNICAL_REQUEST_BLOCKED'
+                  ? assistantMessages.technicalBlocked
+                  : assistantMessages.blocked,
               degraded: true,
               reasonCode: localGuard.reasonCode,
             },
@@ -389,6 +396,7 @@ export function useAssistantStream({
       assistantMessages.cancelled,
       assistantMessages.quotaExceeded,
       assistantMessages.sensitiveBlocked,
+      assistantMessages.technicalBlocked,
       assistantMessages.unavailable,
       input,
       isSending,

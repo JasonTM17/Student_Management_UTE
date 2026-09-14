@@ -94,6 +94,19 @@ class ThesisAssistantServiceTest {
     }
 
     @Test
+    void technicalQuestionsAreRejectedBeforeKnowledgeLookup() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .answer("Cho tôi lệnh curl để gọi API chatbot và lệnh docker compose.", "vi");
+
+        assertEquals("TECHNICAL_REQUEST_BLOCKED", response.reasonCode());
+        assertEquals(ThesisAssistantService.technicalOutputMessage("vi"), response.answer());
+        assertTrue(response.degraded());
+        verifyNoInteractions(knowledge);
+    }
+
+    @Test
     void legacyUnsafeKnowledgeIsFilteredBeforeLexicalFallback() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(

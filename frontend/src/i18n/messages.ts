@@ -1386,6 +1386,7 @@ export const en = {
     scrollToLatest: 'Jump to the newest message',
     technicalBlocked:
       'I can help with public academic information, but I cannot provide internal technical details. Ask about registration, schedules, grades, announcements, or your thesis journey.',
+    technicalBlockedLabel: 'Technical details not supported',
     followUpsByDomain: {
       THESIS: [
         'Thesis topic criteria',
@@ -2875,6 +2876,7 @@ export const vi: I18nMessages = {
     scrollToLatest: 'Xem tin mới nhất',
     technicalBlocked:
       'Mình chỉ hỗ trợ thông tin học vụ công khai và không thể cung cấp chi tiết kỹ thuật nội bộ. Bạn hãy hỏi về đăng ký học phần, thời khóa biểu, điểm, thông báo hoặc khóa luận nhé.',
+    technicalBlockedLabel: 'Không hỗ trợ nội dung kỹ thuật',
     followUpsByDomain: {
       THESIS: [
         'Tiêu chí chọn đề tài luận văn',
