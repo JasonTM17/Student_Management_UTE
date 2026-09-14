@@ -23,9 +23,12 @@ import java.net.http.HttpRequest;
 import java.net.http.HttpResponse;
 import java.nio.charset.StandardCharsets;
 import java.time.Duration;
+import java.util.ArrayList;
+import java.util.LinkedHashSet;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.StringJoiner;
 import java.util.UUID;
 import java.util.function.Consumer;
@@ -271,6 +274,8 @@ public class RagAssistantGateway {
         }
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         StringBuilder answer = new StringBuilder();
+        List<ThesisAssistantService.StreamCitation> citations = new ArrayList<>();
+        Set<String> sourceIds = new LinkedHashSet<>();
         boolean[] blocked = { false };
         return event -> {
             if (event instanceof ThesisAssistantService.StreamDelta delta) {
@@ -286,7 +291,9 @@ public class RagAssistantGateway {
                     return;
                 }
                 answer.append(text);
-                downstream.accept(event);
+                if (delta.sourceIds() != null) {
+                    delta.sourceIds().stream().filter(id -> id != null && !id.isBlank()).forEach(sourceIds::add);
+                }
                 return;
             }
             if (event instanceof ThesisAssistantService.StreamReplace replace) {
@@ -302,18 +309,32 @@ public class RagAssistantGateway {
                 }
                 answer.setLength(0);
                 answer.append(text);
-                downstream.accept(event);
+                sourceIds.clear();
+                if (replace.sourceIds() != null) {
+                    replace.sourceIds().stream().filter(id -> id != null && !id.isBlank()).forEach(sourceIds::add);
+                }
                 return;
             }
             if (event instanceof ThesisAssistantService.StreamCitation citation) {
                 if (!blocked[0] && safeCitation(citation.citation())) {
-                    downstream.accept(event);
+                    citations.add(citation);
                 }
                 return;
             }
-            if (event instanceof ThesisAssistantService.StreamDone done && blocked[0]) {
-                downstream.accept(new ThesisAssistantService.StreamDone(
-                        done.messageId(), "PROVIDER_UNSAFE_OUTPUT", true, done.terminalStatus()));
+            if (event instanceof ThesisAssistantService.StreamDone done) {
+                if (blocked[0]) {
+                    downstream.accept(new ThesisAssistantService.StreamDone(
+                            done.messageId(), "PROVIDER_UNSAFE_OUTPUT", true, done.terminalStatus()));
+                    return;
+                }
+                String normalized = ThesisAssistantService.normalizeAssistantCopy(answer.toString(), normalizedLocale);
+                boolean noMatch = "NO_MATCH".equals(done.reasonCode());
+                if (normalized != null && !normalized.isBlank()) {
+                    downstream.accept(new ThesisAssistantService.StreamDelta(
+                            0, normalized, noMatch ? List.of() : List.copyOf(sourceIds)));
+                }
+                if (!noMatch) citations.forEach(downstream);
+                downstream.accept(done);
                 return;
             }
             downstream.accept(event);
@@ -322,18 +343,26 @@ public class RagAssistantGateway {
 
     private static ChatResponse guardResponse(ChatResponse response, String locale) {
         if (response == null) return null;
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        boolean unsafeAnswer = !AssistantOutputGuard.isSafe(response.answer());
+        String normalizedAnswer = ThesisAssistantService.normalizeAssistantCopy(response.answer(), normalizedLocale);
+        boolean noMatch = "NO_MATCH".equals(response.reasonCode());
         List<io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation> citations =
                 response.citations() == null ? List.of() : response.citations().stream()
                         .filter(RagAssistantGateway::safeCitation).toList();
-        boolean unsafeAnswer = !AssistantOutputGuard.isSafe(response.answer());
-        if (!unsafeAnswer && citations.size() == (response.citations() == null ? 0 : response.citations().size())) {
+        if (unsafeAnswer || noMatch) citations = List.of();
+        boolean unchanged = !unsafeAnswer
+                && java.util.Objects.equals(normalizedAnswer, response.answer())
+                && java.util.Objects.equals(normalizedLocale, response.locale())
+                && java.util.Objects.equals(citations, response.citations());
+        if (unchanged) {
             return response;
         }
         return new ChatResponse(
-                unsafeAnswer ? ThesisAssistantService.technicalOutputMessage(locale) : response.answer(),
+                unsafeAnswer ? ThesisAssistantService.technicalOutputMessage(normalizedLocale) : normalizedAnswer,
                 response.model(), unsafeAnswer || response.degraded(),
                 unsafeAnswer ? "PROVIDER_UNSAFE_OUTPUT" : response.reasonCode(),
-                AssistantInputGuard.normalizeLocale(locale), citations, response.requestId(),
+                normalizedLocale, citations, response.requestId(),
                 response.clientRequestId(), response.turnId(), response.replayed(), response.terminalStatus(),
                 response.conversationId(), response.messageId());
     }
