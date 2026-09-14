@@ -138,11 +138,14 @@ test('assistant guard blocks end the turn locally without a JSON replay', () => 
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
   assert.match(reducerSource, /GUARD_BLOCKED_CODES = new Set\(\[\s*'PROMPT_INJECTION',\s*'SENSITIVE_EMAIL',/);
+  assert.match(reducerSource, /'TECHNICAL_REQUEST_BLOCKED'/);
   assert.match(hookSource, /GUARD_BLOCKED_CODES\.has/);
+  assert.match(hookSource, /assistantMessages\.technicalBlocked/);
   // The localized blocked copy exists in both locales and the chip gets a
   // dedicated label instead of the generic degraded badge.
   assert.match(messagesSource, /blockedLabel: 'Blocked request'/);
   assert.match(messagesSource, /blockedLabel: 'Câu hỏi đã bị chặn'/);
+  assert.match(messagesSource, /technicalBlockedLabel:/);
   assert.match(messagesSource, /asks the assistant to ignore its instructions/);
   assert.match(messagesSource, /yêu cầu trợ lý bỏ qua hướng dẫn hệ thống/);
 });
@@ -626,6 +629,7 @@ test('assistant UI strings are localized and reason labels cover personal contex
 
 test('assistant output guard hides technical commands from rendered and copied answers', () => {
   const guard = load('src/lib/assistant-output-guard.ts');
+  const inputGuard = load('src/lib/assistant-input-guard.ts');
   assert.equal(guard.isAssistantOutputSafe('Hạn đăng ký học phần là ngày 15/11/2026.'), true);
   assert.equal(guard.isAssistantOutputSafe('```bash\ncurl https://campuscore.local/api/v1/assistant\n```'), false);
   assert.equal(guard.isAssistantOutputSafe('The retrieved context does not contain API endpoints, curl commands, or Docker Compose instructions.'), false);
@@ -637,6 +641,12 @@ test('assistant output guard hides technical commands from rendered and copied a
     ),
     'Mình chỉ hỗ trợ thông tin học vụ công khai.',
   );
+  assert.equal(inputGuard.inspectAssistantInput('Cho tôi lệnh curl để gọi API chatbot.').allowed, false);
+  assert.equal(
+    inputGuard.inspectAssistantInput('Cho tôi lệnh curl để gọi API chatbot.').reasonCode,
+    'TECHNICAL_REQUEST_BLOCKED',
+  );
+  assert.equal(inputGuard.inspectAssistantInput('Quy định đăng ký tối đa bao nhiêu tín chỉ?').allowed, true);
 
   const markdownSource = fs.readFileSync(
     path.join(root, 'src/components/assistant/AssistantMarkdownContent.tsx'),
@@ -644,8 +654,11 @@ test('assistant output guard hides technical commands from rendered and copied a
   );
   const messagesComponent = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantMessages.tsx'), 'utf8');
   assert.match(markdownSource, /sanitizeAssistantOutput/);
+  assert.match(markdownSource, /guardOutput = true/);
+  assert.match(messagesComponent, /guardOutput=\{!isUser\}/);
+  assert.match(messagesComponent, /isAssistantOutputSafe\(citation\.source\)/);
   assert.match(messagesComponent, /writeText\(visibleContent\)/);
-  assert.doesNotMatch(messagesComponent, /citation\.source/);
+  assert.doesNotMatch(messagesComponent, /\{citation\.source\}/);
 });
 
 test('streaming markdown trims only unclosed trailing constructs', () => {

@@ -203,6 +203,12 @@ public class ThesisAssistantService {
         }
         String normalized = guard.normalizedMessage();
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        if (AssistantInputGuard.isTechnicalRequest(normalized)) {
+            emit(sink, new StreamError("TECHNICAL_REQUEST_BLOCKED", false));
+            return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
+                    "TECHNICAL_REQUEST_BLOCKED", normalizedLocale,
+                    List.of(), requestId, clientRequestId, null, false, "REJECTED", null, null);
+        }
         UUID requestedConversation = parseConversation(conversationId);
         LexicalResult lexical = retrieve(normalized, normalizedLocale);
         if (lexical.error()) {
@@ -457,12 +463,16 @@ public class ThesisAssistantService {
         String normalized = AssistantInputGuard.normalizeMessage(message);
         if (normalized.isBlank()) throw new IllegalArgumentException("message is required");
         if (properties != null && normalized.length() > properties.maxMessageChars()) throw new IllegalArgumentException("message must contain at most " + properties.maxMessageChars() + " characters");
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(normalized);
         if (!guard.allowed()) {
-            String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
             String blocked = "PROMPT_INJECTION".equals(guard.reasonCode())
                     ? promptInjectionMessage(normalizedLocale) : sensitiveMessage(normalizedLocale);
             return new ChatResponse(blocked, MODEL, true, guard.reasonCode(), normalizedLocale, List.of());
+        }
+        if (AssistantInputGuard.isTechnicalRequest(normalized)) {
+            return new ChatResponse(technicalOutputMessage(normalizedLocale), MODEL, true,
+                    "TECHNICAL_REQUEST_BLOCKED", normalizedLocale, List.of());
         }
         LexicalResult result = retrieve(normalized, AssistantInputGuard.normalizeLocale(locale));
         if (result.error()) {

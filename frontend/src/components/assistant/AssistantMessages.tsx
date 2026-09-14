@@ -55,6 +55,9 @@ export function reasonLabel(
   message: ChatMessage,
   messages: ReturnType<typeof useI18n>['messages'],
 ) {
+  if (message.reasonCode === 'TECHNICAL_REQUEST_BLOCKED') {
+    return messages.assistant.technicalBlockedLabel;
+  }
   return message.reasonCode === 'QUOTA_EXCEEDED'
     ? messages.assistant.quotaExceeded
     : message.reasonCode === 'CANCELLED'
@@ -164,7 +167,8 @@ export function AssistantMessages({
           : (message.citations ?? []).filter(
               (citation) =>
                 isAssistantOutputSafe(citation.title) &&
-                isAssistantOutputSafe(citation.excerpt),
+                isAssistantOutputSafe(citation.excerpt) &&
+                isAssistantOutputSafe(citation.source),
             );
 
         return (
@@ -230,6 +234,7 @@ export function AssistantMessages({
                     <AssistantMarkdownContent
                       content={visibleContent}
                       streaming={Boolean(message.pending)}
+                      guardOutput={!isUser}
                     />
                   )}
 
