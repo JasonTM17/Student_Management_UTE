@@ -1,4 +1,4 @@
-import api, { API_BASE_URL, refreshSessionSingleFlight } from '@/lib/api';
+import api, { API_BASE_URL, createRequestId, refreshSessionSingleFlight } from '@/lib/api';
 import {
   createAssistantSseParser,
   parseAssistantStreamEvent,
@@ -216,6 +216,7 @@ export interface AssistantReply {
     | 'KNOWLEDGE_UNAVAILABLE'
     | 'PROVIDER_DISABLED'
     | 'PROVIDER_UNAVAILABLE'
+    | 'PROVIDER_TRUNCATED'
     | 'HISTORY_UNAVAILABLE'
     | 'QUOTA_EXCEEDED'
     | 'CANCELLED'
@@ -250,6 +251,11 @@ export interface AssistantMessage {
   citations?: AssistantCitation[];
   feedback?: 'UP' | 'DOWN' | null;
   createdAt: string;
+}
+
+export interface AssistantMessagePage {
+  items: AssistantMessage[];
+  nextCursor?: string;
 }
 
 export type AssistantKnowledgeState =
@@ -333,9 +339,7 @@ export type AssistantStreamEvent =
   | { type: 'error'; code?: string; retryable?: boolean };
 
 export function createAssistantRequestId(): string {
-  if (typeof globalThis.crypto?.randomUUID === 'function')
-    return globalThis.crypto.randomUUID();
-  return `${Date.now()}-${Math.random().toString(36).slice(2)}-${Math.random().toString(36).slice(2)}`;
+  return createRequestId();
 }
 
 /** Parse one or more SSE frames. Kept pure so the stream contract can be tested without a browser. */
@@ -813,12 +817,15 @@ export const thesisApi = {
   getConversationMessages: async (
     conversationId: string,
     params?: { limit?: number; cursor?: string },
-  ): Promise<AssistantMessage[]> => {
+  ): Promise<AssistantMessagePage> => {
     const response = await api.get<AssistantMessage[]>(
       `/assistant/conversations/${encodeURIComponent(conversationId)}/messages`,
       { params },
     );
-    return response.data;
+    const rawCursor = response.headers?.['x-next-cursor'];
+    const nextCursor =
+      typeof rawCursor === 'string' && rawCursor ? rawCursor : undefined;
+    return { items: response.data, nextCursor };
   },
 
   createConversation: async (

@@ -23,6 +23,7 @@ import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -79,6 +80,28 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(answer.contains("Thứ Hai 07:00-09:30 — SE401 - Lập trình Java nâng cao (phòng A 101)"), answer);
         assertTrue(answer.contains("Thứ Hai 09:45-11:45 — SE403 - Cấu trúc dữ liệu và giải thuật (phòng A 103)"), answer);
         assertFalse(answer.contains("SE201"), "older-term enrollments must not leak into the current timetable");
+    }
+
+    @Test
+    void streamsTheAlreadyComputedAnswerWithoutReadingPersonalRecordsAgain() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101"))))));
+
+        ChatRequest request = chatRequest("vi", "Lịch học của tôi tuần này?");
+        ChatResponse response = advisor.answer(request, jwtStudent());
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+
+        advisor.stream(response, request, events::add);
+
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamReplace replace
+                && replace.text().equals(response.answer())
+                && "PERSONAL_CONTEXT".equals(replace.reasonCode())));
+        assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDone done
+                && "PERSONAL_CONTEXT".equals(done.reasonCode())
+                && !done.degraded()));
+        org.mockito.Mockito.verify(enrollmentService).findStudentEnrollments("student-profile", null);
     }
 
     @Test

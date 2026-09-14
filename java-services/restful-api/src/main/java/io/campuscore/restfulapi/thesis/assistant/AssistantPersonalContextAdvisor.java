@@ -91,19 +91,30 @@ public class AssistantPersonalContextAdvisor {
 
     /** Emits the personal answer over the SSE contract as meta → replace → done. */
     public void stream(ChatRequest request, Jwt actor, Consumer<ThesisAssistantService.StreamEvent> sink) {
+        stream(answer(request, actor), request, sink);
+    }
+
+    /**
+     * Streams an already-computed answer. Keeping answer and stream on the
+     * same response prevents the controller from reading personal records
+     * twice and makes JSON/SSE reason metadata identical.
+     */
+    public void stream(ChatResponse response, ChatRequest request,
+            Consumer<ThesisAssistantService.StreamEvent> sink) {
         String locale = normalizedLocale(request);
-        String message = request != null ? request.message() : null;
-        String answer = composeAnswer(actor, locale, message);
-        if (answer == null) {
-            answer = fallbackMessage(locale);
-        }
+        String answer = response == null ? fallbackMessage(locale) : response.answer();
+        String reasonCode = response == null || !StringUtils.hasText(response.reasonCode())
+                ? REASON_CODE : response.reasonCode();
+        boolean degraded = response != null && response.degraded();
         if (!AssistantOutputGuard.isSafe(answer)) {
             answer = ThesisAssistantService.technicalOutputMessage(locale);
+            reasonCode = "TECHNICAL_REQUEST_BLOCKED";
+            degraded = true;
         }
         sink.accept(new ThesisAssistantService.StreamMeta(
                 UUID.randomUUID(), request.clientRequestId(), null, null, MODEL, locale));
-        sink.accept(new ThesisAssistantService.StreamReplace(answer, List.of(), REASON_CODE));
-        sink.accept(new ThesisAssistantService.StreamDone(null, "COMPLETED", false, "COMPLETED"));
+        sink.accept(new ThesisAssistantService.StreamReplace(answer, List.of(), reasonCode));
+        sink.accept(new ThesisAssistantService.StreamDone(null, reasonCode, degraded, "COMPLETED"));
     }
 
     private String composeAnswer(Jwt actor, String locale, String message) {

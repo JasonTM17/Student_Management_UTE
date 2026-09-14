@@ -38,6 +38,7 @@ export type AssistantReplyPatch = {
 
 export type AssistantAction =
   | { type: 'reset'; conversationId?: string; messages?: ChatMessage[] }
+  | { type: 'prepend'; messages: ChatMessage[] }
   | { type: 'user'; message: ChatMessage }
   | { type: 'assistant-start'; message: ChatMessage }
   | { type: 'retry-start'; prompt: string }
@@ -81,6 +82,11 @@ export function assistantReducer(
       return {
         messages: action.messages ?? [],
         conversationId: action.conversationId,
+      };
+    case 'prepend':
+      return {
+        ...state,
+        messages: [...action.messages, ...state.messages],
       };
     case 'user':
       return {

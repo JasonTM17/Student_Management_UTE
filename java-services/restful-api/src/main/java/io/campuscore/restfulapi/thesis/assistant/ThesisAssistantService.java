@@ -43,17 +43,70 @@ public class ThesisAssistantService {
      * digit→letter direction requires a complete following word.
      */
     private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_WORD = java.util.regex.Pattern.compile(
-            "(?<![\\p{L}\\p{N}_])(từ|đến|tới|đa|thiểu|khoảng|hơn|dưới|trên|gồm|bằng|tổng|cộng|còn|điểm|mức|đạt)(?=\\p{N})",
+            "(?<![\\p{L}\\p{N}_])(từ|đến|tới|đa|thiểu|khoảng|hơn|dưới|trên|gồm|bằng|tổng|cộng|còn|điểm|mức|đạt|hoặc|hoac)(?=\\p{N})",
             java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
     private static final java.util.regex.Pattern NUMBER_GLUE_BEFORE_WORD = java.util.regex.Pattern.compile(
             "(?<=\\p{N})(thành|người|tín|chỉ|nhóm|đề|ngày|giờ|phút|tuần|năm|tháng|buổi|ca|giảng|viên|sinh|phân|điểm|tiết|môn|lớp)(?![\\p{L}])",
             java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern HEADING_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)(\\d+\\.\\s+(?:Truy cập và chọn học phần|Đăng ký lớp|Xử lý các thông báo từ hệ thống|"
+                    + "Lưu ý về thời gian đăng ký|Kiểm tra điều kiện học phần|Access and select courses|"
+                    + "Register for a section|Handle system messages|Registration timing|Check course requirements|"
+                    + "Lưu ý về học phần điều kiện|Course requirements))\\s+(?=\\p{Lu})",
+            java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern LABEL_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)(Lưu ý về học phần điều kiện|Course requirements)\\s+(?=\\p{Lu})",
+            java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern COURSE_CODE = java.util.regex.Pattern.compile(
+            "(?i)(?<![\\p{L}\\p{N}_])[A-Z]{2,}[0-9]{2,}(?![\\p{L}\\p{N}_])");
+    /**
+     * Retrieval is deliberately scoped before the database query.  A generic
+     * lexical overlap (for example "thời" or "hôm nay") is not evidence that
+     * a public academic document answers the question.  Keep this vocabulary
+     * broad enough for the campus services actually represented in the
+     * corpus, while leaving greetings and unrelated small talk to the FE
+     * resolver/no-match path.
+     */
+    private static final java.util.regex.Pattern PUBLIC_SCOPE_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?<![\\p{L}\\p{N}_])(?:academic|campus|course|courses|register|registered|registration|schedule|class|classes|grade|grades|gpa|transcript|credit|credits|semester|term|tuition|fee|fees|announcement|announcements|notice|notices|thesis|capstone|topic|topics|defen[cs]e|supervisor|supervision|lecturer|faculty|department|student|portal|curriculum|prerequisite|corequisite|exam|examination|scholarship|graduation|internship|library|dormitory|wifi|email|account|password|research|appeal|regrade|withdrawal|withdraw|retake|conduct|training|attendance|classroom|room|hoc|dang\\s+ky|dang\\s+nhap|lich|diem|bang\\s+diem|tin\\s+chi|hoc\\s+ky|hoc\\s+phi|thong\\s+bao|luan\\s+van|do\\s+an|de\\s+tai|bao\\s+ve|giang\\s+vien|khoa|bo\\s+mon|sinh\\s+vien|cong|chuong\\s+trinh|tien\\s+quyet|song\\s+hanh|thi|hoc\\s+bong|tot\\s+nghiep|thuc\\s+tap|thu\\s+vien|ky\\s+tuc\\s+xa|tai\\s+khoan|mat\\s+khau|nghien\\s+cuu|phuc\\s+khao|rut\\s+hoc\\s+phan|hoc\\s+lai|ren\\s+luyen|diem\\s+danh|phong)(?![\\p{L}\\p{N}_])");
 
     static String normalizeNumberSpacing(String text) {
         if (text == null || text.isBlank()) return text;
         String out = NUMBER_GLUE_AFTER_WORD.matcher(text).replaceAll("$1 ");
         out = NUMBER_GLUE_BEFORE_WORD.matcher(out).replaceAll(" $1");
         return out;
+    }
+
+    /**
+     * Keeps user-facing assistant copy free of internal enum names that are
+     * useful to the API but confusing in a student-facing answer.
+     */
+    static String normalizeAssistantCopy(String text, String locale) {
+        if (text == null || text.isBlank()) return text;
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        String out = normalizeNumberSpacing(text);
+        out = HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = LABEL_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        if ("en".equals(normalizedLocale)) {
+            return out
+                    .replaceAll("(?i)\\bthe\\s+ADD_DROP_OPEN\\b", "the open add/drop period")
+                    .replaceAll("(?i)\\bADD_DROP_OPEN\\b", "the open add/drop period")
+                    .replaceAll("(?i)\\bthe\\s+REGISTRATION_OPEN\\b", "the open registration period")
+                    .replaceAll("(?i)\\bREGISTRATION_OPEN\\b", "the open registration period")
+                    .replaceAll("(?i)\\bthe\\s+ADD_DROP\\b", "the add/drop period")
+                    .replaceAll("(?i)\\bADD_DROP\\b", "add/drop period")
+                    .replaceAll("(?i)\\bthe\\s+REGISTRATION\\b", "the registration period")
+                    .replaceAll("(?i)\\bREGISTRATION\\b", "registration period");
+        }
+        return out
+                .replaceAll("(?i)đợt\\s+ADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
+                .replaceAll("(?i)\\bADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
+                .replaceAll("(?i)đợt\\s+REGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
+                .replaceAll("(?i)\\bREGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
+                .replaceAll("(?i)đợt\\s+ADD_DROP\\b", "đợt bổ sung/rút học phần")
+                .replaceAll("(?i)\\bADD_DROP\\b", "đợt bổ sung/rút học phần")
+                .replaceAll("(?i)đợt\\s+REGISTRATION\\b", "đợt đăng ký")
+                .replaceAll("(?i)\\bREGISTRATION\\b", "đợt đăng ký");
     }
 
     private final ThesisAssistantKnowledgeRepository knowledge;
@@ -195,8 +248,7 @@ public class ThesisAssistantService {
         UUID requestId = UUID.randomUUID();
         if (!guard.allowed()) {
             String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
-            String blocked = "PROMPT_INJECTION".equals(guard.reasonCode())
-                    ? promptInjectionMessage(normalizedLocale) : sensitiveMessage(normalizedLocale);
+            String blocked = guardMessage(guard.reasonCode(), normalizedLocale);
             emit(sink, new StreamError(guard.reasonCode(), false));
             return new ChatResponse(blocked, MODEL, true, guard.reasonCode(), normalizedLocale,
                     List.of(), requestId, clientRequestId, null, false, "REJECTED", null, null);
@@ -216,6 +268,14 @@ public class ThesisAssistantService {
             return new ChatResponse(lexical.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", normalizedLocale,
                     List.of(), requestId, clientRequestId, null, false, "FAILED_PRE_DISPATCH", null, null);
         }
+        // The lexical answer is taken from the top-ranked document. Keep the
+        // fallback provenance equally precise instead of displaying every
+        // retrieved candidate as if it contributed to the visible answer.
+        List<Citation> fallbackCitations = lexical.citations().stream().limit(1).toList();
+        List<String> fallbackSourceIds = fallbackCitations.stream()
+                .map(Citation::sourceId)
+                .filter(value -> value != null && !value.isBlank())
+                .toList();
 
         String hash = AssistantInputGuard.canonicalHash(normalized, normalizedLocale, requestedConversation);
         String leaseOwner = "assistant-" + UUID.randomUUID();
@@ -299,19 +359,32 @@ public class ThesisAssistantService {
                         // committed. Do not trust a collector's separate answer
                         // field if it diverges from streamed segments.
                         if (emittedSegments.isEmpty()) throw new InvalidSegmentException();
-                        answer = emittedSegments.stream().map(ProviderSegment::text).collect(Collectors.joining()).trim();
-                        if (answer.isBlank()) throw new InvalidSegmentException();
-                        // Deterministic spacing repair at the provider boundary.
-                        // The streamed deltas may carry glued numbers; emit one
-                        // replace frame so the rendered answer matches the
-                        // committed one, then commit the repaired text.
-                        String repaired = normalizeNumberSpacing(answer);
-                        if (!repaired.equals(answer)) {
-                            answer = repaired;
-                            emit(sink, new StreamReplace(answer, lexical.sourceIds(), "ANSWERED"));
+                        String providerText = emittedSegments.stream().map(ProviderSegment::text)
+                                .collect(Collectors.joining()).trim();
+                        if (providerText.isBlank()) throw new InvalidSegmentException();
+                        if ("length".equalsIgnoreCase(result.finishReason())) {
+                            // A length stop is a valid upstream response, but it
+                            // is not a complete answer. Replace the partial
+                            // stream with the deterministic grounded fallback so
+                            // the UI never presents truncated prose as final.
+                            reason = "PROVIDER_TRUNCATED";
+                            degraded = true;
+                            answer = lexical.answer();
+                            emit(sink, new StreamReplace(answer, fallbackSourceIds, reason));
+                        } else {
+                            answer = providerText;
+                            // Deterministic spacing repair at the provider
+                            // boundary. The streamed deltas may carry glued
+                            // numbers; emit one replace frame so the rendered
+                            // answer matches the committed one.
+                            String repaired = normalizeAssistantCopy(answer, normalizedLocale);
+                            if (!repaired.equals(answer)) {
+                                answer = repaired;
+                                emit(sink, new StreamReplace(answer, lexical.sourceIds(), "ANSWERED"));
+                            }
+                            reason = "ANSWERED";
+                            degraded = false;
                         }
-                        reason = "ANSWERED";
-                        degraded = false;
                     } catch (CancellationException | DeepSeekClient.ProviderCancelledException cancelled) {
                         throw problem(409, "TURN_CANCELLED", "Turn was cancelled");
                     } catch (DeepSeekClient.ProviderUnavailableException | InvalidSegmentException
@@ -320,7 +393,7 @@ public class ThesisAssistantService {
                                 ? "PROVIDER_UNSAFE_OUTPUT" : "PROVIDER_UNAVAILABLE";
                         degraded = true;
                         answer = lexical.answer();
-                        emit(sink, new StreamReplace(answer, lexical.sourceIds(), reason));
+                        emit(sink, new StreamReplace(answer, fallbackSourceIds, reason));
                     }
                 } else if ("QUOTA_EXCEEDED".equals(dispatch.reasonCode())) {
                     throw problem(429, "QUOTA_EXCEEDED", "The daily assistant quota has been reached");
@@ -336,14 +409,16 @@ public class ThesisAssistantService {
             // terminal degraded reason in the committed turn.
             if (!providerAttempt && ("PROVIDER_DISABLED".equals(reason) || "RAG_GROUNDED".equals(reason)
                     || "NO_MATCH".equals(reason))) {
-                emit(sink, new StreamDelta(0, answer, lexical.sourceIds()));
+                emit(sink, new StreamDelta(0, answer, fallbackSourceIds));
             }
+            List<Citation> terminalCitations = "ANSWERED".equals(reason)
+                    ? lexical.citations() : fallbackCitations;
             ThesisAssistantTurnRepository.TerminalResult terminal = cancellations == null
                     ? turns.complete(reservation.turnId(), ownerId, reservation.leaseGeneration(), normalized,
-                            reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason, lexical.citations())
+                            reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason, terminalCitations)
                     : turns.complete(reservation.turnId(), ownerId, reservation.leaseGeneration(), normalized,
                             reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason,
-                            lexical.citations(), this::fenceExpired);
+                            terminalCitations, this::fenceExpired);
             for (Citation citation : terminal.citations()) emit(sink, new StreamCitation(citation));
             emit(sink, new StreamDone(terminal.messageId(), reason, degraded, terminal.terminalStatus()));
             return new ChatResponse(terminal.answer(), terminal.model(), terminal.degraded(), terminal.reasonCode(), normalizedLocale,
@@ -381,6 +456,7 @@ public class ThesisAssistantService {
         ChatResponse lexical = lexicalAnswer(message, locale);
         if (legacyHistory == null || ownerId == null || ownerId.isBlank() || lexical.degraded()) return lexical;
         String requestedLocale = AssistantInputGuard.normalizeLocale(locale);
+        List<Citation> fallbackCitations = primaryCitations(lexical.citations());
         try {
             UUID conversation = legacyHistory.ensureConversation(ownerId, conversationId, requestedLocale,
                     properties == null ? 90 : properties.retentionDays());
@@ -389,31 +465,34 @@ public class ThesisAssistantService {
             if (!lexical.citations().isEmpty() && provider != null && deepSeek != null && deepSeek.usable()
                     && legacyHistory.consumeQuota(ownerId, properties.userDailyQuota(), properties.globalDailyQuota())) {
                 try {
-                    String generated = provider.complete(message.trim(), lexical.citations().stream()
+                    String generated = normalizeAssistantCopy(provider.complete(message.trim(), lexical.citations().stream()
                             .map(citation -> citation.title() + "\n" + citation.excerpt())
-                            .collect(Collectors.joining("\n\n")), requestedLocale);
+                            .collect(Collectors.joining("\n\n")), requestedLocale), requestedLocale);
                     if (AssistantOutputGuard.isSafe(generated)) {
                         response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale, lexical.citations());
                     } else {
                         response = new ChatResponse(technicalOutputMessage(requestedLocale), MODEL, true,
-                                "PROVIDER_UNSAFE_OUTPUT", requestedLocale, lexical.citations());
+                                "PROVIDER_UNSAFE_OUTPUT", requestedLocale, fallbackCitations);
                     }
                 } catch (DeepSeekClient.ProviderUnavailableException exception) {
-                    response = new ChatResponse(lexical.answer(), MODEL, true, "PROVIDER_UNAVAILABLE", requestedLocale, lexical.citations());
+                    response = new ChatResponse(lexical.answer(), MODEL, true, "PROVIDER_UNAVAILABLE", requestedLocale, fallbackCitations);
                 }
             } else if (!lexical.citations().isEmpty()) {
                 response = new ChatResponse(lexical.answer(), MODEL, true,
-                        deepSeek == null || !deepSeek.usable() ? "PROVIDER_DISABLED" : "QUOTA_EXCEEDED", requestedLocale, lexical.citations());
+                        deepSeek == null || !deepSeek.usable() ? "PROVIDER_DISABLED" : "QUOTA_EXCEEDED", requestedLocale, fallbackCitations);
             }
             UUID messageId = legacyHistory.appendMessage(conversation, "ASSISTANT", response.answer(), response.model(), response.degraded(), response.reasonCode());
             legacyHistory.appendCitations(messageId, response.citations());
             return new ChatResponse(response.answer(), response.model(), response.degraded(), response.reasonCode(), response.locale(), response.citations(), conversation.toString(), messageId.toString());
         } catch (DataAccessException exception) {
-            return new ChatResponse(lexical.answer(), MODEL, true, "HISTORY_UNAVAILABLE", requestedLocale, lexical.citations());
+            return new ChatResponse(lexical.answer(), MODEL, true, "HISTORY_UNAVAILABLE", requestedLocale, fallbackCitations);
         }
     }
 
     private LexicalResult retrieve(String message, String locale) {
+        if (!hasPublicScopeSignal(message)) {
+            return noMatchResult(locale);
+        }
         List<String> terms = tokenize(message);
         List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
@@ -439,7 +518,7 @@ public class ThesisAssistantService {
         }
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
-        String answer = normalizeNumberSpacing(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content());
+        String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content(), locale);
         String context = documents.stream()
                 .map(d -> "### " + safe(d.title()) + "\n" + safe(d.content()))
                 .collect(Collectors.joining("\n\n"));
@@ -459,6 +538,21 @@ public class ThesisAssistantService {
         return new LexicalResult(answer, documents, citations, context, false, false, sourceIds, sha256(snapshotMaterial));
     }
 
+    private static LexicalResult noMatchResult(String locale) {
+        String answer = noMatchMessage(locale);
+        return new LexicalResult(answer, List.of(), List.of(), "", false, false, List.of(), sha256(answer));
+    }
+
+    static boolean hasPublicScopeSignal(String message) {
+        if (message == null || message.isBlank()) return false;
+        String folded = Normalizer.normalize(message, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D')
+                .toLowerCase(Locale.ROOT);
+        return PUBLIC_SCOPE_SIGNAL.matcher(folded).find() || COURSE_CODE.matcher(message).find();
+    }
+
     private ChatResponse lexicalAnswer(String message, String locale) {
         String normalized = AssistantInputGuard.normalizeMessage(message);
         if (normalized.isBlank()) throw new IllegalArgumentException("message is required");
@@ -466,8 +560,7 @@ public class ThesisAssistantService {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(normalized);
         if (!guard.allowed()) {
-            String blocked = "PROMPT_INJECTION".equals(guard.reasonCode())
-                    ? promptInjectionMessage(normalizedLocale) : sensitiveMessage(normalizedLocale);
+            String blocked = guardMessage(guard.reasonCode(), normalizedLocale);
             return new ChatResponse(blocked, MODEL, true, guard.reasonCode(), normalizedLocale, List.of());
         }
         if (AssistantInputGuard.isTechnicalRequest(normalized)) {
@@ -478,7 +571,7 @@ public class ThesisAssistantService {
         if (result.error()) {
             return new ChatResponse(result.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", AssistantInputGuard.normalizeLocale(locale), List.of());
         }
-        return new ChatResponse(result.answer(), MODEL, false, result.documents().isEmpty() ? "NO_MATCH" : "ANSWERED", AssistantInputGuard.normalizeLocale(locale), result.citations());
+        return new ChatResponse(result.answer(), MODEL, false, result.documents().isEmpty() ? "NO_MATCH" : "ANSWERED", AssistantInputGuard.normalizeLocale(locale), primaryCitations(result.citations()));
     }
 
     private static Citation citation(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
@@ -557,10 +650,18 @@ public class ThesisAssistantService {
         return java.util.Arrays.stream(message.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().limit(16).toList();
     }
-    private static String noMatchMessage(String locale) { return "vi".equals(locale) ? "Chưa tìm thấy hướng dẫn phù hợp trong kho kiến thức CampusCore công khai." : "No matching public CampusCore guidance was found."; }
+    private static List<Citation> primaryCitations(List<Citation> citations) {
+        return citations == null || citations.isEmpty() ? List.of() : List.of(citations.get(0));
+    }
+    private static String noMatchMessage(String locale) { return "vi".equals(locale) ? "Mình chưa tìm thấy hướng dẫn phù hợp trong kho kiến thức công khai. Bạn thử nêu rõ học phần, học kỳ hoặc mục học vụ cần hỏi nhé." : "I could not find matching public guidance. Try naming the course, semester, or campus service you need."; }
     private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
+    static String guardMessage(String reasonCode, String locale) {
+        if ("PROMPT_INJECTION".equals(reasonCode)) return promptInjectionMessage(locale);
+        if ("TECHNICAL_REQUEST_BLOCKED".equals(reasonCode)) return technicalOutputMessage(locale);
+        return sensitiveMessage(locale);
+    }
     static String technicalOutputMessage(String locale) {
         return "vi".equals(locale)
                 ? "Mình chỉ hỗ trợ thông tin học vụ công khai và không thể cung cấp chi tiết kỹ thuật nội bộ. Bạn hãy hỏi về đăng ký học phần, thời khóa biểu, điểm, thông báo hoặc khóa luận nhé."

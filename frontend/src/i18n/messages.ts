@@ -1335,8 +1335,10 @@ export const en = {
     ],
     unavailable: 'The assistant is not available right now. Your academic records are unchanged.',
     answered: 'Answer based on reviewed guidance',
+    answerReady: 'A new assistant answer is ready.',
     noMatch: 'No matching guidance',
     degraded: 'Reviewed guidance temporarily unavailable',
+    incomplete: 'The provider response was incomplete; reviewed guidance is shown instead.',
     sources: 'Sources',
     domains: {
       THESIS: 'Thesis guidance',
@@ -1356,6 +1358,7 @@ export const en = {
     historyUnavailable: 'Conversation history is temporarily unavailable.',
     historyEmpty: 'No saved conversations yet.',
     loadMoreHistory: 'Load more conversations',
+    loadMoreMessages: 'Load older messages',
     untitledConversation: 'Campus conversation',
     model: 'Source note',
     stop: 'Stop generating',
@@ -1365,6 +1368,7 @@ export const en = {
     blocked:
       'Your question was blocked because it asks the assistant to ignore its instructions. Ask about public campus topics instead.',
     cancelled: 'Generation stopped. You can retry when you are ready.',
+    turnInProgress: 'The previous request is still being completed. Retry to check its result.',
     feedbackUp: 'Mark answer helpful',
     feedbackDown: 'Mark answer not helpful',
     copyMessage: 'Copy answer',
@@ -2825,8 +2829,10 @@ export const vi: I18nMessages = {
     ],
     unavailable: 'Trợ lý hiện chưa sẵn sàng. Hồ sơ học vụ của bạn không bị thay đổi.',
     answered: 'Trả lời dựa trên hướng dẫn đã duyệt',
+    answerReady: 'Đã có câu trả lời mới từ trợ lý.',
     noMatch: 'Chưa có hướng dẫn phù hợp',
     degraded: 'Hướng dẫn đã duyệt tạm thời chưa sẵn sàng',
+    incomplete: 'Câu trả lời từ bộ xử lý chưa hoàn tất; mình hiển thị hướng dẫn đã duyệt thay thế.',
     sources: 'Nguồn tham khảo',
     domains: {
       THESIS: 'Hướng dẫn luận văn',
@@ -2846,6 +2852,7 @@ export const vi: I18nMessages = {
     historyUnavailable: 'Lịch sử hội thoại tạm thời chưa sẵn sàng.',
     historyEmpty: 'Chưa có hội thoại nào được lưu.',
     loadMoreHistory: 'Tải thêm hội thoại',
+    loadMoreMessages: 'Tải tin nhắn cũ hơn',
     untitledConversation: 'Hội thoại CampusCore',
     model: 'Ghi chú nguồn',
     stop: 'Dừng tạo câu trả lời',
@@ -2855,6 +2862,7 @@ export const vi: I18nMessages = {
     blocked:
       'Câu hỏi của bạn đã bị chặn vì yêu cầu trợ lý bỏ qua hướng dẫn hệ thống. Hãy hỏi về các thông tin công khai của trường.',
     cancelled: 'Đã dừng tạo câu trả lời. Bạn có thể thử lại khi sẵn sàng.',
+    turnInProgress: 'Yêu cầu trước vẫn đang được hoàn tất. Hãy thử lại để kiểm tra kết quả.',
     feedbackUp: 'Đánh dấu câu trả lời hữu ích',
     feedbackDown: 'Đánh dấu câu trả lời chưa hữu ích',
     copyMessage: 'Sao chép câu trả lời',

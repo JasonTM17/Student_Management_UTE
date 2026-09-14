@@ -36,6 +36,7 @@ export interface UseAssistantStreamOptions {
     blocked: string;
     sensitiveBlocked: string;
     technicalBlocked: string;
+    turnInProgress: string;
   };
   onReconcileHistory?: () => void;
   onNewExchange?: () => void;
@@ -43,6 +44,23 @@ export interface UseAssistantStreamOptions {
 
 interface SendMessageOptions {
   retry?: boolean;
+}
+
+function apiErrorStatus(error: unknown): number | undefined {
+  const value = error as {
+    response?: { status?: unknown };
+    status?: unknown;
+  };
+  const status = value.response?.status ?? value.status;
+  return typeof status === 'number' ? status : undefined;
+}
+
+function apiErrorCode(error: unknown): string | undefined {
+  const value = error as {
+    response?: { data?: { code?: unknown } };
+  };
+  const code = value.response?.data?.code;
+  return typeof code === 'string' ? code : undefined;
 }
 
 export function useAssistantStream({
@@ -73,6 +91,13 @@ export function useAssistantStream({
   // Abort any ongoing stream when the hook unmounts
   useEffect(() => {
     return () => {
+      const requestId = activeRequestIdRef.current;
+      if (requestId) {
+        // Give the server a bounded, authenticated cancellation signal before
+        // the browser tears down the stream so provider work does not continue
+        // silently after navigation or panel unmount.
+        void thesisApi.cancelRequest(requestId).catch(() => undefined);
+      }
       requestGenerationRef.current += 1;
       abortRef.current?.abort();
       isSendingRef.current = false;
@@ -240,6 +265,13 @@ export function useAssistantStream({
           try {
             const resolution = await resolveStudentAssistantQuery(message, locale);
             if (resolution && isCurrentRequest() && !controller.signal.aborted) {
+              const localReasonCode = resolution.reasonCode ?? (
+                resolution.citation?.source === 'academic-records' ||
+                resolution.citation?.source === 'academic-conduct' ||
+                resolution.citation?.source === 'academic-announcements'
+                  ? 'PERSONAL_CONTEXT'
+                  : 'ANSWERED'
+              );
               applyStreamEvent({
                 type: 'meta',
                 conversationId: requestedConversationId,
@@ -249,14 +281,16 @@ export function useAssistantStream({
                 type: 'delta',
                 text: resolution.answer,
               });
-              applyStreamEvent({
-                type: 'citation',
-                citation: resolution.citation,
-              });
+              if (resolution.citation) {
+                applyStreamEvent({
+                  type: 'citation',
+                  citation: resolution.citation,
+                });
+              }
               applyStreamEvent({
                 type: 'done',
                 messageId: `local-resolved-${Date.now()}`,
-                reasonCode: 'PERSONAL_CONTEXT',
+                reasonCode: localReasonCode,
                 degraded: false,
               });
               terminalReconciled = true;
@@ -324,13 +358,29 @@ export function useAssistantStream({
         // error, even when deltas were already rendered.
         // The two-argument thesisApi.chat(message, locale) compatibility contract
         // remains supported; reconciliation below supplies the conversation/key.
-        try {
-          const reply = await thesisApi.chat(
-            message,
-            locale,
-            requestedConversationId,
-            clientRequestId,
-          );
+        let reply: Awaited<ReturnType<typeof thesisApi.chat>> | undefined;
+        let fallbackError: unknown;
+        for (let attempt = 0; attempt < 4; attempt += 1) {
+          try {
+            reply = await thesisApi.chat(
+              message,
+              locale,
+              requestedConversationId,
+              clientRequestId,
+            );
+            break;
+          } catch (error) {
+            fallbackError = error;
+            if (apiErrorCode(error) !== 'TURN_IN_PROGRESS' || attempt === 3) break;
+            // The original stream may still be committing the same key. Keep
+            // the idempotency key and briefly poll for its replayable result
+            // instead of minting a second turn.
+            await new Promise((resolve) =>
+              globalThis.setTimeout(resolve, 250 * (attempt + 1)),
+            );
+          }
+        }
+        if (reply) {
           if (isCurrentRequest()) {
             dispatch({
               type: 'complete',
@@ -340,11 +390,11 @@ export function useAssistantStream({
             retryRequestIdRef.current = undefined;
             onReconcileHistory?.();
           }
-        } catch (fallbackError) {
+        } else {
           if (!isCurrentRequest()) return;
-          const status =
-            (fallbackError as { response?: { status?: number }; status?: number })
-              .response?.status ?? (fallbackError as { status?: number }).status;
+          const status = apiErrorStatus(fallbackError);
+          const code = apiErrorCode(fallbackError);
+          const turnStillProcessing = code === 'TURN_IN_PROGRESS';
           const kind =
             status === 429
               ? 'quota'
@@ -360,19 +410,24 @@ export function useAssistantStream({
             type: 'complete',
             reply: {
               content:
-                kind === 'quota'
+                turnStillProcessing
+                  ? assistantMessages.turnInProgress
+                  : kind === 'quota'
                   ? assistantMessages.quotaExceeded
                   : assistantMessages.unavailable,
               degraded: true,
-              reasonCode:
-                kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
+              reasonCode: turnStillProcessing
+                ? 'TURN_IN_PROGRESS'
+                : kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
             },
           });
-          // Quota, auth, and offline failures are terminal: the next retry
-          // must mint a fresh idempotency key, otherwise the server replays
-          // the committed failed turn and retry can never make progress.
-          retryRequestIdRef.current = undefined;
-          retryConversationIdRef.current = undefined;
+          // Quota, auth, and offline failures are terminal. An active turn is
+          // different: retain its key so the explicit Retry action replays the
+          // original result instead of creating a duplicate turn.
+          if (!turnStillProcessing) {
+            retryRequestIdRef.current = undefined;
+            retryConversationIdRef.current = undefined;
+          }
         }
       } finally {
         if (isCurrentRequest()) {
@@ -397,6 +452,7 @@ export function useAssistantStream({
       assistantMessages.quotaExceeded,
       assistantMessages.sensitiveBlocked,
       assistantMessages.technicalBlocked,
+      assistantMessages.turnInProgress,
       assistantMessages.unavailable,
       input,
       isSending,

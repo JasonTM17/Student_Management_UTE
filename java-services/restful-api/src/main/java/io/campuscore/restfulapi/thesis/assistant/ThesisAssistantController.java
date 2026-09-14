@@ -64,10 +64,17 @@ public class ThesisAssistantController {
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
-        if (AssistantInputGuard.isTechnicalRequest(request.message())) {
-            return new ChatResponse(ThesisAssistantService.technicalOutputMessage(request.locale()),
-                    "curated-lexical-rag", true, "TECHNICAL_REQUEST_BLOCKED",
-                    AssistantInputGuard.normalizeLocale(request.locale()), List.of());
+        AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
+        String locale = AssistantInputGuard.normalizeLocale(request.locale());
+        if (!guard.allowed()) {
+            return new ChatResponse(ThesisAssistantService.guardMessage(guard.reasonCode(), locale),
+                    ThesisAssistantService.MODEL, true, guard.reasonCode(), locale, List.of(),
+                    UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
+        }
+        if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
+            return new ChatResponse(ThesisAssistantService.technicalOutputMessage(locale),
+                    ThesisAssistantService.MODEL, true, "TECHNICAL_REQUEST_BLOCKED", locale, List.of(),
+                    UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
         }
         if (personalContext != null && personalContext.handles(request.message())) {
             ChatResponse personal = personalContext.answer(request, actor);
@@ -98,14 +105,21 @@ public class ThesisAssistantController {
         String owner = subject(actor);
         Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
-            if (AssistantInputGuard.isTechnicalRequest(request.message())) {
+            AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
+            if (!guard.allowed()) {
+                sendError(emitter, guard.reasonCode(), false);
+                emitter.complete();
+                return emitter;
+            }
+            if (AssistantInputGuard.isTechnicalRequest(guard.normalizedMessage())) {
                 sendError(emitter, "TECHNICAL_REQUEST_BLOCKED", false);
                 emitter.complete();
                 return emitter;
             }
-            if (personalContext != null && personalContext.handles(request.message())
-                    && personalContext.answer(request, actor) != null) {
-                personalContext.stream(request, actor, sink);
+            ChatResponse personal = personalContext != null && personalContext.handles(request.message())
+                    ? personalContext.answer(request, actor) : null;
+            if (personal != null) {
+                personalContext.stream(personal, request, sink);
             } else if (remoteRag()) {
                 ragGateway.stream(request, owner, sink);
             } else {

@@ -88,7 +88,7 @@ export function AssistantHistoryPanel({
           </Button>
         </div>
       ) : null}
-      {historyStatus !== 'loading' && !history.length ? (
+      {historyStatus === 'loaded' && !history.length ? (
         <p className="px-2 py-4 text-sm text-muted-foreground">
           {messages.assistant.historyEmpty}
         </p>
@@ -113,7 +113,7 @@ export function AssistantHistoryPanel({
               disabled={deletingConversationId === item.id}
               className="mr-1 min-h-11 min-w-11 text-muted-foreground hover:text-destructive"
               onClick={() => onDelete(item.id)}
-              aria-label={messages.assistant.deleteConversation}
+              aria-label={`${messages.assistant.deleteConversation}: ${item.title || messages.assistant.untitledConversation}`}
             >
               <Trash2 className="h-4 w-4" aria-hidden="true" />
             </Button>

@@ -78,10 +78,69 @@ class ThesisAssistantServiceTest {
     }
 
     @Test
+    void providerLengthStopFallsBackToGroundedAnswerWithExplicitReason() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        String sourceId = "44444444-4444-4444-4444-444444444444";
+        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                sourceId, "topic", "en", "Topic", "Grounded answer", "office");
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+        when(provider.model()).thenReturn("deepseek-v4-flash");
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
+                eq("Grounded answer"), eq(true), eq("PROVIDER_TRUNCATED"), anyList(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, message, "Grounded answer", "curated-lexical-rag", true,
+                        "PROVIDER_TRUNCATED", List.of(), false, "COMPLETED"));
+        doAnswer(invocation -> {
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
+            sink.accept(new ProviderSegment(0, "Partial answer", List.of(sourceId)));
+            return new CompletionResult("Partial answer", List.of(), "length");
+        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+                any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
+
+        List<StreamEvent> events = new ArrayList<>();
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90));
+
+        ChatResponse response = service.answer("topic compare multiple conditions", "en", null, "owner-length", request, events::add);
+
+        assertEquals("PROVIDER_TRUNCATED", response.reasonCode());
+        assertTrue(response.degraded());
+        assertEquals("Grounded answer", response.answer());
+        assertTrue(events.stream().anyMatch(event -> event instanceof StreamReplace replace
+                && "Grounded answer".equals(replace.text())
+                && "PROVIDER_TRUNCATED".equals(replace.reasonCode())));
+    }
+
+    @Test
     void databaseOutageReturnsExplicitDegradedResponseWithoutCitations() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt()))
                 .thenThrow(new DataAccessResourceFailureException("database unavailable"));
+
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Điều kiện đăng ký đề tài là gì?"));
 
         ChatResponse response = new ThesisAssistantService(knowledge)
                 .answer("Điều kiện đăng ký đề tài là gì?", "vi");
@@ -103,6 +162,19 @@ class ThesisAssistantServiceTest {
         assertEquals("TECHNICAL_REQUEST_BLOCKED", response.reasonCode());
         assertEquals(ThesisAssistantService.technicalOutputMessage("vi"), response.answer());
         assertTrue(response.degraded());
+        verifyNoInteractions(knowledge);
+    }
+
+    @Test
+    void unrelatedQuestionsDoNotRetrieveProviderContextOrCitations() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .answer("Thời tiết hôm nay thế nào?", "vi");
+
+        assertEquals("NO_MATCH", response.reasonCode());
+        assertTrue(response.citations().isEmpty());
+        assertTrue(response.answer().contains("chưa tìm thấy hướng dẫn phù hợp"));
         verifyNoInteractions(knowledge);
     }
 
@@ -311,6 +383,8 @@ class ThesisAssistantServiceTest {
                 ThesisAssistantService.normalizeNumberSpacing("Tối đa28 tín chỉ / học kỳ"));
         assertEquals("còn 13 tín chỉ",
                 ThesisAssistantService.normalizeNumberSpacing("còn13 tín chỉ"));
+        assertEquals("điểm D hoặc 4.0/10",
+                ThesisAssistantService.normalizeNumberSpacing("điểm D hoặc4.0/10"));
         assertEquals("đạt 8.5 điểm rèn luyện và 3 môn tích lũy",
                 ThesisAssistantService.normalizeNumberSpacing("đạt8.5 điểm rèn luyện và 3môn tích lũy"));
         assertEquals("mức 4 tín chỉ, học 3 tiết",
@@ -321,5 +395,24 @@ class ThesisAssistantServiceTest {
                         "Lớp SE101 học kỳ 2026 - 2027, phòng A101"));
         assertEquals("KLTN 2026-2027",
                 ThesisAssistantService.normalizeNumberSpacing("KLTN 2026-2027"));
+    }
+
+    @Test
+    void userFacingCopyDoesNotExposeRegistrationEnums() {
+        assertEquals("Khi đợt bổ sung/rút học phần đang mở, bạn có thể đăng ký lớp còn chỗ.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Khi ADD_DROP_OPEN, bạn có thể đăng ký lớp còn chỗ.", "vi"));
+        assertEquals("During the open add/drop period, you can register for sections with seats.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "During ADD_DROP_OPEN, you can register for sections with seats.", "en"));
+        assertEquals("When the main window ends but the add/drop period remains open, check the catalog.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "When the main window ends but the ADD_DROP remains open, check the catalog.", "en"));
+        assertEquals("Khi đợt đăng ký chính kết thúc nhưng đợt bổ sung/rút học phần vẫn mở.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Khi đợt REGISTRATION chính kết thúc nhưng đợt ADD_DROP vẫn mở.", "vi"));
+        assertEquals("3. Xử lý các thông báo từ hệ thống\n\nNếu lớp đã đóng, hãy chọn lớp khác.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "3. Xử lý các thông báo từ hệ thống Nếu lớp đã đóng, hãy chọn lớp khác.", "vi"));
     }
 }

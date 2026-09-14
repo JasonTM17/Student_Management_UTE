@@ -624,7 +624,9 @@ test('assistant UI strings are localized and reason labels cover personal contex
 
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   assert.match(hookSource, /inspectAssistantInput/);
-  assert.match(hookSource, /reasonCode: 'PERSONAL_CONTEXT'/);
+  assert.match(hookSource, /const localReasonCode = resolution\.reasonCode/);
+  assert.match(hookSource, /reasonCode: localReasonCode/);
+  assert.match(hookSource, /if \(resolution\.citation\)/);
 });
 
 test('assistant output guard hides technical commands from rendered and copied answers', () => {
@@ -765,8 +767,8 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
   assert.match(workload.answer, /ngày bảo vệ: 15\/12\/2026/);
   // Grading workload per council topic with live score status.
   assert.match(workload.answer, /Đề tài hội đồng phân công cho bạn \(2\)/);
-  assert.match(workload.answer, /⏳ Chưa nhập điểm/);
-  assert.match(workload.answer, /✓ Đã nhập điểm/);
+  assert.match(workload.answer, /Chưa nhập điểm/);
+  assert.match(workload.answer, /Đã nhập điểm/);
   assert.match(workload.answer, /Còn 1 đề tài chưa nhập điểm/);
   assert.equal(workload.citation.domain, 'THESIS');
 

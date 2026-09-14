@@ -10,12 +10,14 @@ import {
   sectionsApi,
 } from '@/lib/api';
 import { thesisApi } from '@/lib/thesis-api';
-import type { Enrollment } from '@/types/api';
+import type { Enrollment, LecturerSection, User } from '@/types/api';
 import type { AssistantCitation } from '@/lib/thesis-api';
+import { announcementPriorityLabel } from '@/lib/announcement-presentation';
 
 export interface StudentAssistantResolution {
   answer: string;
-  citation: AssistantCitation;
+  citation?: AssistantCitation;
+  reasonCode?: 'ANSWERED' | 'PERSONAL_CONTEXT';
 }
 
 // 0. GREETING & CASUAL HELLO REGEX
@@ -167,6 +169,29 @@ function formatAssistantDateTime(
     minute: '2-digit',
     timeZone: 'Asia/Ho_Chi_Minh',
   }).format(date);
+}
+
+function formatConductClassification(
+  value: string | null | undefined,
+  locale: 'vi' | 'en',
+): string {
+  const normalized = value?.trim().toLocaleUpperCase('vi-VN');
+  const labels: Record<string, [string, string]> = {
+    XUAT_SAC: ['Xuất sắc', 'Excellent'],
+    'XUẤT SẮC': ['Xuất sắc', 'Excellent'],
+    TOT: ['Tốt', 'Good'],
+    TỐT: ['Tốt', 'Good'],
+    KHA: ['Khá', 'Fair'],
+    KHÁ: ['Khá', 'Fair'],
+    TRUNG_BINH: ['Trung bình', 'Average'],
+    'TRUNG BÌNH': ['Trung bình', 'Average'],
+    YEU: ['Yếu', 'Weak'],
+    YẾU: ['Yếu', 'Weak'],
+    KEM: ['Kém', 'Poor'],
+    KÉM: ['Kém', 'Poor'],
+  };
+  const label = normalized ? labels[normalized] : undefined;
+  return label ? label[locale === 'vi' ? 0 : 1] : value || (locale === 'vi' ? 'Đang cập nhật' : 'Not available');
 }
 
 const THESIS_ROUND_STATUS_LABELS: Record<string, [string, string]> = {
@@ -407,7 +432,7 @@ function extractMeetings(enrollments: Enrollment[], locale: 'vi' | 'en'): Schedu
   });
 }
 
-function extractLecturerMeetings(sections: any[], locale: 'vi' | 'en'): ScheduleMeeting[] {
+function extractLecturerMeetings(sections: LecturerSection[], locale: 'vi' | 'en'): ScheduleMeeting[] {
   const meetings: ScheduleMeeting[] = [];
   for (const sec of sections) {
     const courseCode = sec.courseCode ?? 'MH';
@@ -418,9 +443,7 @@ function extractLecturerMeetings(sections: any[], locale: 'vi' | 'en'): Schedule
       const normalizedDay = rawDay === 0 ? 1 : rawDay;
       const room = sch.roomNumber
         ? (sch.building ? `${sch.building}-${sch.roomNumber}` : sch.roomNumber)
-        : (sch.classroom?.roomNumber
-          ? (sch.classroom.building ? `${sch.classroom.building}-${sch.classroom.roomNumber}` : sch.classroom.roomNumber)
-          : undefined);
+        : undefined;
       meetings.push({
         courseCode,
         courseName,
@@ -444,7 +467,7 @@ export async function resolveStudentAssistantQuery(
   locale: 'vi' | 'en',
 ): Promise<StudentAssistantResolution | null> {
   // Check user profile for role awareness if needed
-  let currentUser: any = null;
+  let currentUser: User | null = null;
   try {
     currentUser = await authApi.me();
   } catch {
@@ -465,7 +488,7 @@ export async function resolveStudentAssistantQuery(
 
   const displayName = currentUser?.firstName
     ? `${currentUser.lastName ? currentUser.lastName + ' ' : ''}${currentUser.firstName}`.trim()
-    : (currentUser?.fullName ?? (locale === 'vi' ? 'bạn' : 'there'));
+    : (locale === 'vi' ? 'bạn' : 'there');
 
   // 0. GREETING & CASUAL HELLO
   if (
@@ -479,131 +502,69 @@ export async function resolveStudentAssistantQuery(
   ) {
     const greetingHeader =
       locale === 'vi'
-        ? `Chào bạn **${displayName}**! 👋 Mình là **Trợ lý Học vụ Thông minh CampusCore** của **Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*).`
-        : `Hello **${displayName}**! 👋 I am the **CampusCore Academic Assistant** of **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*).`;
+        ? `Chào **${displayName}**! Mình là **Trợ lý học vụ CampusCore**.`
+        : `Hello **${displayName}**! I’m the **CampusCore academic assistant**.`;
 
     const answer =
       locale === 'vi'
         ? `${greetingHeader}\n\n` +
-          `Mình luôn sẵn sàng đồng hành và hỗ trợ bạn tra cứu mọi thông tin học vụ và quy chế đào tạo 24/7. Dưới đây là những nội dung bạn có thể hỏi mình ngay:\n\n` +
-          `1. 📅 **Thời khóa biểu & Lịch học**: Tra cứu lịch học hôm nay, ngày mai, phòng học và giảng viên phụ trách.\n` +
-          `2. 📊 **Bảng điểm & GPA**: Xem điểm học phần, GPA tích lũy, điều kiện xét học bổng khuyến khích học tập.\n` +
-          `3. ⭐ **Điểm rèn luyện (ĐRL)**: Xem chi tiết 5 tiêu chí ĐRL, hướng dẫn minh chứng và xuất phiếu rèn luyện.\n` +
-          `4. 📝 **Đăng ký học phần**: Tra cứu hạn mức 28 tín chỉ, thời hạn đăng ký và môn tiên quyết.\n` +
-          `5. 🎓 **Khóa luận tốt nghiệp**: Tiến độ đồ án, xem danh mục đề tài, phân công hội đồng bảo vệ.\n` +
-          `6. 📜 **Quy chế & Chính sách**: Chuẩn đầu ra tốt nghiệp, quy định học lại/cải thiện điểm F/C, miễn giảm học phí.\n\n` +
-          `💡 **Bạn cần mình hỗ trợ thông tin gì hôm nay?** Bạn có thể gõ câu hỏi cụ thể hoặc nhấn nhanh vào các gợi ý bên dưới nhé!`
+          `Mình hỗ trợ tra cứu thông tin học vụ công khai và dữ liệu cá nhân mà tài khoản của bạn được phép xem. Bạn có thể hỏi về:\n\n` +
+          `1. **Lịch học**: lớp học, thời gian, phòng và lịch theo ngày.\n` +
+          `2. **Điểm số**: điểm học phần, GPA và bảng điểm.\n` +
+          `3. **Đăng ký học phần**: điều kiện, thời hạn và số tín chỉ theo từng học kỳ.\n` +
+          `4. **Đồ án hoặc khóa luận**: tiến độ, đề tài và các mốc cần lưu ý.\n` +
+          `5. **Thông báo và quy định**: hướng dẫn, chính sách và biểu mẫu học vụ.\n\n` +
+          `Bạn muốn bắt đầu với nội dung nào?`
         : `${greetingHeader}\n\n` +
-          `I am always here to assist you 24/7 with academic regulations, courses, and schedules. Here is what I can help you with:\n\n` +
-          `1. 📅 **Schedule & Classes**: View class timetable, classrooms, and lecturers.\n` +
-          `2. 📊 **Grades & GPA**: Check your course grades, cumulative GPA, and scholarship eligibility.\n` +
-          `3. ⭐ **Conduct Points**: Review your 5 conduct criteria and export certificates.\n` +
-          `4. 📝 **Course Registration**: Check the 28-credit cap, enrollment deadlines, and prerequisites.\n` +
-          `5. 🎓 **Graduation Thesis**: Monitor thesis progress, explore topics, and check defense councils.\n` +
-          `6. 📜 **Academic Regulations**: Graduation requirements, retake policies, and academic rules.\n\n` +
-          `💡 **How may I assist you today?** Feel free to type your question below!`;
+          `I can help with public academic guidance and personal records that your account is allowed to view. You can ask about:\n\n` +
+          `1. **Schedules**: classes, times, rooms, and a specific day.\n` +
+          `2. **Grades**: course results, GPA, and your transcript.\n` +
+          `3. **Course registration**: eligibility, deadlines, and term credit limits.\n` +
+          `4. **Thesis or capstone work**: progress, topics, and important dates.\n` +
+          `5. **Announcements and regulations**: official guidance and forms.\n\n` +
+          `What would you like to check first?`;
 
-    return {
-      answer,
-      citation: {
-        id: 'campuscore-assistant-welcome',
-        slug: 'assistant-introduction',
-        title: locale === 'vi' ? 'Trợ lý Học vụ Thông minh CampusCore' : 'CampusCore Academic Assistant',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Trợ lý ảo hỗ trợ 24/7 tra cứu thời khóa biểu, điểm số, điểm rèn luyện, đăng ký học phần và khóa luận tại CampusUTE.'
-            : '24/7 intelligent assistant supporting schedule, grades, conduct points, registration, and thesis at CampusUTE.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    return { answer };
   }
 
   // 0.1 CAPABILITIES / WHO ARE YOU / HELP
   if (CAPABILITIES_REGEX.test(message)) {
     const answer =
       locale === 'vi'
-        ? `Mình là **Trợ lý Học vụ Thông minh CampusCore** – hệ thống trí tuệ nhân tạo học vụ chính thức của **Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*).\n\n` +
-          `🎯 **Năng lực cốt lõi của mình:**\n` +
-          `- **Tự động cá nhân hóa**: Nhận diện hồ sơ của bạn (**${displayName}**) để cung cấp chính xác lịch học, điểm số và tiến độ học tập thực tế tức thời.\n` +
-          `- **Căn cứ quy chế minh bạch**: Toàn bộ câu trả lời về học vụ đều trích xuất trực tiếp từ Quy chế Đào tạo đại học, Quy định Khóa luận tốt nghiệp và Quyết định ĐRL của Nhà trường.\n` +
-          `- **Đa vai trò**: Hỗ trợ tối ưu cho cả Sinh viên (lịch học, điểm, học bổng, đồ án) và Giảng viên (lịch giảng dạy, phân công lớp học phần, chấm điểm bảo vệ).\n\n` +
-          `Bạn có thể thử hỏi mình ngay: *"Hôm nay tôi có lịch học không?"*, *"Điểm GPA tích lũy của tôi là bao nhiêu?"*, hoặc *"Quy định đăng ký tối đa bao nhiêu tín chỉ?"* nhé!`
-        : `I am the **CampusCore Academic Assistant** – the official intelligent academic companion at **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*).\n\n` +
-          `🎯 **Key Capabilities:**\n` +
-          `- **Personalized Records**: Real-time integration with your student record (${displayName}) for schedules, grades, and degree progress.\n` +
-          `- **Official Regulations**: Grounded in university credit policies, scholarship criteria, and thesis guidelines.\n` +
-          `- **Multi-Role Support**: Assists both Students and Lecturers seamlessly.\n\n` +
-          `Try asking me: *"Do I have classes today?"* or *"What is my GPA?"*!`;
+        ? `Mình là **Trợ lý học vụ CampusCore**.\n\n` +
+          `Mình có thể:\n` +
+          `- Tra cứu lịch học, điểm số, thông báo và tiến độ học tập của bạn khi dữ liệu được cung cấp.\n` +
+          `- Giải thích các hướng dẫn học vụ công khai dựa trên nguồn đã được duyệt.\n` +
+          `- Hỗ trợ sinh viên và giảng viên theo quyền truy cập của từng tài khoản.\n\n` +
+          `Nếu chưa đủ căn cứ, mình sẽ nói rõ thay vì tự suy đoán. Bạn có thể hỏi: *"Hôm nay tôi có lịch học không?"* hoặc *"Điểm GPA của tôi là bao nhiêu?"*.`
+        : `I’m the **CampusCore academic assistant**.\n\n` +
+          `I can:\n` +
+          `- Check your schedules, grades, announcements, and academic progress when the records are available.\n` +
+          `- Explain public academic guidance from approved sources.\n` +
+          `- Support students and lecturers within each account’s access.\n\n` +
+          `When the available evidence is insufficient, I will say so instead of guessing. Try asking: *"Do I have classes today?"* or *"What is my GPA?"*.`;
 
-    return {
-      answer,
-      citation: {
-        id: 'campuscore-assistant-capabilities',
-        slug: 'assistant-capabilities',
-        title: locale === 'vi' ? 'Năng lực Trợ lý CampusCore' : 'CampusCore Capabilities',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Trợ lý học vụ thông minh hỗ trợ sinh viên và giảng viên CampusUTE với độ chính xác cao.'
-            : 'Intelligent academic assistant supporting CampusUTE students and faculty.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    return { answer };
   }
 
   // 0.2 THANK YOU / PRAISE
   if (THANK_YOU_REGEX.test(message)) {
     const answer =
       locale === 'vi'
-        ? `Dạ không có gì ạ! 😊 Rất vui được đồng hành và hỗ trợ bạn **${displayName}**.\n\n` +
-          `Nếu trong quá trình học tập tại **Trường Đại học Công nghệ Kỹ thuật TP.HCM** bạn có bất kỳ thắc mắc nào về lịch học, điểm thi, học bổng hay đồ án tốt nghiệp, đừng ngần ngại nhắn cho mình bất kỳ lúc nào nhé.\n\n` +
-          `Chúc bạn một ngày học tập và làm việc thật hiệu quả, tràn đầy năng lượng và gặt hái kết quả xuất sắc! 🚀🎓`
-        : `You're very welcome, **${displayName}**! 😊 It's always my pleasure to assist you.\n\n` +
-          `Feel free to reach out anytime you need help with your schedule, grades, courses, or graduation thesis.\n\n` +
-          `Wishing you a productive and successful day ahead! 🚀🎓`;
+        ? `Không có gì! Nếu cần, bạn có thể hỏi mình về lịch học, điểm số, đăng ký học phần hoặc đồ án tốt nghiệp.`
+        : `You’re welcome. You can ask me about schedules, grades, course registration, or thesis work whenever you need.`;
 
-    return {
-      answer,
-      citation: {
-        id: 'campuscore-assistant-thanks',
-        slug: 'assistant-appreciation',
-        title: locale === 'vi' ? 'Phản hồi Trợ lý CampusCore' : 'CampusCore Appreciation',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Trợ lý CampusCore luôn sẵn sàng phục vụ 24/7.'
-            : 'CampusCore Assistant is always ready to help 24/7.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    return { answer };
   }
 
   // 0.3 GOODBYE / FAREWELL
   if (GOODBYE_REGEX.test(message)) {
     const answer =
       locale === 'vi'
-        ? `Tạm biệt bạn **${displayName}** nhé! 👋 Chúc bạn luôn giữ vững phong độ học tập thật tốt. Hẹn gặp lại bạn bất cứ khi nào bạn cần hỗ trợ học vụ!`
-        : `Goodbye **${displayName}**! 👋 Have a wonderful day and see you next time whenever you need academic guidance!`;
+        ? `Hẹn gặp lại **${displayName}**. Chúc bạn học tập hiệu quả!`
+        : `Goodbye **${displayName}**. Have a productive day!`;
 
-    return {
-      answer,
-      citation: {
-        id: 'campuscore-assistant-goodbye',
-        slug: 'assistant-farewell',
-        title: locale === 'vi' ? 'Chào tạm biệt' : 'Farewell',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Hẹn gặp lại bạn tại Cổng thông tin học vụ CampusUTE.'
-            : 'See you again at CampusUTE Academic Portal.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    return { answer };
   }
 
   // 0.4 GENERAL UNIVERSITY / CAMPUS INFO — delegated to backend RAG
@@ -728,10 +689,13 @@ export async function resolveStudentAssistantQuery(
       if (conduct) {
         const cur = conduct.currentSemester;
         const curScore = cur?.totalScore != null ? cur.totalScore : conduct.cumulativeAverageScore;
-        const curRank = cur?.classificationVi || conduct.cumulativeClassificationVi || 'Đang cập nhật';
+        const curRank = formatConductClassification(
+          cur?.classification || conduct.cumulativeClassificationVi,
+          locale,
+        );
         const cumAvg = conduct.cumulativeAverageScore != null ? conduct.cumulativeAverageScore : curScore;
-        const cumRank = conduct.cumulativeClassificationVi || curRank;
-        const semName = cur?.semesterName || 'Học kỳ hiện tại';
+        const cumRank = formatConductClassification(conduct.cumulativeClassificationVi, locale);
+        const semName = cur?.semesterName || (locale === 'vi' ? 'Học kỳ hiện tại' : 'Current semester');
 
         const hasScore = curScore != null;
 
@@ -743,17 +707,17 @@ export async function resolveStudentAssistantQuery(
                 `• **Điểm trung bình toàn khóa (tích lũy):** **${cumAvg ?? curScore} / 100 điểm** (Xếp loại: **${cumRank}**)\n` +
                 `• **Trạng thái phê duyệt:** **${cur?.status === 'APPROVED' ? 'Đã phê duyệt chính thức' : 'Đang xử lý'}**\n` +
                 `• **Số minh chứng phong trào Đoàn - Hội:** **${cur?.activities?.length ?? 0} hoạt động**\n\n` +
-                `💡 Bạn có thể xem chi tiết 5 tiêu chí chuẩn của Bộ GD&ĐT, minh chứng phong trào và xuất phiếu rèn luyện PDF tại mục **Điểm rèn luyện** (/dashboard/conduct).`
+                `Bạn có thể xem chi tiết 5 tiêu chí chuẩn của Bộ GD&ĐT, minh chứng phong trào và xuất phiếu rèn luyện PDF tại mục **Điểm rèn luyện** (/dashboard/conduct).`
               : `Hiện tại hệ thống chưa ghi nhận điểm rèn luyện chính thức cho học kỳ này của bạn.\n\n` +
-                `💡 Bạn có thể tự đánh giá điểm rèn luyện, tải lên minh chứng hoạt động và theo dõi kết quả tại mục **Điểm rèn luyện** (/dashboard/conduct).`
+                `Bạn có thể tự đánh giá điểm rèn luyện, tải lên minh chứng hoạt động và theo dõi kết quả tại mục **Điểm rèn luyện** (/dashboard/conduct).`
             : hasScore
               ? `Your Student Conduct Points (DRL) summary:\n\n` +
                 `• **Current Semester (${semName}):** **${curScore} / 100** (Rating: **${curRank}**)\n` +
                 `• **Cumulative Average:** **${cumAvg ?? curScore} / 100** (Rating: **${cumRank}**)\n` +
                 `• **Approval Status:** **${cur?.status === 'APPROVED' ? 'Officially Approved' : 'In Progress'}**\n\n` +
-                `💡 View the 5 standard criteria breakdown and download your PDF evaluation under **Conduct Points** (/dashboard/conduct).`
+                `View the 5 standard criteria breakdown and download your PDF evaluation under **Conduct Points** (/dashboard/conduct).`
               : `No official conduct record has been published for this semester yet.\n\n` +
-                `💡 You can evaluate your conduct score and submit proof under **Conduct Points** (/dashboard/conduct).`;
+                `You can evaluate your conduct score and submit proof under **Conduct Points** (/dashboard/conduct).`;
 
         return {
           answer,
@@ -806,7 +770,7 @@ export async function resolveStudentAssistantQuery(
         const formatted = list
           .map(
             (a: AnnouncementRecord) =>
-              `• **${a.title}** (${a.priority || 'THƯỜNG'}${
+              `• **${a.title}** (${announcementPriorityLabel(a.priority, locale)}${
                 a.publishAt || a.createdAt
                   ? ` • ${new Date(a.publishAt || a.createdAt).toLocaleDateString(locale === 'vi' ? 'vi-VN' : 'en-US')}`
                   : ''
@@ -816,8 +780,8 @@ export async function resolveStudentAssistantQuery(
 
         const answer =
           locale === 'vi'
-            ? `Các thông báo học vụ mới nhất từ nhà trường:\n\n${formatted}\n\n💡 Bạn có thể đọc toàn bộ chi tiết tại mục **Thông báo** (/dashboard/announcements).`
-            : `Latest announcements from the university:\n\n${formatted}\n\n💡 Read all notices under **Announcements** (/dashboard/announcements).`;
+            ? `Các thông báo học vụ mới nhất từ nhà trường:\n\n${formatted}\n\nBạn có thể đọc toàn bộ chi tiết tại mục **Thông báo** (/dashboard/announcements).`
+            : `Latest announcements from the university:\n\n${formatted}\n\nRead all notices under **Announcements** (/dashboard/announcements).`;
 
         return {
           answer,
@@ -863,8 +827,8 @@ export async function resolveStudentAssistantQuery(
         if (topics.length > 0) {
           lines.push(
             vi
-              ? `\n📌 **Đề tài bạn hướng dẫn (${topics.length}):**`
-              : `\n📌 **Topics you supervise (${topics.length}):**`,
+              ? `\n**Đề tài bạn hướng dẫn (${topics.length}):**`
+              : `\n**Topics you supervise (${topics.length}):**`,
           );
           for (const topic of topics.slice(0, 5)) {
             const groupNote =
@@ -895,22 +859,22 @@ export async function resolveStudentAssistantQuery(
         } else {
           lines.push(
             vi
-              ? '\n📌 Bạn chưa được phân công hướng dẫn đề tài nào.'
-              : '\n📌 You are not supervising any topic yet.',
+              ? '\nBạn chưa được phân công hướng dẫn đề tài nào.'
+              : '\nYou are not supervising any topic yet.',
           );
         }
         if (pendingTopics.length > 0) {
           lines.push(
-            vi
-              ? '\n⏳ **Bạn có nhóm đang chờ xét duyệt** — vào mục **Đồ án tốt nghiệp** (/dashboard/thesis) để duyệt.'
-              : '\n⏳ **Groups are awaiting your approval** — review them under **Thesis & Capstone** (/dashboard/thesis).',
+              vi
+                ? '\n**Bạn có nhóm đang chờ xét duyệt** — vào mục **Đồ án tốt nghiệp** (/dashboard/thesis) để duyệt.'
+                : '\n**Groups are awaiting your approval** — review them under **Thesis & Capstone** (/dashboard/thesis).',
           );
         }
         if (councils.length > 0) {
           lines.push(
-            vi
-              ? `\n🏛️ **Hội đồng bảo vệ của bạn (${councils.length}):**`
-              : `\n🏛️ **Your defense councils (${councils.length}):**`,
+              vi
+                ? `\n**Hội đồng bảo vệ của bạn (${councils.length}):**`
+                : `\n**Your defense councils (${councils.length}):**`,
           );
           for (const council of councils.slice(0, 5)) {
             const roleLabels = COUNCIL_ROLE_LABELS[council.memberRole];
@@ -943,34 +907,34 @@ export async function resolveStudentAssistantQuery(
           }
           lines.push(
             vi
-              ? '\n💡 Vào **Đồ án tốt nghiệp** (/dashboard/thesis) để nhập điểm phản biện đúng hạn.'
-              : '\n💡 Enter your review scores on time under **Thesis & Capstone** (/dashboard/thesis).',
+              ? '\nVào **Đồ án tốt nghiệp** (/dashboard/thesis) để nhập điểm phản biện đúng hạn.'
+              : '\nEnter your review scores on time under **Thesis & Capstone** (/dashboard/thesis).',
           );
         }
         const gradingTasks = workload.gradingTasks ?? [];
         if (gradingTasks.length > 0) {
           lines.push(
-            vi
-              ? `\n📝 **Đề tài hội đồng phân công cho bạn (${gradingTasks.length}):**`
-              : `\n📝 **Council topics assigned to you (${gradingTasks.length}):**`,
+              vi
+                ? `\n**Đề tài hội đồng phân công cho bạn (${gradingTasks.length}):**`
+                : `\n**Council topics assigned to you (${gradingTasks.length}):**`,
           );
           for (const task of gradingTasks.slice(0, 5)) {
             const status =
               task.myScoreRows > 0
                 ? vi
-                  ? '✓ Đã nhập điểm'
-                  : '✓ Score entered'
+                  ? 'Đã nhập điểm'
+                  : 'Score entered'
                 : vi
-                  ? '⏳ Chưa nhập điểm'
-                  : '⏳ Awaiting your score';
+                  ? 'Chưa nhập điểm'
+                  : 'Awaiting your score';
             lines.push(`\n• "${task.title}" (${task.councilName}) — ${status}`);
           }
           const ungraded = gradingTasks.filter((task) => task.myScoreRows === 0);
           if (ungraded.length > 0) {
             lines.push(
               vi
-                ? `\n⏳ Còn ${ungraded.length} đề tài chưa nhập điểm — hãy hoàn thành trước hạn nộp điểm của hội đồng.`
-                : `\n⏳ ${ungraded.length} topic(s) still ungraded — finish before the council score deadline.`,
+                ? `\nCòn ${ungraded.length} đề tài chưa nhập điểm — hãy hoàn thành trước hạn nộp điểm của hội đồng.`
+                : `\n${ungraded.length} topic(s) still ungraded — finish before the council score deadline.`,
             );
           }
         }
@@ -1021,15 +985,16 @@ export async function resolveStudentAssistantQuery(
               `• **Điểm trung bình tích lũy (GPA):** **${gpa} / 4.0**\n` +
               `• **Tổng số tín chỉ đã tích lũy:** **${credits}** tín chỉ\n\n` +
               (recentGrades ? `**Các môn học gần đây:**\n${recentGrades}\n\n` : '') +
-              `💡 Bạn có thể xem bảng điểm đầy đủ từng học kỳ và in bảng điểm chính thức tại mục **Bảng điểm** (/dashboard/grades).`
+              `Bạn có thể xem bảng điểm đầy đủ từng học kỳ và in bảng điểm chính thức tại mục **Bảng điểm** (/dashboard/grades).`
             : `Here is your current academic performance summary:\n\n` +
               `• **Cumulative GPA:** **${gpa} / 4.0**\n` +
               `• **Total Credits Earned:** **${credits}** credits\n\n` +
               (recentGrades ? `**Recent Courses:**\n${recentGrades}\n\n` : '') +
-              `💡 Review your complete term-by-term transcript under **Grades & Transcript** (/dashboard/grades).`;
+              `Review your complete term-by-term transcript under **Grades & Transcript** (/dashboard/grades).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'personal-grades-transcript',
             slug: 'academic-transcript',
@@ -1193,7 +1158,7 @@ export async function resolveStudentAssistantQuery(
               (gvpbDeadlineText ? `• **Hạn nộp điểm phản biện (GVPB):** ${gvpbDeadlineText}\n` : '') +
               (councilName ? `• **Hội đồng bảo vệ:** ${councilName}\n` : '') +
               (finalScore != null ? `• **Điểm tổng kết:** **${finalScore}/10**\n` : '') +
-              `\n💡 Xem chi tiết danh sách đề tài, đăng ký nhóm và nộp báo cáo tại mục **Đồ án tốt nghiệp** (/dashboard/thesis).`
+              `\nXem chi tiết danh sách đề tài, đăng ký nhóm và nộp báo cáo tại mục **Đồ án tốt nghiệp** (/dashboard/thesis).`
             : `Here is your graduation thesis/capstone information:\n\n` +
               `• **Active Round:** **${activeRound.name}** (${activeRound.thesisType})\n` +
               `• **Round Status:** ${roundStatusText}\n` +
@@ -1206,10 +1171,11 @@ export async function resolveStudentAssistantQuery(
               (gvpbDeadlineText ? `• **Reviewer score deadline (GVPB):** ${gvpbDeadlineText}\n` : '') +
               (councilName ? `• **Defense Council:** ${councilName}\n` : '') +
               (finalScore != null ? `• **Final Score:** **${finalScore}/10**\n` : '') +
-              `\n💡 Manage your thesis proposals and groups under **Thesis & Capstone** (/dashboard/thesis).`;
+              `\nManage your thesis proposals and groups under **Thesis & Capstone** (/dashboard/thesis).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'personal-thesis-status',
             slug: 'thesis-overview',
@@ -1269,9 +1235,11 @@ export async function resolveStudentAssistantQuery(
           ? (locale === 'vi' ? 'Được phép đăng ký' : 'Eligible')
           : (locale === 'vi' ? 'Chưa trong đợt hoặc chưa đủ điều kiện' : 'Ineligible or Window Closed');
 
-        const creditLimit = eligibility.creditLimit || 28;
+        const creditLimit = eligibility.creditLimit > 0 ? eligibility.creditLimit : null;
         const creditsUsed = eligibility.creditsUsed ?? 0;
-        const creditsRemaining = eligibility.creditsRemaining ?? Math.max(0, creditLimit - creditsUsed);
+        const creditsRemaining = eligibility.creditsRemaining ?? (creditLimit == null
+          ? null
+          : Math.max(0, creditLimit - creditsUsed));
         const windowStartText = formatAssistantDateTime(eligibility.windowStart, locale);
         const windowEndText = formatAssistantDateTime(eligibility.windowEnd, locale);
         const windowTextVi =
@@ -1291,18 +1259,21 @@ export async function resolveStudentAssistantQuery(
             ? `Tình trạng đăng ký học phần của bạn:\n\n` +
               `• **Trạng thái đợt đăng ký:** **${statusText}**\n` +
               `• **Số tín chỉ bạn đã đăng ký:** **${creditsUsed}** tín chỉ\n` +
-              `• **Số tín chỉ còn lại có thể đăng ký bổ sung:** **${creditsRemaining}** tín chỉ\n` +
+              (creditLimit != null ? `• **Hạn mức học kỳ:** **${creditLimit}** tín chỉ\n` : '') +
+              (creditsRemaining != null ? `• **Số tín chỉ còn lại có thể đăng ký bổ sung:** **${creditsRemaining}** tín chỉ\n` : '') +
               (windowTextVi ? `• **Thời gian mở đợt:** ${windowTextVi}\n` : '') +
-              `\n💡 Để chọn môn, đổi lớp học phần hoặc rút môn, bạn hãy truy cập ngay mục **Đăng ký học phần** (/dashboard/register).`
+              `\nGợi ý: Để chọn môn, đổi lớp học phần hoặc rút môn, bạn hãy truy cập mục **Đăng ký học phần** (/dashboard/register).`
             : `Here is your course registration eligibility status:\n\n` +
               `• **Status:** **${statusText}**\n` +
               `• **Credits Used:** **${creditsUsed}** credits\n` +
-              `• **Credits Remaining:** **${creditsRemaining}** credits\n` +
+              (creditLimit != null ? `• **Term Credit Limit:** **${creditLimit}** credits\n` : '') +
+              (creditsRemaining != null ? `• **Credits Remaining:** **${creditsRemaining}** credits\n` : '') +
               (windowTextEn ? `• **Registration Window:** ${windowTextEn}\n` : '') +
-              `\n💡 Register or modify course sections under **Course Registration** (/dashboard/register).`;
+              `\nTip: Register or modify course sections under **Course Registration** (/dashboard/register).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'registration-eligibility-info',
             slug: 'registration-eligibility',
@@ -1328,29 +1299,38 @@ export async function resolveStudentAssistantQuery(
       const curriculum = await curriculumApi.getMyCurriculum();
       if (curriculum) {
         const currName = curriculum.curriculum?.name ?? curriculum.curriculum?.code ?? '';
-        const requiredCredits = curriculum.curriculum?.totalCredits ?? 140;
+        const requiredCredits = curriculum.curriculum?.totalCredits > 0
+          ? curriculum.curriculum.totalCredits
+          : null;
         const completedCredits = (curriculum.courses ?? [])
           .filter((c) => c.status === 'COMPLETED')
           .reduce((sum, c) => sum + (c.credits ?? 0), 0);
-        const percent = Math.min(100, Math.round((completedCredits / Math.max(requiredCredits, 1)) * 100));
+        const percent = requiredCredits == null
+          ? null
+          : Math.min(100, Math.round((completedCredits / Math.max(requiredCredits, 1)) * 100));
 
         const answer =
           locale === 'vi'
             ? `Tiến độ chương trình đào tạo của bạn:\n\n` +
               `• **Chương trình:** **${currName}**\n` +
-              `• **Tổng số tín chỉ yêu cầu:** **${requiredCredits}** tín chỉ\n` +
-              `• **Tín chỉ đã hoàn thành:** **${completedCredits}** tín chỉ (${percent}% tiến độ)\n` +
-              `• **Tín chỉ còn lại cần tích lũy:** **${Math.max(0, requiredCredits - completedCredits)}** tín chỉ\n\n` +
-              `💡 Bạn có thể xem lộ trình cây môn học tiên quyết và học phần gợi ý tại mục **Chương trình đào tạo** (/dashboard/curriculum).`
+              (requiredCredits != null ? `• **Tổng số tín chỉ yêu cầu:** **${requiredCredits}** tín chỉ\n` : '') +
+              `• **Tín chỉ đã hoàn thành:** **${completedCredits}** tín chỉ` +
+              (percent != null ? ` (${percent}% tiến độ)` : '') +
+              `\n` +
+              (requiredCredits != null ? `• **Tín chỉ còn lại cần tích lũy:** **${Math.max(0, requiredCredits - completedCredits)}** tín chỉ\n\n` : '\n') +
+              `Bạn có thể xem lộ trình học phần và tiến độ tại mục **Chương trình đào tạo** (/dashboard/enrollments).`
             : `Here is your degree curriculum progress:\n\n` +
               `• **Program:** **${currName}**\n` +
-              `• **Total Required Credits:** **${requiredCredits}** credits\n` +
-              `• **Completed Credits:** **${completedCredits}** credits (${percent}% progress)\n` +
-              `• **Remaining Credits:** **${Math.max(0, requiredCredits - completedCredits)}** credits\n\n` +
-              `💡 View your prerequisite course tree and curriculum matrix under **Curriculum** (/dashboard/curriculum).`;
+              (requiredCredits != null ? `• **Total Required Credits:** **${requiredCredits}** credits\n` : '') +
+              `• **Completed Credits:** **${completedCredits}** credits` +
+              (percent != null ? ` (${percent}% progress)` : '') +
+              `\n` +
+              (requiredCredits != null ? `• **Remaining Credits:** **${Math.max(0, requiredCredits - completedCredits)}** credits\n\n` : '\n') +
+              `View your study program and progress under **Curriculum** (/dashboard/enrollments).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'personal-curriculum-progress',
             slug: 'curriculum-progress',
@@ -1371,8 +1351,8 @@ export async function resolveStudentAssistantQuery(
 
     const answer =
       locale === 'vi'
-        ? 'Để xem khung chương trình đào tạo, danh mục môn học bắt buộc/tự chọn và tiến độ tích lũy tín chỉ của bạn, vui lòng truy cập mục **Chương trình đào tạo** (/dashboard/curriculum).'
-        : 'To view your degree requirements, prerequisite tree, and completion progress, visit **Curriculum** (/dashboard/curriculum).';
+        ? 'Để xem khung chương trình đào tạo, danh mục môn học và tiến độ tích lũy tín chỉ, bạn mở mục **Chương trình đào tạo** (/dashboard/enrollments).'
+        : 'To view your study program, course requirements, and completion progress, open **Curriculum** (/dashboard/enrollments).';
 
     return {
       answer,
@@ -1384,8 +1364,8 @@ export async function resolveStudentAssistantQuery(
         locale,
         excerpt:
           locale === 'vi'
-            ? 'Xem khung chương trình đào tạo tại /dashboard/curriculum.'
-            : 'Explore degree curriculum at /dashboard/curriculum.',
+            ? 'Xem khung chương trình đào tạo tại /dashboard/enrollments.'
+            : 'Explore your study program at /dashboard/enrollments.',
         domain: 'ACADEMIC_CATALOG',
       },
     };
@@ -1394,62 +1374,46 @@ export async function resolveStudentAssistantQuery(
   // H. Handle Student / Lecturer Profile & MSSV queries
   if (PROFILE_REGEX.test(message)) {
     if (currentUser) {
-      const fullName = `${currentUser.lastName ?? ''} ${currentUser.firstName ?? ''}`.trim() || currentUser.email;
-      const roleName = isStudent ? 'Sinh viên' : isLecturer ? 'Giảng viên' : isAdmin ? 'Quản trị viên' : 'Người dùng';
+      const fullName = `${currentUser.lastName ?? ''} ${currentUser.firstName ?? ''}`.trim()
+        || (locale === 'vi' ? 'Chưa cập nhật' : 'Not available');
+      const roleName = locale === 'vi'
+        ? isStudent ? 'Sinh viên' : isLecturer ? 'Giảng viên' : isAdmin ? 'Quản trị viên' : 'Người dùng'
+        : isStudent ? 'Student' : isLecturer ? 'Lecturer' : isAdmin ? 'Administrator' : 'User';
 
-      let mssv = currentUser.studentNumber ?? currentUser.studentCode;
-      if (!mssv) {
+      let studentNumber: string | undefined;
+      if (!studentNumber) {
         try {
           const conduct = await conductApi.getMyConduct();
-          if (conduct?.studentCode) mssv = conduct.studentCode;
+          if (conduct?.studentCode) studentNumber = conduct.studentCode;
         } catch {
           // ignore
         }
       }
-      if (!mssv && currentUser.email === 'student@campuscore.edu') {
-        mssv = '24110054';
-      }
-
-      const lecturerCode =
-        currentUser.lecturerId ||
-        currentUser.lecturerCode ||
-        (currentUser.email === 'lecturer@campuscore.edu' ? 'GV-1029' : currentUser.id);
-      const lecturerTitle =
-        currentUser.title ||
-        currentUser.academicTitle ||
-        (currentUser.email === 'lecturer@campuscore.edu'
-          ? (locale === 'vi' ? 'Phó Giáo sư, Tiến sĩ (PGS.TS)' : 'Associate Professor, Ph.D.')
-          : (locale === 'vi' ? 'Giảng viên' : 'Lecturer'));
-      const lecturerDept =
-        currentUser.department ||
-        (locale === 'vi' ? 'Kỹ thuật Phần mềm, Khoa CNTT - HCMUTE' : 'Software Engineering, Faculty of IT - HCMUTE');
+      const lecturerId = currentUser.lecturerId;
+      const notAvailable = locale === 'vi' ? 'Chưa cập nhật' : 'Not available';
 
       const answer =
         locale === 'vi'
           ? `Thông tin hồ sơ cá nhân của bạn:\n\n` +
             `• **Họ và tên:** **${fullName}**\n` +
             `• **Vai trò:** **${roleName}**\n` +
-            (isStudent ? `• **Mã số sinh viên (MSSV):** **${mssv || '24110054'}**\n` : '') +
-            (isStudent ? `• **Khoa:** **Khoa Công nghệ Thông tin - HCMUTE**\n` : '') +
-            (isLecturer ? `• **Mã cán bộ / Giảng viên:** **${lecturerCode}**\n` : '') +
-            (isLecturer ? `• **Học hàm / Học vị:** **${lecturerTitle}**\n` : '') +
-            (isLecturer ? `• **Bộ môn:** **${lecturerDept}**\n` : '') +
+            (isStudent ? `• **Mã số sinh viên (MSSV):** **${studentNumber || notAvailable}**\n` : '') +
+            (isLecturer ? `• **Mã hồ sơ giảng viên:** **${lecturerId || notAvailable}**\n` : '') +
             `• **Email:** **${currentUser.email}**\n` +
             (currentUser.phone ? `• **Số điện thoại:** ${currentUser.phone}\n` : '') +
-            `\n💡 Bạn có thể cập nhật thông tin liên hệ và ảnh đại diện tại trang **Hồ sơ cá nhân** (/dashboard/profile).`
+            `\nGợi ý: Bạn có thể cập nhật thông tin liên hệ và ảnh đại diện tại trang **Hồ sơ cá nhân** (/dashboard/profile).`
           : `Here is your profile information:\n\n` +
             `• **Full Name:** **${fullName}**\n` +
             `• **Role:** **${roleName}**\n` +
-            (isStudent ? `• **Student ID (MSSV):** **${mssv || '24110054'}**\n` : '') +
-            (isLecturer ? `• **Lecturer ID:** **${lecturerCode}**\n` : '') +
-            (isLecturer ? `• **Title / Academic Rank:** **${lecturerTitle}**\n` : '') +
-            (isLecturer ? `• **Department:** **${lecturerDept}**\n` : '') +
+            (isStudent ? `• **Student ID (MSSV):** **${studentNumber || notAvailable}**\n` : '') +
+            (isLecturer ? `• **Lecturer profile ID:** **${lecturerId || notAvailable}**\n` : '') +
             `• **Email:** **${currentUser.email}**\n` +
             (currentUser.phone ? `• **Phone:** ${currentUser.phone}\n` : '') +
-            `\n💡 Manage your profile details and settings under **Profile** (/dashboard/profile).`;
+            `\nTip: Manage your profile details and settings under **Profile** (/dashboard/profile).`;
 
       return {
         answer,
+        reasonCode: 'PERSONAL_CONTEXT',
         citation: {
           id: 'personal-profile-info',
           slug: 'personal-profile',
@@ -1491,13 +1455,14 @@ export async function resolveStudentAssistantQuery(
           locale === 'vi'
             ? `Danh sách các lớp học phần bạn đang phụ trách giảng dạy:\n\n` +
               lines.join('\n\n') +
-              `\n\n💡 Bạn có thể xem lịch trực quan tại **Lịch giảng dạy** (/dashboard/lecturer/schedule) hoặc nhập điểm tại **Quản lý điểm** (/dashboard/lecturer/grading).`
+              `\n\nBạn có thể xem lịch trực quan tại **Lịch giảng dạy** (/dashboard/lecturer/schedule) hoặc nhập điểm tại **Quản lý điểm** (/dashboard/lecturer/grades).`
             : `Here are the course sections you are currently teaching:\n\n` +
               lines.join('\n\n') +
-              `\n\n💡 View your visual timetable under **Teaching Schedule** (/dashboard/lecturer/schedule).`;
+              `\n\nView your visual timetable under **Teaching Schedule** (/dashboard/lecturer/schedule).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'lecturer-teaching-sections',
             slug: 'teaching-sections',
@@ -1583,13 +1548,14 @@ export async function resolveStudentAssistantQuery(
           locale === 'vi'
             ? `${isLecturerSchedule ? 'Lịch giảng dạy' : 'Lịch học'} **${dayName}** của bạn gồm có:\n\n` +
               lines.join('\n\n') +
-              `\n\n💡 Bạn có thể xem toàn bộ lịch trực quan theo tuần tại mục **${targetLabel}** (${targetUrl}).`
+              `\n\nBạn có thể xem toàn bộ lịch trực quan theo tuần tại mục **${targetLabel}** (${targetUrl}).`
             : `Here is your **${dayName}** ${isLecturerSchedule ? 'teaching schedule' : 'schedule'}:\n\n` +
               lines.join('\n\n') +
-              `\n\n💡 You can view your full visual weekly timetable under **${targetLabel}** (${targetUrl}).`;
+              `\n\nYou can view your full visual weekly timetable under **${targetLabel}** (${targetUrl}).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'personal-schedule-guide',
             slug: 'schedule-overview',
@@ -1612,12 +1578,13 @@ export async function resolveStudentAssistantQuery(
         const answer =
           locale === 'vi'
             ? `Theo lịch hiện tại, bạn **không có ${isLecturerSchedule ? 'ca giảng dạy nào' : 'lịch học'}** vào **${dayName}**.\n\n` +
-              `💡 Để xem lịch các ngày khác trong tuần, bạn hãy truy cập mục **${targetLabel}** (${targetUrl}).`
+              `Để xem lịch các ngày khác trong tuần, bạn hãy truy cập mục **${targetLabel}** (${targetUrl}).`
             : `According to your current schedule, you have **no ${isLecturerSchedule ? 'teaching sessions' : 'scheduled classes'}** on **${dayName}**.\n\n` +
-              `💡 To check your schedule for other days, visit **${targetLabel}** (${targetUrl}).`;
+              `To check your schedule for other days, visit **${targetLabel}** (${targetUrl}).`;
 
         return {
           answer,
+          reasonCode: 'PERSONAL_CONTEXT',
           citation: {
             id: 'personal-schedule-guide',
             slug: 'schedule-overview',
@@ -1663,13 +1630,14 @@ export async function resolveStudentAssistantQuery(
         locale === 'vi'
           ? `${isLecturerSchedule ? 'Lịch giảng dạy' : 'Thời khóa biểu'} tổng quan các ngày trong tuần của bạn:\n\n` +
             summaryLines.join('\n') +
-            `\n\n💡 Bạn có thể xem chi tiết phòng học, giảng viên và thời khóa biểu trực quan tại trang **${targetLabel}** (${targetUrl}).`
+            `\n\nBạn có thể xem chi tiết phòng học, giảng viên và thời khóa biểu trực quan tại trang **${targetLabel}** (${targetUrl}).`
           : `Summary of your weekly ${isLecturerSchedule ? 'teaching' : 'class'} schedule:\n\n` +
             summaryLines.join('\n') +
-            `\n\n💡 View your visual weekly timetable and classrooms under **${targetLabel}** (${targetUrl}).`;
+            `\n\nView your visual weekly timetable and classrooms under **${targetLabel}** (${targetUrl}).`;
 
       return {
         answer,
+        reasonCode: 'PERSONAL_CONTEXT',
         citation: {
           id: 'personal-schedule-guide',
           slug: 'schedule-overview',
@@ -1730,6 +1698,7 @@ export async function resolveStudentAssistantQuery(
 
     return {
       answer,
+      reasonCode: 'PERSONAL_CONTEXT',
       citation: {
         id: 'personal-schedule-guide',
         slug: 'schedule-overview',
