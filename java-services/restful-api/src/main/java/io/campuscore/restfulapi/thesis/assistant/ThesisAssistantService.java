@@ -43,7 +43,7 @@ public class ThesisAssistantService {
      * digit→letter direction requires a complete following word.
      */
     private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_WORD = java.util.regex.Pattern.compile(
-            "(?<![\\p{L}\\p{N}_])(từ|đến|tới|đa|thiểu|khoảng|hơn|dưới|trên|gồm|bằng|tổng|cộng|còn|điểm|mức|đạt|hoặc|hoac)(?=\\p{N})",
+            "(?<![\\p{L}\\p{N}_])(từ|đến|tới|đa|thiểu|khoảng|hơn|dưới|trên|gồm|bằng|tổng|cộng|còn|điểm|mức|đạt|hoặc|hoac|đương|duong)(?=\\p{N})",
             java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
     private static final java.util.regex.Pattern NUMBER_GLUE_BEFORE_WORD = java.util.regex.Pattern.compile(
             "(?<=\\p{N})(thành|người|tín|chỉ|nhóm|đề|ngày|giờ|phút|tuần|năm|tháng|buổi|ca|giảng|viên|sinh|phân|điểm|tiết|môn|lớp)(?![\\p{L}])",

@@ -385,6 +385,8 @@ class ThesisAssistantServiceTest {
                 ThesisAssistantService.normalizeNumberSpacing("còn13 tín chỉ"));
         assertEquals("điểm D hoặc 4.0/10",
                 ThesisAssistantService.normalizeNumberSpacing("điểm D hoặc4.0/10"));
+        assertEquals("điểm D (tương đương 4.0/10)",
+                ThesisAssistantService.normalizeNumberSpacing("điểm D (tương đương4.0/10)"));
         assertEquals("đạt 8.5 điểm rèn luyện và 3 môn tích lũy",
                 ThesisAssistantService.normalizeNumberSpacing("đạt8.5 điểm rèn luyện và 3môn tích lũy"));
         assertEquals("mức 4 tín chỉ, học 3 tiết",

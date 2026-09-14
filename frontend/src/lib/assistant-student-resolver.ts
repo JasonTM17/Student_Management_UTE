@@ -1391,24 +1391,27 @@ export async function resolveStudentAssistantQuery(
       }
       const lecturerId = currentUser.lecturerId;
       const notAvailable = locale === 'vi' ? 'Chưa cập nhật' : 'Not available';
+      const email = currentUser.email.trim() || notAvailable;
+      const phone = currentUser.phone?.trim();
+      const lecturerProfileId = lecturerId?.trim();
 
       const answer =
-        locale === 'vi'
+          locale === 'vi'
           ? `Thông tin hồ sơ cá nhân của bạn:\n\n` +
             `• **Họ và tên:** **${fullName}**\n` +
             `• **Vai trò:** **${roleName}**\n` +
             (isStudent ? `• **Mã số sinh viên (MSSV):** **${studentNumber || notAvailable}**\n` : '') +
-            (isLecturer ? `• **Mã hồ sơ giảng viên:** **${lecturerId || notAvailable}**\n` : '') +
-            `• **Email:** **${currentUser.email}**\n` +
-            (currentUser.phone ? `• **Số điện thoại:** ${currentUser.phone}\n` : '') +
+            (isLecturer ? `• **Mã hồ sơ giảng viên:** **${lecturerProfileId || notAvailable}**\n` : '') +
+            `• **Email:** **${email}**\n` +
+            (phone ? `• **Số điện thoại:** ${phone}\n` : '') +
             `\nGợi ý: Bạn có thể cập nhật thông tin liên hệ và ảnh đại diện tại trang **Hồ sơ cá nhân** (/dashboard/profile).`
           : `Here is your profile information:\n\n` +
             `• **Full Name:** **${fullName}**\n` +
             `• **Role:** **${roleName}**\n` +
             (isStudent ? `• **Student ID (MSSV):** **${studentNumber || notAvailable}**\n` : '') +
-            (isLecturer ? `• **Lecturer profile ID:** **${lecturerId || notAvailable}**\n` : '') +
-            `• **Email:** **${currentUser.email}**\n` +
-            (currentUser.phone ? `• **Phone:** ${currentUser.phone}\n` : '') +
+            (isLecturer ? `• **Lecturer profile ID:** **${lecturerProfileId || notAvailable}**\n` : '') +
+            `• **Email:** **${email}**\n` +
+            (phone ? `• **Phone:** ${phone}\n` : '') +
             `\nTip: Manage your profile details and settings under **Profile** (/dashboard/profile).`;
 
       return {
@@ -1418,7 +1421,7 @@ export async function resolveStudentAssistantQuery(
           id: 'personal-profile-info',
           slug: 'personal-profile',
           title: locale === 'vi' ? 'Thông tin hồ sơ cá nhân' : 'User Profile',
-          source: 'academic-catalog',
+          source: 'academic-records',
           locale,
           excerpt:
             locale === 'vi'
