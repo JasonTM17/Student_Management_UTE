@@ -528,12 +528,12 @@ export default function DashboardPage() {
 
           <WorkspacePanel
             title={
-              <div className="flex items-center gap-2.5">
+              <span className="flex items-center gap-2.5">
                 <span>{messages.studentDashboard.panels.currentCourses.title}</span>
                 <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                   {activeCourses.length} {copy.coursesUnit}
                 </span>
-              </div>
+              </span>
             }
             variant="muted"
             footer={

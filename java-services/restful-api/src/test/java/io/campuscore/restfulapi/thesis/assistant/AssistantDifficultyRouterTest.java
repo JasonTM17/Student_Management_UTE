@@ -15,7 +15,42 @@ class AssistantDifficultyRouterTest {
 
     @Test
     void simpleFactualVietnameseStaysOnRag() {
-        assertFalse(AssistantDifficultyRouter.requiresSynthesis("Thời gian nộp học phí là khi nào?", List.of(document("FINANCE"))));
+        assertFalse(AssistantDifficultyRouter.requiresSynthesis("Thời hạn nộp học phí kỳ này", List.of(document("FINANCE"))));
+    }
+
+    @Test
+    void academicRegulationQuestionsTriggerSynthesis() {
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Phân biệt học phần tiên quyết và học phần học trước",
+                List.of(document("REGISTRATION"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Điều kiện làm đồ án tốt nghiệp là gì?",
+                List.of(document("POLICY"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Bị điểm F môn bắt buộc thì xử lý thế nào?",
+                List.of(document("POLICY"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Quy chế cảnh báo học vụ mức 1 và mức 2",
+                List.of(document("POLICY"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Học bổng khuyến khích học tập cần điều kiện gì?",
+                List.of(document("POLICY"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Thời gian nộp học phí là khi nào?",
+                List.of(document("FINANCE"))));
+    }
+
+    @Test
+    void eightOrMoreTermsTriggerSynthesis() {
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "mot hai ba bon nam sau bay tam",
+                List.of(document("THESIS"))));
+    }
+
+    @Test
+    void overOneHundredTenCharsTriggersSynthesis() {
+        String longMsg = "a".repeat(111);
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(longMsg, List.of(document("THESIS"))));
     }
 
     @Test
@@ -37,6 +72,16 @@ class AssistantDifficultyRouterTest {
         assertTrue(AssistantDifficultyRouter.requiresSynthesis(
                 "Tôi muốn biết chi tiết về toàn bộ các quy định liên quan đến việc bảo lưu kết quả học tập",
                 List.of(document("ACADEMIC_CATALOG"))));
+    }
+
+    @Test
+    void distinctionAndExplanationMarkersUseSynthesis() {
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Phân biệt học phần tiên quyết và học phần học trước",
+                List.of(document("REGISTRATION"))));
+        assertTrue(AssistantDifficultyRouter.requiresSynthesis(
+                "Giải thích quy định xử lý điểm F và học lại",
+                List.of(document("POLICY"))));
     }
 
     @Test

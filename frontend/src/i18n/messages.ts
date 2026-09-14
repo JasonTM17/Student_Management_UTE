@@ -1384,9 +1384,8 @@ export const en = {
     personalContext: 'Answered from your personal academic records',
     composerHint: 'Enter to send · Shift+Enter for a new line',
     scrollToLatest: 'Jump to the newest message',
-    modelBadgeKnowledge: 'Knowledge base',
-    modelBadgePersonal: 'Your records',
-    modelBadgeModel: 'V4 Flash',
+    technicalBlocked:
+      'I can help with public academic information, but I cannot provide internal technical details. Ask about registration, schedules, grades, announcements, or your thesis journey.',
     followUpsByDomain: {
       THESIS: [
         'Thesis topic criteria',
@@ -2874,9 +2873,8 @@ export const vi: I18nMessages = {
     personalContext: 'Trả lời từ dữ liệu học vụ cá nhân của bạn',
     composerHint: 'Enter để gửi · Shift+Enter xuống dòng',
     scrollToLatest: 'Xem tin mới nhất',
-    modelBadgeKnowledge: 'Kiến thức đã duyệt',
-    modelBadgePersonal: 'Dữ liệu cá nhân',
-    modelBadgeModel: 'V4 Flash',
+    technicalBlocked:
+      'Mình chỉ hỗ trợ thông tin học vụ công khai và không thể cung cấp chi tiết kỹ thuật nội bộ. Bạn hãy hỏi về đăng ký học phần, thời khóa biểu, điểm, thông báo hoặc khóa luận nhé.',
     followUpsByDomain: {
       THESIS: [
         'Tiêu chí chọn đề tài luận văn',

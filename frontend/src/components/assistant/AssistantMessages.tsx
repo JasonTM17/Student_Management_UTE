@@ -20,6 +20,10 @@ import { useI18n } from '@/i18n';
 import type { AssistantCitation } from '@/lib/thesis-api';
 import type { ChatMessage } from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
+import {
+  isAssistantOutputSafe,
+  sanitizeAssistantOutput,
+} from '@/lib/assistant-output-guard';
 
 type FeedbackReason =
   | 'INCORRECT'
@@ -119,7 +123,11 @@ export function AssistantMessages({
 
   const copyMessage = async (message: ChatMessage) => {
     try {
-      await navigator.clipboard.writeText(message.content);
+      const visibleContent = sanitizeAssistantOutput(
+        message.content,
+        messages.assistant.technicalBlocked,
+      );
+      await navigator.clipboard.writeText(visibleContent);
       setCopiedId(message.id);
       window.setTimeout(() => {
         setCopiedId((current) => (current === message.id ? null : current));
@@ -145,6 +153,19 @@ export function AssistantMessages({
         const isUser = message.role === 'user';
         const isCitationOpen = Boolean(openCitations[message.id]);
         const timeLabel = messageTimeLabel(message.createdAt, locale);
+        const visibleContent = isUser
+          ? message.content
+          : sanitizeAssistantOutput(
+              message.content,
+              messages.assistant.technicalBlocked,
+            );
+        const visibleCitations = isUser
+          ? []
+          : (message.citations ?? []).filter(
+              (citation) =>
+                isAssistantOutputSafe(citation.title) &&
+                isAssistantOutputSafe(citation.excerpt),
+            );
 
         return (
           <div key={message.id} className="space-y-2">
@@ -207,7 +228,7 @@ export function AssistantMessages({
                     </div>
                   ) : (
                     <AssistantMarkdownContent
-                      content={message.content}
+                      content={visibleContent}
                       streaming={Boolean(message.pending)}
                     />
                   )}
@@ -241,18 +262,18 @@ export function AssistantMessages({
                   )}
 
                   {/* Collapsible Citations Card */}
-                  {!isUser && message.citations?.length ? (
+                  {!isUser && visibleCitations.length ? (
                     <div className="mt-2.5 border-t border-border/60 pt-1.5">
                       <button
                         type="button"
                         onClick={() => toggleCitation(message.id)}
                         aria-expanded={isCitationOpen}
                         aria-controls={`assistant-citations-${message.id}`}
-                        className="flex w-full items-center justify-between py-1 text-xs font-semibold text-primary transition-opacity hover:opacity-80"
+                        className="flex min-h-11 w-full items-center justify-between py-2 text-xs font-semibold text-primary transition-opacity hover:opacity-80"
                       >
                         <span className="flex items-center gap-1.5">
                           <FileText className="h-3.5 w-3.5" />
-                          {messages.assistant.sources} ({message.citations.length})
+                           {messages.assistant.sources} ({visibleCitations.length})
                         </span>
                         {isCitationOpen ? (
                           <ChevronUp className="h-3.5 w-3.5" />
@@ -266,7 +287,7 @@ export function AssistantMessages({
                           id={`assistant-citations-${message.id}`}
                           className="mt-2 space-y-2 rounded-xl bg-secondary/50 p-2.5 text-xs"
                         >
-                          {message.citations.map((citation) => (
+                          {visibleCitations.map((citation) => (
                             <div
                               key={citation.id}
                               className="border-l-2 border-primary pl-2 leading-5"
@@ -282,7 +303,6 @@ export function AssistantMessages({
                                   .filter(Boolean)
                                   .join(' · ')}
                               </p>
-                              <span className="sr-only">{citation.source}</span>
                               <p className="mt-1 text-muted-foreground italic">
                                 &ldquo;{citation.excerpt}&rdquo;
                               </p>
@@ -303,7 +323,7 @@ export function AssistantMessages({
                         type="button"
                         variant="ghost"
                         size="icon"
-                        className="min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-primary"
+                        className="min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary"
                         aria-label={
                           copiedId === message.id
                             ? messages.assistant.copiedMessage
@@ -324,7 +344,7 @@ export function AssistantMessages({
                             variant="ghost"
                             size="icon"
                             className={cn(
-                              'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-primary',
+                              'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary',
                               message.feedback === 'UP' &&
                                 'bg-secondary text-primary',
                             )}
@@ -339,7 +359,7 @@ export function AssistantMessages({
                             variant="ghost"
                             size="icon"
                             className={cn(
-                              'min-h-8 min-w-8 rounded-lg text-muted-foreground hover:text-destructive',
+                              'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-destructive',
                               message.feedback === 'DOWN' &&
                                 'bg-secondary text-destructive',
                             )}
@@ -405,7 +425,7 @@ export function AssistantMessages({
                       key={suggestion}
                       type="button"
                       onClick={() => onFollowUp(suggestion)}
-                      className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                      className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                     >
                       {suggestion}
                     </button>

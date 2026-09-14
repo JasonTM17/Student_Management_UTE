@@ -132,12 +132,13 @@ test('the authenticated portal assistant is a complete bottom-right RAG surface'
   // Streaming deltas must not flood screen readers; announcements resume on settle.
   assert.match(assistant, /aria-live=\{isSending \? 'off' : 'polite'\}/);
   assert.match(assistant, /event\.key !== 'Escape'/);
+  assert.match(assistant, /aria-modal=\{isMobile\}/);
   assert.match(assistant, /triggerRef\.current\?\.focus\(\)/);
   assert.match(assistant, /thesisApi\.chat\(message, locale\)/);
   assert.match(assistant, /KNOWLEDGE_UNAVAILABLE/);
   const assistantMessages = read('src/components/assistant/AssistantMessages.tsx');
   assert.match(assistantMessages, /citation\.title/);
-  assert.match(assistantMessages, /citation\.source/);
+  assert.match(assistantMessages, /citationDomainLabel/);
   assert.match(assistantMessages, /citation\.excerpt/);
   assert.match(assistantMessages, /messages\.assistant\.noMatch/);
   assert.match(assistantMessages, /messages\.assistant\.degraded/);
@@ -155,6 +156,7 @@ test('the sidebar drawer locks scroll, inerts the shell, and the context rail st
   assert.match(layout, /document\.body\.style\.overflow = previousOverflow/);
   assert.match(layout, /event\.key !== 'Escape'/);
   assert.match(layout, /sidebarCloseRef\.current\?\.focus/);
+  assert.match(layout, /if \(event\.key !== 'Tab'\) return/);
   assert.match(layout, /inert=\{!isDesktopSidebar && sidebarOpen \? true : undefined\}/);
   // Feedback #1/#5/#6: the right-hand student context rail (and its broken
   // collapsed state) was removed entirely, component file included.

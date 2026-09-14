@@ -270,7 +270,8 @@ public class ThesisAssistantService {
                                 // crosses the stream boundary; any already-
                                 // rendered safe prefix is replaced below.
                                 String candidate = providerAnswer + segment.text();
-                                if (!AssistantInputGuard.inspect(candidate).allowed()) {
+                                if (!AssistantInputGuard.inspect(candidate).allowed()
+                                        || !AssistantOutputGuard.isSafe(candidate)) {
                                     throw new ProviderOutputRejectedException();
                                 }
                                 providerAnswer.append(segment.text());
@@ -385,7 +386,12 @@ public class ThesisAssistantService {
                     String generated = provider.complete(message.trim(), lexical.citations().stream()
                             .map(citation -> citation.title() + "\n" + citation.excerpt())
                             .collect(Collectors.joining("\n\n")), requestedLocale);
-                    response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale, lexical.citations());
+                    if (AssistantOutputGuard.isSafe(generated)) {
+                        response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale, lexical.citations());
+                    } else {
+                        response = new ChatResponse(technicalOutputMessage(requestedLocale), MODEL, true,
+                                "PROVIDER_UNSAFE_OUTPUT", requestedLocale, lexical.citations());
+                    }
                 } catch (DeepSeekClient.ProviderUnavailableException exception) {
                     response = new ChatResponse(lexical.answer(), MODEL, true, "PROVIDER_UNAVAILABLE", requestedLocale, lexical.citations());
                 }
@@ -428,7 +434,9 @@ public class ThesisAssistantService {
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeNumberSpacing(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content());
-        String context = citations.stream().map(c -> c.title() + "\n" + c.excerpt()).collect(Collectors.joining("\n\n"));
+        String context = documents.stream()
+                .map(d -> "### " + safe(d.title()) + "\n" + safe(d.content()))
+                .collect(Collectors.joining("\n\n"));
         if (properties != null && context.length() > properties.maxContextChars()) context = context.substring(0, properties.maxContextChars());
         List<String> sourceIds = citations.stream().map(Citation::sourceId).filter(value -> value != null && !value.isBlank()).toList();
         String snapshotMaterial = documents.stream().map(document -> String.join("|",
@@ -526,11 +534,15 @@ public class ThesisAssistantService {
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.slug())
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.title())
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.content())
-                && AssistantInputGuard.isPublicKnowledgeSafe(document.source());
+                && AssistantInputGuard.isPublicKnowledgeSafe(document.source())
+                && AssistantOutputGuard.isSafe(document.title())
+                && AssistantOutputGuard.isSafe(document.content())
+                && AssistantOutputGuard.isSafe(document.source());
     }
     private static final Set<String> STOP_WORDS = Set.of(
             "a", "an", "and", "are", "do", "does", "for", "how", "i", "is", "it", "of", "on", "or", "the", "to", "what", "when", "where", "why", "with",
-            "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi");
+            "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi",
+            "của", "để", "là", "làm", "nên", "như", "những", "gì", "nào", "tôi", "và", "về", "với", "các", "có", "được", "không", "thì", "ra", "sao");
     private static List<String> tokenize(String message) {
         return java.util.Arrays.stream(message.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().limit(16).toList();
@@ -539,6 +551,11 @@ public class ThesisAssistantService {
     private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
+    static String technicalOutputMessage(String locale) {
+        return "vi".equals(locale)
+                ? "Mình chỉ hỗ trợ thông tin học vụ công khai và không thể cung cấp chi tiết kỹ thuật nội bộ. Bạn hãy hỏi về đăng ký học phần, thời khóa biểu, điểm, thông báo hoặc khóa luận nhé."
+                : "I can help with public academic information, but I cannot provide internal technical details. Ask about registration, schedules, grades, announcements, or your thesis journey.";
+    }
     private static String safe(String value) { return value == null ? "" : value; }
     private static DomainException problem(int status, String code, String message) { return new DomainException(org.springframework.http.HttpStatus.valueOf(status), code, message); }
 

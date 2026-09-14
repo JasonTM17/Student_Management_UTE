@@ -123,11 +123,17 @@ const EXAM_REGEX =
 // returning a personal status card. A question counts as policy-only when it
 // asks about rules and contains no first-person marker.
 const POLICY_QUESTION_REGEX =
-  /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed)/i;
+  /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiêu\s*chuẩn|chính\s*sách|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ|rút)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|như\s*thế\s*nào|thế\s*nào|ra\s*sao|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|so\s*sánh|khác\s*(?:nhau|gì)|phân\s*biệt|tiên\s*quyết|học\s*trước|song\s*hành|học\s*lại|cải\s*thiện|rớt\s*môn|điểm\s*f\b|cảnh\s*báo\s*học\s*vụ|buộc\s*thôi\s*học|(?:thời\s*hạn|hạn|khi\s*nào)\s*(?:đóng|nộp)\s*học\s*phí|rút\s*học\s*phần|học\s*bổng|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed|compare|prerequisite|corequisite)/i;
 const PERSONAL_MARKER_REGEX =
   /(của\s+(?:tôi|mình|em|anh|chị)|tôi\s+(?:có|đang|được|cần|thiếu|là|vừa|muốn)|em\s+(?:có|đang|được|muốn|vừa)|anh\s+(?:có|đang|muốn)|chị\s+(?:có|đang|muốn)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
 
+const ACADEMIC_REGULATION_REGEX =
+  /(?:quy\s*(?:định|chế|trình)|quy\s*(?:dinh|che|trinh)|nội\s*quy|noi\s*quy|chính\s*sách|chinh\s*sach|thủ\s*tục|thu\s*tuc|tiêu\s*chuẩn|tieu\s*chuan|tiêu\s*chí|tieu\s*chi|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiên\s*quyết|tien\s*quyet|học\s*trước|hoc\s*truoc|song\s*hành|song\s*hanh|học\s*lại|hoc\s*lai|cải\s*thiện\s*điểm|cai\s*thien\s*diem|học\s*cải\s*thiện|hoc\s*cai\s*thien|rớt\s*môn|rot\s*mon|điểm\s*f\b|diem\s*f\b|cảnh\s*báo\s*học\s*vụ|canh\s*bao\s*hoc\s*vu|buộc\s*thôi\s*học|buoc\s*thoi\s*hoc|học\s*bổng|hoc\s*bong|học\s*phí|hoc\s*phi|công\s*nợ|cong\s*no|tiền\s*học|tien\s*hoc|\btuition\b|(?:hạn|thời\s*hạn|cách|phương\s*thức)\s*(?:nộp|đóng)\s*học\s*phí|(?:han|thoi\s*han|cach|phuong\s*thuc)\s*(?:nop|dong)\s*hoc\s*phi|quy\s*chế\s*thi|quy\s*che\s*thi|điều\s*kiện\s*(?:dự\s*thi|xét\s*tốt\s*nghiệp|tốt\s*nghiệp|xét\s*học\s*bổng)|dieu\s*kien\s*(?:du\s*thi|xet\s*tot\s*nghiep|tot\s*nghiep|xet\s*hoc\s*bong)|\bpolicy\b|\bregulation\b|\bprerequisite\b|\bcorequisite\b|academic\s*warning)/i;
+
 export function isPolicyQuestion(message: string): boolean {
+  if (ACADEMIC_REGULATION_REGEX.test(message)) {
+    return true;
+  }
   return POLICY_QUESTION_REGEX.test(message) && !PERSONAL_MARKER_REGEX.test(message);
 }
 
@@ -600,39 +606,9 @@ export async function resolveStudentAssistantQuery(
     };
   }
 
-  // 0.4 GENERAL UNIVERSITY / CAMPUS INFO
+  // 0.4 GENERAL UNIVERSITY / CAMPUS INFO — delegated to backend RAG
   if (CAMPUS_INFO_REGEX.test(message) && !SCHEDULE_REGEX.test(message) && !THESIS_REGEX.test(message)) {
-    const answer =
-      locale === 'vi'
-        ? `🏫 **Thông tin Trường Đại học Công nghệ Kỹ thuật TP.HCM** (*CampusUTE*):\n\n` +
-          `- 📍 **Trụ sở chính**: Số 1 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh.\n` +
-          `- 🌐 **Cổng thông tin đào tạo điện tử**: CampusUTE Portal (\`http://127.0.0.1:3100\`).\n` +
-          `- 🏢 **Phòng Đào tạo**: Tòa nhà Trung tâm - Phụ trách kế hoạch đào tạo, mở lớp học phần, cấp bảng điểm và xét tốt nghiệp.\n` +
-          `- 🎖️ **Phòng Công tác Sinh viên**: Phụ trách đánh giá điểm rèn luyện (ĐRL), quản lý học bổng và hỗ trợ sinh viên.\n` +
-          `- 📚 **Thư viện số & Trung tâm Học liệu**: Tòa nhà Thư viện trung tâm, phục vụ tài liệu học tập và nghiên cứu khoa học.\n\n` +
-          `💡 Bạn có thể hỏi mình thêm về lịch học, đăng ký môn hoặc đồ án tốt nghiệp của bạn nhé!`
-        : `🏫 **Ho Chi Minh City University of Technology and Engineering** (*CampusUTE*):\n\n` +
-          `- 📍 **Main Campus**: 1 Vo Van Ngan Street, Linh Chieu Ward, Thu Duc City, Ho Chi Minh City.\n` +
-          `- 🌐 **Academic Portal**: CampusUTE Portal (\`http://127.0.0.1:3100\`).\n` +
-          `- 🏢 **Academic Affairs Office**: Main Building - Course planning, transcripts, and graduation.\n` +
-          `- 🎖️ **Student Affairs Office**: Conduct assessment, student support, and scholarships.\n\n` +
-          `💡 You can ask me anytime about your class schedule, transcript, or thesis!`;
-
-    return {
-      answer,
-      citation: {
-        id: 'campuscore-campus-info',
-        slug: 'campus-overview',
-        title: locale === 'vi' ? 'Thông tin Trường Đại học Công nghệ Kỹ thuật TP.HCM' : 'CampusUTE University Overview',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Địa chỉ, phòng ban chức năng và thông tin liên hệ Trường Đại học Công nghệ Kỹ thuật TP.HCM.'
-            : 'Address, offices, and contact details for CampusUTE.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    return null;
   }
 
   // A. Handle Learning Materials queries
@@ -1095,295 +1071,29 @@ export async function resolveStudentAssistantQuery(
     };
   }
 
-  // C. Handle Tuition & Financial queries
-  if (TUITION_REGEX.test(message) && !policyQuestion) {
-    let enrolledCredits = 0;
-    try {
-      const enrollments = await enrollmentsApi.getMyEnrollments();
-      enrolledCredits = (enrollments ?? [])
-        .filter((e) => e.status === 'ENROLLED' || e.status === 'CONFIRMED')
-        .reduce((sum, e) => sum + (e.section?.course?.credits ?? 0), 0);
-    } catch {
-      // ignore
-    }
-
-    const answer =
-      locale === 'vi'
-        ? 'Thông tin về học phí và tài chính học vụ:\n\n' +
-          (enrolledCredits > 0
-            ? `• **Tín chỉ đăng ký học kỳ này:** Bạn hiện đang đăng ký **${enrolledCredits} tín chỉ** học phần.\n`
-            : '') +
-          '• **Mức học phí:** Được tính theo định mức tín chỉ của từng môn học trong chương trình đào tạo theo quy định của Nhà trường.\n' +
-          '• **Phương thức nộp học phí:** Sinh viên nộp qua cổng thanh toán trực tuyến của Trường hoặc chuyển khoản định danh (VietQR) theo cú pháp: `[MSSV] - [Họ tên] - Hoc phi HK`.\n' +
-          '• **Thời hạn nộp:** Thông báo hạn nộp học phí được công bố cụ thể trên trang **Thông báo** (/dashboard/announcements).\n\n' +
-          '💡 Mọi thắc mắc về công nợ và miễn giảm học phí, bạn vui lòng liên hệ trực tiếp Phòng Kế hoạch - Tài chính.'
-        : 'Tuition and financial information:\n\n' +
-          (enrolledCredits > 0
-            ? `• **Current Enrolled Credits:** You are registered for **${enrolledCredits} credits** this semester.\n`
-            : '') +
-          '• **Tuition Calculation:** Billed per credit according to institutional department rates.\n' +
-          '• **Payment Methods:** Online portal payment or bank transfer using your Student ID.\n' +
-          '• **Deadlines:** Official tuition deadlines are announced under **Announcements** (/dashboard/announcements).\n\n' +
-          '💡 For billing inquiries, contact the Financial Affairs Office.';
-
-    return {
-      answer,
-      citation: {
-        id: 'tuition-policy-guide',
-        slug: 'tuition-guidelines',
-        title: locale === 'vi' ? 'Hướng dẫn nộp học phí & công nợ' : 'Tuition & Payment Guide',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Quy định và hướng dẫn nộp học phí, tra cứu công nợ sinh viên.'
-            : 'Tuition payment policies and financial guidelines.',
-        domain: 'GENERAL_FAQ',
-      },
-    };
+  // C. Handle Tuition & Financial queries — delegated to backend RAG
+  if (TUITION_REGEX.test(message)) {
+    return null;
   }
 
-  // D1. Handle Graduation Requirements & Standards
+  // D1. Handle Graduation Requirements & Standards — delegated to backend RAG
   if (GRADUATION_REQUIREMENTS_REGEX.test(message)) {
-    let completedCredits = 0;
-    let totalCredits = 140;
-    let gpa: string | null = null;
-    let conductScore: number | null = null;
-    try {
-      const curriculum = await curriculumApi.getMyCurriculum();
-      if (curriculum?.curriculum) {
-        totalCredits = curriculum.curriculum.totalCredits ?? 140;
-        completedCredits = (curriculum.courses ?? [])
-          .filter((c) => c.status === 'COMPLETED')
-          .reduce((sum, c) => sum + (c.credits ?? 0), 0);
-      }
-    } catch {
-      // fallback
-    }
-    try {
-      const transcript = await gradesApi.getMyTranscript();
-      if (transcript?.summary?.cumulativeGpa != null) {
-        gpa = Number(transcript.summary.cumulativeGpa).toFixed(2);
-      }
-    } catch {
-      // fallback
-    }
-    try {
-      const conduct = await conductApi.getMyConduct();
-      if (conduct?.cumulativeAverageScore != null) {
-        conductScore = conduct.cumulativeAverageScore;
-      }
-    } catch {
-      // fallback
-    }
-
-    const percent = Math.min(100, Math.round((completedCredits / Math.max(totalCredits, 1)) * 100));
-
-    const answer =
-      locale === 'vi'
-        ? `Quy định chuẩn đầu ra và điều kiện xét tốt nghiệp tại Trường ĐH Công nghệ Kỹ thuật TP.HCM (HCM-UTE):\n\n` +
-          `1. **Tích lũy đầy đủ tín chỉ chương trình đào tạo:**\n` +
-          `   • Yêu cầu tối thiểu: **${totalCredits} tín chỉ**\n` +
-          `   • Tiến độ hiện tại của bạn: Đã hoàn thành **${completedCredits}/${totalCredits} tín chỉ** (${percent}%)\n\n` +
-          `2. **Điểm trung bình tích lũy toàn khóa (GPA):**\n` +
-          `   • Yêu cầu: Đạt từ **2.0 / 4.0** trở lên (thang điểm 4)\n` +
-          `   • GPA tích lũy hiện tại của bạn: **${gpa != null ? `${gpa} / 4.0` : 'Đang cập nhật'}** ${gpa != null && Number(gpa) >= 2.0 ? '(Đạt chuẩn)' : ''}\n\n` +
-          `3. **Điểm rèn luyện toàn khóa (ĐRL):**\n` +
-          `   • Yêu cầu: Đạt từ loại **Trung bình (>= 50 điểm)** trở lên\n` +
-          `   • Điểm rèn luyện tích lũy của bạn: **${conductScore != null ? `${conductScore} / 100 điểm` : 'Đang cập nhật'}** ${conductScore != null && conductScore >= 50 ? '(Đạt chuẩn)' : ''}\n\n` +
-          `4. **Chuẩn đầu ra Ngoại ngữ & Tin học:**\n` +
-          `   • Ngoại ngữ: Chứng chỉ TOEIC Quốc tế tối thiểu 500+ (hoặc IELTS 5.0+, TOEFL tương đương)\n` +
-          `   • Tin học: Chứng chỉ Ứng dụng CNTT nâng cao theo quy định\n\n` +
-          `5. **Chứng chỉ Bắt buộc khác:**\n` +
-          `   • Đã hoàn tất và có chứng chỉ Giáo dục Quốc phòng - An ninh (GDQP-AN)\n` +
-          `   • Hoàn thành đầy đủ các học phần Giáo dục Thể chất (GDTC)\n\n` +
-          `6. **Đồ án / Khóa luận tốt nghiệp:**\n` +
-          `   • Hoàn thành và bảo vệ đạt yêu cầu Khóa luận tốt nghiệp (KLTN) hoặc các môn học thay thế tốt nghiệp\n\n` +
-          `7. **Kỷ luật & Pháp lý:**\n` +
-          `   • Không bị kỷ luật từ mức đình chỉ học tập trở lên hoặc đang trong thời gian bị truy cứu trách nhiệm hình sự.\n\n` +
-          `💡 Bạn có thể kiểm tra danh mục môn học còn thiếu tại mục **Chương trình đào tạo** (/dashboard/curriculum) và theo dõi đợt xét tốt nghiệp tại **Thông báo** (/dashboard/announcements).`
-        : `Graduation Requirements and Exit Standards at HCMUTE:\n\n` +
-          `1. **Curriculum Credits:** Complete all **${totalCredits} credits** (Your progress: **${completedCredits}/${totalCredits}**, ${percent}%).\n` +
-          `2. **Cumulative GPA:** Minimum **2.0 / 4.0** (Your current GPA: **${gpa != null ? `${gpa} / 4.0` : 'In progress'}**).\n` +
-          `3. **Conduct Points:** Minimum **50 / 100** (Your cumulative score: **${conductScore != null ? `${conductScore} / 100` : 'In progress'}**).\n` +
-          `4. **Certificates:** Foreign Language (TOEIC 500+ / IELTS 5.0+), Advanced IT certificate, Physical Education & Defense Training.\n` +
-          `5. **Graduation Capstone:** Successfully defend graduation thesis or capstone courses.\n\n` +
-          `💡 Track remaining courses under **Curriculum** (/dashboard/curriculum).`;
-
-    return {
-      answer,
-      citation: {
-        id: 'graduation-requirements-guide',
-        slug: 'graduation-requirements',
-        title: locale === 'vi' ? 'Chuẩn đầu ra & Điều kiện tốt nghiệp HCMUTE' : 'Graduation Requirements',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Quy chế xét và công nhận tốt nghiệp đại học hệ chính quy chuẩn tín chỉ HCMUTE.'
-            : 'Academic exit standards and graduation criteria.',
-        domain: 'POLICY',
-      },
-    };
+    return null;
   }
 
-  // D2. Handle Scholarship queries
-  if (SCHOLARSHIP_REGEX.test(message) && !policyQuestion) {
-    let gpa: string | null = null;
-    let conductScore: number | null = null;
-    let conductRank = 'Đang cập nhật';
-    try {
-      const transcript = await gradesApi.getMyTranscript();
-      if (transcript?.summary?.cumulativeGpa != null) {
-        gpa = Number(transcript.summary.cumulativeGpa).toFixed(2);
-      }
-    } catch {
-      // fallback
-    }
-    try {
-      const conduct = await conductApi.getMyConduct();
-      if (conduct) {
-        conductScore = conduct.currentSemester?.totalScore ?? conduct.cumulativeAverageScore ?? null;
-        conductRank = conduct.currentSemester?.classificationVi ?? conduct.cumulativeClassificationVi ?? 'Đang cập nhật';
-      }
-    } catch {
-      // fallback
-    }
-
-    const hasData = gpa != null && conductScore != null;
-    const numericGpa = gpa != null ? parseFloat(gpa) : 0;
-    let scholarshipLevel = 'Chưa đạt khung xét';
-    if (hasData) {
-      if (numericGpa >= 3.6 && (conductScore ?? 0) >= 90) {
-        scholarshipLevel = 'Học bổng XUẤT SẮC (Mức 120% học phí)';
-      } else if (numericGpa >= 3.2 && (conductScore ?? 0) >= 80) {
-        scholarshipLevel = 'Học bổng GIỎI (Mức 100% học phí)';
-      } else if (numericGpa >= 2.5 && (conductScore ?? 0) >= 70) {
-        scholarshipLevel = 'Học bổng KHÁ (Mức học bổng cơ bản)';
-      }
-    }
-
-    const answer =
-      locale === 'vi'
-        ? `Thông tin về Học bổng Khuyến khích học tập (KKHT) tại Trường ĐH Công nghệ Kỹ thuật TP.HCM:\n\n` +
-          `• **Khung tiêu chuẩn phân loại học bổng:**\n` +
-          `   - **Loại Xuất sắc:** Điểm GPA >= 3.6 / 4.0 và Điểm rèn luyện >= 90 điểm (Xuất sắc)\n` +
-          `   - **Loại Giỏi:** Điểm GPA >= 3.2 / 4.0 và Điểm rèn luyện >= 80 điểm (Tốt trở lên)\n` +
-          `   - **Loại Khá:** Điểm GPA >= 2.5 / 4.0 và Điểm rèn luyện >= 70 điểm (Khá trở lên)\n\n` +
-          `• **Điều kiện tiên quyết:**\n` +
-          `   - Đăng ký và tích lũy tối thiểu **14 tín chỉ** trong học kỳ xét (không tính GDTC, GDQP-AN).\n` +
-          `   - Không có môn học nào bị điểm F hoặc vi phạm kỷ luật trong kỳ.\n\n` +
-          (hasData
-            ? `• **Đối chiếu hồ sơ cá nhân của bạn hiện tại:**\n` +
-              `   - **Điểm GPA tích lũy:** **${gpa} / 4.0**\n` +
-              `   - **Điểm rèn luyện:** **${conductScore} / 100 điểm** (Xếp loại: **${conductRank}**)\n` +
-              `   - **Đánh giá triển vọng:** Với điểm số hiện tại, bạn ${numericGpa >= 2.5 && (conductScore ?? 0) >= 70 ? `đủ điều kiện nằm trong diện xem xét **${scholarshipLevel}** của Khoa!` : 'chưa đạt ngưỡng điểm tối thiểu để xét học bổng kỳ này.'}\n\n`
-            : `• **Hồ sơ học vụ của bạn:** Chưa ghi nhận đủ dữ liệu điểm GPA hoặc điểm rèn luyện chính thức của học kỳ gần nhất để đối chiếu tự động.\n\n`) +
-          `💡 Danh sách sinh viên nhận học bổng chính thức theo từng kỳ được Hội đồng xét duyệt và công bố tại mục **Thông báo** (/dashboard/announcements).`
-        : `Academic Scholarship Information (KKHT) at HCM-UTE:\n\n` +
-          `• **Criteria:**\n` +
-          `   - Excellent: GPA >= 3.6 & Conduct >= 90 (120% tuition)\n` +
-          `   - Very Good: GPA >= 3.2 & Conduct >= 80 (100% tuition)\n` +
-          `   - Good: GPA >= 2.5 & Conduct >= 70\n` +
-          `• **Prerequisites:** Min 14 credits enrolled, no F grades, no disciplinary records.\n` +
-          (hasData
-            ? `• **Your Profile:** GPA: **${gpa}**, Conduct: **${conductScore}** (${scholarshipLevel}).\n\n`
-            : `• **Your Profile:** Transcript or conduct records for the target term are not finalized yet.\n\n`) +
-          `💡 Official recipient lists are published under **Announcements** (/dashboard/announcements).`;
-
-    return {
-      answer,
-      citation: {
-        id: 'scholarship-policy-guide',
-        slug: 'scholarship-guidelines',
-        title: locale === 'vi' ? 'Quy chế xét học bổng khuyến khích học tập' : 'Academic Scholarship Policy',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Quy chế cấp học bổng khuyến khích học tập cho sinh viên theo Nghị định 84 và quy định của Trường ĐH Công nghệ Kỹ thuật TP.HCM.'
-            : 'Institutional merit-based scholarship regulations and evaluation criteria.',
-        domain: 'POLICY',
-      },
-    };
+  // D2. Handle Scholarship queries — delegated to backend RAG
+  if (SCHOLARSHIP_REGEX.test(message)) {
+    return null;
   }
 
-  // D3. Handle Retake and Grade Improvement queries
+  // D3. Handle Retake and Grade Improvement queries — delegated to backend RAG
   if (RETAKE_POLICY_REGEX.test(message)) {
-    const answer =
-      locale === 'vi'
-        ? `Quy định về học lại môn, học cải thiện điểm và cảnh báo học vụ tại Trường ĐH Công nghệ Kỹ thuật TP.HCM:\n\n` +
-          `1. **Quy định học cải thiện điểm (áp dụng cho điểm C, C+, D, D+):**\n` +
-          `   • Sinh viên có điểm tổng kết môn đạt từ **D đến C+** được phép đăng ký học lại để nâng cao điểm trung bình.\n` +
-          `   • Khi học cải thiện, **điểm số cao hơn** giữa hai lần học sẽ được chọn để tính điểm trung bình tích lũy (GPA).\n` +
-          `   • Điểm lần đầu vẫn được lưu trên bảng điểm tổng hợp kèm ghi chú môn cải thiện.\n\n` +
-          `2. **Quy định học lại khi bị rớt môn (Điểm F):**\n` +
-          `   • **Môn học bắt buộc:** Bắt buộc sinh viên phải đăng ký học lại ở các học kỳ tiếp theo hoặc học kỳ hè khi trường mở lớp cho đến khi đạt (điểm >= D).\n` +
-          `   • **Môn học tự chọn:** Sinh viên có thể đăng ký học lại chính môn đó hoặc chọn một môn tự chọn khác tương đương trong cùng khối kiến thức để thay thế.\n\n` +
-          `3. **Quy chế Cảnh báo học vụ & Buộc thôi học:**\n` +
-          `   • Sinh viên bị cảnh báo học vụ nếu: Điểm TBHK < 1.0 (học kỳ 1), < 1.2 (học kỳ 2), < 1.4 (học kỳ 3 trở đi) hoặc GPA tích lũy < 1.6.\n` +
-          `   • Nếu bị cảnh báo học vụ **3 lần liên tiếp**, sinh viên sẽ bị xem xét **Buộc thôi học chính thức** theo Quy chế Đào tạo.\n\n` +
-          `💡 Khi có đợt đăng ký môn học, bạn vui lòng truy cập mục **Đăng ký học phần** (/dashboard/register) để chọn lớp học lại/cải thiện.`
-        : `Regulations on Course Retakes, Grade Improvement and Academic Warnings:\n\n` +
-          `1. **Grade Improvement (Grades C, D):** Students can re-enroll to improve grades. The higher grade is counted toward cumulative GPA.\n` +
-          `2. **Failed Courses (Grade F):** Required courses must be retaken until passed. Electives can be replaced by equivalent subjects.\n` +
-          `3. **Academic Warnings:** Issued when term GPA falls below minimum threshold. Three consecutive warnings result in academic dismissal.\n\n` +
-          `💡 Register for repeat or improvement sections under **Course Registration** (/dashboard/register).`;
-
-    return {
-      answer,
-      citation: {
-        id: 'academic-retake-policy',
-        slug: 'retake-and-warning-policy',
-        title: locale === 'vi' ? 'Quy chế học lại, cải thiện & cảnh báo học vụ' : 'Course Retake & Academic Warning Policy',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Quy chế đào tạo đại học chính quy theo hệ thống tín chỉ về xử lý học vụ và thi lại.'
-            : 'University policies on repeat courses, grade replacement, and academic standing.',
-        domain: 'POLICY',
-      },
-    };
+    return null;
   }
 
-  // D4. Handle Exam Schedule queries
-  if (EXAM_REGEX.test(message) && !policyQuestion) {
-    const answer =
-      locale === 'vi'
-        ? `Thông tin về Lịch thi và Quy chế thi kết thúc học phần tại HCMUTE:\n\n` +
-          `• **Thời gian công bố lịch thi:** Phòng Đào tạo công bố lịch thi chính thức trước kỳ thi từ **2 đến 4 tuần**.\n` +
-          `• **Cách tra cứu lịch thi:**\n` +
-          `   - Xem danh sách ca thi, ngày thi, phòng thi và số báo danh (SBD) tại mục **Thời khóa biểu** (/dashboard/schedule) hoặc thông báo phân lịch tại **Thông báo** (/dashboard/announcements).\n` +
-          `• **Điều kiện được dự thi kết thúc học phần:**\n` +
-          `   - Tham gia lớp học đầy đủ, vắng không quá **20% tổng số tiết** của học phần.\n` +
-          `   - Điểm đánh giá quá trình (điểm thành phần) phải đạt từ **3.0 / 10.0** trở lên.\n` +
-          `• **Lưu ý khi vào phòng thi:**\n` +
-          `   - Bắt buộc mang theo **Thẻ sinh viên** hoặc **CCCD gắn chip**.\n` +
-          `   - Có mặt trước phòng thi ít nhất **15 phút** so với giờ phát đề.\n` +
-          `   - Tuyệt đối không mang điện thoại di động và tài liệu trái phép vào phòng thi.\n\n` +
-          `💡 Mọi thắc mắc về trùng lịch thi, sinh viên liên hệ Phòng Đào tạo hoặc Khoa phụ trách học phần để được xử lý ghép ca.`
-        : `Exam Schedule and Regulations at HCMUTE:\n\n` +
-          `• Schedules are published 2-4 weeks prior to exams under **Announcements** (/dashboard/announcements) and **Schedule** (/dashboard/schedule).\n` +
-          `• Requirements: Minimum 80% attendance and coursework score >= 3.0.\n` +
-          `• Bring your Student ID card or Citizen Identity Card. Arrive 15 minutes before exam start.\n\n` +
-          `💡 Contact Academic Affairs for schedule conflicts.`;
-
-    return {
-      answer,
-      citation: {
-        id: 'exam-regulations-guide',
-        slug: 'exam-regulations',
-        title: locale === 'vi' ? 'Quy chế thi kết thúc học phần HCMUTE' : 'Semester Examination Rules',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Quy chế thi kết thúc học phần, điều kiện dự thi và thủ tục hoãn thi.'
-            : 'Official university examination procedures and eligibility.',
-        domain: 'POLICY',
-      },
-    };
+  // D4. Handle Exam Schedule queries — delegated to backend RAG
+  if (EXAM_REGEX.test(message)) {
+    return null;
   }
 
   // E. Handle Thesis / Capstone Graduation queries — also catches deadline
@@ -1454,6 +1164,9 @@ export async function resolveStudentAssistantQuery(
 
         const reportDateText = formatAssistantDate(activeRound.reportDate, locale);
         const gvpbDeadlineText = formatAssistantDate(activeRound.gvpbDeadline, locale);
+        const registrationEndText = formatAssistantDate(activeRound.registrationEnd, locale);
+        const registrationDeadlineText =
+          registrationEndText ?? (locale === 'vi' ? 'Chưa được cập nhật' : 'Not published');
         const roundStatusText = localizedStatus(
           THESIS_ROUND_STATUS_LABELS,
           activeRound.status,
@@ -1471,6 +1184,7 @@ export async function resolveStudentAssistantQuery(
             ? `Thông tin đồ án tốt nghiệp / khóa luận của bạn:\n\n` +
               `• **Đợt đồ án:** **${activeRound.name}** (Loại: ${activeRound.thesisType})\n` +
               `• **Trạng thái đợt:** ${roundStatusText}\n` +
+              `• **Hạn chót đăng ký:** ${registrationDeadlineText}\n` +
               (topicTitle ? `• **Đề tài đăng ký:** **${topicTitle}**\n` : '') +
               (myGroup
                 ? `• **Trạng thái nhóm:** ${groupStatusText} (Xét duyệt: ${approvalText})\n`
@@ -1483,6 +1197,7 @@ export async function resolveStudentAssistantQuery(
             : `Here is your graduation thesis/capstone information:\n\n` +
               `• **Active Round:** **${activeRound.name}** (${activeRound.thesisType})\n` +
               `• **Round Status:** ${roundStatusText}\n` +
+              `• **Registration deadline:** ${registrationDeadlineText}\n` +
               (topicTitle ? `• **Registered Topic:** **${topicTitle}**\n` : '') +
               (myGroup
                 ? `• **Group Status:** ${groupStatusText} (Approval: ${approvalText})\n`
@@ -1537,7 +1252,16 @@ export async function resolveStudentAssistantQuery(
   }
 
   // F. Handle Course Registration Eligibility & Credit Cap queries
-  if (REGISTRATION_REGEX.test(message) && !policyQuestion) {
+  if (REGISTRATION_REGEX.test(message)) {
+    // Policy questions (prerequisite vs corequisite, credit limits, registration eligibility rules) must return null
+    if (
+      policyQuestion ||
+      /(?:tiên\s*quyết|tien\s*quyet|học\s*trước|hoc\s*truoc|song\s*hành|song\s*hanh|tối\s*đa|toi\s*da|bao\s*nhiêu\s*tín\s*chỉ|bao\s*nhieu\s*tin\s*chi|hạn\s*mức\s*tín\s*chỉ|han\s*muc\s*tin\s*chi|28\s*tín\s*chỉ|điều\s*kiện|dieu\s*kien|quy\s*(?:định|chế)|quy\s*(?:dinh|che)|hạn\s*đăng\s*ký|han\s*dang\s*ky|đợt\s*đăng\s*ký|dot\s*dang\s*ky)/i.test(
+        message,
+      )
+    ) {
+      return null;
+    }
     try {
       const eligibility = await registrationApi.eligibility();
       if (eligibility) {
@@ -1564,17 +1288,14 @@ export async function resolveStudentAssistantQuery(
 
         const answer =
           locale === 'vi'
-            ? `Quy định và tình trạng đăng ký học phần của bạn:\n\n` +
+            ? `Tình trạng đăng ký học phần của bạn:\n\n` +
               `• **Trạng thái đợt đăng ký:** **${statusText}**\n` +
-              `• **Hạn mức tín chỉ tối đa:** Tối đa **${creditLimit} tín chỉ / học kỳ** (theo Quy chế Đào tạo tín chỉ UTE)\n` +
-              `• **Số tín chỉ tối thiểu:** **14 tín chỉ** (đối với sinh viên học lực bình thường) hoặc **10 tín chỉ** (đối với sinh viên bị cảnh cáo học vụ)\n` +
               `• **Số tín chỉ bạn đã đăng ký:** **${creditsUsed}** tín chỉ\n` +
               `• **Số tín chỉ còn lại có thể đăng ký bổ sung:** **${creditsRemaining}** tín chỉ\n` +
               (windowTextVi ? `• **Thời gian mở đợt:** ${windowTextVi}\n` : '') +
               `\n💡 Để chọn môn, đổi lớp học phần hoặc rút môn, bạn hãy truy cập ngay mục **Đăng ký học phần** (/dashboard/register).`
             : `Here is your course registration eligibility status:\n\n` +
               `• **Status:** **${statusText}**\n` +
-              `• **Credit Limit:** Maximum **${creditLimit}** credits / semester (HCMUTE Credit Regulations)\n` +
               `• **Credits Used:** **${creditsUsed}** credits\n` +
               `• **Credits Remaining:** **${creditsRemaining}** credits\n` +
               (windowTextEn ? `• **Registration Window:** ${windowTextEn}\n` : '') +
@@ -1585,13 +1306,13 @@ export async function resolveStudentAssistantQuery(
           citation: {
             id: 'registration-eligibility-info',
             slug: 'registration-eligibility',
-            title: locale === 'vi' ? 'Điều kiện đăng ký học phần & Hạn mức tín chỉ' : 'Registration Eligibility',
+            title: locale === 'vi' ? 'Tình trạng đăng ký học phần' : 'Registration Eligibility',
             source: 'academic-catalog',
             locale,
             excerpt:
               locale === 'vi'
-                ? 'Thông tin hạn mức tối đa 28 tín chỉ và thời gian đợt đăng ký môn học.'
-                : 'Registration window and credit allocation limits.',
+                ? 'Thông tin thời gian đợt đăng ký môn học và số tín chỉ cá nhân.'
+                : 'Registration window and personal credit allocation.',
             domain: 'REGISTRATION',
           },
         };

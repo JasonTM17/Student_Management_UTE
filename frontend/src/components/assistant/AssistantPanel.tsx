@@ -53,9 +53,11 @@ export function AssistantPanel() {
   const [deletingConversationId, setDeletingConversationId] =
     useState<string>();
   const [userScrolled, setUserScrolled] = useState(false);
+  const [isMobile, setIsMobile] = useState(false);
 
   // Focus returns to whichever control opened the panel (header or sidebar launcher)
   const triggerRef = useRef<HTMLElement | null>(null);
+  const assistantDialogRef = useRef<HTMLElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const logRef = useRef<HTMLDivElement>(null);
   const selectedHistoryRef = useRef(false);
@@ -92,25 +94,6 @@ export function AssistantPanel() {
     onNewExchange: handleNewExchange,
   });
 
-  // The header badge must reflect the engine that actually answered the last
-  // turn (meta/done carries model), not a fixed marketing label.
-  const modelBadge = useMemo(() => {
-    const model = state.model;
-    if (!model) return null;
-    if (model === 'curated-lexical-rag') return messages.assistant.modelBadgeKnowledge;
-    if (
-      model === 'campuscore-personal-context' ||
-      model === 'CampusCore Student Assistant'
-    ) {
-      return messages.assistant.modelBadgePersonal;
-    }
-    const lower = model.toLowerCase();
-    if (lower.includes('deepseek') || lower.includes('flash')) {
-      return messages.assistant.modelBadgeModel;
-    }
-    return null;
-  }, [state.model, messages]);
-
   // Follow-up chips follow the domain of the last grounded answer instead of
   // repeating the empty-state suggestions after every reply.
   const followUps = useMemo(() => {
@@ -140,6 +123,15 @@ export function AssistantPanel() {
   }, []);
 
   useEffect(() => {
+    const media = window.matchMedia('(max-width: 767px)');
+    const syncMobileState = () => setIsMobile(media.matches);
+
+    syncMobileState();
+    media.addEventListener('change', syncMobileState);
+    return () => media.removeEventListener('change', syncMobileState);
+  }, []);
+
+  useEffect(() => {
     if (!open) return undefined;
     const handleEscape = (event: globalThis.KeyboardEvent) => {
       if (event.key !== 'Escape') return;
@@ -156,6 +148,57 @@ export function AssistantPanel() {
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, showHistory]);
+
+  useEffect(() => {
+    if (!open || !isMobile) return undefined;
+
+    const getFocusable = () => {
+      const root = assistantDialogRef.current;
+      if (!root) return [];
+      return Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+    };
+
+    const handleTab = (event: globalThis.KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const root = assistantDialogRef.current;
+      if (!root) return;
+
+      const activeModal = document.activeElement?.closest(
+        '[role="dialog"][aria-modal="true"]',
+      );
+      if (activeModal && activeModal !== root) return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        root.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      const activeIndex = active ? focusable.indexOf(active) : -1;
+
+      if (!root.contains(active) || activeIndex === -1) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && activeIndex === 0) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeIndex === focusable.length - 1) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    return () => document.removeEventListener('keydown', handleTab);
+  }, [isMobile, open]);
 
   const loadHistory = useCallback(() => {
     if (historyStatus === 'loading') return;
@@ -316,13 +359,15 @@ export function AssistantPanel() {
       >
         {open ? (
           <section
+            ref={assistantDialogRef}
             role="dialog"
-            aria-modal="false"
+            aria-modal={isMobile}
+            tabIndex={-1}
             aria-labelledby="assistant-panel-title"
             aria-describedby="assistant-panel-description"
             className="relative flex h-full flex-col overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
           >
-            {/* Header with quick New Chat, live status indicator, and V4 Flash badge */}
+            {/* Header with quick New Chat and live status indicator */}
             <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
@@ -338,11 +383,6 @@ export function AssistantPanel() {
                     className="flex items-center gap-1.5 font-semibold text-white text-sm"
                   >
                     <span>{messages.assistant.title}</span>
-                    {modelBadge ? (
-                      <span className="shrink-0 rounded bg-white/20 px-1.5 py-0.5 text-[10px] font-medium tracking-wide text-amber-200">
-                        {modelBadge}
-                      </span>
-                    ) : null}
                   </h2>
                   <p
                     id="assistant-panel-description"
@@ -359,7 +399,7 @@ export function AssistantPanel() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                  className="min-h-11 min-w-11 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={() => void createConversation()}
                   aria-label={messages.assistant.newConversation}
                   title={messages.assistant.newConversation}
@@ -372,7 +412,7 @@ export function AssistantPanel() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                  className="min-h-11 min-w-11 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={() => setShowHistory((current) => !current)}
                   aria-label={messages.assistant.history}
                   aria-expanded={showHistory}
@@ -386,7 +426,7 @@ export function AssistantPanel() {
                   type="button"
                   variant="ghost"
                   size="icon"
-                  className="h-8 w-8 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
+                  className="min-h-11 min-w-11 rounded-lg text-white/80 hover:bg-white/15 hover:text-white"
                   onClick={closePanel}
                   aria-label={messages.assistant.close}
                   title={messages.assistant.close}
@@ -447,7 +487,7 @@ export function AssistantPanel() {
                         key={suggestion}
                         type="button"
                         onClick={() => void sendMessage(undefined, suggestion)}
-                        className="rounded-full border border-primary/20 bg-primary/5 px-2.5 py-1 text-[11px] font-medium text-primary hover:bg-primary/10 hover:border-primary/40 transition-colors"
+                        className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                       >
                         {suggestion}
                       </button>
@@ -493,7 +533,9 @@ export function AssistantPanel() {
                       variant="ghost"
                       size="sm"
                       className="mt-2 min-h-10 px-0 text-destructive hover:bg-transparent hover:underline"
-                      onClick={(event) => void sendMessage(event, lastPrompt)}
+                      onClick={(event) =>
+                        void sendMessage(event, lastPrompt, { retry: true })
+                      }
                     >
                       <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
                       {messages.assistant.retry}
