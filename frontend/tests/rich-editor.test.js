@@ -286,6 +286,14 @@ test('sortablejs integration empowers admin block building and announcement reor
   assert.match(appearancePage, /<SortableList/);
   assert.match(announcementsPage, /<SortableList/);
   assert.match(announcementsPage, /modal === 'reorder'/);
+
+  // The reorder dialog is portal-rendered, so keyboard handling must be a native
+  // listener on the container: a React onKeyDown prop never fired there and the
+  // arrow keys silently did nothing in the browser.
+  assert.match(sortableComponent, /addEventListener\('keydown', onKeyDown\)/);
+  assert.match(sortableComponent, /removeEventListener\('keydown', onKeyDown\)/);
+  assert.doesNotMatch(sortableComponent, /onKeyDown=\{handleKeyDown\}/);
+  assert.match(sortableComponent, /phím mũi tên/);
 });
 
 
