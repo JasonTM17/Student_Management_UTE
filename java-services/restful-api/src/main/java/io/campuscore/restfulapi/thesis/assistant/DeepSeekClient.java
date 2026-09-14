@@ -89,8 +89,8 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 || AssistantInputGuard.containsPromptInjection(request.context())) {
             throw invalid("provider prompt injection rejected");
         }
-        AssistantInputGuard.GuardResult contextGuard = AssistantInputGuard.inspect(request.context());
-        if (!contextGuard.allowed()) throw invalid("provider context privacy guard rejected");
+        AssistantInputGuard.GuardResult questionGuard = AssistantInputGuard.inspect(request.question());
+        if (!questionGuard.allowed()) throw invalid("provider question privacy guard rejected");
         if (!bulkhead.tryAcquire()) throw unavailable("provider concurrency limit reached");
         try {
             return executeWithOnePreContentRetry(request, segmentSink == null ? ignored -> { } : segmentSink, cancellation);
