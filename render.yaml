@@ -43,5 +43,5 @@ services:
       - key: DEEPSEEK_TIMEOUT_MS
         value: "15000"
       - key: DEEPSEEK_MAX_OUTPUT_TOKENS
-        value: "800"
+        value: "1200"
 

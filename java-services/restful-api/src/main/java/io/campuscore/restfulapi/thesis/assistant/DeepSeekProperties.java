@@ -24,7 +24,7 @@ public record DeepSeekProperties(
         this.baseUrl = baseUrl == null || baseUrl.isBlank() ? "https://api.deepseek.com" : baseUrl.trim();
         this.model = model == null || model.isBlank() ? "deepseek-v4-flash" : model.trim();
         this.timeoutMs = clamp(timeoutMs <= 0 ? 15_000 : timeoutMs, 1_000, 60_000);
-        this.maxOutputTokens = clamp(maxOutputTokens <= 0 ? 800 : maxOutputTokens, 1, 2_000);
+        this.maxOutputTokens = clamp(maxOutputTokens <= 0 ? 1200 : maxOutputTokens, 1, 2_000);
         this.maxResponseBytes = clamp(maxResponseBytes <= 0 ? 512_000 : maxResponseBytes, 16_384, 2_000_000);
         this.maxFrameBytes = clamp(maxFrameBytes <= 0 ? 64_000 : maxFrameBytes, 1_024, 256_000);
         this.maxConcurrent = clamp(maxConcurrent <= 0 ? 4 : maxConcurrent, 1, 32);

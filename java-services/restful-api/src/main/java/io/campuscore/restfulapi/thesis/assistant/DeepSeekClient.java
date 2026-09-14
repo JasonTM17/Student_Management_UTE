@@ -308,7 +308,7 @@ public class DeepSeekClient implements AssistantCompletionProvider {
         }
         if (!sawDoneMarker) throw invalid("provider stream missing terminal marker");
         if (finishReason == null) throw invalid("provider stream missing finish reason");
-        if (!"stop".equals(finishReason)) throw invalid("provider finish reason rejected");
+        if (!"stop".equals(finishReason) && !"length".equals(finishReason)) throw invalid("provider finish reason rejected: " + finishReason);
         if (answer.isEmpty()) throw unavailable("provider returned no answer", true, null);
         return new CompletionResult(answer.toString().trim(), List.copyOf(segments),
                 finishReason == null ? "stop" : finishReason);
