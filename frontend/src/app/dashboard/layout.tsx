@@ -1058,7 +1058,7 @@ export default function DashboardLayout({
                       >
                         <span className="flex items-center gap-1.5">
                           <Megaphone className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
-                          <span>{locale === 'vi' ? 'Bảng tin Thông báo Phòng Đào Tạo' : 'Academic Affairs Notice Board'}</span>
+                          <span>{locale === 'vi' ? 'Bảng tin Phòng Đào tạo' : 'Academic Affairs Notice Board'}</span>
                         </span>
                         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground" />
                       </LocalizedLink>

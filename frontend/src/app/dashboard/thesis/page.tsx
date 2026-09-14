@@ -1868,7 +1868,7 @@ export default function ThesisPage() {
                     )}
                   >
                     <BookOpen className="h-4 w-4" />
-                    <span>1. Đề Tài & Nhóm Hướng Dẫn (GVHD)</span>
+                    <span>1. Đề tài & nhóm hướng dẫn (GVHD)</span>
                     <span
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
@@ -1891,7 +1891,7 @@ export default function ThesisPage() {
                     )}
                   >
                     <GraduationCap className="h-4 w-4" />
-                    <span>2. Hội Đồng Chấm Bảo Vệ (Điều R6 — R8)</span>
+                    <span>2. Hội đồng chấm bảo vệ (Điều R6 — R8)</span>
                     <span
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
@@ -2072,7 +2072,7 @@ export default function ThesisPage() {
                       </span>
                     </div>
                     <h3 className="mt-1 text-base font-bold text-foreground sm:text-lg">
-                      Kết Quả Đánh Giá & Điểm Số Khóa Luận Tốt Nghiệp
+                      Kết quả đánh giá & điểm số khóa luận tốt nghiệp
                     </h3>
                   </div>
                 </div>
@@ -2108,7 +2108,7 @@ export default function ThesisPage() {
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Xếp Loại Tốt Nghiệp
+                    Xếp loại tốt nghiệp
                   </p>
                   <p className="mt-2 text-xl font-bold text-foreground">
                     {studentGradeInfo.rank}
@@ -2120,7 +2120,7 @@ export default function ThesisPage() {
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Hội Đồng Đánh Giá
+                    Hội đồng đánh giá
                   </p>
                   <p className="mt-2 text-sm font-bold text-foreground truncate">
                     {myResultItem?.councilName || 'Hội đồng Khoa CNTT'}
