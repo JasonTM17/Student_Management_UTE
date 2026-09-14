@@ -326,7 +326,7 @@ export function AnnouncementFeedCard({
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex h-7 w-7 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
               title={isVi ? 'Sao chép liên kết' : 'Copy link'}
               aria-label={isVi ? 'Chia sẻ' : 'Share'}
             >

@@ -646,7 +646,7 @@ export default function StudentConductPage() {
                 onClick={() => {
                   document.getElementById('conduct-activities-section')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="text-primary font-medium cursor-pointer hover:underline focus:outline-none"
+                className="inline-flex min-h-8 items-center text-primary font-medium cursor-pointer hover:underline focus:outline-none"
               >
                 {copy.viewCertificates}
               </button>
@@ -841,7 +841,7 @@ export default function StudentConductPage() {
                           variant="outline"
                           size="sm"
                           onClick={() => setSelectedActivity(act)}
-                          className="h-7 px-2.5 text-xs font-semibold gap-1 text-primary hover:bg-primary/10 transition-colors"
+                          className="h-8 px-2.5 text-xs font-semibold gap-1 text-primary hover:bg-primary/10 transition-colors"
                         >
                           <FileCheck className="h-3.5 w-3.5" />
                           {copy.viewCertificate}

@@ -1757,6 +1757,7 @@ export default function ThesisPage() {
       <PageHeader
         eyebrow={<SectionEyebrow>{messages.thesis.eyebrow}</SectionEyebrow>}
         title={messages.thesis.title}
+        tabLabel={messages.thesis.eyebrow}
         description={messages.thesis.description}
         actions={
           <div className="flex flex-wrap items-end gap-3">
