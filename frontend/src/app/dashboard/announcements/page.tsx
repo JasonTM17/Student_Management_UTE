@@ -65,7 +65,7 @@ const FALLBACK_OFFICIAL_NOTICES: AnnouncementRecord[] = [
   <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
 </ul>`,
     priority: 'HIGH',
-    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào tạo',
     createdAt: '2026-09-08T08:00:00Z',
     publishAt: '2026-09-08T08:00:00Z',
   },
@@ -92,7 +92,7 @@ const FALLBACK_OFFICIAL_NOTICES: AnnouncementRecord[] = [
   <li><strong>Lưu ý:</strong> Sinh viên kiểm tra điều kiện tiên quyết và trùng lịch trước khi xác nhận lưu đăng ký. Mọi thắc mắc liên hệ trực tiếp bàn số 3 Phòng Đào tạo (Tòa nhà Trung tâm).</li>
 </ul>`,
     priority: 'HIGH',
-    publishedBy: 'Phòng Đào Tạo UTE',
+    publishedBy: 'Phòng Đào tạo UTE',
     createdAt: '2026-08-25T08:00:00Z',
     publishAt: '2026-08-25T08:00:00Z',
   },
@@ -106,7 +106,7 @@ const FALLBACK_OFFICIAL_NOTICES: AnnouncementRecord[] = [
   <li><strong>Hạn chót GVPB nộp điểm:</strong> Áp dụng nghiêm ngặt theo mốc thời gian đã ấn định của đợt.</li>
 </ul>`,
     priority: 'HIGH',
-    publishedBy: 'Khoa CNTT & Phòng Đào Tạo',
+    publishedBy: 'Khoa CNTT & Phòng Đào tạo',
     createdAt: '2026-09-01T07:30:00Z',
     publishAt: '2026-09-01T07:30:00Z',
   },
@@ -159,6 +159,7 @@ export default function StudentAnnouncementsPage() {
       ? {
           eyebrow: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM • CỔNG THÔNG TIN HỌC VỤ',
           title: 'Bảng Tin & Thông Báo Đại Học',
+          tabLabel: 'Thông báo',
           description:
             'Kênh tin tức học thuật, nghiên cứu, hướng nghiệp và công văn học vụ chính thức của Nhà trường.',
           refresh: 'Làm mới',
@@ -180,7 +181,7 @@ export default function StudentAnnouncementsPage() {
           filterThesis: 'Đề tài & Luận văn',
           filterScholarship: 'Học bổng & ĐRL',
           filterExam: 'Thi cử & Khảo thí',
-          officialBadge: 'Khoa CNTT & Phòng Đào Tạo',
+          officialBadge: 'Khoa CNTT & Phòng Đào tạo',
           readFull: 'Đọc toàn văn',
           viewMagazine: 'Tạp chí báo',
           viewDispatch: 'Sổ công văn',
@@ -188,6 +189,7 @@ export default function StudentAnnouncementsPage() {
       : {
           eyebrow: 'HCMUTE • ACADEMIC AFFAIRS DEPARTMENT',
           title: 'Campus News & Academic Notices',
+          tabLabel: 'Notices',
           description:
             'Official channel for research news, career opportunities, scholarships, and administrative dispatches.',
           refresh: 'Refresh',
@@ -303,6 +305,7 @@ export default function StudentAnnouncementsPage() {
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
+        tabLabel={copy.tabLabel}
         description={copy.description}
         actions={
           <div className="flex items-center gap-2">

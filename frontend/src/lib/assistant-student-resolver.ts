@@ -73,6 +73,11 @@ const THESIS_REGEX =
 const LECTURER_THESIS_WORK_REGEX =
   /(?:đồ\s*án|do\s*an|khóa\s*luận|khoa\s*luan|đề\s*tài|de\s*ta|nhóm|nhom|hội\s*đồng|hoi\s*dong|chấm|cham|phản\s*biện|phan\s*bien|bảo\s*vệ|bao\s*ve|duyệt|duyet|\bcouncil\b|\bthesis\b|\bcapstone\b|supervis|\bapprove\b|\bgrade\b)/i;
 
+// 5c. Deadline intents (GVPB score deadline, report cutoffs). These mention
+// "điểm" but must NOT be swallowed by the GRADES transcript branch.
+const DEADLINE_INTENT_REGEX =
+  /(?:hạn\s*nộp|hạn\s*chót|nộp\s*điểm|chốt\s*điểm|\bgvpb\b|\bdeadline\b)/i;
+
 const COUNCIL_ROLE_LABELS: Record<string, [string, string]> = {
   CHAIR: ['Chủ tịch hội đồng', 'Council chair'],
   SECRETARY: ['Thư ký hội đồng', 'Council secretary'],
@@ -264,6 +269,7 @@ export function isStudentAssistantQuery(message: string): boolean {
     // question ("Tôi có hội đồng bảo vệ nào?") even without the words
     // "đồ án/thesis"; the branch itself still requires the LECTURER role.
     LECTURER_THESIS_WORK_REGEX.test(message) ||
+    DEADLINE_INTENT_REGEX.test(message) ||
     CURRICULUM_REGEX.test(message) ||
     PROFILE_REGEX.test(message) ||
     REGISTRATION_REGEX.test(message) ||
@@ -864,7 +870,7 @@ export async function resolveStudentAssistantQuery(
   // I have to do for thesis right now?" instead of digging through the portal.
   // The server aggregates this across all rounds in one request (the earlier
   // client-side scan guessed a single "active" round and missed data).
-  if (isLecturer && LECTURER_THESIS_WORK_REGEX.test(message) && !policyQuestion) {
+  if (isLecturer && (LECTURER_THESIS_WORK_REGEX.test(message) || DEADLINE_INTENT_REGEX.test(message)) && !policyQuestion) {
     try {
       const workload = await thesisApi.myWorkload();
       if (workload) {
@@ -1014,7 +1020,7 @@ export async function resolveStudentAssistantQuery(
   }
 
   // B3. Handle Grades, GPA & Transcript queries
-  if (GRADES_REGEX.test(message) && !policyQuestion) {
+  if (GRADES_REGEX.test(message) && !DEADLINE_INTENT_REGEX.test(message) && !policyQuestion) {
     try {
       const transcript = await gradesApi.getMyTranscript();
       const grades = await gradesApi.getMyGrades();
@@ -1380,8 +1386,10 @@ export async function resolveStudentAssistantQuery(
     };
   }
 
-  // E. Handle Thesis / Capstone Graduation queries
-  if (THESIS_REGEX.test(message) && !policyQuestion) {
+  // E. Handle Thesis / Capstone Graduation queries — also catches deadline
+  // questions ("Hạn nộp điểm GVPB là khi nào?") so they are not swallowed by
+  // the GRADES transcript branch.
+  if ((THESIS_REGEX.test(message) || DEADLINE_INTENT_REGEX.test(message)) && !policyQuestion) {
     try {
       const rounds = await thesisApi.listRounds();
       // Multiple rounds can be open at once; the student's group may live in
@@ -1445,6 +1453,7 @@ export async function resolveStudentAssistantQuery(
         }
 
         const reportDateText = formatAssistantDate(activeRound.reportDate, locale);
+        const gvpbDeadlineText = formatAssistantDate(activeRound.gvpbDeadline, locale);
         const roundStatusText = localizedStatus(
           THESIS_ROUND_STATUS_LABELS,
           activeRound.status,
@@ -1467,6 +1476,7 @@ export async function resolveStudentAssistantQuery(
                 ? `• **Trạng thái nhóm:** ${groupStatusText} (Xét duyệt: ${approvalText})\n`
                 : '• **Nhóm đồ án:** Bạn chưa tham gia nhóm đồ án nào trong đợt này.\n') +
               (reportDateText ? `• **Ngày báo cáo / bảo vệ dự kiến:** ${reportDateText}\n` : '') +
+              (gvpbDeadlineText ? `• **Hạn nộp điểm phản biện (GVPB):** ${gvpbDeadlineText}\n` : '') +
               (councilName ? `• **Hội đồng bảo vệ:** ${councilName}\n` : '') +
               (finalScore != null ? `• **Điểm tổng kết:** **${finalScore}/10**\n` : '') +
               `\n💡 Xem chi tiết danh sách đề tài, đăng ký nhóm và nộp báo cáo tại mục **Đồ án tốt nghiệp** (/dashboard/thesis).`
@@ -1478,6 +1488,7 @@ export async function resolveStudentAssistantQuery(
                 ? `• **Group Status:** ${groupStatusText} (Approval: ${approvalText})\n`
                 : '• **Group Status:** You have not joined a thesis group for this round yet.\n') +
               (reportDateText ? `• **Target Defense Date:** ${reportDateText}\n` : '') +
+              (gvpbDeadlineText ? `• **Reviewer score deadline (GVPB):** ${gvpbDeadlineText}\n` : '') +
               (councilName ? `• **Defense Council:** ${councilName}\n` : '') +
               (finalScore != null ? `• **Final Score:** **${finalScore}/10**\n` : '') +
               `\n💡 Manage your thesis proposals and groups under **Thesis & Capstone** (/dashboard/thesis).`;

@@ -26,6 +26,13 @@ export function SectionEyebrow({
 interface PageHeaderProps {
   eyebrow?: React.ReactNode;
   title: React.ReactNode;
+  /**
+   * Short label for the mobile page tab. When the page title is a long
+   * sentence (e.g. "Đồ án tốt nghiệp: từ đề tài đến kết quả."), the tab
+   * would truncate to an unreadable fragment; tabLabel keeps the tab legible
+   * while the full title still renders in the page body.
+   */
+  tabLabel?: React.ReactNode;
   description?: React.ReactNode;
   actions?: React.ReactNode;
   className?: string;
@@ -34,18 +41,19 @@ interface PageHeaderProps {
 export function PageHeader({
   eyebrow: _eyebrow,
   title,
+  tabLabel,
   description: _description,
   actions,
   className,
 }: PageHeaderProps) {
   return (
     <header className={cn('min-w-0', className)}>
-      <div className="relative flex min-w-0 items-center gap-x-4 border-b border-border">
-        <div className="portal-page-tab inline-flex min-w-0 items-center rounded-t-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
-          <h1 className="truncate">{title}</h1>
+      <div className="relative flex flex-col gap-2 border-b border-border sm:flex-row sm:items-center sm:gap-x-4">
+        <div className="portal-page-tab inline-flex max-w-full self-start rounded-t-lg bg-primary px-5 py-2.5 text-sm font-semibold text-primary-foreground">
+          <h1 className="truncate">{tabLabel ?? title}</h1>
         </div>
         {actions ? (
-          <div className="ml-auto flex flex-wrap items-center gap-2 py-1.5">
+          <div className="flex flex-wrap items-center gap-2 py-1.5 sm:ml-auto">
             {actions}
           </div>
         ) : null}
