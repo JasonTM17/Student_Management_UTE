@@ -94,7 +94,7 @@ export function WorkspacePanel({
   return (
     <Card variant={variant} className={cn('min-w-0', className)}>
       <CardHeader className="border-b border-border/70 pb-4">
-        <CardTitle>{title}</CardTitle>
+        <CardTitle as="h2">{title}</CardTitle>
         {description ? <CardDescription>{description}</CardDescription> : null}
       </CardHeader>
       <CardContent className={cn('min-w-0', contentClassName)}>{children}</CardContent>

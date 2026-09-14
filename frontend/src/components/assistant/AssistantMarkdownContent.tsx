@@ -10,6 +10,7 @@ import {
   sanitizeStreamingMarkdown,
   splitAssistantBlocks,
 } from '@/lib/assistant-inline-markdown-regex';
+import { sanitizeAssistantOutput } from '@/lib/assistant-output-guard';
 
 interface AssistantMarkdownContentProps {
   content: string;
@@ -23,9 +24,12 @@ export function AssistantMarkdownContent({
   className,
   streaming = false,
 }: AssistantMarkdownContentProps) {
-  const { href } = useI18n();
+  const { href, messages } = useI18n();
   const router = useRouter();
-  const safeContent = streaming ? sanitizeStreamingMarkdown(content) : content;
+  const safeContent = sanitizeAssistantOutput(
+    streaming ? sanitizeStreamingMarkdown(content) : content,
+    messages.assistant.technicalBlocked,
+  );
 
   // Structural blocks: pipe tables stay table-scoped; consecutive plain-text
   // lines merge into one paragraph (see splitAssistantBlocks).

@@ -57,7 +57,7 @@ export function AssistantComposer({
           placeholder={messages.assistant.placeholder}
           rows={2}
           maxLength={2000}
-          className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-sm leading-6 text-foreground outline-none placeholder:text-muted-foreground"
+          className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
           aria-label={messages.assistant.placeholder}
         />
         {isSending ? (

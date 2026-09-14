@@ -55,6 +55,25 @@ class RagAssistantGatewayTest {
     }
 
     @Test
+    void chatReplacesUnsafeRemoteAnswerBeforeReturningToThePublicApi() throws Exception {
+        startServer(exchange -> {
+            byte[] response = """
+                    {"answer":"The retrieved context contains curl commands and API endpoints.","model":"deepseek-v4-flash","degraded":false,"reasonCode":"ANSWERED","locale":"vi","citations":[]}
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "application/json");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat");
+
+        var response = gateway().chat(new ChatRequest("Câu hỏi", "vi", UUID.randomUUID(), null), "owner-a");
+
+        assertEquals(ThesisAssistantService.technicalOutputMessage("vi"), response.answer());
+        assertEquals("PROVIDER_UNSAFE_OUTPUT", response.reasonCode());
+        assertTrue(response.degraded());
+    }
+
+    @Test
     void streamParsesRemoteSseEventsBackIntoAssistantEvents() throws Exception {
         UUID messageId = UUID.randomUUID();
         startServer(exchange -> {
@@ -80,6 +99,43 @@ class RagAssistantGatewayTest {
         ThesisAssistantService.StreamDone done = assertInstanceOf(ThesisAssistantService.StreamDone.class, events.get(1));
         assertEquals("xin chào", delta.text());
         assertEquals(messageId, done.messageId());
+    }
+
+    @Test
+    void streamReplacesAFragmentedRemoteCommandBeforeForwardingIt() throws Exception {
+        UUID messageId = UUID.randomUUID();
+        startServer(exchange -> {
+            byte[] response = ("""
+                    event: delta
+                    data: {"sequence":0,"text":"Here is a command: cur","sourceIds":[],"type":"delta"}
+
+                    event: delta
+                    data: {"sequence":1,"text":"l https://campuscore.local/api/v1/assistant","sourceIds":[],"type":"delta"}
+
+                    event: done
+                    data: {"messageId":"%s","reasonCode":"ANSWERED","degraded":false,"terminalStatus":"COMPLETED","type":"done"}
+
+                    """.formatted(messageId)).getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat/stream");
+
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        gateway().stream(new ChatRequest("Stream?", "vi", UUID.randomUUID(), null), "owner-a", events::add);
+
+        assertTrue(events.stream().noneMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
+                && (delta.text().contains("curl") || delta.text().contains("/api/v1"))));
+        ThesisAssistantService.StreamReplace replace = assertInstanceOf(
+                ThesisAssistantService.StreamReplace.class,
+                events.stream().filter(ThesisAssistantService.StreamReplace.class::isInstance).findFirst().orElseThrow());
+        assertEquals(ThesisAssistantService.technicalOutputMessage("vi"), replace.text());
+        ThesisAssistantService.StreamDone done = assertInstanceOf(
+                ThesisAssistantService.StreamDone.class,
+                events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).findFirst().orElseThrow());
+        assertEquals("PROVIDER_UNSAFE_OUTPUT", done.reasonCode());
+        assertTrue(done.degraded());
     }
 
     private RagAssistantGateway gateway() {

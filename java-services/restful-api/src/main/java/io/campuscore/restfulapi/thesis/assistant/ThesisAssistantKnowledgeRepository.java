@@ -50,12 +50,16 @@ public class ThesisAssistantKnowledgeRepository {
                 .addValue("locale", locale)
                 .addValue("limit", limit);
         List<String> predicates = new ArrayList<>();
+        List<String> scoreTerms = new ArrayList<>();
         for (int index = 0; index < usableTerms.size(); index++) {
             String parameter = "term" + index;
             params.addValue(parameter, "%" + usableTerms.get(index) + "%");
             predicates.add("(LOWER(p.title) LIKE :" + parameter
                     + " OR LOWER(p.content) LIKE :" + parameter + ")");
+            scoreTerms.add("(CASE WHEN LOWER(p.title) LIKE :" + parameter + " THEN 3 ELSE 0 END + "
+                    + "CASE WHEN LOWER(p.content) LIKE :" + parameter + " THEN 1 ELSE 0 END)");
         }
+        String scoreExpression = String.join(" + ", scoreTerms);
 
         String sql = "SELECT p.source_id AS id, p.slug, p.locale, p.title, p.content, p.source, p.domain, p.revision_id, p.version AS revision_version, "
                 + "rel.id AS release_id, rel.corpus_version, rel.corpus_hash "
@@ -66,12 +70,14 @@ public class ThesisAssistantKnowledgeRepository {
                 + "AND p.locale IN (:locale, 'both') "
                 + "AND (" + String.join(" OR ", predicates) + ") "
                 + "ORDER BY CASE WHEN p.locale = :locale THEN 0 ELSE 1 END, "
+                + "(" + scoreExpression + ") DESC, "
                 + "p.priority ASC, p.published_at DESC, p.slug ASC LIMIT :limit";
         try {
             return jdbc.query(sql, params, ROW_MAPPER);
         } catch (org.springframework.jdbc.BadSqlGrammarException missingProjection) {
             // Focused pre-V16 fixtures can still exercise lexical retrieval.
             if (!allowLegacyFallback) throw missingProjection;
+            String legacyScoreExpression = scoreExpression.replace("p.", "r.");
             String legacySql = "SELECT CAST(d.id AS VARCHAR) AS id, d.slug, r.locale, r.title, r.content, r.source, 'THESIS' AS domain, r.id AS revision_id, r.version AS revision_version, "
                     + "NULL AS release_id, NULL AS corpus_version, NULL AS corpus_hash "
                     + "FROM assistant.knowledge_document d "
@@ -80,6 +86,7 @@ public class ThesisAssistantKnowledgeRepository {
                     + "AND r.locale IN (:locale, 'both') "
                     + "AND (" + String.join(" OR ", predicates).replace("p.", "r.") + ") "
                     + "ORDER BY CASE WHEN r.locale = :locale THEN 0 ELSE 1 END, "
+                    + "(" + legacyScoreExpression + ") DESC, "
                     + "r.priority ASC, r.published_at DESC, d.slug ASC LIMIT :limit";
             return jdbc.query(legacySql, params, ROW_MAPPER);
         }

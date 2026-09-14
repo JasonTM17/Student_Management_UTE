@@ -81,6 +81,35 @@ test('assistant panel opens from dashboard entries and restores focus to its tri
   assert.match(source, /triggerRef\.current\?\.focus\(\)/);
 });
 
+test('quick suggestions create user turns while retries remain explicit', () => {
+  const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+
+  assert.match(hookSource, /interface SendMessageOptions/);
+  assert.match(hookSource, /const isRetry = options\?\.retry === true/);
+  assert.match(panelSource, /sendMessage\(event, lastPrompt, \{ retry: true \}\)/);
+  assert.match(panelSource, /sendMessage\(undefined, suggestion\)/);
+});
+
+test('mobile assistant and sidebar dialogs keep keyboard focus inside the active overlay', () => {
+  const assistant = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  const layout = fs.readFileSync(path.join(root, 'src/app/dashboard/layout.tsx'), 'utf8');
+
+  assert.match(assistant, /assistantDialogRef/);
+  assert.match(assistant, /aria-modal=\{isMobile\}/);
+  assert.match(assistant, /if \(event\.key !== 'Tab'\) return/);
+  assert.match(layout, /if \(event\.key !== 'Tab'\) return/);
+  assert.match(layout, /focusable\.indexOf\(active\)/);
+});
+
+test('workspace panels expose a semantic second-level heading without changing card styling', () => {
+  const card = fs.readFileSync(path.join(root, 'src/components/ui/card.tsx'), 'utf8');
+  const workspace = fs.readFileSync(path.join(root, 'src/components/dashboard/WorkspaceSurface.tsx'), 'utf8');
+
+  assert.match(card, /as\?: 'h2' \| 'h3' \| 'h4'/);
+  assert.match(workspace, /<CardTitle as="h2">\{title\}<\/CardTitle>/);
+});
+
 test('assistant history routes URI-encode owner-scoped identifiers', () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
   assert.match(source, /conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);
@@ -342,12 +371,26 @@ test('student resolver defers regulation questions to the knowledge base', () =>
   assert.equal(isPolicyQuestion('Hội đồng bảo vệ có bao nhiêu thành viên?'), true);
   assert.equal(isPolicyQuestion('Điểm cuối cùng của đề tài tính thế nào?'), true);
   assert.equal(isPolicyQuestion('Giảng viên hướng dẫn tối đa mấy người?'), true);
+  assert.equal(isPolicyQuestion('Học phần tiên quyết khác học phần học trước như thế nào?'), true);
+  assert.equal(isPolicyQuestion('So sánh môn tiên quyết và môn song hành?'), true);
+  assert.equal(isPolicyQuestion('Bị điểm F môn bắt buộc thì xử lý thế nào?'), true);
+  assert.equal(isPolicyQuestion('Hạn nộp học phí học kỳ này khi nào?'), true);
+  assert.equal(isPolicyQuestion('Quy định cảnh báo học vụ các mức?'), true);
+  assert.equal(isPolicyQuestion('Tiêu chuẩn xét học bổng khuyến khích?'), true);
+  assert.equal(isPolicyQuestion('Chuẩn đầu ra tốt nghiệp cần chứng chỉ gì?'), true);
 
   // Personal records questions still resolve locally.
   assert.equal(isPolicyQuestion('đồ án tốt nghiệp của tôi'), false);
   assert.equal(isPolicyQuestion('Tôi được đăng ký tối đa bao nhiêu tín chỉ?'), false);
   assert.equal(isPolicyQuestion('điểm của tôi học kỳ này'), false);
   assert.equal(isPolicyQuestion('lịch học hôm nay'), false);
+
+  // Regulation questions containing personal pronouns ("của tôi", "em", "mình") are still recognized as policy questions
+  assert.equal(isPolicyQuestion('điểm F của em có phải học lại không?'), true);
+  assert.equal(isPolicyQuestion('học phí của tôi nộp qua đâu theo quy chế?'), true);
+  assert.equal(isPolicyQuestion('chuẩn đầu ra tốt nghiệp của mình gồm những gì?'), true);
+  assert.equal(isPolicyQuestion('em muốn hỏi điều kiện xét học bổng khuyến khích?'), true);
+  assert.equal(isPolicyQuestion('thưa thầy học phần tiên quyết của em là gì?'), true);
 });
 
 test('regulation questions fall through the resolver to the server', async () => {
@@ -366,6 +409,77 @@ test('regulation questions fall through the resolver to the server', async () =>
     'vi',
   );
   assert.equal(thesisRules, null);
+
+  // Academic regulations (prerequisites, grade F, retakes, tuition deadlines) must fall through to server RAG
+  const prereqRules = await resolveStudentAssistantQuery(
+    'Học phần tiên quyết khác học phần học trước như thế nào?',
+    'vi',
+  );
+  assert.equal(prereqRules, null);
+
+  const retakeRules = await resolveStudentAssistantQuery(
+    'Bị điểm F môn bắt buộc thì xử lý như thế nào?',
+    'vi',
+  );
+  assert.equal(retakeRules, null);
+
+  const tuitionRules = await resolveStudentAssistantQuery(
+    'Thời hạn nộp học phí học kỳ hè là khi nào?',
+    'vi',
+  );
+  assert.equal(tuitionRules, null);
+
+  // Explicit contract assertions for academic questions returning null from resolveStudentAssistantQuery
+  assert.equal(
+    await resolveStudentAssistantQuery('điểm F có phải học lại không', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('học phí nộp qua đâu theo quy chế', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('học phí', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('nộp học phí', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('công nợ học phí', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('học phí của tôi còn nợ không', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('chuẩn đầu ra tốt nghiệp gồm những gì', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('học phần tiên quyết là gì', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('điều kiện xét học bổng khuyến khích', 'vi'),
+    null,
+  );
+
+  // Even with personal pronouns, academic regulation queries must return null
+  assert.equal(
+    await resolveStudentAssistantQuery('điểm F của em có phải học lại không', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('học phí của tôi nộp qua đâu theo quy chế', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('chuẩn đầu ra tốt nghiệp của mình gồm những gì', 'vi'),
+    null,
+  );
 
   // Genuine schedule questions still resolve locally when data is present.
   const enrollments = [
@@ -410,6 +524,50 @@ test('resolver personalizes thesis status dates and enums', () => {
   assert.match(source, /thesisApi\.myResults\(activeRound\.id\)/);
 });
 
+test('student thesis answers expose the registration deadline from the round API', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const round = {
+    id: 'round-2026',
+    name: 'KLTN 2026-2027',
+    thesisType: 'KLTN',
+    registrationStart: '2026-10-16T00:00:00Z',
+    registrationEnd: '2026-11-15T00:00:00Z',
+    lecturerSubmitStart: '2026-09-01T00:00:00Z',
+    lecturerSubmitEnd: '2026-10-01T00:00:00Z',
+    gvpbDeadline: '2026-12-01T00:00:00Z',
+    reportDate: '2026-12-15T00:00:00Z',
+    status: 'REGISTRATION_OPEN',
+  };
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
+    if (name === '@/lib/api') {
+      return { authApi: { me: async () => ({ id: 'student-user', roles: ['STUDENT'] }) } };
+    }
+    if (name === '@/lib/thesis-api') {
+      return {
+        thesisApi: {
+          listRounds: async () => [round],
+          listGroups: async () => [],
+        },
+      };
+    }
+    return {};
+  });
+
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
+  const resolution = await resolveStudentAssistantQuery(
+    'Hạn chót đăng ký khóa luận tốt nghiệp là khi nào?',
+    'vi',
+  );
+
+  assert.ok(resolution);
+  assert.match(resolution.answer, /Hạn chót đăng ký[^\n]*15\/11\/2026/);
+  assert.doesNotMatch(resolution.answer, /Hạn chót đăng ký[^\n]*Chưa được cập nhật/);
+});
+
 test('assistant internal route linkification matches after punctuation and spaces', () => {
   const { ASSISTANT_INLINE_MARKDOWN_REGEX } = load('src/lib/assistant-inline-markdown-regex.ts');
   const re = () => new RegExp(ASSISTANT_INLINE_MARKDOWN_REGEX.source, ASSISTANT_INLINE_MARKDOWN_REGEX.flags);
@@ -445,11 +603,13 @@ test('assistant UI strings are localized and reason labels cover personal contex
   const composerSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantComposer.tsx'), 'utf8');
   assert.doesNotMatch(composerSource, /Enter để gửi · Shift\+Enter xuống dòng/);
   assert.match(composerSource, /messages\.assistant\.composerHint/);
+  assert.match(composerSource, /text-base[\s\S]*md:text-sm/);
 
   const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
   assert.doesNotMatch(panelSource, /aria-label="Cuộc trò chuyện mới"/);
-  assert.doesNotMatch(panelSource, />\s*V4 Flash\s*</);
-  assert.match(panelSource, /modelBadge/);
+  assert.doesNotMatch(panelSource, /V4 Flash/);
+  assert.doesNotMatch(panelSource, /modelBadge/);
+  assert.match(messagesSource, /technicalBlocked:/);
   assert.match(panelSource, /followUpsByDomain/);
   // Mobile opens as a full-screen sheet; desktop keeps the floating card.
   assert.match(panelSource, /inset-0 md:inset-auto/);
@@ -462,6 +622,30 @@ test('assistant UI strings are localized and reason labels cover personal contex
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   assert.match(hookSource, /inspectAssistantInput/);
   assert.match(hookSource, /reasonCode: 'PERSONAL_CONTEXT'/);
+});
+
+test('assistant output guard hides technical commands from rendered and copied answers', () => {
+  const guard = load('src/lib/assistant-output-guard.ts');
+  assert.equal(guard.isAssistantOutputSafe('Hạn đăng ký học phần là ngày 15/11/2026.'), true);
+  assert.equal(guard.isAssistantOutputSafe('```bash\ncurl https://campuscore.local/api/v1/assistant\n```'), false);
+  assert.equal(guard.isAssistantOutputSafe('The retrieved context does not contain API endpoints, curl commands, or Docker Compose instructions.'), false);
+  assert.equal(guard.isAssistantOutputSafe('Mình không thể cung cấp chi tiết kỹ thuật nội bộ.'), true);
+  assert.equal(
+    guard.sanitizeAssistantOutput(
+      'The retrieved context mentions curl commands.',
+      'Mình chỉ hỗ trợ thông tin học vụ công khai.',
+    ),
+    'Mình chỉ hỗ trợ thông tin học vụ công khai.',
+  );
+
+  const markdownSource = fs.readFileSync(
+    path.join(root, 'src/components/assistant/AssistantMarkdownContent.tsx'),
+    'utf8',
+  );
+  const messagesComponent = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantMessages.tsx'), 'utf8');
+  assert.match(markdownSource, /sanitizeAssistantOutput/);
+  assert.match(messagesComponent, /writeText\(visibleContent\)/);
+  assert.doesNotMatch(messagesComponent, /citation\.source/);
 });
 
 test('streaming markdown trims only unclosed trailing constructs', () => {

@@ -40,6 +40,10 @@ export interface UseAssistantStreamOptions {
   onNewExchange?: () => void;
 }
 
+interface SendMessageOptions {
+  retry?: boolean;
+}
+
 export function useAssistantStream({
   locale,
   assistantMessages,
@@ -148,11 +152,12 @@ export function useAssistantStream({
     async (
       event?: FormEvent<HTMLFormElement> | React.SyntheticEvent,
       retryPrompt?: string,
+      options?: SendMessageOptions,
     ) => {
       event?.preventDefault();
       const message = (retryPrompt ?? input).trim();
       if (!message || isSending || isSendingRef.current) return;
-      const isRetry = retryPrompt !== undefined;
+      const isRetry = options?.retry === true;
       isSendingRef.current = true;
       setInput('');
       setLastPrompt(message);

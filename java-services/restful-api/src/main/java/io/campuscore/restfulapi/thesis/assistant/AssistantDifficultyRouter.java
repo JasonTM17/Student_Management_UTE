@@ -11,12 +11,17 @@ import java.util.Locale;
  * independent knowledge documents.
  */
 final class AssistantDifficultyRouter {
-    private static final int LONG_QUESTION_CHARS = 180;
-    private static final int MANY_TERMS = 12;
+    private static final int LONG_QUESTION_CHARS = 110;
+    private static final int MANY_TERMS = 8;
     private static final List<String> COMPLEX_MARKERS = List.of(
             "so sanh", "khac nhau", "tai sao", "vi sao", "nhu the nao", "lam the nao",
-            "huong dan", "cac buoc", "ngoai le", "truong hop", "neu ", "compare",
-            "difference", "why", "how", "steps", "exception", "case");
+            "huong dan", "cac buoc", "ngoai le", "truong hop", "neu ", "phan biet",
+            "dieu kien", "quy che", "quy dinh", "chi tiet", "tong hop", "phan tich",
+            "giai thich", "co duoc", "co the", "khi nao", "the nao", "yeu cau",
+            "thu tuc", "phuong thuc", "canh bao", "muc 1", "muc 2", "hoc bong",
+            "tot nghiep", "tu van", "dieu kien gi", "can nhung gi",
+            "compare", "difference", "why", "how", "steps", "exception", "case",
+            "explain", "analyze", "distinguish");
 
     private AssistantDifficultyRouter() {
     }

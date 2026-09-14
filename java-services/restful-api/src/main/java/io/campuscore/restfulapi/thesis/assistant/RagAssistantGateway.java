@@ -65,7 +65,9 @@ public class RagAssistantGateway {
     }
 
     public ChatResponse chat(ChatRequest request, String ownerId) {
-        return exchangeJson("POST", "/chat", Map.of(), Map.of(), request, ownerId, new TypeReference<ChatResponse>() { }).data();
+        ChatResponse response = exchangeJson("POST", "/chat", Map.of(), Map.of(), request, ownerId,
+                new TypeReference<ChatResponse>() { }).data();
+        return guardResponse(response, request == null ? "vi" : request.locale());
     }
 
     public ChatResponse complete(ChatRequest request, String ownerId) {
@@ -116,7 +118,7 @@ public class RagAssistantGateway {
                 throw problem(response.statusCode(), new String(response.body().readAllBytes(), StandardCharsets.UTF_8));
             }
             try (BufferedReader reader = new BufferedReader(new InputStreamReader(response.body(), StandardCharsets.UTF_8))) {
-                parseStream(reader, sink);
+                parseStream(reader, guardedSink(sink, request == null ? "vi" : request.locale()));
             }
         } catch (IOException exception) {
             throw unavailable("RAG_SERVICE_UNAVAILABLE", "RAG service request failed");
@@ -255,6 +257,92 @@ public class RagAssistantGateway {
             }
         }
         emit(eventName, data.toString(), sink);
+    }
+
+    /**
+     * The gateway is also a public backend boundary. Keep it safe if a remote
+     * RAG service is older, misconfigured, or returns an answer that bypasses
+     * the local service guard.
+     */
+    private static Consumer<ThesisAssistantService.StreamEvent> guardedSink(
+            Consumer<ThesisAssistantService.StreamEvent> downstream, String locale) {
+        if (downstream == null) {
+            return ignored -> { };
+        }
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        StringBuilder answer = new StringBuilder();
+        boolean[] blocked = { false };
+        return event -> {
+            if (event instanceof ThesisAssistantService.StreamDelta delta) {
+                if (blocked[0]) return;
+                String text = delta.text() == null ? "" : delta.text();
+                String candidate = answer + text;
+                if (!AssistantOutputGuard.isSafe(candidate)) {
+                    blocked[0] = true;
+                    answer.setLength(0);
+                    downstream.accept(new ThesisAssistantService.StreamReplace(
+                            ThesisAssistantService.technicalOutputMessage(normalizedLocale), List.of(),
+                            "PROVIDER_UNSAFE_OUTPUT"));
+                    return;
+                }
+                answer.append(text);
+                downstream.accept(event);
+                return;
+            }
+            if (event instanceof ThesisAssistantService.StreamReplace replace) {
+                if (blocked[0]) return;
+                String text = replace.text() == null ? "" : replace.text();
+                if (!AssistantOutputGuard.isSafe(text)) {
+                    blocked[0] = true;
+                    answer.setLength(0);
+                    downstream.accept(new ThesisAssistantService.StreamReplace(
+                            ThesisAssistantService.technicalOutputMessage(normalizedLocale), List.of(),
+                            "PROVIDER_UNSAFE_OUTPUT"));
+                    return;
+                }
+                answer.setLength(0);
+                answer.append(text);
+                downstream.accept(event);
+                return;
+            }
+            if (event instanceof ThesisAssistantService.StreamCitation citation) {
+                if (!blocked[0] && safeCitation(citation.citation())) {
+                    downstream.accept(event);
+                }
+                return;
+            }
+            if (event instanceof ThesisAssistantService.StreamDone done && blocked[0]) {
+                downstream.accept(new ThesisAssistantService.StreamDone(
+                        done.messageId(), "PROVIDER_UNSAFE_OUTPUT", true, done.terminalStatus()));
+                return;
+            }
+            downstream.accept(event);
+        };
+    }
+
+    private static ChatResponse guardResponse(ChatResponse response, String locale) {
+        if (response == null) return null;
+        List<io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation> citations =
+                response.citations() == null ? List.of() : response.citations().stream()
+                        .filter(RagAssistantGateway::safeCitation).toList();
+        boolean unsafeAnswer = !AssistantOutputGuard.isSafe(response.answer());
+        if (!unsafeAnswer && citations.size() == (response.citations() == null ? 0 : response.citations().size())) {
+            return response;
+        }
+        return new ChatResponse(
+                unsafeAnswer ? ThesisAssistantService.technicalOutputMessage(locale) : response.answer(),
+                response.model(), unsafeAnswer || response.degraded(),
+                unsafeAnswer ? "PROVIDER_UNSAFE_OUTPUT" : response.reasonCode(),
+                AssistantInputGuard.normalizeLocale(locale), citations, response.requestId(),
+                response.clientRequestId(), response.turnId(), response.replayed(), response.terminalStatus(),
+                response.conversationId(), response.messageId());
+    }
+
+    private static boolean safeCitation(ThesisAssistantDtos.Citation citation) {
+        return citation != null
+                && AssistantOutputGuard.isSafe(citation.title())
+                && AssistantOutputGuard.isSafe(citation.excerpt())
+                && AssistantOutputGuard.isSafe(citation.source());
     }
 
     private void emit(String eventName, String payload, Consumer<ThesisAssistantService.StreamEvent> sink) throws IOException {

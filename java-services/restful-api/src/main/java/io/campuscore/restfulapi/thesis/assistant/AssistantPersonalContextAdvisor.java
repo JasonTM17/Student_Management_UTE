@@ -83,6 +83,9 @@ public class AssistantPersonalContextAdvisor {
         if (answer == null) {
             return null;
         }
+        if (!AssistantOutputGuard.isSafe(answer)) {
+            answer = ThesisAssistantService.technicalOutputMessage(locale);
+        }
         return new ChatResponse(answer, MODEL, false, REASON_CODE, locale, List.of());
     }
 
@@ -93,6 +96,9 @@ public class AssistantPersonalContextAdvisor {
         String answer = composeAnswer(actor, locale, message);
         if (answer == null) {
             answer = fallbackMessage(locale);
+        }
+        if (!AssistantOutputGuard.isSafe(answer)) {
+            answer = ThesisAssistantService.technicalOutputMessage(locale);
         }
         sink.accept(new ThesisAssistantService.StreamMeta(
                 UUID.randomUUID(), request.clientRequestId(), null, null, MODEL, locale));

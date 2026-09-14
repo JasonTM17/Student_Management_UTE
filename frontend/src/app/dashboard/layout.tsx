@@ -462,11 +462,59 @@ export default function DashboardLayout({
 
   useEffect(() => {
     if (!sidebarOpen || isDesktopSidebar) {
-      return;
+      return undefined;
     }
 
     const frame = window.requestAnimationFrame(() => sidebarCloseRef.current?.focus());
-    return () => window.cancelAnimationFrame(frame);
+    const getFocusable = () => {
+      const root = sidebarRef.current;
+      if (!root) return [];
+      return Array.from(
+        root.querySelectorAll<HTMLElement>(
+          'button:not([disabled]), a[href], input:not([disabled]), select:not([disabled]), textarea:not([disabled]), [tabindex]:not([tabindex="-1"])',
+        ),
+      ).filter((element) => element.getClientRects().length > 0);
+    };
+
+    const handleTab = (event: KeyboardEvent) => {
+      if (event.key !== 'Tab') return;
+      const root = sidebarRef.current;
+      if (!root) return;
+
+      const activeModal = document.activeElement?.closest(
+        '[role="dialog"][aria-modal="true"]',
+      );
+      if (activeModal && activeModal !== root) return;
+
+      const focusable = getFocusable();
+      if (focusable.length === 0) {
+        event.preventDefault();
+        root.focus();
+        return;
+      }
+
+      const first = focusable[0];
+      const last = focusable[focusable.length - 1];
+      const active = document.activeElement as HTMLElement | null;
+      const activeIndex = active ? focusable.indexOf(active) : -1;
+
+      if (!root.contains(active) || activeIndex === -1) {
+        event.preventDefault();
+        (event.shiftKey ? last : first).focus();
+      } else if (event.shiftKey && activeIndex === 0) {
+        event.preventDefault();
+        last.focus();
+      } else if (!event.shiftKey && activeIndex === focusable.length - 1) {
+        event.preventDefault();
+        first.focus();
+      }
+    };
+
+    document.addEventListener('keydown', handleTab);
+    return () => {
+      window.cancelAnimationFrame(frame);
+      document.removeEventListener('keydown', handleTab);
+    };
   }, [isDesktopSidebar, sidebarOpen]);
 
   useEffect(() => {
@@ -663,6 +711,7 @@ export default function DashboardLayout({
         aria-modal={!isDesktopSidebar && sidebarOpen ? true : undefined}
         aria-hidden={!isDesktopSidebar && !sidebarOpen}
         inert={!isDesktopSidebar && !sidebarOpen ? true : undefined}
+        tabIndex={-1}
         className={cn(
           'portal-sidebar fixed inset-y-0 left-0 z-50 flex w-[var(--portal-sidebar-width)] max-w-[calc(100vw-3rem)] flex-col border-r border-white/10 shadow-xl transition-[transform,width] duration-200 [transition-timing-function:var(--portal-ease)] lg:translate-x-0 print:hidden',
           sidebarCollapsed
@@ -919,7 +968,7 @@ export default function DashboardLayout({
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="lg:hidden"
+                className="min-h-11 min-w-11 lg:hidden"
                 onClick={() => setSidebarOpen(true)}
                 aria-label={messages.dashboardShell.controls.openSidebar}
                 aria-expanded={sidebarOpen}
@@ -973,7 +1022,7 @@ export default function DashboardLayout({
                 <LanguageToggle />
               </div>
               <div className="flex items-center">
-                <ThemeToggle className="h-10 w-10 text-muted-foreground hover:bg-secondary/60 hover:text-foreground" />
+                <ThemeToggle className="min-h-11 min-w-11 text-muted-foreground hover:bg-secondary/60 hover:text-foreground" />
               </div>
 
               <div className="relative" ref={notificationsRef}>

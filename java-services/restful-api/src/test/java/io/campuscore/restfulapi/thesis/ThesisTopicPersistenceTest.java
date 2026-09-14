@@ -121,7 +121,9 @@ class ThesisTopicPersistenceTest {
         mvc.perform(get("/api/v1/thesis/rounds").with(jwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value(later.toString()))
-                .andExpect(jsonPath("$[0].status").value("REGISTRATION_OPEN"));
+                .andExpect(jsonPath("$[0].status").value("REGISTRATION_OPEN"))
+                .andExpect(jsonPath("$[0].registrationStart").exists())
+                .andExpect(jsonPath("$[0].registrationEnd").exists());
 
         mvc.perform(get("/api/v1/thesis/rounds")
                         .queryParam("status", "DRAFT")
