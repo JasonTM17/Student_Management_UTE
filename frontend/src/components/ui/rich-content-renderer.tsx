@@ -1,6 +1,8 @@
 'use client';
 
 import React, { useState } from 'react';
+
+import { sanitizeAnnouncementHtml } from '@/lib/html-sanitizer';
 import {
   AlertCircle,
   AlertTriangle,
@@ -321,15 +323,14 @@ function MarkdownTable({ rows }: { rows: string[] }) {
   );
 }
 
+/**
+ * HTML bodies are rebuilt from an allowlist. The previous attribute blacklist
+ * let `<img src=x/onerror=…>` through because its `on\w+` pattern required a
+ * leading whitespace, which made every lecturer-authored announcement a
+ * stored-XSS vector for student feeds.
+ */
 function sanitizeHtml(html: string): string {
-  if (!html) return '';
-  return html
-    .replace(/<script\b[^<]*(?:(?!<\/script>)<[^<]*)*<\/script>/gi, '')
-    .replace(/<iframe\b[^<]*(?:(?!<\/iframe>)<[^<]*)*<\/iframe>/gi, '')
-    .replace(/<object\b[^<]*(?:(?!<\/object>)<[^<]*)*<\/object>/gi, '')
-    .replace(/<embed\b[^<]*(?:(?!<\/embed>)<[^<]*)*<\/embed>/gi, '')
-    .replace(/\son\w+\s*=\s*(?:'[^']*'|"[^"]*"|[^\s>]+)/gi, '')
-    .replace(/href\s*=\s*["']?\s*(?:javascript|vbscript):[^"'>\s]*/gi, 'href="#"');
+  return sanitizeAnnouncementHtml(html);
 }
 
 function isHtmlDocument(raw: string): boolean {

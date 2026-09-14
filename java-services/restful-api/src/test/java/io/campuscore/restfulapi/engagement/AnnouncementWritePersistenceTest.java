@@ -60,6 +60,25 @@ class AnnouncementWritePersistenceTest {
     @BeforeEach
     void prepareWriteFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        // The feed endpoint this class asserts against consults the enrollment
+        // table for section-scoped notices.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "sectionId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL
+                )
+                """);
+        jdbc.execute("DELETE FROM academic.\"Enrollment\"");
+        // The seeded notice is scoped to section-1, so the student who must see
+        // it is enrolled there.
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-1", "student-profile", "section-1", "semester-1", "ENROLLED");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"AnnouncementAudit\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"Announcement\"");
         jdbc.execute("""

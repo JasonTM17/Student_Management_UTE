@@ -42,6 +42,20 @@ class AnnouncementReadPersistenceTest {
     @BeforeEach
     void prepareReadOnlyFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        // The reader scopes section-targeted notices to enrolled students, so the
+        // fixture owns the enrollment table it consults (the H2 mirror excludes it
+        // by design; Postgres V14 owns the real unique indexes).
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS academic");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS academic."Enrollment" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "sectionId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL
+                )
+                """);
+        jdbc.execute("DELETE FROM academic.\"Enrollment\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"AnnouncementAudit\"");
         jdbc.execute("DROP TABLE IF EXISTS \"engagement\".\"Announcement\"");
         jdbc.execute("""
@@ -142,6 +156,65 @@ class AnnouncementReadPersistenceTest {
                                 .claim("student", Map.of("year", Long.MAX_VALUE)))))
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("ACCESS_DENIED"));
+    }
+
+    @Test
+    void droppedEnrollmentDoesNotGrantSectionNoticeVisibility() throws Exception {
+        insert(fixture("dropped-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-dropped", "03", "CS103", "Networks"));
+        insert(fixture("still-enrolled", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T11:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-active", "04", "CS104", "Databases"));
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-dropped", "student-profile", "section-dropped", "semester-1", "DROPPED");
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-active", "student-profile", "section-active", "semester-1", "ENROLLED");
+
+        // A withdrawn student is not enrolled: only the active section's notice
+        // is visible, which matches how credit load is computed elsewhere.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("still-enrolled"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+    }
+
+    @Test
+    void sectionScopedNoticeOnlyReachesEnrolledStudents() throws Exception {
+        insert(fixture("own-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T10:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-owned", "01", "CS101", "Web Programming"));
+        insert(fixture("other-section", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T11:00:00Z")
+                .withAcademicContext("semester-1", "Semester 1", "section-other", "02", "CS102", "Data Structures"));
+        insert(fixture("whole-cohort", false, new String[]{"STUDENT"}, new Integer[0], "2026-08-20T12:00:00Z"));
+        jdbc.update("INSERT INTO academic.\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\")"
+                        + " VALUES (?, ?, ?, ?, ?)",
+                "enrollment-1", "student-profile", "section-owned", "semester-1", "ENROLLED");
+
+        // createdAt DESC: the cohort-wide notice first, then the notice for the
+        // section the student is actually enrolled in. The notice scoped to
+        // another section must not appear at all.
+        mvc.perform(get("/api/v1/announcements/my")
+                        .with(jwt().jwt(token -> token
+                                .subject("student-user")
+                                .claim("email", "student@campuscore.edu")
+                                .claim("roles", List.of("STUDENT"))
+                                .claim("studentId", "student-profile")
+                                .claim("student", Map.of("year", 2)))))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("whole-cohort"))
+                .andExpect(jsonPath("$.data[1].id").value("own-section"))
+                .andExpect(jsonPath("$.meta.total").value(2));
     }
 
     @Test

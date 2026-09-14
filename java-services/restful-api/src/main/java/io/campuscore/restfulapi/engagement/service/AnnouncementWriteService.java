@@ -84,7 +84,7 @@ public class AnnouncementWriteService {
         AnnouncementResponse created = announcements.create(new CreateAnnouncementCommand(
                 UUID.randomUUID().toString(),
                 requireValue(request.title(), "title"),
-                requireValue(request.content(), "content"),
+                requirePublicHtml(request.content()),
                 priority,
                 targetRoles,
                 targetYears,
@@ -144,7 +144,7 @@ public class AnnouncementWriteService {
         int changed = announcements.update(new UpdateAnnouncementCommand(
                 id,
                 patch(request, "title", request.title()),
-                patch(request, "content", request.content()),
+                patch(request, "content", request.has("content") ? requirePublicHtml(request.content()) : null),
                 patch(request, "priority", request.priority()),
                 patch(
                         request,
@@ -382,6 +382,31 @@ public class AnnouncementWriteService {
             throw new IllegalArgumentException(name + " is required");
         }
         return value;
+    }
+
+    /**
+     * Announcement bodies are rendered as HTML in student and lecturer feeds, so
+     * executable markup is refused at the write boundary rather than trusting
+     * every renderer to strip it. The frontend allowlist sanitizer stays the
+     * render-time guarantee; this gate keeps active content out of the database
+     * so other API clients cannot receive it either.
+     */
+    private static final java.util.regex.Pattern ACTIVE_CONTENT = java.util.regex.Pattern.compile(
+            "(?is)<\\s*(?:script|iframe|object|embed|form|meta|link|base|svg|math|template|applet)\\b"
+                    // An event handler attribute may be introduced by whitespace, a
+                    // slash, or a quote — `<img src=x/onerror=alert(1)>` uses a slash,
+                    // which a whitespace-only pattern misses. Excluding `-` keeps
+                    // data-* attributes such as data-online="true" legitimate.
+                    + "|<[^>]*[\\s/\"']on[a-z]{3,}\\s*="
+                    + "|(?:href|src|xlink:href)\\s*=\\s*[\"']?\\s*(?:javascript|vbscript|data\\s*:\\s*text/html)");
+
+    private static String requirePublicHtml(String value) {
+        String content = requireValue(value, "content");
+        if (ACTIVE_CONTENT.matcher(content).find()) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "UNSAFE_ANNOUNCEMENT_CONTENT",
+                    "Announcement content must not contain scripts, embedded frames, or event handlers");
+        }
+        return content;
     }
 
     private static String requireValue(String value, String name) {

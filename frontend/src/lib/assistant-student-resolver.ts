@@ -25,8 +25,12 @@ const GREETING_REGEX =
   /^(?:hello|hi|hey|alo|halo|xin\s*chào|xin\s*chao|chào\s*(?:bạn|ban|em|anh|chị|chi|thầy|cô|bot|ad|admin|cậu|cau)?|chào|chao|good\s*(?:morning|afternoon|evening|day)|chào\s*buổi\s*(?:sáng|chiều|tối))\b/i;
 
 // 0.1 ASSISTANT CAPABILITIES & SELF INTRODUCTION
+// (R1) This branch only answers genuine capability questions. A bare
+// "hướng dẫn", "giúp tôi" or "help" used to match here, so regulation
+// questions such as "Hướng dẫn nộp học phí…" were answered with the client's
+// static menu instead of the server knowledge base.
 const CAPABILITIES_REGEX =
-  /(?:bạn|ban|em|cậu|bot)\s*(?:là\s*ai|la\s*ai|tên\s*gì|ten\s*gi|có\s*thể\s*làm\s*gì|giúp\s*(?:được\s*)?gì|hỗ\s*trợ\s*gì|chức\s*năng\s*gì)|hướng\s*dẫn\s*(?:sử\s*dụng|dùng)?|làm\s*được\s*gì|giới\s*thiệu\s*(?:về\s*)?(?:bạn|mình|bot)|giúp\s*(?:tôi|mình)|trợ\s*lý\s*(?:này|học\s*vụ)|\bwho\s*are\s*you\b|\bwhat\s*can\s*you\s*do\b|\bhow\s*to\s*use\b|\bhelp\b/i;
+  /(?:(?:bạn|ban|em|cậu|bot|trợ\s*lý|tro\s*ly)\s*(?:là\s*(?:ai|gì)|la\s*(?:ai|gi)|tên\s*gì|ten\s*gi|có\s*thể\s*làm\s*(?:được\s*)?gì|giúp\s*(?:được\s*)?gì|hỗ\s*trợ\s*(?:được\s*)?gì|chức\s*năng\s*gì|làm\s*được\s*gì)|hướng\s*dẫn\s*(?:sử\s*dụng|dùng)\b|giới\s*thiệu\s*(?:về\s*)?(?:bạn|mình|bot|trợ\s*lý)|\bwho\s*are\s*you\b|\bwhat\s+can\s+you\s+do\b|\bhow\s+to\s+use\s+(?:this|you|the\s+assistant)\b|^\s*help\s*$)/i;
 
 // 0.2 THANK YOU & APPRECIATION
 const THANK_YOU_REGEX =
@@ -125,9 +129,9 @@ const EXAM_REGEX =
 // returning a personal status card. A question counts as policy-only when it
 // asks about rules and contains no first-person marker.
 const POLICY_QUESTION_REGEX =
-  /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiêu\s*chuẩn|chính\s*sách|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ|rút)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|như\s*thế\s*nào|thế\s*nào|ra\s*sao|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|so\s*sánh|khác\s*(?:nhau|gì)|phân\s*biệt|tiên\s*quyết|học\s*trước|song\s*hành|học\s*lại|cải\s*thiện|rớt\s*môn|điểm\s*f\b|cảnh\s*báo\s*học\s*vụ|buộc\s*thôi\s*học|(?:thời\s*hạn|hạn|khi\s*nào)\s*(?:đóng|nộp)\s*học\s*phí|rút\s*học\s*phần|học\s*bổng|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed|compare|prerequisite|corequisite)/i;
+  /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiêu\s*chuẩn|chính\s*sách|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ|rút)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|như\s*thế\s*nào|thế\s*nào|ra\s*sao|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|so\s*sánh|khác\s*(?:nhau|gì)|phân\s*biệt|tiên\s*quyết|học\s*trước|song\s*hành|học\s*lại|cải\s*thiện|rớt\s*môn|điểm\s*f\b|cảnh\s*báo\s*học\s*vụ|buộc\s*thôi\s*học|(?:thời\s*hạn|hạn|khi\s*nào)\s*(?:đóng|nộp)\s*học\s*phí|rút\s*học\s*phần|học\s*bổng|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed|compare|prerequisite|corequisite|điểm\s*rèn\s*luyện|diem\s*ren\s*luyen|rèn\s*luyện|ren\s*luyen|đrl|drl|xếp\s*loại|xep\s*loai|thể\s*lệ|the\s*le|cách\s*(?:tính|xếp\s*loại|đăng\s*ký|nộp|thức\s*nộp|thanh\s*toán|chuyển\s*đổi)|cach\s*(?:tinh|xep\s*loai|dang\s*ky|nop|thuc\s*nop|thanh\s*toan|chuyen\s*doi)|có\s*được\s*không|co\s*duoc\s*khong|được\s*chưa|duoc\s*chua|chuẩn\s*bị|chuan\s*bi)/i;
 const PERSONAL_MARKER_REGEX =
-  /(của\s+(?:tôi|mình|em|anh|chị)|tôi\s+(?:có|đang|được|cần|thiếu|là|vừa|muốn)|em\s+(?:có|đang|được|muốn|vừa)|anh\s+(?:có|đang|muốn)|chị\s+(?:có|đang|muốn)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
+  /(của\s+(?:tôi|mình|em|anh|chị|tụi\s+tôi|chúng\s+tôi)|cho\s+(?:tôi|mình|em)|tôi\s+(?:có|đang|được|cần|thiếu|là|vừa|muốn|đã|sẽ|học|nộp|đóng)|em\s+(?:có|đang|được|muốn|vừa|cần|đã|sẽ)|anh\s+(?:có|đang|muốn|cần)|chị\s+(?:có|đang|muốn|cần)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
 
 const ACADEMIC_REGULATION_REGEX =
   /(?:quy\s*(?:định|chế|trình)|quy\s*(?:dinh|che|trinh)|nội\s*quy|noi\s*quy|chính\s*sách|chinh\s*sach|thủ\s*tục|thu\s*tuc|tiêu\s*chuẩn|tieu\s*chuan|tiêu\s*chí|tieu\s*chi|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiên\s*quyết|tien\s*quyet|học\s*trước|hoc\s*truoc|song\s*hành|song\s*hanh|học\s*lại|hoc\s*lai|cải\s*thiện\s*điểm|cai\s*thien\s*diem|học\s*cải\s*thiện|hoc\s*cai\s*thien|rớt\s*môn|rot\s*mon|điểm\s*f\b|diem\s*f\b|cảnh\s*báo\s*học\s*vụ|canh\s*bao\s*hoc\s*vu|buộc\s*thôi\s*học|buoc\s*thoi\s*hoc|học\s*bổng|hoc\s*bong|học\s*phí|hoc\s*phi|công\s*nợ|cong\s*no|tiền\s*học|tien\s*hoc|\btuition\b|(?:hạn|thời\s*hạn|cách|phương\s*thức)\s*(?:nộp|đóng)\s*học\s*phí|(?:han|thoi\s*han|cach|phuong\s*thuc)\s*(?:nop|dong)\s*hoc\s*phi|quy\s*chế\s*thi|quy\s*che\s*thi|điều\s*kiện\s*(?:dự\s*thi|xét\s*tốt\s*nghiệp|tốt\s*nghiệp|xét\s*học\s*bổng)|dieu\s*kien\s*(?:du\s*thi|xet\s*tot\s*nghiep|tot\s*nghiep|xet\s*hoc\s*bong)|\bpolicy\b|\bregulation\b|\bprerequisite\b|\bcorequisite\b|academic\s*warning)/i;
@@ -137,6 +141,27 @@ export function isPolicyQuestion(message: string): boolean {
     return true;
   }
   return POLICY_QUESTION_REGEX.test(message) && !PERSONAL_MARKER_REGEX.test(message);
+}
+
+/**
+ * (R1) A regulation lookup asks about rules, not about the asker's own records,
+ * so it is answered exclusively by the server knowledge base. The resolver
+ * returns null for these and the request reaches /api/v1/assistant/chat|stream
+ * instead of being composed from a client-side template.
+ *
+ * A first-person marker keeps record questions that only the client can render
+ * on the client. That gate is not the whole story, though: the tuition,
+ * graduation, scholarship, retake and exam branches below delegate
+ * unconditionally (this predates the R1 work), so "học phí của tôi còn nợ
+ * không?" also reaches the server. Backend personal context currently covers
+ * timetable intent only, so such a question is answered from the regulation
+ * corpus rather than from the asker's own invoice — a known limitation, not a
+ * behaviour this gate introduces.
+ */
+export function isRegulationLookup(message: string): boolean {
+  const regulation =
+    ACADEMIC_REGULATION_REGEX.test(message) || POLICY_QUESTION_REGEX.test(message);
+  return regulation && !PERSONAL_MARKER_REGEX.test(message);
 }
 
 function formatAssistantDate(
@@ -466,6 +491,13 @@ export async function resolveStudentAssistantQuery(
   message: string,
   locale: 'vi' | 'en',
 ): Promise<StudentAssistantResolution | null> {
+  // (R1) Regulation lookups never run on the client. Returning before the
+  // profile fetch keeps them off the client path entirely and avoids a
+  // pointless /auth/me round trip for a question the server must answer.
+  if (isRegulationLookup(message)) {
+    return null;
+  }
+
   // Check user profile for role awareness if needed
   let currentUser: User | null = null;
   try {

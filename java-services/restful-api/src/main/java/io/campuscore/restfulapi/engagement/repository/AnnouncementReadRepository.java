@@ -138,6 +138,18 @@ public class AnnouncementReadRepository {
                         + " OR :studentYear = ANY(\"targetYears\"))");
                 parameters.addValue("studentYear", visibility.studentYear());
             }
+            // A notice scoped to a teaching section must only reach students
+            // currently enrolled in it. The admin editor advertises this
+            // restriction, but the reader previously ignored "sectionId"
+            // entirely, so every section-scoped notice was visible to the whole
+            // role/year cohort. The predicate only narrows notices that name a
+            // section, and DROPPED/CANCELLED rows do not count as enrolled —
+            // the same rule AcademicMutationService uses for credit load.
+            conditions.add("(\"sectionId\" IS NULL OR \"sectionId\" IN ("
+                    + "SELECT enrollment.\"sectionId\" FROM academic.\"Enrollment\" enrollment"
+                    + " WHERE enrollment.\"studentId\" = :viewerStudentId"
+                    + " AND enrollment.\"status\" NOT IN ('DROPPED', 'CANCELLED')))");
+            parameters.addValue("viewerStudentId", visibility.studentId());
         }
 
         if (visibility.roles().contains("LECTURER") && visibility.lecturerId() != null) {

@@ -316,8 +316,10 @@ public class RagAssistantGateway {
                 return;
             }
             if (event instanceof ThesisAssistantService.StreamCitation citation) {
-                if (!blocked[0] && safeCitation(citation.citation())) {
-                    citations.add(citation);
+                ThesisAssistantDtos.Citation normalizedCitation = ThesisAssistantService.normalizeCitation(
+                        citation.citation(), normalizedLocale);
+                if (!blocked[0] && safeCitation(normalizedCitation)) {
+                    citations.add(new ThesisAssistantService.StreamCitation(normalizedCitation));
                 }
                 return;
             }
@@ -349,6 +351,7 @@ public class RagAssistantGateway {
         boolean noMatch = "NO_MATCH".equals(response.reasonCode());
         List<io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.Citation> citations =
                 response.citations() == null ? List.of() : response.citations().stream()
+                        .map(citation -> ThesisAssistantService.normalizeCitation(citation, normalizedLocale))
                         .filter(RagAssistantGateway::safeCitation).toList();
         if (unsafeAnswer || noMatch) citations = List.of();
         boolean unchanged = !unsafeAnswer

@@ -1386,6 +1386,7 @@ export const en = {
     sensitiveBlocked:
       'Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant.',
     personalContext: 'Answered from your personal academic records',
+    localAssist: 'Direct reply from the assistant',
     composerHint: 'Enter to send · Shift+Enter for a new line',
     scrollToLatest: 'Jump to the newest message',
     technicalBlocked:
@@ -2880,6 +2881,7 @@ export const vi: I18nMessages = {
     sensitiveBlocked:
       'Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý.',
     personalContext: 'Trả lời từ dữ liệu học vụ cá nhân của bạn',
+    localAssist: 'Trả lời trực tiếp từ trợ lý',
     composerHint: 'Enter để gửi · Shift+Enter xuống dòng',
     scrollToLatest: 'Xem tin mới nhất',
     technicalBlocked:

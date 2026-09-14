@@ -9,6 +9,55 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
+function loadTs(relativePath) {
+  const ts = require('typescript');
+  const output = ts.transpileModule(read(relativePath), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
+
+test('applyPageOrder lands a reorder and never moves off-page pins', () => {
+  const { applyPageOrder } = loadTs('src/lib/site-appearance.ts');
+
+  // First save with nothing pinned yet.
+  assert.deepEqual(applyPageOrder([], ['c', 'a', 'b']), ['c', 'a', 'b']);
+
+  // A repeat reorder of the same page must actually apply. A helper that keeps
+  // the existing order would return ['c','a','b'] here, discarding the drag.
+  assert.deepEqual(applyPageOrder(['c', 'a', 'b'], ['b', 'c', 'a']), ['b', 'c', 'a']);
+
+  // Pins for announcements outside the reordered page keep their positions.
+  assert.deepEqual(applyPageOrder(['z', 'c', 'a', 'b'], ['b', 'a', 'c']), ['z', 'b', 'a', 'c']);
+  assert.deepEqual(
+    applyPageOrder(['p', 'c', 'q', 'a', 'b', 'r'], ['a', 'b', 'c']),
+    ['p', 'a', 'q', 'b', 'c', 'r'],
+  );
+
+  // Pins outside the offered page are preserved — including ones this batch
+  // does not mention — so a reorder never silently unpins an announcement.
+  assert.deepEqual(applyPageOrder(['z', 'c', 'a'], ['a']), ['z', 'c', 'a']);
+  assert.deepEqual(applyPageOrder(['z', 'c', 'a', 'b'], ['a', 'b']), ['z', 'c', 'a', 'b']);
+
+  // Nothing pinned and nothing offered stays empty.
+  assert.deepEqual(applyPageOrder([], []), []);
+});
+
+test('reorder save paths apply the new order instead of a plain merge', () => {
+  const adminAnnouncements = read('src/app/admin/announcements/page.tsx');
+  const studio = read('src/app/admin/appearance/page.tsx');
+  const editor = read('src/app/dashboard/editor/page.tsx');
+  const appearance = read('src/lib/site-appearance.ts');
+
+  for (const source of [adminAnnouncements, studio, editor]) {
+    assert.match(source, /applyPageOrder\(/);
+  }
+  // The misleading helper is gone: it could not apply a reorder at all.
+  assert.doesNotMatch(appearance, /export function mergePostOrder/);
+});
+
 function orderByIds(items, order) {
   const rank = new Map(order.map((id, index) => [id, index]));
   return [...items].sort((left, right) => {

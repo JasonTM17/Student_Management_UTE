@@ -143,7 +143,12 @@ export default function StudentAnnouncementsPage() {
     'ADMIN',
     'SUPER_ADMIN',
   ]);
-  const isAdmin = user?.role === 'ADMIN' || user?.role === 'SUPER_ADMIN';
+  // /auth/me returns a `roles` array and no `role` field, so the previous
+  // `user?.role === 'ADMIN'` check was always false: the admin quick-edit
+  // action never rendered for anyone.
+  const isAdmin = Boolean(
+    user?.roles?.some((role) => role === 'ADMIN' || role === 'SUPER_ADMIN'),
+  );
   const { locale, formatDateTime } = useI18n();
   const [items, setItems] = useState<AnnouncementRecord[]>([]);
   const orderedItems = useOrderedPosts(items);

@@ -48,12 +48,112 @@ public class ThesisAssistantService {
     private static final java.util.regex.Pattern NUMBER_GLUE_BEFORE_WORD = java.util.regex.Pattern.compile(
             "(?<=\\p{N})(thành|người|tín|chỉ|nhóm|đề|ngày|giờ|phút|tuần|năm|tháng|buổi|ca|giảng|viên|sinh|phân|điểm|tiết|môn|lớp)(?![\\p{L}])",
             java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern ENGLISH_NUMBER_GLUE_AFTER_WORD = java.util.regex.Pattern.compile(
+            // Deliberately narrow and case-sensitive: a case-insensitive "is" used
+            // to rewrite the course code "IS101" into "IS 101".
+            "(?<![\\p{L}\\p{N}_])(?:of|from|to|up to|at least|at most|minimum|maximum)(?=\\d)");
+    private static final java.util.regex.Pattern ENGLISH_NUMBER_GLUE_BEFORE_WORD = java.util.regex.Pattern.compile(
+            "(?i)(?<=\\d)(?:credits?|courses?|weeks?|days?|students?|members?|terms?|months?)(?![\\p{L}])");
+    /**
+     * In Vietnamese prose a number is always separated from the preceding word
+     * by a space, but provider output regularly glues them ("trong4 tuần",
+     * "thang10", "đủ100%"). A word allowlist kept missing cases, so the rule is
+     * inverted: any two-or-more letter run followed directly by a digit gets a
+     * space, unless the run is an uppercase ASCII identifier.
+     */
+    private static final java.util.regex.Pattern WORD_GLUE_BEFORE_DIGIT = java.util.regex.Pattern.compile(
+            "(?<![\\p{L}\\p{N}_/.-])(\\p{L}{2,})(\\p{N})");
+    /** Uppercase ASCII runs are identifiers, not prose: SE101, V38, TOEIC, IC3. */
+    private static final java.util.regex.Pattern ASCII_IDENTIFIER_WORD = java.util.regex.Pattern.compile("[A-Z]+");
+    /** Characters that make up an identifier, URL, email address or anchor. */
+    private static final java.util.regex.Pattern TOKEN_CHARS =
+            java.util.regex.Pattern.compile("[A-Za-z0-9._+#?&=~/@%-]");
+    /** A run carrying one of these is a link, address or anchor, not prose. */
+    private static final java.util.regex.Pattern TOKEN_MARKERS = java.util.regex.Pattern.compile("[@?#&=]|://");
+    private static final String EMPHASIS_MARKER = "**";
+    private static final java.util.regex.Pattern WORD_CHAR_BEFORE =
+            java.util.regex.Pattern.compile("[\\p{L}\\p{N}.]");
+    private static final java.util.regex.Pattern CLAUSE_START =
+            java.util.regex.Pattern.compile("[\\p{Lu}\\p{N}•*]");
+    /**
+     * A list marker that directly abuts the end of a word is concatenated output
+     * ("học lại- Điểm F"). Whether it really is a bullet is decided in
+     * {@link #repairBulletGlue(String)}, because abbreviated labels such as
+     * "Nhóm SV- K20" and hyphenated prose such as "self- study" must survive.
+     */
+    private static final java.util.regex.Pattern BULLET_GLUE_CANDIDATE = java.util.regex.Pattern.compile(
+            "(?<=[\\p{L}])-[ \\t]");
+    /**
+     * A list marker indented mid-line is also glued output, but only after a
+     * clause terminator, so legitimate ranges such as "5 - 7 ngày" stay intact.
+     */
+    private static final java.util.regex.Pattern INLINE_LIST_GAP = java.util.regex.Pattern.compile(
+            "(?<=[.:;!?*])[ \\t]+(?=-[ \\t])");
+    /**
+     * Two or more spaces before a list marker is concatenation rather than
+     * intentional spacing: provider output produces "## Điều kiện tốt nghiệp  -
+     * Tích lũy…", which would otherwise pull the first bullet into the heading.
+     * A heading that legitimately uses " - " as a separator has single spaces.
+     */
+    private static final java.util.regex.Pattern DOUBLE_SPACE_LIST_GAP =
+            java.util.regex.Pattern.compile("[ \\t]{2,}(?=-[ \\t])");
+    /**
+     * A heading marker glued directly after a word loses its block boundary
+     * ("…gia hạn học phí## Thời hạn nộp học phí"). Requiring a lowercase letter
+     * before the marker keeps "C# là…" intact, and requiring whitespace after it
+     * keeps anchors such as "#muc4" intact.
+     */
+    private static final java.util.regex.Pattern HEADING_GLUE =
+            java.util.regex.Pattern.compile("(?<=[\\p{Ll}])(#{1,6})[ \\t]+");
+    private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_LABEL_COLON = java.util.regex.Pattern.compile(
+            "(?<=[\\p{L}])(:)(?=\\d)");
     private static final java.util.regex.Pattern HEADING_SENTENCE_GLUE = java.util.regex.Pattern.compile(
             "(?m)(\\d+\\.\\s+(?:Truy cập và chọn học phần|Đăng ký lớp|Xử lý các thông báo từ hệ thống|"
                     + "Lưu ý về thời gian đăng ký|Kiểm tra điều kiện học phần|Access and select courses|"
                     + "Register for a section|Handle system messages|Registration timing|Check course requirements|"
                     + "Lưu ý về học phần điều kiện|Course requirements))\\s+(?=\\p{Lu})",
             java.util.regex.Pattern.UNICODE_CASE);
+    /**
+     * Some provider responses correctly emit a Markdown heading marker but
+     * still concatenate the first sentence onto the same line. Keep this
+     * allowlist bounded to assistant section labels so ordinary title-case
+     * prose is never split heuristically.
+     */
+    private static final java.util.regex.Pattern MARKDOWN_HEADING_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)^((?:#{1,6}[ \\t]+)(?:Cách đăng ký học phần trên CampusCore|Cách đăng ký học phần|"
+                    + "Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|"
+                    + "Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|"
+                    + "Lưu ý về học phần điều kiện|Thời gian đăng ký|"
+                    + "How to register for a course in CampusCore|Course registration on CampusCore|"
+                    + "When you see a system message|If Registration Is Blocked|What Happens During Add/Drop|Add/Drop Period|"
+                    + "Credit Load Rules|"
+                    + "Related Rules to Keep in Mind|Prerequisites and Limits|Prerequisites and Retakes|"
+                    + "Course requirements|Registration timing|"
+                    + "Registering for a Course|Prerequisites and Related Requirements|During Add/Drop|"
+                    + "Withdrawal and Credit Workload|Retakes and Grade Improvement|"
+                    + "Prerequisites and Related Courses|Credit Limits))[ \\t]*(?=[\\p{Lu}\\p{N}•*-])",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    /** Restore a bullet boundary after an allowlisted sentence starter without touching hyphenated titles. */
+    private static final java.util.regex.Pattern MARKDOWN_HEADING_DASH_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)^((?:#{1,6}[ \\t]+)[^\\r\\n]*?\\S)[ \\t]*(?=-[ \\t]+(?:A|An|Before|Check|Each|If|Open|Prerequisite|Prerequisites|Review|Sections|The|This|To|Use|While|When|You|Bạn|Các|Cần|Chọn|Hãy|Khi|Kiểm|Lớp|Mở|Nếu|Xem|Để|Đợt)\\b)",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern EMPHASIZED_HEADING_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)^((?:\\*\\*|__)(?:Cách đăng ký học phần trên CampusCore|Cách đăng ký học phần|"
+                    + "Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|"
+                    + "Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|"
+                    + "Lưu ý về học phần điều kiện|Thời gian đăng ký|"
+                    + "How to register for a course in CampusCore|Course registration on CampusCore|"
+                    + "When you see a system message|If Registration Is Blocked|What Happens During Add/Drop|Add/Drop Period|"
+                    + "Credit Load Rules|"
+                    + "Related Rules to Keep in Mind|Prerequisites and Limits|Prerequisites and Retakes|"
+                    + "Course requirements|Registration timing|"
+                    + "Registering for a Course|Prerequisites and Related Requirements|During Add/Drop|"
+                    + "Withdrawal and Credit Workload|Retakes and Grade Improvement|"
+                    + "Prerequisites and Related Courses|Credit Limits)(?:\\*\\*|__))[ \\t]*(?=[\\p{Lu}\\p{N}•*-])",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
+    private static final java.util.regex.Pattern EMPHASIZED_HEADING_DASH_SENTENCE_GLUE = java.util.regex.Pattern.compile(
+            "(?m)^((?:\\*\\*|__)[^\\r\\n]*?\\S)[ \\t]*(?=-[ \\t]+(?:A|An|Before|Check|Each|If|Open|Prerequisite|Prerequisites|Review|Sections|The|This|To|Use|While|When|You|Bạn|Các|Cần|Chọn|Hãy|Khi|Kiểm|Lớp|Mở|Nếu|Xem|Để|Đợt)\\b)",
+            java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE);
     private static final java.util.regex.Pattern LABEL_SENTENCE_GLUE = java.util.regex.Pattern.compile(
             "(?m)(Lưu ý về học phần điều kiện|Course requirements)\\s+(?=\\p{Lu})",
             java.util.regex.Pattern.UNICODE_CASE);
@@ -74,7 +174,126 @@ public class ThesisAssistantService {
         if (text == null || text.isBlank()) return text;
         String out = NUMBER_GLUE_AFTER_WORD.matcher(text).replaceAll("$1 ");
         out = NUMBER_GLUE_BEFORE_WORD.matcher(out).replaceAll(" $1");
-        return out;
+        out = ENGLISH_NUMBER_GLUE_AFTER_WORD.matcher(out).replaceAll("$0 ");
+        out = ENGLISH_NUMBER_GLUE_BEFORE_WORD.matcher(out).replaceAll(" $0");
+        out = NUMBER_GLUE_AFTER_LABEL_COLON.matcher(out).replaceAll("$1 ");
+        return separateWordsFromNumbers(out);
+    }
+
+    /**
+     * Inserts the missing space between a prose word and a following digit while
+     * leaving identifier-shaped tokens untouched — including URLs, email
+     * addresses and anchors, whose runs carry a token marker.
+     */
+    static String separateWordsFromNumbers(String text) {
+        if (text == null || text.isBlank()) return text;
+        java.util.regex.Matcher matcher = WORD_GLUE_BEFORE_DIGIT.matcher(text);
+        StringBuilder out = new StringBuilder();
+        boolean changed = false;
+        while (matcher.find()) {
+            String word = matcher.group(1);
+            if (ASCII_IDENTIFIER_WORD.matcher(word).matches()
+                    || isTokenLike(text, matcher.start(), matcher.end())) {
+                continue;
+            }
+            changed = true;
+            matcher.appendReplacement(out,
+                    java.util.regex.Matcher.quoteReplacement(word + " " + matcher.group(2)));
+        }
+        if (!changed) return text;
+        matcher.appendTail(out);
+        return out.toString();
+    }
+
+    /** True when the surrounding run is part of a link, address or anchor. */
+    private static boolean isTokenLike(String text, int start, int end) {
+        int left = start;
+        while (left > 0 && TOKEN_CHARS.matcher(String.valueOf(text.charAt(left - 1))).matches()) left--;
+        int right = end;
+        while (right < text.length() && TOKEN_CHARS.matcher(String.valueOf(text.charAt(right))).matches()) right++;
+        String run = text.substring(left, right);
+        return TOKEN_MARKERS.matcher(run).find() || run.startsWith("#");
+    }
+
+    /**
+     * Restores the block boundary when an OPENING emphasis marker abuts a word
+     * ("học phí**Hạn nộp học phí**"). Markers are counted per line, so the
+     * closing marker of a bold run stays where it is and "**Điểm**4.0" is not
+     * mangled.
+     */
+    static String repairEmphasisGlue(String text) {
+        if (text == null || text.isBlank() || !text.contains(EMPHASIS_MARKER)) return text;
+        StringBuilder out = new StringBuilder(text.length());
+        for (String line : text.split("\n", -1)) {
+            int markers = 0;
+            boolean openingAtLineStart = false;
+            int index = 0;
+            while (index < line.length()) {
+                if (line.startsWith(EMPHASIS_MARKER, index)) {
+                    char before = index > 0 ? line.charAt(index - 1) : ' ';
+                    int afterIndex = index + EMPHASIS_MARKER.length();
+                    char after = afterIndex < line.length() ? line.charAt(afterIndex) : ' ';
+                    if (markers % 2 == 0) {
+                        openingAtLineStart = index == 0;
+                        if (Character.isLetter(before)
+                                && (Character.isLetter(after) || Character.isDigit(after))) {
+                            out.append("\n\n");
+                        }
+                    } else {
+                        out.append(EMPHASIS_MARKER);
+                        markers++;
+                        index += EMPHASIS_MARKER.length();
+                        // Text glued straight after a closing marker is a
+                        // concatenated block ("**Hậu quả…**Sinh viên không đóng…").
+                        // A bold heading opens at the line start, so it regains a
+                        // block boundary; an inline run only gains the space. A
+                        // digit after the marker means inline emphasis over a
+                        // number ("**Điểm**4.0"), which stays as written.
+                        if (Character.isLetter(after)) {
+                            out.append(openingAtLineStart ? "\n\n" : " ");
+                        }
+                        continue;
+                    }
+                    out.append(EMPHASIS_MARKER);
+                    markers++;
+                    index += EMPHASIS_MARKER.length();
+                    continue;
+                }
+                out.append(line.charAt(index));
+                index++;
+            }
+            out.append('\n');
+        }
+        // split(-1) keeps a trailing empty segment, so one newline is surplus.
+        return out.length() > 0 ? out.substring(0, out.length() - 1) : text;
+    }
+
+    /**
+     * Restores a bullet boundary where a list marker was glued to a word
+     * ("học lại- Điểm F") while leaving abbreviated labels ("Nhóm SV- K20") and
+     * hyphenated prose ("self- study") alone.
+     */
+    static String repairBulletGlue(String text) {
+        if (text == null || text.isBlank()) return text;
+        java.util.regex.Matcher matcher = BULLET_GLUE_CANDIDATE.matcher(text);
+        StringBuilder out = new StringBuilder();
+        boolean changed = false;
+        while (matcher.find()) {
+            int start = matcher.start();
+            while (start > 0 && WORD_CHAR_BEFORE.matcher(String.valueOf(text.charAt(start - 1))).matches()) {
+                start--;
+            }
+            String precedingWord = text.substring(start, matcher.start());
+            String following = text.substring(matcher.end());
+            boolean abbreviation = precedingWord.matches("[A-Z]{2,}");
+            boolean clauseStart = !following.isEmpty() && CLAUSE_START.matcher(String.valueOf(following.charAt(0))).matches();
+            if (abbreviation || !clauseStart) continue;
+            changed = true;
+            matcher.appendReplacement(out, java.util.regex.Matcher.quoteReplacement("\n\n- "));
+        }
+        if (!changed) return text;
+        matcher.appendTail(out);
+        return out.toString();
     }
 
     /**
@@ -86,27 +305,42 @@ public class ThesisAssistantService {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         String out = normalizeNumberSpacing(text);
         out = HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = MARKDOWN_HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = MARKDOWN_HEADING_DASH_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = EMPHASIZED_HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = EMPHASIZED_HEADING_DASH_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
         out = LABEL_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
+        out = INLINE_LIST_GAP.matcher(out).replaceAll("\n");
+        out = DOUBLE_SPACE_LIST_GAP.matcher(out).replaceAll("\n");
+        out = HEADING_GLUE.matcher(out).replaceAll("\n\n$1 ");
+        // Marker-aware passes run last: they need the emphasis state of the whole
+        // line, which a single regex match window cannot express.
+        out = repairBulletGlue(repairEmphasisGlue(out));
         if ("en".equals(normalizedLocale)) {
             return out
                     .replaceAll("(?i)\\bthe\\s+ADD_DROP_OPEN\\b", "the open add/drop period")
-                    .replaceAll("(?i)\\bADD_DROP_OPEN\\b", "the open add/drop period")
+                    .replaceAll("\\bADD_DROP_OPEN\\b", "the open add/drop period")
                     .replaceAll("(?i)\\bthe\\s+REGISTRATION_OPEN\\b", "the open registration period")
-                    .replaceAll("(?i)\\bREGISTRATION_OPEN\\b", "the open registration period")
+                    .replaceAll("\\bREGISTRATION_OPEN\\b", "the open registration period")
                     .replaceAll("(?i)\\bthe\\s+ADD_DROP\\b", "the add/drop period")
-                    .replaceAll("(?i)\\bADD_DROP\\b", "add/drop period")
+                    .replaceAll("\\bADD_DROP\\b", "add/drop period")
                     .replaceAll("(?i)\\bthe\\s+REGISTRATION\\b", "the registration period")
-                    .replaceAll("(?i)\\bREGISTRATION\\b", "registration period");
+                    .replaceAll("\\bREGISTRATION\\b", "registration period")
+                    .replaceAll("(?i)\\bperiod(?:\\s+period)+\\b", "period");
         }
         return out
-                .replaceAll("(?i)đợt\\s+ADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
-                .replaceAll("(?i)\\bADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
-                .replaceAll("(?i)đợt\\s+REGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
-                .replaceAll("(?i)\\bREGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
-                .replaceAll("(?i)đợt\\s+ADD_DROP\\b", "đợt bổ sung/rút học phần")
-                .replaceAll("(?i)\\bADD_DROP\\b", "đợt bổ sung/rút học phần")
-                .replaceAll("(?i)đợt\\s+REGISTRATION\\b", "đợt đăng ký")
-                .replaceAll("(?i)\\bREGISTRATION\\b", "đợt đăng ký");
+                .replaceAll("Đợt\\s+ADD_DROP_OPEN\\b", "Đợt bổ sung/rút học phần đang mở")
+                .replaceAll("(?iu)đợt\\s+ADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
+                .replaceAll("\\bADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
+                .replaceAll("Đợt\\s+REGISTRATION_OPEN\\b", "Đợt đăng ký đang mở")
+                .replaceAll("(?iu)đợt\\s+REGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
+                .replaceAll("\\bREGISTRATION_OPEN\\b", "đợt đăng ký đang mở")
+                .replaceAll("Đợt\\s+ADD_DROP\\b", "Đợt bổ sung/rút học phần")
+                .replaceAll("(?iu)đợt\\s+ADD_DROP\\b", "đợt bổ sung/rút học phần")
+                .replaceAll("\\bADD_DROP\\b", "đợt bổ sung/rút học phần")
+                .replaceAll("Đợt\\s+REGISTRATION\\b", "Đợt đăng ký")
+                .replaceAll("(?iu)đợt\\s+REGISTRATION\\b", "đợt đăng ký")
+                .replaceAll("\\bREGISTRATION\\b", "đợt đăng ký");
     }
 
     private final ThesisAssistantKnowledgeRepository knowledge;
@@ -316,11 +550,15 @@ public class ThesisAssistantService {
                 : cancellations.register(ownerId, clientRequestId, reservation.leaseGeneration());
         try {
             if (synthesisRequired && deepSeek != null && deepSeek.usable()) {
+                int userDailyQuota = properties.quotaEnforced()
+                        ? properties.userDailyQuota() : Integer.MAX_VALUE;
+                int globalDailyQuota = properties.quotaEnforced()
+                        ? properties.globalDailyQuota() : Integer.MAX_VALUE;
                 ThesisAssistantTurnRepository.DispatchDecision dispatch = cancellations == null
                         ? turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
-                                properties.userDailyQuota(), properties.globalDailyQuota())
+                                userDailyQuota, globalDailyQuota)
                         : turns.dispatch(reservation.turnId(), ownerId, reservation.leaseGeneration(),
-                                properties.userDailyQuota(), properties.globalDailyQuota(), this::fenceExpired);
+                                userDailyQuota, globalDailyQuota, this::fenceExpired);
                 if (dispatch.dispatched()) {
                     providerAttempt = true;
                     try {
@@ -583,17 +821,32 @@ public class ThesisAssistantService {
                 document.catalogEntityType() == null ? "" : document.catalogEntityType(),
                 document.catalogEntityId() == null ? "" : document.catalogEntityId(),
                 document.catalogUpdatedAt() == null ? "" : document.catalogUpdatedAt().toString()));
+        Citation citation;
         if ("ACADEMIC_CATALOG".equalsIgnoreCase(document.domain()) || "academic-catalog".equals(document.source())) {
-            return new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
+            citation = new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
                     "ACADEMIC_CATALOG", "CATALOG", sourceId, null, null, hash, document.catalogEntityType(), document.catalogEntityId(),
                     document.catalogUpdatedAt() == null ? null : document.catalogUpdatedAt().toString(),
                     document.corpusVersion(), document.corpusHash(), document.releaseId());
+        } else {
+            UUID revision = parseUuid(document.id());
+            citation = new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
+                    document.domain() == null ? "THESIS" : document.domain(), "CURATED", sourceId, document.revisionId() == null ? revision : document.revisionId(),
+                    document.revisionVersion(), hash, null, null, null,
+                    document.corpusVersion(), document.corpusHash(), document.releaseId());
         }
-        UUID revision = parseUuid(document.id());
-        return new Citation(document.id(), document.slug(), document.title(), document.source(), document.locale(), excerpt(document.content()),
-                document.domain() == null ? "THESIS" : document.domain(), "CURATED", sourceId, document.revisionId() == null ? revision : document.revisionId(),
-                document.revisionVersion(), hash, null, null, null,
-                document.corpusVersion(), document.corpusHash(), document.releaseId());
+        return normalizeCitation(citation, document.locale());
+    }
+
+    /** Keep persisted and streamed citation copy readable when source content contains API status names. */
+    static Citation normalizeCitation(Citation citation, String locale) {
+        if (citation == null) return null;
+        String citationLocale = citation.locale() == null ? locale : citation.locale();
+        return new Citation(citation.id(), citation.slug(), normalizeAssistantCopy(citation.title(), citationLocale),
+                normalizeAssistantCopy(citation.source(), citationLocale), citation.locale(),
+                normalizeAssistantCopy(citation.excerpt(), citationLocale), citation.domain(), citation.sourceKind(),
+                citation.sourceId(), citation.revisionId(), citation.revisionVersion(), citation.snapshotHash(),
+                citation.entityType(), citation.entityId(), citation.updatedAt(), citation.corpusVersion(),
+                citation.corpusHash(), citation.releaseId());
     }
 
     private static void validateSegment(ProviderSegment segment, List<String> allowed, int expectedSequence) {
@@ -609,8 +862,9 @@ public class ThesisAssistantService {
     private static void emitReplay(Consumer<StreamEvent> sink, ThesisAssistantTurnRepository.ReplayResult replay, UUID clientRequestId,
             UUID requestId, String locale, UUID turnId) {
         emit(sink, new StreamMeta(requestId, clientRequestId, turnId, replay.conversationId(), replay.model(), locale));
-        emit(sink, new StreamDelta(0, replay.answer(), replay.citations().stream().map(Citation::sourceId).toList()));
-        replay.citations().forEach(citation -> emit(sink, new StreamCitation(citation)));
+        List<Citation> citations = replay.citations().stream().map(citation -> normalizeCitation(citation, locale)).toList();
+        emit(sink, new StreamDelta(0, normalizeAssistantCopy(replay.answer(), locale), citations.stream().map(Citation::sourceId).toList()));
+        citations.forEach(citation -> emit(sink, new StreamCitation(citation)));
         emit(sink, new StreamDone(replay.messageId(), replay.reasonCode(), replay.degraded(), replay.terminalStatus()));
     }
 
@@ -618,7 +872,8 @@ public class ThesisAssistantService {
 
     private static ChatResponse response(ThesisAssistantTurnRepository.ReplayResult replay, UUID clientRequestId, UUID requestId,
             UUID turnId, boolean replayed, String locale) {
-        return new ChatResponse(replay.answer(), replay.model(), replay.degraded(), replay.reasonCode(), locale, replay.citations(),
+        List<Citation> citations = replay.citations().stream().map(citation -> normalizeCitation(citation, locale)).toList();
+        return new ChatResponse(normalizeAssistantCopy(replay.answer(), locale), replay.model(), replay.degraded(), replay.reasonCode(), locale, citations,
                 requestId, clientRequestId, turnId, replayed, replay.terminalStatus(), replay.conversationId().toString(), replay.messageId().toString());
     }
 

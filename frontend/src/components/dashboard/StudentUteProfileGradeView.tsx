@@ -387,7 +387,7 @@ export function StudentUteProfileGradeView({
                   <button
                     type="button"
                     onClick={handleRefreshChart}
-                    className="p-1 rounded hover:bg-muted transition-colors"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
                     title={card.chartRefresh}
                     aria-label={card.chartRefresh}
                   >
@@ -396,7 +396,7 @@ export function StudentUteProfileGradeView({
                   <button
                     type="button"
                     onClick={handleDownloadChart}
-                    className="p-1 rounded hover:bg-muted transition-colors"
+                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
                     title={card.chartDownload}
                     aria-label={card.chartDownload}
                   >
