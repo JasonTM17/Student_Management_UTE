@@ -28,7 +28,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R1',
       number: 'Điều R1',
-      title: 'Phân Loại 4 Đợt Đăng Ký & Các Mốc Thời Gian Bắt Buộc',
+      title: 'Phân loại 4 đợt đăng ký & các mốc thời gian bắt buộc',
       badge: 'Đợt & Kế hoạch',
       icon: CalendarDays,
       content: (
@@ -68,7 +68,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R2',
       number: 'Điều R2',
-      title: 'Quy Trình 2 Giai Đoạn Độc Lập',
+      title: 'Quy trình 2 giai đoạn độc lập',
       badge: 'Trình tự triển khai',
       icon: Layers,
       content: (
@@ -90,7 +90,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R3',
       number: 'Điều R3',
-      title: 'Quản Lý Đề Tài Theo Từng Bộ Môn & 1–2 Giảng Viên Hướng Dẫn',
+      title: 'Quản lý đề tài theo từng bộ môn & 1–2 giảng viên hướng dẫn',
       badge: 'Chuyên môn & GVHD',
       icon: BookOpen,
       content: (
@@ -111,7 +111,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R4',
       number: 'Điều R4',
-      title: 'Quy Định Nhóm Sinh Viên Thực Hiện & Phê Duyệt',
+      title: 'Quy định nhóm sinh viên thực hiện & phê duyệt',
       badge: 'Cơ cấu nhóm',
       icon: UsersRound,
       content: (
@@ -136,7 +136,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R5',
       number: 'Điều R5',
-      title: 'Quy Chế Nộp Báo Cáo: Chỉ Nhóm Trưởng Nộp Báo Cáo',
+      title: 'Quy chế nộp báo cáo: chỉ nhóm trưởng nộp báo cáo',
       badge: 'Trách nhiệm nộp',
       icon: FileText,
       content: (
@@ -153,7 +153,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R6',
       number: 'Điều R6',
-      title: 'Hội Đồng Phản Biện & Cơ Cấu Thành Viên',
+      title: 'Hội đồng phản biện & cơ cấu thành viên',
       badge: 'Hội đồng bảo vệ',
       icon: UserCheck,
       content: (
@@ -175,7 +175,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R7',
       number: 'Điều R7',
-      title: 'Công Thức Điểm Số: Trung Bình Cộng Điểm Thành Phần',
+      title: 'Công thức điểm số: trung bình cộng điểm thành phần',
       badge: 'Công thức tính điểm',
       icon: Scale,
       content: (
@@ -192,7 +192,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R8',
       number: 'Điều R8',
-      title: 'Quy Tắc Loại Trừ Xung Đột Lợi Ích: GVHD Không Được Chấm Đề Tài Của Mình',
+      title: 'Quy tắc loại trừ xung đột lợi ích: GVHD không được chấm đề tài của mình',
       badge: 'Công tâm & Minh bạch',
       icon: ShieldAlert,
       content: (
@@ -209,7 +209,7 @@ export function ThesisRegulationGuide() {
     {
       id: 'R9',
       number: 'Điều R9',
-      title: 'Công Bố & Tra Cứu Kết Quả Công Khai',
+      title: 'Công bố & tra cứu kết quả công khai',
       badge: 'Tra cứu điểm',
       icon: Award,
       content: (
@@ -246,11 +246,11 @@ export function ThesisRegulationGuide() {
                 Quy Chế Đào Tạo HCMUTE
               </span>
               <span className="text-xs text-muted-foreground font-medium">
-                Khoa Công Nghệ Thông Tin
+                Khoa Công nghệ Thông tin
               </span>
             </div>
             <h3 className="mt-1 text-base font-bold text-foreground sm:text-lg">
-              Cẩm Nang Quy Chế Đề Tài & Khóa Luận Tốt Nghiệp (Quy Định R1 — R13)
+              Cẩm nang quy chế đề tài & khóa luận tốt nghiệp (Quy định R1 — R13)
             </h3>
           </div>
         </div>

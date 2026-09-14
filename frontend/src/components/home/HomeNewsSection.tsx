@@ -29,7 +29,7 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
 </ul>`,
     priority: 'HIGH',
-    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào tạo',
     createdAt: '2026-09-08T08:00:00Z',
     publishAt: '2026-09-08T08:00:00Z',
   },
@@ -69,7 +69,7 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Lưu ý:</strong> Sinh viên kiểm tra điều kiện tiên quyết và trùng lịch trước khi xác nhận lưu đăng ký.</li>
 </ul>`,
     priority: 'HIGH',
-    publishedBy: 'Phòng Đào Tạo UTE',
+    publishedBy: 'Phòng Đào tạo UTE',
     createdAt: '2026-08-25T08:00:00Z',
     publishAt: '2026-08-25T08:00:00Z',
   },

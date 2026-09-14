@@ -51,7 +51,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
     return [
       {
         step: 1,
-        title: 'GV Đề Xuất Đề Tài',
+        title: 'GV đề xuất đề tài',
         shortDesc: 'GV bộ môn gửi đề xuất',
         role: 'Giảng viên Bộ môn (1-2 GVHD)',
         rule: 'Điều R1, R2, R3',
@@ -70,7 +70,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       },
       {
         step: 2,
-        title: 'Thẩm Định & Công Bố',
+        title: 'Thẩm định & công bố',
         shortDesc: 'Khoa xét duyệt & công bố',
         role: 'Trưởng Bộ môn & Khoa CNTT',
         rule: 'Điều R2, R3',
@@ -89,7 +89,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       },
       {
         step: 3,
-        title: 'Nhóm SV Đăng Ký',
+        title: 'Nhóm SV đăng ký',
         shortDesc: 'Lập nhóm ≤3 SV & chọn đề tài',
         role: 'Sinh viên & GVHD',
         rule: 'Điều R2, R4',
@@ -108,7 +108,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       },
       {
         step: 4,
-        title: 'Thực Hiện & Nộp Báo Cáo',
+        title: 'Thực hiện & nộp báo cáo',
         shortDesc: 'Nghiên cứu & nộp báo cáo',
         role: 'Nhóm trưởng (Chỉ trưởng nhóm nộp)',
         rule: 'Điều R4, R5',
@@ -127,7 +127,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       },
       {
         step: 5,
-        title: 'Bảo Vệ & Chốt Điểm',
+        title: 'Bảo vệ & chốt điểm',
         shortDesc: 'Hội đồng 3-5 GV chấm bảo vệ',
         role: 'Hội đồng 3-5 GV & Chủ tịch',
         rule: 'Điều R6, R7, R8, R9',
@@ -158,14 +158,14 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary border border-primary/20">
               <Sparkles className="h-3.5 w-3.5" />
-              Quy Trình Chuẩn 5 Giai Đoạn
+              Quy trình chuẩn 5 giai đoạn
             </span>
             <span className="text-xs font-semibold text-muted-foreground">
-              (Theo Quy chế Đồ án Cuối kỳ Khoa CNTT - HCMUTE)
+              (Theo Quy chế đồ án cuối kỳ — Khoa CNTT, HCMUTE)
             </span>
           </div>
           <h3 className="mt-1.5 text-lg font-bold tracking-tight text-foreground sm:text-xl">
-            Tiến Trình Thực Hiện Đề Tài & Khóa Luận Tốt Nghiệp
+            Tiến trình thực hiện đề tài & khóa luận tốt nghiệp
           </h3>
         </div>
 
