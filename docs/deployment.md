@@ -80,17 +80,19 @@ Hệ thống trợ lý học vụ AI (`ThesisAssistantService`) áp dụng kiế
 
 ## 5. Nhật Ký Kiểm Thử Sản Xuất Trực Tiếp (Live Verification Log)
 
-- **Thời gian xác minh**: 09/09/2026 13:15 (UTC+7)
-- **Git Commit**: `b235693f` (`origin/main`)
+- **Thời gian xác minh**: 14/09/2026 17:38 (UTC+7)
+- **Git Commit**: `c4f67886` (`origin/main`)
 - **Vercel Production**:
   - URL triển khai: `https://www.campusute.io.vn` / `https://campusute.io.vn`
   - HTTP Status: `200 OK`
-  - Build: Next.js SSG + SSR hoàn thành sạch sẽ (`dpl_9XDwgFeGJJqXFDrvci1qzL8rhNNa`).
+  - Build: Next.js 15 App Router hoàn tất sạch sẽ (`dpl_H1zYp8H4tuUFB9ECPHKxaT6ju8iN`).
 - **Render Backend REST API**:
   - URL: `https://campuscore-backend-p4em.onrender.com`
   - Endpoint liveness: `{"service":"restful-api","status":"ok"}`
-  - Endpoint actuator: `{"status":"UP","groups":["liveness","readiness"]}`
-- **Supabase PostgreSQL**:
-  - Host: `https://kbptwmwitojjjwvwckom.supabase.co`
-  - Trạng thái xác thực thực tế: Gọi trực tiếp `/api/v1/auth/login` bằng tài khoản sinh viên demo (`student@campuscore.edu`), phản hồi định danh thành công với đầy đủ hồ sơ người dùng.
+  - Supabase Flyway Migrations: Đã tự động áp dụng thành công V40, V41, V42 nâng tổng tri thức lên 81 văn bản song ngữ (`local-demo-v42`).
+- **Trợ lý Học vụ AI Live Production (RAG + DeepSeek V4 Flash)**:
+  - **Truy vấn Tiên quyết vs Học trước**: Khớp chính xác tài liệu `prerequisite-prior-corequisite-vi` (Rank 1), trích dẫn và phân biệt rõ 3 loại môn học.
+  - **Truy vấn Điểm rèn luyện**: Định tuyến thành công tới DeepSeek V4 Flash (`model: deepseek-v4-flash`, `degraded: false`), tổng hợp 5 tiêu chí thang điểm 100 từ tài liệu `student-conduct-score-handbook-vi`.
+  - **Truy vấn Thời hạn học phí**: DeepSeek V4 Flash giải đáp chi tiết mốc 4 tuần và chế tài nợ học phí từ tài liệu `tuition-payment-deadline-rules-vi`.
+
 
