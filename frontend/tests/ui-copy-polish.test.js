@@ -137,3 +137,104 @@ test('enrollment and thesis status fallbacks stay human-readable', () => {
   assert.match(thesisPages, /messages\.common\.statuses\.UNKNOWN/);
   assert.doesNotMatch(thesisPages, /messages\.thesis\.status\[[^\n]+\]\s*\?\?\s*status/);
 });
+
+test('thesis workflow copy is localized and the English side carries no Vietnamese', () => {
+  const VI = /[ăâêôơưđáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹ]/i;
+  const namespace = read('src/i18n/messages-thesis-workflow.ts');
+
+  // The two components previously rendered Vietnamese literals directly, so the
+  // English portal showed Vietnamese regulation text.
+  for (const component of [
+    'src/components/thesis/ThesisWorkflowStepper.tsx',
+    'src/components/thesis/ThesisRegulationGuide.tsx',
+  ]) {
+    const source = read(component);
+    const literals = source.match(/'[^']*'/g) || [];
+    const leaked = literals.filter((literal) => VI.test(literal));
+    assert.deepEqual(leaked, [], `${component} still has Vietnamese literals: ${leaked.join(', ')}`);
+    assert.match(source, /useI18n\(\)/);
+    assert.match(source, /messages\.thesisWorkflow/);
+  }
+
+  // Both dictionaries must exist and stay in step.
+  assert.match(namespace, /export const thesisWorkflowEn/);
+  assert.match(namespace, /export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn>/);
+
+  // Load the real module so the assertions run against the shipped copy.
+  const ts = require('typescript');
+  const output = ts.transpileModule(namespace, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  const { thesisWorkflowEn, thesisWorkflowVi } = moduleRecord.exports;
+
+  const flat = (value, trail = '') => {
+    if (typeof value === 'string') return [[trail, value]];
+    if (Array.isArray(value)) return value.flatMap((item, index) => flat(item, `${trail}[${index}]`));
+    if (value && typeof value === 'object') {
+      return Object.entries(value).flatMap(([key, child]) => flat(child, trail ? `${trail}.${key}` : key));
+    }
+    return [];
+  };
+
+  const english = flat(thesisWorkflowEn);
+  const vietnamese = flat(thesisWorkflowVi);
+
+  assert.ok(english.length > 60, `expected a substantial English dictionary, got ${english.length}`);
+  assert.equal(vietnamese.length, english.length, 'vi and en must expose the same number of strings');
+  assert.deepEqual(
+    vietnamese.map(([key]) => key),
+    english.map(([key]) => key),
+    'vi and en must expose the same keys',
+  );
+
+  const leakedToEnglish = english.filter(([, value]) => VI.test(value));
+  assert.deepEqual(
+    leakedToEnglish.map(([key]) => key),
+    [],
+    'English thesis copy must not contain Vietnamese characters',
+  );
+
+  // Guard the inverse: the Vietnamese side must actually be Vietnamese, so a
+  // copy/paste of the English strings cannot pass silently.
+  const translated = vietnamese.filter(([, value]) => VI.test(value));
+  assert.ok(
+    translated.length > english.length / 2,
+    `expected most vi strings to be Vietnamese, only ${translated.length}/${english.length} are`,
+  );
+
+  // Spot-check a few user-visible strings in both directions.
+  assert.equal(thesisWorkflowEn.stepper.badge, 'Standard 5-stage process');
+  assert.equal(thesisWorkflowVi.stepper.badge, 'Quy trình chuẩn 5 giai đoạn');
+  assert.match(thesisWorkflowEn.stepper.stages[0].title, /Lecturer proposes a topic/);
+  assert.match(thesisWorkflowVi.stepper.stages[0].title, /GV đề xuất đề tài/);
+  assert.equal(thesisWorkflowEn.guide.rules[0].number, 'Article R1');
+  assert.equal(thesisWorkflowVi.guide.rules[0].number, 'Điều R1');
+});
+
+test('thesis page labels come from the dictionary instead of Vietnamese literals', () => {
+  const VI = /[ăâêôơưđáàảãạấầẩẫậắằẳẵặéèẻẽẹếềểễệíìỉĩịóòỏõọốồổỗộớờởỡợúùủũụứừửữựýỳỷỹ]/i;
+  const page = read('src/app/dashboard/thesis/page.tsx');
+
+  // The page used Vietnamese default values, so an English reader saw Vietnamese
+  // whenever the API returned nothing (rejection reason, council name, document
+  // title) and for every validation message.
+  const fallbackDefaults = page.match(/\|\|\s*'([^']*)'/g) || [];
+  const leakedFallbacks = fallbackDefaults.filter((entry) => VI.test(entry));
+  assert.deepEqual(leakedFallbacks, [], `Vietnamese default values remain: ${leakedFallbacks.join(', ')}`);
+
+  // Validation copy is dictionary-driven too. `setActionError('')` is the reset
+  // call, so only a non-empty literal is a leak.
+  assert.doesNotMatch(page, /setActionError\('[^']+'/);
+  assert.match(page, /pageCopy\.defenceScoreRange/);
+  assert.match(page, /pageCopy\.councilScoresPending/);
+  assert.match(page, /pageCopy\.topicAlreadyFinalised/);
+  assert.match(page, /pageCopy\.groupLeaderFallback/);
+
+  // Graduation classification labels are resolved from a stable band key rather
+  // than being baked into the scoring helper.
+  assert.match(page, /band: 'EXCELLENT'/);
+  assert.match(page, /pageCopy\.classification\[studentGradeInfo\.band\]/);
+  assert.doesNotMatch(page, /\brank: '/);
+});

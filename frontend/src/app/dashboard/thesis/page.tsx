@@ -74,12 +74,42 @@ function getThesisErrorCode(error: unknown): string {
   return data?.code ?? '';
 }
 
-export function getGradeClassification(score: number) {
+/** Fills `{name}` placeholders in a copy template. */
+function fillCopy(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
+}
+
+/** Renders `**bold**` spans inside a copy string as inline emphasis. */
+function renderInlineBold(text: string): React.ReactNode[] {
+  return text
+    .split('**')
+    .map((part, index) => (index % 2 === 1 ? <strong key={index}>{part}</strong> : <span key={index}>{part}</span>));
+}
+
+/** Stable classification keys; the display label comes from the i18n dictionary. */
+export type GradeBand =
+  | 'EXCELLENT'
+  | 'GOOD'
+  | 'FAIR'
+  | 'UPPER_AVERAGE'
+  | 'AVERAGE'
+  | 'BELOW_AVERAGE'
+  | 'PASS'
+  | 'RETAKE';
+
+export function getGradeClassification(score: number): {
+  letter: string;
+  gpa4: string;
+  band: GradeBand;
+  badgeClass: string;
+} {
   if (score >= 8.5) {
     return {
       letter: 'A',
       gpa4: '4.0',
-      rank: 'Xuất sắc',
+      band: 'EXCELLENT',
       badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
     };
   }
@@ -87,7 +117,7 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'B+',
       gpa4: '3.5',
-      rank: 'Giỏi',
+      band: 'GOOD',
       badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
     };
   }
@@ -95,7 +125,7 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'B',
       gpa4: '3.0',
-      rank: 'Khá',
+      band: 'FAIR',
       badgeClass: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
     };
   }
@@ -103,7 +133,7 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'C+',
       gpa4: '2.5',
-      rank: 'Trung bình khá',
+      band: 'UPPER_AVERAGE',
       badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
     };
   }
@@ -111,7 +141,7 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'C',
       gpa4: '2.0',
-      rank: 'Trung bình',
+      band: 'AVERAGE',
       badgeClass: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
     };
   }
@@ -119,7 +149,7 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'D+',
       gpa4: '1.5',
-      rank: 'Trung bình yếu',
+      band: 'BELOW_AVERAGE',
       badgeClass: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30',
     };
   }
@@ -127,14 +157,14 @@ export function getGradeClassification(score: number) {
     return {
       letter: 'D',
       gpa4: '1.0',
-      rank: 'Đạt',
+      band: 'PASS',
       badgeClass: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/30',
     };
   }
   return {
     letter: 'F',
     gpa4: '0.0',
-    rank: 'Không đạt (Bảo vệ lại)',
+    band: 'RETAKE',
     badgeClass: 'bg-destructive/15 text-destructive border-destructive/30',
   };
 }
@@ -143,6 +173,7 @@ export default function ThesisPage() {
   const { user, isStudent, isLecturer, isAdmin } = useAuth();
   const isSupervisorOrAdmin = Boolean(isLecturer || isAdmin);
   const { locale, formatDateTime, messages } = useI18n();
+  const pageCopy = messages.thesisWorkflow.page;
   const searchParams = useSearchParams();
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
@@ -257,7 +288,7 @@ export default function ThesisPage() {
     const key = `${councilId}:${topicId}`;
     const scoreVal = parseFloat(draftScores[key] || '');
     if (isNaN(scoreVal) || scoreVal < 0 || scoreVal > 10) {
-      setActionError('Điểm bảo vệ phải là số từ 0.0 đến 10.0');
+      setActionError(pageCopy.defenceScoreRange);
       return;
     }
     setIsActionPending(true);
@@ -289,7 +320,7 @@ export default function ThesisPage() {
     setActionSuccess('');
     try {
       const res = await thesisApi.finalizeScores(councilId, topicId);
-      const msg = `Đã chốt điểm thành công: ${res.finalScore} điểm.`;
+      const msg = fillCopy(pageCopy.scoreFinalised, { score: res.finalScore ?? '' });
       setActionSuccess(msg);
       toast.success(msg);
       const key = `${councilId}:${topicId}`;
@@ -299,11 +330,11 @@ export default function ThesisPage() {
     } catch (err: unknown) {
       const code = getThesisErrorCode(err);
       if (code === 'SCORES_INCOMPLETE') {
-        const msg = 'Cần tất cả thành viên hội đồng hợp lệ chấm điểm trước khi chốt.';
+        const msg = pageCopy.councilScoresPending;
         setActionError(msg);
         toast.error(msg);
       } else if (code === 'SCORE_ALREADY_FINALIZED') {
-        const msg = 'Điểm đề tài này đã được chốt trước đó.';
+        const msg = pageCopy.topicAlreadyFinalised;
         setActionError(msg);
         toast.info(msg);
       } else {
@@ -658,7 +689,7 @@ export default function ThesisPage() {
   const currentLeaderMember = groupMemberList.find((m) => m.isLeader);
   const currentLeaderName = currentLeaderMember
     ? (currentLeaderMember.displayName || currentLeaderMember.studentNumber || currentLeaderMember.studentId)
-    : (currentGroup?.leaderStudentId || 'Nhóm trưởng');
+    : (currentGroup?.leaderStudentId || pageCopy.groupLeaderFallback);
 
   const memberCopy =
     locale === 'vi'
@@ -1058,7 +1089,8 @@ export default function ThesisPage() {
                           </span>
                           <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
                           <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                            Vai trò của bạn: {isGroupLeader ? 'Nhóm trưởng (Đại diện nộp báo cáo - R5)' : 'Thành viên'}
+                            {pageCopy.yourRoleLabel}{' '}
+                        {isGroupLeader ? pageCopy.roleGroupLeaderReport : pageCopy.roleMember}
                           </span>
                         </div>
                         <h4 className="text-sm font-semibold text-foreground truncate">
@@ -1086,7 +1118,7 @@ export default function ThesisPage() {
                     {/* Supervisor Info (Rule R3) */}
                     {studentTopicSupervisors.length > 0 && (
                       <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] px-3 py-2 text-xs">
-                        <span className="font-bold text-foreground">Giảng viên hướng dẫn (Điều R3):</span>
+                        <span className="font-bold text-foreground">{pageCopy.supervisorLabel}</span>
                         <span className="font-semibold text-primary">{studentTopicSupervisors.join(' · ')}</span>
                       </div>
                     )}
@@ -1096,21 +1128,21 @@ export default function ThesisPage() {
                       <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
                         <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
                         <div>
-                          <strong>Đề tài đã được GVHD phê duyệt chính thức (Điều R4):</strong> Nhóm đủ điều kiện triển khai nghiên cứu. Nhóm trưởng chuẩn bị nộp báo cáo luận văn và slide theo Điều R5.
+                          {renderInlineBold(pageCopy.topicApprovedNotice)}
                         </div>
                       </div>
                     ) : currentGroup.approvalStatus === 'PENDING' ? (
                       <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
                         <CircleDot className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
                         <div>
-                          <strong>Đang chờ GVHD xét duyệt (Điều R4):</strong> Nguyện vọng đề tài đang chờ Giảng viên hướng dẫn duyệt. Nhóm trưởng có thể quản lý thành viên trong thời gian mở đăng ký.
+                          {renderInlineBold(pageCopy.topicPendingNotice)}
                         </div>
                       </div>
                     ) : (
                       <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
                         <Shield className="h-4 w-4 shrink-0 mt-0.5" />
                         <div>
-                          <strong>Đề tài bị từ chối:</strong> {currentGroup.rejectionReason || 'Vui lòng liên hệ GVHD hoặc chọn đề tài khác phù hợp.'}
+                          <strong>{pageCopy.topicRejectedLabel}</strong> {currentGroup.rejectionReason || pageCopy.rejectedTopicFallback}
                         </div>
                       </div>
                     )}
@@ -1202,7 +1234,7 @@ export default function ThesisPage() {
                           <div className="flex items-center gap-2">
                             <FileText className="h-4 w-4 text-primary" />
                             <span className="text-sm font-semibold text-foreground">
-                              {messages.thesis.report.title} (Điều R5)
+                              {messages.thesis.report.title} {pageCopy.articleR5Suffix}
                             </span>
                           </div>
                           {isGroupLeader ? (
@@ -1225,7 +1257,7 @@ export default function ThesisPage() {
                         <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5 text-xs text-muted-foreground flex items-center gap-2">
                           <Info className="h-4 w-4 shrink-0 text-primary" />
                           <span>
-                            <strong>Quy chế Điều R5:</strong> Quyền nộp hoặc cập nhật báo cáo luận văn thuộc về <strong>Nhóm trưởng</strong> ({currentLeaderName}). Các thành viên xem tài liệu nghiệm thu đã nộp.
+                            {renderInlineBold(fillCopy(pageCopy.reportRightsNotice, { leader: currentLeaderName }))}
                           </span>
                         </div>
 
@@ -1304,7 +1336,7 @@ export default function ThesisPage() {
                                 disabled={isActionPending}
                               />
                               <p className="mt-1 text-[11px] text-muted-foreground">
-                                Chấp nhận liên kết Google Drive (chế độ Anyone with the link), OneDrive, GitHub repo hoặc file PDF trực tiếp.
+                                {pageCopy.reportLinkHint}
                               </p>
                             </div>
                             <div>
@@ -1558,7 +1590,7 @@ export default function ThesisPage() {
                             {council.name}
                           </h4>
                           <p className="text-xs text-muted-foreground mt-0.5">
-                            Vai trò của bạn:{' '}
+                            {pageCopy.yourRoleLabel}{' '}
                             <span className="font-medium text-primary">
                               {myMembership?.memberRole === 'CHAIR'
                                 ? messages.thesis.councils.roleChair
@@ -1566,12 +1598,12 @@ export default function ThesisPage() {
                                 ? messages.thesis.councils.roleSecretary
                                 : myMembership
                                 ? messages.thesis.councils.roleMember
-                                : 'Quản trị viên'}
+                                : pageCopy.roleAdmin}
                             </span>
                           </p>
                         </div>
                         <span className="text-xs font-medium text-muted-foreground">
-                          {topicIds.length} đề tài phân công
+                          {fillCopy(pageCopy.assignedTopicsCount, { count: topicIds.length })}
                         </span>
                       </div>
 
@@ -1627,7 +1659,7 @@ export default function ThesisPage() {
                                           className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
                                         >
                                           <FileText className="h-3.5 w-3.5" />
-                                          <span>Tài liệu luận văn: {topicReports[tid]?.title || 'Báo cáo tốt nghiệp'}</span>
+                                          <span>{pageCopy.thesisDocumentLabel} {topicReports[tid]?.title || pageCopy.thesisReportFallback}</span>
                                           <ExternalLink className="h-3 w-3" />
                                         </a>
                                         {topicReports[tid]?.note ? (
@@ -1869,7 +1901,7 @@ export default function ThesisPage() {
                     )}
                   >
                     <BookOpen className="h-4 w-4" />
-                    <span>1. Đề tài & nhóm hướng dẫn (GVHD)</span>
+                    <span>{pageCopy.tabTopicsAndSupervisors}</span>
                     <span
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
@@ -1878,7 +1910,7 @@ export default function ThesisPage() {
                           : 'bg-muted text-foreground',
                       )}
                     >
-                      {supervisedGroups.length} nhóm
+                      {fillCopy(pageCopy.groupsCount, { count: supervisedGroups.length })}
                     </span>
                   </button>
                   <button
@@ -1892,7 +1924,7 @@ export default function ThesisPage() {
                     )}
                   >
                     <GraduationCap className="h-4 w-4" />
-                    <span>2. Hội đồng chấm bảo vệ (Điều R6 — R8)</span>
+                    <span>{pageCopy.tabCouncil}</span>
                     <span
                       className={cn(
                         'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
@@ -1901,12 +1933,12 @@ export default function ThesisPage() {
                           : 'bg-muted text-foreground',
                       )}
                     >
-                      {visibleCouncils.length} hội đồng
+                      {fillCopy(pageCopy.councilsCount, { count: visibleCouncils.length })}
                     </span>
                   </button>
                 </div>
                 <span className="text-xs text-muted-foreground font-medium">
-                  Khu vực: <strong className="text-primary">{isAdmin ? 'Quản trị viên' : 'Giảng viên'}</strong> (Khoa CNTT - HCMUTE)
+                    {pageCopy.workspaceAreaLabel} <strong className="text-primary">{isAdmin ? pageCopy.roleAdmin : pageCopy.roleLecturer}</strong> {pageCopy.facultySuffix}
                 </span>
               </div>
 
@@ -1976,13 +2008,13 @@ export default function ThesisPage() {
                                     className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
                                   >
                                     <FileText className="h-3.5 w-3.5" />
-                                    <span>Báo cáo luận văn: {supervisedReports[group.id]?.title || 'Tài liệu đồ án'}</span>
+                                    <span>{pageCopy.thesisReportLabel} {supervisedReports[group.id]?.title || pageCopy.projectDocumentsFallback}</span>
                                     <ExternalLink className="h-3 w-3" />
                                   </a>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                                     <FileText className="h-3 w-3" />
-                                    Chưa nộp báo cáo luận văn
+                                    {pageCopy.reportNotSubmitted}
                                   </span>
                                 )}
                               </div>
@@ -2040,17 +2072,17 @@ export default function ThesisPage() {
                   </div>
                   <div className="space-y-0.5">
                     <h4 className="text-sm font-bold text-foreground">
-                      Bàn Làm Việc Sinh Viên & Nhóm Nghiên Cứu (Điều R4, R5, R9)
+                      {pageCopy.workspaceTitle}
                     </h4>
                     <p className="text-xs text-muted-foreground leading-relaxed">
-                      Tuân thủ Quy chế Khoa CNTT: Tối đa 3 SV/nhóm (Điều R4), chỉ Nhóm trưởng nộp báo cáo luận văn (Điều R5), và tra cứu điểm số minh bạch sau khi Hội đồng chốt điểm (Điều R9).
+                      {pageCopy.workspaceSubtitle}
                     </p>
                   </div>
                 </div>
                 {currentGroup && (
                   <div className="shrink-0 flex items-center gap-2">
                     <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-foreground border border-border/80 shadow-2xs">
-                      Vai trò của bạn: {isGroupLeader ? 'Nhóm trưởng' : 'Thành viên'}
+                        {pageCopy.yourRoleLabel} {isGroupLeader ? pageCopy.roleGroupLeader : pageCopy.roleMember}
                     </span>
                   </div>
                 )}
@@ -2066,68 +2098,68 @@ export default function ThesisPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
-                        Đã Hoàn Thành Bảo Vệ
+                        {pageCopy.defenceCompleted}
                       </span>
                       <span className="text-xs font-semibold text-muted-foreground">
-                        Quy chế Điều R7 & Điều R9
+                        {pageCopy.articlesR7R9}
                       </span>
                     </div>
                     <h3 className="mt-1 text-base font-bold text-foreground sm:text-lg">
-                      Kết quả đánh giá & điểm số khóa luận tốt nghiệp
+                      {pageCopy.resultsHeading}
                     </h3>
                   </div>
                 </div>
                 <span className="text-xs font-medium text-muted-foreground">
-                  Công bố chính thức bởi Hội đồng Khoa CNTT
+                      {pageCopy.publishedByCouncil}
                 </span>
               </div>
 
               <div className="mt-5 grid grid-cols-1 gap-4 sm:grid-cols-4">
                 <div className="rounded-xl border border-emerald-500/30 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Điểm Bảo Vệ (Thang 10)
+                    {pageCopy.defenceScoreTenScale}
                   </p>
                   <p className="mt-1 font-mono text-3xl font-extrabold text-emerald-600 dark:text-emerald-400">
                     {studentFinalScore.toFixed(2)}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Trung bình cộng R7
+                    {pageCopy.arithmeticMeanR7}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Điểm Chữ
+                    {pageCopy.letterGradeLabel}
                   </p>
                   <p className="mt-1 font-mono text-3xl font-extrabold text-primary">
                     {studentGradeInfo.letter}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Quy đổi GPA: {studentGradeInfo.gpa4}
+                    {fillCopy(pageCopy.gpaConversion, { gpa: studentGradeInfo.gpa4 })}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Xếp loại tốt nghiệp
+                    {pageCopy.graduationClassification}
                   </p>
                   <p className="mt-2 text-xl font-bold text-foreground">
-                    {studentGradeInfo.rank}
+                    {pageCopy.classification[studentGradeInfo.band]}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Theo thang điểm tín chỉ
+                    {pageCopy.creditScaleNote}
                   </p>
                 </div>
 
                 <div className="rounded-xl border border-border/70 bg-background/80 p-4 text-center shadow-2xs">
                   <p className="text-xs font-bold uppercase tracking-wider text-muted-foreground">
-                    Hội đồng đánh giá
+                    {pageCopy.evaluationCouncil}
                   </p>
                   <p className="mt-2 text-sm font-bold text-foreground truncate">
-                    {myResultItem?.councilName || 'Hội đồng Khoa CNTT'}
+                    {myResultItem?.councilName || pageCopy.councilNameFallback}
                   </p>
                   <p className="mt-1 text-[11px] text-muted-foreground">
-                    Trường ĐH Công nghệ Kỹ thuật TP.HCM
+                    {pageCopy.universityName}
                   </p>
                 </div>
               </div>

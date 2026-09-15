@@ -1,4 +1,5 @@
 import type { Locale } from '@/i18n/config';
+import { thesisWorkflowEn, thesisWorkflowVi } from '@/i18n/messages-thesis-workflow';
 
 export const en = {
   common: {
@@ -1482,6 +1483,7 @@ export const en = {
     toastRefreshed: 'Study chart data refreshed',
     toastDownloaded: 'Academic results chart downloaded (SVG)',
   },
+  thesisWorkflow: thesisWorkflowEn,
 } as const;
 
 type DeepWiden<T> = T extends string
@@ -2977,6 +2979,7 @@ export const vi: I18nMessages = {
     toastRefreshed: 'Đã làm mới dữ liệu biểu đồ học tập',
     toastDownloaded: 'Đã tải xuống biểu đồ kết quả học tập (SVG)',
   },
+  thesisWorkflow: thesisWorkflowVi,
 };
 
 export const dictionaries = {
