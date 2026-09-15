@@ -100,6 +100,13 @@ Tài khoản demo: `student@campuscore.edu` | Mật khẩu: `password123`
 | ![Student Assistant Chat](docs/assets/screenshots/student-07-assistant-chat.png) | ![Student Thesis](docs/assets/screenshots/student-08-thesis.png) |
 | *Trợ lý RAG giải đáp quy chế, lịch thi kèm trích dẫn tài liệu thật* | *Theo dõi đợt bảo vệ, đăng ký đề tài và thành lập nhóm* |
 
+> **Nộp báo cáo khóa luận:** trưởng nhóm nộp báo cáo bằng **file Word/PDF (tối đa 20 MB)** hoặc
+> đường liên kết. Giảng viên hướng dẫn, hội đồng và thành viên nhóm tải tài liệu gốc trực tiếp
+> từ hệ thống; nộp lại luôn thay thế bằng đúng một phiên bản hiện hành.
+>
+> **Bảng điểm:** bảng điểm hiển thị song song thang điểm 10, điểm chữ và thang điểm 4 kèm bảng
+> quy đổi chính thức UTE / Bộ GD&ĐT ngay trên màn hình (và trong bản in).
+
 ---
 
 ### 3. Hành trình Giảng viên (Lecturer Role)
@@ -115,6 +122,14 @@ Tài khoản demo: `lecturer@campuscore.edu` | Mật khẩu: `password123`
 | --- | --- |
 | ![Lecturer Grades](docs/assets/screenshots/lecturer-03-grades-management.png) | ![Lecturer Grade Entry](docs/assets/screenshots/lecturer-04-grade-entry.png) |
 | *Theo dõi tiến độ nộp điểm và trạng thái khóa sổ* | *Bảng tính nhập điểm quá trình, điểm thi và lưu an toàn* |
+
+> **Nhập điểm từ Excel:** tại bảng nhập điểm, giảng viên có thể chọn *Nhập điểm từ Excel/CSV* —
+> dán trực tiếp vùng chọn trong Excel (tab-separated) hoặc upload file CSV. Mỗi dòng gồm
+> `mã sinh viên (hoặc email), điểm quá trình, điểm cuối kỳ`; dòng không khớp sẽ được báo lý do
+> ngay trong bảng xem trước, sau đó bấm *Điền vào bảng điểm* → *Lưu nháp* → *Xuất bản* như nhập tay.
+>
+> **Quản lý nhóm khóa luận:** giảng viên hướng dẫn thêm/xoá thành viên trong nhóm đang đăng ký
+> (tối đa 3 thành viên, giữ nguyên nhóm trưởng) ngay trong khu vực *Hướng dẫn* của cổng khóa luận.
 
 ---
 
