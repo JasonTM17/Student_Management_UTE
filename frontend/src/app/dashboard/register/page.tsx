@@ -122,6 +122,12 @@ export default function RegisterPage() {
     return set;
   }, [enrollments]);
 
+  /**
+   * The catalog used to dump every open section on load. It now stays behind
+   * the search box so the page opens on a prompt instead of a wall of classes.
+   */
+  const hasSearchQuery = courseCodeSearch.trim() !== '' || courseNameSearch.trim() !== '';
+
   const filteredSections = useMemo(() => {
     const codeQuery = courseCodeSearch.trim().toLowerCase();
     const nameQuery = courseNameSearch.trim().toLowerCase();
@@ -158,8 +164,9 @@ export default function RegisterPage() {
    * filters, otherwise the first visible course is selected automatically so a
    * section list is always on screen once any course matches.
    */
-  const activeCourse =
-    courseGroups.find((group) => group.courseId === selectedCourseId) ?? courseGroups[0] ?? null;
+  const activeCourse = hasSearchQuery
+    ? (courseGroups.find((group) => group.courseId === selectedCourseId) ?? courseGroups[0] ?? null)
+    : null;
 
   const registered = enrollments.filter((item) => ACTIVE_ENROLLMENT_STATUSES.has(item.status));
   const totalRegisteredCredits = registered.reduce(
@@ -282,10 +289,18 @@ export default function RegisterPage() {
               <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))]">
                 <CardTitle className="flex items-center gap-2 text-base">
                   <BookOpen className="h-4 w-4 text-primary" />
-                  {copy.sectionCount.replace('{count}', formatNumber(filteredSections.length))}
+                  {hasSearchQuery
+                    ? copy.sectionCount.replace('{count}', formatNumber(filteredSections.length))
+                    : copy.searchPromptTitle}
                 </CardTitle>
               </CardHeader>
-              {!activeCourse ? (
+              {!hasSearchQuery ? (
+                <EmptyState
+                  icon={Search}
+                  title={copy.searchPromptTitle}
+                  description={copy.searchPromptDescription}
+                />
+              ) : !activeCourse ? (
                 <EmptyState icon={BookOpen} title={copy.emptyTitle} description={copy.emptyDescription} />
               ) : (
               <div className="min-w-0">

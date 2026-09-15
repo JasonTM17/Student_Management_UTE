@@ -5,7 +5,11 @@ import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass, statusToneClass } from '@/components/ui/status';
-import { GpaTrendChart, GradeDistributionChart } from '@/components/dashboard/TranscriptCharts';
+import {
+  GpaTrendChart,
+  GradeDistributionChart,
+  TenScaleTrendChart,
+} from '@/components/dashboard/TranscriptCharts';
 import {
   buildCumulativeGpaTrendPoints,
   buildGpaTrendPoints,
@@ -24,7 +28,7 @@ import {
   StudentGradeRecord,
   StudentTranscriptSemester,
 } from '@/types/api';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
 import {
@@ -247,6 +251,7 @@ export default function TranscriptPage() {
           gpaSemesterTrend: 'Theo học kỳ',
           gpaBothTrend: 'Song song',
           avgTenScale: 'ĐTB hệ 10',
+          tenScaleTrendHint: 'Điểm trung bình học kỳ trên thang 10.',
           clickToViewDetail: 'Chi tiết GK/CK',
           distribution: 'Phân bố xếp loại',
           programTitle: 'Chương trình đào tạo',
@@ -300,6 +305,7 @@ export default function TranscriptPage() {
           gpaSemesterTrend: 'By semester',
           gpaBothTrend: 'Both',
           avgTenScale: '10-scale average',
+          tenScaleTrendHint: 'Semester average on the 10-point scale.',
           clickToViewDetail: 'Midterm/final detail',
           distribution: 'Grade distribution',
           programTitle: 'Study program',
@@ -594,14 +600,28 @@ export default function TranscriptPage() {
                 <GpaTrendChart
                   points={gpaTrendPoints}
                   cumulativePoints={cumulativeGpaTrendPoints}
-                  tenScalePoints={tenScaleTrendPoints}
-                  tenScaleLegendLabel={copy.avgTenScale}
                   mode={gpaMode}
                   selectedLabel={selectedSemester ? selectedSemesterName : undefined}
                   ariaLabel={copy.gpaTrend}
                 />
               </CardContent>
             </Card>
+            {/* The 0-10 average gets its own axis; plotting it on the 4.0 plot
+                put both series at nearly the same height. */}
+            {tenScaleTrendPoints.length > 0 ? (
+              <Card variant="elevated">
+                <CardHeader className="border-b border-border/70">
+                  <CardTitle className="text-base">{copy.avgTenScale}</CardTitle>
+                  <CardDescription>{copy.tenScaleTrendHint}</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <TenScaleTrendChart
+                    points={tenScaleTrendPoints}
+                    ariaLabel={`${copy.gpaTrend} — ${copy.avgTenScale}`}
+                  />
+                </CardContent>
+              </Card>
+            ) : null}
             <Card variant="elevated">
               <CardHeader>
                 <CardTitle className="text-base">{copy.distribution}</CardTitle>

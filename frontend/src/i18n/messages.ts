@@ -517,6 +517,9 @@ export const en = {
     drop: 'Drop course',
     emptyTitle: 'No matching sections',
     emptyDescription: 'Try another semester or search term.',
+    searchPromptTitle: 'Search to see available sections',
+    searchPromptDescription:
+      'Enter a course code or a course name to list the classes you can register for.',
     loadFailed: 'Course registration data could not be loaded.',
     success: 'Enrollment updated.',
     confirmRegister: 'Confirm course registration?',
@@ -2014,6 +2017,8 @@ export const vi: I18nMessages = {
     drop: 'Hủy đăng ký',
     emptyTitle: 'Chưa có lớp học phần phù hợp',
     emptyDescription: 'Thử đổi học kỳ hoặc từ khóa tìm kiếm.',
+    searchPromptTitle: 'Tìm kiếm để xem lớp học phần',
+    searchPromptDescription: 'Nhập mã học phần hoặc tên môn để xem danh sách lớp có thể đăng ký.',
     loadFailed: 'Không thể tải dữ liệu đăng ký học phần.',
     success: 'Đã cập nhật đăng ký học phần.',
     confirmRegister: 'Xác nhận đăng ký học phần này?',
