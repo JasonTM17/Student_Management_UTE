@@ -13,11 +13,13 @@ import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
 import org.springframework.util.StringUtils;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
- * Brief R5: only the group leader submits the topic report. The report is an
- * external-artifact reference (link + metadata), one current version per
- * group, and it is frozen once the round's GVPB grading deadline passes.
+ * Brief R5: only the group leader submits the topic report. The report
+ * references an external artifact — a link, an attached Word/PDF document
+ * (feedback item 7), or both. There is one current version per group and it
+ * is frozen once the round's GVPB grading deadline passes.
  */
 @Service
 @Profile("persistence")
@@ -67,6 +69,65 @@ public class ThesisReportService {
         return get(groupId, actor);
     }
 
+    /** Feedback item 7: the leader may attach the report document itself. */
+    @Transactional
+    public ReportResponse submitFile(UUID groupId, MultipartFile file, String title, String note, Jwt actor) {
+        GroupContext group = loadGroup(groupId);
+        if (!group.leaderStudentId().equals(studentId(actor))) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_OWNER_REQUIRED",
+                    "Only the group leader can submit the topic report");
+        }
+        ReportFilePolicy.ValidatedFile validated = ReportFilePolicy.validate(file);
+        Instant gvpbDeadline = group.gvpbDeadline();
+        if (gvpbDeadline != null && !Instant.now().isBefore(gvpbDeadline)) {
+            throw conflict("REPORT_DEADLINE_PASSED",
+                    "The GVPB grading deadline for this round has passed; reports are frozen");
+        }
+        Integer approved = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE id = :groupId AND approval_status = 'APPROVED'",
+                params().addValue("groupId", groupId), Integer.class);
+        if (approved == null || approved == 0) {
+            throw conflict("GROUP_STATE_CONFLICT", "Reports can be submitted only after the group is approved");
+        }
+        jdbc.update("DELETE FROM thesis.thesis_group_report WHERE group_id = :groupId",
+                params().addValue("groupId", groupId));
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url, note, "
+                        + "file_name, file_type, file_size, file_data) "
+                        + "VALUES (:id, :groupId, :roundId, :submittedBy, :title, :url, :note, "
+                        + ":fileName, :fileType, :fileSize, :fileData)",
+                params().addValue("id", UUID.randomUUID())
+                        .addValue("groupId", groupId)
+                        .addValue("roundId", group.roundId())
+                        .addValue("submittedBy", studentId(actor))
+                        .addValue("title", blankToNull(title, 240))
+                        .addValue("url", (String) null)
+                        .addValue("note", blankToNull(note, 500))
+                        .addValue("fileName", validated.fileName())
+                        .addValue("fileType", validated.contentType())
+                        .addValue("fileSize", validated.size())
+                        .addValue("fileData", validated.data()));
+        return get(groupId, actor);
+    }
+
+    /** Serves the attached document; authorization is exactly the read matrix of {@link #get}. */
+    @Transactional(readOnly = true)
+    public StoredReport download(UUID groupId, Jwt actor) {
+        get(groupId, actor);
+        try {
+            return jdbc.queryForObject(
+                    "SELECT file_name, file_type, file_data FROM thesis.thesis_group_report "
+                            + "WHERE group_id = :groupId AND file_data IS NOT NULL",
+                    params().addValue("groupId", groupId),
+                    (rs, ignored) -> new StoredReport(
+                            rs.getString("file_name"),
+                            rs.getString("file_type"),
+                            rs.getBytes("file_data")));
+        } catch (EmptyResultDataAccessException exception) {
+            throw notFound("REPORT_FILE_NOT_FOUND", "The current report is a link, not an attached document");
+        }
+    }
+
     @Transactional(readOnly = true)
     public ReportResponse get(UUID groupId, Jwt actor) {
         GroupContext group = loadGroup(groupId);
@@ -88,7 +149,8 @@ public class ThesisReportService {
         }
         try {
             return jdbc.queryForObject(
-                    "SELECT group_id, title, url, note, submitted_by, submitted_at, updated_at "
+                    "SELECT group_id, title, url, note, submitted_by, submitted_at, updated_at, "
+                            + "file_name, file_type, file_size "
                             + "FROM thesis.thesis_group_report WHERE group_id = :groupId",
                     params().addValue("groupId", groupId),
                     (rs, ignored) -> new ReportResponse(
@@ -98,7 +160,10 @@ public class ThesisReportService {
                             rs.getString("note"),
                             rs.getString("submitted_by"),
                             rs.getObject("submitted_at", java.time.OffsetDateTime.class).toInstant(),
-                            rs.getObject("updated_at", java.time.OffsetDateTime.class).toInstant()));
+                            rs.getObject("updated_at", java.time.OffsetDateTime.class).toInstant(),
+                            rs.getString("file_name"),
+                            rs.getString("file_type"),
+                            (Long) rs.getObject("file_size")));
         } catch (EmptyResultDataAccessException exception) {
             throw notFound("REPORT_NOT_FOUND", "The group has not submitted a report yet");
         }
@@ -146,7 +211,13 @@ public class ThesisReportService {
             String note,
             String submittedBy,
             Instant submittedAt,
-            Instant updatedAt) { }
+            Instant updatedAt,
+            String fileName,
+            String fileType,
+            Long fileSize) { }
+
+    /** The attached document bytes, served only through the authorized download path. */
+    public record StoredReport(String fileName, String contentType, byte[] data) { }
 
     private static Instant instantOf(Object value) {
         if (value == null) return null;

@@ -21,9 +21,11 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
+import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
+import org.springframework.util.StringUtils;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.PatchMapping;
@@ -33,7 +35,9 @@ import org.springframework.web.bind.annotation.PutMapping;
 import org.springframework.web.bind.annotation.RequestBody;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
+import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
+import org.springframework.web.multipart.MultipartFile;
 
 /**
  * Brief-governed thesis mutations. Round lifecycle ownership sits with the
@@ -201,6 +205,39 @@ public class ThesisMutationController {
                 request == null ? null : request.get("url"),
                 request == null ? null : request.get("note"),
                 actor);
+    }
+
+    /** Feedback item 7: submit the report as an attached Word/PDF document. */
+    @PostMapping(value = "/groups/{id}/report/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    public ReportResponse submitReportFile(
+            @PathVariable UUID id,
+            @RequestPart("file") MultipartFile file,
+            @RequestPart(value = "title", required = false) String title,
+            @RequestPart(value = "note", required = false) String note,
+            @AuthenticationPrincipal Jwt actor) {
+        return reports.submitFile(id, file, title, note, actor);
+    }
+
+    /** Feedback item 7: download the attached document; same read matrix as the report metadata. */
+    @GetMapping("/groups/{id}/report/file")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    public org.springframework.http.ResponseEntity<byte[]> downloadReportFile(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        ThesisReportService.StoredReport stored = reports.download(id, actor);
+        String fileName = stored.fileName() == null ? "report" : stored.fileName();
+        String encoded = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        String contentType = StringUtils.hasText(stored.contentType())
+                ? stored.contentType()
+                : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encoded)
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(stored.data());
     }
 
     @GetMapping("/groups/{id}/report")

@@ -3,6 +3,12 @@ spring:
     name: campuscore-restful-api
   main:
     banner-mode: off
+  servlet:
+    multipart:
+      # Feedback item 7: thesis report documents (.pdf/.doc/.docx, <= 20 MB),
+      # validated again in ReportFilePolicy after the bytes are read.
+      max-file-size: 20MB
+      max-request-size: 21MB
   mvc:
     throw-exception-if-no-handler-found: true
   autoconfigure:
