@@ -14,7 +14,6 @@ import {
   Info,
   Layers,
   Printer,
-  QrCode,
   ShieldCheck,
   Sparkles,
   TrendingUp,
@@ -121,8 +120,6 @@ const conductCopy = {
     organizerLabel: 'Organizer:',
     appliedCriteria: 'Applied criterion:',
     bonusConductPoints: 'Bonus conduct points:',
-    digitalVerification: 'UTE DIGITAL VERIFICATION',
-    secureCode: 'Security code:',
     digitallyVerified: 'DIGITALLY VERIFIED',
     printCertificate: 'Print certificate',
     close: 'Close',
@@ -215,8 +212,6 @@ const conductCopy = {
     organizerLabel: 'Đơn vị tổ chức:',
     appliedCriteria: 'Tiêu chí ĐRL áp dụng:',
     bonusConductPoints: 'Điểm cộng rèn luyện:',
-    digitalVerification: 'XÁC THỰC SỐ UTE',
-    secureCode: 'Mã bảo mật:',
     digitallyVerified: 'ĐÃ XÁC THỰC ĐIỆN TỬ',
     printCertificate: 'In giấy chứng nhận',
     close: 'Đóng',
@@ -1108,15 +1103,8 @@ export default function StudentConductPage() {
                 </div>
               </div>
 
-              {/* Official Institutional Verification Seals */}
-              <div className="pt-2 border-t border-border/60 grid grid-cols-2 items-center text-xs text-muted-foreground">
-                <div className="flex items-center gap-2">
-                  <QrCode className="h-8 w-8 text-foreground/80 shrink-0" />
-                  <div className="text-[11px] leading-tight">
-                    <span className="font-mono font-semibold text-foreground">{copy.digitalVerification}</span>
-                    <p className="text-[10px] text-muted-foreground">{copy.secureCode} 7F8C9A24110054</p>
-                  </div>
-                </div>
+              {/* Official Institutional Verification Seal */}
+              <div className="pt-2 border-t border-border/60 flex items-center justify-end text-xs text-muted-foreground">
                 <div className="text-right">
                   <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-bold text-primary">
                     <CheckCircle2 className="h-3 w-3" />

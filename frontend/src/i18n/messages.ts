@@ -977,6 +977,7 @@ export const en = {
       newPassword: 'New password',
       confirmNewPassword: 'Confirm new password',
       managedHint: 'Email is managed through your campus account owner.',
+      nameManagedHint: 'Your full name is managed by the school. Contact the academic office to correct it.',
       phonePlaceholder: '+84...',
       addressPlaceholder: 'Street, city, region',
       currentPasswordPlaceholder: 'Enter your current password',
@@ -1338,7 +1339,7 @@ export const en = {
     answered: 'Answer based on reviewed guidance',
     answerReady: 'A new assistant answer is ready.',
     noMatch: 'No matching guidance',
-    degraded: 'Reviewed guidance temporarily unavailable',
+    degraded: 'Using reviewed guidance while AI is temporarily unavailable',
     incomplete: 'The provider response was incomplete; reviewed guidance is shown instead.',
     sources: 'Sources',
     domains: {
@@ -2473,6 +2474,7 @@ export const vi: I18nMessages = {
       newPassword: 'Mật khẩu mới',
       confirmNewPassword: 'Xác nhận mật khẩu mới',
       managedHint: 'Email do nhà trường quản lý.',
+      nameManagedHint: 'Họ tên do nhà trường quản lý. Liên hệ Phòng học vụ nếu cần chỉnh sửa.',
       phonePlaceholder: '+84...',
       addressPlaceholder: 'Số nhà, thành phố, khu vực',
       currentPasswordPlaceholder: 'Nhập mật khẩu hiện tại',
@@ -2834,7 +2836,7 @@ export const vi: I18nMessages = {
     answered: 'Trả lời dựa trên hướng dẫn đã duyệt',
     answerReady: 'Đã có câu trả lời mới từ trợ lý.',
     noMatch: 'Chưa có hướng dẫn phù hợp',
-    degraded: 'Hướng dẫn đã duyệt tạm thời chưa sẵn sàng',
+    degraded: 'Đang dùng hướng dẫn đã duyệt trong lúc AI tạm thời chưa sẵn sàng',
     incomplete: 'Câu trả lời từ bộ xử lý chưa hoàn tất; mình hiển thị hướng dẫn đã duyệt thay thế.',
     sources: 'Nguồn tham khảo',
     domains: {

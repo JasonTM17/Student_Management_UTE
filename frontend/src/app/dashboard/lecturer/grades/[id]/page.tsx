@@ -85,6 +85,7 @@ export default function SectionGradingPage() {
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
+  const [scoreErrors, setScoreErrors] = useState<Map<string, string>>(new Map());
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const sectionId = params?.id;
@@ -121,6 +122,7 @@ export default function SectionGradingPage() {
           publishingGrades: 'Đang công bố điểm',
           saved: 'Đã lưu điểm',
           saveFailed: 'Hiện chưa thể lưu điểm.',
+          invalidScore: 'Điểm phải là số từ 0 đến 10.',
           publishTitle: 'Công bố điểm',
           publishMessage:
             'Công bố điểm ngay bây giờ? Sinh viên sẽ nhìn thấy kết quả đã công bố, nên đây cần là một bước phát hành có chủ đích.',
@@ -171,6 +173,7 @@ export default function SectionGradingPage() {
           publishingGrades: 'Releasing grades',
           saved: 'Grades saved',
           saveFailed: 'Grades could not be saved.',
+          invalidScore: 'Score must be a number between 0 and 10.',
           publishTitle: 'Release grades',
           publishMessage:
             'Release these grades now? Students will see the results immediately, so confirm that everything is ready.',
@@ -274,19 +277,40 @@ export default function SectionGradingPage() {
     });
   };
 
+  /**
+   * A `type="number"` input shows characters it rejects while reporting an empty
+   * `value`, so an out-of-range or non-numeric entry used to vanish silently:
+   * the lecturer saw the text, no message, and a save that quietly dropped it.
+   * `badInput` is the reliable signal that the browser rejected the entry.
+   */
   const handleScoreChange = (
     enrollmentId: string,
     field: 'processScore' | 'finalExamScore',
     draft: string,
+    badInput = false,
   ) => {
     markEdited(enrollmentId);
+    const errorKey = `${enrollmentId}:${field}`;
+    const trimmed = draft.trim();
+    const parsed = trimmed === '' ? null : Number(draft);
+    const invalid =
+      badInput || (trimmed !== '' && (parsed === null || !Number.isFinite(parsed) || parsed < 0 || parsed > 10));
+
+    setScoreErrors((previous) => {
+      const next = new Map(previous);
+      if (invalid) next.set(errorKey, copy.invalidScore);
+      else next.delete(errorKey);
+      return next;
+    });
+    if (invalid) {
+      // Keep the last valid value in state; the inline message explains why.
+      return;
+    }
+
     setGrades((previous) => {
       const next = new Map(previous);
       const current = next.get(enrollmentId) ?? { enrollmentId, processScore: null, finalExamScore: null };
-      const parsed = draft.trim() === '' ? null : Number(draft);
-      if (parsed === null || (Number.isFinite(parsed) && parsed >= 0 && parsed <= 10)) {
-        next.set(enrollmentId, { ...current, [field]: parsed });
-      }
+      next.set(enrollmentId, { ...current, [field]: parsed });
       return next;
     });
   };
@@ -302,6 +326,13 @@ export default function SectionGradingPage() {
       .filter((enrollment) => editedIds.has(enrollment.id))
       .map((enrollment) => grades.get(enrollment.id))
       .filter((update): update is GradeUpdate & { processScore: number; finalExamScore: number } => hasCompletedGrade(update));
+
+    // An out-of-range entry keeps the previous value in state, so saving now
+    // would persist something other than what the lecturer sees on screen.
+    if (scoreErrors.size > 0) {
+      toast.error(copy.invalidScore);
+      return;
+    }
 
     if (updates.length === 0) {
       return;
@@ -540,7 +571,10 @@ export default function SectionGradingPage() {
                           max="10"
                           step="0.1"
                           value={current.processScore ?? ''}
-                          onChange={(event) => handleScoreChange(enrollment.id, 'processScore', event.target.value)}
+                          onChange={(event) =>
+                            handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
+                          }
+                          error={scoreErrors.get(`${enrollment.id}:processScore`)}
                           disabled={isPublished}
                           aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))}
                         />
@@ -551,7 +585,10 @@ export default function SectionGradingPage() {
                         </span>
                         <Input type="number" min="0" max="10" step="0.1"
                           value={current.finalExamScore ?? ''}
-                          onChange={(event) => handleScoreChange(enrollment.id, 'finalExamScore', event.target.value)}
+                          onChange={(event) =>
+                            handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
+                          }
+                          error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
                           disabled={isPublished}
                           aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))} />
                       </label>
@@ -606,7 +643,10 @@ export default function SectionGradingPage() {
                               max="10"
                               step="0.1"
                               value={current.processScore ?? ''}
-                              onChange={(event) => handleScoreChange(enrollment.id, 'processScore', event.target.value)}
+                              onChange={(event) =>
+                                handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
+                              }
+                              error={scoreErrors.get(`${enrollment.id}:processScore`)}
                               disabled={isPublished}
                               aria-label={`ĐQT 50% - ${formatVietnameseName(enrollment.studentName)}`}
                             />
@@ -616,7 +656,10 @@ export default function SectionGradingPage() {
                           <div className="mx-auto max-w-[96px]">
                             <Input type="number" min="0" max="10" step="0.1"
                               value={current.finalExamScore ?? ''}
-                              onChange={(event) => handleScoreChange(enrollment.id, 'finalExamScore', event.target.value)}
+                              onChange={(event) =>
+                                handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
+                              }
+                              error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
                               disabled={isPublished}
                               aria-label={`ĐCK 50% - ${formatVietnameseName(enrollment.studentName)}`} />
                           </div>
