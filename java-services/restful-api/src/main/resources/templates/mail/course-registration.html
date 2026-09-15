@@ -1,303 +1,98 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title th:text="${subject}">Xác nhận Đăng ký Học phần - CampusUTE</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      color: #1e293b;
-    }
-    table {
-      border-spacing: 0;
-      border-collapse: collapse;
-    }
-    td {
-      padding: 0;
-    }
-    .wrapper {
-      width: 100%;
-      table-layout: fixed;
-      background-color: #f1f5f9;
-      padding: 40px 0;
-    }
-    .main {
-      background-color: #ffffff;
-      margin: 0 auto;
-      width: 100%;
-      max-width: 620px;
-      border-spacing: 0;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
-    }
-    .header {
-      background: linear-gradient(135deg, #002b66 0%, #004b99 50%, #0f52ba 100%);
-      padding: 36px 32px;
-      text-align: center;
-    }
-    .brand-badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 6px 14px;
-      border-radius: 20px;
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    .brand-title {
-      color: #ffffff;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin: 0 0 6px 0;
-    }
-    .brand-subtitle {
-      color: #cbd5e1;
-      font-size: 13px;
-      margin: 0;
-    }
-    .gold-bar {
-      height: 4px;
-      background: linear-gradient(90deg, #d97706 0%, #fbbf24 50%, #d97706 100%);
-    }
-    .content {
-      padding: 36px 32px;
-    }
-    .receipt-header {
-      text-align: center;
-      margin-bottom: 24px;
-    }
-    .receipt-badge {
-      display: inline-block;
-      padding: 6px 16px;
-      border-radius: 20px;
-      font-size: 12px;
-      font-weight: 700;
-      background-color: #ecfdf5;
-      color: #059669;
-      border: 1px solid #a7f3d0;
-      margin-bottom: 12px;
-    }
-    .receipt-title {
-      font-size: 20px;
-      font-weight: 800;
-      color: #0f172a;
-      margin: 0 0 8px 0;
-    }
-    .student-info-card {
-      background: #f8fafc;
-      border: 1px solid #e2e8f0;
-      border-radius: 12px;
-      padding: 20px 24px;
-      margin-bottom: 28px;
-    }
-    .info-table td {
-      padding: 6px 0;
-      font-size: 13px;
-    }
-    .info-label {
-      color: #64748b;
-      width: 40%;
-    }
-    .info-val {
-      color: #0f172a;
-      font-weight: 600;
-      width: 60%;
-    }
-    .course-table {
-      width: 100%;
-      margin-bottom: 24px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-    }
-    .course-table th {
-      background-color: #f1f5f9;
-      color: #475569;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-      padding: 12px 14px;
-      text-align: left;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .course-table td {
-      padding: 12px 14px;
-      font-size: 13px;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
-    }
-    .code-badge {
-      font-family: monospace;
-      font-weight: 700;
-      color: #0284c7;
-      background: #f0f9ff;
-      padding: 2px 6px;
-      border-radius: 4px;
-    }
-    .total-box {
-      background: linear-gradient(135deg, #f8fafc 0%, #eff6ff 100%);
-      border: 1px solid #bfdbfe;
-      border-radius: 10px;
-      padding: 16px 20px;
-      display: flex;
-      justify-content: space-between;
-      align-items: center;
-      margin-bottom: 24px;
-    }
-    .warning-box {
-      background-color: #fffbeb;
-      border-left: 4px solid #f59e0b;
-      padding: 14px 18px;
-      border-radius: 0 8px 8px 0;
-      margin-bottom: 24px;
-      font-size: 12px;
-      color: #92400e;
-      line-height: 1.5;
-    }
-    .btn-container {
-      text-align: center;
-      margin: 28px 0 12px 0;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #004b99 0%, #0284c7 100%);
-      color: #ffffff !important;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 14px;
-      display: inline-block;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
-    }
-    .footer {
-      background-color: #f8fafc;
-      border-top: 1px solid #e2e8f0;
-      padding: 28px 32px;
-      text-align: center;
-      font-size: 12px;
-      color: #64748b;
-      line-height: 1.6;
-    }
-  </style>
-</head>
+<head th:replace="~{mail/fragments :: emailHead(${subject})}"></head>
 <body>
-  <div class="wrapper">
-    <table class="main" align="center" width="620">
-      <!-- HEADER -->
-      <tr>
-        <td class="header">
-          <div class="brand-badge">XÁC NHẬN HỌC VỤ ĐIỆN TỬ</div>
-          <h1 class="brand-title">CampusUTE Portal</h1>
-          <p class="brand-subtitle">Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh</p>
-        </td>
-      </tr>
-      <tr>
-        <td class="gold-bar"></td>
-      </tr>
+  <span th:replace="~{mail/fragments :: preheader(${subject})}">Xác nhận đăng ký học phần CampusUTE</span>
 
-      <!-- BODY CONTENT -->
-      <tr>
-        <td class="content">
-          <div class="receipt-header">
-            <div class="receipt-badge">✓ ĐĂNG KÝ HỌC PHẦN THÀNH CÔNG</div>
-            <h2 class="receipt-title">PHIẾU XÁC NHẬN ĐĂNG KÝ HỌC PHẦN</h2>
-            <div style="font-size: 13px; color: #64748b;">
-              Học kỳ: <strong style="color: #0f172a;" th:text="${semester != null ? semester : 'Học kỳ 1 - Năm học 2026-2027'}">Học kỳ 1 (2026-2027)</strong>
-            </div>
-          </div>
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td class="outer-pad" align="center">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0">
+          <th:block th:replace="~{mail/fragments :: masthead('XÁC NHẬN ĐĂNG KÝ HỌC PHẦN', 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
 
-          <!-- STUDENT INFO -->
-          <div class="student-info-card">
-            <table class="info-table" width="100%">
-              <tr>
-                <td class="info-label">Họ và tên sinh viên:</td>
-                <td class="info-val" th:text="${studentName}">Nguyễn Tiến Sơn</td>
-              </tr>
-              <tr>
-                <td class="info-label">Mã số sinh viên (MSSV):</td>
-                <td class="info-val" th:text="${studentId}">22110001</td>
-              </tr>
-              <tr>
-                <td class="info-label">Khoa / Ngành đào tạo:</td>
-                <td class="info-val" th:text="${department != null ? department : 'Khoa Công nghệ Thông tin'}">Khoa Công nghệ Thông tin</td>
-              </tr>
-              <tr>
-                <td class="info-label">Thời điểm ghi nhận:</td>
-                <td class="info-val" th:text="${timestamp != null ? timestamp : #dates.format(#dates.createNow(), 'HH:mm dd/MM/yyyy')}">15/09/2026 09:00</td>
-              </tr>
-            </table>
-          </div>
+          <tr>
+            <td class="content">
+              <p class="section-label">GIAO DỊCH HỌC VỤ ĐÃ GHI NHẬN</p>
+              <h1 class="page-title">PHIẾU XÁC NHẬN ĐĂNG KÝ HỌC PHẦN</h1>
 
-          <!-- COURSE LIST TABLE -->
-          <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 10px;">
-            DANH SÁCH HỌC PHẦN ĐÃ ĐĂNG KÝ:
-          </div>
+              <div class="status-panel">
+                <p class="status-label">ĐĂNG KÝ THÀNH CÔNG</p>
+                <h2 class="status-title" th:text="${semester != null ? semester : 'Học kỳ 1 Năm học 2026-2027'}">Học kỳ 1 Năm học 2026-2027</h2>
+                <p class="status-copy">Hệ thống đã ghi nhận danh sách học phần dưới đây. Bạn nên lưu email này để đối chiếu khi cần.</p>
+              </div>
 
-          <table class="course-table">
-            <thead>
-              <tr>
-                <th>Mã môn</th>
-                <th>Tên học phần</th>
-                <th style="text-align: center;">Tín chỉ</th>
-                <th>Lịch học / Phòng</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr th:each="c : ${courses}">
-                <td><span class="code-badge" th:text="${c.code}">SE013</span></td>
-                <td>
-                  <strong th:text="${c.name}">Lập trình Web nâng cao</strong><br>
-                  <span style="font-size: 11px; color: #64748b;" th:text="${c.lecturer}">GV: TS. Hoàng Văn Nam</span>
-                </td>
-                <td style="text-align: center; font-weight: 700; color: #0284c7;" th:text="${c.credits}">3</td>
-                <td style="font-size: 12px;" th:text="${c.schedule}">Thứ 2 (Tiết 1-3) - A103</td>
-              </tr>
-            </tbody>
-          </table>
+              <table role="presentation" class="meta-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="meta-cell">
+                    <p class="meta-label">Sinh viên</p>
+                    <p class="meta-value" th:text="${studentName}">Nguyễn Tiến Sơn</p>
+                  </td>
+                  <td class="meta-cell">
+                    <p class="meta-label">Mã số sinh viên</p>
+                    <p class="meta-value" th:text="${studentId}">22110001</p>
+                  </td>
+                </tr>
+                <tr>
+                  <td class="meta-cell">
+                    <p class="meta-label">Khoa / ngành</p>
+                    <p class="meta-value" th:text="${department != null ? department : 'Khoa Công nghệ Thông tin'}">Khoa Công nghệ Thông tin</p>
+                  </td>
+                  <td class="meta-cell">
+                    <p class="meta-label">Thời điểm ghi nhận</p>
+                    <p class="meta-value" th:text="${timestamp != null ? timestamp : #dates.format(#dates.createNow(), 'HH:mm dd/MM/yyyy')}">15/09/2026 09:00</p>
+                  </td>
+                </tr>
+              </table>
 
-          <!-- TOTAL CREDITS BOX -->
-          <div class="total-box">
-            <span style="font-weight: 600; color: #1e3a8a; font-size: 14px;">TỔNG SỐ TÍN CHỈ ĐĂNG KÝ:</span>
-            <span style="font-weight: 800; font-size: 18px; color: #1d4ed8;" th:text="${totalCredits + ' TÍN CHỈ'}">15 TÍN CHỈ</span>
-          </div>
+              <p class="section-label">HỌC PHẦN ĐÃ ĐĂNG KÝ</p>
 
-          <div class="warning-box">
-            <strong>Lưu ý quan trọng:</strong> Sinh viên vui lòng kiểm tra kỹ thời khóa biểu cá nhân trên cổng đào tạo để tránh trùng lịch. Hạn nộp học phí theo thông báo của Phòng Kế hoạch - Tài chính. Sau hạn quy định, các học phần chưa đóng học phí sẽ tự động bị hủy theo quy chế.
-          </div>
+              <div th:if="${courses != null and not #lists.isEmpty(courses)}">
+                <table role="presentation" class="course-item" width="100%" cellpadding="0" cellspacing="0" border="0" th:each="c : ${courses}">
+                  <tr>
+                    <td>
+                      <span class="course-code" th:text="${c.code}">SE013</span>
+                    </td>
+                    <td align="right">
+                      <span class="credit-badge" th:text="${c.credits + ' tín chỉ'}">3 tín chỉ</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" class="course-name" th:text="${c.name}">Lập trình Web nâng cao với React và Node.js</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" class="course-meta">
+                      <span th:text="${c.lecturer != null ? 'Giảng viên: ' + c.lecturer : 'Giảng viên: Chưa cập nhật'}">Giảng viên: TS. Hoàng Văn Nam</span><br>
+                      <span th:text="${c.schedule != null ? 'Lịch học: ' + c.schedule : 'Lịch học: Cập nhật trên cổng CampusUTE'}">Lịch học: Thứ 2 (Tiết 1-3) - A103</span>
+                    </td>
+                  </tr>
+                </table>
+              </div>
 
-          <div class="btn-container">
-            <a href="https://www.campusute.io.vn/dashboard/schedule" class="btn-primary">
-              Xem Thời khóa biểu Chi tiết
-            </a>
-          </div>
-        </td>
-      </tr>
+              <div class="callout-panel" th:if="${courses == null or #lists.isEmpty(courses)}">
+                <p><strong>Chưa có danh sách học phần:</strong> Vui lòng kiểm tra lại trên cổng CampusUTE hoặc liên hệ Phòng Đào tạo.</p>
+              </div>
 
-      <!-- FOOTER -->
-      <tr>
-        <td class="footer">
-          <strong>TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH</strong><br>
-          Hệ thống Đăng ký Học phần & Học vụ Trực tuyến CampusUTE<br>
-          Địa chỉ: Số 1 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh
-          <div style="margin-top: 14px; font-size: 11px; color: #94a3b8;">
-            Phiếu xác nhận này có giá trị xác thực điện tử tại thời điểm xuất bản.
-          </div>
-        </td>
-      </tr>
-    </table>
-  </div>
+              <table role="presentation" class="total-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="total-label">TỔNG SỐ TÍN CHỈ</td>
+                  <td class="total-value" align="right" th:text="${totalCredits + ' TÍN CHỈ'}">15 TÍN CHỈ</td>
+                </tr>
+              </table>
+
+              <div class="callout-panel">
+                <p><strong>Trước khi hoàn tất:</strong> Hãy kiểm tra thời khóa biểu cá nhân để phát hiện trùng lịch. Học phí và các mốc điều chỉnh học phần thực hiện theo thông báo của Nhà trường.</p>
+              </div>
+
+              <div class="cta-wrap">
+                <a href="https://www.campusute.io.vn/dashboard/schedule" class="button">Xem thời khóa biểu</a>
+              </div>
+            </td>
+          </tr>
+
+          <tr th:replace="~{mail/fragments :: footer('Phiếu xác nhận tự động từ CampusUTE. Thông tin có giá trị đối chiếu tại thời điểm ghi nhận.')}"></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>

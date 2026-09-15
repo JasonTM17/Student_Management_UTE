@@ -1,0 +1,698 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:fragment="emailHead(pageTitle)">
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <meta http-equiv="x-ua-compatible" content="ie=edge">
+  <meta name="color-scheme" content="light">
+  <meta name="supported-color-schemes" content="light">
+  <title th:text="${pageTitle}">CampusUTE</title>
+  <style>
+    :root {
+      color-scheme: light;
+      supported-color-schemes: light;
+    }
+
+    html,
+    body {
+      width: 100%;
+      margin: 0;
+      padding: 0;
+      background-color: #eef3f8;
+    }
+
+    body,
+    table,
+    td,
+    p,
+    a,
+    h1,
+    h2,
+    h3 {
+      -ms-text-size-adjust: 100%;
+      -webkit-text-size-adjust: 100%;
+    }
+
+    body {
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      color: #16365f;
+      -webkit-font-smoothing: antialiased;
+    }
+
+    table {
+      border-spacing: 0;
+      border-collapse: collapse;
+    }
+
+    td {
+      padding: 0;
+    }
+
+    img {
+      display: block;
+      max-width: 100%;
+      border: 0;
+      line-height: 100%;
+      outline: none;
+      text-decoration: none;
+    }
+
+    a {
+      color: #0d5c9d;
+    }
+
+    a:focus-visible {
+      outline: 3px solid #d59a2e;
+      outline-offset: 3px;
+    }
+
+    .preheader {
+      display: none !important;
+      max-height: 0;
+      overflow: hidden;
+      font-size: 1px;
+      line-height: 1px;
+      color: #eef3f8;
+      opacity: 0;
+    }
+
+    .email-wrapper {
+      width: 100%;
+      background-color: #eef3f8;
+    }
+
+    .outer-pad {
+      padding: 32px 16px;
+    }
+
+    .email-shell {
+      width: 100%;
+      max-width: 640px;
+      background-color: #ffffff;
+      border: 1px solid #d6e0eb;
+      border-radius: 12px;
+      overflow: hidden;
+    }
+
+    .masthead {
+      padding: 36px 40px 32px;
+      background-color: #0a2854;
+      text-align: left;
+    }
+
+    .masthead-kicker {
+      display: inline-block;
+      margin: 0 0 16px;
+      padding: 7px 10px;
+      border: 1px solid #6d8db8;
+      border-radius: 999px;
+      color: #e9f0f8;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 1.1px;
+      text-transform: uppercase;
+    }
+
+    .masthead-title {
+      margin: 0;
+      color: #ffffff;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 34px;
+      letter-spacing: -0.2px;
+    }
+
+    .masthead-subtitle {
+      margin: 8px 0 0;
+      color: #cbd9ea;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .brand-rule {
+      height: 4px;
+      background-color: #d59a2e;
+      font-size: 0;
+      line-height: 0;
+    }
+
+    .content {
+      padding: 40px 40px 36px;
+    }
+
+    .eyebrow-row {
+      margin: 0 0 16px;
+    }
+
+    .eyebrow {
+      display: inline-block;
+      padding: 6px 10px;
+      border: 1px solid #9fc2e3;
+      border-radius: 6px;
+      color: #0d5c9d;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+    }
+
+    .official-label {
+      display: inline-block;
+      margin-left: 8px;
+      padding: 6px 10px;
+      border: 1px solid #d6e0eb;
+      border-radius: 6px;
+      color: #516579;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.5px;
+      text-transform: uppercase;
+    }
+
+    .page-title {
+      margin: 0 0 20px;
+      color: #132d50;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 28px;
+      font-weight: 700;
+      line-height: 34px;
+      letter-spacing: -0.25px;
+    }
+
+    .section-title {
+      margin: 0 0 12px;
+      color: #16365f;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 22px;
+    }
+
+    .section-label {
+      padding: 0 0 10px;
+      color: #42607f;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+    }
+
+    .meta-panel,
+    .notice-panel,
+    .course-item,
+    .grade-item,
+    .status-panel,
+    .callout-panel,
+    .attachment-panel {
+      border: 1px solid #d6e0eb;
+      border-radius: 10px;
+    }
+
+    .meta-panel {
+      margin: 0 0 28px;
+      background-color: #f7f9fc;
+    }
+
+    .meta-cell {
+      width: 50%;
+      padding: 14px 16px;
+      vertical-align: top;
+    }
+
+    .meta-cell + .meta-cell {
+      border-left: 1px solid #d6e0eb;
+    }
+
+    .meta-label {
+      margin: 0 0 4px;
+      color: #63788f;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.55px;
+      text-transform: uppercase;
+    }
+
+    .meta-value {
+      margin: 0;
+      color: #16365f;
+      font-size: 14px;
+      font-weight: 600;
+      line-height: 21px;
+    }
+
+    .salutation {
+      margin: 0 0 14px;
+      color: #16365f;
+      font-size: 16px;
+      font-weight: 700;
+      line-height: 24px;
+    }
+
+    .prose {
+      margin: 0 0 24px;
+      color: #2f4965;
+      font-size: 16px;
+      line-height: 26px;
+    }
+
+    .prose p {
+      margin: 0 0 16px;
+    }
+
+    .prose p:last-child {
+      margin-bottom: 0;
+    }
+
+    .prose ul,
+    .prose ol {
+      margin: 0 0 16px 24px;
+      padding: 0;
+    }
+
+    .prose a {
+      font-weight: 600;
+    }
+
+    .timeline {
+      width: 100%;
+      margin: 0 0 28px;
+      border-top: 1px solid #d6e0eb;
+      border-bottom: 1px solid #d6e0eb;
+    }
+
+    .timeline-row td {
+      padding: 14px 0;
+      border-top: 1px solid #e6edf4;
+      vertical-align: top;
+    }
+
+    .timeline-row:first-of-type td {
+      border-top: 0;
+    }
+
+    .step-number {
+      width: 32px;
+      color: #a36b00;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 24px;
+    }
+
+    .step-copy {
+      color: #2f4965;
+      font-size: 15px;
+      line-height: 24px;
+    }
+
+    .attachment-panel {
+      margin: 0 0 28px;
+      padding: 16px;
+      background-color: #f3f8fc;
+    }
+
+    .attachment-title {
+      margin: 0 0 4px;
+      color: #16365f;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 21px;
+    }
+
+    .attachment-meta {
+      margin: 0;
+      color: #63788f;
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .cta-wrap {
+      margin: 0 0 28px;
+    }
+
+    .button {
+      display: inline-block;
+      padding: 14px 22px;
+      border: 1px solid #0a2854;
+      border-radius: 8px;
+      background-color: #0a2854;
+      color: #ffffff !important;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 20px;
+      text-align: center;
+      text-decoration: none;
+    }
+
+    .button-secondary {
+      border-color: #9fc2e3;
+      background-color: #ffffff;
+      color: #0d5c9d !important;
+    }
+
+    .signature {
+      padding-top: 20px;
+      border-top: 1px solid #d6e0eb;
+    }
+
+    .signature-label {
+      margin: 0 0 4px;
+      color: #63788f;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.7px;
+      text-transform: uppercase;
+    }
+
+    .signature-name {
+      margin: 0;
+      color: #16365f;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 23px;
+    }
+
+    .status-panel {
+      margin: 0 0 24px;
+      padding: 16px;
+      background-color: #eaf7f1;
+      border-color: #a9d8c5;
+    }
+
+    .status-label {
+      margin: 0;
+      color: #0c6a50;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      letter-spacing: 0.65px;
+      text-transform: uppercase;
+    }
+
+    .status-title {
+      margin: 0 0 4px;
+      color: #16365f;
+      font-family: Georgia, "Times New Roman", serif;
+      font-size: 24px;
+      font-weight: 700;
+      line-height: 30px;
+    }
+
+    .status-copy {
+      margin: 0;
+      color: #2f4965;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .course-item,
+    .grade-item {
+      width: 100%;
+      margin: 0 0 12px;
+      background-color: #ffffff;
+    }
+
+    .course-item td,
+    .grade-item td {
+      padding: 12px 14px;
+    }
+
+    .course-code,
+    .grade-code {
+      color: #0d5c9d;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      letter-spacing: 0.55px;
+    }
+
+    .credit-badge,
+    .letter-badge {
+      display: inline-block;
+      padding: 4px 8px;
+      border-radius: 6px;
+      background-color: #f1f6fb;
+      color: #0d5c9d;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 18px;
+      white-space: nowrap;
+    }
+
+    .course-name,
+    .grade-name {
+      padding-top: 0 !important;
+      padding-bottom: 4px !important;
+      color: #16365f;
+      font-size: 15px;
+      font-weight: 700;
+      line-height: 23px;
+    }
+
+    .course-meta,
+    .grade-meta {
+      padding-top: 0 !important;
+      color: #63788f;
+      font-size: 13px;
+      line-height: 20px;
+    }
+
+    .total-panel {
+      margin: 16px 0 24px;
+      border-top: 1px solid #9fc2e3;
+      border-bottom: 1px solid #9fc2e3;
+      background-color: #f3f8fc;
+    }
+
+    .total-label,
+    .total-value {
+      padding: 14px 0;
+      color: #16365f;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .total-label {
+      font-weight: 600;
+    }
+
+    .total-value {
+      color: #0d5c9d;
+      font-size: 18px;
+      font-weight: 700;
+      text-align: right;
+    }
+
+    .callout-panel {
+      margin: 0 0 24px;
+      padding: 16px;
+      background-color: #fff7e6;
+      border-color: #e8c77e;
+    }
+
+    .callout-panel p {
+      margin: 0;
+      color: #704f08;
+      font-size: 14px;
+      line-height: 22px;
+    }
+
+    .metric-cell {
+      width: 48%;
+      padding: 18px 16px;
+      border: 1px solid #d6e0eb;
+      border-radius: 10px;
+      background-color: #f3f8fc;
+      text-align: center;
+      vertical-align: top;
+    }
+
+    .metric-cell-positive {
+      border-color: #a9d8c5;
+      background-color: #eaf7f1;
+    }
+
+    .metric-gap {
+      width: 4%;
+    }
+
+    .metric-label {
+      margin: 0 0 6px;
+      color: #42607f;
+      font-size: 11px;
+      font-weight: 700;
+      line-height: 16px;
+      letter-spacing: 0.65px;
+      text-transform: uppercase;
+    }
+
+    .metric-value {
+      margin: 0;
+      color: #0d5c9d;
+      font-size: 30px;
+      font-weight: 700;
+      line-height: 34px;
+    }
+
+    .metric-value-positive {
+      color: #0c6a50;
+    }
+
+    .metric-note {
+      margin: 4px 0 0;
+      color: #63788f;
+      font-size: 12px;
+      line-height: 18px;
+    }
+
+    .footer {
+      padding: 24px 40px 28px;
+      border-top: 1px solid #d6e0eb;
+      background-color: #f5f8fb;
+      text-align: center;
+    }
+
+    .footer-brand {
+      margin: 0 0 4px;
+      color: #16365f;
+      font-size: 14px;
+      font-weight: 700;
+      line-height: 21px;
+    }
+
+    .footer-product {
+      margin: 0 0 2px;
+      color: #42607f;
+      font-size: 12px;
+      font-weight: 700;
+      line-height: 20px;
+    }
+
+    .footer-copy,
+    .footer-copy a {
+      margin: 0;
+      color: #63788f;
+      font-size: 12px;
+      line-height: 20px;
+      text-decoration: none;
+    }
+
+    .footer-note {
+      margin: 16px 0 0;
+      padding-top: 12px;
+      border-top: 1px solid #d6e0eb;
+      color: #71859a;
+      font-size: 11px;
+      line-height: 18px;
+    }
+
+    @media screen and (max-width: 640px) {
+      .outer-pad {
+        padding: 16px 10px !important;
+      }
+
+      .email-shell {
+        border-radius: 8px !important;
+      }
+
+      .masthead {
+        padding: 28px 22px 24px !important;
+      }
+
+      .masthead-title {
+        font-size: 24px !important;
+        line-height: 30px !important;
+      }
+
+      .masthead-subtitle {
+        font-size: 13px !important;
+        line-height: 20px !important;
+      }
+
+      .content {
+        padding: 28px 22px !important;
+      }
+
+      .page-title {
+        font-size: 24px !important;
+        line-height: 30px !important;
+      }
+
+      .meta-cell {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .meta-cell + .meta-cell {
+        border-top: 1px solid #d6e0eb !important;
+        border-left: 0 !important;
+      }
+
+      .metric-cell {
+        display: block !important;
+        width: 100% !important;
+        box-sizing: border-box !important;
+      }
+
+      .metric-gap {
+        display: none !important;
+      }
+
+      .button {
+        display: block !important;
+        box-sizing: border-box !important;
+        width: 100% !important;
+      }
+
+      .footer {
+        padding: 22px !important;
+      }
+    }
+
+    @media (prefers-reduced-motion: reduce) {
+      *,
+      *::before,
+      *::after {
+        scroll-behavior: auto !important;
+        transition: none !important;
+        animation: none !important;
+      }
+    }
+  </style>
+</head>
+<body>
+  <span th:fragment="preheader(text)" class="preheader" th:text="${text}">CampusUTE</span>
+
+  <th:block th:fragment="masthead(kicker, subtitle)">
+    <tr>
+      <td class="masthead" style="padding:36px 40px 32px;background-color:#0a2854;text-align:left;">
+        <div class="masthead-kicker" style="display:inline-block;margin:0 0 16px;padding:7px 10px;border:1px solid #6d8db8;border-radius:999px;color:#e9f0f8;font-size:11px;font-weight:700;line-height:16px;letter-spacing:1.1px;text-transform:uppercase;" th:text="${kicker}">CỔNG THÔNG TIN ĐÀO TẠO VÀ HỌC VỤ</div>
+        <p class="masthead-title" style="margin:0;color:#ffffff;font-size:28px;font-weight:700;line-height:34px;letter-spacing:-0.2px;">CampusUTE Academic</p>
+        <p class="masthead-subtitle" style="margin:8px 0 0;color:#cbd9ea;font-size:14px;line-height:22px;" th:text="${subtitle}">Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh</p>
+      </td>
+    </tr>
+    <tr>
+      <td class="brand-rule" style="height:4px;background-color:#d59a2e;font-size:0;line-height:0;">&nbsp;</td>
+    </tr>
+  </th:block>
+
+  <tr th:fragment="footer(note)">
+    <td class="footer" style="padding:24px 40px 28px;border-top:1px solid #d6e0eb;background-color:#f5f8fb;text-align:center;">
+      <p class="footer-brand" style="margin:0 0 4px;color:#16365f;font-size:14px;font-weight:700;line-height:21px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH</p>
+      <p class="footer-product" style="margin:0 0 2px;color:#42607f;font-size:12px;font-weight:700;line-height:20px;">CampusUTE Academic</p>
+      <p class="footer-copy" style="margin:0;color:#63788f;font-size:12px;line-height:20px;">Hệ thống thông báo đào tạo và học vụ</p>
+      <p class="footer-copy" style="margin:0;color:#63788f;font-size:12px;line-height:20px;">
+        <a href="mailto:phongdaotao@hcmute.edu.vn" style="color:#0d5c9d;text-decoration:none;">phongdaotao@hcmute.edu.vn</a>
+        <span aria-hidden="true"> · </span>
+        (028) 3896 8641
+      </p>
+      <p class="footer-note" style="margin:16px 0 0;padding-top:12px;border-top:1px solid #d6e0eb;color:#71859a;font-size:11px;line-height:18px;" th:text="${note}">Email tự động từ CampusUTE. Không chia sẻ mật khẩu hoặc mã OTP.</p>
+    </td>
+  </tr>
+</body>
+</html>

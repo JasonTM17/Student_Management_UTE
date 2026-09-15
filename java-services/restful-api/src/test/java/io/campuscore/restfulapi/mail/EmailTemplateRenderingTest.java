@@ -6,6 +6,8 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 
 import io.campuscore.restfulapi.mail.web.MailDtos.CourseItem;
 import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
+import java.io.IOException;
+import java.nio.charset.StandardCharsets;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Locale;
@@ -133,11 +135,47 @@ class EmailTemplateRenderingTest {
         String html = templateEngine.process("mail/grade-alert", context);
 
         assertNotNull(html);
-        assertTrue(html.contains("KẾT QUẢ HỌC VỤ & RÈN LUYỆN"));
+        assertTrue(html.contains("KẾT QUẢ HỌC VỤ & RÈN LUYỆN")
+                || html.contains("KẾT QUẢ HỌC VỤ &amp; RÈN LUYỆN"));
         assertTrue(html.contains("3.85") || html.contains("3,85"));
         assertTrue(html.contains("9.20") || html.contains("9,20"));
         assertTrue(html.contains("96"));
         assertTrue(html.contains("SE001"));
         assertTrue(html.contains("Nhập môn Lập trình"));
+    }
+
+    @Test
+    void emailTemplatesShareResponsiveEmailSafeLayout() throws IOException {
+        String fragments = readTemplate("fragments.html");
+
+        assertTrue(fragments.contains("@media screen and (max-width: 640px)"));
+        assertTrue(fragments.contains("prefers-reduced-motion"));
+        assertFalse(fragments.contains("linear-gradient"));
+        assertFalse(fragments.contains("display: flex"));
+        assertFalse(fragments.contains("backdrop-filter"));
+
+        for (String templateName : List.of(
+                "academic-announcement.html",
+                "course-registration.html",
+                "grade-alert.html",
+                "test-verification.html")) {
+            String template = readTemplate(templateName);
+            assertTrue(template.contains("th:replace=\"~{mail/fragments :: emailHead"), templateName);
+            assertTrue(template.contains("role=\"presentation\""), templateName);
+            assertFalse(template.contains("linear-gradient"), templateName);
+            assertFalse(template.contains("display: flex"), templateName);
+            assertFalse(template.contains("backdrop-filter"), templateName);
+            assertFalse(template.contains("📌"), templateName);
+            assertFalse(template.contains("📎"), templateName);
+            assertFalse(template.contains("🔒"), templateName);
+        }
+    }
+
+    private String readTemplate(String templateName) throws IOException {
+        String resourceName = "templates/mail/" + templateName;
+        try (var input = getClass().getClassLoader().getResourceAsStream(resourceName)) {
+            assertNotNull(input, resourceName);
+            return new String(input.readAllBytes(), StandardCharsets.UTF_8);
+        }
     }
 }
