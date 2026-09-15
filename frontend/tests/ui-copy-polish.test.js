@@ -233,8 +233,11 @@ test('thesis page labels come from the dictionary instead of Vietnamese literals
   assert.match(page, /pageCopy\.groupLeaderFallback/);
 
   // Graduation classification labels are resolved from a stable band key rather
-  // than being baked into the scoring helper.
-  assert.match(page, /band: 'EXCELLENT'/);
+  // than being baked into the scoring helper. The band table itself now lives
+  // in grade-scale.ts (feedback item 2), so the page only carries the badge
+  // styling keyed by the same stable band names.
+  assert.match(page, /EXCELLENT: 'bg-emerald/);
+  assert.match(page, /classifyThesisScore\(score\)/);
   assert.match(page, /pageCopy\.classification\[studentGradeInfo\.band\]/);
   assert.doesNotMatch(page, /\brank: '/);
 });
