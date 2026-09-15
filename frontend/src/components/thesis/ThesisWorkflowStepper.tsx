@@ -10,11 +10,11 @@ import {
   FileCheck,
   FileSpreadsheet,
   GraduationCap,
-  Scale,
   ShieldCheck,
   Sparkles,
   Users,
 } from 'lucide-react';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import type { ThesisRound } from '@/lib/thesis-api';
 
@@ -23,7 +23,20 @@ interface ThesisWorkflowStepperProps {
   formatDateTime: (value: string | number | Date) => string;
 }
 
+/** Icons are positional, matching the stage order in the i18n copy. */
+const STAGE_ICONS = [BookOpen, FileSpreadsheet, Users, FileCheck, GraduationCap];
+
+/** Fills `{name}` placeholders in a copy template. */
+function fill(template: string, values: Record<string, string | number>): string {
+  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
+    key in values ? String(values[key]) : match,
+  );
+}
+
 export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowStepperProps) {
+  const { messages } = useI18n();
+  const copy = messages.thesisWorkflow.stepper;
+
   // Determine current active stage (1 to 5) based on round status & dates
   const activeStage = useMemo(() => {
     switch (round.status) {
@@ -48,105 +61,48 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
   const [isDetailExpanded, setIsDetailExpanded] = useState<boolean>(true);
 
   const stages = useMemo(() => {
-    return [
-      {
-        step: 1,
-        title: 'GV đề xuất đề tài',
-        shortDesc: 'GV bộ môn gửi đề xuất',
-        role: 'Giảng viên Bộ môn (1-2 GVHD)',
-        rule: 'Điều R1, R2, R3',
-        status: activeStage > 1 ? 'completed' : activeStage === 1 ? 'active' : 'upcoming',
-        timeline: `${formatDateTime(round.lecturerSubmitStart)} → ${formatDateTime(round.lecturerSubmitEnd)}`,
-        icon: BookOpen,
+    return copy.stages.map((stage, index) => {
+      const step = index + 1;
+      const timeline =
+        step === 1
+          ? `${formatDateTime(round.lecturerSubmitStart)} → ${formatDateTime(round.lecturerSubmitEnd)}`
+          : step === 2
+            ? round.proposalPublishAt
+              ? formatDateTime(round.proposalPublishAt)
+              : copy.fallbackBeforeRegistration
+            : step === 3
+              ? `${formatDateTime(round.registrationStart)} → ${formatDateTime(round.registrationEnd)}`
+              : step === 4
+                ? round.gvpbDeadline
+                  ? fill(copy.reportDeadline, { date: formatDateTime(round.gvpbDeadline) })
+                  : copy.fallbackBeforeDefence
+                : round.reportDate
+                  ? fill(copy.reportDate, { date: formatDateTime(round.reportDate) })
+                  : copy.fallbackPerAssignment;
+
+      // Stage 4 is the only stage whose regulation note becomes date-specific.
+      const deadlineNote =
+        step === 4 && round.gvpbDeadline
+          ? fill(copy.reviewerScoreDeadline, { date: formatDateTime(round.gvpbDeadline) })
+          : stage.deadlineNote;
+
+      return {
+        step,
+        title: stage.title,
+        shortDesc: stage.shortDesc,
+        role: stage.role,
+        rule: stage.rule,
+        status: activeStage > step ? 'completed' : activeStage === step ? 'active' : 'upcoming',
+        timeline,
+        icon: STAGE_ICONS[index],
         details: {
-          objective: 'Giảng viên thuộc các Bộ môn xây dựng mục tiêu, yêu cầu công nghệ và chỉ tiêu số lượng nhóm cho từng đề tài.',
-          actions: [
-            'Mỗi đề tài thuộc 1 Bộ môn cụ thể và có từ 1 đến 2 Giảng viên hướng dẫn (GVHD chính & GVHD phối hợp).',
-            'Giảng viên soạn thảo tóm tắt nội dung, công nghệ sử dụng, và số nhóm tối đa (1-20 nhóm).',
-            'Đề tài được lưu dạng bản nháp (Draft) hoặc gửi lên Hội đồng Khoa phê duyệt.',
-          ],
-          deadlineNote: 'Hạn cuối nộp đề tài được quy định nghiêm ngặt theo thời gian biểu của Khoa.',
+          objective: stage.objective,
+          actions: stage.actions,
+          deadlineNote,
         },
-      },
-      {
-        step: 2,
-        title: 'Thẩm định & công bố',
-        shortDesc: 'Khoa xét duyệt & công bố',
-        role: 'Trưởng Bộ môn & Khoa CNTT',
-        rule: 'Điều R2, R3',
-        status: activeStage > 2 ? 'completed' : activeStage === 2 ? 'active' : 'upcoming',
-        timeline: round.proposalPublishAt ? formatDateTime(round.proposalPublishAt) : 'Trước ngày mở đăng ký SV',
-        icon: FileSpreadsheet,
-        details: {
-          objective: 'Hội đồng Khoa học và Trưởng Bộ môn thẩm định tính khoa học, độ trùng lặp và tính khả thi của đề tài trước khi công bố.',
-          actions: [
-            'Trưởng bộ môn rà soát khối lượng kiến thức và tính khả thi đối với sinh viên đại học.',
-            'Khoa ban hành danh mục đề tài chính thức được phê duyệt công khai trên cổng học vụ.',
-            'Sinh viên có thể tra cứu toàn bộ danh mục đề tài theo từng bộ môn chuyên ngành.',
-          ],
-          deadlineNote: 'Sau khi công bố, danh mục đề tài sẽ sẵn sàng cho sinh viên đăng ký ở Giai đoạn 2.',
-        },
-      },
-      {
-        step: 3,
-        title: 'Nhóm SV đăng ký',
-        shortDesc: 'Lập nhóm ≤3 SV & chọn đề tài',
-        role: 'Sinh viên & GVHD',
-        rule: 'Điều R2, R4',
-        status: activeStage > 3 ? 'completed' : activeStage === 3 ? 'active' : 'upcoming',
-        timeline: `${formatDateTime(round.registrationStart)} → ${formatDateTime(round.registrationEnd)}`,
-        icon: Users,
-        details: {
-          objective: 'Sinh viên thành lập nhóm nghiên cứu và đăng ký đúng 1 đề tài trong danh mục đã công bố.',
-          actions: [
-            'Mỗi nhóm tối đa 3 sinh viên, có đúng 1 Nhóm trưởng (Leader) đại diện.',
-            'Mỗi sinh viên chỉ được tham gia duy nhất 1 nhóm trong toàn bộ đợt đăng ký.',
-            'Mỗi nhóm chỉ đăng ký đúng 1 đề tài; Giảng viên hướng dẫn sẽ xét duyệt (Approve) hoặc từ chối (Reject kèm lý do).',
-          ],
-          deadlineNote: 'Chỉ được phép tạo nhóm và đăng ký trong khung giờ quy định của Giai đoạn 2.',
-        },
-      },
-      {
-        step: 4,
-        title: 'Thực hiện & nộp báo cáo',
-        shortDesc: 'Nghiên cứu & nộp báo cáo',
-        role: 'Nhóm trưởng (Chỉ trưởng nhóm nộp)',
-        rule: 'Điều R4, R5',
-        status: activeStage > 4 ? 'completed' : activeStage === 4 ? 'active' : 'upcoming',
-        timeline: round.gvpbDeadline ? `Hạn nộp báo cáo trước: ${formatDateTime(round.gvpbDeadline)}` : 'Trước ngày phản biện',
-        icon: FileCheck,
-        details: {
-          objective: 'Nhóm sinh viên tiến hành nghiên cứu, viết báo cáo luận văn, xây dựng sản phẩm và nộp tài liệu nghiệm thu.',
-          actions: [
-            'Nhóm sinh viên làm việc thường xuyên dưới sự chỉ dẫn khoa học của Giảng viên hướng dẫn.',
-            'Quy chế Điều R5: CHỈ NHÓM TRƯỞNG mới có quyền nộp hoặc cập nhật báo cáo luận văn (PDF/Google Drive/OneDrive).',
-            'Giảng viên phản biện (GVPB) đọc báo cáo và chấm điểm phản biện nộp về Khoa.',
-          ],
-          deadlineNote: round.gvpbDeadline ? `Hạn chót GVPB nộp điểm về Khoa: ${formatDateTime(round.gvpbDeadline)}` : 'Theo kế hoạch đợt',
-        },
-      },
-      {
-        step: 5,
-        title: 'Bảo vệ & chốt điểm',
-        shortDesc: 'Hội đồng 3-5 GV chấm bảo vệ',
-        role: 'Hội đồng 3-5 GV & Chủ tịch',
-        rule: 'Điều R6, R7, R8, R9',
-        status: activeStage === 5 ? 'active' : 'upcoming',
-        timeline: round.reportDate ? `Ngày báo cáo: ${formatDateTime(round.reportDate)}` : 'Theo lịch phân công',
-        icon: GraduationCap,
-        details: {
-          objective: 'Sinh viên báo cáo trước Hội đồng đánh giá luận văn. Hội đồng chấm điểm, tổng hợp điểm trung bình và công bố kết quả.',
-          actions: [
-            'Hội đồng gồm 3 đến 5 giảng viên (1 Chủ tịch, 1 Thư ký, các Ủy viên).',
-            'Quy tắc Điều R8: Giảng viên hướng dẫn KHÔNG ĐƯỢC CHẤM đề tài do chính mình hướng dẫn để đảm bảo tính khách quan.',
-            'Quy tắc Điều R7: Điểm cuối cùng là TRUNG BÌNH CỘNG các điểm thành phần hợp lệ của thành viên hội đồng.',
-            'Quy tắc Điều R9: Chủ tịch chốt điểm và Khoa công bố điểm số, xếp loại và nhận xét công khai trên hệ thống.',
-          ],
-          deadlineNote: 'Kết quả được lưu trữ chính thức vào hồ sơ tốt nghiệp đại học của sinh viên.',
-        },
-      },
-    ];
-  }, [round, activeStage, formatDateTime]);
+      };
+    });
+  }, [copy, round, activeStage, formatDateTime]);
 
   const currentStageInfo = stages.find((s) => s.step === selectedStage) || stages[activeStage - 1] || stages[0];
 
@@ -158,14 +114,14 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
           <div className="flex items-center gap-2">
             <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary border border-primary/20">
               <Sparkles className="h-3.5 w-3.5" />
-              Quy trình chuẩn 5 giai đoạn
+              {copy.badge}
             </span>
             <span className="text-xs font-semibold text-muted-foreground">
-              (Theo Quy chế đồ án cuối kỳ — Khoa CNTT, HCMUTE)
+              {copy.authorityNote}
             </span>
           </div>
           <h3 className="mt-1.5 text-lg font-bold tracking-tight text-foreground sm:text-xl">
-            Tiến trình thực hiện đề tài & khóa luận tốt nghiệp
+            {copy.title}
           </h3>
         </div>
 
@@ -176,12 +132,12 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
         >
           {isDetailExpanded ? (
             <>
-              <span>Thu gọn hướng dẫn</span>
+              <span>{copy.collapse}</span>
               <ChevronUp className="h-4 w-4" />
             </>
           ) : (
             <>
-              <span>Xem chi tiết giai đoạn</span>
+              <span>{copy.expand}</span>
               <ChevronDown className="h-4 w-4" />
             </>
           )}
@@ -233,7 +189,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                 {isCompleted ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-medium text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="h-3.5 w-3.5" />
-                    Đã xong
+                    {copy.stageProgress.done}
                   </span>
                 ) : isCurrentActive ? (
                   <span className="inline-flex items-center gap-1 text-[11px] font-bold text-emerald-600 dark:text-emerald-400">
@@ -241,10 +197,12 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                       <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-emerald-400 opacity-75"></span>
                       <span className="relative inline-flex rounded-full h-2 w-2 bg-emerald-500"></span>
                     </span>
-                    Hiện tại
+                    {copy.stageProgress.current}
                   </span>
                 ) : (
-                  <span className="text-[11px] text-muted-foreground font-medium">Sắp tới</span>
+                  <span className="text-[11px] text-muted-foreground font-medium">
+                    {copy.stageProgress.upcoming}
+                  </span>
                 )}
               </div>
 
@@ -277,11 +235,11 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
               </div>
               <div>
                 <h4 className="text-sm font-bold text-foreground">
-                  Giai đoạn {currentStageInfo.step}: {currentStageInfo.title}
+                  {fill(copy.stageHeading, { step: currentStageInfo.step, title: currentStageInfo.title })}
                 </h4>
                 <p className="text-xs text-muted-foreground">
-                  Chủ thể thực hiện:{' '}
-                  <strong className="text-foreground">{currentStageInfo.role}</strong> · Căn cứ{' '}
+                  {copy.ownerLabel}{' '}
+                  <strong className="text-foreground">{currentStageInfo.role}</strong> · {copy.basisLabel}{' '}
                   <strong className="text-primary">{currentStageInfo.rule}</strong>
                 </p>
               </div>
@@ -306,7 +264,9 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
             </ul>
             <div className="mt-2 flex items-center gap-1.5 rounded-md bg-primary/5 px-2.5 py-1.5 text-[11px] font-medium text-primary border border-primary/15">
               <ShieldCheck className="h-3.5 w-3.5 shrink-0" />
-              <span>Lưu ý quy chế: {currentStageInfo.details.deadlineNote}</span>
+              <span>
+                {copy.regulationNote} {currentStageInfo.details.deadlineNote}
+              </span>
             </div>
           </div>
         </div>
