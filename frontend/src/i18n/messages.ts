@@ -1124,6 +1124,10 @@ export const en = {
     externalBadge: 'External / Cross-major',
     maxMembersReached: 'The maximum group size is 3 members.',
     chooseTopic: 'Choose topic',
+    choosingTopic: 'Choosing…',
+    topicAlreadyChosen: 'Your group is working on this topic',
+    openCatalogHint:
+      'Every published topic lives in the topic catalog. Open it to compare topics and pick one for your group.',
     groupCreated: 'Thesis group created.',
     actionFailed: 'This action could not be completed.',
     proposeTopic: 'Propose a topic',
@@ -2623,6 +2627,10 @@ export const vi: I18nMessages = {
     externalBadge: 'Khác ngành / Ngoại trường',
     maxMembersReached: 'Nhóm đã đạt số lượng tối đa 3 thành viên.',
     chooseTopic: 'Chọn đề tài',
+    choosingTopic: 'Đang chọn…',
+    topicAlreadyChosen: 'Nhóm của bạn đang thực hiện đề tài này',
+    openCatalogHint:
+      'Toàn bộ đề tài đã công bố nằm trong danh mục đề tài. Mở danh mục để so sánh và chọn đề tài cho nhóm.',
     groupCreated: 'Đã tạo nhóm đề tài.',
     actionFailed: 'Không thể hoàn tất tác vụ này.',
     proposeTopic: 'Đề xuất đề tài',

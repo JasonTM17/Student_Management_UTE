@@ -203,7 +203,14 @@ test('thesis page integrates RichTextEditor for proposal and RichContentRenderer
   assert.match(page, /import \{ RichTextEditor \} from '@\/components\/ui\/rich-text-editor'/);
   assert.match(page, /import \{ RichContentRenderer \} from '@\/components\/ui\/rich-content-renderer'/);
   assert.match(page, /<RichTextEditor[\s\S]*?value=\{proposeDescription\}/);
-  assert.match(page, /<RichContentRenderer content=\{topic\.description\} \/>/);
+  // Topic selection moved to the catalog, so the thesis page renders rich topic
+  // descriptions in the topic modal instead of an inline topic grid.
+  assert.match(page, /<RichContentRenderer content=\{viewingTopic\.description\} \/>/);
+
+  // The catalog detail page is where a student reads a topic, so it must render
+  // the description as rich content too.
+  const topicDetail = read('src/components/dashboard/thesis/ThesisTopicDetailPage.tsx');
+  assert.match(topicDetail, /<RichContentRenderer content=\{topic\.description\} \/>/);
 });
 
 test('dedicated academic editor workbench provides templates, stats, copy and export actions', () => {

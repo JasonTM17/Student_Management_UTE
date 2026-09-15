@@ -47,37 +47,31 @@ export function useThesisWorkspace(initialRoundId = '') {
     void loadRounds();
   }, [loadRounds]);
 
-  useEffect(() => {
+  const refreshWorkspace = useCallback(async () => {
     if (!selectedRoundId) {
       setTopics([]);
       setGroups([]);
       return;
     }
-
-    let cancelled = false;
-    const loadWorkspace = async () => {
-      setWorkspaceLoading(true);
-      setError('');
-      try {
-        const [nextTopics, nextGroups] = await Promise.all([
-          thesisApi.listTopics(selectedRoundId),
-          thesisApi.listGroups(selectedRoundId),
-        ]);
-        if (cancelled) return;
-        setTopics(nextTopics);
-        setGroups(nextGroups);
-      } catch {
-        if (!cancelled) setError(loadFailedMessage);
-      } finally {
-        if (!cancelled) setWorkspaceLoading(false);
-      }
-    };
-
-    void loadWorkspace();
-    return () => {
-      cancelled = true;
-    };
+    setWorkspaceLoading(true);
+    setError('');
+    try {
+      const [nextTopics, nextGroups] = await Promise.all([
+        thesisApi.listTopics(selectedRoundId),
+        thesisApi.listGroups(selectedRoundId),
+      ]);
+      setTopics(nextTopics);
+      setGroups(nextGroups);
+    } catch {
+      setError(loadFailedMessage);
+    } finally {
+      setWorkspaceLoading(false);
+    }
   }, [loadFailedMessage, selectedRoundId]);
+
+  useEffect(() => {
+    void refreshWorkspace();
+  }, [refreshWorkspace]);
 
   const selectedRound = useMemo(
     () => rounds.find((round) => round.id === selectedRoundId),
@@ -114,5 +108,6 @@ export function useThesisWorkspace(initialRoundId = '') {
     isLoading: roundsLoading || workspaceLoading,
     error,
     reload: loadRounds,
+    refreshWorkspace,
   };
 }

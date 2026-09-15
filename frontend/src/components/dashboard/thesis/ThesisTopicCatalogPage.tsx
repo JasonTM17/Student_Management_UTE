@@ -1,5 +1,6 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { ArrowUpRight, FileStack } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
@@ -10,6 +11,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { thesisApi } from '@/lib/thesis-api';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -17,6 +19,41 @@ export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages } = useI18n();
   const workspace = useThesisWorkspace();
+  const autoSwitched = useRef(false);
+
+  /**
+   * The workspace opens on the first round in the list, which is often a round
+   * that has no published topics yet — the catalog then looks empty even though
+   * another round holds dozens of topics. Probe the other rounds once and move
+   * to the first one that actually has something to show.
+   */
+  useEffect(() => {
+    if (autoSwitched.current || workspace.isLoading) return;
+    if (workspace.topics.length > 0) {
+      autoSwitched.current = true;
+      return;
+    }
+    if (workspace.rounds.length < 2) return;
+    autoSwitched.current = true;
+    void (async () => {
+      // Probe every round and land on the one with the most topics: the first
+      // non-empty round is often a leftover verification round with a couple of
+      // records, while the real catalog sits in another round.
+      let best: { id: string; count: number } | null = null;
+      for (const round of workspace.rounds) {
+        if (round.id === workspace.selectedRoundId) continue;
+        try {
+          const topics = await thesisApi.listTopics(round.id);
+          if (topics.length > 0 && (!best || topics.length > best.count)) {
+            best = { id: round.id, count: topics.length };
+          }
+        } catch {
+          // A round that fails to list simply does not win the probe.
+        }
+      }
+      if (best) workspace.setSelectedRoundId(best.id);
+    })();
+  }, [workspace]);
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;

@@ -310,10 +310,13 @@ test('thesis lecturer-student multi-role flow provides group approval, rejection
   assert.match(messagesSource, /myProposedTopics/);
   assert.match(messagesSource, /noProposedTopics/);
 
-  // Topic selection approvalStatus guard, filtering, and listTopics status signature
+  // Topic selection approvalStatus guard, plus the catalog hand-off that
+  // replaced the inline topic grid (and the lecturer-facing topic chooser).
   assert.match(thesisPageSource, /currentGroup\.approvalStatus !== 'APPROVED'/);
-  assert.match(thesisPageSource, /topicFilter/);
-  assert.match(thesisPageSource, /messages\.thesis\.myProposedTopics/);
+  assert.match(thesisPageSource, /messages\.thesis\.openCatalogHint/);
+  assert.match(thesisPageSource, /<LinkButton href="\/dashboard\/thesis\/topics"/);
+  assert.doesNotMatch(thesisPageSource, /topicFilter/);
+  assert.match(messagesSource, /openCatalogHint/);
   assert.match(thesisApiSource, /listTopics:\s*async\s*\(\s*roundId:\s*string,\s*status\?:/);
   assert.match(thesisApiSource, /studentNumber\?: string \| null/);
   assert.match(thesisPageSource, /const memberDisplayName =/);
