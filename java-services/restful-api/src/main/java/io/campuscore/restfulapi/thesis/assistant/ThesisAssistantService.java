@@ -169,6 +169,14 @@ public class ThesisAssistantService {
      */
     private static final java.util.regex.Pattern PUBLIC_SCOPE_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?<![\\p{L}\\p{N}_])(?:academic|campus|course|courses|register|registered|registration|schedule|class|classes|grade|grades|gpa|transcript|credit|credits|semester|term|tuition|fee|fees|announcement|announcements|notice|notices|thesis|capstone|topic|topics|defen[cs]e|supervisor|supervision|lecturer|faculty|department|student|portal|curriculum|prerequisite|corequisite|exam|examination|scholarship|graduation|internship|library|dormitory|wifi|email|account|password|research|appeal|regrade|withdrawal|withdraw|retake|conduct|training|attendance|classroom|room|hoc|dang\\s+ky|dang\\s+nhap|lich|diem|bang\\s+diem|tin\\s+chi|hoc\\s+ky|hoc\\s+phi|thong\\s+bao|luan\\s+van|do\\s+an|de\\s+tai|bao\\s+ve|giang\\s+vien|khoa|bo\\s+mon|sinh\\s+vien|cong|chuong\\s+trinh|tien\\s+quyet|song\\s+hanh|thi|hoc\\s+bong|tot\\s+nghiep|thuc\\s+tap|thu\\s+vien|ky\\s+tuc\\s+xa|tai\\s+khoan|mat\\s+khau|nghien\\s+cuu|phuc\\s+khao|rut\\s+hoc\\s+phan|hoc\\s+lai|ren\\s+luyen|diem\\s+danh|phong)(?![\\p{L}\\p{N}_])");
+    private static final java.util.regex.Pattern REGISTRATION_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:register(?:ed|ing)?|registration|enroll(?:ed|ing|ment)?|enrolment|add\\s*[/-]?\\s*drop)\\b|\\b(?:dang\\s+ky|hoc\\s+phan|mon(?:\\s+hoc)?)\\b)");
+    private static final java.util.regex.Pattern COURSE_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:course|courses|class|classes|section|sections|module|modules)\\b|\\b(?:hoc\\s+phan|mon(?:\\s+hoc)?)\\b|\\badd\\s*[/-]?\\s*drop\\b)");
+    private static final java.util.regex.Pattern REGISTRATION_TIME_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:deadline|window|period|when|date|dates)\\b|\\b(?:khi\\s+nao|bao\\s+gio|thoi\\s+diem|han\\s+(?:chot|dang\\s+ky)|dot\\s+dang\\s+ky)\\b)");
+    private static final java.util.regex.Pattern THESIS_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:thesis|capstone|report|defen[cs]e|council|reviewer)\\b|\\b(?:do\\s+an|khoa\\s+luan|bao\\s+cao|bao\\s+ve|hoi\\s+dong|phan\\s+bien)\\b)");
 
     static String normalizeNumberSpacing(String text) {
         if (text == null || text.isBlank()) return text;
@@ -731,7 +739,7 @@ public class ThesisAssistantService {
         if (!hasPublicScopeSignal(message)) {
             return noMatchResult(locale);
         }
-        List<String> terms = tokenize(message);
+        List<String> terms = retrievalTerms(message);
         List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
         try {
@@ -755,6 +763,15 @@ public class ThesisAssistantService {
             }
         }
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
+        if (isCourseRegistrationQuery(message)) {
+            List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
+                    .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
+                    .toList();
+            // If the scoped search did not find a registration document, fail
+            // closed with no citation rather than displaying policy documents
+            // that happen to mention a deadline or classes.
+            documents = registrationDocuments;
+        }
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content(), locale);
         String context = documents.stream()
@@ -783,12 +800,21 @@ public class ThesisAssistantService {
 
     static boolean hasPublicScopeSignal(String message) {
         if (message == null || message.isBlank()) return false;
-        String folded = Normalizer.normalize(message, Normalizer.Form.NFD)
-                .replaceAll("\\p{M}", "")
-                .replace('\u0111', 'd')
-                .replace('\u0110', 'D')
-                .toLowerCase(Locale.ROOT);
+        String folded = foldForMatching(message);
         return PUBLIC_SCOPE_SIGNAL.matcher(folded).find() || COURSE_CODE.matcher(message).find();
+    }
+
+    /**
+     * Identifies the public course-registration topic so unrelated documents
+     * cannot become citations merely because they share broad words such as
+     * "deadline" or "classes". Thesis registration keeps its own domain.
+     */
+    static boolean isCourseRegistrationQuery(String message) {
+        if (message == null || message.isBlank()) return false;
+        String folded = foldForMatching(message);
+        if (THESIS_SIGNAL.matcher(folded).find() && !COURSE_SIGNAL.matcher(folded).find()) return false;
+        boolean registration = REGISTRATION_SIGNAL.matcher(folded).find();
+        return registration && (COURSE_SIGNAL.matcher(folded).find() || REGISTRATION_TIME_SIGNAL.matcher(folded).find());
     }
 
     private ChatResponse lexicalAnswer(String message, String locale) {
@@ -898,12 +924,44 @@ public class ThesisAssistantService {
                 && AssistantOutputGuard.isSafe(document.source());
     }
     private static final Set<String> STOP_WORDS = Set.of(
-            "a", "an", "and", "are", "do", "does", "for", "how", "i", "is", "it", "of", "on", "or", "the", "to", "what", "when", "where", "why", "with",
+            "a", "an", "and", "are", "can", "could", "do", "does", "for", "how", "i", "is", "it", "may", "me", "of", "on", "or", "please", "should", "tell", "the", "to", "what", "when", "where", "why", "with", "would",
             "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi",
             "của", "để", "là", "làm", "nên", "như", "những", "gì", "nào", "tôi", "và", "về", "với", "các", "có", "được", "không", "thì", "ra", "sao");
-    private static List<String> tokenize(String message) {
-        return java.util.Arrays.stream(message.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
+    static List<String> retrievalTerms(String message) {
+        String source = message == null ? "" : message;
+        List<String> baseTerms = java.util.Arrays.stream(source.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().limit(16).toList();
+        List<String> foldedTerms = java.util.Arrays.stream(foldForMatching(source).split("[^\\p{L}\\p{N}]+"))
+                .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().toList();
+        List<String> expanded = new ArrayList<>();
+        for (String term : baseTerms) {
+            expanded.add(term);
+            switch (term) {
+                case "enroll", "enrolled", "enrolling", "enrollment", "enrolment" -> expanded.addAll(List.of("registration", "register"));
+                case "register", "registered", "registering", "registration" -> expanded.addAll(List.of("enroll", "enrollment"));
+                case "class", "classes" -> expanded.addAll(List.of("course", "courses", "section", "sections"));
+                case "course", "courses" -> expanded.addAll(List.of("class", "classes", "section", "sections"));
+                case "deadline", "deadlines" -> expanded.addAll(List.of("window", "period"));
+                case "window", "windows" -> expanded.addAll(List.of("deadline", "period"));
+                case "đăng" -> expanded.add("đăng ký");
+                case "ký" -> expanded.add("đăng ký");
+                case "học" -> expanded.add("học phần");
+                case "phần" -> expanded.add("học phần");
+                default -> { }
+            }
+        }
+        if ((baseTerms.contains("đăng") && baseTerms.contains("ký"))
+                || (foldedTerms.contains("dang") && foldedTerms.contains("ky"))) expanded.add("đăng ký");
+        if ((baseTerms.contains("học") && baseTerms.contains("phần"))
+                || (foldedTerms.contains("hoc") && foldedTerms.contains("phan"))) expanded.add("học phần");
+        return expanded.stream().distinct().limit(16).toList();
+    }
+    private static String foldForMatching(String value) {
+        return Normalizer.normalize(value == null ? "" : value, Normalizer.Form.NFD)
+                .replaceAll("\\p{M}", "")
+                .replace('\u0111', 'd')
+                .replace('\u0110', 'D')
+                .toLowerCase(Locale.ROOT);
     }
     private static List<Citation> primaryCitations(List<Citation> citations) {
         return citations == null || citations.isEmpty() ? List.of() : List.of(citations.get(0));

@@ -179,6 +179,57 @@ class ThesisAssistantServiceTest {
     }
 
     @Test
+    void courseRegistrationRetrievalExpandsSynonymsAndRejectsIrrelevantCitations() {
+        assertTrue(ThesisAssistantService.isCourseRegistrationQuery("What is the enrollment deadline for courses?"));
+        assertTrue(ThesisAssistantService.isCourseRegistrationQuery("When can I enroll in classes?"));
+        assertTrue(ThesisAssistantService.isCourseRegistrationQuery("Khi nào đăng ký học phần?"));
+        assertTrue(ThesisAssistantService.isCourseRegistrationQuery("Khi nao dang ky hoc phan?"));
+        assertTrue(ThesisAssistantService.isCourseRegistrationQuery("How does add/drop work for registration?"));
+        assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("registration"));
+        assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("sections"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("đăng ký"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("học phần"));
+
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        var unrelated = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "policy", "policy-deadline", "en", "General policy", "General classes and enrollment deadline information.",
+                "registrar", "POLICY", UUID.randomUUID(), 1);
+        var registration = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "registration", "registration-window-en", "en", "Registration window",
+                "Check the active registration window and the add/drop period before enrolling in a course.",
+                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+        var registrationVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "registration-vi", "registration-window-vi", "vi", "Đăng ký học phần",
+                "Kiểm tra thời hạn đăng ký học phần trước khi chọn lớp.",
+                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+        when(knowledge.search(anyString(), anyList(), anyInt()))
+                .thenReturn(List.of(unrelated, registration, registrationVietnamese));
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .answer("When can I enroll in classes?", "en");
+
+        assertEquals("registration-window-en", response.citations().get(0).slug());
+        assertTrue(response.citations().stream()
+                .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
+        assertTrue(response.answer().contains("active registration window"));
+
+        ChatResponse noDiacriticsResponse = new ThesisAssistantService(knowledge)
+                .answer("Khi nao dang ky hoc phan?", "vi");
+
+        assertEquals("registration-window-vi", noDiacriticsResponse.citations().get(0).slug());
+        assertTrue(noDiacriticsResponse.citations().stream()
+                .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
+        assertTrue(noDiacriticsResponse.answer().contains("thời hạn đăng ký học phần"));
+
+        ChatResponse addDropResponse = new ThesisAssistantService(knowledge)
+                .answer("How does add/drop work for registration?", "en");
+
+        assertEquals("registration-window-en", addDropResponse.citations().get(0).slug());
+        assertTrue(addDropResponse.citations().stream()
+                .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
+    }
+
+    @Test
     void legacyUnsafeKnowledgeIsFilteredBeforeLexicalFallback() {
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(

@@ -136,6 +136,7 @@ test('assistant streaming hook encapsulates lifecycle, CAS recovery, and cleanup
 test('assistant guard blocks end the turn locally without a JSON replay', () => {
   const reducerSource = fs.readFileSync(path.join(root, 'src/components/assistant/assistant-reducer.ts'), 'utf8');
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+  const messagesComponentSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantMessages.tsx'), 'utf8');
   const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
   assert.match(reducerSource, /GUARD_BLOCKED_CODES = new Set\(\[\s*'PROMPT_INJECTION',\s*'SENSITIVE_EMAIL',/);
   assert.match(reducerSource, /'TECHNICAL_REQUEST_BLOCKED'/);
@@ -148,6 +149,13 @@ test('assistant guard blocks end the turn locally without a JSON replay', () => 
   assert.match(messagesSource, /technicalBlockedLabel:/);
   assert.match(messagesSource, /asks the assistant to ignore its instructions/);
   assert.match(messagesSource, /yêu cầu trợ lý bỏ qua hướng dẫn hệ thống/);
+  assert.match(messagesSource, /Using reviewed guidance while AI is temporarily unavailable/);
+  assert.match(messagesSource, /Đang dùng hướng dẫn đã duyệt trong lúc AI tạm thời chưa sẵn sàng/);
+  assert.match(messagesComponentSource, /message\.reasonCode === 'KNOWLEDGE_UNAVAILABLE'/);
+  assert.match(messagesComponentSource, /message\.reasonCode === 'PROVIDER_UNAVAILABLE'/);
+  assert.match(messagesComponentSource, /message\.reasonCode === 'PROVIDER_UNSAFE_OUTPUT'/);
+  assert.match(messagesComponentSource, /!message\.citations\?\.length/);
+  assert.match(messagesComponentSource, /messages\.assistant\.unavailable/);
 });
 
 test('assistant stop-race and quota-retry regressions stay guarded', () => {
@@ -240,6 +248,12 @@ test('personalized student assistant query detection and unaccented day matching
   assert.equal(isStudentAssistantQuery('chương trình đào tạo của tôi'), true);
   assert.equal(isStudentAssistantQuery('lớp tôi đang dạy'), true);
   assert.equal(isStudentAssistantQuery('lop toi dang day'), true);
+  assert.equal(isStudentAssistantQuery('Hạn nộp điểm GVPB là khi nào?'), true);
+  assert.equal(isStudentAssistantQuery('What is the deadline for my assignment?'), false);
+  // A bare "classes" must not turn a public enrollment question into a
+  // personal schedule lookup; schedule wording stays contextual.
+  assert.equal(isStudentAssistantQuery('What classes do I have?'), true);
+  assert.equal(isStudentAssistantQuery('When can I enroll in classes?'), false);
 });
 
 test('student assistant resolves schedules and materials from portal APIs', async () => {
@@ -376,6 +390,16 @@ test('regulation questions are never answered by the client (R1)', async () => {
     'Cách tính điểm rèn luyện cho sinh viên?',
     'Thể lệ nộp báo cáo đồ án gồm giấy tờ gì?',
     'Bảo vệ đồ án cần chuẩn bị những gì?',
+    'What are the steps and deadline for course registration?',
+    'What is the registration window for courses?',
+    'What is the deadline for course registration?',
+    'What is the enrollment deadline for courses?',
+    'When can I enroll in classes?',
+    'Khi nào đăng ký học phần?',
+    'Khi nao dang ky hoc phan?',
+    'Han chot dang ky hoc phan la khi nao?',
+    'How does add/drop work for registration?',
+    'Hạn chót đăng ký học phần là khi nào?',
   ];
   for (const question of regulationQuestions) {
     assert.equal(isRegulationLookup(question), true, `expected a regulation lookup: ${question}`);
@@ -386,8 +410,19 @@ test('regulation questions are never answered by the client (R1)', async () => {
     'điểm của tôi thế nào',
     'lịch thứ 2 của tôi là khi nào',
     'học phí của tôi còn nợ không',
+    'What is my course registration deadline?',
+    'Toi dang ky hoc phan khi nao?',
   ]) {
     assert.equal(isRegulationLookup(question), false, `expected a personal answer: ${question}`);
+  }
+
+  for (const question of [
+    'What is the enrollment deadline for courses?',
+    'When can I enroll in classes?',
+    'Khi nào đăng ký học phần?',
+    'Khi nao dang ky hoc phan?',
+  ]) {
+    assert.equal(isRegulationLookup(question), true, `expected a regulation lookup: ${question}`);
   }
 
   // The resolver must delegate before it touches any API module.
@@ -610,6 +645,10 @@ test('regulation questions fall through the resolver to the server', async () =>
   );
   assert.equal(
     await resolveStudentAssistantQuery('điều kiện xét học bổng khuyến khích', 'vi'),
+    null,
+  );
+  assert.equal(
+    await resolveStudentAssistantQuery('What is the deadline for my assignment?', 'en'),
     null,
   );
 

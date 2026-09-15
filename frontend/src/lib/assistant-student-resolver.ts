@@ -46,7 +46,7 @@ const CAMPUS_INFO_REGEX =
 
 // 1. SCHEDULE & TIMETABLE REGEX (both accented and unaccented)
 const SCHEDULE_REGEX =
-  /(?:lịch|lich)\s*(?:học|hoc|dạy|day|giảng\s*dạy|giang\s*day|tuần|tuan|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|của\s*tôi|cua\s*toi|thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|chủ\s*nhật|chu\s*nhat|t[2-7]|cn)?|thời\s*(?:khoá|khóa|khoa)\s*biểu|thoi\s*khoa\s*bieu|\btkb\b|tiết\s*học|tiet\s*hoc|buổi\s*học|buoi\s*hoc|ca\s*học|ca\s*hoc|ca\s*dạy|ca\s*day|tiết\s*dạy|tiet\s*day|(?:thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|chủ\s*nhật|chu\s*nhat)\s*(?:tôi\s*)?(?:có\s*)?(?:học|hoc|dạy|day|lịch|lich|tiết|tiet|môn|mon|buổi|buoi|ca|ở\s*đâu|o\s*dau|mấy\s*giờ|may\s*gio|khi\s*nào|khi\s*nao)|\bschedule\b|\btimetable\b|\bclasses\b/i;
+  /(?:lịch|lich)\s*(?:học|hoc|dạy|day|giảng\s*dạy|giang\s*day|tuần|tuan|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|của\s*tôi|cua\s*toi|thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|chủ\s*nhật|chu\s*nhat|t[2-7]|cn)?|thời\s*(?:khoá|khóa|khoa)\s*biểu|thoi\s*khoa\s*bieu|\btkb\b|tiết\s*học|tiet\s*hoc|buổi\s*học|buoi\s*hoc|ca\s*học|ca\s*hoc|ca\s*dạy|ca\s*day|tiết\s*dạy|tiet\s*day|(?:thứ\s*[2-7]|thu\s*[2-7]|thứ\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|thu\s*(?:hai|ba|tu|bon|nam|sau|bay)|hôm\s*nay|hom\s*nay|ngày\s*mai|ngay\s*mai|chủ\s*nhật|chu\s*nhat)\s*(?:tôi\s*)?(?:có\s*)?(?:học|hoc|dạy|day|lịch|lich|tiết|tiet|môn|mon|buổi|buoi|ca|ở\s*đâu|o\s*dau|mấy\s*giờ|may\s*gio|khi\s*nào|khi\s*nao)|\bschedule\b|\btimetable\b|(?:\b(?:my|our)\s+classes\b|\b(?:monday|tuesday|wednesday|thursday|friday|saturday|sunday)\s+classes\b|\bdo\s+i\s+have\s+classes\b|\bwhat\s+classes\s+do\s+i\s+have\b|\bwhich\s+classes\s+am\s+i\s+taking\b|\bi\s+(?:have|am\s+taking)\s+classes\b)/i;
 
 // 2. MATERIALS & COURSEWARE REGEX
 const MATERIALS_REGEX =
@@ -83,6 +83,31 @@ const LECTURER_THESIS_WORK_REGEX =
 // "điểm" but must NOT be swallowed by the GRADES transcript branch.
 const DEADLINE_INTENT_REGEX =
   /(?:hạn\s*nộp|hạn\s*chót|nộp\s*điểm|chốt\s*điểm|\bgvpb\b|\bdeadline\b)/i;
+
+// Course-registration windows and deadlines are public policy, not the
+// student's thesis status. Keep the course noun in the Vietnamese branch so
+// a question such as "Hạn chót đăng ký khóa luận" still reaches the thesis
+// branch below. Personal markers are applied by the exported policy gates,
+// allowing an explicitly personal eligibility question to stay record-aware.
+const COURSE_REGISTRATION_POLICY_REGEX =
+  /(?:course\s+(?:registration|enrol(?:l)?ment)|(?:registration|enrol(?:l)?ment)\s+(?:deadline|window|period)\s+(?:for\s+)?(?:course|courses|class(?:es)?|module(?:s)?)|(?:deadline|window|period)\s+(?:for\s+)?(?:course|courses|class(?:es)?|module(?:s)?)\s+(?:registration|enrol(?:l)?ment)|registration\s+window|enrol(?:l)?ment\s+window|register(?:ing)?\s+(?:for|in)\s+(?:(?:a|the)\s+)?(?:course|courses|class(?:es)?|module(?:s)?)|enrol(?:l)?(?:ing)?\s+(?:for|in)\s+(?:(?:a|the)\s+)?(?:course|courses|class(?:es)?|module(?:s)?)|add\s*[\/]?\s*drop|(?:(?:khi\s*nào|bao\s*giờ|thời\s*điểm)\s*(?:mới\s*)?(?:được\s*)?(?:đăng\s*ký|dang\s*ky)|(?:đăng\s*ký|dang\s*ky)\s*(?:học\s*phần|hoc\s*phan|môn(?:\s*học)?|mon(?:\s*hoc)?)\s*(?:khi\s*nào|bao\s*giờ|thời\s*điểm))\s*(?:học\s*phần|hoc\s*phan|môn(?:\s*học)?|mon(?:\s*hoc)?)?|(?:hạn\s*(?:chót|đăng\s*ký)|đợt\s*đăng\s*ký|cách\s*đăng\s*ký|thủ\s*tục\s*đăng\s*ký)\s*(?:đăng\s*ký\s*)?(?:học\s*phần|môn(?:\s*học)?))/i;
+
+// Keep the no-diacritic Vietnamese variants explicit at the policy boundary.
+// The server receives both forms from real keyboards, while the personal
+// resolver must not turn a public registration question into a record card.
+const COURSE_REGISTRATION_ASCII_POLICY_REGEX =
+  /(?:(?:khi\s*nao|bao\s*gio|thoi\s*diem)\s*(?:moi\s*)?(?:duoc\s*)?dang\s*ky(?:\s*(?:hoc\s*phan|mon(?:\s*hoc)?))?|(?:dang\s*ky|han\s*chot|han\s*dang\s*ky|dot\s*dang\s*ky|cach\s*dang\s*ky|thu\s*tuc\s*dang\s*ky)\s*(?:hoc\s*phan|mon(?:\s*hoc)?)|add\s*[\/-]?\s*drop)/i;
+
+const THESIS_DEADLINE_CONTEXT_REGEX =
+  /(?:đồ\s*án|do\s*an|khóa\s*luận|khoa\s*luan|báo\s*cáo|bao\s*cao|bảo\s*vệ|bao\s*ve|hội\s*đồng|hoi\s*dong|phản\s*biện|phan\s*bien|gvpb|\bthesis\b|\bcapstone\b|\breport\b|\bdefen[cs]e\b|\bcouncil\b|\breviewer\b)/i;
+
+function isThesisDeadlineQuestion(message: string): boolean {
+  return (
+    DEADLINE_INTENT_REGEX.test(message) &&
+    THESIS_DEADLINE_CONTEXT_REGEX.test(message) &&
+    !COURSE_REGISTRATION_POLICY_REGEX.test(message)
+  );
+}
 
 const COUNCIL_ROLE_LABELS: Record<string, [string, string]> = {
   CHAIR: ['Chủ tịch hội đồng', 'Council chair'],
@@ -132,6 +157,12 @@ const POLICY_QUESTION_REGEX =
   /(quy\s*(?:định|chế|trình)|nội\s*quy|thủ\s*tục|trình\s*tự|điều\s*kiện|tiêu\s*chí|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiêu\s*chuẩn|chính\s*sách|bao\s*nhiêu\s*thành\s*viên|mấy\s*(?:thành\s*viên|người|giảng\s*viên)|tối\s*đa\s*(?:bao\s*nhiêu|mấy|được)|tối\s*thiểu\s*(?:bao|mấy)|được\s*phép|không\s*được\s*|có\s*được\s*(?:làm|đăng\s*ký|chấm|nộp|bảo\s*vệ|rút)|ai\s*(?:được|phải|chấm|phụ\s*trách|làm)|tính\s*thế\s*nào|như\s*thế\s*nào|thế\s*nào|ra\s*sao|chấm\s*điểm|cấu\s*trúc|gồm\s*(?:những|bao|tối)|so\s*sánh|khác\s*(?:nhau|gì)|phân\s*biệt|tiên\s*quyết|học\s*trước|song\s*hành|học\s*lại|cải\s*thiện|rớt\s*môn|điểm\s*f\b|cảnh\s*báo\s*học\s*vụ|buộc\s*thôi\s*học|(?:thời\s*hạn|hạn|khi\s*nào)\s*(?:đóng|nộp)\s*học\s*phí|rút\s*học\s*phần|học\s*bổng|how\s+many|maximum|minimum|policy|regulation|criteria|eligible|procedure|allowed|compare|prerequisite|corequisite|điểm\s*rèn\s*luyện|diem\s*ren\s*luyen|rèn\s*luyện|ren\s*luyen|đrl|drl|xếp\s*loại|xep\s*loai|thể\s*lệ|the\s*le|cách\s*(?:tính|xếp\s*loại|đăng\s*ký|nộp|thức\s*nộp|thanh\s*toán|chuyển\s*đổi)|cach\s*(?:tinh|xep\s*loai|dang\s*ky|nop|thuc\s*nop|thanh\s*toan|chuyen\s*doi)|có\s*được\s*không|co\s*duoc\s*khong|được\s*chưa|duoc\s*chua|chuẩn\s*bị|chuan\s*bi)/i;
 const PERSONAL_MARKER_REGEX =
   /(của\s+(?:tôi|mình|em|anh|chị|tụi\s+tôi|chúng\s+tôi)|cho\s+(?:tôi|mình|em)|tôi\s+(?:có|đang|được|cần|thiếu|là|vừa|muốn|đã|sẽ|học|nộp|đóng)|em\s+(?:có|đang|được|muốn|vừa|cần|đã|sẽ)|anh\s+(?:có|đang|muốn|cần)|chị\s+(?:có|đang|muốn|cần)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
+const PERSONAL_MARKER_ASCII_REGEX =
+  /(?:cua\s+(?:toi|minh|em|anh|chi|tu\s*toi|chung\s*toi)|cho\s+(?:toi|minh|em)|(?:toi|em|anh|chi)\s+(?:co|dang|duoc|can|thieu|la|vua|muon|da|se|hoc|nop|dong)|\bmy\b|\bi\s+(?:have|am|need|got|want)\b)/i;
+
+function hasPersonalMarker(message: string): boolean {
+  return PERSONAL_MARKER_REGEX.test(message) || PERSONAL_MARKER_ASCII_REGEX.test(message);
+}
 
 const ACADEMIC_REGULATION_REGEX =
   /(?:quy\s*(?:định|chế|trình)|quy\s*(?:dinh|che|trinh)|nội\s*quy|noi\s*quy|chính\s*sách|chinh\s*sach|thủ\s*tục|thu\s*tuc|tiêu\s*chuẩn|tieu\s*chuan|tiêu\s*chí|tieu\s*chi|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiên\s*quyết|tien\s*quyet|học\s*trước|hoc\s*truoc|song\s*hành|song\s*hanh|học\s*lại|hoc\s*lai|cải\s*thiện\s*điểm|cai\s*thien\s*diem|học\s*cải\s*thiện|hoc\s*cai\s*thien|rớt\s*môn|rot\s*mon|điểm\s*f\b|diem\s*f\b|cảnh\s*báo\s*học\s*vụ|canh\s*bao\s*hoc\s*vu|buộc\s*thôi\s*học|buoc\s*thoi\s*hoc|học\s*bổng|hoc\s*bong|học\s*phí|hoc\s*phi|công\s*nợ|cong\s*no|tiền\s*học|tien\s*hoc|\btuition\b|(?:hạn|thời\s*hạn|cách|phương\s*thức)\s*(?:nộp|đóng)\s*học\s*phí|(?:han|thoi\s*han|cach|phuong\s*thuc)\s*(?:nop|dong)\s*hoc\s*phi|quy\s*chế\s*thi|quy\s*che\s*thi|điều\s*kiện\s*(?:dự\s*thi|xét\s*tốt\s*nghiệp|tốt\s*nghiệp|xét\s*học\s*bổng)|dieu\s*kien\s*(?:du\s*thi|xet\s*tot\s*nghiep|tot\s*nghiep|xet\s*hoc\s*bong)|\bpolicy\b|\bregulation\b|\bprerequisite\b|\bcorequisite\b|academic\s*warning)/i;
@@ -140,7 +171,12 @@ export function isPolicyQuestion(message: string): boolean {
   if (ACADEMIC_REGULATION_REGEX.test(message)) {
     return true;
   }
-  return POLICY_QUESTION_REGEX.test(message) && !PERSONAL_MARKER_REGEX.test(message);
+  return (
+    (POLICY_QUESTION_REGEX.test(message) ||
+      COURSE_REGISTRATION_POLICY_REGEX.test(message) ||
+      COURSE_REGISTRATION_ASCII_POLICY_REGEX.test(message)) &&
+    !hasPersonalMarker(message)
+  );
 }
 
 /**
@@ -160,8 +196,11 @@ export function isPolicyQuestion(message: string): boolean {
  */
 export function isRegulationLookup(message: string): boolean {
   const regulation =
-    ACADEMIC_REGULATION_REGEX.test(message) || POLICY_QUESTION_REGEX.test(message);
-  return regulation && !PERSONAL_MARKER_REGEX.test(message);
+    ACADEMIC_REGULATION_REGEX.test(message) ||
+    POLICY_QUESTION_REGEX.test(message) ||
+    COURSE_REGISTRATION_POLICY_REGEX.test(message) ||
+    COURSE_REGISTRATION_ASCII_POLICY_REGEX.test(message);
+  return regulation && !hasPersonalMarker(message);
 }
 
 function formatAssistantDate(
@@ -325,7 +364,7 @@ export function isStudentAssistantQuery(message: string): boolean {
     // question ("Tôi có hội đồng bảo vệ nào?") even without the words
     // "đồ án/thesis"; the branch itself still requires the LECTURER role.
     LECTURER_THESIS_WORK_REGEX.test(message) ||
-    DEADLINE_INTENT_REGEX.test(message) ||
+    isThesisDeadlineQuestion(message) ||
     CURRICULUM_REGEX.test(message) ||
     PROFILE_REGEX.test(message) ||
     REGISTRATION_REGEX.test(message) ||
@@ -842,7 +881,7 @@ export async function resolveStudentAssistantQuery(
   // I have to do for thesis right now?" instead of digging through the portal.
   // The server aggregates this across all rounds in one request (the earlier
   // client-side scan guessed a single "active" round and missed data).
-  if (isLecturer && (LECTURER_THESIS_WORK_REGEX.test(message) || DEADLINE_INTENT_REGEX.test(message)) && !policyQuestion) {
+  if (isLecturer && (LECTURER_THESIS_WORK_REGEX.test(message) || isThesisDeadlineQuestion(message)) && !policyQuestion) {
     try {
       const workload = await thesisApi.myWorkload();
       if (workload) {
@@ -1093,10 +1132,11 @@ export async function resolveStudentAssistantQuery(
     return null;
   }
 
-  // E. Handle Thesis / Capstone Graduation queries — also catches deadline
-  // questions ("Hạn nộp điểm GVPB là khi nào?") so they are not swallowed by
-  // the GRADES transcript branch.
-  if ((THESIS_REGEX.test(message) || DEADLINE_INTENT_REGEX.test(message)) && !policyQuestion) {
+  // E. Handle Thesis / Capstone Graduation queries — also catches contextual
+  // deadline questions ("Hạn nộp điểm GVPB là khi nào?") so they are not
+  // swallowed by the GRADES transcript branch. An unrelated "deadline" must
+  // fall through to server RAG instead of fabricating thesis status.
+  if ((THESIS_REGEX.test(message) || isThesisDeadlineQuestion(message)) && !policyQuestion) {
     try {
       const rounds = await thesisApi.listRounds();
       // Multiple rounds can be open at once; the student's group may live in

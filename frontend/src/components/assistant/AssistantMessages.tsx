@@ -59,6 +59,17 @@ export function reasonLabel(
   if (message.reasonCode === 'TECHNICAL_REQUEST_BLOCKED') {
     return messages.assistant.technicalBlockedLabel;
   }
+  // A knowledge outage has no reviewed source to show. Keep that state
+  // distinct from a provider-degraded answer that still carries fallback
+  // citations, otherwise the badge overclaims provenance.
+  if (
+    message.reasonCode === 'KNOWLEDGE_UNAVAILABLE' ||
+    ((message.reasonCode === 'PROVIDER_UNAVAILABLE' ||
+      message.reasonCode === 'PROVIDER_UNSAFE_OUTPUT') &&
+      !message.citations?.length)
+  ) {
+    return messages.assistant.unavailable;
+  }
   return message.reasonCode === 'QUOTA_EXCEEDED'
     ? messages.assistant.quotaExceeded
       : message.reasonCode === 'CANCELLED'
