@@ -37,7 +37,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
-import { resolveGradePoint } from '@/lib/grade-scale';
+import { CONVERSION_TABLE, resolveGradePoint } from '@/lib/grade-scale';
 import { StudentUteProfileGradeView } from '@/components/dashboard/StudentUteProfileGradeView';
 
 function getGradeTone(letterGrade: string | null) {
@@ -997,6 +997,66 @@ export default function TranscriptPage() {
               className="min-h-[120px] border-none bg-transparent px-0 py-0"
             />
           )}
+
+          {/* Feedback item 2: the official 10 → letter → 4.0 conversion is a
+              first-class, always-visible card (previously it existed only in
+              the print block). One source of truth in grade-scale.ts. */}
+          <Card className="mt-6 print:mt-10">
+            <CardHeader>
+              <CardTitle className="text-base">
+                {locale === 'vi'
+                  ? 'Quy đổi thang điểm 10 → điểm chữ → thang điểm 4'
+                  : '10-point → letter → 4.0 scale conversion'}
+              </CardTitle>
+              <CardDescription>
+                {locale === 'vi'
+                  ? 'Thang điểm chữ theo quy đổi tín chỉ UTE / Bộ GD&ĐT.'
+                  : 'Letter grades follow the UTE / MOET credit conversion table.'}
+              </CardDescription>
+            </CardHeader>
+            <CardContent className="pt-0">
+              <div className="overflow-hidden rounded-lg border border-border/70">
+                <table className="w-full text-left text-xs">
+                  <thead>
+                    <tr className="bg-secondary/50 text-muted-foreground">
+                      <th className="px-3 py-2 font-semibold">
+                        {locale === 'vi' ? 'Thang điểm 10' : '10-point scale'}
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        {locale === 'vi' ? 'Điểm chữ' : 'Letter grade'}
+                      </th>
+                      <th className="px-3 py-2 font-semibold">
+                        {locale === 'vi' ? 'Thang điểm 4' : '4.0 scale'}
+                      </th>
+                    </tr>
+                  </thead>
+                  <tbody>
+                    {CONVERSION_TABLE.map((row, index) => (
+                      <tr
+                        key={row.letter}
+                        className={index % 2 === 0 ? 'bg-card' : 'bg-secondary/20'}
+                      >
+                        <td className="px-3 py-1.5 font-mono text-foreground">
+                          {row.letter === 'F'
+                            ? '< 4.0'
+                            : `${row.min.toFixed(1)} – ${(row.max! - 0.01).toFixed(1)}`}
+                        </td>
+                        <td className="px-3 py-1.5 font-semibold text-foreground">{row.letter}</td>
+                        <td className="px-3 py-1.5 font-mono text-foreground">
+                          {row.point.toFixed(1)}
+                        </td>
+                      </tr>
+                    ))}
+                  </tbody>
+                </table>
+              </div>
+              {locale === 'vi' ? (
+                <p className="mt-2 text-[11px] text-muted-foreground">
+                  F (&lt;4.0): chưa tích lũy, phải học lại.
+                </p>
+              ) : null}
+            </CardContent>
+          </Card>
 
           {/* Official Institutional Sign-off Block for Print Document */}
           <div className="hidden print:block mt-10 pt-6 border-t border-border/80">
