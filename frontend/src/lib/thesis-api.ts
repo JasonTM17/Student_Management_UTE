@@ -42,6 +42,10 @@ export interface ThesisRound {
 export interface ThesisTopicSupervisor {
   lecturerId: string;
   supervisorOrder: number;
+  /** Resolved server-side; null only when the lecturer has no directory row. */
+  firstName?: string | null;
+  lastName?: string | null;
+  email?: string | null;
 }
 
 export type ThesisCouncilMemberRole =

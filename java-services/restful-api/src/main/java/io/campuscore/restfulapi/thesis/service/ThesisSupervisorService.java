@@ -35,11 +35,25 @@ public class ThesisSupervisorService {
     @Transactional(readOnly = true)
     public List<SupervisorRow> list(UUID topicId) {
         requireTopic(topicId);
+        // The name travels with the row because the lecturer directory endpoint
+        // is closed to students, which left their group view showing the raw
+        // lecturer id instead of the supervisor's name.
         return jdbc.query(
-                "SELECT lecturer_id, supervisor_order FROM thesis.thesis_topic_supervisor "
-                        + "WHERE topic_id = :topicId ORDER BY supervisor_order",
+                "SELECT supervisor.lecturer_id, supervisor.supervisor_order,"
+                        + " user_account.\"firstName\" AS first_name,"
+                        + " user_account.\"lastName\" AS last_name,"
+                        + " user_account.\"email\" AS email"
+                        + " FROM thesis.thesis_topic_supervisor supervisor"
+                        + " LEFT JOIN campuscore_auth.\"Lecturer\" lecturer ON lecturer.\"id\" = supervisor.lecturer_id"
+                        + " LEFT JOIN campuscore_auth.\"User\" user_account ON user_account.\"id\" = lecturer.\"userId\""
+                        + " WHERE supervisor.topic_id = :topicId ORDER BY supervisor.supervisor_order",
                 new MapSqlParameterSource().addValue("topicId", topicId),
-                (rs, ignored) -> new SupervisorRow(rs.getString("lecturer_id"), rs.getInt("supervisor_order")));
+                (rs, ignored) -> new SupervisorRow(
+                        rs.getString("lecturer_id"),
+                        rs.getInt("supervisor_order"),
+                        rs.getString("first_name"),
+                        rs.getString("last_name"),
+                        rs.getString("email")));
     }
 
     @Transactional
@@ -149,5 +163,11 @@ public class ThesisSupervisorService {
         return new DomainException(HttpStatus.NOT_FOUND, code, message);
     }
 
-    public record SupervisorRow(String lecturerId, int supervisorOrder) { }
+    /** `firstName`/`lastName`/`email` are null when the lecturer has no directory row. */
+    public record SupervisorRow(
+            String lecturerId,
+            int supervisorOrder,
+            String firstName,
+            String lastName,
+            String email) { }
 }
