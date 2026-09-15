@@ -22,7 +22,7 @@ export type ThesisRoundStatus =
 
 export type ThesisTopicStatus = 'DRAFT' | 'PUBLISHED' | 'APPROVED' | 'REJECTED' | 'ARCHIVED';
 export type ThesisGroupStatus =
-  'DRAFT' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
+  'DRAFT' | 'ASSIGNED' | 'SUBMITTED' | 'APPROVED' | 'REJECTED' | 'COMPLETED' | 'CANCELLED';
 export type ThesisApprovalStatus = 'PENDING' | 'APPROVED' | 'REJECTED';
 
 export interface ThesisRound {
