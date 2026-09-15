@@ -147,7 +147,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/members")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
     public GroupResponse addMember(
             @PathVariable UUID id,
             @RequestBody MemberRequest request,
@@ -156,13 +156,13 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/students/search")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
     public List<StudentSearchResponse> searchStudents(@RequestParam String q) {
         return mutations.searchStudents(q);
     }
 
     @DeleteMapping("/groups/{id}/members/{studentId}")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
     public GroupResponse removeMember(
             @PathVariable UUID id,
             @PathVariable String studentId,

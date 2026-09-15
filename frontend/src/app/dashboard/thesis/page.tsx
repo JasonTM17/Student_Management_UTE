@@ -47,6 +47,7 @@ import { useI18n } from '@/i18n';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import { MemberAvatars } from '@/components/thesis/MemberAvatars';
 import { ThesisWorkflowStepper } from '@/components/thesis/ThesisWorkflowStepper';
+import { SupervisedGroupMembers } from '@/components/dashboard/thesis/SupervisedGroupMembers';
 import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide';
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import { departmentsApi, lecturersApi } from '@/lib/api';
@@ -54,6 +55,7 @@ import { getLocalizedName } from '@/lib/academic-content';
 import type { Department, Lecturer } from '@/types/api';
 import {
   thesisApi,
+  type ThesisLecturerWorkload,
   type ThesisCouncil,
   type ThesisCouncilScore,
   type ThesisGroup,
@@ -237,6 +239,7 @@ export default function ThesisPage() {
 
   // Defense council grading state (R6-R8)
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
+  const [lecturerWorkload, setLecturerWorkload] = useState<ThesisLecturerWorkload | null>(null);
   const [councilScores, setCouncilScores] = useState<Record<string, ThesisCouncilScore[]>>({});
   const [draftScores, setDraftScores] = useState<Record<string, string>>({});
   const [topicSupervisors, setTopicSupervisors] = useState<Record<string, string[]>>({});
@@ -376,6 +379,40 @@ export default function ThesisPage() {
     };
   }, [messages.thesis.loadFailed]);
 
+  // The round default above is a student-facing preference. A lecturer whose
+  // supervision lives in another round would otherwise land on an empty
+  // workspace, so once the workload is known, follow the round that actually
+  // holds supervised groups.
+  const explicitRoundId = searchParams.get('roundId');
+  useEffect(() => {
+    // The data-loading effect can run before auth resolves, so the workload is
+    // fetched here where `isSupervisorOrAdmin` is reliable.
+    if (!isSupervisorOrAdmin || !selectedRoundId) return;
+    let cancelled = false;
+    thesisApi
+      .myWorkload()
+      .then((workload) => {
+        if (!cancelled) setLecturerWorkload(workload);
+      })
+      .catch(() => {
+        // Without the workload the lecturer simply sees no member panel.
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [isSupervisorOrAdmin, selectedRoundId]);
+
+  useEffect(() => {
+    if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId) return;
+    const withGroups = lecturerWorkload.topics.filter((topic) => topic.groupCount > 0);
+    if (withGroups.length === 0) return;
+    if (withGroups.some((topic) => topic.roundId === selectedRoundId)) return;
+    const target = [...withGroups].sort((a, b) => b.groupCount - a.groupCount)[0].roundId;
+    if (target && rounds.some((round) => round.id === target)) {
+      setSelectedRoundId(target);
+    }
+  }, [explicitRoundId, isSupervisorOrAdmin, lecturerWorkload, rounds, selectedRoundId]);
+
   useEffect(() => {
     let cancelled = false;
     const loadDepartments = async () => {
@@ -471,6 +508,9 @@ export default function ThesisPage() {
               }
             }),
           );
+          // Which topics this lecturer supervises drives the member-management
+          // affordance; a dedicated effect below fetches it once the role is
+          // actually known, because this data effect can run before auth does.
         }
         await Promise.all(promises);
       } catch {
@@ -590,12 +630,24 @@ export default function ThesisPage() {
   );
   const myTopicIds = useMemo(() => new Set(myTopics.map((topic) => topic.id)), [myTopics]);
 
+  // "Supervised" is the R3 supervisor relationship (thesis_topic_supervisor),
+  // served by /thesis/me/workload. Groups on topics the lecturer merely
+  // proposed are a different set and must not be conflated with it.
+  const supervisedTopicIds = useMemo(
+    () => new Set((lecturerWorkload?.topics ?? []).map((topic) => topic.topicId)),
+    [lecturerWorkload],
+  );
+
   const supervisedGroups = useMemo(
     () =>
       isSupervisorOrAdmin
-        ? groups.filter((group) => group.topicId && (isAdmin || myTopicIds.has(group.topicId)))
+        ? groups.filter(
+            (group) =>
+              group.topicId &&
+              (isAdmin || myTopicIds.has(group.topicId) || supervisedTopicIds.has(group.topicId)),
+          )
         : [],
-    [groups, isAdmin, isSupervisorOrAdmin, myTopicIds],
+    [groups, isAdmin, isSupervisorOrAdmin, myTopicIds, supervisedTopicIds],
   );
 
 
@@ -1856,6 +1908,15 @@ export default function ThesisPage() {
                                 {messages.thesis.rejectionReason}: {group.rejectionReason}
                               </p>
                             ) : null}
+
+                            <SupervisedGroupMembers
+                              group={group}
+                              onChanged={(next) =>
+                                setGroups((current) =>
+                                  current.map((item) => (item.id === next.id ? next : item)),
+                                )
+                              }
+                            />
 
                             {group.approvalStatus === 'APPROVED' ? (
                               <div className="mt-2 flex flex-wrap items-center gap-2">

@@ -232,9 +232,11 @@ public class ThesisMutationService {
     @Transactional
     public GroupResponse addMember(UUID groupId, MemberRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
-        authorizeLeaderOrAdmin(group, actor);
+        boolean supervisorPath = authorizeMemberManagement(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
-        requireMutableMembership(group, actor);
+        if (!supervisorPath) {
+            requireMutableMembership(group, actor);
+        }
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
             throw conflict("GROUP_FULL", "A thesis group can have at most three members");
         }
@@ -279,9 +281,11 @@ public class ThesisMutationService {
     @Transactional
     public GroupResponse removeMember(UUID groupId, String studentId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
-        authorizeLeaderOrAdmin(group, actor);
+        boolean supervisorPath = authorizeMemberManagement(group, actor);
         requireRoundStatus(group.roundId(), RoundStatus.REGISTRATION_OPEN);
-        requireMutableMembership(group, actor);
+        if (!supervisorPath) {
+            requireMutableMembership(group, actor);
+        }
         String normalized = normalize(studentId);
         if (group.leaderStudentId().equals(normalized)) {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
@@ -427,6 +431,39 @@ public class ThesisMutationService {
         if (group.status() != GroupStatus.DRAFT && group.status() != GroupStatus.SUBMITTED) {
             throw conflict("GROUP_STATE_CONFLICT", "The group is no longer editable");
         }
+    }
+
+    /**
+     * Membership may be changed by the group leader, an admin, or — feedback
+     * items 5 and 11 — the lecturer who supervises the group's topic, who is
+     * expected to complete a group's roster even after the faculty approved it.
+     * Returns true on the supervisor path, where the approved-group freeze does
+     * not apply; the open-round gate still does and is enforced by the caller.
+     */
+    private boolean authorizeMemberManagement(GroupRow group, Jwt actor) {
+        if (isAdmin(actor)) {
+            return false;
+        }
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (isLecturer(actor) && !lecturerId.isBlank() && group.topicId() != null
+                && isSupervisorOf(group.topicId(), lecturerId)) {
+            return true;
+        }
+        if (!group.leaderStudentId().equals(studentId(actor))) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_OWNER_REQUIRED", "Only the group leader can change this group");
+        }
+        if (group.status() != GroupStatus.DRAFT && group.status() != GroupStatus.SUBMITTED) {
+            throw conflict("GROUP_STATE_CONFLICT", "The group is no longer editable");
+        }
+        return false;
+    }
+
+    private boolean isSupervisorOf(UUID topicId, String lecturerId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
+                params().addValue("topicId", topicId).addValue("lecturerId", lecturerId),
+                Integer.class);
+        return count != null && count > 0;
     }
 
     private void authorizeReviewer(GroupRow group, Jwt actor) {
