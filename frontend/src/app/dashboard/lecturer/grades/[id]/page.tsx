@@ -10,6 +10,7 @@ import { useRequireAuth } from '@/context/AuthContext';
 import { sectionsApi } from '@/lib/api';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
 import { SectionGrades } from '@/types/api';
+import { GradeImportPanel } from '@/components/lecturer/GradeImportPanel';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -315,6 +316,32 @@ export default function SectionGradingPage() {
     });
   };
 
+  /** Feedback item 9: an imported sheet lands in the same table the lecturer
+   *  reviews, so the existing save path and its validation stay authoritative. */
+  const applyImportedRows = (rows: { enrollmentId: string; processScore: number; finalExamScore: number }[]) => {
+    setGrades((previous) => {
+      const next = new Map(previous);
+      for (const row of rows) {
+        const current = next.get(row.enrollmentId) ?? {
+          enrollmentId: row.enrollmentId,
+          processScore: null,
+          finalExamScore: null,
+        };
+        next.set(row.enrollmentId, { ...current, processScore: row.processScore, finalExamScore: row.finalExamScore });
+      }
+      return next;
+    });
+    setScoreErrors((previous) => {
+      const next = new Map(previous);
+      for (const row of rows) {
+        next.delete(`${row.enrollmentId}:processScore`);
+        next.delete(`${row.enrollmentId}:finalExamScore`);
+      }
+      return next;
+    });
+    for (const row of rows) markEdited(row.enrollmentId);
+  };
+
   const handleSave = async () => {
     if (!sectionId || !sectionData) {
       return;
@@ -520,7 +547,20 @@ export default function SectionGradingPage() {
       ) : (
         <Card variant="muted">
           <CardHeader>
-            <CardTitle className="text-xl">{copy.tableTitle}</CardTitle>
+            <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+              <CardTitle className="text-xl">{copy.tableTitle}</CardTitle>
+              {isSaving ? null : (
+                <GradeImportPanel
+                  students={sectionData.enrollments.map((enrollment) => ({
+                    enrollmentId: enrollment.id,
+                    studentCode: enrollment.studentCode,
+                    email: enrollment.email,
+                  }))}
+                  disabled={sectionData.enrollments.some((enrollment) => enrollment.gradeStatus === 'PUBLISHED')}
+                  onApply={applyImportedRows}
+                />
+              )}
+            </div>
           </CardHeader>
           <CardContent>
             <div
