@@ -18,23 +18,10 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { GradeDetailModal } from '@/components/dashboard/GradeDetailModal';
+import { GRADE_POINTS } from '@/lib/grade-scale';
 import { useI18n } from '@/i18n';
 
-const gradePoints: Record<string, number> = {
-  'A+': 4,
-  A: 4,
-  'A-': 3.7,
-  'B+': 3.3,
-  B: 3,
-  'B-': 2.7,
-  'C+': 2.3,
-  C: 2,
-  'C-': 1.7,
-  'D+': 1.3,
-  D: 1,
-  'D-': 0.7,
-  F: 0,
-};
+const gradePoints = GRADE_POINTS;
 
 function getGradeTone(letterGrade: string | null) {
   if (!letterGrade) {
