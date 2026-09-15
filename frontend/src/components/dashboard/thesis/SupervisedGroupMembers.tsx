@@ -10,6 +10,9 @@ import { thesisApi, type ThesisGroup, type ThesisGroupMember, type ThesisStudent
 
 interface SupervisedGroupMembersProps {
   group: ThesisGroup;
+  /** Feedback item 5/11 UX: membership management only runs in an open round;
+   *  the server still enforces this, the prop just pre-hides the controls. */
+  roundOpen?: boolean;
   onChanged: (group: ThesisGroup) => void;
 }
 
@@ -18,7 +21,7 @@ interface SupervisedGroupMembersProps {
  * group's roster. The server, not this component, decides who may manage
  * membership — a failed call surfaces its message here.
  */
-export function SupervisedGroupMembers({ group, onChanged }: SupervisedGroupMembersProps) {
+export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: SupervisedGroupMembersProps) {
   const { messages, formatNumber } = useI18n();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
@@ -146,7 +149,11 @@ export function SupervisedGroupMembers({ group, onChanged }: SupervisedGroupMemb
             ))}
           </ul>
 
-          {isFull ? (
+          {!roundOpen ? (
+            <p className="text-xs text-muted-foreground">
+              {messages.thesis.membersClosedRound}
+            </p>
+          ) : isFull ? (
             <p className="text-xs text-muted-foreground">{messages.thesis.maxMembersReached}</p>
           ) : (
             <div className="space-y-2">

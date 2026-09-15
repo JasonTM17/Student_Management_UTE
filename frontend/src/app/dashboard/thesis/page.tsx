@@ -11,6 +11,7 @@ import {
   Check,
   CircleDot,
   ExternalLink,
+  FileDown,
   FileStack,
   FileText,
   GraduationCap,
@@ -29,6 +30,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
+import { classifyThesisScore } from '@/lib/grade-scale';
 import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
 import { Input } from '@/components/ui/input';
@@ -103,74 +105,27 @@ type GradeBand =
   | 'PASS'
   | 'RETAKE';
 
+// Feedback item 2: one classification source. The 10-point bands live in
+// grade-scale.ts now, matching the official conversion table end to end.
+const GRADE_BADGE_CLASS: Record<GradeBand, string> = {
+  EXCELLENT: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
+  GOOD: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
+  FAIR: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
+  UPPER_AVERAGE: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
+  AVERAGE: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
+  BELOW_AVERAGE: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30',
+  PASS: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/30',
+  RETAKE: 'bg-destructive/15 text-destructive border-destructive/30',
+};
+
 function getGradeClassification(score: number): {
   letter: string;
   gpa4: string;
   band: GradeBand;
   badgeClass: string;
 } {
-  if (score >= 8.5) {
-    return {
-      letter: 'A',
-      gpa4: '4.0',
-      band: 'EXCELLENT',
-      badgeClass: 'bg-emerald-500/15 text-emerald-700 dark:text-emerald-300 border-emerald-500/30',
-    };
-  }
-  if (score >= 8.0) {
-    return {
-      letter: 'B+',
-      gpa4: '3.5',
-      band: 'GOOD',
-      badgeClass: 'bg-blue-500/15 text-blue-700 dark:text-blue-300 border-blue-500/30',
-    };
-  }
-  if (score >= 7.0) {
-    return {
-      letter: 'B',
-      gpa4: '3.0',
-      band: 'FAIR',
-      badgeClass: 'bg-cyan-500/15 text-cyan-700 dark:text-cyan-300 border-cyan-500/30',
-    };
-  }
-  if (score >= 6.5) {
-    return {
-      letter: 'C+',
-      gpa4: '2.5',
-      band: 'UPPER_AVERAGE',
-      badgeClass: 'bg-amber-500/15 text-amber-700 dark:text-amber-300 border-amber-500/30',
-    };
-  }
-  if (score >= 5.5) {
-    return {
-      letter: 'C',
-      gpa4: '2.0',
-      band: 'AVERAGE',
-      badgeClass: 'bg-orange-500/15 text-orange-700 dark:text-orange-300 border-orange-500/30',
-    };
-  }
-  if (score >= 5.0) {
-    return {
-      letter: 'D+',
-      gpa4: '1.5',
-      band: 'BELOW_AVERAGE',
-      badgeClass: 'bg-yellow-500/15 text-yellow-700 dark:text-yellow-300 border-yellow-500/30',
-    };
-  }
-  if (score >= 4.0) {
-    return {
-      letter: 'D',
-      gpa4: '1.0',
-      band: 'PASS',
-      badgeClass: 'bg-zinc-500/15 text-zinc-700 dark:text-zinc-300 border-zinc-500/30',
-    };
-  }
-  return {
-    letter: 'F',
-    gpa4: '0.0',
-    band: 'RETAKE',
-    badgeClass: 'bg-destructive/15 text-destructive border-destructive/30',
-  };
+  const classified = classifyThesisScore(score);
+  return { ...classified, badgeClass: GRADE_BADGE_CLASS[classified.band] };
 }
 
 export default function ThesisPage() {
@@ -225,6 +180,8 @@ export default function ThesisPage() {
   const [reportUrl, setReportUrl] = useState('');
   const [reportNote, setReportNote] = useState('');
   const [reportError, setReportError] = useState('');
+  // Feedback item 7: the report may be an attached Word/PDF document.
+  const [reportFile, setReportFile] = useState<File | null>(null);
 
   // Round results state (shown once the round reaches RESULTS_PUBLISHED)
   const [roundResults, setRoundResults] = useState<ThesisRoundResult[]>([]);
@@ -795,27 +752,6 @@ export default function ThesisPage() {
     }
   };
 
-  const handleCreateGroupWithTopic = async (topicId: string) => {
-    if (!selectedRoundId) return;
-    setIsActionPending(true);
-    setActionError('');
-    setActionSuccess('');
-    try {
-      const newGroup = await thesisApi.createGroup(selectedRoundId);
-      if (newGroup && newGroup.id) {
-        await thesisApi.assignTopic(newGroup.id, topicId);
-      }
-      await refreshGroups();
-      toast.success(locale === 'vi' ? 'Đã tạo nhóm và đăng ký đề tài thành công!' : 'Group created and topic registered successfully!');
-      setViewingTopic(null);
-    } catch {
-      setActionError(messages.thesis.actionFailed);
-      toast.error(messages.thesis.actionFailed);
-    } finally {
-      setIsActionPending(false);
-    }
-  };
-
   const handleAddMember = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!currentGroup) return;
@@ -926,20 +862,8 @@ export default function ThesisPage() {
     }
   };
 
-  const chooseTopic = async (topicId: string) => {
-    if (!currentGroup) return;
-    setIsActionPending(true);
-    setActionError('');
-    setActionSuccess('');
-    try {
-      await thesisApi.assignTopic(currentGroup.id, topicId);
-      await refreshGroups();
-    } catch {
-      setActionError(messages.thesis.actionFailed);
-    } finally {
-      setIsActionPending(false);
-    }
-  };
+  // Topic selection lives only in the catalog (feedback item 6); the inline
+  // chooser was removed so the catalog stays the single entry point.
 
   const approveGroup = async (groupId: string) => {
     setIsActionPending(true);
@@ -992,32 +916,93 @@ export default function ThesisPage() {
     setReportTitle(groupReport?.title ?? '');
     setReportUrl(groupReport?.url ?? '');
     setReportNote(groupReport?.note ?? '');
+    setReportFile(null);
     setReportError('');
     setIsReportFormOpen(true);
+  };
+
+  const REPORT_FILE_EXTENSIONS = ['.pdf', '.doc', '.docx'];
+  const REPORT_MAX_BYTES = 20 * 1024 * 1024;
+
+  /** Downloads an attached report document for any authorized viewer. */
+  const downloadReportArtifact = async (
+    groupId: string,
+    report: ThesisGroupReport | null | undefined,
+  ) => {
+    if (!report?.fileName) return;
+    try {
+      await thesisApi.downloadReportFile(groupId, report);
+    } catch {
+      toast.error(messages.thesis.report.submitFailed);
+    }
+  };
+
+  const handleDownloadReportFile = async () => {
+    if (!currentGroup || !groupReport?.fileName) return;
+    await downloadReportArtifact(currentGroup.id, groupReport);
   };
 
   const handleSubmitReport = async (event: React.FormEvent) => {
     event.preventDefault();
     if (!currentGroup) return;
     const url = reportUrl.trim();
-    if (!url) {
-      setReportError(messages.thesis.report.urlRequired);
+
+    // Feedback item 7: a Word/PDF upload or a link — at least one artifact.
+    if (reportFile) {
+      const lowerName = reportFile.name.toLowerCase();
+      const extensionOk = REPORT_FILE_EXTENSIONS.some((ext) => lowerName.endsWith(ext));
+      if (!extensionOk) {
+        setReportError(messages.thesis.report.fileTypeUnsupported);
+        return;
+      }
+      if (reportFile.size > REPORT_MAX_BYTES) {
+        setReportError(messages.thesis.report.fileTooLarge);
+        return;
+      }
+    } else if (!url && !groupReport?.url) {
+      setReportError(messages.thesis.report.fileRequired);
       return;
     }
+
     setIsActionPending(true);
     setReportError('');
     setActionSuccess('');
     try {
-      const saved = await thesisApi.submitReport(currentGroup.id, {
-        title: reportTitle.trim() || undefined,
-        url,
-        note: reportNote.trim() || undefined,
-      });
+      let saved: ThesisGroupReport;
+      if (reportFile) {
+        saved = await thesisApi.submitReportFile(currentGroup.id, {
+          file: reportFile,
+          title: reportTitle.trim() || undefined,
+          note: reportNote.trim() || undefined,
+        });
+      } else {
+        // Keep the previous link when the leader only refreshes the metadata
+        // of a link-based report without re-entering the URL.
+        const effectiveUrl = url || groupReport?.url || '';
+        if (!effectiveUrl) {
+          setReportError(messages.thesis.report.fileRequired);
+          setIsActionPending(false);
+          return;
+        }
+        saved = await thesisApi.submitReport(currentGroup.id, {
+          title: reportTitle.trim() || undefined,
+          url: effectiveUrl,
+          note: reportNote.trim() || undefined,
+        });
+      }
       setGroupReport(saved);
+      setReportFile(null);
       setIsReportFormOpen(false);
       setActionSuccess(messages.thesis.report.submitSuccess);
-    } catch {
-      setReportError(messages.thesis.report.submitFailed);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'FILE_TOO_LARGE') {
+        setReportError(messages.thesis.report.fileTooLarge);
+      } else if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
+        setReportError(messages.thesis.report.fileTypeUnsupported);
+      } else {
+        setReportError(messages.thesis.report.submitFailed);
+      }
     } finally {
       setIsActionPending(false);
     }
@@ -1338,15 +1323,31 @@ export default function ThesisPage() {
                                 {groupReport.title}
                               </p>
                             ) : null}
-                            <a
-                              href={groupReport.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
-                            >
-                              {messages.thesis.report.view}
-                              <ExternalLink className="h-3.5 w-3.5" />
-                            </a>
+                            {groupReport.fileName ? (
+                              // Feedback item 7: the attached Word/PDF document.
+                              <button
+                                type="button"
+                                onClick={() => void handleDownloadReportFile()}
+                                className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+                              >
+                                {messages.thesis.report.downloadFile}
+                                <FileDown className="h-3.5 w-3.5" />
+                                <span className="text-xs text-muted-foreground">
+                                  ({groupReport.fileName})
+                                </span>
+                              </button>
+                            ) : null}
+                            {groupReport.url ? (
+                              <a
+                                href={groupReport.url}
+                                target="_blank"
+                                rel="noreferrer"
+                                className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+                              >
+                                {messages.thesis.report.view}
+                                <ExternalLink className="h-3.5 w-3.5" />
+                              </a>
+                            ) : null}
                             {groupReport.note ? (
                               <p className="text-xs text-muted-foreground">{groupReport.note}</p>
                             ) : null}
@@ -1388,17 +1389,34 @@ export default function ThesisPage() {
                             <div>
                               <label
                                 className="mb-1 block text-xs font-medium text-foreground"
+                                htmlFor="thesis-report-file"
+                              >
+                                {messages.thesis.report.fileLabel}
+                              </label>
+                              <input
+                                id="thesis-report-file"
+                                type="file"
+                                accept=".pdf,.doc,.docx"
+                                onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                                disabled={isActionPending}
+                                className="block w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground hover:file:bg-secondary/80"
+                              />
+                              <p className="mt-1 text-[11px] text-muted-foreground">
+                                {messages.thesis.report.fileHint}
+                              </p>
+                            </div>
+                            <div>
+                              <label
+                                className="mb-1 block text-xs font-medium text-foreground"
                                 htmlFor="thesis-report-url"
                               >
-                                {messages.thesis.report.urlLabel}{' '}
-                                <span className="text-destructive">*</span>
+                                {messages.thesis.report.urlLabel}
                               </label>
                               <Input
                                 id="thesis-report-url"
                                 value={reportUrl}
                                 onChange={(e) => setReportUrl(e.target.value)}
                                 placeholder="https://..."
-                                required
                                 disabled={isActionPending}
                               />
                               <p className="mt-1 text-[11px] text-muted-foreground">
@@ -1563,16 +1581,30 @@ export default function ThesisPage() {
                                     )}
                                     {topicReports[tid] ? (
                                       <div className="pt-1.5 flex items-center gap-2">
-                                        <a
-                                          href={topicReports[tid]?.url}
-                                          target="_blank"
-                                          rel="noreferrer"
-                                          className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
-                                        >
-                                          <FileText className="h-3.5 w-3.5" />
-                                          <span>{pageCopy.thesisDocumentLabel} {topicReports[tid]?.title || pageCopy.thesisReportFallback}</span>
-                                          <ExternalLink className="h-3 w-3" />
-                                        </a>
+                                        {/* A report is a link, an attached document,
+                                            or both (feedback item 7). */}
+                                        {topicReports[tid]?.url ? (
+                                          <a
+                                            href={topicReports[tid]?.url || undefined}
+                                            target="_blank"
+                                            rel="noreferrer"
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
+                                          >
+                                            <FileText className="h-3.5 w-3.5" />
+                                            <span>{pageCopy.thesisDocumentLabel} {topicReports[tid]?.title || pageCopy.thesisReportFallback}</span>
+                                            <ExternalLink className="h-3 w-3" />
+                                          </a>
+                                        ) : null}
+                                        {topicReports[tid]?.fileName ? (
+                                          <button
+                                            type="button"
+                                            onClick={() => void downloadReportArtifact(tid, topicReports[tid])}
+                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
+                                          >
+                                            <FileDown className="h-3.5 w-3.5" />
+                                            <span>{topicReports[tid]?.fileName}</span>
+                                          </button>
+                                        ) : null}
                                         {topicReports[tid]?.note ? (
                                           <span className="text-[11px] text-muted-foreground italic truncate max-w-xs">
                                             ({topicReports[tid]?.note})
@@ -1911,6 +1943,7 @@ export default function ThesisPage() {
 
                             <SupervisedGroupMembers
                               group={group}
+                              roundOpen={selectedRound?.status === 'REGISTRATION_OPEN'}
                               onChanged={(next) =>
                                 setGroups((current) =>
                                   current.map((item) => (item.id === next.id ? next : item)),
@@ -1921,16 +1954,32 @@ export default function ThesisPage() {
                             {group.approvalStatus === 'APPROVED' ? (
                               <div className="mt-2 flex flex-wrap items-center gap-2">
                                 {supervisedReports[group.id] ? (
-                                  <a
-                                    href={supervisedReports[group.id]?.url}
-                                    target="_blank"
-                                    rel="noreferrer"
-                                    className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
-                                  >
-                                    <FileText className="h-3.5 w-3.5" />
-                                    <span>{pageCopy.thesisReportLabel} {supervisedReports[group.id]?.title || pageCopy.projectDocumentsFallback}</span>
-                                    <ExternalLink className="h-3 w-3" />
-                                  </a>
+                                  <>
+                                    {/* A report is a link, an attached document,
+                                        or both (feedback item 7). */}
+                                    {supervisedReports[group.id]?.url ? (
+                                      <a
+                                        href={supervisedReports[group.id]?.url || undefined}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
+                                      >
+                                        <FileText className="h-3.5 w-3.5" />
+                                        <span>{pageCopy.thesisReportLabel} {supervisedReports[group.id]?.title || pageCopy.projectDocumentsFallback}</span>
+                                        <ExternalLink className="h-3 w-3" />
+                                      </a>
+                                    ) : null}
+                                    {supervisedReports[group.id]?.fileName ? (
+                                      <button
+                                        type="button"
+                                        onClick={() => void downloadReportArtifact(group.id, supervisedReports[group.id])}
+                                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
+                                      >
+                                        <FileDown className="h-3.5 w-3.5" />
+                                        <span>{supervisedReports[group.id]?.fileName}</span>
+                                      </button>
+                                    ) : null}
+                                  </>
                                 ) : (
                                   <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
                                     <FileText className="h-3 w-3" />
@@ -2585,32 +2634,12 @@ export default function ThesisPage() {
                   {locale === 'vi' ? 'Đóng' : 'Close'}
                 </Button>
 
-                {isStudent &&
-                currentGroup &&
-                currentGroup.topicId !== viewingTopic.id &&
-                currentGroup.approvalStatus !== 'APPROVED' &&
-                viewingTopic.status === 'PUBLISHED' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      void chooseTopic(viewingTopic.id);
-                      setViewingTopic(null);
-                    }}
-                    disabled={isActionPending}
-                  >
-                    {messages.thesis.chooseTopic}
-                  </Button>
-                ) : isStudent && !currentGroup && viewingTopic.status === 'PUBLISHED' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => void handleCreateGroupWithTopic(viewingTopic.id)}
-                    disabled={isActionPending}
-                  >
-                    {locale === 'vi' ? 'Tạo nhóm & Đăng ký đề tài' : 'Create group & Select topic'}
-                  </Button>
-                ) : isSupervisorOrAdmin &&
+                {/* Feedback item 6: the topic catalog is the only place a topic
+                    is chosen, so the modal offers no student chooser. The
+                    lecturer branch below stays because publishing a draft is
+                    not a topic selection (item 12 keeps lecturers off the
+                    chooser). */}
+                {isSupervisorOrAdmin &&
                   (isAdmin || viewingTopic.createdBy === user?.id || (user?.lecturerId && viewingTopic.createdBy === user.lecturerId)) &&
                   viewingTopic.status === 'DRAFT' ? (
                   <Button

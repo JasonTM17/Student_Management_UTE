@@ -73,11 +73,15 @@ export interface ThesisCouncil {
 export interface ThesisGroupReport {
   groupId: string;
   title?: string | null;
-  url: string;
+  url?: string | null;
   note?: string | null;
   submittedBy: string;
   submittedAt: string;
   updatedAt: string;
+  /** Feedback item 7: the attached Word/PDF artifact, when the leader uploaded one. */
+  fileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
 }
 
 export interface ThesisCouncilScore {
@@ -496,6 +500,56 @@ export const thesisApi = {
       data,
     );
     return response.data;
+  },
+
+  /** Feedback item 7: upload the report document itself (.pdf/.doc/.docx, <= 20 MB). */
+  submitReportFile: async (
+    groupId: string,
+    data: { file: File; title?: string; note?: string },
+  ): Promise<ThesisGroupReport> => {
+    const form = new FormData();
+    form.append('file', data.file);
+    if (data.title) form.append('title', data.title);
+    if (data.note) form.append('note', data.note);
+    const response = await api.post<ThesisGroupReport>(
+      '/thesis/groups/' + groupId + '/report/file',
+      form,
+      { headers: { 'Content-Type': 'multipart/form-data' } },
+    );
+    return response.data;
+  },
+
+  /** Feedback item 7: fetch the attached document and hand it to the browser's saver. */
+  downloadReportFile: async (
+    groupId: string,
+    report: { fileName?: string | null },
+  ): Promise<void> => {
+    const response = await api.get<Blob>(
+      '/thesis/groups/' + groupId + '/report/file',
+      { responseType: 'blob' },
+    );
+    const header = response.headers?.['content-disposition'] as string | undefined;
+    let name = report.fileName || 'thesis-report';
+    if (header) {
+      const star = header.match(/filename\*=UTF-8''([^;]+)/i);
+      const plain = header.match(/filename="?([^";]+)"?/i);
+      const encoded = star?.[1] ?? plain?.[1];
+      if (encoded) {
+        try {
+          name = decodeURIComponent(encoded);
+        } catch {
+          name = encoded;
+        }
+      }
+    }
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
   },
 
   getReport: async (groupId: string): Promise<ThesisGroupReport> => {
