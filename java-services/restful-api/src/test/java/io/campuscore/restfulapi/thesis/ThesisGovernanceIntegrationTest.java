@@ -206,6 +206,57 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isForbidden());
     }
 
+    // ---------- Feedback items 5 and 11: the topic supervisor manages membership ----------
+
+    @Test
+    void supervisingLecturerCanCompleteAnApprovedGroupsMembership() throws Exception {
+        UUID roundId = insertRound("Gov Supervisor Member Round", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        ensureLecturer("gov-supervisor-1");
+        ensureLecturer("gov-outsider-1");
+        ensureStudent("gov-member-1", "gov-user-1", "gov-member-1@campuscore.edu");
+        ensureStudent("gov-member-3", "gov-user-3", "gov-member-3@campuscore.edu");
+        UUID topicId = insertPublishedTopic(roundId);
+        // The report asks for roster completion on an approved group, so the
+        // fixture is deliberately APPROVED: only the supervisor path may touch it.
+        UUID groupId = insertGroup(roundId, "gov-member-1", topicId, "APPROVED");
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                        + "VALUES (?, ?, 'gov-supervisor-1', 1)",
+                UUID.randomUUID(), topicId);
+
+        // The supervisor adds the missing member to the approved group. The
+        // fixture inserts no member rows, so the roster holds exactly the new
+        // member afterwards.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"gov-member-3\"}")
+                        .with(lecturerJwt("gov-supervisor-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(1))
+                .andExpect(jsonPath("$.members[0].studentId").value("gov-member-3"));
+
+        // A lecturer who does not supervise this topic is still locked out.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"gov-member-2\"}")
+                        .with(lecturerJwt("gov-outsider-1")))
+                .andExpect(status().isForbidden());
+
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gov-member-3")
+                        .with(lecturerJwt("gov-supervisor-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.members.length()").value(0));
+
+        // The leader's own path still works through the same endpoint.
+        mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"studentId\":\"gov-member-3\"}")
+                        .with(studentJwt("gov-member-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+    }
+
     // ---------- R4: single active group per student ----------
 
     @Test
