@@ -50,7 +50,23 @@ async function main() {
 
     // --- Item 1: no catalog until the student searches ---
     await page.goto(`${BASE_URL}/vi/dashboard/register`, { waitUntil: 'domcontentloaded', timeout: 120000 });
-    await page.waitForTimeout(6000);
+    // Wait for the page to settle into either state before reading: on a cold
+    // production start the catalog area is still mounting after a fixed sleep.
+    await page
+      .waitForFunction(
+        () => {
+          const text = document.body.innerText;
+          const hasPrompt = /Tìm kiếm để xem lớp học phần/.test(text);
+          const hasRegister = [...document.querySelectorAll('button')].some((b) =>
+            /^(Đăng ký|Register)$/.test(b.innerText.trim()),
+          );
+          return hasPrompt || hasRegister;
+        },
+        undefined,
+        { timeout: 60000 },
+      )
+      .catch(() => {});
+    await page.waitForTimeout(1500);
     const emptyState = await page.evaluate(() => document.body.innerText);
     // The registered-course rail legitimately shows course codes, so count the
     // catalog's own register actions instead: those only exist per listed section.
