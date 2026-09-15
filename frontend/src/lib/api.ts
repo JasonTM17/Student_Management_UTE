@@ -347,9 +347,9 @@ export const authApi = {
     return response.data;
   },
 
+  // The full name is school-managed, so it is not part of this payload; the
+  // server ignores it if an older client still sends it.
   updateProfile: async (data: {
-    firstName?: string;
-    lastName?: string;
     phone?: string;
     dateOfBirth?: string;
     address?: string;

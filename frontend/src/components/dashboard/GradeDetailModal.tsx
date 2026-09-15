@@ -7,6 +7,7 @@ import { gradesApi } from '@/lib/api';
 import { StudentGradeRecord, StudentGradesByEnrollmentResponse } from '@/types/api';
 import { useI18n } from '@/i18n';
 import { getLocalizedFlatLabel } from '@/lib/academic-content';
+import { resolveGradePoint } from '@/lib/grade-scale';
 
 interface GradeDetailModalProps {
   isOpen: boolean;
@@ -16,6 +17,25 @@ interface GradeDetailModalProps {
 
 function isFiniteScore(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
+}
+
+/**
+ * The grades API stores component names in Vietnamese only (there is no
+ * `gradeItemNameEn`), so the English dialog used to show Vietnamese labels.
+ * Translate the known component types and keep the raw name for anything else.
+ */
+const GRADE_ITEM_LABELS: Record<string, { vi: string; en: string }> = {
+  PROCESS: { vi: 'Điểm quá trình (ĐQT - 50%)', en: 'Process score (50%)' },
+  FINAL: { vi: 'Điểm cuối kỳ (ĐCK - 50%)', en: 'Final exam score (50%)' },
+};
+
+function gradeItemLabel(
+  item: { gradeItemName: string; gradeItemType?: string | null },
+  locale: string,
+): string {
+  const known = GRADE_ITEM_LABELS[(item.gradeItemType ?? '').toUpperCase()];
+  if (!known) return item.gradeItemName;
+  return locale === 'vi' ? known.vi : known.en;
 }
 
 export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalProps) {
@@ -68,7 +88,7 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             {
               id: 'process-grade',
               gradeItemId: 'process',
-              gradeItemName: locale === 'vi' ? 'Điểm quá trình (ĐQT - 50%)' : 'Process score (50%)',
+              gradeItemName: GRADE_ITEM_LABELS.PROCESS.vi,
               gradeItemType: 'PROCESS',
               score: record.processScore,
               maxScore: 10,
@@ -77,7 +97,7 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             {
               id: 'final-exam-grade',
               gradeItemId: 'final_exam',
-              gradeItemName: locale === 'vi' ? 'Điểm cuối kỳ (ĐCK - 50%)' : 'Final exam score (50%)',
+              gradeItemName: GRADE_ITEM_LABELS.FINAL.vi,
               gradeItemType: 'FINAL',
               score: record.finalExamScore,
               maxScore: 10,
@@ -119,7 +139,13 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             ) : null}
             <span className="inline-flex items-center gap-1.5">
               <Calendar className="h-3.5 w-3.5 text-primary" />
-              {record.semester}
+              {getLocalizedFlatLabel(
+                locale,
+                record.semester,
+                record.semesterNameEn,
+                record.semesterNameVi,
+                record.semester,
+              )}
             </span>
           </div>
         </div>
@@ -174,7 +200,7 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
                     return (
                       <tr key={item.id} className="transition-colors hover:bg-secondary/15">
                         <td className="px-4 py-3 font-medium text-foreground">
-                          {item.gradeItemName}
+                          {gradeItemLabel(item, locale)}
                           <div className="text-[11px] text-muted-foreground uppercase font-mono">
                             {item.gradeItemType}
                           </div>
@@ -224,8 +250,8 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
               {locale === 'vi' ? 'Quy đổi (4.0)' : 'Grade Point'}
             </div>
             <div className="mt-1 text-2xl font-bold text-foreground">
-              {isFiniteScore(record.gradePoint)
-                ? record.gradePoint.toFixed(2)
+              {resolveGradePoint(record) !== null
+                ? resolveGradePoint(record)!.toFixed(1)
                 : emptyValue}
             </div>
           </div>

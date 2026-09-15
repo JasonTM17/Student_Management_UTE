@@ -225,9 +225,9 @@ export default function ProfilePage() {
     setIsLoading(true);
 
     try {
+      // The full name is school-managed (see the update endpoint), so it is
+      // deliberately not part of the self-service payload.
       await authApi.updateProfile({
-        firstName: formData.firstName.trim(),
-        lastName: formData.lastName.trim(),
         phone: formData.phone.trim(),
         dateOfBirth: formData.dateOfBirth || undefined,
         address: formData.address.trim(),
@@ -388,10 +388,9 @@ export default function ProfilePage() {
                     id="profile-first-name"
                     type="text"
                     value={formData.firstName}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, firstName: e.target.value }))
-                    }
+                    disabled
                     icon={<User className="h-4 w-4" />}
+                    hint={messages.profile.fields.nameManagedHint}
                   />
                 </div>
                 <div className="space-y-2">
@@ -402,10 +401,9 @@ export default function ProfilePage() {
                     id="profile-last-name"
                     type="text"
                     value={formData.lastName}
-                    onChange={(e) =>
-                      setFormData((current) => ({ ...current, lastName: e.target.value }))
-                    }
+                    disabled
                     icon={<User className="h-4 w-4" />}
+                    hint={messages.profile.fields.nameManagedHint}
                   />
                 </div>
                 <div className="space-y-2">
