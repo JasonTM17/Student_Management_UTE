@@ -13,6 +13,16 @@ import { useI18n } from '@/i18n';
 
 export const dynamic = 'force-dynamic';
 
+/** Feedback item 10: validation problems surface under the field they belong
+ *  to, not only as one form-level banner. The banner stays as the fallback for
+ *  server failures that cannot be tied to a single field. */
+interface SignupFieldErrors {
+  firstName?: string;
+  lastName?: string;
+  email?: string;
+  password?: string;
+}
+
 export default function RegisterPage() {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
@@ -21,6 +31,7 @@ export default function RegisterPage() {
   const [showPassword, setShowPassword] = useState(false);
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [formError, setFormError] = useState('');
+  const [fieldErrors, setFieldErrors] = useState<SignupFieldErrors>({});
   const formErrorRef = useRef<HTMLDivElement>(null);
   const { register } = useAuth();
   const { href, messages } = useI18n();
@@ -33,22 +44,51 @@ export default function RegisterPage() {
     }
   }, [formError]);
 
-  const errorMessage = (error: unknown) => {
+  const serverError = (error: unknown): { form?: string; field?: SignupFieldErrors } => {
     if (!(error instanceof AxiosError) || !error.response) {
-      return copy.errors.fallback;
+      return { form: copy.errors.fallback };
     }
-    if (error.response.status === 409) {
-      return copy.errors.conflict;
+    const payload = error.response.data as { code?: string; message?: string } | undefined;
+    const detail = (payload?.message ?? '').toLowerCase();
+    if (error.response.status === 409 || payload?.code === 'EMAIL_ALREADY_EXISTS') {
+      return { field: { email: copy.errors.emailConflict } };
     }
     if (error.response.status === 400) {
-      return copy.errors.validation;
+      if (detail.includes('password')) {
+        return { field: { password: copy.errors.passwordShort } };
+      }
+      if (detail.includes('email')) {
+        return { field: { email: copy.errors.emailInvalid } };
+      }
+      if (detail.includes('first') || detail.includes('last') || detail.includes('name')) {
+        return { field: { firstName: copy.errors.nameRequired } };
+      }
+      return { form: copy.errors.validation };
     }
-    return copy.errors.fallback;
+    return { form: copy.errors.fallback };
   };
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+
+    // Mirror the server rules so a wrong field shows its message immediately
+    // (feedback item 10) instead of failing after a round trip.
+    const errors: SignupFieldErrors = {};
+    if (!firstName.trim() || !lastName.trim()) {
+      errors.firstName = copy.errors.nameRequired;
+    }
+    if (!/^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email.trim())) {
+      errors.email = copy.errors.emailInvalid;
+    }
+    if (password.length < 8) {
+      errors.password = copy.errors.passwordShort;
+    }
+    setFieldErrors(errors);
     setFormError('');
+    if (Object.keys(errors).length > 0) {
+      return;
+    }
+
     setIsSubmitting(true);
     try {
       await register({
@@ -59,11 +99,20 @@ export default function RegisterPage() {
       });
       router.push(href('/dashboard'));
     } catch (error: unknown) {
-      setFormError(errorMessage(error));
+      const mapped = serverError(error);
+      setFieldErrors(mapped.field ?? {});
+      setFormError(mapped.form ?? '');
     } finally {
       setIsSubmitting(false);
     }
   };
+
+  const fieldError = (id: keyof SignupFieldErrors, describedBy: string) =>
+    fieldErrors[id] ? (
+      <p id={`${describedBy}-error`} role="alert" className="text-xs font-medium text-destructive">
+        {fieldErrors[id]}
+      </p>
+    ) : null;
 
   return (
     <AuthShell
@@ -89,7 +138,7 @@ export default function RegisterPage() {
             {formError}
           </div>
         ) : null}
-        <form onSubmit={handleSubmit} className="space-y-4" aria-describedby={formError ? 'signup-error' : undefined}>
+        <form onSubmit={handleSubmit} className="space-y-4" aria-describedby={formError ? 'signup-error' : undefined} noValidate>
           <div className="space-y-2">
             <label htmlFor="firstName" className="text-sm font-medium text-foreground">
               {copy.firstNameLabel}
@@ -100,8 +149,11 @@ export default function RegisterPage() {
               onChange={(event) => setFirstName(event.target.value)}
               autoComplete="given-name"
               icon={<UserRound className="h-4 w-4" />}
+              aria-invalid={fieldErrors.firstName ? true : undefined}
+              aria-describedby={fieldErrors.firstName ? 'firstName-error' : undefined}
               required
             />
+            {fieldError('firstName', 'firstName')}
           </div>
           <div className="space-y-2">
             <label htmlFor="lastName" className="text-sm font-medium text-foreground">
@@ -113,8 +165,11 @@ export default function RegisterPage() {
               onChange={(event) => setLastName(event.target.value)}
               autoComplete="family-name"
               icon={<UserRound className="h-4 w-4" />}
+              aria-invalid={fieldErrors.lastName ? true : undefined}
+              aria-describedby={fieldErrors.lastName ? 'lastName-error' : undefined}
               required
             />
+            {fieldError('lastName', 'lastName')}
           </div>
           <div className="space-y-2">
             <label htmlFor="email" className="text-sm font-medium text-foreground">
@@ -127,8 +182,11 @@ export default function RegisterPage() {
               onChange={(event) => setEmail(event.target.value)}
               autoComplete="email"
               icon={<Mail className="h-4 w-4" />}
+              aria-invalid={fieldErrors.email ? true : undefined}
+              aria-describedby={fieldErrors.email ? 'email-error' : undefined}
               required
             />
+            {fieldError('email', 'email')}
           </div>
           <div className="space-y-2">
             <label htmlFor="password" className="text-sm font-medium text-foreground">
@@ -140,8 +198,9 @@ export default function RegisterPage() {
               value={password}
               onChange={(event) => setPassword(event.target.value)}
               autoComplete="new-password"
-              minLength={8}
               icon={<Lock className="h-4 w-4" />}
+              aria-invalid={fieldErrors.password ? true : undefined}
+              aria-describedby={fieldErrors.password ? 'password-error' : undefined}
               required
               endAction={
                 <button
@@ -160,6 +219,7 @@ export default function RegisterPage() {
                 </button>
               }
             />
+            {fieldError('password', 'password')}
           </div>
           <Button type="submit" className="w-full" disabled={isSubmitting}>
             <span className="inline-flex items-center gap-2">
