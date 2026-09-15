@@ -121,7 +121,9 @@ public class SecurityConfig {
                                 "/api/v1/health/**",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
-                                "/api/v1/mail/**",
+                                // Mail endpoints used to be reachable without a
+                                // token; sending mail is now a staff action and
+                                // the template previews require any login.
                                 "/error",
                                 "/actuator/health/**",
                                 "/api/docs/**",
