@@ -121,6 +121,7 @@ public class SecurityConfig {
                                 "/api/v1/health/**",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
+                                "/api/v1/mail/**",
                                 "/error",
                                 "/actuator/health/**",
                                 "/api/docs/**",
