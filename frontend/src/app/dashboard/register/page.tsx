@@ -45,6 +45,9 @@ export default function RegisterPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState('');
+  // Feedback item 10: enrollment failures also render inline above the
+  // catalog instead of vanishing with the toast.
+  const [actionError, setActionError] = useState('');
   const loadGeneration = useRef(0);
 
   /** Loads the student's enrollments, active registration rounds, and section catalog. */
@@ -191,7 +194,9 @@ export default function RegisterPage() {
     const section = sections.find((item) => item.id === sectionId);
     const creditsToAdd = section?.credits ?? 0;
     if (totalRegisteredCredits + creditsToAdd > creditLimit) {
-      toast.error(`Đăng ký học phần này sẽ vượt giới hạn tối đa ${creditLimit} tín chỉ của học kỳ.`);
+      const message = `Đăng ký học phần này sẽ vượt giới hạn tối đa ${creditLimit} tín chỉ của học kỳ.`;
+      setActionError(message);
+      toast.error(message);
       return;
     }
     const ok = await confirm({
@@ -204,12 +209,15 @@ export default function RegisterPage() {
     });
     if (!ok) return;
     setPending(sectionId);
+    setActionError('');
     try {
       await enrollmentsApi.enroll(sectionId);
       toast.success(copy.success);
       await load();
     } catch (cause) {
-      toast.error(campusCodeMessage(cause, messages.common.campusErrors));
+      const message = campusCodeMessage(cause, messages.common.campusErrors);
+      setActionError(message);
+      toast.error(message);
     } finally {
       setPending('');
     }
@@ -227,12 +235,15 @@ export default function RegisterPage() {
     });
     if (!ok) return;
     setPending(enrollment.id);
+    setActionError('');
     try {
       await enrollmentsApi.drop(enrollment.id);
       toast.success(copy.success);
       await load();
     } catch (cause) {
-      toast.error(campusCodeMessage(cause, messages.common.campusErrors));
+      const message = campusCodeMessage(cause, messages.common.campusErrors);
+      setActionError(message);
+      toast.error(message);
     } finally {
       setPending('');
     }
@@ -263,6 +274,15 @@ export default function RegisterPage() {
       ) : (
         <div className="grid min-w-0 gap-6 lg:grid-cols-12">
           <div className="min-w-0 space-y-6 lg:col-span-9">
+            {actionError ? (
+              <div
+                role="alert"
+                aria-live="polite"
+                className="rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2 text-sm text-destructive"
+              >
+                {actionError}
+              </div>
+            ) : null}
             <Card>
               <CardContent className="grid gap-3 p-4 md:grid-cols-2">
                 <label className="min-w-0 space-y-2">
