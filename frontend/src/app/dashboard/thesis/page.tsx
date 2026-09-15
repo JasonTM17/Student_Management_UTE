@@ -62,6 +62,7 @@ import {
   type ThesisRoundResult,
   type ThesisStudentResult,
   type ThesisTopic,
+  type ThesisTopicSupervisor,
 } from '@/lib/thesis-api';
 
 /** Shape of the API error envelope (`{ code, message }`) used for domain conflicts. */
@@ -245,7 +246,7 @@ export default function ThesisPage() {
   const [lecturerTab, setLecturerTab] = useState<'supervision' | 'defense'>('supervision');
 
   // Supervisors for current student group's topic
-  const [currentTopicSupervisors, setCurrentTopicSupervisors] = useState<string[]>([]);
+  const [currentTopicSupervisors, setCurrentTopicSupervisors] = useState<ThesisTopicSupervisor[]>([]);
 
   const myLecturerId = user?.lecturerId || user?.id || '';
   const visibleCouncils = useMemo(() => {
@@ -645,7 +646,7 @@ export default function ThesisPage() {
       .listSupervisors(currentGroup.topicId)
       .then((sups) => {
         if (!cancelled) {
-          setCurrentTopicSupervisors(sups.map((s) => s.lecturerId));
+          setCurrentTopicSupervisors(sups);
         }
       })
       .catch(() => {});
@@ -673,11 +674,18 @@ export default function ThesisPage() {
   }, [searchParams, topics]);
 
   const studentTopicSupervisors = useMemo(() => {
-    return currentTopicSupervisors.map((lid) => {
-      const lect = lecturers.find((l) => l.id === lid);
-      return lect?.user
-        ? `${lect.user.lastName} ${lect.user.firstName}`
-        : lid;
+    return currentTopicSupervisors.map((supervisor) => {
+      // The API now ships the name with the row; fall back to the lecturer
+      // directory, and only then to the raw id.
+      const fromRow = [supervisor.lastName, supervisor.firstName].filter(Boolean).join(' ').trim();
+      if (fromRow) {
+        return fromRow;
+      }
+      const lect = lecturers.find((l) => l.id === supervisor.lecturerId);
+      if (lect?.user) {
+        return `${lect.user.lastName} ${lect.user.firstName}`.trim();
+      }
+      return supervisor.lecturerId;
     });
   }, [currentTopicSupervisors, lecturers]);
 
