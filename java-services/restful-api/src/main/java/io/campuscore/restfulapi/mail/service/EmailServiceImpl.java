@@ -101,8 +101,8 @@ public class EmailServiceImpl implements EmailService {
         variables.put("recipientName", recipientName != null && !recipientName.isBlank() ? recipientName : "Quý Thầy/Cô & Sinh viên");
         variables.put("introMessage", introMessage != null && !introMessage.isBlank()
                 ? introMessage
-                : "Hệ thống Quản lý Đào tạo CampusUTE thông báo: Cấu hình SMTP Gmail với công nghệ mẫu giao diện Thymeleaf đã được thiết lập và kích hoạt thành công!");
-        variables.put("statusBadge", "● KẾT NỐI SMTP THÀNH CÔNG");
+                : "Đây là thư kiểm thử để xác nhận dịch vụ email CampusUTE đã phản hồi thành công.");
+        variables.put("statusBadge", "KẾT NỐI SMTP THÀNH CÔNG");
         variables.put("smtpProtocol", "Gmail SMTP (Port 587 - TLS)");
         variables.put("senderEmail", mailConfig.getFrom());
         variables.put("timestamp", LocalDateTime.now().format(DATE_TIME_FORMATTER));

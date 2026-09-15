@@ -111,8 +111,8 @@ public class MailController {
             case "test-verification" -> {
                 data.put("subject", "CampusUTE - Xác nhận kết nối SMTP thành công");
                 data.put("recipientName", "Nguyễn Tiến Sơn (Sinh viên)");
-                data.put("introMessage", "Hệ thống Quản lý Đào tạo CampusUTE: Dịch vụ gửi email SMTP qua Google Cloud Engine đã được cấu hình và vận hành thành công.");
-                data.put("statusBadge", "● KẾT NỐI SMTP THÀNH CÔNG");
+                data.put("introMessage", "Đây là thư kiểm thử để xác nhận dịch vụ email CampusUTE đã phản hồi thành công.");
+                data.put("statusBadge", "KẾT NỐI SMTP THÀNH CÔNG");
                 data.put("smtpProtocol", "Gmail SMTP (Port 587 - TLS)");
                 data.put("senderEmail", "conbocuoi1721@gmail.com");
                 data.put("timestamp", nowStr);

@@ -1,273 +1,102 @@
 <!DOCTYPE html>
 <html xmlns:th="http://www.thymeleaf.org" lang="vi">
-<head>
-  <meta charset="UTF-8">
-  <meta name="viewport" content="width=device-width, initial-scale=1.0">
-  <title th:text="${subject}">Thông báo Kết quả Học tập & Rèn luyện - CampusUTE</title>
-  <style>
-    body {
-      margin: 0;
-      padding: 0;
-      background-color: #f1f5f9;
-      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
-      -webkit-font-smoothing: antialiased;
-      color: #1e293b;
-    }
-    table {
-      border-spacing: 0;
-      border-collapse: collapse;
-    }
-    td {
-      padding: 0;
-    }
-    .wrapper {
-      width: 100%;
-      table-layout: fixed;
-      background-color: #f1f5f9;
-      padding: 40px 0;
-    }
-    .main {
-      background-color: #ffffff;
-      margin: 0 auto;
-      width: 100%;
-      max-width: 620px;
-      border-spacing: 0;
-      border-radius: 16px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
-    }
-    .header {
-      background: linear-gradient(135deg, #002b66 0%, #004b99 50%, #0f52ba 100%);
-      padding: 36px 32px;
-      text-align: center;
-    }
-    .brand-badge {
-      display: inline-block;
-      background: rgba(255, 255, 255, 0.15);
-      border: 1px solid rgba(255, 255, 255, 0.3);
-      padding: 6px 14px;
-      border-radius: 20px;
-      color: #ffffff;
-      font-size: 11px;
-      font-weight: 700;
-      letter-spacing: 1.5px;
-      text-transform: uppercase;
-      margin-bottom: 12px;
-    }
-    .brand-title {
-      color: #ffffff;
-      font-size: 24px;
-      font-weight: 800;
-      letter-spacing: -0.5px;
-      margin: 0 0 6px 0;
-    }
-    .brand-subtitle {
-      color: #cbd5e1;
-      font-size: 13px;
-      margin: 0;
-    }
-    .gold-bar {
-      height: 4px;
-      background: linear-gradient(90deg, #d97706 0%, #fbbf24 50%, #d97706 100%);
-    }
-    .content {
-      padding: 36px 32px;
-    }
-    .summary-grid {
-      display: table;
-      width: 100%;
-      margin-bottom: 28px;
-    }
-    .stat-cell {
-      display: table-cell;
-      width: 50%;
-      padding: 16px;
-      text-align: center;
-      vertical-align: middle;
-      border-radius: 12px;
-    }
-    .stat-gpa {
-      background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%);
-      border: 1px solid #bfdbfe;
-    }
-    .stat-conduct {
-      background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%);
-      border: 1px solid #bbf7d0;
-    }
-    .stat-number {
-      font-size: 28px;
-      font-weight: 800;
-      margin-bottom: 4px;
-    }
-    .stat-label {
-      font-size: 12px;
-      font-weight: 600;
-      text-transform: uppercase;
-      letter-spacing: 0.5px;
-    }
-    .rank-pill {
-      display: inline-block;
-      font-size: 11px;
-      font-weight: 700;
-      padding: 3px 10px;
-      border-radius: 12px;
-      margin-top: 6px;
-    }
-    .grade-table {
-      width: 100%;
-      margin-bottom: 24px;
-      border-radius: 8px;
-      overflow: hidden;
-      border: 1px solid #e2e8f0;
-    }
-    .grade-table th {
-      background-color: #f1f5f9;
-      color: #475569;
-      font-size: 12px;
-      font-weight: 700;
-      text-transform: uppercase;
-      padding: 10px 12px;
-      text-align: left;
-      border-bottom: 1px solid #e2e8f0;
-    }
-    .grade-table td {
-      padding: 10px 12px;
-      font-size: 13px;
-      border-bottom: 1px solid #f1f5f9;
-      color: #334155;
-    }
-    .grade-letter {
-      font-weight: 800;
-      color: #059669;
-      background-color: #ecfdf5;
-      padding: 2px 8px;
-      border-radius: 4px;
-      display: inline-block;
-    }
-    .btn-container {
-      text-align: center;
-      margin: 28px 0 12px 0;
-    }
-    .btn-primary {
-      background: linear-gradient(135deg, #004b99 0%, #0284c7 100%);
-      color: #ffffff !important;
-      text-decoration: none;
-      padding: 14px 32px;
-      border-radius: 8px;
-      font-weight: 600;
-      font-size: 14px;
-      display: inline-block;
-      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
-    }
-    .footer {
-      background-color: #f8fafc;
-      border-top: 1px solid #e2e8f0;
-      padding: 28px 32px;
-      text-align: center;
-      font-size: 12px;
-      color: #64748b;
-      line-height: 1.6;
-    }
-  </style>
-</head>
+<head th:replace="~{mail/fragments :: emailHead(${subject})}"></head>
 <body>
-  <div class="wrapper">
-    <table class="main" align="center" width="620">
-      <!-- HEADER -->
-      <tr>
-        <td class="header">
-          <div class="brand-badge">KẾT QUẢ HỌC VỤ & RÈN LUYỆN</div>
-          <h1 class="brand-title">CampusUTE Portal</h1>
-          <p class="brand-subtitle">Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh</p>
-        </td>
-      </tr>
-      <tr>
-        <td class="gold-bar"></td>
-      </tr>
+  <span th:replace="~{mail/fragments :: preheader(${subject})}">Kết quả học vụ CampusUTE</span>
 
-      <!-- BODY CONTENT -->
-      <tr>
-        <td class="content">
-          <div style="font-size: 16px; color: #0f172a; font-weight: 600; margin-bottom: 8px;">
-            Kính gửi Sinh viên: <span th:text="${studentName}">Nguyễn Tiến Sơn</span> (MSSV: <span th:text="${studentId}">22110001</span>)
-          </div>
-          <div style="font-size: 13px; color: #64748b; margin-bottom: 24px;">
-            Phòng Đào tạo xin thông báo kết quả học tập và rèn luyện: <strong style="color: #0f172a;" th:text="${semester}">Học kỳ 1 Năm học 2026-2027</strong>.
-          </div>
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
+    <tr>
+      <td class="outer-pad" align="center">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0">
+          <th:block th:replace="~{mail/fragments :: masthead('KẾT QUẢ HỌC VỤ & RÈN LUYỆN', 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
 
-          <!-- SUMMARY SCORE CARDS -->
-          <table width="100%" style="margin-bottom: 24px;">
-            <tr>
-              <td width="48%" style="background: linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%); border: 1px solid #bfdbfe; border-radius: 12px; padding: 20px; text-align: center;">
-                <div style="font-size: 11px; font-weight: 700; color: #1e40af; text-transform: uppercase; margin-bottom: 4px;">ĐIỂM TRUNG BÌNH HỌC KỲ (GPA)</div>
-                <div style="font-size: 32px; font-weight: 800; color: #1d4ed8; line-height: 1.1;" th:text="${#numbers.formatDecimal(gpa4, 1, 2)}">3.65</div>
-                <div style="font-size: 12px; color: #475569; margin: 4px 0 8px 0;">Thang điểm 10: <strong th:text="${#numbers.formatDecimal(gpa10, 1, 2)}">8.85</strong></div>
-                <span class="rank-pill" style="background: #1d4ed8; color: #ffffff;" th:text="${academicStanding != null ? academicStanding : 'XUẤT SẮC'}">XUẤT SẮC</span>
-              </td>
-              <td width="4%"></td>
-              <td width="48%" style="background: linear-gradient(135deg, #f0fdf4 0%, #dcfce7 100%); border: 1px solid #bbf7d0; border-radius: 12px; padding: 20px; text-align: center;">
-                <div style="font-size: 11px; font-weight: 700; color: #166534; text-transform: uppercase; margin-bottom: 4px;">ĐIỂM RÈN LUYỆN (ĐRL)</div>
-                <div style="font-size: 32px; font-weight: 800; color: #15803d; line-height: 1.1;" th:text="${conductScore}">92</div>
-                <div style="font-size: 12px; color: #475569; margin: 4px 0 8px 0;">Xếp loại rèn luyện</div>
-                <span class="rank-pill" style="background: #15803d; color: #ffffff;" th:text="${conductRank != null ? conductRank : 'XUẤT SẮC'}">XUẤT SẮC</span>
-              </td>
-            </tr>
-          </table>
+          <tr>
+            <td class="content">
+              <p class="section-label">THÔNG BÁO KẾT QUẢ CÁ NHÂN</p>
+              <h1 class="page-title">Kết quả học tập và rèn luyện</h1>
 
-          <!-- DETAILED GRADES TABLE -->
-          <div style="font-weight: 700; font-size: 14px; color: #0f172a; margin-bottom: 10px;">
-            CHI TIẾT ĐIỂM CÁC HỌC PHẦN:
-          </div>
+              <p class="salutation">
+                Kính gửi <span th:text="${studentName}">Nguyễn Tiến Sơn</span> <span aria-hidden="true">·</span> MSSV <span th:text="${studentId}">22110001</span>,
+              </p>
+              <p class="prose">
+                Phòng Đào tạo đã cập nhật kết quả của bạn cho <strong th:text="${semester}">Học kỳ 2 Năm học 2025-2026</strong>. Vui lòng kiểm tra các thông tin dưới đây và gửi yêu cầu phúc khảo trong thời hạn quy định nếu cần.
+              </p>
 
-          <table class="grade-table">
-            <thead>
-              <tr>
-                <th>Học phần</th>
-                <th style="text-align: center;">Số TC</th>
-                <th style="text-align: center;">Điểm hệ 10</th>
-                <th style="text-align: center;">Điểm chữ</th>
-              </tr>
-            </thead>
-            <tbody>
-              <tr th:each="g : ${grades}">
-                <td>
-                  <strong th:text="${g.courseName}">Lập trình Web nâng cao</strong><br>
-                  <span style="font-family: monospace; font-size: 11px; color: #64748b;" th:text="${g.courseCode}">SE013</span>
-                </td>
-                <td style="text-align: center; font-weight: 600;" th:text="${g.credits}">3</td>
-                <td style="text-align: center; font-weight: 700;" th:text="${#numbers.formatDecimal(g.score10, 1, 1)}">9.0</td>
-                <td style="text-align: center;">
-                  <span class="grade-letter" th:text="${g.scoreLetter}">A+</span>
-                </td>
-              </tr>
-            </tbody>
-          </table>
+              <table role="presentation" class="meta-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="meta-cell">
+                    <p class="meta-label">Sinh viên</p>
+                    <p class="meta-value" th:text="${studentName}">Nguyễn Tiến Sơn</p>
+                  </td>
+                  <td class="meta-cell">
+                    <p class="meta-label">Học kỳ</p>
+                    <p class="meta-value" th:text="${semester}">Học kỳ 2 Năm học 2025-2026</p>
+                  </td>
+                </tr>
+              </table>
 
-          <div style="background-color: #f8fafc; border-left: 4px solid #0284c7; padding: 14px 18px; border-radius: 0 8px 8px 0; font-size: 12px; color: #334155; line-height: 1.6;">
-            <strong>Thời hạn phúc khảo:</strong> Trong vòng 7 ngày làm việc kể từ ngày công bố điểm, nếu có thắc mắc sinh viên làm đơn phúc khảo trực tuyến trên cổng đào tạo hoặc liên hệ trực tiếp Bộ phận Khảo thí.
-          </div>
+              <table role="presentation" width="100%" cellpadding="0" cellspacing="0" border="0">
+                <tr>
+                  <td class="metric-cell">
+                    <p class="metric-label">Điểm trung bình học kỳ</p>
+                    <p class="metric-value" th:text="${#numbers.formatDecimal(gpa4, 1, 2)}">3.85</p>
+                    <p class="metric-note">Thang điểm 4</p>
+                    <p class="metric-note">Thang 10: <strong th:text="${#numbers.formatDecimal(gpa10, 1, 2)}">9.20</strong></p>
+                    <p class="metric-note" th:text="${academicStanding != null ? academicStanding : 'Đang cập nhật'}">XUẤT SẮC</p>
+                  </td>
+                  <td class="metric-gap">&nbsp;</td>
+                  <td class="metric-cell metric-cell-positive">
+                    <p class="metric-label">Điểm rèn luyện</p>
+                    <p class="metric-value metric-value-positive" th:text="${conductScore}">96</p>
+                    <p class="metric-note">Thang điểm 100</p>
+                    <p class="metric-note" th:text="${conductRank != null ? conductRank : 'Đang cập nhật'}">XUẤT SẮC</p>
+                  </td>
+                </tr>
+              </table>
 
-          <div class="btn-container">
-            <a href="https://www.campusute.io.vn/dashboard/grades" class="btn-primary">
-              Xem Bảng Điểm Toàn Khóa
-            </a>
-          </div>
-        </td>
-      </tr>
+              <p class="section-label" style="padding-top:28px;">CHI TIẾT ĐIỂM CÁC HỌC PHẦN</p>
 
-      <!-- FOOTER -->
-      <tr>
-        <td class="footer">
-          <strong>TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH</strong><br>
-          Phòng Đào tạo & Bộ phận Khảo thí Đảm bảo chất lượng<br>
-          Địa chỉ: Số 1 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh
-          <div style="margin-top: 14px; font-size: 11px; color: #94a3b8;">
-            Thông báo tự động từ hệ thống quản lý học vụ số CampusCore.
-          </div>
-        </td>
-      </tr>
-    </table>
-  </div>
+              <div th:if="${grades != null and not #lists.isEmpty(grades)}">
+                <table role="presentation" class="grade-item" width="100%" cellpadding="0" cellspacing="0" border="0" th:each="g : ${grades}">
+                  <tr>
+                    <td>
+                      <span class="grade-code" th:text="${g.courseCode}">SE001</span>
+                    </td>
+                    <td align="right">
+                      <span class="letter-badge" th:text="${g.scoreLetter}">A+</span>
+                    </td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" class="grade-name" th:text="${g.courseName}">Nhập môn Lập trình</td>
+                  </tr>
+                  <tr>
+                    <td colspan="2" class="grade-meta">
+                      <span th:text="${g.credits + ' tín chỉ'}">3 tín chỉ</span>
+                      <span aria-hidden="true"> · </span>
+                      Điểm hệ 10: <strong th:text="${#numbers.formatDecimal(g.score10, 1, 1)}">9.5</strong>
+                    </td>
+                  </tr>
+                </table>
+              </div>
+
+              <div class="callout-panel" th:if="${grades == null or #lists.isEmpty(grades)}">
+                <p><strong>Chưa có chi tiết điểm:</strong> Vui lòng kiểm tra lại trên cổng CampusUTE sau khi dữ liệu được cập nhật.</p>
+              </div>
+
+              <div class="callout-panel">
+                <p><strong>Thời hạn phúc khảo:</strong> Trong vòng 7 ngày làm việc kể từ ngày công bố điểm, sinh viên gửi yêu cầu trực tuyến trên cổng đào tạo hoặc liên hệ Bộ phận Khảo thí.</p>
+              </div>
+
+              <div class="cta-wrap">
+                <a href="https://www.campusute.io.vn/dashboard/grades" class="button">Mở bảng điểm</a>
+              </div>
+            </td>
+          </tr>
+
+          <tr th:replace="~{mail/fragments :: footer('Kết quả tự động từ CampusUTE. Vui lòng dùng cổng đào tạo để kiểm tra bản ghi mới nhất.')}"></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
 </body>
 </html>
