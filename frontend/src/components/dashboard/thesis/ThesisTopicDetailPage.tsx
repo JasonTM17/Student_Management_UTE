@@ -1,9 +1,11 @@
 'use client';
 
 import { useEffect, useState } from 'react';
-import { ArrowLeft, FileStack } from 'lucide-react';
+import { ArrowLeft, CheckCircle2, FileStack } from 'lucide-react';
 import { useParams, useSearchParams } from 'next/navigation';
+import { Button } from '@/components/ui/button';
 import { LinkButton } from '@/components/ui/link-button';
+import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,6 +25,35 @@ export default function ThesisTopicDetailPage() {
   const workspace = useThesisWorkspace(searchParams.get('roundId') ?? '');
   const [directTopic, setDirectTopic] = useState<ThesisTopic | null>(null);
   const [directLoading, setDirectLoading] = useState(false);
+  const [isChoosing, setIsChoosing] = useState(false);
+  const [actionError, setActionError] = useState('');
+
+  /**
+   * Topic selection belongs to the student who will work on it. Lecturers
+   * propose topics, so they never get a selection control here.
+   */
+  const isStudent = Boolean(user?.roles?.includes('STUDENT'));
+  const myGroup = workspace.currentGroup;
+  const groupTopicId = myGroup?.topicId ?? null;
+  const alreadyChosen = Boolean(groupTopicId) && groupTopicId === topicId;
+  const roundAllowsChoice =
+    workspace.selectedRound?.status === 'REGISTRATION_OPEN' ||
+    workspace.selectedRound?.status === 'PROPOSALS_PUBLISHED';
+  const canChoose = isStudent && Boolean(myGroup) && !alreadyChosen && roundAllowsChoice;
+
+  const chooseThisTopic = async () => {
+    if (!myGroup) return;
+    setIsChoosing(true);
+    setActionError('');
+    try {
+      await thesisApi.assignTopic(myGroup.id, topicId);
+      await workspace.refreshWorkspace();
+    } catch {
+      setActionError(messages.thesis.actionFailed);
+    } finally {
+      setIsChoosing(false);
+    }
+  };
 
   useEffect(() => {
     if (!topicId || workspace.topics.some((item) => item.id === topicId)) {
@@ -100,17 +131,27 @@ export default function ThesisTopicDetailPage() {
         <Card variant="muted">
           <CardHeader>
             <CardTitle>{topic.title}</CardTitle>
-            <CardDescription>{topic.description}</CardDescription>
+            <CardDescription>{messages.thesis.topicDetailDescription}</CardDescription>
           </CardHeader>
           <CardContent className="space-y-5">
-            <div className="rounded-lg border border-primary/20 bg-primary/[0.035] p-5 text-sm leading-7 text-muted-foreground">
-              {topic.description}
+            {/* This is the page students read a topic on, so the description
+                renders as rich content rather than escaped plain text. */}
+            <div className="rich-html-content rounded-lg border border-primary/20 bg-primary/[0.035] p-5 text-sm leading-7 text-muted-foreground">
+              <RichContentRenderer content={topic.description} />
             </div>
-            <LinkButton
-              href={`/dashboard/thesis?roundId=${workspace.selectedRoundId}&topicId=${topic.id}`}
-            >
-              {messages.thesis.chooseTopic}
-            </LinkButton>
+            {alreadyChosen ? (
+              <span className="inline-flex items-center gap-2 rounded-lg border border-primary/30 bg-primary/[0.06] px-3 py-2 text-sm font-semibold text-primary">
+                <CheckCircle2 className="h-4 w-4" />
+                {messages.thesis.topicAlreadyChosen}
+              </span>
+            ) : canChoose ? (
+              <div className="space-y-2">
+                <Button onClick={() => void chooseThisTopic()} disabled={isChoosing}>
+                  {isChoosing ? messages.thesis.choosingTopic : messages.thesis.chooseTopic}
+                </Button>
+                {actionError ? <p className="text-sm text-destructive">{actionError}</p> : null}
+              </div>
+            ) : null}
           </CardContent>
         </Card>
 
