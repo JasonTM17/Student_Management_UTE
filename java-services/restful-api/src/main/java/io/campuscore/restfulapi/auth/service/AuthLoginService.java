@@ -161,10 +161,13 @@ public class AuthLoginService {
     @Transactional
     public AuthUserResponse updateProfile(String userId, UpdateProfileRequest request) {
         AuthUserRecord user = requireActiveUser(userId);
+        // The full name is school-managed: firstName/lastName in the payload are
+        // ignored so a user cannot rename themselves. The fields remain on the
+        // request record only so older clients still deserialize successfully.
         users.updateProfile(
                 user.id(),
-                request != null && request.firstName() != null ? request.firstName() : user.firstName(),
-                request != null && request.lastName() != null ? request.lastName() : user.lastName(),
+                user.firstName(),
+                user.lastName(),
                 request != null && request.phone() != null ? request.phone() : user.phone(),
                 request != null && request.dateOfBirth() != null ? parseDate(request.dateOfBirth()) : user.dateOfBirth(),
                 request != null && request.address() != null ? request.address() : user.address(),

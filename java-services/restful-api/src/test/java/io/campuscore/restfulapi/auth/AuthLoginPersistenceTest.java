@@ -420,6 +420,14 @@ class AuthLoginPersistenceTest {
         Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
         Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
 
+        // The school-managed name before anyone tries to change it.
+        MvcResult before = mvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
+                .andExpect(status().isOk())
+                .andReturn();
+        JsonNode beforeBody = objectMapper.readTree(before.getResponse().getContentAsString());
+        String managedFirstName = beforeBody.path("firstName").asText();
+        String managedLastName = beforeBody.path("lastName").asText();
+
         mvc.perform(put("/api/v1/auth/profile")
                         .cookie(accessCookie, csrfCookie)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -444,16 +452,17 @@ class AuthLoginPersistenceTest {
                                 """))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.id").value("student-user"))
-                .andExpect(jsonPath("$.firstName").value("Updated"))
-                .andExpect(jsonPath("$.lastName").value("Student"))
+                // The full name is school-managed: the payload is ignored.
+                .andExpect(jsonPath("$.firstName").value(managedFirstName))
+                .andExpect(jsonPath("$.lastName").value(managedLastName))
                 .andExpect(jsonPath("$.phone").value("+84999999999"))
                 .andExpect(jsonPath("$.address").value("Java monolith lane"))
                 .andExpect(jsonPath("$.roles[0]").value("STUDENT"));
 
         mvc.perform(get("/api/v1/auth/me").cookie(accessCookie))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.firstName").value("Updated"))
-                .andExpect(jsonPath("$.lastName").value("Student"))
+                .andExpect(jsonPath("$.firstName").value(managedFirstName))
+                .andExpect(jsonPath("$.lastName").value(managedLastName))
                 .andExpect(jsonPath("$.phone").value("+84999999999"))
                 .andExpect(jsonPath("$.address").value("Java monolith lane"));
     }
