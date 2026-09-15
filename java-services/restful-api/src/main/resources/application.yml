@@ -12,6 +12,30 @@ spring:
       - org.springframework.boot.autoconfigure.orm.jpa.HibernateJpaAutoConfiguration
       - org.springframework.boot.autoconfigure.data.jpa.JpaRepositoriesAutoConfiguration
       - org.springframework.boot.autoconfigure.flyway.FlywayAutoConfiguration
+  mail:
+    host: ${SPRING_MAIL_HOST:smtp.gmail.com}
+    port: ${SPRING_MAIL_PORT:587}
+    username: ${SPRING_MAIL_USERNAME:}
+    # No default on purpose: mail credentials come from the environment or a
+    # secret store, never from a committed value.
+    password: ${SPRING_MAIL_PASSWORD:}
+    default-encoding: UTF-8
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+            required: true
+          connectiontimeout: 8000
+          timeout: 8000
+          writetimeout: 8000
+  thymeleaf:
+    prefix: classpath:/templates/
+    suffix: .html
+    mode: HTML
+    encoding: UTF-8
+    cache: false
 
 server:
   port: ${PORT:${SERVER_PORT:4010}}
@@ -98,6 +122,11 @@ assistant:
     reconcile-initial-delay-ms: ${ASSISTANT_SUPABASE_RECONCILE_INITIAL_DELAY_MS:120000}
     connect-timeout-ms: ${ASSISTANT_SUPABASE_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${ASSISTANT_SUPABASE_READ_TIMEOUT_MS:30000}
+
+mail:
+  from: ${MAIL_FROM:conbocuoi1721@gmail.com}
+  sender-name: ${MAIL_SENDER_NAME:CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM}
+  enabled: ${MAIL_ENABLED:true}
 
 ---
 spring:

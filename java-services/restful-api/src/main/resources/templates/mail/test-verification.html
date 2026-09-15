@@ -1,0 +1,239 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title th:text="${subject}">Xác nhận kiểm thử hệ thống - CampusUTE</title>
+  <style>
+    body {
+      margin: 0;
+      padding: 0;
+      background-color: #f1f5f9;
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Helvetica, Arial, sans-serif;
+      -webkit-font-smoothing: antialiased;
+      color: #1e293b;
+    }
+    table {
+      border-spacing: 0;
+      border-collapse: collapse;
+    }
+    td {
+      padding: 0;
+    }
+    img {
+      border: 0;
+    }
+    .wrapper {
+      width: 100%;
+      table-layout: fixed;
+      background-color: #f1f5f9;
+      padding: 40px 0;
+    }
+    .main {
+      background-color: #ffffff;
+      margin: 0 auto;
+      width: 100%;
+      max-width: 600px;
+      border-spacing: 0;
+      border-radius: 16px;
+      overflow: hidden;
+      border: 1px solid #e2e8f0;
+      box-shadow: 0 10px 25px -5px rgba(15, 23, 42, 0.08);
+    }
+    .header {
+      background: linear-gradient(135deg, #002b66 0%, #004b99 50%, #0f52ba 100%);
+      padding: 36px 32px;
+      text-align: center;
+      position: relative;
+    }
+    .brand-badge {
+      display: inline-block;
+      background: rgba(255, 255, 255, 0.15);
+      border: 1px solid rgba(255, 255, 255, 0.3);
+      backdrop-filter: blur(8px);
+      padding: 6px 14px;
+      border-radius: 20px;
+      color: #ffffff;
+      font-size: 11px;
+      font-weight: 700;
+      letter-spacing: 1.5px;
+      text-transform: uppercase;
+      margin-bottom: 12px;
+    }
+    .brand-title {
+      color: #ffffff;
+      font-size: 24px;
+      font-weight: 800;
+      letter-spacing: -0.5px;
+      margin: 0 0 6px 0;
+    }
+    .brand-subtitle {
+      color: #cbd5e1;
+      font-size: 13px;
+      margin: 0;
+      font-weight: 400;
+    }
+    .gold-bar {
+      height: 4px;
+      background: linear-gradient(90deg, #d97706 0%, #fbbf24 50%, #d97706 100%);
+    }
+    .content {
+      padding: 36px 32px;
+    }
+    .greeting {
+      font-size: 16px;
+      color: #0f172a;
+      font-weight: 600;
+      margin-bottom: 16px;
+    }
+    .intro {
+      font-size: 14px;
+      line-height: 1.6;
+      color: #475569;
+      margin-bottom: 24px;
+    }
+    .card-box {
+      background: #f8fafc;
+      border: 1px solid #e2e8f0;
+      border-radius: 12px;
+      padding: 24px;
+      margin-bottom: 24px;
+    }
+    .status-badge {
+      display: inline-block;
+      padding: 4px 12px;
+      border-radius: 20px;
+      font-size: 12px;
+      font-weight: 700;
+      background-color: #ecfdf5;
+      color: #059669;
+      border: 1px solid #a7f3d0;
+      margin-bottom: 16px;
+    }
+    .button-container {
+      text-align: center;
+      margin: 32px 0 20px 0;
+    }
+    .btn-primary {
+      background: linear-gradient(135deg, #004b99 0%, #0284c7 100%);
+      color: #ffffff !important;
+      text-decoration: none;
+      padding: 14px 32px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 14px;
+      display: inline-block;
+      box-shadow: 0 4px 12px rgba(2, 132, 199, 0.25);
+    }
+    .footer {
+      background-color: #f8fafc;
+      border-top: 1px solid #e2e8f0;
+      padding: 28px 32px;
+      text-align: center;
+      font-size: 12px;
+      color: #64748b;
+      line-height: 1.6;
+    }
+    .footer strong {
+      color: #334155;
+    }
+    .footer-links {
+      margin-top: 12px;
+    }
+    .footer-links a {
+      color: #0284c7;
+      text-decoration: none;
+      margin: 0 8px;
+      font-weight: 500;
+    }
+    .disclaimer {
+      margin-top: 16px;
+      font-size: 11px;
+      color: #94a3b8;
+    }
+  </style>
+</head>
+<body>
+  <div class="wrapper">
+    <table class="main" align="center" width="600">
+      <!-- HEADER -->
+      <tr>
+        <td class="header">
+          <div class="brand-badge">HCMUTE CAMPUS PORTAL</div>
+          <h1 class="brand-title">CampusUTE Academic</h1>
+          <p class="brand-subtitle">Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh</p>
+        </td>
+      </tr>
+      <tr>
+        <td class="gold-bar"></td>
+      </tr>
+
+      <!-- BODY CONTENT -->
+      <tr>
+        <td class="content">
+          <div class="greeting">
+            Kính chào <span th:text="${recipientName != null ? recipientName : 'Quý Thầy/Cô và các Bạn Sinh viên'}">Bạn</span>,
+          </div>
+          
+          <p class="intro" th:text="${introMessage != null ? introMessage : 'Đây là email thông báo tự động từ hệ thống Quản lý Đào tạo & Khóa luận tốt nghiệp CampusUTE. Dịch vụ gửi email SMTP qua Google Cloud Engine đã được cấu hình và vận hành thành công.'}">
+            Đây là thư kiểm thử hệ thống gửi mail CampusUTE.
+          </p>
+
+          <div class="card-box">
+            <div class="status-badge" th:text="${statusBadge != null ? statusBadge : '● KẾT NỐI SMTP THÀNH CÔNG'}">● KẾT NỐI SMTP THÀNH CÔNG</div>
+            
+            <table width="100%">
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px;">Giao thức SMTP:</td>
+                <td style="padding: 8px 0; color: #0f172a; font-weight: 600; text-align: right; font-size: 13px;" th:text="${smtpProtocol != null ? smtpProtocol : 'Gmail SMTP (Port 587 - TLS)'}">Gmail SMTP (587 TLS)</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px; border-top: 1px dashed #e2e8f0;">Hộp thư phát hành:</td>
+                <td style="padding: 8px 0; color: #0f172a; font-weight: 600; text-align: right; font-size: 13px;" th:text="${senderEmail != null ? senderEmail : 'conbocuoi1721@gmail.com'}">conbocuoi1721@gmail.com</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px; border-top: 1px dashed #e2e8f0;">Định dạng nội dung:</td>
+                <td style="padding: 8px 0; color: #0f172a; font-weight: 600; text-align: right; font-size: 13px;">Thymeleaf HTML5 Responsive Engine</td>
+              </tr>
+              <tr>
+                <td style="padding: 8px 0; color: #64748b; font-size: 13px; border-top: 1px dashed #e2e8f0;">Thời gian gửi:</td>
+                <td style="padding: 8px 0; color: #0f172a; font-weight: 600; text-align: right; font-size: 13px;" th:text="${timestamp != null ? timestamp : #dates.format(#dates.createNow(), 'HH:mm:ss dd/MM/yyyy')}">12:00:00 15/09/2026</td>
+              </tr>
+            </table>
+          </div>
+
+          <div style="background-color: #f0f9ff; border-left: 4px solid #0284c7; padding: 16px; border-radius: 0 8px 8px 0; margin-bottom: 24px;">
+            <p style="margin: 0; font-size: 13px; color: #0369a1; line-height: 1.5;">
+              <strong>Lưu ý bảo mật:</strong> Mọi thông báo chính thức từ nhà trường đều có chữ ký số và được gửi từ hệ thống máy chủ xác thực. Tuyệt đối không chia sẻ mật khẩu tài khoản cho bất kỳ ai.
+            </p>
+          </div>
+
+          <div class="button-container">
+            <a th:href="${actionUrl != null ? actionUrl : 'https://www.campusute.io.vn'}" class="btn-primary" th:text="${actionText != null ? actionText : 'Truy cập Cổng Đào tạo CampusUTE'}">
+              Truy cập Cổng Đào tạo CampusUTE
+            </a>
+          </div>
+        </td>
+      </tr>
+
+      <!-- FOOTER -->
+      <tr>
+        <td class="footer">
+          <strong>TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH</strong><br>
+          Cổng thông tin Đào tạo & Quản lý Học vụ số CampusUTE<br>
+          Địa chỉ: Số 1 Võ Văn Ngân, Phường Linh Chiểu, TP. Thủ Đức, TP. Hồ Chí Minh<br>
+          Email hỗ trợ: phongdaotao@hcmute.edu.vn | Hotline: (028) 38968641
+          <div class="footer-links">
+            <a href="https://www.campusute.io.vn">Cổng sinh viên</a> •
+            <a href="https://www.campusute.io.vn/dashboard/schedule">Thời khóa biểu</a> •
+            <a href="https://www.campusute.io.vn/dashboard/grades">Bảng điểm</a>
+          </div>
+          <div class="disclaimer">
+            Email này được gửi tự động từ máy chủ CampusCore. Vui lòng không trả lời trực tiếp vào email này.
+          </div>
+        </td>
+      </tr>
+    </table>
+  </div>
+</body>
+</html>
