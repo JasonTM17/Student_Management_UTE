@@ -38,11 +38,18 @@ async function login(page) {
     await page.locator('#password').fill(PASSWORD);
     await page.waitForTimeout(700);
     if (!(await submit.isEnabled().catch(() => false))) continue;
-    await Promise.race([
-      page.waitForResponse((r) => /auth\/login/.test(r.url()), { timeout: 25000 }).catch(() => null),
-      submit.click().then(() => null),
-    ]);
-    if (await page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 30000 }).then(() => true).catch(() => false)) return;
+    await submit.click().catch(() => {});
+    // Wait on the URL, not on the login response: behind the production proxy
+    // the first request can take longer than any short response timeout.
+    if (
+      await page
+        .waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 75000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
+      return;
+    }
+    console.log(`attempt ${attempt}: still on ${page.url()}`);
   }
   throw new Error('login did not reach the dashboard');
 }
@@ -54,7 +61,21 @@ async function openGradeDialog(page, locale) {
   await row.click();
   const dialog = page.locator('[role="dialog"]').first();
   await dialog.waitFor({ state: 'visible', timeout: 30000 });
-  await page.waitForTimeout(1500);
+  // The component rows and the summary arrive from a second request; reading
+  // before it settles would assert against the "loading" placeholder.
+  await page
+    .waitForFunction(
+      () => {
+        const d = document.querySelector('[role="dialog"]');
+        if (!d) return false;
+        const text = d.innerText;
+        return !/Đang tải điểm chi tiết|Loading grade breakdown/.test(text) && /Điểm chuyển|Letter Grade/.test(text);
+      },
+      undefined,
+      { timeout: 60000 },
+    )
+    .catch(() => {});
+  await page.waitForTimeout(800);
   return dialog.innerText();
 }
 
@@ -126,6 +147,43 @@ async function main() {
     });
     record('Item 4 — certificate has no QR code', !hasSecureCode && hasQrSvg === 0,
       `secureCode=${hasSecureCode} qrSvgs=${hasQrSvg}`);
+
+    // --- Supervisor name: the API must return a name, not just the id ---
+    // Checked at the API level so this is real evidence of the backend fix
+    // rather than the absence of a string on a page that may not render it.
+    const supervisorProbe = await page.evaluate(async () => {
+      const get = async (url) => {
+        const res = await fetch(url, { credentials: 'include', headers: { accept: 'application/json' } });
+        if (!res.ok) return { ok: false, status: res.status, url };
+        return { ok: true, body: await res.json(), url };
+      };
+      const rounds = await get('/api/v1/thesis/rounds');
+      if (!rounds.ok) return { stage: 'rounds', status: rounds.status };
+      const list = Array.isArray(rounds.body) ? rounds.body : (rounds.body?.data ?? []);
+      for (const round of list.slice(0, 4)) {
+        const topics = await get(`/api/v1/thesis/topics?roundId=${round.id}&status=PUBLISHED`);
+        if (!topics.ok) continue;
+        const topicList = Array.isArray(topics.body) ? topics.body : (topics.body?.data ?? []);
+        for (const topic of topicList.slice(0, 8)) {
+          const sups = await get(`/api/v1/thesis/topics/${topic.id}/supervisors`);
+          if (!sups.ok) continue;
+          const rows = Array.isArray(sups.body) ? sups.body : (sups.body?.data ?? []);
+          if (rows.length) return { stage: 'found', rows };
+        }
+      }
+      return { stage: 'no-supervisors-found' };
+    });
+    if (supervisorProbe.stage === 'found') {
+      const named = supervisorProbe.rows.filter((r) => r.firstName || r.lastName);
+      record(
+        'Supervisor API returns a resolved name',
+        named.length === supervisorProbe.rows.length && named.length > 0,
+        `rows=${supervisorProbe.rows.length} named=${named.length} sample=${JSON.stringify(named[0] ?? supervisorProbe.rows[0])}`,
+      );
+    } else {
+      record('Supervisor API returns a resolved name', false,
+        `NOT_RUN — probe stopped at ${supervisorProbe.stage}${supervisorProbe.status ? ` (${supervisorProbe.status})` : ''}`);
+    }
   } catch (error) {
     record('harness completed without throwing', false, String(error).slice(0, 300));
   } finally {
