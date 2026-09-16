@@ -21,6 +21,9 @@ const BASE_URL = (process.env.AUDIT_BASE_URL || 'http://127.0.0.1:3000').replace
 const EMAIL = process.env.AUDIT_EMAIL;
 const PASSWORD = process.env.AUDIT_PASSWORD;
 const LOCALE = process.env.AUDIT_LOCALE || 'vi';
+// Production cold starts serve shell content for a while; give each route a
+// configurable settle budget instead of a fixed sleep.
+const SETTLE_MS = Number(process.env.AUDIT_SETTLE_MS || 3500);
 
 if (!EMAIL || !PASSWORD) {
   console.error('Missing AUDIT_EMAIL / AUDIT_PASSWORD in the environment.');
@@ -162,13 +165,20 @@ function auditInPage() {
  * attempt waits for the actual `auth/login` response and retries otherwise.
  */
 async function login(page) {
-  await page.goto(`${BASE_URL}/${LOCALE}/login?portal=student`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+  const portal = process.env.AUDIT_PORTAL || 'student';
+  await page.goto(`${BASE_URL}/${LOCALE}/login?portal=${portal}`, { waitUntil: 'domcontentloaded', timeout: 120000 });
   await page.locator('#email').waitFor({ state: 'visible', timeout: 60000 });
   const submit = page.locator('form button[type="submit"]').first();
 
   for (let attempt = 0; attempt < 6; attempt++) {
-    await page.locator('#email').fill(EMAIL);
-    await page.locator('#password').fill(PASSWORD);
+    try {
+      await page.locator('#email').fill(EMAIL);
+      await page.locator('#password').fill(PASSWORD);
+    } catch {
+      // A re-render replaced the inputs mid-fill (hydration); retry.
+      await page.waitForTimeout(1500);
+      continue;
+    }
     await page.waitForTimeout(700);
     if (!(await submit.isEnabled().catch(() => false))) continue;
 
@@ -181,10 +191,20 @@ async function login(page) {
     } else {
       console.log(`attempt ${attempt}: click produced no login request, retrying`);
     }
-    if (await page.waitForURL(/\/dashboard(?:$|[/?#])/, { timeout: 30000 }).then(() => true).catch(() => false)) {
+    // Students land on /dashboard; admins land on /admin.
+    if (
+      await page
+        .waitForURL(/\/(dashboard|admin)(?:$|[/?#])/, { timeout: 30000 })
+        .then(() => true)
+        .catch(() => false)
+    ) {
       return;
     }
   }
+  console.log(`login failed on ${BASE_URL}/${LOCALE}/login?portal=${process.env.AUDIT_PORTAL || 'student'} — page text head:`);
+  try {
+    console.log((await page.evaluate(() => document.body.innerText)).replace(/\s+/g, ' ').slice(0, 400));
+  } catch {}
   throw new Error('login did not reach the dashboard');
 }
 
@@ -219,7 +239,7 @@ async function main() {
         }
         window.scrollTo(0, 0);
       });
-      await page.waitForTimeout(3500);
+      await page.waitForTimeout(SETTLE_MS);
       // Pages whose content sits behind a selector render almost nothing until
       // a choice is made; pick the first option so the audit has real content.
       const sparseText = await page.evaluate(() => document.body.innerText.trim().length < 400);
