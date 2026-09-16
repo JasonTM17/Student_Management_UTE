@@ -149,6 +149,18 @@ test('the public signup route explains the Academic Office issuance policy', () 
   assert.ok(source.includes('issuedByOfficeTitle'), 'the route must explain who issues accounts');
   assert.ok(source.includes('issuedByOfficeSteps'), 'the route must show the next steps');
   assert.ok(!source.includes('<form'), 'students must not self-register from the public route');
+
+  const login = readSource('src/app/login/page.tsx');
+  assert.ok(
+    login.includes("portal === 'student' || portal === 'lecturer'"),
+    'login guides both students and lecturers to Academic Office account issuance',
+  );
+
+  const adminUsers = readSource('src/app/admin/users/page.tsx');
+  assert.ok(
+    adminUsers.includes('issuancePolicy'),
+    'admin users console highlights the centralized issuance boundary',
+  );
 });
 
 test('the course registration page surfaces failures inline, not only as toasts', () => {

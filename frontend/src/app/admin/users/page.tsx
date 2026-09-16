@@ -231,6 +231,9 @@ export default function AdminUsersPage() {
           title: 'Quản lý người dùng',
           description:
             'Rà soát tài khoản campus, tạo bản ghi mới và giữ các hành động nhạy cảm sau bước xác nhận rõ ràng.',
+          issuancePolicy: 'Chính sách cấp tài khoản học vụ tập trung',
+          issuancePolicyDescription:
+            'Chỉ Phòng Đào tạo cấp tài khoản cho Sinh viên và Giảng viên, gắn liền với mã số và họ tên chính thức. Sinh viên và Giảng viên không tự đăng ký hoặc tự ý đổi tên.',
           createUser: 'Tạo người dùng',
           createStudent: 'Thêm sinh viên',
           createLecturer: 'Thêm giảng viên',
@@ -290,6 +293,9 @@ export default function AdminUsersPage() {
           title: 'User management',
           description:
             'Review campus accounts, create new records, and keep sensitive actions behind explicit confirmation.',
+          issuancePolicy: 'Centralized academic account issuance',
+          issuancePolicyDescription:
+            'The Academic Office exclusively issues student and lecturer accounts with official IDs and verified names. Students and lecturers cannot self-register or rename themselves.',
           createUser: 'Create user',
           createStudent: 'Add Student',
           createLecturer: 'Add Lecturer',
@@ -576,6 +582,18 @@ export default function AdminUsersPage() {
       <div className="space-y-6">
         <AdminToolbarCard>
           <div className="flex flex-col gap-4">
+            <div
+              role="note"
+              className="flex items-start gap-3 rounded-xl border border-primary/20 bg-primary/[0.04] p-3"
+            >
+              <ShieldCheck className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+              <div className="min-w-0">
+                <p className="text-sm font-semibold text-foreground">{copy.issuancePolicy}</p>
+                <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                  {copy.issuancePolicyDescription}
+                </p>
+              </div>
+            </div>
             {/* Filter Tabs by Role */}
             <div className="flex flex-wrap items-center gap-2 border-b border-border/70 pb-3">
               <span className="text-xs font-semibold text-muted-foreground mr-1">

@@ -514,7 +514,6 @@ export const thesisApi = {
     const response = await api.post<ThesisGroupReport>(
       '/thesis/groups/' + groupId + '/report/file',
       form,
-      { headers: { 'Content-Type': 'multipart/form-data' } },
     );
     return response.data;
   },
