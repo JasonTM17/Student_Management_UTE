@@ -42,16 +42,11 @@ public class AccountStateFilter extends OncePerRequestFilter {
             AuthUserRepository repository = users.getIfAvailable();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (repository != null && authentication instanceof JwtAuthenticationToken jwtToken) {
-                Optional<AuthUserRepository.AccountState> state;
-                try {
-                    state = repository.findAccountState(jwtToken.getToken().getSubject());
-                } catch (org.springframework.dao.DataAccessException exception) {
-                    // The account store is unavailable: let the request proceed and
-                    // fail (or not) on its own business query instead of turning a
-                    // lookup problem into a new 500 path here.
-                    chain.doFilter(request, response);
-                    return;
-                }
+                // No defensive catch: if the account store is unavailable the
+                // gate fails closed (the lookup error aborts the request)
+                // rather than waving a flagged account through on a DB outage.
+                Optional<AuthUserRepository.AccountState> state =
+                        repository.findAccountState(jwtToken.getToken().getSubject());
                 if (state.isPresent()) {
                     // A present row is authoritative: deactivation and the
                     // office-issued credential flag take effect immediately,

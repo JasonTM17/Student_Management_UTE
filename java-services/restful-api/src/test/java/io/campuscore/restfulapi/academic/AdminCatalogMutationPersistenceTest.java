@@ -47,6 +47,19 @@ class AdminCatalogMutationPersistenceTest {
     @BeforeEach
     void prepareFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        // The account-state filter reads these columns on every authenticated
+        // request, so the fixture mirrors the production schema.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(320) NOT NULL,
+                    "firstName" VARCHAR(120) NOT NULL,
+                    "lastName" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
         createTables();
         clearTables();
         insertFixture();

@@ -515,33 +515,38 @@ class AuthLoginPersistenceTest {
 
     @Test
     void changePasswordRequiresAuthenticationUpdatesHashAndRevokesRefreshSessions() throws Exception {
-        MvcResult login = loginStudent().andReturn();
+        // Random per-run secrets keep this file free of credential literals
+        // while still proving the hash update end to end.
+        String oldSecret = "old-" + UUID.randomUUID();
+        String newSecret = "new-" + UUID.randomUUID();
+        jdbc.update("UPDATE \"campuscore_auth\".\"User\" SET \"password\" = ? WHERE \"id\" = 'student-user'",
+                passwordEncoder.encode(oldSecret));
+        MvcResult login = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + oldSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
         JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
         String accessToken = loginBody.get("accessToken").asText();
 
         mvc.perform(post("/api/v1/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"oldPassword":"password123","newPassword":"newpass123"}
-                                """))
+                        .content("{\"oldPassword\":\"" + oldSecret + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
 
         mvc.perform(post("/api/v1/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Authorization", "Bearer " + accessToken)
-                        .content("""
-                                {"oldPassword":"wrong-password","newPassword":"newpass123"}
-                                """))
+                        .content("{\"oldPassword\":\"wrong-\" + \"" + UUID.randomUUID()
+                                + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid old password"));
 
         mvc.perform(post("/api/v1/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Authorization", "Bearer " + accessToken)
-                        .content("""
-                                {"oldPassword":"password123","newPassword":"newpass123"}
-                                """))
+                        .content("{\"oldPassword\":\"" + oldSecret + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.message").value("Password changed successfully"));
 

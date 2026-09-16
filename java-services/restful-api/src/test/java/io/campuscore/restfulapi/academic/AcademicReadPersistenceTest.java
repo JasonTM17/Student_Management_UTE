@@ -26,7 +26,8 @@ import org.springframework.test.web.servlet.MockMvc;
 @AutoConfigureMockMvc
 @ActiveProfiles({"test", "persistence"})
 @TestPropertySource(properties = {
-        "spring.flyway.enabled=false"
+        "spring.flyway.enabled=false",
+        "spring.datasource.url=jdbc:h2:mem:academic_read;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE;DB_CLOSE_DELAY=-1"
 })
 class AcademicReadPersistenceTest {
 
@@ -40,6 +41,19 @@ class AcademicReadPersistenceTest {
     @BeforeEach
     void prepareReadOnlyFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
+        // The account-state filter reads these columns on every authenticated
+        // request, so the read-only fixture mirrors the production schema.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(200) NOT NULL,
+                    "firstName" VARCHAR(120) NOT NULL,
+                    "lastName" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE
+                )
+                """);
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Section\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"Lecturer\"");
         jdbc.execute("DROP TABLE IF EXISTS \"academic\".\"CurriculumCourse\"");
