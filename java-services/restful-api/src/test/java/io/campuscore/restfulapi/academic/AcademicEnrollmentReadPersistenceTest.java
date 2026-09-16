@@ -156,6 +156,41 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(jsonPath("$.totalWeight").value(0));
     }
 
+    /**
+     * L-P1-2: draft component scores are the lecturer's working record. A
+     * student who knows their own enrollment id must not be able to poll the
+     * detail endpoint before the lecturer publishes, and the enrollment reads
+     * must hide the provisional total/letter for drafts (Wukong residual).
+     */
+    @Test
+    void studentCannotReadDraftGradeComponentsOrProvisionalTotals() throws Exception {
+        // Draft enrollment: component detail is 404 for the owning student…
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-2")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("HTTP_404"));
+
+        // …while the published enrollment stays readable.
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"));
+
+        // The my-enrollments list hides the provisional draft summary but
+        // keeps the published one (fixture order: enrollment-2 then -1).
+        mvc.perform(get("/api/v1/enrollments/my").with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].id").value("enrollment-2"))
+                .andExpect(jsonPath("$[0].finalGrade").doesNotExist())
+                .andExpect(jsonPath("$[0].letterGrade").doesNotExist())
+                .andExpect(jsonPath("$[1].id").value("enrollment-1"))
+                .andExpect(jsonPath("$[1].finalGrade").value(88.5));
+
+        // Admin detail reads keep full visibility of drafts.
+        mvc.perform(get("/api/v1/enrollments/enrollment-2").with(adminJwt()))
+                .andExpect(status().isOk());
+    }
+
     @Test
     void lecturerGradeReadsAreScopedToOwnedSectionsAndRequireLecturerClaim() throws Exception {
         mvc.perform(get("/api/v1/grades/items/lecturer/my").with(lecturerJwt("lecturer-1")))

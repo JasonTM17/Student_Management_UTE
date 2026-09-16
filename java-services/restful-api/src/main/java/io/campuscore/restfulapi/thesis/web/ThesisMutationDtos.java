@@ -55,11 +55,14 @@ public final class ThesisMutationDtos {
     public record GroupRejectionRequest(String reason) {
     }
 
-    /** Minimal directory entry so a leader can invite a classmate into the group. */
+    /**
+     * Minimal directory entry so a leader can invite a classmate into the
+     * group. Deliberately carries no email: a directory lookup must not
+     * expose contact PII to the whole student body.
+     */
     public record StudentSearchResponse(
             String studentId,
             String studentNumber,
-            String email,
             String firstName,
             String lastName,
             String curriculumCode,

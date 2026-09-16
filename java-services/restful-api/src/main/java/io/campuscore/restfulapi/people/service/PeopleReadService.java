@@ -90,8 +90,10 @@ public class PeopleReadService {
     }
 
     private static boolean staffOnly(Authentication authentication) {
+        // Fail closed: an absent authentication must never widen access, even
+        // though the controller annotations currently guarantee one.
         if (authentication == null) {
-            return true;
+            return false;
         }
         Set<String> authorities = authentication.getAuthorities().stream()
                 .map(GrantedAuthority::getAuthority)

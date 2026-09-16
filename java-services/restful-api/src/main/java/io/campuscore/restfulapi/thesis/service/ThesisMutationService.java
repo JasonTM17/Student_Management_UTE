@@ -397,31 +397,41 @@ public class ThesisMutationService {
     }
 
     /**
-     * Directory lookup used by group leaders to invite classmates: matches
-     * active students by student number, email or full name (max 8 hits).
+     * Directory lookup used by group leaders to invite classmates into the
+     * current round: matches active students by student number or full name
+     * (max 8 hits). Only exists while a round is still live — outside an
+     * active round there is nothing to join, and an always-on lookup would let
+     * any student enumerate the whole student directory. Email addresses are
+     * never returned: the invite flow only needs the student number.
      */
     public List<StudentSearchResponse> searchStudents(String query) {
         String normalized = normalize(query).toLowerCase(java.util.Locale.ROOT);
         if (normalized.length() < 2) {
             return List.of();
         }
+        Integer liveRounds = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_registration_round"
+                        + " WHERE status IN ('DRAFT', 'PROPOSAL_OPEN', 'PROPOSALS_PUBLISHED', 'REGISTRATION_OPEN', 'REGISTRATION_CLOSED')",
+                params(),
+                Integer.class);
+        if (liveRounds == null || liveRounds == 0) {
+            return List.of();
+        }
         String pattern = "%" + normalized.replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_") + "%";
         return jdbc.query(
-                "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"email\", u.\"firstName\", u.\"lastName\","
+                "SELECT s.\"id\", s.\"studentId\" AS student_number, u.\"firstName\", u.\"lastName\","
                         + " cur.\"code\" AS curriculum_code, cur.\"name\" AS curriculum_name"
                         + " FROM campuscore_auth.\"Student\" s"
                         + " JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\""
                         + " LEFT JOIN academic.\"Curriculum\" cur ON cur.\"id\" = s.\"curriculumId\""
                         + " WHERE s.\"status\" = 'ACTIVE'"
                         + " AND (LOWER(s.\"studentId\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"email\") LIKE :pattern ESCAPE '\\'"
                         + "   OR LOWER(u.\"firstName\" || ' ' || u.\"lastName\") LIKE :pattern ESCAPE '\\')"
                         + " ORDER BY s.\"studentId\" LIMIT 8",
                 params().addValue("pattern", pattern),
                 (rs, ignored) -> new StudentSearchResponse(
                         rs.getString("id"),
                         rs.getString("student_number"),
-                        rs.getString("email"),
                         rs.getString("firstName"),
                         rs.getString("lastName"),
                         rs.getString("curriculum_code"),

@@ -28,6 +28,8 @@ public class AdminUserMutationService {
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
     private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
+    /** Lifecycle values the account-state filter and the UI understand. */
+    private static final Set<String> ACCOUNT_STATUSES = Set.of("ACTIVE", "PENDING", "SUSPENDED", "LOCKED", "DISABLED");
     private static final String TEMP_PASSWORD_ALPHABET =
             "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
@@ -187,6 +189,16 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage administrator accounts");
         }
+        String requestedStatus = input.get("status") == null ? null : text(input, "status", "");
+        if (requestedStatus != null && !requestedStatus.isBlank()
+                && !ACCOUNT_STATUSES.contains(requestedStatus.toUpperCase(java.util.Locale.ROOT))) {
+            // Free-form status values would silently break the account-state
+            // filter and the console badges; only the lifecycle set is valid.
+            throw problem(
+                    HttpStatus.BAD_REQUEST,
+                    "INVALID_ACCOUNT_STATUS",
+                    "Unknown account status");
+        }
         String previousStatus = jdbc.queryForObject(
                 "SELECT \"status\" FROM " + USER + " WHERE \"id\" = :id",
                 new MapSqlParameterSource("id", id),
@@ -233,11 +245,13 @@ public class AdminUserMutationService {
                     "SELF_DELETION_NOT_ALLOWED",
                     "You cannot delete your own account");
         }
-        if (!canManageSuperAdmin && hasRole(id, "SUPER_ADMIN")) {
+        if (!canManageSuperAdmin && (hasRole(id, "ADMIN") || hasRole(id, "SUPER_ADMIN"))) {
+            // Same ceiling as update()/resetPassword(): a plain administrator
+            // can neither edit, reset, nor hard-delete another administrator.
             throw problem(
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
-                    "Only a super administrator can manage super administrator accounts");
+                    "Only a super administrator can manage administrator accounts");
         }
         // Revoke live sessions while the row still exists: after the hard
         // delete there is no account state left for the filter to consult.

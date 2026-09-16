@@ -542,9 +542,16 @@ Giá trị dưới đây là **mặc định của `docker-compose.yml`**. Mọi
 
 ## Tài khoản demo kiểm thử
 
-Cơ sở dữ liệu seed sẵn các tài khoản tương ứng với các nhóm vai trò trong hệ thống:
+> **Quan trọng (bảo mật):** migration `V48` **khoá toàn bộ tài khoản seed demo**
+> (`status = 'LOCKED'`) ngay sau khi apply, vì thông tin đăng nhập bên dưới đã được công bố công khai
+> trong chính README này — một bản triển khai thật chạy Flyway sẽ không bao giờ hoạt động với các
+> mật khẩu public. Mật khẩu dưới đây chỉ dùng được sau khi bạn chủ động mở khoá trong môi trường
+> demo cục bộ (xem lệnh ở cuối mục). Trên sản phẩm thật, tài khoản do **Phòng Đào tạo cấp phát**
+> với mật khẩu tạm một-lần và bắt buộc đổi tại lần đăng nhập đầu.
 
-| Vai trò (Role) | Email đăng nhập | Mật khẩu mặc định | Quyền hạn và phạm vi truy cập |
+Cơ sở dữ liệu seed sẵn các tài khoản tương ứng với các nhóm vai trò trong hệ thống (mặc định bị khoá, xem cảnh báo trên):
+
+| Vai trò (Role) | Email đăng nhập | Mật khẩu demo | Quyền hạn và phạm vi truy cập |
 | --- | --- | --- | --- |
 | **Sinh viên (Student)** | `student@campuscore.edu` | `password123` | Đăng ký học phần, xem TKB, tra cứu điểm/bảng điểm, hỏi Trợ lý AI, đăng ký đề tài khóa luận |
 | **Giảng viên (Lecturer)** | `lecturer@campuscore.edu` | `password123` | Xem lịch dạy, chấm/nhập điểm học phần, đề xuất và hướng dẫn các nhóm khóa luận |
@@ -552,6 +559,13 @@ Cơ sở dữ liệu seed sẵn các tài khoản tương ứng với các nhóm
 | **Quản trị viên thứ 2** | `admin002@campuscore.demo` | `admin123` | Tài khoản Quản trị độc lập dùng để duyệt chéo tri thức RAG theo nguyên tắc Four-Eyes |
 
 Ngoài ra, dữ liệu demo còn seed sẵn một danh bạ giảng viên phụ (`lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo`) để danh sách lớp, hội đồng và lịch dạy phản ánh môi trường trường học thực tế.
+
+**Mở khoá tài khoản demo trong môi trường local** (chỉ làm trên cụm demo của bạn, không bao giờ
+trên cơ sở dữ liệu thật):
+
+```powershell
+docker compose exec postgres psql -U campuscore -d campuscore_restful -c "UPDATE campuscore_auth.\"User\" SET \"status\" = 'ACTIVE' WHERE \"email\" IN ('student@campuscore.edu','lecturer@campuscore.edu','admin@campuscore.edu','admin002@campuscore.demo')"
+```
 
 ---
 

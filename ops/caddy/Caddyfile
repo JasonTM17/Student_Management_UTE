@@ -38,10 +38,15 @@
     reverse_proxy @assistant_stream restful-api:4010 {
         flush_interval -1
         header_down Cache-Control "no-cache"
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
     }
 
     @api path /api/v1/*
-    reverse_proxy @api restful-api:4010
+    reverse_proxy @api restful-api:4010 {
+        header_up X-Real-IP {remote_host}
+        header_up X-Forwarded-For {remote_host}
+    }
 
     # Only the browser-facing Next.js app is reachable for non-API paths.
     reverse_proxy web:3000

@@ -122,7 +122,7 @@ public class EmailServiceImpl implements EmailService {
         variables.put("recipientName", request.recipientName() != null ? request.recipientName() : "Sinh viên");
         variables.put("content", request.content());
         variables.put("highlights", request.highlights());
-        variables.put("actionUrl", request.actionUrl() != null ? request.actionUrl() : "https://www.campusute.io.vn/dashboard/announcements");
+        variables.put("actionUrl", safeActionUrl(request.actionUrl(), "https://www.campusute.io.vn/dashboard/announcements"));
         variables.put("actionText", request.actionText() != null ? request.actionText() : "Xem chi tiết trên Cổng Đào tạo");
 
         String subject = "[CampusUTE] " + request.title();
@@ -161,5 +161,21 @@ public class EmailServiceImpl implements EmailService {
 
         String subject = "[CampusUTE] Thông báo Kết quả Học tập & Rèn luyện - " + request.studentId();
         sendHtmlEmail(request.to(), subject, "grade-alert", variables);
+    }
+
+    /**
+     * The CTA lands in every recipient's mail client as an href, so a free
+     * string would allow javascript:/data: links from a "campus notice".
+     * Only https URLs are accepted; anything else falls back to the portal.
+     */
+    private static String safeActionUrl(String candidate, String fallback) {
+        if (candidate == null || candidate.isBlank()) {
+            return fallback;
+        }
+        String trimmed = candidate.trim();
+        if (!trimmed.toLowerCase(java.util.Locale.ROOT).startsWith("https://")) {
+            return fallback;
+        }
+        return trimmed;
     }
 }

@@ -17,6 +17,8 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
@@ -32,6 +34,9 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Profile("persistence")
 public class AuthLoginService {
+
+    private static final Logger reuseLogger =
+            LoggerFactory.getLogger(AuthLoginService.class);
 
     private static final int MAX_FAILED_ATTEMPTS = 5;
     private static final Duration LOCK_DURATION = Duration.ofMinutes(30);
@@ -85,7 +90,7 @@ public class AuthLoginService {
         return issueSession(user, ipAddress, userAgent);
     }
 
-    @Transactional
+    @Transactional(noRollbackFor = BadCredentialsException.class)
     public LoginResult refresh(String refreshTokenValue, String ipAddress, String userAgent) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is required");
@@ -94,7 +99,23 @@ public class AuthLoginService {
         Jwt decoded = decodeRefresh(refreshTokenValue);
         String refreshTokenHash = hash(refreshTokenValue);
         AuthUserRecord user = users.findByActiveRefreshSession(refreshTokenHash, clock.instant())
-                .orElseThrow(() -> new BadCredentialsException("Invalid refresh token"));
+                .orElseGet(() -> {
+                    // The token carries our signature, yet no active session
+                    // holds its hash: it was already rotated or revoked, so a
+                    // replay is the classic stolen-token signal. Fail the
+                    // family (every live session for the account) closed and
+                    // leave an audit trace instead of silently 401-ing.
+                    String subject = decoded.getSubject();
+                    users.findById(subject).ifPresent(owner -> {
+                        users.deleteAllRefreshSessions(owner.id());
+                        reuseLogger.warn(
+                                "REFRESH_TOKEN_REUSE subject={} ip={} userAgent={}",
+                                subject,
+                                ipAddress,
+                                userAgent);
+                    });
+                    throw new BadCredentialsException("Invalid refresh token");
+                });
         if (!user.id().equals(decoded.getSubject()) || !"ACTIVE".equals(user.status())) {
             throw new BadCredentialsException("Invalid refresh token");
         }

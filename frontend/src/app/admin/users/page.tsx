@@ -73,6 +73,15 @@ function isRecordSuperAdmin(record: UserRecord): boolean {
   return values.some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
 }
 
+function recordRoles(record: UserRecord): string[] {
+  return Array.isArray(record.roles) ? record.roles : record.roles?.split(',') ?? [];
+}
+
+function isRecordAdministrator(record: UserRecord): boolean {
+  const values = recordRoles(record).map((role) => role.trim().toUpperCase());
+  return values.includes('ADMIN') || values.includes('SUPER_ADMIN');
+}
+
 function userStatusTone(status: string): StatusTone {
   switch (status.toUpperCase()) {
     case 'ACTIVE':
@@ -895,8 +904,11 @@ export default function AdminUsersPage() {
                           <AdminRowActions>
                             {(() => {
                               const isSelf = Boolean(user && (user.id === record.id || user.email === record.email));
-                              const isTargetSuperAdmin = isRecordSuperAdmin(record);
-                              const canManageTarget = isSuperAdmin || !isTargetSuperAdmin;
+                              // Mirror the server ceiling: a plain administrator
+                              // can neither edit, reset, nor delete another
+                              // administrator or super administrator.
+                              const isPrivilegedTarget = isRecordAdministrator(record);
+                              const canManageTarget = isSuperAdmin || !isPrivilegedTarget;
                               return (
                                 <>
                                   <Button
