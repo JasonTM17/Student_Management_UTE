@@ -141,6 +141,12 @@ public class AcademicMutationService {
             if (!sectionId.equals(enrollment.get("section_id"))) {
                 throw problem(HttpStatus.BAD_REQUEST, "GRADE_SECTION_MISMATCH", "Grade enrollment is outside this section");
             }
+            if ("PUBLISHED".equals(enrollment.get("grade_status"))) {
+                // Published grades are the official record: an API replay must
+                // not silently flip them back to draft.
+                throw problem(HttpStatus.CONFLICT, "GRADES_PUBLISHED_LOCKED",
+                        "Published grades can no longer be edited");
+            }
             requireScoreRange(grade.processScore(), "processScore");
             requireScoreRange(grade.finalExamScore(), "finalExamScore");
             BigDecimal total = calculateFinalGrade(grade.processScore(), grade.finalExamScore());
@@ -266,7 +272,8 @@ public class AcademicMutationService {
     private Map<String, Object> enrollment(String enrollmentId) {
         try {
             return jdbc.queryForMap(
-                    "SELECT \"id\", \"studentId\" AS student_id, \"sectionId\" AS section_id, \"status\""
+                    "SELECT \"id\", \"studentId\" AS student_id, \"sectionId\" AS section_id, \"status\","
+                            + " \"gradeStatus\" AS grade_status"
                             + " FROM " + ENROLLMENT + " WHERE \"id\" = :id FOR UPDATE",
                     new MapSqlParameterSource("id", enrollmentId));
         } catch (EmptyResultDataAccessException exception) {
