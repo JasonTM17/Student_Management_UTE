@@ -31,7 +31,7 @@ class RateLimitFilterTest {
         limiterService = new RateLimiterService();
         // trustProxyHeaders=false keeps the default socket-address client key,
         // matching direct (non-proxied) request handling in these tests.
-        properties = new RateLimitProperties(true, false, 5, 3, 40, 60);
+        properties = new RateLimitProperties(true, false, 5, 40, 60);
         errorWriter = new ApiErrorWriter(new ObjectMapper());
         filter = new RateLimitFilter(limiterService, properties, errorWriter);
         SecurityContextHolder.clearContext();

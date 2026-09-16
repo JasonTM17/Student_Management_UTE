@@ -191,7 +191,6 @@ app:
     # false so spoofed forwarded headers cannot evade IP-keyed limits.
     trust-proxy-headers: ${RATE_LIMIT_TRUST_PROXY_HEADERS:false}
     login-limit: ${RATE_LIMIT_LOGIN:15}
-    register-limit: ${RATE_LIMIT_REGISTER:10}
     default-limit: ${RATE_LIMIT_DEFAULT:40}
     default-window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
 

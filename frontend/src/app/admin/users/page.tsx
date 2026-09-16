@@ -3,12 +3,10 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
-  Building2,
   CheckCircle2,
   ChevronDown,
-  Eye,
-  EyeOff,
   GraduationCap,
+  KeyRound,
   Pencil,
   Plus,
   School,
@@ -107,15 +105,16 @@ export default function AdminUsersPage() {
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'STUDENT' | 'LECTURER' | 'ADMIN'>('ALL');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
-  const [showTemporaryPassword, setShowTemporaryPassword] = useState(false);
   const [editingUser, setEditingUser] = useState<UserRecord | null>(null);
   const [isSaving, setIsSaving] = useState(false);
   const [formError, setFormError] = useState('');
+  // One-time office-issued credential shown exactly once after create/reset.
+  const [issuedCredential, setIssuedCredential] = useState<{ email: string; secret: string } | null>(null);
+  const [fieldErrors, setFieldErrors] = useState<Record<string, string>>({});
 
   // 2-Column form data covering both general account & role-specific academic profiles
   const [formData, setFormData] = useState({
     email: '',
-    password: '',
     firstName: '',
     lastName: '',
     role: defaultRole as ManagedRole,
@@ -268,9 +267,29 @@ export default function AdminUsersPage() {
           createLecturerTitle: 'Thêm Mới Tài Khoản Giảng Viên',
           createAdminTitle: 'Thêm Mới Tài Khoản Quản Trị Viên',
           emailLabel: 'Địa chỉ Email trường cấp',
-          temporaryPassword: 'Mật khẩu tạm thời',
-          temporaryPasswordHint:
-            'Mật khẩu tạm thời cấp cho người dùng lần đầu đăng nhập. Yêu cầu đổi lại sau khi đăng nhập.',
+          issuedSecretTitle: 'Hệ thống tự cấp mật khẩu tạm thời',
+          issuedSecretNote:
+            'Bạn không cần nhập mật khẩu khởi tạo. Sau khi tạo, hệ thống sinh một mật khẩu tạm thời dùng một lần và người dùng phải đổi ngay khi đăng nhập đầu tiên.',
+          resetAction: 'Cấp lại mật khẩu tạm thời',
+          resetSuccess: 'Đã cấp lại mật khẩu tạm thời và đăng xuất mọi phiên của người dùng.',
+          resetFailed: 'Hiện chưa thể cấp lại mật khẩu cho người dùng này.',
+          credentialTitle: 'Mật khẩu tạm thời dùng một lần',
+          credentialDescription:
+            'Hãy chuyển mật khẩu tạm thời dưới đây cho người dùng qua kênh bảo mật. Hệ thống sẽ không hiển thị lại.',
+          credentialShownOnce:
+            'Mật khẩu chỉ hiển thị một lần duy nhất. Sau khi đóng, bạn không thể xem lại — người dùng sẽ phải đổi ngay khi đăng nhập.',
+          copyAction: 'Sao chép',
+          copied: 'Đã sao chép mật khẩu tạm thời.',
+          errors: {
+            studentIdRequired: 'Vui lòng nhập mã số sinh viên chính thức.',
+            curriculumRequired: 'Vui lòng chọn khung chương trình đào tạo.',
+            employeeIdRequired: 'Vui lòng nhập mã số giảng viên chính thức.',
+            departmentRequired: 'Vui lòng chọn khoa / bộ môn công tác.',
+            emailExists: 'Email này đã có trong hệ thống.',
+            studentIdExists: 'Mã số sinh viên đã tồn tại.',
+            employeeIdExists: 'Mã số giảng viên đã tồn tại.',
+            adminReserved: 'Chỉ siêu quản trị viên mới được tạo tài khoản quản trị viên.',
+          },
           firstName: 'Tên',
           lastName: 'Họ và tên đệm',
           roleLabel: 'Vai trò hệ thống',
@@ -330,9 +349,29 @@ export default function AdminUsersPage() {
           createLecturerTitle: 'Add New Lecturer Account',
           createAdminTitle: 'Add New Administrator Account',
           emailLabel: 'Campus Email Address',
-          temporaryPassword: 'Temporary password',
-          temporaryPasswordHint:
-            'Temporary password for first-time sign in. User should rotate it.',
+          issuedSecretTitle: 'The system issues the temporary credential',
+          issuedSecretNote:
+            'You do not choose the start credential. After creation the system generates a one-time temporary password that the user must rotate at first sign-in.',
+          resetAction: 'Re-issue temporary credential',
+          resetSuccess: 'Issued a new temporary credential and signed the user out everywhere.',
+          resetFailed: 'Could not re-issue a credential for this user.',
+          credentialTitle: 'One-time temporary credential',
+          credentialDescription:
+            'Hand the temporary credential below to the user over a secure channel. The system will not show it again.',
+          credentialShownOnce:
+            'This secret is shown exactly once. After closing this dialog you cannot retrieve it — the user must rotate at first sign-in.',
+          copyAction: 'Copy',
+          copied: 'Temporary credential copied.',
+          errors: {
+            studentIdRequired: 'Enter the official student ID.',
+            curriculumRequired: 'Select the curriculum.',
+            employeeIdRequired: 'Enter the official employee ID.',
+            departmentRequired: 'Select the department.',
+            emailExists: 'This email is already registered.',
+            studentIdExists: 'This student ID already exists.',
+            employeeIdExists: 'This employee ID already exists.',
+            adminReserved: 'Only a super administrator can create administrator accounts.',
+          },
           firstName: 'First name',
           lastName: 'Last name',
           roleLabel: 'System role',
@@ -362,19 +401,17 @@ export default function AdminUsersPage() {
 
   const resetForm = (role: ManagedRole = defaultRole) => {
     setEditingUser(null);
-    setShowTemporaryPassword(false);
     setFormError('');
-    const randomSuffix = Math.floor(100 + Math.random() * 900);
+    setFieldErrors({});
     setFormData({
       email: '',
-      password: '',
       firstName: '',
       lastName: '',
       role,
-      studentId: role === 'STUDENT' ? `24110${randomSuffix}` : '',
+      studentId: '',
       year: '1',
       curriculumId: 'curriculum-demo',
-      employeeId: role === 'LECTURER' ? `GV2026${randomSuffix}` : '',
+      employeeId: '',
       departmentId: departments[0]?.id || '',
       academicTitle: 'TS.',
       specialization: '',
@@ -396,11 +433,10 @@ export default function AdminUsersPage() {
       return;
     }
     setEditingUser(userRecord);
-    setShowTemporaryPassword(false);
     setFormError('');
+    setFieldErrors({});
     setFormData({
       email: userRecord.email,
-      password: '',
       firstName: userRecord.firstName,
       lastName: userRecord.lastName,
       role: primaryRole(userRecord.roles),
@@ -417,7 +453,22 @@ export default function AdminUsersPage() {
 
   const closeModal = () => {
     setShowCreateModal(false);
+    setIssuedCredential(null);
+    setFieldErrors({});
     resetForm();
+  };
+
+  const handleResetCredential = async (userRecord: UserRecord) => {
+    try {
+      const result = await usersApi.resetPassword(userRecord.id);
+      if (result.temporaryPassword) {
+        setIssuedCredential({ email: result.email, secret: result.temporaryPassword });
+      }
+      toast.success(copy.resetSuccess);
+      await fetchUsers();
+    } catch {
+      toast.error(copy.resetFailed);
+    }
   };
 
   const handleSearch = (e: React.FormEvent) => {
@@ -495,24 +546,43 @@ export default function AdminUsersPage() {
         });
         toast.success(copy.updated);
       } else {
+        const nextFieldErrors: Record<string, string> = {};
+        if (formData.role === 'STUDENT') {
+          if (!formData.studentId.trim()) nextFieldErrors.studentId = copy.errors.studentIdRequired;
+          if (!formData.curriculumId) nextFieldErrors.curriculumId = copy.errors.curriculumRequired;
+        } else if (formData.role === 'LECTURER') {
+          if (!formData.employeeId.trim()) nextFieldErrors.employeeId = copy.errors.employeeIdRequired;
+          if (!formData.departmentId) nextFieldErrors.departmentId = copy.errors.departmentRequired;
+        }
+        if (Object.keys(nextFieldErrors).length > 0) {
+          setFieldErrors(nextFieldErrors);
+          setIsSaving(false);
+          return;
+        }
+        setFieldErrors({});
+
+        // The office never picks the start credential: the server issues a
+        // one-time temporary password and the account must rotate it at first login.
         const payload: Record<string, any> = {
           email: formData.email.trim(),
-          password: formData.password,
           firstName: formData.firstName.trim(),
           lastName: formData.lastName.trim(),
           role: formData.role,
         };
 
         if (formData.role === 'STUDENT') {
-          payload.studentId = formData.studentId.trim() || undefined;
+          payload.studentId = formData.studentId.trim();
           payload.year = formData.year;
-          payload.curriculumId = formData.curriculumId || 'curriculum-demo';
+          payload.curriculumId = formData.curriculumId;
         } else if (formData.role === 'LECTURER') {
-          payload.employeeId = formData.employeeId.trim() || undefined;
-          payload.departmentId = formData.departmentId || departments[0]?.id || 'department-demo';
+          payload.employeeId = formData.employeeId.trim();
+          payload.departmentId = formData.departmentId;
         }
 
-        await usersApi.create(payload);
+        const created = await usersApi.create(payload);
+        if (created.temporaryPassword) {
+          setIssuedCredential({ email: created.email, secret: created.temporaryPassword });
+        }
 
         if (formData.role === 'STUDENT') {
           toast.success(copy.createdStudent);
@@ -526,6 +596,21 @@ export default function AdminUsersPage() {
       closeModal();
       await fetchUsers();
     } catch (err: any) {
+      const code = err?.response?.data?.code as string | undefined;
+      const codeField: Record<string, string> = {
+        EMAIL_EXISTS: 'email',
+        STUDENT_ID_EXISTS: 'studentId',
+        EMPLOYEE_ID_EXISTS: 'employeeId',
+      };
+      const fieldKey = code ? codeField[code] : undefined;
+      if (fieldKey) {
+        const fieldMessages: Record<string, string> = {
+          EMAIL_EXISTS: copy.errors.emailExists,
+          STUDENT_ID_EXISTS: copy.errors.studentIdExists,
+          EMPLOYEE_ID_EXISTS: copy.errors.employeeIdExists,
+        };
+        setFieldErrors({ [fieldKey]: fieldMessages[code as string] });
+      }
       const message = campusErrorMessage(
         err,
         messages.common.campusErrors,
@@ -567,15 +652,17 @@ export default function AdminUsersPage() {
             <School className="mr-2 h-4 w-4" />
             {copy.createLecturer}
           </Button>
-          <Button
-            onClick={() => openCreate('ADMIN')}
-            variant="ghost"
-            size="sm"
-            className="text-xs text-muted-foreground hover:text-foreground"
-          >
-            <Plus className="mr-1 h-3.5 w-3.5" />
-            {copy.roles.ADMIN}
-          </Button>
+          {isSuperAdmin ? (
+            <Button
+              onClick={() => openCreate('ADMIN')}
+              variant="ghost"
+              size="sm"
+              className="text-xs text-muted-foreground hover:text-foreground"
+            >
+              <Plus className="mr-1 h-3.5 w-3.5" />
+              {copy.roles.ADMIN}
+            </Button>
+          ) : null}
         </div>
       }
     >
@@ -817,6 +904,15 @@ export default function AdminUsersPage() {
                                   <Button
                                     size="icon"
                                     variant="ghost"
+                                    onClick={() => void handleResetCredential(record)}
+                                    disabled={isSelf || !canManageTarget}
+                                    title={copy.resetAction}
+                                  >
+                                    <KeyRound className="h-4 w-4" />
+                                  </Button>
+                                  <Button
+                                    size="icon"
+                                    variant="ghost"
                                     className="text-destructive hover:bg-destructive/10 hover:text-destructive disabled:opacity-40 disabled:cursor-not-allowed"
                                     onClick={() => void handleDelete(record)}
                                     disabled={isSelf || !canManageTarget}
@@ -868,11 +964,7 @@ export default function AdminUsersPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFormData((c) => ({
-                        ...c,
-                        role: 'STUDENT',
-                        studentId: c.studentId || `24110${Math.floor(100 + Math.random() * 900)}`,
-                      }));
+                      setFormData((c) => ({ ...c, role: 'STUDENT' }));
                     }}
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
@@ -887,11 +979,7 @@ export default function AdminUsersPage() {
                   <button
                     type="button"
                     onClick={() => {
-                      setFormData((c) => ({
-                        ...c,
-                        role: 'LECTURER',
-                        employeeId: c.employeeId || `GV2026${Math.floor(100 + Math.random() * 900)}`,
-                      }));
+                      setFormData((c) => ({ ...c, role: 'LECTURER' }));
                     }}
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
@@ -906,11 +994,13 @@ export default function AdminUsersPage() {
                   <button
                     type="button"
                     onClick={() => setFormData((c) => ({ ...c, role: 'ADMIN' }))}
+                    disabled={!isSuperAdmin}
+                    title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
                     className={cn(
                       'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
                       formData.role === 'ADMIN'
                         ? 'bg-purple-600 text-white shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground',
+                        : 'text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
                     )}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
@@ -939,7 +1029,7 @@ export default function AdminUsersPage() {
                 </div>
               </div>
 
-              <AdminFormField label={copy.emailLabel}>
+              <AdminFormField label={copy.emailLabel} error={fieldErrors.email}>
                 <Input
                   type="email"
                   value={formData.email}
@@ -957,29 +1047,13 @@ export default function AdminUsersPage() {
               </AdminFormField>
 
               {!editingUser ? (
-                <AdminFormField
-                  label={copy.temporaryPassword}
-                  description={copy.temporaryPasswordHint}
-                >
-                  <div className="relative">
-                    <Input
-                      type={showTemporaryPassword ? 'text' : 'password'}
-                      value={formData.password}
-                      placeholder="Nhập mật khẩu ban đầu..."
-                      onChange={(e) => setFormData((current) => ({ ...current, password: e.target.value }))}
-                      className="pr-12"
-                      required
-                    />
-                    <button
-                      type="button"
-                      className="absolute right-2 top-[22px] inline-flex h-9 w-9 -translate-y-1/2 items-center justify-center rounded-md text-muted-foreground transition hover:bg-secondary hover:text-foreground"
-                      onClick={() => setShowTemporaryPassword((current) => !current)}
-                      aria-label={showTemporaryPassword ? messages.login.hidePassword : messages.login.showPassword}
-                    >
-                      {showTemporaryPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-                    </button>
+                <div className="rounded-lg border border-primary/20 bg-primary/[0.04] p-3 text-xs leading-5 text-muted-foreground">
+                  <div className="flex items-center gap-2 font-semibold text-foreground">
+                    <KeyRound className="h-3.5 w-3.5" aria-hidden="true" />
+                    {copy.issuedSecretTitle}
                   </div>
-                </AdminFormField>
+                  <p className="mt-1">{copy.issuedSecretNote}</p>
+                </div>
               ) : null}
 
               <div className="grid grid-cols-2 gap-3">
@@ -1071,6 +1145,7 @@ export default function AdminUsersPage() {
                   <AdminFormField
                     label="Mã số sinh viên (MSSV) *"
                     description="Mã định danh sinh viên dùng tra cứu điểm, ĐRL và ĐKHP"
+                    error={fieldErrors.studentId}
                   >
                     <Input
                       type="text"
@@ -1130,6 +1205,7 @@ export default function AdminUsersPage() {
                   <AdminFormField
                     label="Mã số Giảng viên (MSGV) *"
                     description="Mã định danh cán bộ giảng dạy và chấm thi luận văn"
+                    error={fieldErrors.employeeId}
                   >
                     <Input
                       type="text"
@@ -1250,6 +1326,49 @@ export default function AdminUsersPage() {
       </Modal>
 
       {confirmationDialog}
+
+      {/* One-time office-issued credential handoff: shown exactly once. */}
+      <Modal
+        isOpen={Boolean(issuedCredential)}
+        onClose={() => setIssuedCredential(null)}
+        title={copy.credentialTitle}
+        closeLabel={copy.closeDialog}
+        className="max-w-md"
+      >
+        <div className="space-y-4">
+          <p className="text-sm leading-6 text-muted-foreground">{copy.credentialDescription}</p>
+          {issuedCredential ? (
+            <>
+              <p className="font-mono text-sm text-foreground">{issuedCredential.email}</p>
+              <div className="flex items-center gap-2">
+                <code
+                  id="issued-temporary-secret"
+                  className="min-w-0 flex-1 truncate rounded-lg border border-border bg-secondary/30 px-3 py-2 font-mono text-sm font-semibold text-foreground"
+                >
+                  {issuedCredential.secret}
+                </code>
+                <Button
+                  type="button"
+                  variant="outline"
+                  onClick={() => {
+                    void navigator.clipboard?.writeText(issuedCredential.secret);
+                    toast.success(copy.copied);
+                  }}
+                >
+                  {copy.copyAction}
+                </Button>
+              </div>
+              <p
+                role="alert"
+                className="flex items-start gap-2 rounded-lg border border-amber-500/30 bg-amber-500/10 px-3 py-2 text-xs font-medium text-amber-700 dark:text-amber-400"
+              >
+                <ShieldCheck className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                {copy.credentialShownOnce}
+              </p>
+            </>
+          ) : null}
+        </div>
+      </Modal>
     </AdminFrame>
   );
 }

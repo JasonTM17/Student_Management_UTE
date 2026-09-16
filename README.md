@@ -561,7 +561,7 @@ Toàn bộ API dùng tiền tố chung `/api/v1` và được nhóm thành các 
 
 | Nhóm tài nguyên | Tiền tố đường dẫn | Mô tả chức năng nghiệp vụ |
 | --- | --- | --- |
-| Xác thực & phiên | `/api/v1/auth` | Đăng ký, đăng nhập phân luồng portal, làm mới token, đăng xuất |
+| Xác thực & phiên | `/api/v1/auth` | Đăng nhập phân luồng portal, làm mới token, đăng xuất, đổi mật khẩu. **Không có tự đăng ký** — tài khoản do Phòng Đào tạo cấp qua `/api/v1/users` |
 | Hồ sơ cá nhân | `/api/v1/me` | Thông tin cá nhân, điều kiện đăng ký, tóm tắt đợt đăng ký, phiếu đăng ký học |
 | Đăng ký học phần | `/api/v1/me/enrollments` | Đăng ký môn (chống race 4 lớp, bắt buộc `Idempotency-Key`), rút môn, danh sách môn đã đăng ký |
 | Danh mục & tra cứu | `/api/v1/sections`, `/api/v1/schedules`, `/api/v1/attendance`, `/api/v1/lecturers` | Tra cứu lớp học phần, thời khóa biểu, điểm danh, giảng viên |

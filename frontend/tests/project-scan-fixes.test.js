@@ -180,15 +180,18 @@ test('feedback polish: profile supports local photo preview and password visibil
   assert.match(messages, /photoUploadFailed/);
 });
 
-test('feedback polish: admin temporary passwords can be revealed while student signup stays managed', () => {
+test('feedback polish: office-issued credentials are server-generated while student signup stays managed', () => {
   const signup = read('src/app/register/page.tsx');
   const adminUsers = read('src/app/admin/users/page.tsx');
 
   assert.match(signup, /issuedByOfficeTitle/);
   assert.doesNotMatch(signup, /<form|showPassword/);
-  assert.match(adminUsers, /const \[showTemporaryPassword, setShowTemporaryPassword\] = useState\(false\)/);
-  assert.match(adminUsers, /type=\{showTemporaryPassword \? 'text' : 'password'\}/);
-  assert.match(adminUsers, /messages\.login\.hidePassword/);
+  // The admin console no longer picks a start credential: the server issues a
+  // one-time temporary password and the page hands it off exactly once.
+  assert.doesNotMatch(adminUsers, /password: formData\.password/);
+  assert.match(adminUsers, /issuedCredential/);
+  assert.match(adminUsers, /credentialShownOnce/);
+  assert.match(adminUsers, /usersApi\.resetPassword/);
 });
 
 test('feedback polish: curriculum counts stay localized and enrolled schedules use CampusCore weekdays', () => {

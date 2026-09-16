@@ -18,6 +18,7 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.util.HexFormat;
+import java.util.UUID;
 import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
@@ -78,6 +79,7 @@ class AuthLoginPersistenceTest {
                     "address" VARCHAR(500),
                     "avatar" VARCHAR(500),
                     "status" VARCHAR(40) NOT NULL,
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
                     "emailVerified" BOOLEAN NOT NULL,
                     "isSuperAdmin" BOOLEAN NOT NULL,
                     "failedLoginAttempts" INTEGER NOT NULL,
@@ -171,20 +173,21 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
-    void publicStudentRegistrationIsRejectedBecauseTheAcademicOfficeIssuesAccounts() throws Exception {
-        MvcResult result = mvc.perform(post("/api/v1/auth/register")
+    void publicRegistrationEndpointIsRemovedAndCreatesNoUser() throws Exception {
+        // Accounts are issued by the Academic Office: the public contract is
+        // gone entirely, so an anonymous call is rejected as unauthenticated
+        // instead of reaching any registration handler. The payload is
+        // irrelevant now — it must never reach a handler or create a user.
+        mvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {
                                   "email":"new.student@campuscore.edu",
-                                  "password":"password123",
                                   "firstName":"New",
                                   "lastName":"Student"
                                 }
                                 """))
-                .andExpect(status().isForbidden())
-                .andExpect(jsonPath("$.code").value("STUDENT_ACCOUNT_ISSUED_BY_ACADEMIC_OFFICE"))
-                .andReturn();
+                .andExpect(status().isUnauthorized());
 
         org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject(
                 "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
@@ -202,11 +205,12 @@ class AuthLoginPersistenceTest {
                         .content("""
                                 {
                                   "email":"managed.student@campuscore.edu",
-                                  "password":"password123",
                                   "firstName":"Managed",
                                   "lastName":"Student",
                                   "role":"STUDENT",
-                                  "studentId":"SV-MANAGED-001"
+                                  "studentId":"SV-MANAGED-001",
+                                  "curriculumId":"curriculum-demo",
+                                  "year":1
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -220,6 +224,54 @@ class AuthLoginPersistenceTest {
                 Integer.class,
                 userId);
         org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
+    }
+
+    @Test
+    void issuedAccountMustRotateItsTemporarySecretBeforeUsingThePortal() throws Exception {
+        // Simulate an office-issued account: a server-generated one-time
+        // credential plus the rotation flag. The flag — not any token claim —
+        // is what the account-state filter enforces.
+        String issuedSecret = "issued-" + UUID.randomUUID();
+        String rotatedSecret = "rotated-" + UUID.randomUUID();
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"User\" SET \"password\" = ?, \"mustChangePassword\" = TRUE"
+                        + " WHERE \"id\" = 'student-user'",
+                passwordEncoder.encode(issuedSecret));
+
+        MvcResult login = mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + issuedSecret + "\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.user.mustChangePassword").value(true))
+                .andReturn();
+        JsonNode body = objectMapper.readTree(login.getResponse().getContentAsString());
+        String accessToken = body.get("accessToken").asText();
+
+        // Business endpoints refuse the issued credential until it is rotated.
+        mvc.perform(put("/api/v1/auth/profile")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"0900000000\"}"))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("PASSWORD_CHANGE_REQUIRED"));
+
+        mvc.perform(post("/api/v1/auth/change-password")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"oldPassword\":\"" + issuedSecret
+                                + "\",\"newPassword\":\"" + rotatedSecret + "\"}"))
+                .andExpect(status().isOk());
+
+        Boolean flag = jdbc.queryForObject(
+                "SELECT \"mustChangePassword\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Boolean.class);
+        org.junit.jupiter.api.Assertions.assertFalse(flag);
+
+        mvc.perform(put("/api/v1/auth/profile")
+                        .header("Authorization", "Bearer " + accessToken)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"phone\":\"0900000000\"}"))
+                .andExpect(status().isOk());
     }
 
     @Test

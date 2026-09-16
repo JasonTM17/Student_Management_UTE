@@ -106,6 +106,7 @@ public class SecurityConfig {
             CookieOrBearerTokenResolver tokenResolver,
             CsrfCookieFilter csrfCookieFilter,
             io.campuscore.restfulapi.security.ratelimit.RateLimitFilter rateLimitFilter,
+            AccountStateFilter accountStateFilter,
             ApiErrorWriter errorWriter,
             CorsConfigurationSource corsConfigurationSource) throws Exception {
         http
@@ -115,7 +116,6 @@ public class SecurityConfig {
                 .authorizeHttpRequests(auth -> auth
                         .requestMatchers(
                                 "/api/v1/auth/login",
-                                "/api/v1/auth/register",
                                 "/api/v1/auth/refresh",
                                 "/api/v1/contract",
                                 "/api/v1/health/**",
@@ -141,6 +141,7 @@ public class SecurityConfig {
                         .authenticationEntryPoint(authenticationEntryPoint(errorWriter))
                         .jwt(jwt -> jwt.jwtAuthenticationConverter(jwtAuthenticationConverter())))
                 .addFilterAfter(csrfCookieFilter, BearerTokenAuthenticationFilter.class)
+                .addFilterAfter(accountStateFilter, BearerTokenAuthenticationFilter.class)
                 .addFilterAfter(rateLimitFilter, CsrfCookieFilter.class);
 
         return http.build();

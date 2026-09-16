@@ -21,6 +21,8 @@ export interface User {
   address?: string;
   avatar?: string | null;
   status: string;
+  // True while the account still carries the office-issued temporary credential.
+  mustChangePassword?: boolean;
   role?: 'ADMIN' | 'SUPER_ADMIN' | 'LECTURER' | 'STUDENT';
   roles?: string[];
   createdAt: string;

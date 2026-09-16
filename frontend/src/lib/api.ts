@@ -138,7 +138,7 @@ type SectionDetail = Section & {
 };
 
 const CSRF_HEADER_NAME = 'X-CSRF-Token';
-const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|register|refresh|logout)(?:\/|$)/;
+const AUTH_REFRESH_ROUTE_PATTERN = /^\/auth\/(login|refresh|logout)(?:\/|$)/;
 const MUTATING_METHODS = new Set(['post', 'put', 'patch', 'delete']);
 
 function isBrowser() {
@@ -329,19 +329,6 @@ export const authApi = {
         skipAuthRedirect: true,
       } as AuthRequestConfig,
     );
-    return response.data;
-  },
-
-  register: async (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-  }): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>('/auth/register', data, {
-      skipAuthRefresh: true,
-      skipAuthRedirect: true,
-    } as AuthRequestConfig);
     return response.data;
   },
 
@@ -703,8 +690,14 @@ export const usersApi = {
     const response = await api.get<ApiResponse<User[]>>('/users', { params });
     return response.data;
   },
-  create: async (data: ApiObject): Promise<User> => {
-    const response = await api.post<User>('/users', data);
+  create: async (data: ApiObject): Promise<User & { temporaryPassword?: string }> => {
+    const response = await api.post<User & { temporaryPassword?: string }>('/users', data);
+    return response.data;
+  },
+  resetPassword: async (id: string): Promise<User & { temporaryPassword?: string }> => {
+    const response = await api.post<User & { temporaryPassword?: string }>(
+      `/users/${id}/password-reset`,
+    );
     return response.data;
   },
   update: async (id: string, data: ApiObject): Promise<User> => {

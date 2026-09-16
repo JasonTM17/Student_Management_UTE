@@ -25,12 +25,6 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   login: (email: string, password: string) => Promise<User>;
-  register: (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-  }) => Promise<User>;
   logout: (options?: { redirect?: boolean }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -81,18 +75,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return response.user;
   }, []);
 
-  const register = useCallback(async (data: {
-    email: string;
-    password: string;
-    firstName: string;
-    lastName: string;
-  }) => {
-    const response = await authApi.register(data);
-    setIsLoggingOut(false);
-    setUser(response.user);
-    return response.user;
-  }, []);
-
   const logout = useCallback(async (options?: { redirect?: boolean }) => {
     setIsLoggingOut(true);
     try {
@@ -126,7 +108,6 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isAdmin,
         isSuperAdmin,
         login,
-        register,
         logout,
         refreshUser,
       }}

@@ -12,7 +12,6 @@ public class RateLimitProperties {
     private final boolean enabled;
     private final boolean trustProxyHeaders;
     private final int loginLimit;
-    private final int registerLimit;
     private final int defaultLimit;
     private final int defaultWindowSeconds;
 
@@ -20,13 +19,11 @@ public class RateLimitProperties {
             @Value("${app.rate-limit.enabled:true}") boolean enabled,
             @Value("${app.rate-limit.trust-proxy-headers:false}") boolean trustProxyHeaders,
             @Value("${app.rate-limit.login-limit:15}") int loginLimit,
-            @Value("${app.rate-limit.register-limit:10}") int registerLimit,
             @Value("${app.rate-limit.default-limit:40}") int defaultLimit,
             @Value("${app.rate-limit.default-window-seconds:60}") int defaultWindowSeconds) {
         this.enabled = enabled;
         this.trustProxyHeaders = trustProxyHeaders;
         this.loginLimit = loginLimit;
-        this.registerLimit = registerLimit;
         this.defaultLimit = defaultLimit;
         this.defaultWindowSeconds = defaultWindowSeconds;
     }
@@ -46,10 +43,6 @@ public class RateLimitProperties {
 
     public int getLoginLimit() {
         return loginLimit;
-    }
-
-    public int getRegisterLimit() {
-        return registerLimit;
     }
 
     public int getDefaultLimit() {

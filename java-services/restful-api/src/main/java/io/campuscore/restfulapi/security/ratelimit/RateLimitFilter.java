@@ -103,8 +103,8 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private String resolveClientKey(HttpServletRequest request, RateLimitCategory category) {
         String clientIp = resolveClientIp(request);
 
-        // Authentication endpoints (login/register) are always strictly bound to IP to prevent brute-force
-        if (category == RateLimitCategory.AUTH_LOGIN || category == RateLimitCategory.AUTH_REGISTER) {
+        // Authentication endpoints (login) are always strictly bound to IP to prevent brute-force
+        if (category == RateLimitCategory.AUTH_LOGIN) {
             return "ip:" + clientIp + ":" + category.name();
         }
 
@@ -150,9 +150,6 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private RateLimitPolicy resolvePolicy(String uri) {
         if (uri.startsWith("/api/v1/auth/login")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_LOGIN, properties.getLoginLimit(), 60);
-        }
-        if (uri.startsWith("/api/v1/auth/register")) {
-            return new RateLimitPolicy(RateLimitCategory.AUTH_REGISTER, properties.getRegisterLimit(), 60);
         }
         if (uri.startsWith("/api/v1/auth/change-password")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_CHANGE_PASSWORD, 5, 60);

@@ -43,6 +43,7 @@ import { LanguageToggle } from '@/components/LanguageToggle';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
+import { ForcedPasswordRotationGate } from '@/components/auth/ForcedPasswordRotationGate';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
@@ -683,6 +684,7 @@ export default function DashboardLayout({
 
   return (
     <div className="portal-shell">
+      <ForcedPasswordRotationGate />
       <a
         href="#dashboard-main-content"
         className="portal-skip-link"

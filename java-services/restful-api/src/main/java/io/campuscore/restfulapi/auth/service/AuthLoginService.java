@@ -4,22 +4,17 @@ import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
-import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
 import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedRefreshToken;
-import io.campuscore.restfulapi.web.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.time.Clock;
 import java.time.Duration;
 import java.time.Instant;
-import java.time.LocalDate;
-import java.time.ZoneOffset;
-import java.time.format.DateTimeParseException;
 import java.util.HexFormat;
 import java.util.UUID;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -91,17 +86,6 @@ public class AuthLoginService {
     }
 
     @Transactional
-    public LoginResult register(RegisterRequest request, String ipAddress, String userAgent) {
-        // Student identities are issued by the Academic Office. Keep the
-        // legacy public contract so older clients receive a safe, stable
-        // refusal instead of silently creating an unmanaged student profile.
-        throw new DomainException(
-                HttpStatus.FORBIDDEN,
-                "STUDENT_ACCOUNT_ISSUED_BY_ACADEMIC_OFFICE",
-                "Student accounts are issued by the Academic Office");
-    }
-
-    @Transactional
     public LoginResult refresh(String refreshTokenValue, String ipAddress, String userAgent) {
         if (refreshTokenValue == null || refreshTokenValue.isBlank()) {
             throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Refresh token is required");
@@ -140,15 +124,16 @@ public class AuthLoginService {
     @Transactional
     public AuthUserResponse updateProfile(String userId, UpdateProfileRequest request) {
         AuthUserRecord user = requireActiveUser(userId);
-        // The full name is school-managed: firstName/lastName in the payload are
-        // ignored so a user cannot rename themselves. The fields remain on the
-        // request record only so older clients still deserialize successfully.
+        // Names and date of birth are school-managed: identity fields in the
+        // payload are ignored so a user cannot rewrite official records. The
+        // fields remain on the request record only so older clients still
+        // deserialize successfully.
         users.updateProfile(
                 user.id(),
                 user.firstName(),
                 user.lastName(),
                 request != null && request.phone() != null ? request.phone() : user.phone(),
-                request != null && request.dateOfBirth() != null ? parseDate(request.dateOfBirth()) : user.dateOfBirth(),
+                user.dateOfBirth(),
                 request != null && request.address() != null ? request.address() : user.address(),
                 request != null && request.avatar() != null ? normalizeAvatar(request.avatar()) : user.avatar());
         return requireActiveUser(user.id()).toResponse();
@@ -183,7 +168,11 @@ public class AuthLoginService {
         }
 
         users.changePassword(user.id(), passwordEncoder.encode(newPassword), clock.instant());
+        // Rotation clears the office-issued flag; sessions are revoked so the
+        // user signs back in with the new credential.
+        users.setMustChangePassword(user.id(), false);
         users.deleteAllRefreshSessions(user.id());
+        users.clearUserRefreshToken(user.id());
     }
 
     @Transactional
@@ -211,14 +200,6 @@ public class AuthLoginService {
             throw new BadCredentialsException("Invalid session");
         }
         return user;
-    }
-
-    private static Instant parseDate(String value) {
-        try {
-            return LocalDate.parse(value).atStartOfDay().toInstant(ZoneOffset.UTC);
-        } catch (DateTimeParseException exception) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "dateOfBirth must be an ISO date", exception);
-        }
     }
 
     private static AuthPrincipal principal(AuthUserRecord user) {

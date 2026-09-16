@@ -64,7 +64,8 @@ function getRouteMetadata(pathname: string, locale: Locale) {
     return {
       title: messages.meta.register.title,
       description: messages.meta.register.description,
-      robots: { index: true, follow: true },
+      // Account issuance is policy guidance, not a signup landing page.
+      robots: { index: false, follow: true },
     };
   }
 

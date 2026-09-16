@@ -200,6 +200,47 @@ test('the course registration page requires search query before showing courses'
   assert.ok(source.includes('searchPromptTitle'), 'must render search prompt title');
 });
 
+test('the thesis topic catalog is search-first and loads no topics before a query', () => {
+  const catalog = readSource('src/components/dashboard/thesis/ThesisTopicCatalogPage.tsx');
+  const hook = readSource('src/components/dashboard/thesis/useThesisWorkspace.ts');
+  assert.ok(catalog.includes('topicsEnabled: searchActive'), 'catalog gates topic loading on the search query');
+  assert.ok(catalog.includes('!searchActive ? ('), 'catalog renders the search prompt before any topic card');
+  assert.ok(
+    !catalog.includes('autoSwitched'),
+    'the old auto-probe that loaded every round before search must stay removed',
+  );
+  assert.ok(hook.includes('topicsEnabled'), 'workspace hook supports deferring topic loading');
+});
+
+// ---------- Server-side business invariants for grades, results, mail ----------
+
+test('published grades and thesis results are locked server-side', () => {
+  const academic = readSource(
+    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicMutationService.java',
+  );
+  const lockIndex = academic.indexOf('GRADES_PUBLISHED_LOCKED');
+  const writeIndex = academic.indexOf('saveComponent(grade.enrollmentId(), processItemId');
+  assert.ok(lockIndex > -1, 'published-grade lock code must exist');
+  assert.ok(
+    lockIndex < writeIndex,
+    'the published-grade lock must run before any component write',
+  );
+
+  const thesis = readSource(
+    '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/thesis/service/ThesisMutationService.java',
+  );
+  assert.ok(thesis.includes('SCORES_INCOMPLETE'), 'results publish must require every approved group graded');
+  assert.ok(
+    thesis.includes('KLTN rounds require a gvpbDeadline'),
+    'KLTN rounds must carry a report freeze deadline',
+  );
+
+  const mail = readSource(
+    '../java-services/restful-api/src/main/resources/templates/mail/academic-announcement.html',
+  );
+  assert.ok(!mail.includes('th:utext'), 'announcement content must be escaped (th:text), never raw HTML');
+});
+
 // ---------- Item 2: grade point conversion fallback ----------
 
 test('resolveGradePoint falls back gracefully to letter grade and 10-scale score', () => {

@@ -4,10 +4,12 @@ import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.util.List;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -20,6 +22,7 @@ import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
@@ -37,6 +40,9 @@ class AdminUserMutationPersistenceTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private ObjectMapper objectMapper;
+
     @BeforeEach
     void prepareFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
@@ -47,8 +53,10 @@ class AdminUserMutationPersistenceTest {
 
     @Test
     void roleDemotionRevokesObsoleteSystemAuthorizationButPreservesCustomRole() throws Exception {
+        // Only a super administrator may manage administrator accounts, so the
+        // demotion of an ADMIN target runs under a super-admin actor.
         mvc.perform(put("/api/v1/users/target-user")
-                        .with(adminJwt())
+                        .with(superJwt())
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
                                 {"role": "STUDENT", "studentId": "SV2026001", "curriculumId": "curriculum-demo", "year": 2}
@@ -147,6 +155,94 @@ class AdminUserMutationPersistenceTest {
                 .andExpect(jsonPath("$.meta.totalPages").value(2));
     }
 
+    @Test
+    void officeIssuanceReturnsOneTimeSecretForcesRotationAndRejectsDuplicates() throws Exception {
+        MvcResult result = mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"issued.student@campuscore.edu",
+                                  "firstName":"Issued",
+                                  "lastName":"Student",
+                                  "role":"STUDENT",
+                                  "studentId":"SV-ISSUED-001",
+                                  "curriculumId":"curriculum-demo",
+                                  "year":1
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty())
+                .andReturn();
+
+        String userId = objectMapper.readTree(result.getResponse().getContentAsString()).path("id").asText();
+        assertThat(jdbc.queryForObject(
+                "SELECT \"mustChangePassword\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = ?",
+                Boolean.class,
+                userId))
+                .isTrue();
+
+        // Duplicate identity conflicts surface as distinct field-mappable codes.
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "email":"issued.student@campuscore.edu",
+                                  "firstName":"Dup",
+                                  "lastName":"Student",
+                                  "role":"STUDENT",
+                                  "studentId":"SV-ISSUED-002",
+                                  "curriculumId":"curriculum-demo",
+                                  "year":1
+                                }
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("EMAIL_EXISTS"));
+    }
+
+    @Test
+    void ordinaryAdminCannotCreateAdministratorButSuperAdminCan() throws Exception {
+        mvc.perform(post("/api/v1/users")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new.admin@campuscore.edu","firstName":"New","lastName":"Admin","role":"ADMIN"}
+                                """))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+
+        mvc.perform(post("/api/v1/users")
+                        .with(superJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"email":"new.admin@campuscore.edu","firstName":"New","lastName":"Admin","role":"ADMIN"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void passwordResetForcesRotationAndRevokesLiveSessions() throws Exception {
+        jdbc.update("INSERT INTO \"campuscore_auth\".\"Session\""
+                        + " (\"id\", \"userId\", \"refreshToken\", \"expiresAt\", \"createdAt\")"
+                        + " VALUES ('session-second-user', 'second-user', 'hashed-token',"
+                        + " CURRENT_TIMESTAMP + INTERVAL '1' HOUR, CURRENT_TIMESTAMP)");
+
+        mvc.perform(post("/api/v1/users/second-user/password-reset")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.temporaryPassword").isNotEmpty());
+
+        assertThat(jdbc.queryForObject(
+                "SELECT \"mustChangePassword\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'second-user'",
+                Boolean.class))
+                .isTrue();
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'second-user'",
+                Integer.class))
+                .isZero();
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
@@ -157,6 +253,8 @@ class AdminUserMutationPersistenceTest {
                     "lastName" VARCHAR(120) NOT NULL,
                     "phone" VARCHAR(80),
                     "status" VARCHAR(40) NOT NULL,
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "refreshToken" VARCHAR(200),
                     "emailVerified" BOOLEAN NOT NULL,
                     "isSuperAdmin" BOOLEAN NOT NULL,
                     "failedLoginAttempts" INTEGER NOT NULL,
@@ -197,6 +295,17 @@ class AdminUserMutationPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "roleId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."Role" ("id") ON DELETE CASCADE,
                     "permissionId" VARCHAR(120) NOT NULL REFERENCES "campuscore_auth"."Permission" ("id") ON DELETE CASCADE
+                )
+                """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."Session" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "refreshToken" VARCHAR(200) NOT NULL,
+                    "userAgent" VARCHAR(500),
+                    "ipAddress" VARCHAR(80),
+                    "expiresAt" TIMESTAMP NOT NULL,
+                    "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
         jdbc.execute("""
@@ -314,5 +423,10 @@ class AdminUserMutationPersistenceTest {
     private RequestPostProcessor adminJwt() {
         return jwt().jwt(token -> token.subject("admin-user").claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private RequestPostProcessor superJwt() {
+        return jwt().jwt(token -> token.subject("super-user").claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
     }
 }

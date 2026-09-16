@@ -43,6 +43,14 @@ public class AdminUserMutationController {
         return users.create(input, isSuperAdmin(authentication));
     }
 
+    @PostMapping("/{id}/password-reset")
+    public Map<String, Object> resetPassword(
+            @PathVariable String id,
+            Authentication authentication) {
+        String currentUserId = authentication != null ? authentication.getName() : null;
+        return users.resetPassword(id, isSuperAdmin(authentication), currentUserId);
+    }
+
     @PutMapping("/{id}")
     public Map<String, Object> update(
             @PathVariable String id,
