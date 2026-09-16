@@ -86,10 +86,17 @@ async function main() {
     );
 
     // Search, then the catalog must list topics and offer selection on the detail page.
-    const searchForm = studentPage.locator('form input[type="search"]').first();
+    // The default round may legitimately hold zero published topics, so the
+    // probe switches to the last round in the selector (the open teaching round).
+    const roundSelect = studentPage.locator('select').first();
+    const optionCount = await roundSelect.locator('option').count();
+    if (optionCount > 1) {
+      await roundSelect.selectOption({ index: optionCount - 1 });
+    }
+    const searchForm = studentPage.locator('input[type="search"]').first();
     await searchForm.waitFor({ state: 'visible', timeout: 30000 });
     await searchForm.fill(process.env.VERIFY_SEARCH_QUERY || 'a');
-    await studentPage.locator('form button[type="submit"]').last().click();
+    await searchForm.press('Enter');
     await studentPage
       .waitForFunction(
         () => document.querySelectorAll('a[href*="/dashboard/thesis/topics/"]').length > 0,
