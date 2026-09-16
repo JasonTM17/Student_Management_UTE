@@ -16,7 +16,11 @@ database, and publishes its contract through OpenAPI.
 - liveness, readiness, `/api/v1/contract` and `/v3/api-docs`.
 
 There is no Node backend, service gateway, event broker, cache server,
-object-storage service, realtime server or observability stack in this runtime.
+realtime server or observability stack in this runtime. Thesis Word/PDF
+artifacts use the provider-neutral report storage boundary: local Docker
+previews write to the `campuscore_thesis_report_storage` volume; a Supabase
+Storage provider is available only when explicitly configured with a server
+runtime key.
 Finance, analytics, support tickets and advanced thesis council/evaluation
 workflows are outside the course scope.
 

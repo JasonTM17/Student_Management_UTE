@@ -2,7 +2,6 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecord;
-import io.campuscore.restfulapi.auth.repository.AuthUserRepository.RegisterCommand;
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.RegisterRequest;
@@ -11,6 +10,7 @@ import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedRefreshToken;
+import io.campuscore.restfulapi.web.DomainException;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -92,34 +92,13 @@ public class AuthLoginService {
 
     @Transactional
     public LoginResult register(RegisterRequest request, String ipAddress, String userAgent) {
-        if (request == null) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Registration request is required");
-        }
-        String email = normalizeEmail(required(request.email(), "email"));
-        if (!isValidEmail(email)) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "A valid email address is required");
-        }
-        String password = required(request.password(), "password");
-        if (password.length() < 8) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Password must contain at least 8 characters");
-        }
-        String firstName = required(request.firstName(), "firstName");
-        String lastName = required(request.lastName(), "lastName");
-        if (users.findByEmail(email).isPresent()) {
-            throw new ResponseStatusException(HttpStatus.CONFLICT, "Email already exists");
-        }
-        AuthUserRecord user = users.createUser(new RegisterCommand(
-                email,
-                passwordEncoder.encode(password),
-                firstName,
-                lastName,
-                request.phone(),
-                request.gender(),
-                request.dateOfBirth() == null || request.dateOfBirth().isBlank()
-                        ? null
-                        : parseDate(request.dateOfBirth()),
-                request.address()));
-        return issueSession(user, ipAddress, userAgent);
+        // Student identities are issued by the Academic Office. Keep the
+        // legacy public contract so older clients receive a safe, stable
+        // refusal instead of silently creating an unmanaged student profile.
+        throw new DomainException(
+                HttpStatus.FORBIDDEN,
+                "STUDENT_ACCOUNT_ISSUED_BY_ACADEMIC_OFFICE",
+                "Student accounts are issued by the Academic Office");
     }
 
     @Transactional

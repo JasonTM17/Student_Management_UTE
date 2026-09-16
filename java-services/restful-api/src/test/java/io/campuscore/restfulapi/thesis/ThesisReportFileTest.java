@@ -25,6 +25,7 @@ import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
 import org.springframework.test.web.servlet.MockMvc;
 import org.springframework.test.web.servlet.request.RequestPostProcessor;
+import io.campuscore.restfulapi.thesis.service.ThesisReportStorage;
 
 /**
  * Feedback item 7: the leader can attach the report as a Word/PDF document.
@@ -39,7 +40,8 @@ import org.springframework.test.web.servlet.request.RequestPostProcessor;
         "spring.datasource.username=sa",
         "spring.datasource.password=",
         "spring.flyway.enabled=true",
-        "spring.flyway.locations=classpath:db/migration-h2"
+        "spring.flyway.locations=classpath:db/migration-h2",
+        "thesis.report.storage.local-root=target/test-report-storage"
 })
 class ThesisReportFileTest {
 
@@ -51,6 +53,9 @@ class ThesisReportFileTest {
 
     @Autowired
     private MockMvc mvc;
+
+    @Autowired
+    private ThesisReportStorage storage;
 
     @BeforeEach
     void cleanDatabase() {
@@ -79,9 +84,16 @@ class ThesisReportFileTest {
                 .andExpect(jsonPath("$.url").value(org.hamcrest.Matchers.nullValue()))
                 .andExpect(jsonPath("$.fileSize").value(DOCX_BYTES.length));
 
-        byte[] stored = jdbc.queryForObject(
+        String storageProvider = jdbc.queryForObject(
+                "SELECT storage_provider FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId);
+        String storageKey = jdbc.queryForObject(
+                "SELECT storage_key FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId);
+        byte[] databaseBytes = jdbc.queryForObject(
                 "SELECT file_data FROM thesis.thesis_group_report WHERE group_id = ?", byte[].class, groupId);
-        org.junit.jupiter.api.Assertions.assertArrayEquals(DOCX_BYTES, stored);
+        org.junit.jupiter.api.Assertions.assertEquals("local", storageProvider);
+        org.junit.jupiter.api.Assertions.assertNotNull(storageKey);
+        org.junit.jupiter.api.Assertions.assertNull(databaseBytes);
+        org.junit.jupiter.api.Assertions.assertArrayEquals(DOCX_BYTES, storage.read(storageKey));
 
         mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(studentJwt("rf-peer")))
                 .andExpect(status().isOk())

@@ -34,18 +34,15 @@ test('leftover permission pages no longer spinner-gate authLoading or hasAccess'
   }
 });
 
-test('public signup posts campus register fields through existing auth client', () => {
+test('public signup explains that student accounts are issued by the Academic Office', () => {
   const page = read('src/app/register/page.tsx');
   const api = read('src/lib/api.ts');
   const login = read('src/app/login/page.tsx');
-  assert.match(page, /authApi\.register|register\(/);
-  assert.match(page, /email/);
-  assert.match(page, /password/);
-  assert.match(page, /firstName/);
-  assert.match(page, /lastName/);
+  assert.match(page, /issuedByOfficeTitle/);
+  assert.match(page, /issuedByOfficeSteps/);
+  assert.doesNotMatch(page, /<form|authApi\.register/);
   assert.match(api, /post<LoginResponse>\('\/auth\/register'/);
   assert.doesNotMatch(login, /forgot-password|forgotPassword/);
-  assert.doesNotMatch(page, /forgot-password/);
 });
 
 test('leftover sources do not add new locale === vi UI dictionaries', () => {

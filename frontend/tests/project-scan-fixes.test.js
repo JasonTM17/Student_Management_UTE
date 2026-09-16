@@ -180,13 +180,12 @@ test('feedback polish: profile supports local photo preview and password visibil
   assert.match(messages, /photoUploadFailed/);
 });
 
-test('feedback polish: account creation and admin temporary passwords can be revealed intentionally', () => {
+test('feedback polish: admin temporary passwords can be revealed while student signup stays managed', () => {
   const signup = read('src/app/register/page.tsx');
   const adminUsers = read('src/app/admin/users/page.tsx');
 
-  assert.match(signup, /const \[showPassword, setShowPassword\] = useState\(false\)/);
-  assert.match(signup, /type=\{showPassword \? 'text' : 'password'\}/);
-  assert.match(signup, /messages\.login\.showPassword/);
+  assert.match(signup, /issuedByOfficeTitle/);
+  assert.doesNotMatch(signup, /<form|showPassword/);
   assert.match(adminUsers, /const \[showTemporaryPassword, setShowTemporaryPassword\] = useState\(false\)/);
   assert.match(adminUsers, /type=\{showTemporaryPassword \? 'text' : 'password'\}/);
   assert.match(adminUsers, /messages\.login\.hidePassword/);

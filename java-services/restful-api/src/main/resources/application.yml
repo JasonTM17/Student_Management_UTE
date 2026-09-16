@@ -43,6 +43,18 @@ spring:
     encoding: UTF-8
     cache: false
 
+thesis:
+  report:
+    storage:
+      # Local is the safe default for previews. Set provider=supabase only in
+      # an explicitly configured environment with a server-side service key.
+      provider: ${THESIS_REPORT_STORAGE_PROVIDER:local}
+      bucket: ${THESIS_REPORT_STORAGE_BUCKET:thesis-reports}
+      local-root: ${THESIS_REPORT_STORAGE_LOCAL_ROOT:${java.io.tmpdir}/campuscore/thesis-reports}
+      supabase-url: ${SUPABASE_URL:}
+      supabase-service-role-key: ${SUPABASE_SERVICE_ROLE_KEY:}
+      timeout-ms: ${THESIS_REPORT_STORAGE_TIMEOUT_MS:10000}
+
 server:
   port: ${PORT:${SERVER_PORT:4010}}
   forward-headers-strategy: framework
