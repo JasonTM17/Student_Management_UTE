@@ -30,6 +30,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import {
   getLocalizedDescription,
   getLocalizedName,
@@ -375,9 +376,13 @@ export default function AdminCoursesPage() {
 
       closeModal();
       await fetchCourses();
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       toast.error(
-        requestError.response?.data?.message ?? copy.saveFailed,
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
       );
     } finally {
       setIsSaving(false);

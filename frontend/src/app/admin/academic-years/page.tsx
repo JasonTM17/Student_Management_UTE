@@ -28,6 +28,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
+import { campusErrorMessage } from '@/lib/campus-error';
 
 interface AcademicYear {
   id: string;
@@ -275,9 +276,13 @@ export default function AdminAcademicYearsPage() {
 
       closeModal();
       await fetchAcademicYears();
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       toast.error(
-        requestError.response?.data?.message ?? copy.saveFailed,
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
       );
     } finally {
       setIsSaving(false);

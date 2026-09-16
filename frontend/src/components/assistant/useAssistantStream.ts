@@ -418,6 +418,12 @@ export function useAssistantStream({
                   ? assistantMessages.turnInProgress
                   : kind === 'quota'
                   ? assistantMessages.quotaExceeded
+                  : kind === 'forbidden'
+                  ? assistantMessages.forbidden
+                  : kind === 'unauthorized'
+                  ? assistantMessages.sessionExpired
+                  : kind === 'offline'
+                  ? assistantMessages.offline
                   : assistantMessages.unavailable,
               degraded: true,
               reasonCode: turnStillProcessing

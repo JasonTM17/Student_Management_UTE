@@ -41,6 +41,7 @@ import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
+import { campusErrorMessage } from '@/lib/campus-error';
 
 interface UserRecord {
   id: string;
@@ -519,7 +520,11 @@ export default function AdminUsersPage() {
       closeModal();
       await fetchUsers();
     } catch (err: any) {
-      const message = err.response?.data?.message || copy.saveFailed;
+      const message = campusErrorMessage(
+        err,
+        messages.common.campusErrors,
+        copy.saveFailed,
+      );
       setFormError(message);
       toast.error(message);
     } finally {

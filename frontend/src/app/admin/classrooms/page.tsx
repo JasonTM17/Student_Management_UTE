@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 
 interface Classroom {
   id: string;
@@ -310,9 +311,13 @@ export default function AdminClassroomsPage() {
 
       closeModal();
       await fetchClassrooms();
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       toast.error(
-        requestError.response?.data?.message ?? copy.saveFailed,
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
       );
     } finally {
       setIsSaving(false);

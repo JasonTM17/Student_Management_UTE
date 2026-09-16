@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import { getLocalizedName } from '@/lib/academic-content';
 import { ACADEMIC_REFERENCE_LIMIT } from '@/lib/reference-data';
 
@@ -392,9 +393,13 @@ export default function AdminSemestersPage() {
 
       closeModal();
       await fetchSemesters();
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       toast.error(
-        requestError.response?.data?.message ?? copy.saveFailed,
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
       );
     } finally {
       setIsSaving(false);
