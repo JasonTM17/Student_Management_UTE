@@ -100,8 +100,14 @@ public class MailController {
     }
 
     @GetMapping(value = "/preview/{templateName}", produces = MediaType.TEXT_HTML_VALUE + ";charset=UTF-8")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     @Operation(summary = "Xem trước trực tiếp giao diện HTML email trên trình duyệt")
     public ResponseEntity<String> previewTemplate(@PathVariable String templateName) {
+        // Wukong finding: the name flows into "mail/" + templateName, so only
+        // plain template slugs are accepted — no paths, no traversal.
+        if (!templateName.matches("[a-z0-9-]+")) {
+            return ResponseEntity.notFound().build();
+        }
         Map<String, Object> sampleData = buildSampleData(templateName);
         String html = emailService.renderPreview(templateName, sampleData);
         return ResponseEntity.ok(html);

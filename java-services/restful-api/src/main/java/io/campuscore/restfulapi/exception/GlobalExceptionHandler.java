@@ -18,6 +18,7 @@ import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
 import org.springframework.web.bind.annotation.RestControllerAdvice;
 import org.springframework.web.method.annotation.MethodArgumentTypeMismatchException;
+import org.springframework.web.multipart.MaxUploadSizeExceededException;
 import org.springframework.web.server.ResponseStatusException;
 import org.springframework.web.servlet.resource.NoResourceFoundException;
 
@@ -140,6 +141,18 @@ public class GlobalExceptionHandler {
                 HttpStatus.CONFLICT,
                 ErrorCode.CONFLICT.name(),
                 "Operation conflicted with existing database state",
+                request,
+                Map.of());
+    }
+
+    /** Wukong finding: an oversize multipart used to fall through to the 500
+     *  catch-all; the report-upload contract promises a 413 envelope. */
+    @ExceptionHandler(MaxUploadSizeExceededException.class)
+    public ResponseEntity<ErrorResponse> handleMaxUploadSize(MaxUploadSizeExceededException exception, HttpServletRequest request) {
+        return buildErrorResponse(
+                HttpStatus.PAYLOAD_TOO_LARGE,
+                "FILE_TOO_LARGE",
+                "The uploaded document must be 20 MB or smaller",
                 request,
                 Map.of());
     }

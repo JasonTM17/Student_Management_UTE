@@ -58,8 +58,7 @@ public final class ReportFilePolicy {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE_CONTENT",
                     "The document content does not match its .%s extension".formatted(extension));
         }
-        return new ValidatedFile(sanitizeName(original), normalizedType(file.getContentType(), extension),
-                data.length, data);
+        return new ValidatedFile(sanitizeName(original), typeFor(extension), data.length, data);
     }
 
     /** Display-only name: single path segment, printable, capped, extension preserved. */
@@ -116,15 +115,18 @@ public final class ReportFilePolicy {
         return true;
     }
 
-    private static String normalizedType(String contentType, String extension) {
-        if (contentType == null || contentType.isBlank() || contentType.contains("/") == false) {
-            return switch (extension) {
-                case "pdf" -> "application/pdf";
-                case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
-                default -> "application/msword";
-            };
-        }
-        return contentType;
+    /**
+     * Wukong finding: the client-controlled Content-Type was stored verbatim
+     * and echoed on download, so a garbage value could break the download and
+     * text/html leaned on disposition alone. The type now derives from the
+     * validated extension and the browser's declared type is ignored.
+     */
+    private static String typeFor(String extension) {
+        return switch (extension) {
+            case "pdf" -> "application/pdf";
+            case "docx" -> "application/vnd.openxmlformats-officedocument.wordprocessingml.document";
+            default -> "application/msword";
+        };
     }
 
     static AppException unsupported(String message) {
