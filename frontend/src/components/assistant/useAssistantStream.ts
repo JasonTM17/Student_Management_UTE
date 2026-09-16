@@ -37,6 +37,9 @@ export interface UseAssistantStreamOptions {
     sensitiveBlocked: string;
     technicalBlocked: string;
     turnInProgress: string;
+    forbidden?: string;
+    sessionExpired?: string;
+    offline?: string;
   };
   onReconcileHistory?: () => void;
   onNewExchange?: () => void;
