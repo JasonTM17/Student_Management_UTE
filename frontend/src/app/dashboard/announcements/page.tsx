@@ -188,8 +188,8 @@ export default function StudentAnnouncementsPage() {
           filterExam: 'Thi cử & Khảo thí',
           officialBadge: 'Khoa CNTT & Phòng Đào tạo',
           readFull: 'Đọc toàn văn',
-          viewMagazine: 'Tạp chí báo',
-          viewDispatch: 'Sổ công văn',
+          viewMagazine: 'Dạng Bản tin',
+          viewDispatch: 'Dạng Công văn',
         }
       : {
           eyebrow: 'HCMUTE • ACADEMIC AFFAIRS DEPARTMENT',

@@ -234,9 +234,9 @@ export function AdministrativeDispatchSheet({
             <Image
               src="/hcmute-logo.png"
               alt="HCMUTE Emblem"
-              width={48}
-              height={48}
-              className="h-full w-full object-contain"
+              fill
+              sizes="56px"
+              className="object-contain"
               priority
             />
           </div>

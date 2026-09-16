@@ -160,7 +160,7 @@ export default function GradesPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu sinh viên',
+          eyebrow: 'Cổng Sinh viên',
           title: 'Điểm số',
           description: `Xem kết quả đã công bố cho ${selectedSemesterName}, rồi chuyển sang bảng điểm khi cần.`,
           selectSemester: 'Chọn học kỳ cho điểm số',

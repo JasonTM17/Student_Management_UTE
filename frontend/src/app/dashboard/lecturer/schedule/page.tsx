@@ -216,7 +216,7 @@ export default function LecturerSchedulePage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu giảng viên',
+          eyebrow: 'Cổng Giảng viên',
           title: 'Lịch giảng dạy',
           description: 'Thời khóa biểu giảng dạy và lịch công tác học kỳ của giảng viên.',
           selectSemester: 'Chọn học kỳ cho lịch giảng dạy',

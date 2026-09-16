@@ -127,7 +127,7 @@ export function AnnouncementFeedCard({
                   src="/hcmute-logo.png"
                   alt="HCMUTE Emblem Watermark"
                   width={220}
-                  height={220}
+                  height={279}
                 />
               </div>
               <div className="relative z-10 flex items-center gap-2">
@@ -192,9 +192,9 @@ export function AnnouncementFeedCard({
                 <Image
                   src="/hcmute-logo.png"
                   alt="HCMUTE"
-                  width={24}
-                  height={24}
-                  className="h-full w-full object-contain"
+                  fill
+                  sizes="24px"
+                  className="object-contain"
                 />
               </div>
               <span className="font-medium line-clamp-1">{publisher}</span>
@@ -261,7 +261,7 @@ export function AnnouncementFeedCard({
                 src="/hcmute-logo.png"
                 alt="HCMUTE Emblem Watermark"
                 width={140}
-                height={140}
+                height={177}
               />
             </div>
             <div className="relative z-10 flex items-center justify-between">

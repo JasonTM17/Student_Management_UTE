@@ -424,9 +424,16 @@ export default function DashboardPage() {
                 </div>
               ) : (
                 nextMeetings.map((meeting) => {
-                  const room = [meeting.building, meeting.roomNumber]
-                    .filter(Boolean)
-                    .join(' ');
+                  const room =
+                    meeting.building && meeting.roomNumber
+                      ? (locale === 'vi'
+                          ? `Phòng ${meeting.building}-${meeting.roomNumber}`
+                          : `Room ${meeting.building}-${meeting.roomNumber}`)
+                      : meeting.roomNumber
+                        ? (locale === 'vi'
+                            ? `Phòng ${meeting.roomNumber}`
+                            : `Room ${meeting.roomNumber}`)
+                        : meeting.building;
                   const shift = getMeetingShift(meeting.startTime, locale);
 
                   const badgeText =

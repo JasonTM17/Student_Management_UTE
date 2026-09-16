@@ -141,9 +141,9 @@ export function EditorialArticleMagazine({
             <Image
               src="/hcmute-logo.png"
               alt="HCMUTE Emblem"
-              width={38}
-              height={38}
-              className="h-full w-full object-contain"
+              fill
+              sizes="40px"
+              className="object-contain"
             />
           </div>
           <div>

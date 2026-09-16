@@ -27,10 +27,10 @@ export function CampusUteEmblem({ className, size = 44 }: { className?: string; 
       <Image
         src="/hcmute-logo.png"
         alt="HCMUTE Official Logo"
-        width={size}
-        height={Math.round(size * (342 / 270))}
+        fill
+        sizes={`${size}px`}
         priority
-        className="h-full w-full object-contain"
+        className="object-contain"
       />
     </div>
   );

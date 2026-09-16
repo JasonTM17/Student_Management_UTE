@@ -107,7 +107,7 @@ export default function SectionGradingPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu giảng viên',
+          eyebrow: 'Cổng Giảng viên',
           title: 'Quản lý điểm',
           backToGrades: 'Quay lại quản lý điểm',
           missingSection: 'Không thể xác định lớp học phần đã chọn.',

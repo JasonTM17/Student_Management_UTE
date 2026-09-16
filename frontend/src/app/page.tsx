@@ -133,10 +133,10 @@ export default function HomePage() {
                 <Image
                   src="/hcmute-logo.png"
                   alt="Logo Trường Đại học Công nghệ Kỹ thuật TP.HCM"
-                  width={56}
-                  height={71}
+                  fill
+                  sizes="44px"
                   priority
-                  className="h-full w-full object-contain drop-shadow-xs"
+                  className="object-contain drop-shadow-xs"
                 />
               </div>
               <div className="space-y-1">
