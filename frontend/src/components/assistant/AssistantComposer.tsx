@@ -55,6 +55,8 @@ export function AssistantComposer({
           onChange={(event) => onInputChange(event.target.value)}
           onKeyDown={handleKeyDown}
           placeholder={messages.assistant.placeholder}
+          name="assistant-message"
+          autoComplete="off"
           rows={2}
           maxLength={2000}
           className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground md:text-sm"

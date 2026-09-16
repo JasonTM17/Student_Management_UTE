@@ -248,9 +248,9 @@ export function AssistantMessages({
                       className="flex items-center gap-1.5 py-1 text-muted-foreground"
                       aria-label={messages.assistant.thinking}
                     >
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 [animation-delay:-0.3s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary/80 [animation-delay:-0.15s]" />
-                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary/60 motion-reduce:animate-none [animation-delay:-0.3s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary/80 motion-reduce:animate-none [animation-delay:-0.15s]" />
+                      <span className="h-2 w-2 animate-bounce rounded-full bg-primary motion-reduce:animate-none" />
                       <span className="ml-2 text-xs font-normal text-muted-foreground">
                         {messages.assistant.thinking}
                       </span>

@@ -12,6 +12,9 @@ import { chromium } from '@playwright/test';
 const BASE_URL = (process.env.VERIFY_BASE_URL || 'http://127.0.0.1:3210').replace(/\/$/, '');
 const EMAIL = process.env.VERIFY_EMAIL;
 const PASSWORD = process.env.VERIFY_PASSWORD;
+// A group without a report presents "Nộp báo cáo"; after its first submission
+// the same control becomes "Cập nhật báo cáo".  Both states must open the form.
+const REPORT_FORM_TRIGGER = /^(?:Nộp|Cập nhật) báo cáo$/;
 
 // The fixture's original link-based submission, restored at the end.
 const ORIGINAL = {
@@ -54,7 +57,7 @@ async function login(page) {
 }
 
 async function openReportForm(page) {
-  const edit = page.getByRole('button', { name: /Cập nhật báo cáo/ }).first();
+  const edit = page.getByRole('button', { name: REPORT_FORM_TRIGGER }).first();
   await edit.waitFor({ state: 'visible', timeout: 60000 });
   await edit.click();
   await page.locator('#thesis-report-file').waitFor({ state: 'visible', timeout: 30000 });

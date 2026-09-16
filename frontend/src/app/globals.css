@@ -578,22 +578,86 @@
 }
 
 /* Reader Themes & Reading Comfort Utilities */
+.reader-theme-light {
+  color-scheme: light;
+  --reader-bg: #ffffff;
+  --reader-surface: #ffffff;
+  --reader-text: #172033;
+  --reader-muted: #526078;
+  --reader-border: #c7d0dc;
+  --background: 0 0% 100%;
+  --foreground: 217 34% 16%;
+  --card: 0 0% 100%;
+  --card-foreground: 220 24% 14%;
+  --popover: 0 0% 100%;
+  --popover-foreground: 220 24% 14%;
+  --primary: 212 100% 26.5%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 214 30% 94%;
+  --secondary-foreground: 215 38% 20%;
+  --muted: 216 25% 95%;
+  --muted-foreground: 217 14% 38%;
+  --accent: 213 72% 38%;
+  --accent-foreground: 0 0% 100%;
+  --border: 215 22% 83%;
+  --input: 215 22% 76%;
+  --ring: 213 72% 38%;
+  background-color: var(--reader-bg) !important;
+  color: var(--reader-text) !important;
+}
+
 .reader-theme-sepia {
-  --reader-bg: #fcf6e8;
+  color-scheme: light;
+  --reader-bg: #fbf0d9;
   --reader-surface: #f7eed8;
-  --reader-text: #382b1f;
-  --reader-muted: #796652;
-  --reader-border: #e7dac0;
+  --reader-text: #2d2a26;
+  --reader-muted: #675b4e;
+  --reader-border: #d8c9aa;
+  --background: 42 72% 91%;
+  --foreground: 30 18% 17%;
+  --card: 42 72% 91%;
+  --card-foreground: 30 18% 17%;
+  --popover: 42 72% 91%;
+  --popover-foreground: 30 18% 17%;
+  --primary: 26 63% 34%;
+  --primary-foreground: 0 0% 100%;
+  --secondary: 39 54% 84%;
+  --secondary-foreground: 30 22% 20%;
+  --muted: 39 54% 88%;
+  --muted-foreground: 30 12% 34%;
+  --accent: 26 63% 34%;
+  --accent-foreground: 0 0% 100%;
+  --border: 36 35% 75%;
+  --input: 36 35% 68%;
+  --ring: 26 63% 34%;
   background-color: var(--reader-bg) !important;
   color: var(--reader-text) !important;
 }
 
 .reader-theme-dark {
+  color-scheme: dark;
   --reader-bg: #0f172a;
   --reader-surface: #1e293b;
   --reader-text: #f8fafc;
   --reader-muted: #94a3b8;
   --reader-border: #334155;
+  --background: 220 18% 9%;
+  --foreground: 210 18% 94%;
+  --card: 220 14% 12%;
+  --card-foreground: 210 18% 94%;
+  --popover: 220 14% 12%;
+  --popover-foreground: 210 18% 94%;
+  --primary: 205 44% 72%;
+  --primary-foreground: 220 20% 9%;
+  --secondary: 220 11% 16%;
+  --secondary-foreground: 210 18% 94%;
+  --muted: 220 10% 14%;
+  --muted-foreground: 214 14% 84%;
+  --accent: 220 11% 16%;
+  --accent-foreground: 210 18% 94%;
+  --border: 220 9% 24%;
+  --input: 220 9% 24%;
+  --ring: 205 44% 72%;
   background-color: var(--reader-bg) !important;
   color: var(--reader-text) !important;
 }

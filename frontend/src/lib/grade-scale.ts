@@ -65,7 +65,10 @@ export function pointFromScore(score: number): number {
  * Returns null only when neither source is available.
  */
 export function resolveGradePoint(
-  record: Pick<StudentGradeRecord, 'gradePoint' | 'letterGrade'>,
+  record: Pick<StudentGradeRecord, 'gradePoint' | 'letterGrade'> & {
+    finalGrade?: number | null;
+    score?: number | null;
+  },
 ): number | null {
   if (typeof record.gradePoint === 'number' && Number.isFinite(record.gradePoint)) {
     return record.gradePoint;
@@ -73,6 +76,15 @@ export function resolveGradePoint(
   const letter = record.letterGrade;
   if (letter && GRADE_POINTS[letter] !== undefined) {
     return GRADE_POINTS[letter];
+  }
+  const numeric =
+    typeof record.finalGrade === 'number' && Number.isFinite(record.finalGrade)
+      ? record.finalGrade
+      : typeof record.score === 'number' && Number.isFinite(record.score)
+        ? record.score
+        : null;
+  if (numeric !== null) {
+    return pointFromScore(numeric);
   }
   return null;
 }
