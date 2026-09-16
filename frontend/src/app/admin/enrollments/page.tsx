@@ -112,7 +112,8 @@ function getStudentCodeLabel(enrollment: Enrollment) {
     return enrollment.studentId;
   }
   if (enrollment.studentId === 'student-profile') {
-    return '24110054';
+    // Never surface another student's code: leave the cell unresolved.
+    return '';
   }
   const match = enrollment.studentId?.match(/student-profile-(\d+)/);
   if (match) {
