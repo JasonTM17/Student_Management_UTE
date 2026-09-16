@@ -37,7 +37,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { useI18n } from '@/i18n';
-import { CONVERSION_TABLE, resolveGradePoint } from '@/lib/grade-scale';
+import { CONVERSION_TABLE, resolveGradePoint, bandUpperDisplay } from '@/lib/grade-scale';
 import { StudentUteProfileGradeView } from '@/components/dashboard/StudentUteProfileGradeView';
 
 function getGradeTone(letterGrade: string | null) {
@@ -1041,7 +1041,7 @@ export default function TranscriptPage() {
                         <td className="px-3 py-1.5 font-mono text-foreground">
                           {row.letter === 'F'
                             ? '< 4.0'
-                            : `${row.min.toFixed(1)} – ${(row.max! - 0.01).toFixed(1)}`}
+                            : `${row.min.toFixed(1)} – ${bandUpperDisplay(row.max!)}`}
                         </td>
                         <td className="px-3 py-1.5 font-semibold text-foreground">{row.letter}</td>
                         <td className="px-3 py-1.5 font-mono text-foreground">
@@ -1076,14 +1076,16 @@ export default function TranscriptPage() {
                 <p className="font-bold uppercase tracking-wider">TRƯỞNG KHOA CNTT</p>
                 <p className="italic text-muted-foreground mt-1">(Ký và ghi rõ họ tên)</p>
                 <div className="h-20" />
-                <p className="font-semibold text-foreground">PGS. TS. Hoàng Văn Dũng</p>
               </div>
               <div>
-                <p className="text-[11px] italic text-muted-foreground">TP. Hồ Chí Minh, ngày ... tháng ... năm 2026</p>
+                <p className="text-[11px] italic text-muted-foreground">
+                  {locale === 'vi'
+                    ? 'TP. Hồ Chí Minh, ngày ..... tháng ..... năm .....'
+                    : 'Ho Chi Minh City, date ..... month ..... year .....'}
+                </p>
                 <p className="font-bold uppercase tracking-wider mt-1">KT. HIỆU TRƯỞNG<br />PHÓ HIỆU TRƯỞNG</p>
                 <p className="italic text-muted-foreground mt-1">(Ký, đóng dấu và ghi rõ họ tên)</p>
                 <div className="h-16" />
-                <p className="font-semibold text-foreground">TS. Quách Thanh Hải</p>
               </div>
             </div>
           </div>

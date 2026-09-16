@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ArrowUpDown,
   BookOpen,
@@ -58,6 +58,7 @@ import { TinyMceEditor } from '@/components/ui/tinymce-editor';
 import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { cn } from '@/lib/utils';
+import { shouldSeedDefaultEditorDocument } from '@/lib/editor-document';
 
 export interface ContentBlock {
   id: string;
@@ -279,6 +280,11 @@ const DEFAULT_TINYMCE_EN = `
   </table>
 </div>
 `;
+
+const defaultEditorDocument = (inVietnamese: boolean) =>
+  inVietnamese
+    ? { title: 'Thông báo kế hoạch tổ chức học vụ học kỳ mới', content: DEFAULT_TINYMCE_VI }
+    : { title: 'Official Academic Schedule Notice', content: DEFAULT_TINYMCE_EN };
 
 const DEFAULT_MARKDOWN_VI = `# ĐỀ CƯƠNG HỌC PHẦN & TÀI LIỆU HƯỚNG DẪN
 
@@ -512,7 +518,16 @@ export default function AcademicEditorPage() {
     [isVi],
   );
 
-  // Initialize from storage or default
+  // Initialize from storage or default exactly once. The locale must never
+  // reseed this editor afterwards: an in-progress edit (a loaded announcement)
+  // or a hydrated draft would be wiped, and a subsequent save would overwrite
+  // a live record with the blank template.
+  const seedLocaleRef = useRef(isVi);
+  const editingIdRef = useRef(editingId);
+  useEffect(() => {
+    editingIdRef.current = editingId;
+  }, [editingId]);
+
   useEffect(() => {
     try {
       const savedEngine = localStorage.getItem(EDITOR_TYPE_KEY) as 'tinymce' | 'markdown' | null;
@@ -536,9 +551,13 @@ export default function AcademicEditorPage() {
       // ignore
     }
 
-    setTitle(isVi ? 'Thông báo kế hoạch tổ chức học vụ học kỳ mới' : 'Official Academic Schedule Notice');
-    setContent(isVi ? DEFAULT_TINYMCE_VI : DEFAULT_TINYMCE_EN);
-  }, [isVi]);
+    if (!shouldSeedDefaultEditorDocument({ hasStoredDraft: false, editingId: editingIdRef.current })) {
+      return;
+    }
+    const seed = defaultEditorDocument(seedLocaleRef.current);
+    setTitle(seed.title);
+    setContent(seed.content);
+  }, []);
 
   // Load site appearance for Hero control tab
   useEffect(() => {
