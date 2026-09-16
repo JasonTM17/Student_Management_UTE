@@ -1943,7 +1943,12 @@ export default function ThesisPage() {
 
                             <SupervisedGroupMembers
                               group={group}
-                              roundOpen={selectedRound?.status === 'REGISTRATION_OPEN'}
+                              roundOpen={
+                                // The group's own round gates its roster, not
+                                // the round the page is currently viewing.
+                                rounds.find((round) => round.id === group.roundId)?.status ===
+                                'REGISTRATION_OPEN'
+                              }
                               onChanged={(next) =>
                                 setGroups((current) =>
                                   current.map((item) => (item.id === next.id ? next : item)),

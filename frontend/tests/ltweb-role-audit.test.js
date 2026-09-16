@@ -95,8 +95,9 @@ test('member management pre-hides its controls when the round is closed', () => 
   assert.ok(component.includes('membersClosedRound'), 'a closed round must show an explanation');
   const page = readSource('src/app/dashboard/thesis/page.tsx');
   assert.ok(
-    page.includes("roundOpen={selectedRound?.status === 'REGISTRATION_OPEN'}"),
-    'the page must pass the round status down',
+    page.includes("rounds.find((round) => round.id === group.roundId)?.status ===") &&
+      page.includes("'REGISTRATION_OPEN'"),
+    'the page must gate each group by its own round status',
   );
 });
 
