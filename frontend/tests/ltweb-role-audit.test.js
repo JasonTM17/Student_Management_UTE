@@ -122,6 +122,26 @@ test('the report form offers a Word/PDF upload alongside the link', () => {
   assert.ok(migration.includes('file_data'), 'V44 must add the document column');
 });
 
+test('the report-file browser verifier opens both first-submit and update states', () => {
+  const verifier = readSource('scripts/verify-report-file.mjs');
+  assert.ok(
+    verifier.includes('const REPORT_FORM_TRIGGER = /^(?:Nộp|Cập nhật) báo cáo$/;'),
+    'the verifier must recognize the first-submit and update labels',
+  );
+  assert.ok(
+    verifier.includes('name: REPORT_FORM_TRIGGER'),
+    'the report-form locator must use the shared two-state trigger',
+  );
+});
+
+test('the local Mailpit profile does not require unsupported STARTTLS', () => {
+  const compose = readSource('../docker-compose.yml');
+  assert.ok(
+    compose.includes('SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:-false}'),
+    'the local SMTP profile must explicitly disable required STARTTLS for Mailpit',
+  );
+});
+
 // ---------- Item 10: field-level validation messages ----------
 
 test('the signup form renders per-field validation errors', () => {
@@ -159,3 +179,59 @@ test('the CI gate derives the expected schema boundary from the migrations', () 
   assert.ok(workflow.includes("sed -E 's/^V([0-9]+)__[^.]*\\.sql/\\1/p'"), 'the gate must derive the latest version');
   assert.ok(!workflow.includes('= "39"'), 'the stale literal boundary must be gone');
 });
+
+// ---------- Item 1: search prompt before catalog display ----------
+
+test('the course registration page requires search query before showing courses', () => {
+  const source = readSource('src/app/dashboard/register/page.tsx');
+  assert.ok(source.includes('const hasSearchQuery ='), 'must have hasSearchQuery guard');
+  assert.ok(source.includes('!hasSearchQuery ? ('), 'must guard catalog with search prompt');
+  assert.ok(source.includes('searchPromptTitle'), 'must render search prompt title');
+});
+
+// ---------- Item 2: grade point conversion fallback ----------
+
+test('resolveGradePoint falls back gracefully to letter grade and 10-scale score', () => {
+  const { resolveGradePoint } = load('src/lib/grade-scale.ts');
+  assert.equal(resolveGradePoint({ gradePoint: null, letterGrade: 'C+' }), 2.5);
+  assert.equal(resolveGradePoint({ gradePoint: null, letterGrade: 'B+' }), 3.5);
+  assert.equal(resolveGradePoint({ gradePoint: null, letterGrade: null, finalGrade: 6.7 }), 2.5);
+  assert.equal(resolveGradePoint({ gradePoint: null, letterGrade: null, finalGrade: 9.2 }), 4.0);
+  assert.equal(resolveGradePoint({ gradePoint: 3.5, letterGrade: 'B+' }), 3.5);
+});
+
+// ---------- Item 3: 4.0 GPA chart contains only 4.0 curves ----------
+
+test('GpaTrendChart does not plot 10-scale curve on the 4.0 axis', () => {
+  const source = readSource('src/components/dashboard/TranscriptCharts.tsx');
+  assert.ok(!source.includes('avgTenScale'), 'GpaTrendChart must not contain 10-scale series');
+  assert.ok(source.includes('TenScaleTrendChart'), '10-scale is separated into its own chart');
+});
+
+// ---------- Item 4: conduct certificate contains no QR code ----------
+
+test('conduct certificate modal contains no QR code', () => {
+  const source = readSource('src/app/dashboard/conduct/page.tsx');
+  assert.ok(!source.includes('QrCode'), 'must not render QrCode icon');
+  assert.ok(!source.includes('XÁC THỰC SỐ UTE'), 'must not render old QR verification text');
+  assert.ok(source.includes('digitallyVerified'), 'retains modern digital verification badge');
+});
+
+// ---------- Item 8: profile names cannot be edited ----------
+
+test('profile first and last name fields are disabled', () => {
+  const source = readSource('src/app/dashboard/profile/page.tsx');
+  assert.ok(source.includes('id="profile-first-name"'), 'first name input exists');
+  assert.ok(source.includes('id="profile-last-name"'), 'last name input exists');
+  assert.ok(source.includes('nameManagedHint'), 'has managed hint for name');
+});
+
+// ---------- Items 9 & 10: lecturer grading import and validation ----------
+
+test('lecturer grading page includes Excel import and invalid score alert', () => {
+  const source = readSource('src/app/dashboard/lecturer/grades/[id]/page.tsx');
+  assert.ok(source.includes('GradeImportPanel'), 'must include GradeImportPanel');
+  assert.ok(source.includes('scoreErrors'), 'must track scoreErrors state');
+  assert.ok(source.includes('invalidScore'), 'must show invalidScore message');
+});
+

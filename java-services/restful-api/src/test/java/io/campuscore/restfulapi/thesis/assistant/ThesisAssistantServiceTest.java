@@ -185,10 +185,15 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.isCourseRegistrationQuery("Khi nào đăng ký học phần?"));
         assertTrue(ThesisAssistantService.isCourseRegistrationQuery("Khi nao dang ky hoc phan?"));
         assertTrue(ThesisAssistantService.isCourseRegistrationQuery("How does add/drop work for registration?"));
+        assertTrue(ThesisAssistantService.isCreditLimitQuery("Quy dinh tin chi toi da la gi?"));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("registration"));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("sections"));
         assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("đăng ký"));
         assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("học phần"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Cho toi xem lich hoc").contains("lịch học"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Thoi khoa bieu hoc ky nay").contains("thời khóa biểu"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Tra cuu diem").contains("điểm"));
+        assertTrue(ThesisAssistantService.retrievalTerms("Quy dinh tin chi toi da").contains("tối đa"));
 
         ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
         var unrelated = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
@@ -202,8 +207,12 @@ class ThesisAssistantServiceTest {
                 "registration-vi", "registration-window-vi", "vi", "Đăng ký học phần",
                 "Kiểm tra thời hạn đăng ký học phần trước khi chọn lớp.",
                 "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+        var creditLimitVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "credit-limit-vi", "credit-limit-vi", "vi", "Giới hạn tín chỉ",
+                "Quy định tín chỉ tối đa mỗi học kỳ là 28 tín chỉ.",
+                "registrar", "REGISTRATION", UUID.randomUUID(), 1);
         when(knowledge.search(anyString(), anyList(), anyInt()))
-                .thenReturn(List.of(unrelated, registration, registrationVietnamese));
+                .thenReturn(List.of(unrelated, registration, registrationVietnamese, creditLimitVietnamese));
 
         ChatResponse response = new ThesisAssistantService(knowledge)
                 .answer("When can I enroll in classes?", "en");
@@ -226,6 +235,13 @@ class ThesisAssistantServiceTest {
 
         assertEquals("registration-window-en", addDropResponse.citations().get(0).slug());
         assertTrue(addDropResponse.citations().stream()
+                .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
+
+        ChatResponse creditLimitResponse = new ThesisAssistantService(knowledge)
+                .answer("Quy dinh tin chi toi da la gi?", "vi");
+
+        assertTrue(!creditLimitResponse.citations().isEmpty());
+        assertTrue(creditLimitResponse.citations().stream()
                 .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
     }
 

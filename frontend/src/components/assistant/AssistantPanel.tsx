@@ -282,10 +282,15 @@ export function AssistantPanel() {
   }, [dispatch, loadingMoreMessages, messageCursor, state.conversationId]);
 
   useEffect(() => {
-    if (!open || historyFetchedRef.current || selectedHistoryRef.current)
+    if (
+      !open ||
+      historyStatus !== 'idle' ||
+      historyFetchedRef.current ||
+      selectedHistoryRef.current
+    )
       return;
     loadHistory();
-  }, [loadHistory, open]);
+  }, [historyStatus, loadHistory, open]);
 
   useEffect(() => {
     const node = logRef.current;
@@ -426,17 +431,17 @@ export function AssistantPanel() {
             tabIndex={-1}
             aria-labelledby="assistant-panel-title"
             aria-describedby="assistant-panel-description"
-            className="relative flex h-full flex-col overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
+            className="relative flex h-full flex-col overscroll-contain overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-auto md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
           >
-            {/* Header with quick New Chat and live status indicator */}
-            <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm">
+            {/* Header with quick New Chat and a neutral assistant identity indicator */}
+            <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm dark:from-[#0b3a70] dark:via-[#004eab] dark:to-[#005fcf]">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
                   <Bot className="h-4 w-4" aria-hidden="true" />
-                  <span className="absolute -bottom-0.5 -right-0.5 flex h-2.5 w-2.5">
-                    <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-emerald-400 opacity-75" />
-                    <span className="relative inline-flex h-2.5 w-2.5 rounded-full border border-white bg-emerald-500" />
-                  </span>
+                  <span
+                    className="absolute -bottom-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white bg-white/75"
+                    aria-hidden="true"
+                  />
                 </div>
                 <div className="min-w-0">
                   <h2
@@ -530,7 +535,7 @@ export function AssistantPanel() {
               aria-live={isSending ? 'off' : 'polite'}
               aria-relevant="additions text"
               aria-busy={isSending}
-              className="min-h-44 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
+              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
             >
               {messageCursor && state.messages.length > 0 ? (
                 <div className="flex justify-center">
@@ -630,7 +635,7 @@ export function AssistantPanel() {
               <button
                 type="button"
                 onClick={scrollToBottom}
-                className="absolute bottom-20 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95"
+                className="absolute bottom-20 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
                 aria-label={messages.assistant.scrollToLatest}
               >
                 <ArrowDown className="h-3 w-3" aria-hidden="true" />

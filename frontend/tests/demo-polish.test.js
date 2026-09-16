@@ -107,6 +107,17 @@ test('assistant follow-up chips render from panel state, not markdown', () => {
   assert.match(messagesSource, /onFollowUp\(suggestion\)/);
 });
 
+test('conduct certificate shortcut keeps a visible keyboard focus ring', () => {
+  const conduct = fs.readFileSync(
+    path.join(root, 'src/app/dashboard/conduct/page.tsx'),
+    'utf8',
+  );
+  assert.match(
+    conduct,
+    /className="inline-flex min-h-8 items-center text-primary font-medium cursor-pointer hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"/,
+  );
+});
+
 test('document titles are wired through the shared hook in both shells', () => {
   const hook = fs.readFileSync(path.join(root, 'src/lib/use-document-title.ts'), 'utf8');
   assert.match(hook, /document\.title = /);

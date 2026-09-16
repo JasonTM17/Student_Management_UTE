@@ -40,8 +40,12 @@ export function AssistantHistoryPanel({
   return (
     <div
       className="border-b border-border/70 bg-secondary/30 px-3 py-3"
-      aria-label={messages.assistant.history}
+      role="region"
+      aria-labelledby="assistant-history-title"
     >
+      <h3 id="assistant-history-title" className="sr-only">
+        {messages.assistant.history}
+      </h3>
       <div className="mb-2 flex items-center justify-between gap-2">
         <Button
           type="button"

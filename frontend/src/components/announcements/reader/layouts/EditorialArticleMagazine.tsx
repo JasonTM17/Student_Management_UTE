@@ -84,6 +84,7 @@ export function EditorialArticleMagazine({
     <article
       className={cn(
         'mx-auto max-w-4xl space-y-8 p-4 sm:p-8 transition-colors duration-200',
+        `reader-theme-${preferences.theme}`,
         preferences.fontFamily === 'serif' ? 'font-serif' : 'font-sans',
         preferences.theme === 'sepia'
           ? 'bg-[#FBF0D9] text-[#2D2A26] rounded-2xl shadow-sm'
@@ -91,6 +92,7 @@ export function EditorialArticleMagazine({
             ? 'bg-slate-900 text-slate-100 rounded-2xl shadow-sm'
             : 'bg-card text-foreground rounded-2xl shadow-sm border border-border/70',
       )}
+      data-reader-theme={preferences.theme}
     >
       {/* 1. Category Pill & Reading Time Header */}
       <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/50 pb-4">

@@ -641,7 +641,7 @@ export default function StudentConductPage() {
                 onClick={() => {
                   document.getElementById('conduct-activities-section')?.scrollIntoView({ behavior: 'smooth' });
                 }}
-                className="inline-flex min-h-8 items-center text-primary font-medium cursor-pointer hover:underline focus:outline-none"
+                className="inline-flex min-h-8 items-center text-primary font-medium cursor-pointer hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               >
                 {copy.viewCertificates}
               </button>

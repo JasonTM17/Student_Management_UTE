@@ -193,6 +193,7 @@ export function AdministrativeDispatchSheet({
   };
 
   const signer = getSignerInfo(publisherName, locale, announcement);
+  const isReaderDark = preferences.theme === 'dark';
 
   const subjectHeading = announcement.title.toUpperCase().startsWith('THÔNG BÁO')
     ? announcement.title.replace(/^THÔNG BÁO\s*[:-]?\s*/i, 'V/v ')
@@ -215,6 +216,7 @@ export function AdministrativeDispatchSheet({
     <div
       className={cn(
         'mx-auto max-w-4xl rounded-xl border border-border/80 p-6 sm:p-10 shadow-sm space-y-6 transition-colors duration-200 print:border-none print:shadow-none print:p-0',
+        `reader-theme-${preferences.theme}`,
         preferences.fontFamily === 'serif' ? 'font-serif' : 'font-sans',
         preferences.theme === 'sepia'
           ? 'bg-[#FBF0D9] text-[#2D2A26]'
@@ -222,6 +224,7 @@ export function AdministrativeDispatchSheet({
             ? 'bg-card text-foreground'
             : 'bg-white text-foreground',
       )}
+      data-reader-theme={preferences.theme}
     >
       {/* Header Row: University Issuer & National Motto (Decree 30/2020) */}
       <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 sm:items-start border-b border-border/60 pb-6">
@@ -356,18 +359,43 @@ export function AdministrativeDispatchSheet({
           </p>
 
           {/* Official Electronic Seal Box (Dấu Ký Số Điện Tử Chuẩn e-Office) */}
-          <div className="my-2 sm:ml-auto max-w-[260px] rounded border-2 border-red-600 dark:border-red-500 bg-red-500/[0.06] dark:bg-red-950/40 p-2.5 text-left shadow-xs">
-            <div className="flex items-center gap-1.5 border-b border-red-500/40 pb-1 text-[10.5px] font-bold uppercase tracking-tight text-red-600 dark:text-red-400">
-              <ShieldCheck className="h-4 w-4 shrink-0 text-red-600 dark:text-red-400" />
+          <div
+            className={cn(
+              'my-2 sm:ml-auto max-w-[260px] rounded border-2 p-2.5 text-left shadow-xs',
+              isReaderDark ? 'border-red-500 bg-red-950/40' : 'border-red-600 bg-red-50/80',
+            )}
+          >
+            <div
+              className={cn(
+                'flex items-center gap-1.5 border-b border-red-500/40 pb-1 text-[10.5px] font-bold uppercase tracking-tight',
+                isReaderDark ? 'text-red-400' : 'text-red-700',
+              )}
+            >
+              <ShieldCheck
+                className={cn(
+                  'h-4 w-4 shrink-0',
+                  isReaderDark ? 'text-red-400' : 'text-red-700',
+                )}
+              />
               <span>KÝ BỞI: {copy.eSealOrg}</span>
             </div>
-            <div className="pt-1.5 text-[10px] leading-snug text-red-700 dark:text-red-300 space-y-0.5 font-sans">
+            <div
+              className={cn(
+                'pt-1.5 text-[10px] leading-snug space-y-0.5 font-sans',
+                isReaderDark ? 'text-red-300' : 'text-red-800',
+              )}
+            >
               <p className="font-semibold">Đơn vị: {signer.sealUnit || publisherName}</p>
               <p>Người ký: {signer.name}</p>
               <p>
                 Ngày ký: {day}/{month}/{year} {dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
               </p>
-              <p className="text-[9.5px] text-red-600 dark:text-red-400 italic">
+              <p
+                className={cn(
+                  'text-[9.5px] italic',
+                  isReaderDark ? 'text-red-400' : 'text-red-700',
+                )}
+              >
                 ✓ {copy.certStatus}
               </p>
             </div>

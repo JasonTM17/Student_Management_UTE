@@ -789,6 +789,8 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.doesNotMatch(composerSource, /Enter để gửi · Shift\+Enter xuống dòng/);
   assert.match(composerSource, /messages\.assistant\.composerHint/);
   assert.match(composerSource, /text-base[\s\S]*md:text-sm/);
+  assert.match(composerSource, /name="assistant-message"/);
+  assert.match(composerSource, /autoComplete="off"/);
 
   const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
   assert.doesNotMatch(panelSource, /aria-label="Cuộc trò chuyện mới"/);
@@ -798,9 +800,14 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(panelSource, /followUpsByDomain/);
   // Mobile opens as a full-screen sheet; desktop keeps the floating card.
   assert.match(panelSource, /inset-0 md:inset-auto/);
+  assert.match(panelSource, /overscroll-contain/);
+  assert.match(panelSource, /min-h-0 flex-1/);
+  assert.doesNotMatch(panelSource, /animate-ping/);
+  assert.match(panelSource, /dark:from-\[#0b3a70\]/);
 
   const messagesComponent = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantMessages.tsx'), 'utf8');
   assert.match(messagesComponent, /PERSONAL_CONTEXT/);
+  assert.match(messagesComponent, /motion-reduce:animate-none/);
   assert.match(messagesComponent, /aria-expanded=\{isCitationOpen\}/);
   assert.match(messagesComponent, /aria-controls=\{`assistant-citations-\$\{message\.id\}`\}/);
 
@@ -1036,10 +1043,13 @@ test('assistant history paginates with the server cursor', () => {
   assert.match(panelSource, /historyCursor/);
   assert.match(panelSource, /listConversationsPage\(\{\s*limit: 20,\s*cursor: historyCursor,\s*\}\)/);
   assert.match(panelSource, /onLoadMore=\{\(\) => void loadMoreHistory\(\)\}/);
+  assert.match(panelSource, /historyStatus !== 'idle'/);
 
   const historySource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantHistoryPanel.tsx'), 'utf8');
   assert.match(historySource, /nextCursor && historyStatus === 'loaded'/);
   assert.match(historySource, /messages\.assistant\.loadMoreHistory/);
+  assert.match(historySource, /role="region"/);
+  assert.match(historySource, /aria-labelledby="assistant-history-title"/);
 
   const messagesSource = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
   assert.match(messagesSource, /loadMoreHistory: 'Load more conversations'/);

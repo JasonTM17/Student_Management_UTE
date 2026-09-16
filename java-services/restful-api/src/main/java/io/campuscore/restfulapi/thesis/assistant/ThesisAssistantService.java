@@ -14,6 +14,7 @@ import java.util.ArrayList;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.concurrent.CancellationException;
@@ -175,6 +176,10 @@ public class ThesisAssistantService {
             "(?i)(?:\\b(?:course|courses|class|classes|section|sections|module|modules)\\b|\\b(?:hoc\\s+phan|mon(?:\\s+hoc)?)\\b|\\badd\\s*[/-]?\\s*drop\\b)");
     private static final java.util.regex.Pattern REGISTRATION_TIME_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:deadline|window|period|when|date|dates)\\b|\\b(?:khi\\s+nao|bao\\s+gio|thoi\\s+diem|han\\s+(?:chot|dang\\s+ky)|dot\\s+dang\\s+ky)\\b)");
+    private static final java.util.regex.Pattern CREDIT_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:credit|credits)\\b|\\b(?:tin\\s+chi)\\b)");
+    private static final java.util.regex.Pattern CREDIT_LIMIT_SIGNAL = java.util.regex.Pattern.compile(
+            "(?i)(?:\\b(?:maximum|minimum|limit|limits|workload)\\b|\\b(?:toi\\s+(?:da|thieu)|gioi\\s+han|khoi\\s+luong)\\b)");
     private static final java.util.regex.Pattern THESIS_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:thesis|capstone|report|defen[cs]e|council|reviewer)\\b|\\b(?:do\\s+an|khoa\\s+luan|bao\\s+cao|bao\\s+ve|hoi\\s+dong|phan\\s+bien)\\b)");
 
@@ -763,13 +768,13 @@ public class ThesisAssistantService {
             }
         }
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
-        if (isCourseRegistrationQuery(message)) {
+        if (isCourseRegistrationQuery(message) || isCreditLimitQuery(message)) {
             List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
                     .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
                     .toList();
             // If the scoped search did not find a registration document, fail
             // closed with no citation rather than displaying policy documents
-            // that happen to mention a deadline or classes.
+            // that happen to mention a deadline, classes, or credit counts.
             documents = registrationDocuments;
         }
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
@@ -815,6 +820,11 @@ public class ThesisAssistantService {
         if (THESIS_SIGNAL.matcher(folded).find() && !COURSE_SIGNAL.matcher(folded).find()) return false;
         boolean registration = REGISTRATION_SIGNAL.matcher(folded).find();
         return registration && (COURSE_SIGNAL.matcher(folded).find() || REGISTRATION_TIME_SIGNAL.matcher(folded).find());
+    }
+    static boolean isCreditLimitQuery(String message) {
+        if (message == null || message.isBlank()) return false;
+        String folded = foldForMatching(message);
+        return CREDIT_SIGNAL.matcher(folded).find() && CREDIT_LIMIT_SIGNAL.matcher(folded).find();
     }
 
     private ChatResponse lexicalAnswer(String message, String locale) {
@@ -927,6 +937,39 @@ public class ThesisAssistantService {
             "a", "an", "and", "are", "can", "could", "do", "does", "for", "how", "i", "is", "it", "may", "me", "of", "on", "or", "please", "should", "tell", "the", "to", "what", "when", "where", "why", "with", "would",
             "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi",
             "của", "để", "là", "làm", "nên", "như", "những", "gì", "nào", "tôi", "và", "về", "với", "các", "có", "được", "không", "thì", "ra", "sao");
+    private static final Map<String, String> VIETNAMESE_FOLDED_PHRASE_ALIASES = Map.ofEntries(
+            Map.entry("dang ky", "đăng ký"),
+            Map.entry("hoc phan", "học phần"),
+            Map.entry("lich hoc", "lịch học"),
+            Map.entry("thoi khoa bieu", "thời khóa biểu"),
+            Map.entry("diem", "điểm"),
+            Map.entry("thong bao", "thông báo"),
+            Map.entry("khoa luan", "khóa luận"),
+            Map.entry("hoc vu", "học vụ"),
+            Map.entry("tin chi", "tín chỉ"),
+            Map.entry("mon hoc", "môn học"),
+            Map.entry("lop hoc phan", "lớp học phần"),
+            Map.entry("thuc tap", "thực tập"),
+            Map.entry("bao luu", "bảo lưu"),
+            Map.entry("bao ve", "bảo vệ"),
+            Map.entry("giang vien", "giảng viên"),
+            Map.entry("chuong trinh", "chương trình"),
+            Map.entry("hoc bong", "học bổng"),
+            Map.entry("hoc phi", "học phí"),
+            Map.entry("tai khoan", "tài khoản"),
+            Map.entry("mat khau", "mật khẩu"),
+            Map.entry("thu tuc", "thủ tục"),
+            Map.entry("quy dinh", "quy định"),
+            Map.entry("dieu kien", "điều kiện"),
+            Map.entry("toi da", "tối đa"),
+            Map.entry("toi thieu", "tối thiểu"),
+            Map.entry("gioi han", "giới hạn"),
+            Map.entry("khoi luong", "khối lượng"),
+            Map.entry("hoc ky", "học kỳ"),
+            Map.entry("nam hoc", "năm học"),
+            Map.entry("ky hoc", "kỳ học"),
+            Map.entry("thoi gian", "thời gian"),
+            Map.entry("ket qua", "kết quả"));
     static List<String> retrievalTerms(String message) {
         String source = message == null ? "" : message;
         List<String> baseTerms = java.util.Arrays.stream(source.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
@@ -950,6 +993,14 @@ public class ThesisAssistantService {
                 default -> { }
             }
         }
+        String foldedPhraseSource = " " + foldForMatching(source)
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .trim() + " ";
+        VIETNAMESE_FOLDED_PHRASE_ALIASES.forEach((foldedPhrase, accentedPhrase) -> {
+            if (foldedPhraseSource.contains(" " + foldedPhrase + " ")) {
+                expanded.add(accentedPhrase);
+            }
+        });
         if ((baseTerms.contains("đăng") && baseTerms.contains("ký"))
                 || (foldedTerms.contains("dang") && foldedTerms.contains("ky"))) expanded.add("đăng ký");
         if ((baseTerms.contains("học") && baseTerms.contains("phần"))

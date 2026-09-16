@@ -80,6 +80,7 @@ test('dual-domain announcement reader coordinates editorial magazine and officia
   const feedCard = read('src/components/announcements/feed/AnnouncementFeedCard.tsx');
   const homeSection = read('src/components/home/HomeNewsSection.tsx');
   const homePage = read('src/app/page.tsx');
+  const globals = read('src/app/globals.css');
 
   // Reader master coordinator
   assert.match(reader, /resolveAnnouncementDomain/);
@@ -102,6 +103,13 @@ test('dual-domain announcement reader coordinates editorial magazine and officia
   assert.match(magazine, /TableOfContents/);
   assert.match(dispatch, /ShieldCheck/);
   assert.match(dispatch, /eSealOrg/);
+  assert.match(dispatch, /reader-theme-\$\{preferences\.theme\}/);
+  assert.match(dispatch, /const isReaderDark = preferences\.theme === 'dark'/);
+  assert.doesNotMatch(dispatch, /dark:bg-red-950\/40/);
+  assert.match(magazine, /reader-theme-\$\{preferences\.theme\}/);
+  assert.match(globals, /\.reader-theme-light/);
+  assert.match(globals, /\.reader-theme-sepia/);
+  assert.match(globals, /\.reader-theme-dark/);
   assert.match(toc, /extractTocHeadings/);
   assert.match(attachments, /extractAttachmentsFromContent/);
 
@@ -113,4 +121,3 @@ test('dual-domain announcement reader coordinates editorial magazine and officia
   assert.match(homeSection, /AnnouncementReaderModal/);
   assert.match(homePage, /<HomeNewsSection \/>/);
 });
-
