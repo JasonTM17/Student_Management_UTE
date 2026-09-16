@@ -1214,7 +1214,7 @@ export default function AcademicEditorPage() {
                     onClick={handlePublishAnnouncement}
                     disabled={isPublishingNotice}
                     size="sm"
-                    className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 text-white font-semibold shadow-xs"
+                    className="gap-1.5 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white font-semibold shadow-xs"
                   >
                     <Send className="h-4 w-4" />
                     {isPublishingNotice
@@ -1370,7 +1370,7 @@ export default function AcademicEditorPage() {
                       variant="default"
                       size="sm"
                       onClick={handleCompileBlocksToTinyMce}
-                      className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 text-white text-xs font-semibold shadow-xs"
+                      className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
                       {isVi ? 'Chèn tất cả khối vào văn bản' : 'Insert All Blocks'}
@@ -1470,7 +1470,7 @@ export default function AcademicEditorPage() {
                     {isVi
                       ? 'Kho Bài Viết & Thông Báo Đang Lưu Trong Cơ Sở Dữ Liệu'
                       : 'Live Announcements in Campus Records'}
-                    <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-blue-600 border border-blue-500/20">
+                    <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-blue-600 dark:text-blue-300 border border-blue-500/20">
                       {isVi ? 'Kéo thả thứ tự' : 'Custom Order'}
                     </span>
                   </CardTitle>
@@ -1599,10 +1599,10 @@ export default function AcademicEditorPage() {
                               className={cn(
                                 'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
                                 ann.priority === 'URGENT'
-                                  ? 'bg-red-500/10 text-red-600 border border-red-500/30'
+                                  ? 'bg-red-500/10 text-red-600 dark:text-red-300 border border-red-500/30'
                                   : ann.priority === 'HIGH'
-                                  ? 'bg-amber-500/10 text-amber-600 border border-amber-500/30'
-                                  : 'bg-blue-500/10 text-blue-600 border border-blue-500/30'
+                                  ? 'bg-amber-500/10 text-amber-600 dark:text-amber-300 border border-amber-500/30'
+                                  : 'bg-blue-500/10 text-blue-600 dark:text-blue-300 border border-blue-500/30'
                               )}
                             >
                               {ann.priority}
