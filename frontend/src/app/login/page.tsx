@@ -379,7 +379,7 @@ export default function LoginPage() {
           </Button>
         </form>
 
-        {portal === 'student' ? (
+        {portal === 'student' || portal === 'lecturer' ? (
           <p className="text-sm text-muted-foreground">
             {messages.signup.needAccount}{' '}
             <LocalizedLink href="/register" className="inline-flex min-h-8 items-center font-medium text-primary hover:underline">

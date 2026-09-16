@@ -270,6 +270,12 @@ export function refreshSessionSingleFlight(): Promise<LoginResponse> {
 }
 
 api.interceptors.request.use((config) => {
+  // Let the browser adapter add the multipart boundary for file uploads. The
+  // instance-wide JSON default otherwise makes Spring reject FormData before
+  // the controller can validate or store the document.
+  if (typeof FormData !== 'undefined' && config.data instanceof FormData) {
+    config.headers.delete('Content-Type');
+  }
   return applyCsrfHeader(config as AuthInternalRequestConfig);
 });
 

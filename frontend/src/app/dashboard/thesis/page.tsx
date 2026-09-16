@@ -87,6 +87,21 @@ function fillCopy(template: string, values: Record<string, string | number>): st
   );
 }
 
+function formatReportFileSize(bytes: number | null | undefined, locale: string): string | null {
+  if (!Number.isFinite(bytes) || !bytes || bytes < 0) return null;
+  const units = ['B', 'KB', 'MB', 'GB'];
+  let value = bytes;
+  let unitIndex = 0;
+  while (value >= 1024 && unitIndex < units.length - 1) {
+    value /= 1024;
+    unitIndex += 1;
+  }
+  const formatted = new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
+    maximumFractionDigits: unitIndex === 0 ? 0 : 1,
+  }).format(value);
+  return `${formatted} ${units[unitIndex]}`;
+}
+
 /** Renders `**bold**` spans inside a copy string as inline emphasis. */
 function renderInlineBold(text: string): React.ReactNode[] {
   return text
@@ -1325,17 +1340,39 @@ export default function ThesisPage() {
                             ) : null}
                             {groupReport.fileName ? (
                               // Feedback item 7: the attached Word/PDF document.
-                              <button
-                                type="button"
-                                onClick={() => void handleDownloadReportFile()}
-                                className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
-                              >
-                                {messages.thesis.report.downloadFile}
-                                <FileDown className="h-3.5 w-3.5" />
-                                <span className="text-xs text-muted-foreground">
-                                  ({groupReport.fileName})
-                                </span>
-                              </button>
+                              <div className="flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-3 sm:flex-row sm:items-center sm:justify-between">
+                                <div className="flex min-w-0 items-start gap-2.5">
+                                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <FileStack className="h-4 w-4" aria-hidden="true" />
+                                  </span>
+                                  <div className="min-w-0">
+                                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                                      {messages.thesis.report.documentAttached}
+                                    </p>
+                                    <p
+                                      className="truncate text-sm font-medium text-foreground"
+                                      title={groupReport.fileName}
+                                    >
+                                      {groupReport.fileName}
+                                    </p>
+                                    <p className="text-xs text-muted-foreground">
+                                      {[groupReport.fileType, formatReportFileSize(groupReport.fileSize, locale)]
+                                        .filter(Boolean)
+                                        .join(' · ')}
+                                    </p>
+                                  </div>
+                                </div>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="outline"
+                                  onClick={() => void handleDownloadReportFile()}
+                                  className="shrink-0 self-start sm:self-auto"
+                                >
+                                  {messages.thesis.report.downloadFile}
+                                  <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                                </Button>
+                              </div>
                             ) : null}
                             {groupReport.url ? (
                               <a
@@ -1386,43 +1423,67 @@ export default function ThesisPage() {
                                 disabled={isActionPending}
                               />
                             </div>
-                            <div>
-                              <label
-                                className="mb-1 block text-xs font-medium text-foreground"
-                                htmlFor="thesis-report-file"
-                              >
-                                {messages.thesis.report.fileLabel}
-                              </label>
+                            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.025] p-3">
+                              <div className="flex items-start gap-2.5">
+                                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                  <FileStack className="h-4 w-4" aria-hidden="true" />
+                                </span>
+                                <div className="min-w-0">
+                                  <label
+                                    className="block text-sm font-semibold text-foreground"
+                                    htmlFor="thesis-report-file"
+                                  >
+                                    {messages.thesis.report.fileLabel}
+                                  </label>
+                                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                                    {messages.thesis.report.uploadPrimaryHint}
+                                  </p>
+                                </div>
+                              </div>
                               <input
                                 id="thesis-report-file"
                                 type="file"
                                 accept=".pdf,.doc,.docx"
                                 onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
                                 disabled={isActionPending}
-                                className="block w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground hover:file:bg-secondary/80"
+                                className="mt-3 block w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground hover:file:bg-secondary/80"
                               />
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                {messages.thesis.report.fileHint}
-                              </p>
+                              {reportFile ? (
+                                <p className="mt-2 truncate text-xs text-muted-foreground" title={reportFile.name}>
+                                  {messages.thesis.report.selectedFile}: {reportFile.name} ·{' '}
+                                  {formatReportFileSize(reportFile.size, locale)}
+                                </p>
+                              ) : null}
                             </div>
-                            <div>
-                              <label
-                                className="mb-1 block text-xs font-medium text-foreground"
-                                htmlFor="thesis-report-url"
-                              >
-                                {messages.thesis.report.urlLabel}
-                              </label>
-                              <Input
-                                id="thesis-report-url"
-                                value={reportUrl}
-                                onChange={(e) => setReportUrl(e.target.value)}
-                                placeholder="https://..."
-                                disabled={isActionPending}
-                              />
-                              <p className="mt-1 text-[11px] text-muted-foreground">
-                                {pageCopy.reportLinkHint}
-                              </p>
-                            </div>
+                            <details
+                              className="group rounded-xl border border-border/70 bg-secondary/20 px-3"
+                              open={Boolean(reportUrl)}
+                            >
+                              <summary className="cursor-pointer list-none py-3 text-sm font-medium text-foreground marker:hidden">
+                                <span className="inline-flex items-center gap-2">
+                                  <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                                  {messages.thesis.report.urlAlternative}
+                                </span>
+                              </summary>
+                              <div className="border-t border-border/60 pb-3 pt-3">
+                                <label
+                                  className="mb-1 block text-xs font-medium text-foreground"
+                                  htmlFor="thesis-report-url"
+                                >
+                                  {messages.thesis.report.urlLabel}
+                                </label>
+                                <Input
+                                  id="thesis-report-url"
+                                  value={reportUrl}
+                                  onChange={(e) => setReportUrl(e.target.value)}
+                                  placeholder="https://..."
+                                  disabled={isActionPending}
+                                />
+                                <p className="mt-1 text-[11px] text-muted-foreground">
+                                  {pageCopy.reportLinkHint}
+                                </p>
+                              </div>
+                            </details>
                             <div>
                               <label
                                 className="mb-1 block text-xs font-medium text-foreground"
