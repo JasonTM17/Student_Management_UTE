@@ -436,6 +436,54 @@ class AuthLoginPersistenceTest {
         org.junit.jupiter.api.Assertions.assertEquals(sha256(newRefreshToken), storedRefresh);
     }
 
+    /**
+     * SEC-P1-1: a refresh token that was already rotated (or revoked) and is
+     * then replayed is the classic stolen-token signal. The replay must be
+     * refused AND the whole session family for that account must die — the
+     * freshly rotated token included — instead of silently 401-ing while the
+     * thief keeps the current session.
+     */
+    @Test
+    void replayingARotatedRefreshTokenRevokesTheWholeSessionFamily() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        JsonNode loginBody = objectMapper.readTree(login.getResponse().getContentAsString());
+        String staleRefreshToken = loginBody.get("refreshToken").asText();
+        Cookie refreshCookie = login.getResponse().getCookie("cc_refresh_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        // Rotate once: the account now holds exactly one live (new) session.
+        MvcResult rotation = mvc.perform(post("/api/v1/auth/refresh")
+                        .cookie(refreshCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .header("User-Agent", "reuse-test-rotate"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String liveRefreshToken = objectMapper
+                .readTree(rotation.getResponse().getContentAsString())
+                .get("refreshToken")
+                .asText();
+        assertNotEquals(staleRefreshToken, liveRefreshToken);
+
+        // Replaying the stale token: refused, and the family is revoked.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "reuse-test-replay")
+                        .content("{\"refreshToken\":\"" + staleRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+
+        Integer liveSessions = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Session\" WHERE \"userId\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(0, liveSessions);
+
+        // The previously-live rotated token is dead too.
+        mvc.perform(post("/api/v1/auth/refresh")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "reuse-test-after")
+                        .content("{\"refreshToken\":\"" + liveRefreshToken + "\"}"))
+                .andExpect(status().isUnauthorized());
+    }
+
     @Test
     void meReturnsCurrentUserForBearerAndCookieSessions() throws Exception {
         MvcResult login = loginStudent().andReturn();

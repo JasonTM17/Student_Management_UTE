@@ -197,7 +197,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                   {results.slice(0, 5).map((student) => (
                     <li key={student.studentId} className="flex items-center justify-between gap-2">
                       <span className="min-w-0 truncate text-xs text-muted-foreground">
-                        {[student.lastName, student.firstName].filter(Boolean).join(' ').trim() || student.email}
+                        {[student.lastName, student.firstName].filter(Boolean).join(' ').trim() || student.studentNumber}
                         {student.studentNumber ? (
                           <span className="ml-1.5 font-mono text-[11px]">{student.studentNumber}</span>
                         ) : null}

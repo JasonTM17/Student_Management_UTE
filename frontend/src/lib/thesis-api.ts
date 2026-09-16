@@ -182,11 +182,13 @@ export interface ThesisGroup {
   members?: ThesisGroupMember[];
 }
 
-/** Minimal directory entry used when a leader invites a member into a thesis group. */
+/**
+ * Minimal directory entry used when a leader invites a member into a thesis
+ * group. Carries no email: directory lookups must not expose contact PII.
+ */
 export interface ThesisStudentResult {
   studentId: string;
   studentNumber: string;
-  email: string;
   firstName: string;
   lastName: string;
   curriculumCode?: string | null;

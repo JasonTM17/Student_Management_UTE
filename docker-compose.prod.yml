@@ -117,6 +117,10 @@ services:
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "remote"
       ASSISTANT_RETENTION_ENABLED: "true"
       COOKIE_SECURE: "true"
+      # Caddy overwrites forwarded headers, so per-client rate limiting is
+      # safe here; the local compose keeps proxy trust off because its API
+      # port is published directly.
+      RATE_LIMIT_TRUST_PROXY_HEADERS: "true"
       # rag-service is the single Flyway owner for the shared runtime DB.
       FLYWAY_ENABLED: "false"
       MAIL_ENABLED: "false"

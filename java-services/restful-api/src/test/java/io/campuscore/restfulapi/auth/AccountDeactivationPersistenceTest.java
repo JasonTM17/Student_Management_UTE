@@ -64,6 +64,26 @@ class AccountDeactivationPersistenceTest {
         clearTables();
         insertManagedUser("student-user", "student@campuscore.edu", "password123", "STUDENT", "role-student");
         insertManagedUser("admin-user", "admin@campuscore.edu", "admin-secret", "ADMIN", "role-admin");
+        insertManagedUser("admin2-user", "admin002@campuscore.edu", "admin-secret-2", "ADMIN", "role-admin");
+    }
+
+    /**
+     * A-P1-1: the delete path must enforce the same role ceiling as
+     * update/reset — a plain administrator cannot hard-delete another
+     * administrator, and the target row plus its sessions survive.
+     */
+    @Test
+    void plainAdminCannotHardDeleteAnotherAdministrator() throws Exception {
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                        .delete("/api/v1/users/admin2-user")
+                        .with(adminJwt()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("ROLE_ESCALATION"));
+
+        Integer remaining = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'admin2-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertEquals(1, remaining);
     }
 
     @Test
@@ -277,11 +297,17 @@ class AccountDeactivationPersistenceTest {
                 null,
                 localDateTime(BASE_TIME),
                 localDateTime(BASE_TIME));
-        jdbc.update(
-                "INSERT INTO \"campuscore_auth\".\"Role\""
-                        + " (\"id\", \"name\", \"description\", \"isSystem\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (?, ?, NULL, TRUE, ?, ?)",
-                roleId, roleName, localDateTime(BASE_TIME), localDateTime(BASE_TIME));
+        Integer roleCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Role\" WHERE \"id\" = ?",
+                Integer.class,
+                roleId);
+        if (roleCount == 0) {
+            jdbc.update(
+                    "INSERT INTO \"campuscore_auth\".\"Role\""
+                            + " (\"id\", \"name\", \"description\", \"isSystem\", \"createdAt\", \"updatedAt\")"
+                            + " VALUES (?, ?, NULL, TRUE, ?, ?)",
+                    roleId, roleName, localDateTime(BASE_TIME), localDateTime(BASE_TIME));
+        }
         jdbc.update(
                 "INSERT INTO \"campuscore_auth\".\"UserRole\" (\"id\", \"userId\", \"roleId\") VALUES (?, ?, ?)",
                 "user-role-" + userId, userId, roleId);

@@ -16,10 +16,19 @@ async function handle(request: NextRequest, context: RouteContext) {
   headers.delete('host');
   headers.set('accept-encoding', 'identity');
 
-  const clientIp = request.headers.get('x-forwarded-for') || request.headers.get('x-real-ip') || (request as any).ip;
-  if (clientIp && !headers.has('x-forwarded-for')) {
-    headers.set('x-forwarded-for', clientIp);
-  }
+  // Forwarded headers are client-controlled until we overwrite them: an
+  // attacker must not be able to rotate the rate-limit key (the Java filter
+  // prefers X-Real-IP and the leftmost XFF entry when proxy trust is on).
+  // Next.js exposes the peer IP only on platforms that set `request.ip`
+  // (Vercel, Render, ...); everywhere else the hop is marked as our own proxy,
+  // which keys every browser on one bucket exactly like the container IP did.
+  const clientIp =
+    (request as any).ip ||
+    request.headers.get('x-forwarded-for')?.split(',')[0]?.trim() ||
+    'web-proxy';
+  headers.delete('x-real-ip');
+  headers.delete('x-forwarded-for');
+  headers.set('x-forwarded-for', clientIp);
 
   const upstreamUrl = buildApiProxyUrl(origin, path, request.nextUrl.search);
 

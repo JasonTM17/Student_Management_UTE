@@ -73,9 +73,12 @@ public class AcademicEnrollmentReadService {
 
     @Transactional(readOnly = true)
     public List<EnrollmentResponse> findStudentEnrollments(String studentId, String semesterId) {
-        return enrollments(academic.findStudentEnrollments(
+        return academic.findStudentEnrollments(
                 requireProfileId("studentId", studentId),
-                normalizeOptional("semesterId", semesterId)));
+                normalizeOptional("semesterId", semesterId))
+                .stream()
+                .map(row -> studentEnrollment(row, schedules(List.of(row))))
+                .toList();
     }
 
     @Transactional(readOnly = true)
@@ -125,7 +128,10 @@ public class AcademicEnrollmentReadService {
             return enrollment;
         }
         if (enrollment.studentId().equals(normalizeOptional("studentId", studentId))) {
-            return enrollment;
+            return academic.findEnrollmentById(normalizeRequired("id", id))
+                    .filter(row -> gradesVisibleToStudent(row.gradeStatus()))
+                    .map(row -> studentEnrollment(row, schedules(List.of(row))))
+                    .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
         }
         throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found");
     }
@@ -265,6 +271,10 @@ public class AcademicEnrollmentReadService {
         } else {
             academic.findEnrollmentById(normalizedEnrollmentId)
                     .filter(row -> row.studentId().equals(normalizeOptional("studentId", studentId)))
+                    // Draft component scores are the lecturer's working record:
+                    // a student reads them only once the section results are
+                    // published (or under appeal). Anything else is 404.
+                    .filter(row -> gradesVisibleToStudent(row.gradeStatus()))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
             rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
         }
@@ -318,6 +328,39 @@ public class AcademicEnrollmentReadService {
                         new UserSummary(row.studentUserId(), row.studentEmail(), row.studentFirstName(), row.studentLastName())),
                 section(row, schedules.getOrDefault(row.sectionId(), List.of())),
                 semester(row.semesterIdValue(), row.semesterName(), row.semesterNameEn(), row.semesterNameVi(), row.semesterStartDate()));
+    }
+
+    /** Draft results are lecturer working data: only PUBLISHED/APPEALED rows are student-visible. */
+    private static boolean gradesVisibleToStudent(String gradeStatus) {
+        return "PUBLISHED".equals(gradeStatus) || "APPEALED".equals(gradeStatus);
+    }
+
+    /**
+     * Student view of an enrollment row: the provisional total and letter stay
+     * hidden until publication, so draft summaries can never leak through the
+     * enrollment list or detail endpoints.
+     */
+    private static EnrollmentResponse studentEnrollment(EnrollmentRow row, Map<String, List<ScheduleRow>> schedules) {
+        EnrollmentResponse response = enrollment(row, schedules);
+        if (gradesVisibleToStudent(row.gradeStatus())) {
+            return response;
+        }
+        return new EnrollmentResponse(
+                response.id(),
+                response.studentId(),
+                response.sectionId(),
+                response.semesterId(),
+                response.status(),
+                response.enrolledAt(),
+                response.droppedAt(),
+                response.gradeStatus(),
+                null,
+                null,
+                response.createdAt(),
+                response.updatedAt(),
+                response.student(),
+                response.section(),
+                response.semester());
     }
 
     private static SectionSummary section(EnrollmentRow row, List<ScheduleRow> schedules) {
