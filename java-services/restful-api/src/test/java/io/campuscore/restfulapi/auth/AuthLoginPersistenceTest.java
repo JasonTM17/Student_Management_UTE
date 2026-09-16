@@ -171,7 +171,7 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
-    void registrationCreatesAnImmediatelyUsableStudentProfile() throws Exception {
+    void publicStudentRegistrationIsRejectedBecauseTheAcademicOfficeIssuesAccounts() throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/auth/register")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("""
@@ -182,20 +182,14 @@ class AuthLoginPersistenceTest {
                                   "lastName":"Student"
                                 }
                                 """))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.user.email").value("new.student@campuscore.edu"))
-                .andExpect(jsonPath("$.user.roles[0]").value("STUDENT"))
-                .andExpect(jsonPath("$.user.studentId", notNullValue()))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("STUDENT_ACCOUNT_ISSUED_BY_ACADEMIC_OFFICE"))
                 .andReturn();
 
-        String userId = objectMapper.readTree(result.getResponse().getContentAsString())
-                .path("user").path("id").asText();
-        Integer profiles = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"campuscore_auth\".\"Student\" WHERE \"userId\" = ?"
-                        + " AND \"curriculumId\" = 'curriculum-demo' AND \"status\" = 'ACTIVE'",
+        org.junit.jupiter.api.Assertions.assertEquals(0, jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"campuscore_auth\".\"User\" WHERE \"email\" = ?",
                 Integer.class,
-                userId);
-        org.junit.jupiter.api.Assertions.assertEquals(1, profiles);
+                "new.student@campuscore.edu"));
     }
 
     @Test

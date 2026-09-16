@@ -144,12 +144,11 @@ test('the local Mailpit profile does not require unsupported STARTTLS', () => {
 
 // ---------- Item 10: field-level validation messages ----------
 
-test('the signup form renders per-field validation errors', () => {
+test('the public signup route explains the Academic Office issuance policy', () => {
   const source = readSource('src/app/register/page.tsx');
-  assert.ok(source.includes('role="alert"'), 'field errors must be announced');
-  assert.ok(source.includes('aria-invalid'), 'the invalid field must be flagged to assistive tech');
-  assert.ok(source.includes('passwordShort'), 'the password rule mirrors the server');
-  assert.ok(source.includes('emailInvalid'), 'the email rule mirrors the server');
+  assert.ok(source.includes('issuedByOfficeTitle'), 'the route must explain who issues accounts');
+  assert.ok(source.includes('issuedByOfficeSteps'), 'the route must show the next steps');
+  assert.ok(!source.includes('<form'), 'students must not self-register from the public route');
 });
 
 test('the course registration page surfaces failures inline, not only as toasts', () => {
@@ -234,4 +233,3 @@ test('lecturer grading page includes Excel import and invalid score alert', () =
   assert.ok(source.includes('scoreErrors'), 'must track scoreErrors state');
   assert.ok(source.includes('invalidScore'), 'must show invalidScore message');
 });
-

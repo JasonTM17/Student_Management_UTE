@@ -13,7 +13,7 @@ import io.campuscore.restfulapi.web.DomainException;
  * the magic-byte signature must agree, the size cap is enforced before the
  * bytes reach the database, and the client-supplied name is sanitized to a
  * display-only string (it is never used to build a storage path because the
- * bytes live in the report row itself).
+ * storage key is generated server-side).
  */
 public final class ReportFilePolicy {
 
@@ -25,7 +25,7 @@ public final class ReportFilePolicy {
     private ReportFilePolicy() {
     }
 
-    public record ValidatedFile(String fileName, String contentType, long size, byte[] data) {
+    public record ValidatedFile(String fileName, String contentType, String extension, long size, byte[] data) {
     }
 
     public static ValidatedFile validate(MultipartFile file) {
@@ -58,7 +58,7 @@ public final class ReportFilePolicy {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_FILE_CONTENT",
                     "The document content does not match its .%s extension".formatted(extension));
         }
-        return new ValidatedFile(sanitizeName(original), typeFor(extension), data.length, data);
+        return new ValidatedFile(sanitizeName(original), typeFor(extension), extension, data.length, data);
     }
 
     /** Display-only name: single path segment, printable, capped, extension preserved. */

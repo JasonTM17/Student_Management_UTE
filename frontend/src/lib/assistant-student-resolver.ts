@@ -471,10 +471,10 @@ function extractMeetings(enrollments: Enrollment[], locale: 'vi' | 'en'): Schedu
       for (const sch of sec.schedules) {
         const rawDay = sch.dayOfWeek;
         const normalizedDay = rawDay === 0 ? 1 : rawDay;
-        const room =
-          sch.classroom?.roomNumber ??
-          (sch.classroom?.building ? `${sch.classroom.building}-${sch.classroom.roomNumber ?? ''}` : undefined) ??
-          sec.classroom?.roomNumber;
+        const classroom = sch.classroom ?? sec.classroom;
+        const room = classroom
+          ? (classroom.building ? `${classroom.building}-${classroom.roomNumber ?? ''}` : classroom.roomNumber)
+          : undefined;
 
         meetings.push({
           courseCode,

@@ -91,13 +91,11 @@ test.describe('public and auth', () => {
       .toBe(!before);
   });
 
-  test('public signup form posts campus register fields', async ({ page }) => {
+  test('public signup explains that student accounts are issued by the Academic Office', async ({ page }) => {
     await page.goto('/register');
-    await expect(page.getByRole('heading', { name: /create your account|tạo tài khoản/i })).toBeVisible();
-    await expect(page.locator('#firstName')).toBeVisible();
-    await expect(page.locator('#lastName')).toBeVisible();
-    await expect(page.locator('#email')).toBeVisible();
-    await expect(page.locator('#password')).toBeVisible();
+    await expect(page.getByRole('heading', { name: /request an issued account|yêu cầu cấp tài khoản/i })).toBeVisible();
+    await expect(page.getByText(/academic office|phòng đào tạo/i).first()).toBeVisible();
+    await expect(page.getByRole('link', { name: /sign in|đăng nhập/i })).toBeVisible();
     await expect(page.getByRole('link', { name: /forgot password/i })).toHaveCount(0);
   });
 

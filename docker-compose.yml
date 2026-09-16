@@ -107,6 +107,9 @@ services:
       # STARTTLS as required, which makes the health endpoint report DOWN.
       SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED: ${SPRING_MAIL_PROPERTIES_MAIL_SMTP_STARTTLS_REQUIRED:-false}
       MAIL_FROM: ${MAIL_FROM:-no-reply@campuscore.local}
+      THESIS_REPORT_STORAGE_PROVIDER: ${THESIS_REPORT_STORAGE_PROVIDER:-local}
+      THESIS_REPORT_STORAGE_BUCKET: ${THESIS_REPORT_STORAGE_BUCKET:-thesis-reports}
+      THESIS_REPORT_STORAGE_LOCAL_ROOT: /var/lib/campuscore/thesis-reports
       ASSISTANT_MAX_MESSAGE_CHARS: ${ASSISTANT_MAX_MESSAGE_CHARS:-2000}
       ASSISTANT_MAX_CONTEXT_CHARS: ${ASSISTANT_MAX_CONTEXT_CHARS:-6000}
       ASSISTANT_USER_DAILY_QUOTA: ${ASSISTANT_USER_DAILY_QUOTA:-20}
@@ -115,6 +118,8 @@ services:
       ASSISTANT_RETENTION_DAYS: ${ASSISTANT_RETENTION_DAYS:-90}
     ports:
       - "127.0.0.1:${RESTFUL_API_HOST_PORT:-4010}:4010"
+    volumes:
+      - campuscore_thesis_report_storage:/var/lib/campuscore/thesis-reports
     depends_on:
       postgres:
         condition: service_healthy
@@ -155,3 +160,4 @@ services:
 
 volumes:
   campuscore_restful_postgres_data:
+  campuscore_thesis_report_storage:
