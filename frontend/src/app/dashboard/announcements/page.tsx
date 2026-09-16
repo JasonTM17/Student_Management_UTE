@@ -326,8 +326,10 @@ export default function StudentAnnouncementsPage() {
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/70',
                 )}
                 title={copy.viewMagazine}
+                aria-label={copy.viewMagazine}
+                aria-pressed={viewMode === 'magazine'}
               >
-                <LayoutGrid className="h-3.5 w-3.5" />
+                <LayoutGrid className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">{copy.viewMagazine}</span>
               </button>
               <button
@@ -340,8 +342,10 @@ export default function StudentAnnouncementsPage() {
                     : 'text-muted-foreground hover:text-foreground hover:bg-secondary/70',
                 )}
                 title={copy.viewDispatch}
+                aria-label={copy.viewDispatch}
+                aria-pressed={viewMode === 'dispatch'}
               >
-                <List className="h-3.5 w-3.5" />
+                <List className="h-3.5 w-3.5" aria-hidden="true" />
                 <span className="hidden sm:inline">{copy.viewDispatch}</span>
               </button>
             </div>

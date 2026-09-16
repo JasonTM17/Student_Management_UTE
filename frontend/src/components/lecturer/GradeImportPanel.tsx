@@ -64,15 +64,15 @@ export function GradeImportPanel({
         className="inline-flex items-center gap-2 px-3 py-2 text-sm font-semibold text-primary hover:underline disabled:opacity-50"
       >
         <FileUp className="h-4 w-4" />
-        {vi ? 'Nhập điểm từ Excel/CSV' : 'Import scores from Excel/CSV'}
+        {vi ? 'Nhập điểm từ tệp CSV/TSV' : 'Import scores from a CSV/TSV file'}
       </button>
 
       {open ? (
         <div className="space-y-3 border-t border-border/60 p-3">
           <p className="text-xs leading-5 text-muted-foreground">
             {vi
-              ? 'Mỗi dòng gồm: mã sinh viên (hoặc email), điểm quá trình, điểm cuối kỳ — phân cách bởi dấu tab, chấm phẩy hoặc phẩy. Có thể dán trực tiếp từ Excel.'
-              : 'Each row is: student code (or email), process score, final score — separated by tab, semicolon or comma. You can paste a range straight from Excel.'}
+              ? 'Mỗi dòng gồm: mã sinh viên (hoặc email), điểm quá trình, điểm cuối kỳ — phân cách bởi dấu tab, chấm phẩy hoặc phẩy. Có thể sao chép vùng dữ liệu từ Excel/Google Sheets rồi dán vào tệp CSV, hệ thống không đọc trực tiếp tệp .xlsx.'
+              : 'Each row is: student code (or email), process score, final score — separated by tab, semicolon or comma. Copy a range from Excel/Google Sheets into a CSV file; .xlsx files are not read directly.'}
           </p>
 
           <label className="inline-flex cursor-pointer items-center gap-2 text-xs font-semibold text-foreground">

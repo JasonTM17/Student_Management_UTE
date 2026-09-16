@@ -10,7 +10,14 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
-export function useThesisWorkspace(initialRoundId = '') {
+export function useThesisWorkspace(
+  initialRoundId = '',
+  options?: { topicsEnabled?: boolean },
+) {
+  // The catalog gates topic loading behind a search query (course
+  // requirement: the list only appears after searching), so the hook can be
+  // told not to fetch topics at all.
+  const topicsEnabled = options?.topicsEnabled ?? true;
   const { user } = useAuth();
   const { messages } = useI18n();
   const loadFailedMessage = messages.thesis.loadFailed;
@@ -56,10 +63,8 @@ export function useThesisWorkspace(initialRoundId = '') {
     setWorkspaceLoading(true);
     setError('');
     try {
-      const [nextTopics, nextGroups] = await Promise.all([
-        thesisApi.listTopics(selectedRoundId),
-        thesisApi.listGroups(selectedRoundId),
-      ]);
+      const nextGroups = await thesisApi.listGroups(selectedRoundId);
+      const nextTopics = topicsEnabled ? await thesisApi.listTopics(selectedRoundId) : [];
       setTopics(nextTopics);
       setGroups(nextGroups);
     } catch {
@@ -67,7 +72,7 @@ export function useThesisWorkspace(initialRoundId = '') {
     } finally {
       setWorkspaceLoading(false);
     }
-  }, [loadFailedMessage, selectedRoundId]);
+  }, [loadFailedMessage, selectedRoundId, topicsEnabled]);
 
   useEffect(() => {
     void refreshWorkspace();

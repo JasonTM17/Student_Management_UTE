@@ -17,6 +17,7 @@ import { LinkButton } from '@/components/ui/link-button';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
+import { isActiveEnrollment } from '@/lib/enrollment-status';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { buildWeeklyGrid } from '@/lib/weekly-grid';
 import { Enrollment, Semester } from '@/types/api';
@@ -186,12 +187,7 @@ export default function SchedulePage() {
     const items: DayAgendaItem[] = [];
 
     enrollments
-      .filter(
-        (enrollment) =>
-          enrollment.status === 'ENROLLED' ||
-          enrollment.status === 'CONFIRMED' ||
-          enrollment.status === 'PENDING',
-      )
+      .filter((enrollment) => isActiveEnrollment(enrollment.status))
       .forEach((enrollment) => {
         const section = enrollment.section;
         const lecturerName =
