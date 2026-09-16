@@ -18,20 +18,29 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+// Loading shell rendered while the editor chunk resolves. Locale is picked from
+// <html lang> because the dynamic wrapper has no access to the component props.
+function EditorLoading() {
+  const [isVi, setIsVi] = React.useState(true);
+  React.useEffect(() => {
+    setIsVi(!document.documentElement.lang || document.documentElement.lang.toLowerCase().startsWith('vi'));
+  }, []);
+  return (
+    <div className="flex h-96 w-full items-center justify-center rounded-lg border border-border/70 bg-card/60">
+      <div className="flex flex-col items-center gap-2 text-muted-foreground">
+        <Loader2 className="h-6 w-6 animate-spin text-primary" />
+        <span className="text-sm font-medium">
+          {isVi ? 'Đang khởi tạo trình soạn thảo TinyMCE...' : 'Initializing the TinyMCE editor...'}
+        </span>
+      </div>
+    </div>
+  );
+}
+
 // Dynamically import TinyMCE Editor to guarantee zero SSR issues in Next.js App Router
 const Editor = dynamic(
   () => import('@tinymce/tinymce-react').then((mod) => mod.Editor as unknown as React.ComponentType<any>),
-  {
-    ssr: false,
-    loading: () => (
-      <div className="flex h-96 w-full items-center justify-center rounded-lg border border-border/70 bg-card/60">
-        <div className="flex flex-col items-center gap-2 text-muted-foreground">
-          <Loader2 className="h-6 w-6 animate-spin text-primary" />
-          <span className="text-sm font-medium">Đang khởi tạo trình soạn thảo TinyMCE...</span>
-        </div>
-      </div>
-    ),
-  }
+  { ssr: false, loading: EditorLoading }
 );
 
 export interface TinyMceEditorProps {
@@ -267,6 +276,16 @@ export function TinyMceEditor({
     }
   };
 
+  // Close the templates popover with Escape and return focus to its trigger.
+  const templatesTriggerRef = useRef<HTMLButtonElement>(null);
+  const handleTemplatesKeyDown = (event: React.KeyboardEvent) => {
+    if (event.key === 'Escape' && templatesOpen) {
+      event.stopPropagation();
+      setTemplatesOpen(false);
+      templatesTriggerRef.current?.focus();
+    }
+  };
+
   // Copy HTML to clipboard
   const handleCopyHtml = async () => {
     try {
@@ -312,12 +331,15 @@ export function TinyMceEditor({
 
         <div className="flex items-center gap-1.5">
           {showTemplates ? (
-            <div className="relative">
+            <div className="relative" onKeyDown={handleTemplatesKeyDown}>
               <Button
+                ref={templatesTriggerRef}
                 type="button"
                 variant="outline"
                 size="sm"
                 onClick={() => setTemplatesOpen(!templatesOpen)}
+                aria-haspopup="true"
+                aria-expanded={templatesOpen}
                 className="h-8 gap-1.5 text-xs font-medium"
               >
                 <BookOpen className="h-3.5 w-3.5 text-primary" />
@@ -331,7 +353,11 @@ export function TinyMceEditor({
                     onClick={() => setTemplatesOpen(false)}
                     aria-hidden="true"
                   />
-                  <div className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-popover p-2 shadow-xl animate-in fade-in zoom-in-95">
+                  <div
+                    role="menu"
+                    aria-label={isVi ? 'Mẫu văn bản học vụ' : 'Academic templates'}
+                    className="absolute right-0 top-full z-50 mt-1 w-80 rounded-lg border border-border bg-popover p-2 shadow-xl animate-in fade-in zoom-in-95"
+                  >
                   <div className="border-b border-border pb-2 px-2 text-xs font-semibold text-foreground">
                     {isVi ? 'Chọn mẫu văn bản học vụ sẵn có' : 'Select Academic Template'}
                   </div>
@@ -340,8 +366,9 @@ export function TinyMceEditor({
                       <button
                         key={idx}
                         type="button"
+                        role="menuitem"
                         onClick={() => handleInsertTemplate(tmpl.content)}
-                        className="w-full text-left rounded p-2 text-xs transition-colors hover:bg-secondary focus:bg-secondary"
+                        className="w-full text-left rounded p-2 text-xs transition-colors hover:bg-secondary focus-visible:bg-secondary focus-visible:outline focus-visible:outline-2 focus-visible:outline-primary"
                       >
                         <div className="font-semibold text-foreground">
                           {isVi ? tmpl.titleVi : tmpl.titleEn}
@@ -395,9 +422,12 @@ export function TinyMceEditor({
         </div>
       </div>
 
-      {/* TinyMCE Self-Hosted Container */}
+      {/* TinyMCE Self-Hosted Container. The key forces a remount when the
+          theme flips: the React wrapper only reads `init` at mount, so without
+          it a light-to-dark switch would keep the light skin and content CSS. */}
       <div className="flex-1 overflow-hidden">
         <Editor
+          key={`${editorId}-${isDark ? 'dark' : 'light'}`}
           id={editorId}
           tinymceScriptSrc="/tinymce/tinymce.min.js"
           value={value}
