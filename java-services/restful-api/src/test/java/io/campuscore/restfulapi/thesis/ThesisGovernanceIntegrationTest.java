@@ -606,6 +606,14 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("RESULTS_NOT_READY"));
 
+        // One graded topic is not enough while another approved group waits.
+        UUID pendingTopicId = insertPublishedTopic(roundId);
+        insertGroup(roundId, "gov-result-pending", pendingTopicId, "APPROVED");
+        mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-results", roundId).with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SCORES_INCOMPLETE"));
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 7.5, result_status = 'GRADED' WHERE id = ?", pendingTopicId);
+
         mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-results", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("RESULTS_PUBLISHED"));

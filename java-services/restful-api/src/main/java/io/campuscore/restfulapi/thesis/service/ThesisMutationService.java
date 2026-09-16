@@ -79,6 +79,11 @@ public class ThesisMutationService {
         if (roundType == RoundType.KLTN && request.reportDate() == null) {
             throw invalid("KLTN rounds require a reportDate");
         }
+        if (roundType == RoundType.KLTN && request.gvpbDeadline() == null) {
+            // Without a GVPB deadline the report freeze has no anchor and
+            // submissions stay editable indefinitely.
+            throw invalid("KLTN rounds require a gvpbDeadline");
+        }
         Instant regStart = request.registrationStart();
         Instant regEnd = request.registrationEnd();
         requireDates(regStart, regEnd);
@@ -127,18 +132,25 @@ public class ThesisMutationService {
 
     /**
      * Publishes graded results for the round (brief phase two closure).
-     * Requires at least one graded topic; per-topic publication state is the
-     * aggregate the chair froze on the topic row.
+     * Requires every approved group in the round to carry a finalized score —
+     * publishing with ungraded groups would hand students empty result rows.
      */
     @Transactional
     public RoundResponse publishResults(UUID id) {
         roundReadPort.requireExisting(id);
+        Integer approved = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group WHERE round_id = :id AND approval_status = 'APPROVED'",
+                params().addValue("id", id), Integer.class);
         Integer graded = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group g JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE g.round_id = :id AND g.approval_status = 'APPROVED' AND t.final_score IS NOT NULL",
                 params().addValue("id", id), Integer.class);
         if (graded == null || graded == 0) {
             throw conflict("RESULTS_NOT_READY", "No topic has been graded yet; the chair must finalize scores first");
+        }
+        if (approved == null || graded < approved) {
+            throw conflict("SCORES_INCOMPLETE",
+                    "Every approved group must have a finalized score before results are published");
         }
         return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED);
     }
