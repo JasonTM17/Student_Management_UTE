@@ -37,6 +37,7 @@ public class AcademicMutationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
     private final RegistrationService registration;
+    private final boolean postgres;
 
     public AcademicMutationService(
             NamedParameterJdbcTemplate jdbc,
@@ -45,6 +46,19 @@ public class AcademicMutationService {
         this.jdbc = jdbc;
         this.reads = reads;
         this.registration = registration;
+        this.postgres = databaseIsPostgres(jdbc);
+    }
+
+    private static boolean databaseIsPostgres(NamedParameterJdbcTemplate jdbc) {
+        try {
+            org.springframework.jdbc.core.JdbcTemplate template = jdbc.getJdbcTemplate();
+            if (template == null) return false;
+            String name = template.execute((org.springframework.jdbc.core.ConnectionCallback<String>)
+                    connection -> connection.getMetaData().getDatabaseProductName());
+            return name != null && name.toLowerCase(java.util.Locale.ROOT).contains("postgres");
+        } catch (org.springframework.dao.DataAccessException ignored) {
+            return false;
+        }
     }
 
     public EnrollmentResponse enroll(String studentId, String sectionId, List<String> roles, String idempotencyKey) {
@@ -190,13 +204,34 @@ public class AcademicMutationService {
 
     private String canonicalGradeItem(String sectionId, String type, String name) {
         String id = sectionId + "-" + type.toLowerCase() + "-50";
-        jdbc.update("INSERT INTO " + GRADE_ITEM
-                        + " (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
-                        + " VALUES (:id, :sectionId, :name, :type, 10, 50, CURRENT_TIMESTAMP)"
-                        + " ON CONFLICT (\"id\") DO UPDATE SET \"name\" = EXCLUDED.\"name\", \"type\" = EXCLUDED.\"type\","
-                        + " \"maxScore\" = 10, \"weight\" = 50, \"gradedAt\" = CURRENT_TIMESTAMP",
-                new MapSqlParameterSource().addValue("id", id).addValue("sectionId", sectionId)
-                        .addValue("name", name).addValue("type", type));
+        MapSqlParameterSource params = new MapSqlParameterSource()
+                .addValue("id", id)
+                .addValue("sectionId", sectionId)
+                .addValue("name", name)
+                .addValue("type", type);
+        if (postgres) {
+            jdbc.update("INSERT INTO " + GRADE_ITEM
+                            + " (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
+                            + " VALUES (:id, :sectionId, :name, :type, 10, 50, CURRENT_TIMESTAMP)"
+                            + " ON CONFLICT (\"id\") DO UPDATE SET \"name\" = EXCLUDED.\"name\", \"type\" = EXCLUDED.\"type\","
+                            + " \"maxScore\" = 10, \"weight\" = 50, \"gradedAt\" = CURRENT_TIMESTAMP",
+                    params);
+            return id;
+        }
+        // H2 does not implement PostgreSQL's ON CONFLICT syntax. An
+        // update-then-insert inside the surrounding transaction keeps the same
+        // canonical-row semantics without aborting on a duplicate key.
+        int updated = jdbc.update(
+                "UPDATE " + GRADE_ITEM
+                        + " SET \"name\" = :name, \"type\" = :type, \"maxScore\" = 10, \"weight\" = 50,"
+                        + " \"gradedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                params);
+        if (updated == 0) {
+            jdbc.update("INSERT INTO " + GRADE_ITEM
+                            + " (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
+                            + " VALUES (:id, :sectionId, :name, :type, 10, 50, CURRENT_TIMESTAMP)",
+                    params);
+        }
         return id;
     }
 

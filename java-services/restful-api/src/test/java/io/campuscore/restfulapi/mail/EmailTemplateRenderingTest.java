@@ -86,6 +86,33 @@ class EmailTemplateRenderingTest {
     }
 
     @Test
+    void academicAnnouncementTemplateEscapesInlineHtml() {
+        // The announcement body is authored as rich text by admins; the mail
+        // render must treat it as text so a stored <script> can never execute
+        // in a mail client.
+        Context context = new Context(Locale.forLanguageTag("vi"));
+        Map<String, Object> vars = new HashMap<>();
+        vars.put("category", "THÔNG BÁO HỌC VỤ");
+        vars.put("title", "Kiểm tra escape <script>alert('xss')</script>");
+        vars.put("author", "Phòng Đào tạo HCMUTE");
+        vars.put("publishDate", "15/09/2026");
+        vars.put("recipientName", "Sinh viên Nguyễn Tiến Sơn");
+        vars.put("content", "<script>alert('stored-xss')</script><img src=x onerror=alert(1)>Nội dung bình thường.");
+        vars.put("highlights", List.of("Đợt 1: từ 20/09 đến 25/09/2026"));
+        vars.put("actionUrl", "https://www.campusute.io.vn/dashboard/announcements");
+        vars.put("actionText", "Xem chi tiết");
+        context.setVariables(vars);
+
+        String html = templateEngine.process("mail/academic-announcement", context);
+
+        assertNotNull(html);
+        assertFalse(html.contains("<script>alert('stored-xss')"), "inline script must be escaped, not rendered");
+        assertFalse(html.contains("<img src=x onerror="), "event-handler HTML must be escaped, not rendered");
+        assertTrue(html.contains("&lt;script&gt;"), "the payload must appear as escaped text");
+        assertTrue(html.contains("Nội dung bình thường."));
+    }
+
+    @Test
     void rendersCourseRegistrationTemplate() {
         Context context = new Context(Locale.forLanguageTag("vi"));
         Map<String, Object> vars = new HashMap<>();
