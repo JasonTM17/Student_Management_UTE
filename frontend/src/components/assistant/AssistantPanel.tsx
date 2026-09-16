@@ -526,17 +526,18 @@ export function AssistantPanel() {
             <div className="sr-only" role="status" aria-live="polite" aria-atomic="true">
               {announcement}
             </div>
-            <div
-              ref={logRef}
-              onScroll={handleLogScroll}
-              role="log"
-              // Announce only settled answers; streaming deltas would flood
-              // screen readers with partial tokens.
-              aria-live={isSending ? 'off' : 'polite'}
-              aria-relevant="additions text"
-              aria-busy={isSending}
-              className="min-h-0 flex-1 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
-            >
+            <div className="relative min-h-0 flex-1 overflow-hidden">
+              <div
+                ref={logRef}
+                onScroll={handleLogScroll}
+                role="log"
+                // Announce only settled answers; streaming deltas would flood
+                // screen readers with partial tokens.
+                aria-live={isSending ? 'off' : 'polite'}
+                aria-relevant="additions text"
+                aria-busy={isSending}
+                className="absolute inset-0 space-y-3 overflow-y-auto bg-background px-3.5 py-3.5"
+              >
               {messageCursor && state.messages.length > 0 ? (
                 <div className="flex justify-center">
                   <Button
@@ -628,20 +629,22 @@ export function AssistantPanel() {
                   ) : null}
                 </div>
               ) : null}
-            </div>
+              </div>
 
-            {/* Floating scroll-to-bottom action */}
-            {userScrolled ? (
-              <button
-                type="button"
-                onClick={scrollToBottom}
-                className="absolute bottom-20 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
-                aria-label={messages.assistant.scrollToLatest}
-              >
-                <ArrowDown className="h-3 w-3" aria-hidden="true" />
-                <span>{messages.assistant.scrollToLatest}</span>
-              </button>
-            ) : null}
+              {/* Keep the scroll-to-bottom action inside the log viewport so
+                  it never covers the composer when the input wraps. */}
+              {userScrolled ? (
+                <button
+                  type="button"
+                  onClick={scrollToBottom}
+                  className="absolute bottom-3 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
+                  aria-label={messages.assistant.scrollToLatest}
+                >
+                  <ArrowDown className="h-3 w-3" aria-hidden="true" />
+                  <span>{messages.assistant.scrollToLatest}</span>
+                </button>
+              ) : null}
+            </div>
 
             {/* Message composer */}
             <AssistantComposer

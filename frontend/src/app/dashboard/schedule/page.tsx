@@ -277,7 +277,7 @@ export default function SchedulePage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu sinh viên',
+          eyebrow: 'Cổng Sinh viên',
           title: 'Thời khóa biểu',
           description: `Thời khóa biểu học tập của sinh viên trong ${selectedSemesterName}.`,
           selectSemester: 'Chọn học kỳ cho thời khóa biểu',

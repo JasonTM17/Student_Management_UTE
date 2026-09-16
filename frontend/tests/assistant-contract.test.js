@@ -697,6 +697,37 @@ test('regulation questions fall through the resolver to the server', async () =>
   assert.match(schedule.answer, /SE101/);
 });
 
+test('student schedule resolver does not claim an empty timetable when enrollment data is unavailable', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(
+    moduleRecord,
+    moduleRecord.exports,
+    (name) => (name === '@/lib/api'
+      ? {
+          authApi: { me: async () => ({ id: 's1', roles: ['STUDENT'] }) },
+          enrollmentsApi: {
+            getMyEnrollments: async () => {
+              throw new Error('academic enrollment service unavailable');
+            },
+          },
+          announcementsApi: { getMy: async () => ({ data: [] }) },
+          sectionsApi: { getMySchedule: async () => [] },
+          curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
+        }
+      : {}),
+  );
+
+  const resolution = await moduleRecord.exports.resolveStudentAssistantQuery(
+    'Cho toi xem lich hoc',
+    'vi',
+  );
+  assert.equal(resolution, null);
+});
+
 test('resolver personalizes thesis status dates and enums', () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   // Raw enum values and ISO timestamps must no longer be interpolated directly.

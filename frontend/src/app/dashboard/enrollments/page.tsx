@@ -79,7 +79,7 @@ export default function EnrollmentsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu sinh viên',
+          eyebrow: 'Cổng Sinh viên',
           title: 'Môn học của tôi',
           description:
             'Theo dõi chương trình đào tạo và các lớp đã đăng ký.',

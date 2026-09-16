@@ -226,7 +226,7 @@ export default function TranscriptPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu sinh viên',
+          eyebrow: 'Cổng Sinh viên',
           title: 'Bảng điểm',
           description: `GPA, tín chỉ và kết quả môn học cho ${selectedSemesterName}.`,
           selectSemester: 'Chọn học kỳ cho bảng điểm',

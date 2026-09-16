@@ -1550,7 +1550,7 @@ export const vi: I18nMessages = {
       openDashboard: 'Mở bảng điều khiển',
       continueToWorkspace: 'Tiếp tục vào cổng học vụ',
       signInToWorkspace: 'Đăng nhập vào cổng học vụ',
-      reviewAdmin: 'Mở khu quản trị',
+      reviewAdmin: 'Mở Cổng Quản trị',
       browseSections: 'Xem lớp học phần',
       clearFilters: 'Xóa bộ lọc',
       addUser: 'Thêm người dùng',
@@ -1820,14 +1820,14 @@ export const vi: I18nMessages = {
     footerWorkspace: 'Cổng học vụ',
     footerDelivery: 'Triển khai',
     footerLinks: {
-      workspace: ['Khu sinh viên', 'Luồng giảng viên', 'Công cụ quản trị'],
+      workspace: ['Cổng Sinh viên', 'Cổng Giảng viên', 'Cổng Quản trị'],
       delivery: ['Đăng nhập', 'Cổng học vụ', 'Quản trị'],
     },
     footerNav: {
       workspace: [
-        { href: '/login?portal=student', label: 'Khu sinh viên' },
-        { href: '/login?portal=lecturer', label: 'Luồng giảng viên' },
-        { href: '/login?portal=admin', label: 'Công cụ quản trị' },
+        { href: '/login?portal=student', label: 'Cổng Sinh viên' },
+        { href: '/login?portal=lecturer', label: 'Cổng Giảng viên' },
+        { href: '/login?portal=admin', label: 'Cổng Quản trị' },
       ],
       delivery: [
         { href: '/login', label: 'Đăng nhập' },
@@ -1964,14 +1964,14 @@ export const vi: I18nMessages = {
       groupLabel: 'Chọn khu vực học vụ của bạn',
       student: {
         tab: 'Sinh viên',
-        eyebrow: 'Cổng sinh viên',
-        title: 'Đăng nhập vào khu sinh viên.',
+        eyebrow: 'Cổng Sinh viên',
+        title: 'Đăng nhập Cổng Sinh viên.',
         description:
           'Đăng ký học phần, xem thời khóa biểu và theo dõi điểm từ bàn làm việc sinh viên.',
         heading: 'Đăng nhập sinh viên',
         subheading: 'Dùng tài khoản sinh viên để mở đăng ký và hồ sơ lớp học.',
-        officeSupport: 'Phòng học vụ',
-        destination: 'Tài khoản sinh viên khớp sẽ mở khu sinh viên.',
+        officeSupport: 'Phòng Đào tạo',
+        destination: 'Tài khoản sinh viên hợp lệ sẽ mở Cổng Sinh viên.',
         mismatch:
           'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập giảng viên hoặc quản trị.',
         featureTitles: ['Đăng ký', 'Thời khóa biểu', 'Điểm'],
@@ -1983,33 +1983,33 @@ export const vi: I18nMessages = {
       },
       lecturer: {
         tab: 'Giảng viên',
-        eyebrow: 'Cổng giảng viên',
-        title: 'Đăng nhập vào khu giảng viên.',
+        eyebrow: 'Cổng Giảng viên',
+        title: 'Đăng nhập Cổng Giảng viên.',
         description:
-          'Mở sổ điểm, lịch giảng và thông báo lớp từ bàn giảng viên.',
+          'Mở sổ điểm, lịch giảng và thông báo lớp từ bàn làm việc giảng viên.',
         heading: 'Đăng nhập giảng viên',
         subheading: 'Dùng tài khoản giảng viên để tiếp tục công việc giảng dạy.',
-        officeSupport: 'Văn phòng khoa',
-        destination: 'Tài khoản giảng viên khớp sẽ mở khu giảng viên.',
+        officeSupport: 'Văn phòng Khoa',
+        destination: 'Tài khoản giảng viên hợp lệ sẽ mở Cổng Giảng viên.',
         mismatch:
           'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập sinh viên hoặc quản trị.',
-        featureTitles: ['SE204', 'GRADE', 'SLOT'],
+        featureTitles: ['Lớp giảng dạy', 'Nhập điểm', 'Lịch tuần'],
         featureDescriptions: [
-          'Danh sách lớp nằm cạnh sinh viên bạn phụ trách.',
-          'Nhập và rà điểm cho các lớp bạn giảng.',
-          'Xem giờ giảng mà không phải chuyển sang màn khác.',
+          'Danh sách lớp học phần bạn phụ trách.',
+          'Nhập và quản lý điểm cho các lớp học phần.',
+          'Xem thời khóa biểu giảng dạy trực quan.',
         ],
       },
       admin: {
         tab: 'Quản trị',
-        eyebrow: 'Cổng quản trị',
-        title: 'Đăng nhập vào công cụ quản trị nhà trường.',
+        eyebrow: 'Cổng Quản trị',
+        title: 'Đăng nhập Cổng Quản trị Nhà trường.',
         description:
-          'Quản lý người dùng, danh mục, thông báo và diện mạo cổng công khai từ một bàn quản trị.',
+          'Quản lý người dùng, danh mục đào tạo, thông báo và cấu hình hệ thống từ bàn quản trị.',
         heading: 'Đăng nhập quản trị',
         subheading: 'Dùng tài khoản quản trị để tiếp tục quản lý hồ sơ nhà trường.',
-        officeSupport: 'Văn phòng quản trị nhà trường',
-        destination: 'Tài khoản quản trị khớp sẽ mở cổng quản trị.',
+        officeSupport: 'Phòng Đào tạo & Quản trị Hệ thống',
+        destination: 'Tài khoản quản trị hợp lệ sẽ mở Cổng Quản trị.',
         mismatch:
           'Tài khoản này thuộc cổng khác. Hãy mở đăng nhập sinh viên hoặc giảng viên.',
         opsMark: 'Quản trị',
@@ -2371,7 +2371,7 @@ export const vi: I18nMessages = {
     },
     routeDescriptions: {
       dashboard:
-        'Giữ đăng ký, môn học, lịch học và tác vụ hồ sơ trong cùng một khu sinh viên.',
+        'Giữ đăng ký, môn học, lịch học và tác vụ hồ sơ trong cùng Cổng Sinh viên.',
       profile:
         'Giữ thông tin liên hệ và đổi mật khẩu cùng một chỗ trong tài khoản của bạn.',
       register:
@@ -2387,7 +2387,7 @@ export const vi: I18nMessages = {
       notifications:
         'Xem cảnh báo tài khoản, hạn học vụ và cập nhật quy trình trong một hộp thư tập trung.',
       lecturer:
-        'Giữ tác vụ giảng dạy, hàng chờ chấm điểm, thông tin lớp và thông báo trong cùng một khu giảng viên.',
+        'Giữ tác vụ giảng dạy, hàng chờ chấm điểm, thông tin lớp và thông báo trong cùng Cổng Giảng viên.',
       lecturerSchedule: 'Theo dõi lớp được giao, phòng học và khung giờ lên lớp.',
       lecturerGrades:
         'Xem hàng chờ chấm điểm, lọc theo học kỳ và đẩy các lớp học phần sẵn sàng sang bước công bố.',
@@ -2401,7 +2401,7 @@ export const vi: I18nMessages = {
     loading: 'Đang tải cổng học vụ',
   },
   studentDashboard: {
-    eyebrow: 'Khu sinh viên',
+    eyebrow: 'Cổng Sinh viên',
     title: 'Chào mừng quay lại, {name}',
     description:
       '{semester} đang hoạt động. Các công cụ học tập chính nằm ngay trên bảng điều khiển này.',
@@ -2413,7 +2413,7 @@ export const vi: I18nMessages = {
       pendingDecisions: 'Mục chờ xử lý',
       currentSemester: 'Học kỳ hiện tại',
       details: [
-        'Đăng ký, thông tin lớp và môn học hiện tại luôn ở cùng một khu sinh viên.',
+        'Đăng ký, thông tin lớp và môn học hiện tại luôn ở cùng Cổng Sinh viên.',
         'Các lớp đang hoạt động luôn ở gần để bạn chuyển qua lịch học, điểm số và bảng điểm mà không mất thông tin.',
         'Những mục còn cần xử lý vẫn hiển thị sớm trước khi thành bất ngờ trong đợt đăng ký.',
         'Bảng điều khiển giữ một ngữ cảnh học vụ đang hoạt động để các công cụ còn lại luôn đồng bộ.',
@@ -2465,9 +2465,9 @@ export const vi: I18nMessages = {
       ['Thông báo', 'Cập nhật chung từ trường và các nhóm học phần.'],
     ],
     errors: {
-      loadFailed: 'Hiện chưa thể tải dữ liệu khu sinh viên của bạn.',
-      unavailableTitle: 'Khu sinh viên chưa sẵn sàng',
-      loading: 'Đang tải khu sinh viên',
+      loadFailed: 'Hiện chưa thể tải dữ liệu Cổng Sinh viên của bạn.',
+      unavailableTitle: 'Cổng Sinh viên chưa sẵn sàng',
+      loading: 'Đang tải Cổng Sinh viên',
     },
   },
   profile: {
@@ -2525,10 +2525,10 @@ export const vi: I18nMessages = {
     },
   },
   lecturerDashboard: {
-    eyebrow: 'Khu giảng viên',
+    eyebrow: 'Cổng Giảng viên',
     title: 'Chào mừng quay lại, {name}',
     description:
-      'Giữ công việc lớp học, hàng chờ chấm điểm và cập nhật giảng dạy trong cùng một khu giảng viên.',
+      'Giữ công việc lớp học, hàng chờ chấm điểm và cập nhật giảng dạy trong cùng Cổng Giảng viên.',
     quickActionsTitle: 'Tác vụ nhanh',
     quickActionsDescription:
       'Mở các công cụ giảng viên thường dẫn đến tác vụ tiếp theo trong ngày.',
@@ -2549,7 +2549,7 @@ export const vi: I18nMessages = {
       'Các cập nhật ảnh hưởng đến giảng dạy được đưa lên đây mà không làm bạn rời khỏi khối lượng công việc hiện tại.',
     announcementsEmptyTitle: 'Chưa có thông báo mới',
     announcementsEmptyDescription:
-      'Các thông báo chung cho khu giảng viên sẽ xuất hiện ở đây sau khi được đăng.',
+      'Các thông báo chung cho Cổng Giảng viên sẽ xuất hiện ở đây sau khi được đăng.',
     quickLinks: [
       ['Lịch giảng dạy', 'Kiểm tra phòng học, lớp học phần và thời gian dạy của học kỳ hiện tại.'],
       ['Quản lý điểm', 'Xử lý hàng chờ chấm điểm và đưa các lớp học phần đã sẵn sàng sang bước công bố.'],
@@ -2559,7 +2559,7 @@ export const vi: I18nMessages = {
       labels: ['Lớp học phần', 'Sinh viên', 'Sẵn sàng công bố', 'Thông báo mới'],
       details: [
         'Các lớp học phần giảng dạy luôn hiển thị để quyết định về lịch và chấm điểm vẫn bám theo đúng học kỳ.',
-        'Khối lượng đăng ký luôn ở gần khu giảng viên để việc theo dõi lớp học phần không bị mất.',
+        'Khối lượng đăng ký luôn ở gần Cổng Giảng viên để việc theo dõi lớp học phần không bị mất.',
         'Công việc chấm điểm sẵn sàng công bố nổi lên sớm để không bị chìm giữa các việc khác.',
         'Các cập nhật chung ảnh hưởng đến giảng dạy vẫn hiện ra mà không kéo sự chú ý khỏi hàng chờ chấm điểm.',
       ],
@@ -2570,13 +2570,13 @@ export const vi: I18nMessages = {
     studentsSuffix: 'sinh viên',
     gradedSuffix: 'đã chấm',
     errors: {
-      loadFailed: 'Hiện chưa thể tải dữ liệu học thuật của khu giảng viên.',
-      unavailableTitle: 'Khu giảng viên chưa sẵn sàng',
-      loading: 'Đang tải khu giảng viên',
+      loadFailed: 'Hiện chưa thể tải dữ liệu học thuật của Cổng Giảng viên.',
+      unavailableTitle: 'Cổng Giảng viên chưa sẵn sàng',
+      loading: 'Đang tải Cổng Giảng viên',
     },
   },
   lecturerGrades: {
-    eyebrow: 'Khu giảng viên',
+    eyebrow: 'Cổng Giảng viên',
     title: 'Quản lý điểm',
     description:
       'Theo dõi tiến độ chấm điểm cho {semester}, rồi đưa các lớp học phần đã sẵn sàng sang bước rà soát cuối.',
@@ -2875,7 +2875,7 @@ export const vi: I18nMessages = {
     placeholder: 'Hỏi về đăng ký, lịch học, thông báo hoặc hành trình luận văn…',
     send: 'Gửi tin nhắn',
     thinking: 'Đang kiểm tra kho kiến thức CampusCore công khai…',
-    empty: 'Bắt đầu bằng một câu hỏi cụ thể về học vụ hoặc hành trình luận văn.',
+    empty: 'Đặt câu hỏi về quy chế học vụ, đăng ký học phần, thời khóa biểu hoặc khóa luận tốt nghiệp.',
     launcherHint: 'Hỏi trợ lý CampusCore',
     slotLabel: 'Trợ lý',
     greeting: 'Xin chào! Mình có thể giúp gì cho bạn?',

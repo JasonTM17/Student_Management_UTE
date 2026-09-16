@@ -107,7 +107,7 @@ export function ReadingToolbar({
           title={isVi ? 'Giao diện Báo chí Học thuật' : 'Academic Magazine View'}
         >
           <BookOpen className="h-3.5 w-3.5" />
-          <span className="hidden sm:inline">{isVi ? 'Tạp chí báo' : 'Magazine'}</span>
+          <span className="hidden sm:inline">{isVi ? 'Dạng Bản tin' : 'Magazine'}</span>
         </button>
 
         <button

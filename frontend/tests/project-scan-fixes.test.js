@@ -265,6 +265,13 @@ test('Playwright defaults to the collision-checked CampusCore frontend port', ()
   assert.doesNotMatch(config, /E2E_BASE_URL\s*\?\?\s*['"]http:\/\/127\.0\.0\.1:3000['"]/);
 });
 
+test('Next metadata icons have one App Router owner and no public-file collisions', () => {
+  for (const file of ['apple-icon.png', 'favicon.ico', 'icon.png', 'icon.svg']) {
+    assert.equal(fs.existsSync(path.join(root, 'src/app', file)), true, `${file} must stay App Router-owned`);
+    assert.equal(fs.existsSync(path.join(root, 'public', file)), false, `${file} must not shadow an App Router icon`);
+  }
+});
+
 test('admin announcement reference lookup stays within the section API page limit', () => {
   const page = fs.readFileSync(path.join(root, 'src/app/admin/announcements/page.tsx'), 'utf8');
   assert.match(page, /sectionsApi\.getAll\(\{\s*page: 1, limit: 100\s*\}\)/);

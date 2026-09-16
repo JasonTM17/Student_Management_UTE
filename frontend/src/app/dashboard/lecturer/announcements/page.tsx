@@ -72,7 +72,7 @@ export default function LecturerAnnouncementsPage() {
   const copy =
     locale === 'vi'
       ? {
-          eyebrow: 'Khu giảng viên',
+          eyebrow: 'Cổng Giảng viên',
           title: 'Thông báo Giảng dạy & Nghiên cứu',
           description:
             'Cổng thông báo chuyên trách dành cho Cán bộ giảng dạy về kế hoạch đào tạo, lịch coi thi, nhập điểm và nghiên cứu khoa học.',

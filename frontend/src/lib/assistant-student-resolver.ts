@@ -1566,39 +1566,51 @@ export async function resolveStudentAssistantQuery(
   try {
     let meetings: ScheduleMeeting[] = [];
     let isLecturerSchedule = false;
+    let scheduleDataLoaded = false;
 
     if (isLecturer) {
       try {
         const teachingSections = await sectionsApi.getMySchedule();
+        scheduleDataLoaded = true;
         if (teachingSections && teachingSections.length > 0) {
           meetings = extractLecturerMeetings(teachingSections, locale);
           isLecturerSchedule = true;
         }
       } catch {
-        // ignore
+        // A failed personal-data lookup is not evidence of an empty schedule.
       }
     } else {
       try {
         const enrollments = await enrollmentsApi.getMyEnrollments();
+        scheduleDataLoaded = true;
         if (enrollments && enrollments.length > 0) {
           meetings = extractMeetings(enrollments, locale);
         }
       } catch {
-        // If student enrollment fetch fails, could be lecturer fallback
+        // A student must not receive a fabricated "no classes" answer when
+        // the enrollment service is unavailable. Let the server return its
+        // explicit degraded personal-context response instead.
+        if (isStudent) return null;
       }
 
-      if (meetings.length === 0) {
+      // Only probe the teaching endpoint as a fallback for users whose role is
+      // not known to be a student. A successful empty enrollment response is
+      // already authoritative for a student and means "no classes".
+      if (meetings.length === 0 && !isStudent) {
         try {
           const teachingSections = await sectionsApi.getMySchedule();
+          scheduleDataLoaded = true;
           if (teachingSections && teachingSections.length > 0) {
             meetings = extractLecturerMeetings(teachingSections, locale);
             isLecturerSchedule = true;
           }
         } catch {
-          // Not a lecturer or unauthenticated
+          // Not a lecturer or the personal schedule service is unavailable.
         }
       }
     }
+
+    if (!scheduleDataLoaded) return null;
 
     const requestedDay = detectRequestedDay(message);
 
@@ -1764,29 +1776,9 @@ export async function resolveStudentAssistantQuery(
       };
     }
   } catch {
-    // If fetching enrollments fails (e.g. network/session), provide a clear guiding answer
-    const answer =
-      locale === 'vi'
-        ? 'Để xem lịch học và thời khóa biểu cá nhân của bạn (bao gồm lịch học từng thứ, phòng học, giảng viên và ca học), bạn vui lòng vào mục **Thời khóa biểu** (/dashboard/schedule) trên thanh điều hướng.\n\n' +
-          'Hệ thống hiển thị thời khóa biểu dạng lưới tuần trực quan và danh sách các buổi học sắp diễn ra.'
-        : 'To view your personal schedule and class timetable, please visit **Schedule** (/dashboard/schedule) from the navigation menu.';
-
-    return {
-      answer,
-      reasonCode: 'PERSONAL_CONTEXT',
-      citation: {
-        id: 'personal-schedule-guide',
-        slug: 'schedule-overview',
-        title: locale === 'vi' ? 'Hướng dẫn xem thời khóa biểu' : 'Schedule Guide',
-        source: 'academic-catalog',
-        locale,
-        excerpt:
-          locale === 'vi'
-            ? 'Xem thời khóa biểu cá nhân trực quan tại /dashboard/schedule.'
-            : 'View your visual schedule at /dashboard/schedule.',
-        domain: 'ACADEMIC_CATALOG',
-      },
-    };
+    // Do not turn an unexpected personal-data failure into a confident local
+    // answer with a synthetic citation. The server owns the degraded fallback.
+    return null;
   }
   }
 
