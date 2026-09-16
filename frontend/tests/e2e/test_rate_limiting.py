@@ -97,7 +97,7 @@ def test_nextjs_proxy_rate_limit_headers():
 if __name__ == '__main__':
     test_login_rate_limiting()
     test_get_requests_unthrottled()
-    test_registration_rate_limiting()
+    test_registration_endpoint_removed()
     test_nextjs_proxy_rate_limit_headers()
     print("\n=======================================================")
     print("ALL LIVE RATE LIMITING TESTS PASSED SUCCESSFULLY 100%!")

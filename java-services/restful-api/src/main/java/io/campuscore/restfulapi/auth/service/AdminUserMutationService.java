@@ -239,6 +239,9 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage super administrator accounts");
         }
+        // Revoke live sessions while the row still exists: after the hard
+        // delete there is no account state left for the filter to consult.
+        revokeSessions(id);
         try {
             int deleted = jdbc.update("DELETE FROM " + USER + " WHERE \"id\" = :id", new MapSqlParameterSource("id", id));
             if (deleted == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
