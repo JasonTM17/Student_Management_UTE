@@ -538,7 +538,7 @@ class AuthLoginPersistenceTest {
         mvc.perform(post("/api/v1/auth/change-password")
                         .contentType(MediaType.APPLICATION_JSON)
                         .header("Authorization", "Bearer " + accessToken)
-                        .content("{\"oldPassword\":\"wrong-\" + \"" + UUID.randomUUID()
+                        .content("{\"oldPassword\":\"wrong-" + UUID.randomUUID()
                                 + "\",\"newPassword\":\"" + newSecret + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.message").value("Invalid old password"));
@@ -564,19 +564,16 @@ class AuthLoginPersistenceTest {
         org.junit.jupiter.api.Assertions.assertNull(storedRefresh);
         org.junit.jupiter.api.Assertions.assertNotNull(passwordChangedAt);
 
+        // The rotated credential must be the only working one.
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"student@campuscore.edu","password":"password123"}
-                                """))
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + oldSecret + "\"}"))
                 .andExpect(status().isUnauthorized())
                 .andExpect(jsonPath("$.code").value("UNAUTHENTICATED"));
 
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("""
-                                {"email":"student@campuscore.edu","password":"newpass123"}
-                                """))
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"" + newSecret + "\"}"))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.user.id").value("student-user"));
     }

@@ -68,13 +68,25 @@ async function submitReport(page, { title, url, note, file }) {
   await form.scrollIntoViewIfNeeded();
   if (file) {
     await page.locator('#thesis-report-file').setInputFiles(file);
+  } else {
+    // Clear a previously selected file so the link field reappears.
+    await page.locator('#thesis-report-file').setInputFiles([]);
   }
   const titleInput = page.locator('input[id*="report-title"], input[aria-label*="Tiêu đề"]').first();
   if (await titleInput.count()) {
     await titleInput.fill(title);
   }
   const urlInput = page.locator('input[id*="report-url"], input[aria-label*="Liên kết"]').first();
-  if (await urlInput.count()) {
+  // The link field lives inside a <details> that is only open when a link is
+  // already present; expand it before filling during the fixture restore.
+  if ((await urlInput.count()) && !(await urlInput.isVisible().catch(() => false))) {
+    await page
+      .locator('details:has(#thesis-report-url) > summary, details:has(input[aria-label*="Liên kết"]) > summary')
+      .first()
+      .click()
+      .catch(() => {});
+  }
+  if ((await urlInput.count()) && (await urlInput.isVisible().catch(() => false))) {
     await urlInput.fill(url ?? '');
   }
   const noteInput = page.locator('textarea').first();
