@@ -47,33 +47,29 @@ def test_get_requests_unthrottled():
         assert res.status_code == 200, f"GET request {i} expected 200, got {res.status_code}"
     print(">>> PASS: 14 consecutive GET requests passed with 200 OK without throttling!")
 
-def test_registration_rate_limiting():
-    print("\n=== [3] Testing Registration Rate Limiting (Limit: 3 req/min) ===")
-    # Using a distinct simulated IP via X-Forwarded-For to test IP isolation
-    url = f"{DIRECT_API_URL}/auth/register"
+def test_registration_endpoint_removed():
+    print("\n=== [3] Public Self-Registration Endpoint Is Removed ===")
+    # Accounts are issued by the Academic Office: the old /auth/register
+    # contract must be gone, so anonymous calls never reach a registration
+    # handler and no registration rate-limit policy remains.
     custom_headers = {
         "Content-Type": "application/json",
-        "X-Forwarded-For": f"198.51.100.{int(time.time() * 1000 + 7) % 250 + 1}"
+        "X-Forwarded-For": "198.51.100.7",
     }
-    payload = {
-        "email": "bad-reg@campuscore.edu",
-        "password": "short",
-        "firstName": "Test",
-        "lastName": "User"
-    }
+    payload = {"email": "bad-reg@campuscore.edu", "firstName": "Test", "lastName": "User"}
 
     for i in range(1, 4):
-        res = requests.post(url, json=payload, headers=custom_headers)
-        limit = res.headers.get("X-RateLimit-Limit")
-        remaining = res.headers.get("X-RateLimit-Remaining")
-        print(f"Registration Request {i}: Status={res.status_code}, Limit={limit}, Remaining={remaining}")
-        assert limit == "3", f"Limit expected 3, got {limit}"
-
-    # 4th request must be blocked
-    res_blocked = requests.post(url, json=payload, headers=custom_headers)
-    print(f"Registration Request 4 (Exceeded): Status={res_blocked.status_code}, Body={res_blocked.text}")
-    assert res_blocked.status_code == 429, f"Expected 429, got {res_blocked.status_code}"
-    print(">>> PASS: Registration Rate Limiting strictly enforces 3 req/min!")
+        res = requests.post(
+            "http://127.0.0.1:4010/api/v1/auth/register", json=payload, headers=custom_headers
+        )
+        print(f"Register Request {i}: Status={res.status_code}")
+        assert res.status_code in (401, 403, 404, 405), (
+            f"Register endpoint must not accept requests, got {res.status_code}"
+        )
+        assert res.headers.get("X-RateLimit-Limit") is None, (
+            "No registration rate-limit policy may remain"
+        )
+    print(">>> PASS: Public self-registration stays removed!")
 
 def test_nextjs_proxy_rate_limit_headers():
     print("\n=== [4] Testing Next.js Proxy Forwarding 429 & Rate Limit Headers ===")

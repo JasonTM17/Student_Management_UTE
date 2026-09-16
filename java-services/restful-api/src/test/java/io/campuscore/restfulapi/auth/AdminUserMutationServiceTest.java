@@ -26,7 +26,10 @@ class AdminUserMutationServiceTest {
                 .thenReturn(0L);
 
         AdminUserMutationService service =
-                new AdminUserMutationService(jdbc, mock(PasswordEncoder.class));
+                new AdminUserMutationService(
+                        jdbc,
+                        mock(PasswordEncoder.class),
+                        mock(io.campuscore.restfulapi.auth.repository.AuthUserRepository.class));
         service.list(1, 10, null, null);
 
         org.mockito.ArgumentCaptor<MapSqlParameterSource> parameters =

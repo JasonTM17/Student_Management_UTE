@@ -270,6 +270,8 @@ export function AdminRowActions({
 interface AdminFormFieldProps {
   label: React.ReactNode;
   description?: React.ReactNode;
+  /** Field-level validation message, announced via role="alert". */
+  error?: React.ReactNode;
   children: React.ReactNode;
   className?: string;
 }
@@ -277,6 +279,7 @@ interface AdminFormFieldProps {
 export function AdminFormField({
   label,
   description,
+  error,
   children,
   className,
 }: AdminFormFieldProps) {
@@ -285,11 +288,14 @@ export function AdminFormField({
   const child = childNodes.length === 1 ? childNodes[0] : null;
   const control = React.isValidElement(child)
     ? (() => {
-        const element = child as React.ReactElement<{ id?: string }>;
+        const element = child as React.ReactElement<{ id?: string; 'aria-invalid'?: boolean }>;
         const controlId = element.props.id ?? generatedId;
         return {
           id: controlId,
-          node: React.cloneElement(element, { id: controlId }),
+          node: React.cloneElement(element, {
+            id: controlId,
+            'aria-invalid': error ? true : undefined,
+          }),
         };
       })()
     : null;
@@ -303,6 +309,11 @@ export function AdminFormField({
         {label}
       </label>
       {control?.node ?? children}
+      {error ? (
+        <p role="alert" className="text-sm font-medium text-destructive">
+          {error}
+        </p>
+      ) : null}
       {description ? (
         <p className="text-sm text-muted-foreground">{description}</p>
       ) : null}

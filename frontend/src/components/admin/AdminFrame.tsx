@@ -25,6 +25,7 @@ import {
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { BrandMark } from '@/components/BrandMark';
+import { ForcedPasswordRotationGate } from '@/components/auth/ForcedPasswordRotationGate';
 import { LanguageToggle } from '@/components/LanguageToggle';
 import { ThemeToggle } from '@/components/ThemeToggle';
 import { Button } from '@/components/ui/button';
@@ -200,6 +201,7 @@ export function AdminFrame({
 
   return (
     <div className="portal-shell">
+      <ForcedPasswordRotationGate />
       <a
         href="#admin-main-content"
         className="portal-skip-link"

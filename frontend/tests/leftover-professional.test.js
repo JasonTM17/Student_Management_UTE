@@ -37,11 +37,14 @@ test('leftover permission pages no longer spinner-gate authLoading or hasAccess'
 test('public signup explains that student accounts are issued by the Academic Office', () => {
   const page = read('src/app/register/page.tsx');
   const api = read('src/lib/api.ts');
+  const context = read('src/context/AuthContext.tsx');
   const login = read('src/app/login/page.tsx');
   assert.match(page, /issuedByOfficeTitle/);
   assert.match(page, /issuedByOfficeSteps/);
   assert.doesNotMatch(page, /<form|authApi\.register/);
-  assert.match(api, /post<LoginResponse>\('\/auth\/register'/);
+  // Self-registration is removed as a contract: no client may call it.
+  assert.doesNotMatch(api, /auth\/register/);
+  assert.doesNotMatch(context, /register/);
   assert.doesNotMatch(login, /forgot-password|forgotPassword/);
 });
 

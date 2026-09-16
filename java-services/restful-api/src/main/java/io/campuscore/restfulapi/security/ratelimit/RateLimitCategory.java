@@ -5,7 +5,6 @@ package io.campuscore.restfulapi.security.ratelimit;
  */
 public enum RateLimitCategory {
     AUTH_LOGIN(15, 60, "Đăng nhập xác thực"),
-    AUTH_REGISTER(10, 60, "Đăng ký tài khoản"),
     AUTH_CHANGE_PASSWORD(5, 60, "Đổi mật khẩu"),
     AUTH_REFRESH(30, 60, "Làm mới phiên đăng nhập"),
     ENROLLMENT_MUTATION(15, 60, "Đăng ký học phần"),

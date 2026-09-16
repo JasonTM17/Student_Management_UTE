@@ -198,7 +198,9 @@ class PeopleReadPersistenceTest {
                     "id" VARCHAR(120) PRIMARY KEY,
                     "email" VARCHAR(320) NOT NULL,
                     "firstName" VARCHAR(120) NOT NULL,
-                    "lastName" VARCHAR(120) NOT NULL
+                    "lastName" VARCHAR(120) NOT NULL,
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE
                 )
                 """);
         jdbc.execute("""

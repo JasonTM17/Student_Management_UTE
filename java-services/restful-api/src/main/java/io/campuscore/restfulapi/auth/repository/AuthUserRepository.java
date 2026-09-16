@@ -44,7 +44,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -62,7 +62,7 @@ public class AuthUserRepository {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " s.\"id\" AS student_id, s.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + USER_TABLE + " u"
@@ -76,75 +76,11 @@ public class AuthUserRepository {
                 findPermissions(user.id())));
     }
 
-    public AuthUserRecord createUser(RegisterCommand command) {
-        String userId = UUID.randomUUID().toString();
-        MapSqlParameterSource parameters = new MapSqlParameterSource()
-                .addValue("id", userId)
-                .addValue("email", command.email())
-                .addValue("password", command.passwordHash())
-                .addValue("firstName", command.firstName())
-                .addValue("lastName", command.lastName())
-                .addValue("phone", command.phone())
-                .addValue("gender", command.gender())
-                .addValue("dateOfBirth", localDateTime(command.dateOfBirth()))
-                .addValue("address", command.address());
-        jdbc.update(
-                "INSERT INTO " + USER_TABLE
-                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\","
-                        + " \"phone\", \"gender\", \"dateOfBirth\", \"address\", \"status\","
-                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (:id, :email, :password, :firstName, :lastName, :phone, :gender,"
-                        + " :dateOfBirth, :address, 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                parameters);
-
-        String roleId = jdbc.query(
-                        "SELECT \"id\" FROM " + ROLE_TABLE + " WHERE \"name\" = 'STUDENT'",
-                        new MapSqlParameterSource(),
-                        (resultSet, ignored) -> resultSet.getString("id"))
-                .stream()
-                .findFirst()
-                .orElseGet(() -> {
-                    String id = UUID.randomUUID().toString();
-                    jdbc.update(
-                            "INSERT INTO " + ROLE_TABLE
-                                    + " (\"id\", \"name\", \"description\", \"isSystem\", \"createdAt\", \"updatedAt\")"
-                                    + " VALUES (:id, 'STUDENT', 'Student access', TRUE, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                            new MapSqlParameterSource("id", id));
-                    return id;
-                });
-        jdbc.update(
-                "INSERT INTO " + USER_ROLE_TABLE + " (\"id\", \"userId\", \"roleId\")"
-                        + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
-                        + " (SELECT 1 FROM " + USER_ROLE_TABLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
-                new MapSqlParameterSource()
-                        .addValue("id", UUID.randomUUID().toString())
-                        .addValue("userId", userId)
-                        .addValue("roleId", roleId));
-        createStudentProfile(userId);
-        return findById(userId).orElseThrow(() -> new IllegalStateException("created user was not found"));
-    }
-
-    private void createStudentProfile(String userId) {
-        String profileId = UUID.randomUUID().toString();
-        String studentNumber = "SV" + java.time.Year.now().getValue()
-                + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT);
-        jdbc.update(
-                "INSERT INTO " + STUDENT_TABLE
-                        + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
-                        + " \"admissionDate\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (:id, :userId, :studentId, 'curriculum-demo', 1, 'ACTIVE',"
-                        + " CURRENT_TIMESTAMP, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                new MapSqlParameterSource()
-                        .addValue("id", profileId)
-                        .addValue("userId", userId)
-                        .addValue("studentId", studentNumber));
-    }
-
     public Optional<AuthUserRecord> findByActiveRefreshSession(String refreshTokenHash, Instant now) {
         List<AuthUserRecord> matches = jdbc.query(
                 "SELECT u.\"id\", u.\"email\", u.\"password\", u.\"firstName\", u.\"lastName\","
                         + " u.\"phone\", u.\"gender\", u.\"dateOfBirth\", u.\"address\", u.\"avatar\","
-                        + " u.\"status\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
+                        + " u.\"status\", u.\"mustChangePassword\", u.\"failedLoginAttempts\", u.\"lockedUntil\", u.\"createdAt\","
                         + " st.\"id\" AS student_id, st.\"year\" AS student_year,"
                         + " l.\"id\" AS lecturer_id"
                         + " FROM " + SESSION_TABLE + " se"
@@ -181,6 +117,46 @@ public class AuthUserRepository {
                 new MapSqlParameterSource()
                         .addValue("id", userId)
                         .addValue("loggedInAt", localDateTime(loggedInAt)));
+    }
+
+    /**
+     * Lightweight per-request account state used by the account-state filter:
+     * selects only the two enforcement columns so the check stays cheap.
+     */
+    public Optional<AccountState> findAccountState(String userId) {
+        return jdbc.query(
+                        "SELECT \"status\", \"mustChangePassword\" FROM " + USER_TABLE
+                                + " WHERE \"id\" = :id",
+                        new MapSqlParameterSource("id", userId),
+                        (resultSet, ignored) -> new AccountState(
+                                resultSet.getString("status"),
+                                resultSet.getBoolean("mustChangePassword")))
+                .stream()
+                .findFirst();
+    }
+
+    public void setMustChangePassword(String userId, boolean mustChangePassword) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"mustChangePassword\" = :flag,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", userId)
+                        .addValue("flag", mustChangePassword));
+    }
+
+    /** Office-issued credential rotation: replace the hash and force first-login rotation. */
+    public void adminSetPassword(String userId, String encodedPassword, boolean mustChangePassword) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"password\" = :password,"
+                        + " \"mustChangePassword\" = :flag, \"updatedAt\" = CURRENT_TIMESTAMP"
+                        + " WHERE \"id\" = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", userId)
+                        .addValue("password", encodedPassword)
+                        .addValue("flag", mustChangePassword));
+    }
+
+    public record AccountState(String status, boolean mustChangePassword) {
     }
 
     /**
@@ -349,6 +325,7 @@ public class AuthUserRepository {
                 resultSet.getString("address"),
                 resultSet.getString("avatar"),
                 resultSet.getString("status"),
+                resultSet.getBoolean("mustChangePassword"),
                 resultSet.getInt("failedLoginAttempts"),
                 instant(resultSet.getTimestamp("lockedUntil")),
                 instant(resultSet.getTimestamp("createdAt")),
@@ -388,6 +365,7 @@ public class AuthUserRepository {
             String address,
             String avatar,
             String status,
+            boolean mustChangePassword,
             int failedLoginAttempts,
             Instant lockedUntil,
             Instant createdAt,
@@ -410,6 +388,7 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
+                    mustChangePassword,
                     failedLoginAttempts,
                     lockedUntil,
                     createdAt,
@@ -433,6 +412,7 @@ public class AuthUserRepository {
                     address,
                     avatar,
                     status,
+                    mustChangePassword,
                     createdAt,
                     roles,
                     permissions,
@@ -440,16 +420,5 @@ public class AuthUserRepository {
                     lecturerId,
                     student);
         }
-    }
-
-    public record RegisterCommand(
-            String email,
-            String passwordHash,
-            String firstName,
-            String lastName,
-            String phone,
-            String gender,
-            Instant dateOfBirth,
-            String address) {
     }
 }

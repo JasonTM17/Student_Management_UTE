@@ -25,6 +25,12 @@ const DEMO_CREDENTIALS: Record<LoginPortal, { email: string; password: string }>
   admin: { email: 'admin@campuscore.edu', password: 'admin123' },
 };
 
+/**
+ * Course demo builds show the seeded accounts; a deployment can hide them by
+ * setting NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=false.
+ */
+const SHOW_DEMO_CREDENTIALS = process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS !== 'false';
+
 export const dynamic = 'force-dynamic';
 export default function LoginPage() {
   const [email, setEmail] = useState('');
@@ -48,6 +54,7 @@ export default function LoginPage() {
 
   useEffect(() => {
     setFormError('');
+    if (!SHOW_DEMO_CREDENTIALS) return;
     const creds = DEMO_CREDENTIALS[portal];
     setEmail(creds.email);
     setPassword(creds.password);
@@ -182,6 +189,7 @@ export default function LoginPage() {
         </div>
         <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
 
+        {SHOW_DEMO_CREDENTIALS ? (
         <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground">
@@ -207,6 +215,7 @@ export default function LoginPage() {
             </span>
           </div>
         </div>
+        ) : null}
 
         {notice && !noticeDismissed ? (
           <div

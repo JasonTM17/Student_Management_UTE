@@ -1,7 +1,10 @@
 package io.campuscore.restfulapi.auth.service;
 
+import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.web.DomainException;
+import java.security.SecureRandom;
 import java.sql.Types;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -25,13 +28,21 @@ public class AdminUserMutationService {
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
     private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
+    private static final String TEMP_PASSWORD_ALPHABET =
+            "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghijkmnpqrstuvwxyz23456789";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
+    private final AuthUserRepository authUsers;
+    private final SecureRandom random = new SecureRandom();
 
-    public AdminUserMutationService(NamedParameterJdbcTemplate jdbc, PasswordEncoder passwordEncoder) {
+    public AdminUserMutationService(
+            NamedParameterJdbcTemplate jdbc,
+            PasswordEncoder passwordEncoder,
+            AuthUserRepository authUsers) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
+        this.authUsers = authUsers;
     }
 
     @Transactional(readOnly = true)
@@ -78,23 +89,58 @@ public class AdminUserMutationService {
     @Transactional
     public Map<String, Object> create(Map<String, Object> input, boolean canManageSuperAdmin) {
         String email = required(input, "email").toLowerCase();
-        String password = required(input, "password");
-        String id = UUID.randomUUID().toString();
-        jdbc.update(
-                "INSERT INTO " + USER
-                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
-                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE',"
-                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
-                new MapSqlParameterSource().addValue("id", id).addValue("email", email)
-                        .addValue("password", passwordEncoder.encode(password))
-                        .addValue("firstName", required(input, "firstName"))
-                        .addValue("lastName", required(input, "lastName")));
+        // The Academic Office never accepts an admin-chosen start credential:
+        // a server-generated one-time temporary password is issued and shown
+        // exactly once, and the account cannot be used until it is rotated.
         String role = text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
         guardRoleMutation(null, role, canManageSuperAdmin);
+        preflightConflicts(email, role, input, null);
+
+        String temporaryPassword = generateTemporaryPassword();
+        String id = UUID.randomUUID().toString();
+        try {
+            jdbc.update(
+                    "INSERT INTO " + USER
+                            + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
+                            + " \"mustChangePassword\", \"emailVerified\", \"isSuperAdmin\","
+                            + " \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                            + " VALUES (:id, :email, :password, :firstName, :lastName, 'ACTIVE',"
+                            + " TRUE, FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    new MapSqlParameterSource().addValue("id", id).addValue("email", email)
+                            .addValue("password", passwordEncoder.encode(temporaryPassword))
+                            .addValue("firstName", required(input, "firstName"))
+                            .addValue("lastName", required(input, "lastName")));
+        } catch (DataIntegrityViolationException exception) {
+            throw conflict(exception);
+        }
         assignRole(id, role);
         ensureProfile(id, role, input);
-        return find(id);
+        return withTemporaryPassword(find(id), temporaryPassword);
+    }
+
+    @Transactional
+    public Map<String, Object> resetPassword(String id, boolean canManageSuperAdmin, String currentUserId) {
+        if (currentUserId != null && currentUserId.equals(id)) {
+            throw problem(
+                    HttpStatus.BAD_REQUEST,
+                    "SELF_PASSWORD_RESET_NOT_ALLOWED",
+                    "Use change-password to rotate your own password");
+        }
+        if (!canManageSuperAdmin && (hasRole(id, "SUPER_ADMIN") || hasRole(id, "ADMIN"))) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can reset administrator accounts");
+        }
+        String temporaryPassword = generateTemporaryPassword();
+        int updated = jdbc.update(
+                "UPDATE " + USER + " SET \"password\" = :password, \"mustChangePassword\" = TRUE,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                new MapSqlParameterSource().addValue("id", id)
+                        .addValue("password", passwordEncoder.encode(temporaryPassword)));
+        if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        revokeSessions(id);
+        return withTemporaryPassword(find(id), temporaryPassword);
     }
 
     @Transactional
@@ -135,6 +181,16 @@ public class AdminUserMutationService {
                         "You cannot deactivate or lock your own account");
             }
         }
+        if (!canManageSuperAdmin && requestedRole == null && (hasRole(id, "ADMIN") || hasRole(id, "SUPER_ADMIN"))) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can manage administrator accounts");
+        }
+        String previousStatus = jdbc.queryForObject(
+                "SELECT \"status\" FROM " + USER + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                String.class);
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"firstName\" = COALESCE(:firstName, \"firstName\"),"
                         + " \"lastName\" = COALESCE(:lastName, \"lastName\"), \"phone\" = COALESCE(:phone, \"phone\"),"
@@ -143,6 +199,14 @@ public class AdminUserMutationService {
                         .addValue("lastName", input.get("lastName")).addValue("phone", input.get("phone"))
                         .addValue("status", input.get("status")));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
+        String newStatus = input.get("status") == null ? null : text(input, "status", "");
+        if (previousStatus != null && "ACTIVE".equalsIgnoreCase(previousStatus)
+                && newStatus != null && !newStatus.isBlank() && !"ACTIVE".equalsIgnoreCase(newStatus)) {
+            // Deactivation must cut live access immediately: drop refresh
+            // sessions so the stale token cannot rotate, and the account-state
+            // filter rejects remaining access tokens on the next request.
+            revokeSessions(id);
+        }
         if (requestedRole != null) {
             replaceSystemRole(id, requestedRole);
             removeObsoleteProfiles(id, requestedRole);
@@ -226,8 +290,15 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can assign custom roles");
         }
+        if (!canManageSuperAdmin && "ADMIN".equals(roleName)) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can manage administrator accounts");
+        }
         if (!canManageSuperAdmin
-                && ("SUPER_ADMIN".equals(roleName) || (userId != null && hasRole(userId, "SUPER_ADMIN")))) {
+                && ("SUPER_ADMIN".equals(roleName)
+                    || (userId != null && (hasRole(userId, "SUPER_ADMIN") || hasRole(userId, "ADMIN"))))) {
             throw problem(
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
@@ -286,8 +357,16 @@ public class AdminUserMutationService {
         }
         String profileId = UUID.randomUUID().toString();
         if ("STUDENT".equals(roleName)) {
-            String studentNumber = text(input, "studentId", "SV" + java.time.Year.now().getValue()
-                    + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT));
+            // Office-issued accounts carry official identity: no generated
+            // placeholder IDs and no demo curriculum fallbacks.
+            String studentNumber = required(input, "studentId");
+            String curriculumId = required(input, "curriculumId");
+            int year;
+            try {
+                year = Integer.parseInt(required(input, "year"));
+            } catch (NumberFormatException exception) {
+                throw problem(HttpStatus.BAD_REQUEST, "VALIDATION_ERROR", "year must be a number");
+            }
             jdbc.update(
                     "INSERT INTO " + STUDENT
                             + " (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"status\","
@@ -298,11 +377,11 @@ public class AdminUserMutationService {
                             .addValue("id", profileId)
                             .addValue("userId", userId)
                             .addValue("studentId", studentNumber)
-                            .addValue("curriculumId", text(input, "curriculumId", "curriculum-demo"))
-                            .addValue("year", Integer.parseInt(text(input, "year", "1"))));
+                            .addValue("curriculumId", curriculumId)
+                            .addValue("year", year));
         } else if ("LECTURER".equals(roleName)) {
-            String employeeId = text(input, "employeeId", "GV"
-                    + profileId.replace("-", "").substring(0, 8).toUpperCase(java.util.Locale.ROOT));
+            String employeeId = required(input, "employeeId");
+            String departmentId = required(input, "departmentId");
             jdbc.update(
                     "INSERT INTO " + LECTURER
                             + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\")"
@@ -310,7 +389,7 @@ public class AdminUserMutationService {
                     new MapSqlParameterSource()
                             .addValue("id", profileId)
                             .addValue("userId", userId)
-                            .addValue("departmentId", text(input, "departmentId", "department-demo"))
+                            .addValue("departmentId", departmentId)
                             .addValue("employeeId", employeeId));
         }
     }
@@ -325,6 +404,77 @@ public class AdminUserMutationService {
                 new MapSqlParameterSource("userId", userId),
                 Long.class);
         return count != null && count > 0;
+    }
+
+    /** 16-char one-time credential from an ambiguity-free alphabet; never logged. */
+    private String generateTemporaryPassword() {
+        StringBuilder builder = new StringBuilder(16);
+        for (int index = 0; index < 16; index++) {
+            builder.append(TEMP_PASSWORD_ALPHABET.charAt(random.nextInt(TEMP_PASSWORD_ALPHABET.length())));
+        }
+        return builder.toString();
+    }
+
+    private static Map<String, Object> withTemporaryPassword(Map<String, Object> user, String temporaryPassword) {
+        Map<String, Object> response = new LinkedHashMap<>(user);
+        response.put("temporaryPassword", temporaryPassword);
+        return response;
+    }
+
+    /** Deterministic duplicate detection; the DB constraint is the backstop. */
+    private void preflightConflicts(String email, String role, Map<String, Object> input, String excludeUserId) {
+        Long emailCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + USER + " WHERE LOWER(\"email\") = :email"
+                        + " AND (:id IS NULL OR \"id\" <> CAST(:id AS VARCHAR))",
+                new MapSqlParameterSource().addValue("email", email)
+                        .addValue("id", excludeUserId, Types.VARCHAR),
+                Long.class);
+        if (emailCount != null && emailCount > 0) {
+            throw problem(HttpStatus.CONFLICT, "EMAIL_EXISTS", "This email is already registered");
+        }
+        if ("STUDENT".equals(role)) {
+            String studentId = text(input, "studentId", null);
+            if (studentId != null) {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + STUDENT + " WHERE \"studentId\" = :studentId",
+                        new MapSqlParameterSource("studentId", studentId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    throw problem(HttpStatus.CONFLICT, "STUDENT_ID_EXISTS", "This student ID already exists");
+                }
+            }
+        }
+        if ("LECTURER".equals(role)) {
+            String employeeId = text(input, "employeeId", null);
+            if (employeeId != null) {
+                Long count = jdbc.queryForObject(
+                        "SELECT COUNT(*) FROM " + LECTURER + " WHERE \"employeeId\" = :employeeId",
+                        new MapSqlParameterSource("employeeId", employeeId),
+                        Long.class);
+                if (count != null && count > 0) {
+                    throw problem(HttpStatus.CONFLICT, "EMPLOYEE_ID_EXISTS", "This employee ID already exists");
+                }
+            }
+        }
+    }
+
+    private DomainException conflict(DataIntegrityViolationException exception) {
+        String detail = String.valueOf(exception.getMessage()).toLowerCase(java.util.Locale.ROOT);
+        if (detail.contains("email")) {
+            return problem(HttpStatus.CONFLICT, "EMAIL_EXISTS", "This email is already registered");
+        }
+        if (detail.contains("studentid") || detail.contains("student_id")) {
+            return problem(HttpStatus.CONFLICT, "STUDENT_ID_EXISTS", "This student ID already exists");
+        }
+        if (detail.contains("employeeid") || detail.contains("employee_id")) {
+            return problem(HttpStatus.CONFLICT, "EMPLOYEE_ID_EXISTS", "This employee ID already exists");
+        }
+        return problem(HttpStatus.CONFLICT, "CONFLICT", "Operation conflicted with existing database state");
+    }
+
+    private void revokeSessions(String userId) {
+        authUsers.deleteAllRefreshSessions(userId);
+        authUsers.clearUserRefreshToken(userId);
     }
 
     private static String required(Map<String, Object> input, String key) {

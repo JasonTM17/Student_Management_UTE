@@ -17,17 +17,6 @@ public final class AuthDtos {
             @NotBlank String password) {
     }
 
-    public record RegisterRequest(
-            @NotBlank String email,
-            @NotBlank @Size(min = 8, max = 200) String password,
-            @NotBlank @Size(max = 120) String firstName,
-            @NotBlank @Size(max = 120) String lastName,
-            @Size(max = 80) String phone,
-            @Size(max = 40) String gender,
-            String dateOfBirth,
-            @Size(max = 500) String address) {
-    }
-
     public record RefreshRequest(String refreshToken) {
     }
 
@@ -63,6 +52,7 @@ public final class AuthDtos {
             String address,
             String avatar,
             String status,
+            boolean mustChangePassword,
             Instant createdAt,
             List<String> roles,
             List<String> permissions,
