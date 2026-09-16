@@ -73,8 +73,23 @@ async function main() {
       'catalog link present',
     );
 
-    // The catalog itself must list topics and offer selection on the detail page.
+    // The catalog is search-first: no topic links may render before a query.
     await studentPage.goto(`${BASE_URL}/vi/dashboard/thesis/topics`, { waitUntil: 'domcontentloaded', timeout: 120000 });
+    await studentPage.waitForTimeout(6000);
+    const beforeSearch = await studentPage.evaluate(
+      () => document.querySelectorAll('a[href*="/dashboard/thesis/topics/"]').length,
+    );
+    record(
+      'Item 1 — catalog shows no topics before a search query',
+      beforeSearch === 0,
+      `topicLinksBeforeSearch=${beforeSearch}`,
+    );
+
+    // Search, then the catalog must list topics and offer selection on the detail page.
+    const searchForm = studentPage.locator('form input[type="search"]').first();
+    await searchForm.waitFor({ state: 'visible', timeout: 30000 });
+    await searchForm.fill(process.env.VERIFY_SEARCH_QUERY || 'a');
+    await studentPage.locator('form button[type="submit"]').last().click();
     await studentPage
       .waitForFunction(
         () => document.querySelectorAll('a[href*="/dashboard/thesis/topics/"]').length > 0,
@@ -88,7 +103,7 @@ async function main() {
       ),
       excerpt: document.body.innerText.replace(/\s+/g, ' ').slice(0, 260),
     }));
-    record('Item 6 — catalog lists topics', catalogState.links.length > 0,
+    record('Item 6 — catalog lists topics after searching', catalogState.links.length > 0,
       `links=${catalogState.links.length} first=${catalogState.links[0] ?? 'none'}`);
     if (catalogState.links.length === 0) {
       console.log(`  catalog excerpt: ${catalogState.excerpt}`);

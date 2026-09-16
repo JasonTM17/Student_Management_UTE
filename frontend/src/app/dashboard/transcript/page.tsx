@@ -460,10 +460,12 @@ export default function TranscriptPage() {
               {locale === 'vi' ? '(Dành cho sinh viên trình độ Đại học hệ Chính quy theo học chế tín chỉ)' : '(Undergraduate Full-time Credit Program)'}
             </p>
             <div className="flex flex-wrap justify-center gap-6 mt-4 text-xs text-foreground font-medium border-t border-border/40 pt-3">
-              <span><strong>{locale === 'vi' ? 'Họ và tên:' : 'Full Name:'}</strong> {user?.firstName && user?.lastName ? `${user.lastName} ${user.firstName}` : 'Nguyễn Tiến Sơn'}</span>
-              <span><strong>{locale === 'vi' ? 'Mã số SV:' : 'Student ID:'}</strong> 24110054</span>
-              <span><strong>{locale === 'vi' ? 'Ngành đào tạo:' : 'Major:'}</strong> Công nghệ Thông tin</span>
-              <span><strong>{locale === 'vi' ? 'Khóa học:' : 'Batch:'}</strong> 2024 - 2028</span>
+              {/* Official printout binds to the signed-in student only: a
+                  missing field stays visibly blank instead of falling back to
+                  another person's record. */}
+              <span><strong>{locale === 'vi' ? 'Họ và tên:' : 'Full Name:'}</strong> {`${user?.lastName ?? ''} ${user?.firstName ?? ''}`.trim() || '—'}</span>
+              <span><strong>{locale === 'vi' ? 'Mã số SV:' : 'Student ID:'}</strong> {user?.studentId || '—'}</span>
+              <span><strong>{locale === 'vi' ? 'Ngành đào tạo:' : 'Major:'}</strong> {curriculumData?.curriculum?.name || '—'}</span>
               <span><strong>{locale === 'vi' ? 'Học kỳ in:' : 'Selected Term:'}</strong> {selectedSemesterName}</span>
             </div>
           </div>

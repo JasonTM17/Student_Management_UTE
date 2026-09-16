@@ -36,9 +36,9 @@ export default function ThesisTopicDetailPage() {
   const myGroup = workspace.currentGroup;
   const groupTopicId = myGroup?.topicId ?? null;
   const alreadyChosen = Boolean(groupTopicId) && groupTopicId === topicId;
-  const roundAllowsChoice =
-    workspace.selectedRound?.status === 'REGISTRATION_OPEN' ||
-    workspace.selectedRound?.status === 'PROPOSALS_PUBLISHED';
+  // The backend assigns topics only while registration is open (assignTopic
+  // rejects PROPOSALS_PUBLISHED), so the affordance must match exactly.
+  const roundAllowsChoice = workspace.selectedRound?.status === 'REGISTRATION_OPEN';
   const canChoose = isStudent && Boolean(myGroup) && !alreadyChosen && roundAllowsChoice;
 
   const chooseThisTopic = async () => {

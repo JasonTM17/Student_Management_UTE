@@ -295,97 +295,10 @@ export default function StudentConductPage() {
         }
       } catch (err: unknown) {
         if (!mounted) return;
-        // Provide rich fallback dataset matching authentic UTE standards
-        const fallbackData: StudentConductSummary = {
-          studentId: 'student-profile',
-          studentCode: '24110054',
-          fullName: 'Nguyễn Tiến Sơn',
-          cumulativeAverageScore: 88.3,
-          cumulativeClassificationVi: 'Tốt',
-          currentSemester: {
-            id: 'conduct-score-demo-current',
-            semesterId: 'semester-demo',
-            semesterName: 'Học kỳ 1 năm học 2026-2027',
-            criteria1Score: 18.0,
-            criteria2Score: 24.0,
-            criteria3Score: 17.0,
-            criteria4Score: 22.0,
-            criteria5Score: 7.0,
-            totalScore: 88.0,
-            classification: 'TOT',
-            classificationVi: 'Tốt',
-            status: 'APPROVED',
-            evaluatorName: 'Hội đồng đánh giá rèn luyện Khoa CNTT',
-            criteria: [
-              { code: 'CRITERIA_1', nameVi: 'Ý thức tham gia học tập', nameEn: 'Learning Attitude & Academic Results', maxScore: 20, score: 18.0, description: 'Tham gia đầy đủ các buổi học, chuyên cần, làm bài tập và thái độ tích cực trong giờ học, nghiên cứu khoa học.' },
-              { code: 'CRITERIA_2', nameVi: 'Ý thức chấp hành nội quy, quy chế', nameEn: 'Compliance with Regulations', maxScore: 25, score: 24.0, description: 'Chấp hành tốt các quy định của nhà trường, pháp luật và quy chế thi cử, không vi phạm an toàn giao thông.' },
-              { code: 'CRITERIA_3', nameVi: 'Ý thức tham gia hoạt động chính trị - xã hội, văn thể mỹ', nameEn: 'Extracurricular & Social Activities', maxScore: 20, score: 17.0, description: 'Tham gia tích cực ngày hội việc làm, hiến máu tình nguyện, hoạt động Đoàn - Hội, phong trào thanh niên.' },
-              { code: 'CRITERIA_4', nameVi: 'Phẩm chất công dân và quan hệ cộng đồng', nameEn: 'Civic Quality & Community Relations', maxScore: 25, score: 22.0, description: 'Ý thức trách nhiệm với xã hội, quan hệ hòa nhã với bạn bè, thầy cô, giữ gìn an ninh trật tự khu dân cư.' },
-              { code: 'CRITERIA_5', nameVi: 'Ý thức tham gia công tác cán bộ lớp, đoàn thể', nameEn: 'Class / Union Leadership & Special Achievements', maxScore: 10, score: 7.0, description: 'Đóng góp tích cực cho ban cán sự lớp, các câu lạc bộ học thuật hoặc đạt giải thưởng cấp trường.' },
-            ],
-            activities: [
-              { id: 'act-01', title: 'Tham gia Ngày hội việc làm UTE Career Expo 2026', category: 'Kỹ năng & Hướng nghiệp', points: 5.0, activityDate: '2026-09-02', organizer: 'Trung tâm Hướng nghiệp & Việc làm UTE' },
-              { id: 'act-02', title: 'Hiến máu tình nguyện "Giọt hồng Công nghệ Kỹ thuật" đợt 1', category: 'Tình nguyện vì cộng đồng', points: 8.0, activityDate: '2026-08-25', organizer: 'Đoàn Thanh niên - Hội Chữ thập đỏ' },
-              { id: 'act-03', title: 'Hội thảo Trí tuệ Nhân tạo & Dữ liệu lớn trong chuyển đổi số', category: 'Học thuật & Nghiên cứu khoa học', points: 5.0, activityDate: '2026-08-18', organizer: 'Khoa Công nghệ Thông tin' },
-              { id: 'act-04', title: 'Chiến dịch Mùa hè xanh và Tiếp sức đến trường 2026', category: 'Tình nguyện vì cộng đồng', points: 7.0, activityDate: '2026-08-05', organizer: 'Hội Sinh viên ĐH Công nghệ Kỹ thuật TP.HCM' },
-            ],
-          },
-          history: [
-            {
-              id: 'conduct-score-demo-current',
-              semesterId: 'semester-demo',
-              semesterName: 'Học kỳ 1 năm học 2026-2027',
-              criteria1Score: 18.0,
-              criteria2Score: 24.0,
-              criteria3Score: 17.0,
-              criteria4Score: 22.0,
-              criteria5Score: 7.0,
-              totalScore: 88.0,
-              classification: 'TOT',
-              classificationVi: 'Tốt',
-              status: 'APPROVED',
-              evaluatorName: 'Hội đồng đánh giá rèn luyện Khoa CNTT',
-              criteria: [],
-              activities: [],
-            },
-            {
-              id: 'conduct-score-demo-hist-1',
-              semesterId: 'semester-history-demo',
-              semesterName: 'Học kỳ 2 năm học 2025-2026',
-              criteria1Score: 19.5,
-              criteria2Score: 25.0,
-              criteria3Score: 18.5,
-              criteria4Score: 22.0,
-              criteria5Score: 7.0,
-              totalScore: 92.0,
-              classification: 'XUAT_SAC',
-              classificationVi: 'Xuất sắc',
-              status: 'APPROVED',
-              evaluatorName: 'Hội đồng đánh giá rèn luyện Khoa CNTT',
-              criteria: [],
-              activities: [],
-            },
-            {
-              id: 'conduct-score-demo-hist-2',
-              semesterId: 'semester-history-demo-1',
-              semesterName: 'Học kỳ 1 năm học 2025-2026',
-              criteria1Score: 17.5,
-              criteria2Score: 23.5,
-              criteria3Score: 16.0,
-              criteria4Score: 21.0,
-              criteria5Score: 7.0,
-              totalScore: 85.0,
-              classification: 'TOT',
-              classificationVi: 'Tốt',
-              status: 'APPROVED',
-              evaluatorName: 'Hội đồng đánh giá rèn luyện Khoa CNTT',
-              criteria: [],
-              activities: [],
-            },
-          ],
-        };
-        setSummary(fallbackData);
-        setSelectedSemesterId('semester-demo');
+        // A failed load must never be papered over with an invented training
+        // record: the student sees the real failure and can retry.
+        setSummary(null);
+        setError(copy.loadErrorTitle);
       } finally {
         if (mounted) setLoading(false);
       }
@@ -395,7 +308,7 @@ export default function StudentConductPage() {
     return () => {
       mounted = false;
     };
-  }, [hasAccess]);
+  }, [copy.loadErrorTitle, hasAccess]);
 
   const activeSemesterScore = useMemo(() => {
     if (!summary) return null;
@@ -522,7 +435,7 @@ export default function StudentConductPage() {
           <span><strong>{copy.historySemester}:</strong> {formatSemesterName(activeSemesterScore?.semesterName)}</span>
           <span><strong>{vi ? 'Sinh viên' : 'Student'}:</strong> {summary?.fullName || (user ? `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() : '')}</span>
           <span><strong>{copy.studentId}</strong> {summary?.studentCode || user?.studentId}</span>
-          <span><strong>{copy.totalScore}:</strong> {activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '88.0'} / 100</span>
+          <span><strong>{copy.totalScore}:</strong> {activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '—'} / 100</span>
           <span><strong>{copy.historyRank}:</strong> {rankLabel(activeSemesterScore?.classification, activeSemesterScore?.classificationVi)}</span>
         </div>
       </div>
@@ -567,7 +480,7 @@ export default function StudentConductPage() {
           <CardContent className="pt-0">
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-extrabold tracking-tight text-foreground">
-                {activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '88.0'}
+                {activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '—'}
               </span>
               <span className="text-sm font-medium text-muted-foreground">{copy.pointsOutOf}</span>
             </div>
@@ -680,7 +593,7 @@ export default function StudentConductPage() {
             {copy.criteriaTitle}
           </h3>
           <span className="text-xs font-semibold text-muted-foreground">
-            {copy.earned}: <strong className="text-primary text-sm">{activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '88.0'}</strong> / 100
+            {copy.earned}: <strong className="text-primary text-sm">{activeSemesterScore ? formatNumber(activeSemesterScore.totalScore) : '—'}</strong> / 100
           </span>
         </div>
 
@@ -1051,7 +964,7 @@ export default function StudentConductPage() {
                   <div>
                     <span className="text-xs text-muted-foreground">{copy.confirmedStudent}</span>
                     <p className="font-bold text-foreground text-sm">
-                      {summary?.fullName || 'Nguyễn Tiến Sơn'}
+                      {summary?.fullName || '—'}
                     </p>
                   </div>
                   <div>

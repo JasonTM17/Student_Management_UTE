@@ -5,6 +5,7 @@ import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n';
+import { campusCodeMessage } from '@/lib/campus-error';
 import { cn } from '@/lib/utils';
 import { thesisApi, type ThesisGroup, type ThesisGroupMember, type ThesisStudentResult } from '@/lib/thesis-api';
 
@@ -42,8 +43,14 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
     try {
       onChanged(await action());
     } catch (requestError: unknown) {
-      const code = (requestError as { response?: { data?: { message?: string } } })?.response?.data?.message;
-      setError(code || messages.thesis.actionFailed);
+      // Localize the stable backend business code (GROUP_FULL,
+      // STUDENT_ACTIVE_IN_OTHER_GROUP, REGISTRATION_WINDOW_CLOSED, …) instead
+      // of dumping the raw English backend message.
+      setError(campusCodeMessage(
+        requestError,
+        messages.common.campusErrors,
+        messages.thesis.actionFailed,
+      ));
     } finally {
       setIsPending(false);
     }

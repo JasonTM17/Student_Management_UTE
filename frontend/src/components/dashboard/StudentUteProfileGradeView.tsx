@@ -13,6 +13,7 @@ import {
 import { cn } from '@/lib/utils';
 import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
+import { authApi } from '@/lib/api';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { StudentTranscriptSemester, MyCurriculumResponse } from '@/types/api';
 
@@ -31,7 +32,7 @@ export function StudentUteProfileGradeView({
   onSemesterChange,
   availableSemesters = [],
 }: StudentUteProfileGradeViewProps) {
-  const { user } = useAuth();
+  const { user, refreshUser } = useAuth();
   const { messages } = useI18n();
   const card = messages.studentCard;
   const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
@@ -41,28 +42,34 @@ export function StudentUteProfileGradeView({
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
-  const handleAvatarChange = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
-    if (file) {
-      if (file.size > 5 * 1024 * 1024) {
-        toast.error(card.toastPhotoTooLarge);
-        return;
-      }
-      const reader = new FileReader();
-      reader.onload = () => {
-        setAvatarPreview(reader.result as string);
-        toast.success(card.toastPhotoUpdated);
-      };
-      reader.readAsDataURL(file);
+    if (!file) return;
+    if (file.size > 5 * 1024 * 1024) {
+      toast.error(card.toastPhotoTooLarge);
+      return;
     }
-  };
-
-  const handleRefreshChart = () => {
-    setIsRefreshing(true);
-    setTimeout(() => {
-      setIsRefreshing(false);
-      toast.success(card.toastRefreshed);
-    }, 600);
+    const dataUrl = await new Promise<string | null>((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(String(reader.result));
+      reader.onerror = () => resolve(null);
+      reader.readAsDataURL(file);
+    });
+    // The profile API accepts inline data URLs up to ~200k characters.
+    if (!dataUrl || dataUrl.length > 200_000) {
+      toast.error(card.toastPhotoTooLarge);
+      return;
+    }
+    setAvatarPreview(dataUrl);
+    try {
+      await authApi.updateProfile({ avatar: dataUrl });
+      await refreshUser();
+      toast.success(card.toastPhotoUpdated);
+    } catch {
+      // Never keep a preview of a change the server refused to store.
+      setAvatarPreview(null);
+      toast.error(card.toastPhotoFailed);
+    }
   };
 
   const handleDownloadChart = () => {
@@ -83,27 +90,20 @@ export function StudentUteProfileGradeView({
     }
   };
 
-  // Student details with high-fidelity UTE defaults
+  // Official student identity comes from the authenticated profile and the
+  // curriculum record. Missing values stay visibly unavailable — never filled
+  // with another person's data.
   const studentInfo = useMemo(() => {
-    const defaultName = 'Nguyễn Tiến Sơn';
-    const fullName = user?.firstName && user?.lastName
-      ? `${user.lastName} ${user.firstName}`
-      : (user?.firstName || defaultName);
-
+    const empty = card.notAvailable;
     return {
-      name: fullName.includes('Demo') ? defaultName : fullName,
-      studentId: '24110054',
-      dateOfBirth: '17/10/2006',
-      placeOfBirth: 'Đắk Lắk',
-      birthRegistrationPlace: 'Tỉnh Đắk Lắk',
-      gender: 'Nam',
-      country: 'Vietnam',
-      province: 'Tỉnh Đắk Lắk',
-      ward: 'Phường Buôn Ma Thuột',
-      curriculumCode: '24110CTN',
-      curriculumName: 'Kỹ thuật Phần mềm (Chất lượng cao)',
+      name: user ? `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim() || empty : empty,
+      studentId: user?.studentId || empty,
+      dateOfBirth: user?.dateOfBirth ? String(user.dateOfBirth).slice(0, 10) : empty,
+      address: user?.address || empty,
+      gender: user?.gender || empty,
+      curriculumName: curriculumData?.curriculum?.name || empty,
     };
-  }, [user]);
+  }, [card.notAvailable, curriculumData, user]);
 
   // Credit progress (Đã học / Còn lại)
   const totalCredits = curriculumData?.curriculum?.totalCredits || 144;
@@ -120,39 +120,21 @@ export function StudentUteProfileGradeView({
   const remainingCredits = Math.max(0, totalCredits - earnedCredits);
   const earnedRatio = totalCredits > 0 ? earnedCredits / totalCredits : 0.68;
 
-  // Grade data for the selected semester
+  // Only real transcript records feed the chart. Class averages are not
+  // provided by the API, so the component never invents one.
   const sampleCourses = useMemo(() => {
-    // If we have actual grade records in the current semester, use them
     const records = transcriptSemesters.flatMap((s) => s.records || []);
-    if (records.length >= 3) {
-      return records.slice(0, 10).map((r, i) => {
-        const score = typeof r.finalGrade === 'number'
-          ? r.finalGrade
-          : (typeof r.gradePoint === 'number' ? Number((r.gradePoint * 2.5).toFixed(1)) : 8.0);
-        // Realistic class average slightly hovering around student score
-        const classAvg = Math.min(10, Math.max(5.0, Number((score * 0.9 + (i % 3) * 0.4).toFixed(1))));
-        return {
-          code: r.courseCode || `SE${101 + i}`,
-          name: r.courseName || `Học phần ${i + 1}`,
-          studentScore: score,
-          classAvgScore: classAvg,
-        };
-      });
-    }
-
-    // Default courses following UTE sample exactly
-    return [
-      { code: 'CS101', name: 'Nhập môn lập trình', studentScore: 6.2, classAvgScore: 7.0 },
-      { code: 'MA101', name: 'Giải tích 1', studentScore: 7.8, classAvgScore: 7.5 },
-      { code: 'PH102', name: 'Vật lý đại cương', studentScore: 9.7, classAvgScore: 8.5 },
-      { code: 'SE214', name: 'Cấu trúc dữ liệu & GT', studentScore: 8.7, classAvgScore: 7.8 },
-      { code: 'IT205', name: 'Mạng máy tính', studentScore: 8.2, classAvgScore: 7.6 },
-      { code: 'SE302', name: 'Cơ sở dữ liệu', studentScore: 8.8, classAvgScore: 8.0 },
-      { code: 'EN105', name: 'Anh văn chuyên ngành', studentScore: 6.6, classAvgScore: 7.2 },
-      { code: 'SE305', name: 'Công nghệ phần mềm', studentScore: 1.0, classAvgScore: 6.5 },
-      { code: 'SE401', name: 'Lập trình Web nâng cao', studentScore: 8.5, classAvgScore: 7.9 },
-      { code: 'SE490', name: 'Đồ án chuyên ngành', studentScore: 10.0, classAvgScore: 8.8 },
-    ];
+    return records.slice(0, 10).map((r) => ({
+      code: r.courseCode || '',
+      name: r.courseName || '',
+      studentScore: typeof r.finalGrade === 'number'
+        ? r.finalGrade
+        : (typeof r.gradePoint === 'number' ? Number((r.gradePoint * 2.5).toFixed(1)) : null),
+    })).filter((course) => course.studentScore !== null) as Array<{
+      code: string;
+      name: string;
+      studentScore: number;
+    }>;
   }, [transcriptSemesters]);
 
   // SVG Chart dimensions
@@ -162,7 +144,10 @@ export function StudentUteProfileGradeView({
   const plotWidth = chartWidth - padding.left - padding.right;
   const plotHeight = chartHeight - padding.top - padding.bottom;
 
-  const barWidth = Math.min(24, Math.max(14, Math.floor(plotWidth / sampleCourses.length - 12)));
+  const barWidth = Math.min(
+    24,
+    Math.max(14, Math.floor(plotWidth / Math.max(1, sampleCourses.length) - 12)),
+  );
 
   // SVG Pie calculations (radius = 65, center = 80, 80)
   const pieCenter = 80;
@@ -201,11 +186,17 @@ export function StudentUteProfileGradeView({
           <div className="bg-card rounded-lg border border-border p-5 flex flex-col items-center justify-center shadow-2xs">
             <div className="relative mb-3">
               <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#0d509d]/30 bg-muted flex items-center justify-center shadow-inner">
-                <img
-                  src={avatarPreview || user?.avatar || "https://images.unsplash.com/photo-1539571696357-5a69c17a67c6?auto=format&fit=crop&w=250&q=80"}
-                  alt={studentInfo.name}
-                  className="w-full h-full object-cover"
-                />
+                {avatarPreview || user?.avatar ? (
+                  <img
+                    src={avatarPreview || user?.avatar || ''}
+                    alt={studentInfo.name}
+                    className="w-full h-full object-cover"
+                  />
+                ) : (
+                  <span className="text-2xl font-bold text-muted-foreground" aria-hidden="true">
+                    {(user?.lastName?.[0] ?? '') + (user?.firstName?.[0] ?? '') || '?'}
+                  </span>
+                )}
               </div>
             </div>
             <h3 className="font-bold text-base text-foreground tracking-tight text-center">
@@ -247,24 +238,20 @@ export function StudentUteProfileGradeView({
                 <span className="col-span-3 text-foreground">{studentInfo.dateOfBirth}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsPlaceOfBirth}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.placeOfBirth}</span>
-              </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsBirthRegistration}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.birthRegistrationPlace}</span>
-              </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
                 <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsGender}</span>
                 <span className="col-span-3 text-foreground">{studentInfo.gender}</span>
+              </div>
+              <div className="grid grid-cols-5 px-4 py-2.5">
+                <span className="col-span-2 text-muted-foreground font-medium">{card.curriculum}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.curriculumName}</span>
               </div>
               <div className="grid grid-cols-5 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20">
                 <span className="col-span-2 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                   <Award className="h-3.5 w-3.5 shrink-0" />
                   {card.fieldsConductPoints}
                 </span>
-                <span className="col-span-3 font-bold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
-                  <span>88.0 (Tốt)</span>
+                <span className="col-span-3 font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+                  <span>{card.conductSeeRecord}</span>
                   <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] hover:underline font-normal">{card.fieldsDetails}</LocalizedLink>
                 </span>
               </div>
@@ -386,15 +373,6 @@ export function StudentUteProfileGradeView({
                   </button>
                   <button
                     type="button"
-                    onClick={handleRefreshChart}
-                    className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
-                    title={card.chartRefresh}
-                    aria-label={card.chartRefresh}
-                  >
-                    <RotateCw className={cn("w-3.5 h-3.5", isRefreshing && "animate-spin text-[#0d509d] dark:text-sky-400")} />
-                  </button>
-                  <button
-                    type="button"
                     onClick={handleDownloadChart}
                     className="inline-flex h-8 w-8 items-center justify-center rounded hover:bg-muted transition-colors"
                     title={card.chartDownload}
@@ -405,7 +383,12 @@ export function StudentUteProfileGradeView({
                 </div>
               </div>
 
-              {/* SVG Responsive Bar & Line Combo Chart */}
+              {/* SVG Responsive Bar Chart — rendered only from real records */}
+              {sampleCourses.length === 0 ? (
+                <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
+                  {card.chartNoData}
+                </p>
+              ) : (
               <div className="w-full overflow-x-auto">
                 <svg
                   id="grade-combo-chart"
@@ -507,53 +490,14 @@ export function StudentUteProfileGradeView({
                       );
                     })}
 
-                  {/* Line: Điểm TB lớp học phần */}
-                  {(chartType === 'combo' || chartType === 'line') && (
-                    <g>
-                      {/* Connected Polyline */}
-                      <polyline
-                        fill="none"
-                        stroke="#22c55e"
-                        strokeWidth="2"
-                        strokeLinejoin="round"
-                        points={sampleCourses
-                          .map((c, i) => {
-                            const stepX = plotWidth / sampleCourses.length;
-                            const cx = padding.left + i * stepX + stepX / 2;
-                            const cy = padding.top + plotHeight - (c.classAvgScore / 10) * plotHeight;
-                            return `${cx},${cy}`;
-                          })
-                          .join(' ')}
-                      />
-                      {/* Node Circles */}
-                      {sampleCourses.map((c, i) => {
-                        const stepX = plotWidth / sampleCourses.length;
-                        const cx = padding.left + i * stepX + stepX / 2;
-                        const cy = padding.top + plotHeight - (c.classAvgScore / 10) * plotHeight;
-
-                        return (
-                          <circle
-                            key={`dot-${c.code}`}
-                            cx={cx}
-                            cy={cy}
-                            r="3.5"
-                            className="fill-card"
-                            stroke="#22c55e"
-                            strokeWidth="2"
-                          />
-                        );
-                      })}
-                    </g>
-                  )}
+                  {/* Class-average series intentionally omitted: the API does
+                      not expose class aggregates, so none is invented. */}
                 </svg>
               </div>
+              )}
 
               {/* Legend Footer */}
               <div className="flex items-center justify-center gap-6 pt-2 border-t border-border/70 text-xs text-muted-foreground font-medium">
-                <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded-full border-2 border-[#22c55e] bg-card inline-block" />
-                  <span>{card.axisClassAvg}</span>
-                </div>
                 <div className="flex items-center gap-1.5">
                   <span className="w-3 h-3 rounded bg-[#3b82f6] inline-block" />
                   <span>{card.axisYourScore}</span>
@@ -620,16 +564,16 @@ export function StudentUteProfileGradeView({
             </div>
             <div className="divide-y divide-border text-xs">
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-muted-foreground font-medium">{card.country}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.country}</span>
+                <span className="text-muted-foreground font-medium">{card.address}</span>
+                <span className="col-span-3 text-foreground">{studentInfo.address}</span>
               </div>
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-muted-foreground font-medium">{card.province}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.province}</span>
+                <span className="text-muted-foreground font-medium">{card.phone}</span>
+                <span className="col-span-3 text-foreground">{user?.phone || card.notAvailable}</span>
               </div>
               <div className="grid grid-cols-4 px-4 py-2.5">
-                <span className="text-muted-foreground font-medium">{card.ward}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.ward}</span>
+                <span className="text-muted-foreground font-medium">{card.fieldsEmail}</span>
+                <span className="col-span-3 text-foreground">{user?.email || card.notAvailable}</span>
               </div>
             </div>
           </div>

@@ -15,6 +15,7 @@ import {
 import { useRequireAuth } from '@/context/AuthContext';
 import { curriculumApi, enrollmentsApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
+import { isActiveEnrollment, isDroppableEnrollment } from '@/lib/enrollment-status';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { Enrollment, MyCurriculumCourse, MyCurriculumResponse } from '@/types/api';
@@ -313,10 +314,7 @@ export default function EnrollmentsPage() {
   );
 
   const activeEnrollments = useMemo(
-    () =>
-      enrollments.filter(
-        (e) => e.status === 'CONFIRMED' || e.status === 'ENROLLED',
-      ),
+    () => enrollments.filter((e) => isActiveEnrollment(e.status)),
     [enrollments],
   );
 
@@ -821,8 +819,7 @@ export default function EnrollmentsPage() {
                                     </div>
                                   ) : null}
 
-                                  {enrollment.status !== 'DROPPED' &&
-                                  enrollment.status !== 'COMPLETED' ? (
+                                  {isDroppableEnrollment(enrollment.status) ? (
                                     <Button
                                       type="button"
                                       variant="destructive"
@@ -840,8 +837,7 @@ export default function EnrollmentsPage() {
                               </details>
                             </div>
 
-                            {enrollment.status !== 'DROPPED' &&
-                            enrollment.status !== 'COMPLETED' ? (
+                            {isDroppableEnrollment(enrollment.status) ? (
                               <Button
                                 type="button"
                                 variant="destructive"

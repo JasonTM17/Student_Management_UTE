@@ -159,6 +159,9 @@ export default function ThesisPage() {
   const [isActionPending, setIsActionPending] = useState(false);
   const [error, setError] = useState('');
   const [actionError, setActionError] = useState('');
+  // Scoped load failure for the lecturer workload: without it the member
+  // panel silently disappears.
+  const [workloadError, setWorkloadError] = useState('');
   const [actionSuccess, setActionSuccess] = useState('');
 
   // Propose topic state
@@ -364,15 +367,20 @@ export default function ThesisPage() {
     thesisApi
       .myWorkload()
       .then((workload) => {
-        if (!cancelled) setLecturerWorkload(workload);
+        if (!cancelled) {
+          setLecturerWorkload(workload);
+          setWorkloadError('');
+        }
       })
       .catch(() => {
-        // Without the workload the lecturer simply sees no member panel.
+        // Losing the workload silently removes the member panel, so the
+        // lecturer is told the data failed instead of seeing an empty page.
+        if (!cancelled) setWorkloadError(messages.thesis.loadFailed);
       });
     return () => {
       cancelled = true;
     };
-  }, [isSupervisorOrAdmin, selectedRoundId]);
+  }, [isSupervisorOrAdmin, messages.thesis.loadFailed, selectedRoundId]);
 
   useEffect(() => {
     if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId) return;
@@ -527,6 +535,16 @@ export default function ThesisPage() {
     const isNotApproved = currentGroup.approvalStatus !== 'APPROVED';
     return isLeader && isRoundOpen && isNotApproved;
   }, [currentGroup, user, selectedRound]);
+
+  // The backend also rejects group/topic actions outside the registration
+  // window dates, so the CTA must not invite a doomed request after the end.
+  const isRegistrationWindowOpen = useMemo(() => {
+    if (selectedRound?.status !== 'REGISTRATION_OPEN') return false;
+    const now = Date.now();
+    const start = Date.parse(selectedRound.registrationStart);
+    const end = Date.parse(selectedRound.registrationEnd);
+    return (Number.isNaN(start) || now >= start) && (Number.isNaN(end) || now <= end);
+  }, [selectedRound]);
 
   const reportGroupId = currentGroup?.id;
   const reportApprovalStatus = currentGroup?.approvalStatus;
@@ -1122,7 +1140,7 @@ export default function ThesisPage() {
                     title={messages.thesis.noGroup}
                     description={messages.thesis.noGroupDescription}
                     action={
-                      isStudent && selectedRound?.status === 'REGISTRATION_OPEN' ? (
+                      isStudent && isRegistrationWindowOpen ? (
                         <Button type="button" onClick={() => void createGroup()} disabled={isActionPending}>
                           {messages.thesis.createGroup}
                           <ArrowUpRight className="ml-2 h-4 w-4" />
@@ -1659,7 +1677,14 @@ export default function ThesisPage() {
                                         {topicReports[tid]?.fileName ? (
                                           <button
                                             type="button"
-                                            onClick={() => void downloadReportArtifact(tid, topicReports[tid])}
+                                            onClick={() => {
+                                              const report = topicReports[tid];
+                                              // The download route is group-scoped:
+                                              // the topic report carries the group id.
+                                              if (report?.groupId) {
+                                                void downloadReportArtifact(report.groupId, report);
+                                              }
+                                            }}
                                             className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
                                           >
                                             <FileDown className="h-3.5 w-3.5" />
@@ -1846,6 +1871,14 @@ export default function ThesisPage() {
           <ThesisRegulationGuide />
 
           {error ? <ErrorState title={messages.thesis.loadFailed} description={error} /> : null}
+          {workloadError ? (
+            <div
+              role="status"
+              className="rounded-xl border border-amber-500/30 bg-amber-500/10 px-4 py-3 text-sm text-amber-700 dark:text-amber-400 shadow-xs"
+            >
+              {workloadError}
+            </div>
+          ) : null}
           {actionError ? (
             <div className="rounded-xl border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive shadow-xs">
               {actionError}

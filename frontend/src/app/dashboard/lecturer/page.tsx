@@ -196,7 +196,7 @@ export default function LecturerDashboardPage() {
                   gradingSections.slice(0, 4).map((section) => (
                     <LocalizedLink
                       key={section.id}
-                      href="/dashboard/grades"
+                      href={`/dashboard/lecturer/grades/${section.id}`}
                       className="block rounded-lg border border-border/70 bg-card px-4 py-4 transition-all hover:border-primary/60 hover:shadow-xs hover:bg-secondary/30"
                     >
                       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">

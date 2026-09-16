@@ -1,59 +1,40 @@
 'use client';
 
-import { useEffect, useRef } from 'react';
-import { ArrowUpRight, FileStack } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { ArrowUpRight, FileStack, Search } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { LinkButton } from '@/components/ui/link-button';
+import { Button } from '@/components/ui/button';
+import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
-import { thesisApi } from '@/lib/thesis-api';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
 export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
-  const { messages } = useI18n();
-  const workspace = useThesisWorkspace();
-  const autoSwitched = useRef(false);
+  const { messages, locale } = useI18n();
+  const [searchInput, setSearchInput] = useState('');
+  // Course requirement: the topic catalog only appears after a search, so no
+  // topic is fetched or rendered until the query is submitted.
+  const [submittedQuery, setSubmittedQuery] = useState('');
+  const searchActive = submittedQuery.trim().length > 0;
+  const workspace = useThesisWorkspace('', { topicsEnabled: searchActive });
 
-  /**
-   * The workspace opens on the first round in the list, which is often a round
-   * that has no published topics yet — the catalog then looks empty even though
-   * another round holds dozens of topics. Probe the other rounds once and move
-   * to the first one that actually has something to show.
-   */
-  useEffect(() => {
-    if (autoSwitched.current || workspace.isLoading) return;
-    if (workspace.topics.length > 0) {
-      autoSwitched.current = true;
-      return;
-    }
-    if (workspace.rounds.length < 2) return;
-    autoSwitched.current = true;
-    void (async () => {
-      // Probe every round and land on the one with the most topics: the first
-      // non-empty round is often a leftover verification round with a couple of
-      // records, while the real catalog sits in another round.
-      let best: { id: string; count: number } | null = null;
-      for (const round of workspace.rounds) {
-        if (round.id === workspace.selectedRoundId) continue;
-        try {
-          const topics = await thesisApi.listTopics(round.id);
-          if (topics.length > 0 && (!best || topics.length > best.count)) {
-            best = { id: round.id, count: topics.length };
-          }
-        } catch {
-          // A round that fails to list simply does not win the probe.
-        }
-      }
-      if (best) workspace.setSelectedRoundId(best.id);
-    })();
-  }, [workspace]);
+  const normalizedQuery = submittedQuery.trim().toLowerCase();
+  const matchingTopics = useMemo(() => {
+    if (!searchActive) return [];
+    return workspace.topics.filter((topic) =>
+      [topic.title, topic.description]
+        .filter(Boolean)
+        .some((value) => String(value).toLowerCase().includes(normalizedQuery)),
+    );
+  }, [normalizedQuery, searchActive, workspace.topics]);
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -77,6 +58,31 @@ export default function ThesisTopicCatalogPage() {
       />
     );
   }
+
+  const searchCopy = locale === 'vi'
+    ? {
+        label: 'Tìm kiếm đề tài',
+        placeholder: 'Nhập tên đề tài hoặc mô tả để xem danh mục…',
+        action: 'Tìm kiếm',
+        requiredTitle: 'Tìm kiếm để xem danh mục đề tài',
+        requiredDescription:
+          'Danh mục đề tài chỉ hiển thị sau khi bạn nhập từ khóa tìm kiếm và bấm tìm.',
+        noMatch: 'Không có đề tài nào khớp từ khóa.',
+      }
+    : {
+        label: 'Search topics',
+        placeholder: 'Enter a topic title or description to browse the catalog…',
+        action: 'Search',
+        requiredTitle: 'Search to view the topic catalog',
+        requiredDescription:
+          'The topic catalog appears only after you enter a keyword and submit the search.',
+        noMatch: 'No topic matches your search.',
+      };
+
+  const handleSearch = (event: React.FormEvent) => {
+    event.preventDefault();
+    setSubmittedQuery(searchInput);
+  };
 
   return (
     <div className="space-y-8">
@@ -110,12 +116,35 @@ export default function ThesisTopicCatalogPage() {
         ) : null}
       </div>
 
+      <form onSubmit={handleSearch} className="flex flex-col gap-3 sm:flex-row sm:items-end">
+        <label className="flex min-w-0 flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+          {searchCopy.label}
+          <Input
+            type="search"
+            value={searchInput}
+            onChange={(event) => setSearchInput(event.target.value)}
+            placeholder={searchCopy.placeholder}
+            className="h-11 normal-case tracking-normal"
+          />
+        </label>
+        <Button type="submit" className="h-11 sm:w-32">
+          <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+          {searchCopy.action}
+        </Button>
+      </form>
+
       {workspace.error ? (
         <ErrorState title={messages.thesis.loadFailed} description={workspace.error} />
-      ) : workspace.topics.length === 0 ? (
+      ) : !searchActive ? (
         <EmptyState
           icon={FileStack}
-          title={messages.thesis.noTopics}
+          title={searchCopy.requiredTitle}
+          description={searchCopy.requiredDescription}
+        />
+      ) : matchingTopics.length === 0 ? (
+        <EmptyState
+          icon={FileStack}
+          title={workspace.topics.length === 0 ? messages.thesis.noTopics : searchCopy.noMatch}
           description={messages.thesis.noTopicsDescription}
         />
       ) : (
@@ -125,11 +154,15 @@ export default function ThesisTopicCatalogPage() {
             <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
-            {workspace.topics.map((topic) => (
+            {matchingTopics.map((topic) => (
               <LocalizedLink
                 key={topic.id}
                 href={`/dashboard/thesis/topics/${topic.id}?roundId=${workspace.selectedRoundId}`}
-                className="group flex min-h-[210px] flex-col rounded-lg border border-border/70 bg-card p-5 transition-colors hover:border-primary/50 hover:bg-primary/[0.025] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className={cn(
+                  'group flex min-h-[210px] flex-col rounded-lg border border-border/70 bg-card p-5',
+                  'transition-colors hover:border-primary/50 hover:bg-primary/[0.025]',
+                  'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                )}
               >
                 <div className="flex items-start justify-between gap-3">
                   <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
