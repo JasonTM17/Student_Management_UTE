@@ -17,7 +17,9 @@ RUN groupadd --system --gid 10001 campuscore \
     && useradd --system --uid 10001 --gid 10001 --create-home --home-dir /home/campuscore --shell /usr/sbin/nologin campuscore \
     && apt-get update \
     && apt-get install --yes --no-install-recommends wget \
-    && rm -rf /var/lib/apt/lists/*
+    && rm -rf /var/lib/apt/lists/* \
+    && mkdir -p /var/lib/campuscore/thesis-reports \
+    && chown -R campuscore:campuscore /var/lib/campuscore
 
 COPY --from=build --chown=campuscore:campuscore /workspace/java-services/restful-api/target/campuscore-restful-api-*.jar app.jar
 
