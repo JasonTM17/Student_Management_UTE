@@ -35,6 +35,7 @@ import {
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import {
   getLocalizedCourseLabel,
   getLocalizedName,
@@ -552,8 +553,14 @@ export default function AdminSectionsPage() {
 
       closeModal();
       await fetchSections();
-    } catch (requestError: any) {
-      toast.error(requestError.response?.data?.message ?? copy.saveFailed);
+    } catch (requestError: unknown) {
+      toast.error(
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
+      );
     } finally {
       setIsSaving(false);
     }

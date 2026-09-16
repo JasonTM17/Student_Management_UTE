@@ -29,6 +29,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { toast } from 'sonner';
 import { useI18n } from '@/i18n';
+import { campusErrorMessage } from '@/lib/campus-error';
 import {
   getLocalizedDescription,
   getLocalizedName,
@@ -320,9 +321,13 @@ export default function AdminDepartmentsPage() {
 
       closeModal();
       await fetchDepartments();
-    } catch (requestError: any) {
+    } catch (requestError: unknown) {
       toast.error(
-        requestError.response?.data?.message ?? copy.saveFailed,
+        campusErrorMessage(
+          requestError,
+          messages.common.campusErrors,
+          copy.saveFailed,
+        ),
       );
     } finally {
       setIsSaving(false);

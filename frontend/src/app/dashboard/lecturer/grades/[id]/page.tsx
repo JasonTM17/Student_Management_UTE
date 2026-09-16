@@ -292,8 +292,9 @@ export default function SectionGradingPage() {
   ) => {
     markEdited(enrollmentId);
     const errorKey = `${enrollmentId}:${field}`;
-    const trimmed = draft.trim();
-    const parsed = trimmed === '' ? null : Number(draft);
+    const normalizedDraft = draft.replace(',', '.');
+    const trimmed = normalizedDraft.trim();
+    const parsed = trimmed === '' ? null : Number(normalizedDraft);
     const invalid =
       badInput || (trimmed !== '' && (parsed === null || !Number.isFinite(parsed) || parsed < 0 || parsed > 10));
 

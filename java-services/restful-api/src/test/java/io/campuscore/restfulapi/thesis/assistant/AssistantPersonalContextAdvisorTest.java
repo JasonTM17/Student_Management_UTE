@@ -25,6 +25,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 class AssistantPersonalContextAdvisorTest {
@@ -127,6 +128,20 @@ class AssistantPersonalContextAdvisorTest {
 
         assertNotNull(response);
         assertTrue(response.answer().contains("chưa có lớp học phần nào đang hoạt động"), response.answer());
+    }
+
+    @Test
+    void returnsProfessionalFallbackWhenPersonalDataSourceIsUnavailable() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null))
+                .thenThrow(new DataAccessResourceFailureException("academic schema unavailable"));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "Cho toi xem lich hoc"), jwtStudent());
+
+        assertNotNull(response);
+        assertTrue(response.degraded());
+        assertEquals("PERSONAL_CONTEXT_UNAVAILABLE", response.reasonCode());
+        assertTrue(response.citations().isEmpty());
+        assertTrue(response.answer().contains("chưa xem được lịch học cá nhân"), response.answer());
     }
 
     @Test

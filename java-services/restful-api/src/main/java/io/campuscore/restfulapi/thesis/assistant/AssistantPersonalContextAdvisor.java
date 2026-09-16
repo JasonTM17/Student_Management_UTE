@@ -18,6 +18,9 @@ import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.dao.DataAccessException;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
@@ -39,6 +42,8 @@ public class AssistantPersonalContextAdvisor {
 
     private static final String MODEL = "campuscore-personal-context";
     private static final String REASON_CODE = "PERSONAL_CONTEXT";
+    private static final String UNAVAILABLE_REASON_CODE = "PERSONAL_CONTEXT_UNAVAILABLE";
+    private static final Logger LOG = LoggerFactory.getLogger(AssistantPersonalContextAdvisor.class);
 
     /** Enrollment statuses that still bind a seat, matching the web portal. */
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
@@ -79,7 +84,16 @@ public class AssistantPersonalContextAdvisor {
     public ChatResponse answer(ChatRequest request, Jwt actor) {
         String locale = normalizedLocale(request);
         String message = request != null ? request.message() : null;
-        String answer = composeAnswer(actor, locale, message);
+        String answer;
+        try {
+            answer = composeAnswer(actor, locale, message);
+        } catch (DataAccessException exception) {
+            // A personal-data outage must not turn a normal assistant question into HTTP 500.
+            // Do not fall through to public RAG: it must never invent or expose personal data.
+            LOG.warn("personal schedule lookup failed with {}", exception.getClass().getSimpleName());
+            return new ChatResponse(fallbackMessage(locale), MODEL, true, UNAVAILABLE_REASON_CODE,
+                    locale, List.of());
+        }
         if (answer == null) {
             return null;
         }

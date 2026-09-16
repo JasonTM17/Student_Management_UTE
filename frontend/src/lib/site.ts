@@ -1,4 +1,4 @@
-const PRODUCTION_SITE_URL = 'https://campusute.io.vn';
+const PRODUCTION_SITE_URL = 'https://www.campusute.io.vn';
 const DEFAULT_SITE_URL = 'http://localhost:3000';
 
 function normalizeUrl(value: string) {
