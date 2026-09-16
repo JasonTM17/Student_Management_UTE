@@ -295,7 +295,9 @@ export default function DashboardPage() {
   const statChips = [
     {
       label: copy.stats.courses,
-      value: formatNumber(enrollments.length),
+      // Live registrations only: dropped/cancelled rows from add/drop
+      // experiments must not inflate the term count.
+      value: formatNumber(activeCourses.length + pendingCourses.length),
       icon: BookOpen,
       tone: metricToneClass('info'),
       href: '/dashboard/enrollments',

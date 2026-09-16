@@ -451,11 +451,18 @@ export default function AdminUsersPage() {
     setShowCreateModal(true);
   };
 
-  const closeModal = () => {
+  // Closing the form must never clear the one-time credential: both updates
+  // batch in the same handler, and clearing it here made the handoff modal
+  // vanish so the issued password was shown to nobody.
+  const closeFormModal = () => {
     setShowCreateModal(false);
-    setIssuedCredential(null);
     setFieldErrors({});
     resetForm();
+  };
+
+  const closeModal = () => {
+    closeFormModal();
+    setIssuedCredential(null);
   };
 
   const handleResetCredential = async (userRecord: UserRecord) => {
@@ -593,7 +600,7 @@ export default function AdminUsersPage() {
         }
       }
 
-      closeModal();
+      closeFormModal();
       await fetchUsers();
     } catch (err: any) {
       const code = err?.response?.data?.code as string | undefined;

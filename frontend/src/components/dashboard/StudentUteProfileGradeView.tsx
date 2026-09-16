@@ -7,7 +7,6 @@ import {
   Award,
   BarChart2,
   LineChart,
-  RotateCw,
   Download,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
@@ -36,9 +35,6 @@ export function StudentUteProfileGradeView({
   const { messages } = useI18n();
   const card = messages.studentCard;
   const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
-  const [activeCurriculum, setActiveCurriculum] = useState('24110CTN');
-  const [selectedAcademicYear, setSelectedAcademicYear] = useState('2025-2026');
-  const [isRefreshing, setIsRefreshing] = useState(false);
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -105,36 +101,33 @@ export function StudentUteProfileGradeView({
     };
   }, [card.notAvailable, curriculumData, user]);
 
-  // Credit progress (Đã học / Còn lại)
-  const totalCredits = curriculumData?.curriculum?.totalCredits || 144;
+  // Credit progress (Đã học / Còn lại). Numbers render only when the real
+  // curriculum and completed coursework agree — no sample values, ever.
+  const curriculumTotal = curriculumData?.curriculum?.totalCredits;
   const earnedCredits = useMemo(() => {
-    if (curriculumData?.courses) {
-      const sum = curriculumData.courses
-        .filter((c) => c.status === 'COMPLETED')
-        .reduce((acc, c) => acc + c.credits, 0);
-      if (sum > 0) return sum;
-    }
-    return 98; // Realistic benchmark from sample
+    if (!curriculumData?.courses) return null;
+    return curriculumData.courses
+      .filter((c) => c.status === 'COMPLETED')
+      .reduce((acc, c) => acc + c.credits, 0);
   }, [curriculumData]);
+  const totalCredits =
+    typeof curriculumTotal === 'number' && curriculumTotal > 0 ? curriculumTotal : null;
+  const creditsKnown = totalCredits !== null && earnedCredits !== null;
+  const remainingCredits = creditsKnown ? Math.max(0, totalCredits! - earnedCredits!) : 0;
+  const earnedRatio = creditsKnown && totalCredits! > 0 ? earnedCredits! / totalCredits! : 0;
 
-  const remainingCredits = Math.max(0, totalCredits - earnedCredits);
-  const earnedRatio = totalCredits > 0 ? earnedCredits / totalCredits : 0.68;
-
-  // Only real transcript records feed the chart. Class averages are not
-  // provided by the API, so the component never invents one.
+  // Only real transcript records feed the chart. A 4.0 grade point is never
+  // converted into an invented 10-scale score.
   const sampleCourses = useMemo(() => {
     const records = transcriptSemesters.flatMap((s) => s.records || []);
-    return records.slice(0, 10).map((r) => ({
-      code: r.courseCode || '',
-      name: r.courseName || '',
-      studentScore: typeof r.finalGrade === 'number'
-        ? r.finalGrade
-        : (typeof r.gradePoint === 'number' ? Number((r.gradePoint * 2.5).toFixed(1)) : null),
-    })).filter((course) => course.studentScore !== null) as Array<{
-      code: string;
-      name: string;
-      studentScore: number;
-    }>;
+    return records
+      .filter((r) => typeof r.finalGrade === 'number')
+      .slice(0, 10)
+      .map((r) => ({
+        code: r.courseCode || '',
+        name: r.courseName || '',
+        studentScore: r.finalGrade as number,
+      }));
   }, [transcriptSemesters]);
 
   // SVG Chart dimensions
@@ -265,42 +258,12 @@ export function StudentUteProfileGradeView({
           <div className="grid grid-cols-1 xl:grid-cols-12 gap-5">
             {/* Center: Filters & Academic Results Combo Chart (8 cols) */}
             <div className="xl:col-span-8 bg-card rounded-lg border border-border p-4 shadow-2xs flex flex-col justify-between">
-              {/* Selectors Bar */}
+              {/* Selectors Bar — only data-bound controls; curriculum and
+                  academic-year decoration was removed because it changed no
+                  data and contradicted the student's real curriculum. */}
               <div className="flex flex-wrap items-center gap-3 mb-3 text-xs">
-                {/* Curriculum Dropdown */}
-                <div className="flex-1 min-w-[150px]">
-                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
-                    {card.curriculum}
-                  </label>
-                  <select
-                    value={activeCurriculum}
-                    onChange={(e) => setActiveCurriculum(e.target.value)}
-                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs font-semibold text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
-                  >
-                    <option value="24110CTN">24110CTN - Kỹ thuật phần mềm (CLC)</option>
-                    <option value="24110TH">24110TH - Công nghệ thông tin</option>
-                    <option value="24110AI">24110AI - Trí tuệ nhân tạo</option>
-                  </select>
-                </div>
-
-                {/* Academic Year Dropdown */}
-                <div className="w-[110px]">
-                  <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
-                    {card.academicYear}
-                  </label>
-                  <select
-                    value={selectedAcademicYear}
-                    onChange={(e) => setSelectedAcademicYear(e.target.value)}
-                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
-                  >
-                    <option value="2025-2026">2025-2026</option>
-                    <option value="2024-2025">2024-2025</option>
-                    <option value="2023-2024">2023-2024</option>
-                  </select>
-                </div>
-
                 {/* Semester Dropdown */}
-                <div className="w-[110px]">
+                <div className="w-[150px]">
                   <label className="block text-[11px] text-muted-foreground mb-0.5 font-medium">
                     {card.semester}
                   </label>
@@ -421,18 +384,6 @@ export function StudentUteProfileGradeView({
                     );
                   })}
 
-                  {/* Left Axis Label */}
-                  <text
-                    x={-chartHeight / 2}
-                    y={12}
-                    transform="rotate(-90)"
-                    fontSize="9"
-                    className="fill-muted-foreground"
-                    textAnchor="middle"
-                  >
-                    {card.axisClassAvg}
-                  </text>
-
                   {/* Right Axis Label */}
                   <text
                     x={chartHeight / 2}
@@ -511,9 +462,15 @@ export function StudentUteProfileGradeView({
                 <h4 className="font-bold text-sm text-foreground tracking-tight mb-0.5 text-left">
                   {card.progressTitle}
                 </h4>
-                <p className="text-xs text-muted-foreground text-left mb-3">
-                  {card.totalCreditsLabel}: <span className="font-bold text-foreground">{earnedCredits}/{totalCredits}</span>
-                </p>
+                {creditsKnown ? (
+                  <p className="text-xs text-muted-foreground text-left mb-3">
+                    {card.totalCreditsLabel}: <span className="font-bold text-foreground">{earnedCredits}/{totalCredits}</span>
+                  </p>
+                ) : (
+                  <p className="text-xs text-muted-foreground text-left mb-3">
+                    {card.notAvailable}
+                  </p>
+                )}
 
                 {/* Legend badges */}
                 <div className="flex items-center justify-center gap-4 text-xs font-semibold mb-2">
@@ -528,32 +485,40 @@ export function StudentUteProfileGradeView({
                 </div>
               </div>
 
-              {/* SVG Pie Chart */}
+              {/* SVG Pie Chart — only with real credit numbers */}
               <div className="py-2">
-                <svg width="160" height="160" viewBox="0 0 160 160">
-                  {/* Đã học Slice (Blue) */}
-                  <path d={earnedPath} fill="#3b82f6" className="stroke-card" strokeWidth="2" />
-                  {/* Còn lại Slice (Green) */}
-                  <path d={remainingPath} fill="#84cc16" className="stroke-card" strokeWidth="2" />
-                  {/* Center percentage badge */}
-                  <circle cx="80" cy="80" r="28" className="fill-card" />
-                  <text
-                    x="80"
-                    y="84"
-                    fontSize="13"
-                    fontWeight="bold"
-                    className="fill-foreground"
-                    textAnchor="middle"
-                  >
-                    {Math.round(earnedRatio * 100)}%
-                  </text>
-                </svg>
+                {creditsKnown ? (
+                  <svg width="160" height="160" viewBox="0 0 160 160">
+                    {/* Đã học Slice (Blue) */}
+                    <path d={earnedPath} fill="#3b82f6" className="stroke-card" strokeWidth="2" />
+                    {/* Còn lại Slice (Green) */}
+                    <path d={remainingPath} fill="#84cc16" className="stroke-card" strokeWidth="2" />
+                    {/* Center percentage badge */}
+                    <circle cx="80" cy="80" r="28" className="fill-card" />
+                    <text
+                      x="80"
+                      y="84"
+                      fontSize="13"
+                      fontWeight="bold"
+                      className="fill-foreground"
+                      textAnchor="middle"
+                    >
+                      {Math.round(earnedRatio * 100)}%
+                    </text>
+                  </svg>
+                ) : (
+                  <div className="w-[160px] h-[160px] flex items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground px-4">
+                    {card.notAvailable}
+                  </div>
+                )}
               </div>
 
-              <div className="w-full pt-2 border-t border-border/70 flex justify-between text-xs text-muted-foreground">
-                <span>{card.accumulated}: <strong>{earnedCredits} TC</strong></span>
-                <span>{card.needMore}: <strong>{remainingCredits} TC</strong></span>
-              </div>
+              {creditsKnown ? (
+                <div className="w-full pt-2 border-t border-border/70 flex justify-between text-xs text-muted-foreground">
+                  <span>{card.accumulated}: <strong>{earnedCredits} TC</strong></span>
+                  <span>{card.needMore}: <strong>{remainingCredits} TC</strong></span>
+                </div>
+              ) : null}
             </div>
           </div>
 

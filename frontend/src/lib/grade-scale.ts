@@ -59,6 +59,16 @@ export function pointFromScore(score: number): number {
 }
 
 /**
+ * Highest 1-decimal score that still falls inside a `[min, max)` band, for
+ * display purposes. Rounding `max - 0.01` with toFixed would round 8.99 back
+ * up to "9.0" and make adjacent bands overlap, so the bound is floored onto
+ * the 0.1 grid instead: A reads "8.5 – 8.9" while A+ still reads "9.0 – 10.0".
+ */
+export function bandUpperDisplay(maxExclusive: number): string {
+  return (Math.floor((maxExclusive - 0.005) * 10) / 10).toFixed(1);
+}
+
+/**
  * The grades API omits `gradePoint` on some rows, which made the 4.0 column
  * read as "not available" even when the letter grade was known. Fall back to
  * the letter grade so the converted value is always shown when it is derivable.
