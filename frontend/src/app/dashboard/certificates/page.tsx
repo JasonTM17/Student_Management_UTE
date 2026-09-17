@@ -8,15 +8,14 @@ import { MyCurriculumResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import {
   Printer,
-  Copy,
   Check,
-  ShieldCheck,
   Award,
   FileCheck,
   Bus,
   Building,
   Briefcase,
   Info,
+  TriangleAlert,
 } from 'lucide-react';
 
 type CertificatePurpose =
@@ -52,7 +51,7 @@ const PURPOSE_OPTIONS: PurposeOption[] = [
       'Completing documentation for temporary deferment of military enlistment during full-time undergraduate studies per national regulations.',
     defaultRecipientVi: 'Ban Chỉ huy Quân sự cấp Xã/Phường/Thị trấn và Ban CHQS cấp Quận/Huyện/Thị xã',
     defaultRecipientEn: 'Local Military Command at Commune/Ward and District Levels',
-    icon: ShieldCheck,
+    icon: ShieldCheckIcon,
   },
   {
     id: 'STUDENT_LOAN',
@@ -112,15 +111,36 @@ const PURPOSE_OPTIONS: PurposeOption[] = [
   },
 ];
 
+// Small local icon so the purpose list keeps its shield glyph without
+// importing lucide's ShieldCheck (which read as a security endorsement on the
+// old fabricated page).
+function ShieldCheckIcon({ className }: { className?: string }) {
+  return (
+    <svg
+      className={className}
+      viewBox="0 0 24 24"
+      fill="none"
+      stroke="currentColor"
+      strokeWidth="2"
+      strokeLinecap="round"
+      strokeLinejoin="round"
+      aria-hidden="true"
+    >
+      <path d="M20 13c0 5-3.5 7.5-7.66 8.95a1 1 0 0 1-.67-.01C7.5 20.5 4 18 4 13V6a1 1 0 0 1 1-1c2 0 4.5-1.2 6.24-2.72a1.17 1.17 0 0 1 1.52 0C14.51 3.81 17 5 19 5a1 1 0 0 1 1 1z" />
+      <path d="m9 12 2 2 4-4" />
+    </svg>
+  );
+}
+
 export default function CertificatesPage() {
   const { user } = useAuth();
-  const { locale } = useI18n();
+  const { locale, messages, formatDate } = useI18n();
   const isVi = locale === 'vi';
+  const certCopy = messages.certificates;
 
   const [selectedPurpose, setSelectedPurpose] = useState<CertificatePurpose>('MILITARY_DEFERMENT');
   const [customRecipient, setCustomRecipient] = useState<string>('');
   const [curriculumData, setCurriculumData] = useState<MyCurriculumResponse | null>(null);
-  const [copied, setCopied] = useState<boolean>(false);
 
   useEffect(() => {
     let active = true;
@@ -129,7 +149,7 @@ export default function CertificatesPage() {
         const res = await curriculumApi.getMyCurriculum();
         if (active) setCurriculumData(res);
       } catch {
-        // Fallback gracefully to user profile
+        // No curriculum data: the sheet renders an em-dash, never a made-up major.
       }
     }
     void loadCurriculum();
@@ -143,58 +163,40 @@ export default function CertificatesPage() {
     [selectedPurpose]
   );
 
+  // Identity comes only from the signed-in session. When a field is missing we
+  // render an em-dash — never another student's name or MSSV.
   const studentName = useMemo(() => {
     if (user?.firstName || user?.lastName) {
       return `${user.lastName ?? ''} ${user.firstName ?? ''}`.trim().toUpperCase();
     }
-    return 'NGUYỄN VĂN A';
+    return null;
   }, [user]);
 
-  const studentId = useMemo(() => {
-    return user?.studentId || '24110054';
-  }, [user]);
+  const studentId = user?.studentId || null;
 
   const cohort = useMemo(() => {
-    const year = studentId.startsWith('24') ? 2024 : studentId.startsWith('23') ? 2023 : studentId.startsWith('22') ? 2022 : 2024;
-    const shortYear = String(year).slice(-2);
-    return `Khóa 20${shortYear} (K${shortYear})`;
+    if (!studentId) return null;
+    const match = studentId.match(/^(\d{2})/);
+    if (!match) return null;
+    return `20${match[1]} (K${match[1]})`;
   }, [studentId]);
 
-  const departmentName = useMemo(() => {
-    return (
-      curriculumData?.curriculum?.name ||
-      (isVi ? 'Công nghệ Thông tin (Chương trình Chuẩn)' : 'Information Technology (Standard Program)')
-    );
-  }, [curriculumData, isVi]);
+  const departmentName = curriculumData?.curriculum?.name || null;
 
   const today = useMemo(() => new Date(), []);
-  const issueDateVi = useMemo(
-    () =>
-      `Thành phố Hồ Chí Minh, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`,
-    [today]
-  );
-  const issueDateEn = useMemo(
-    () =>
-      `Ho Chi Minh City, ${today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`,
-    [today]
-  );
-
-  const certNumber = useMemo(() => {
-    const seed = Math.abs((studentId.split('').reduce((acc: number, ch: string) => acc * 31 + ch.charCodeAt(0), 7) % 8999) + 1000);
-    return `${today.getFullYear()}/XN-ĐHCNKT-${seed}`;
-  }, [today, studentId]);
-
-  const verificationUrl = `https://www.campusute.io.vn/verify/cert/${certNumber}`;
 
   const handlePrint = () => {
     window.print();
   };
 
-  const handleCopyLink = () => {
-    navigator.clipboard.writeText(verificationUrl);
-    setCopied(true);
-    setTimeout(() => setCopied(false), 2000);
-  };
+  const genderValue = (() => {
+    if (user?.gender === 'MALE') return certCopy.genderMale;
+    if (user?.gender === 'FEMALE') return certCopy.genderFemale;
+    if (user?.gender === 'OTHER') return certCopy.genderOther;
+    return null;
+  })();
+
+  const missing = certCopy.missingValue;
 
   return (
     <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
@@ -202,17 +204,15 @@ export default function CertificatesPage() {
       <div className="print:hidden mb-8 border-b border-border pb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-emerald-50 text-emerald-700 dark:bg-emerald-950/40 dark:text-emerald-300 border border-emerald-200 dark:border-emerald-800 mb-2">
-              <ShieldCheck className="h-3.5 w-3.5" />
-              <span>{isVi ? 'Dịch vụ xác nhận điện tử chính quy' : 'Official Electronic Verification Service'}</span>
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
+              <TriangleAlert className="h-3.5 w-3.5" />
+              <span>{certCopy.serviceBadge}</span>
             </div>
             <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {isVi ? 'Giấy xác nhận sinh viên điện tử' : 'Student Verification Certificate'}
+              {certCopy.pageTitle}
             </h1>
             <p className="mt-1 text-sm text-muted-foreground max-w-3xl">
-              {isVi
-                ? 'Hệ thống tự phục vụ cấp giấy xác nhận có mã kiểm tra QR và chữ ký điện tử hợp lệ, phục vụ tạm hoãn nghĩa vụ quân sự, vay vốn chính sách, ưu đãi xe buýt, giảm trừ gia cảnh và thực tập doanh nghiệp.'
-                : 'Self-service portal issuing official student certificates with verifiable QR integrity and digital seal, valid for military deferment, student loans, bus subsidies, and internships.'}
+              {certCopy.pageDescription}
             </p>
           </div>
           <div className="flex items-center gap-3">
@@ -221,7 +221,7 @@ export default function CertificatesPage() {
               className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex items-center gap-2 font-medium"
             >
               <Printer className="h-4 w-4" />
-              <span>{isVi ? 'In giấy xác nhận (A4)' : 'Print Certificate (A4)'}</span>
+              <span>{certCopy.printAction}</span>
             </Button>
           </div>
         </div>
@@ -233,7 +233,7 @@ export default function CertificatesPage() {
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-3">
               <Award className="h-4 w-4 text-primary" />
-              {isVi ? '1. Chọn mục đích xác nhận' : '1. Select Purpose'}
+              {certCopy.selectPurposeTitle}
             </h2>
             <div className="space-y-2.5">
               {PURPOSE_OPTIONS.map((opt) => {
@@ -275,11 +275,11 @@ export default function CertificatesPage() {
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm space-y-4">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2">
               <Building className="h-4 w-4 text-primary" />
-              {isVi ? '2. Cơ quan / Đơn vị tiếp nhận' : '2. Recipient Agency'}
+              {certCopy.recipientTitle}
             </h2>
             <div>
               <label htmlFor="custom-recipient" className="block text-xs font-medium text-muted-foreground mb-1.5">
-                {isVi ? 'Kính gửi (tùy chỉnh nếu cần)' : 'Addressed to (optional override)'}
+                {certCopy.recipientCustomLabel}
               </label>
               <textarea
                 id="custom-recipient"
@@ -289,11 +289,7 @@ export default function CertificatesPage() {
                 placeholder={isVi ? activeOption.defaultRecipientVi : activeOption.defaultRecipientEn}
                 className="w-full text-xs sm:text-sm p-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
-              <p className="text-[11px] text-muted-foreground mt-1">
-                {isVi
-                  ? 'Để trống để dùng cơ quan thụ lý mặc định theo quy định.'
-                  : 'Leave empty to use the standard default statutory authority.'}
-              </p>
+              <p className="text-[11px] text-muted-foreground mt-1">{certCopy.recipientHelper}</p>
             </div>
           </div>
 
@@ -301,195 +297,136 @@ export default function CertificatesPage() {
             <div className="flex items-start gap-2">
               <Info className="h-4 w-4 text-primary shrink-0 mt-0.5" />
               <p>
-                {isVi
-                  ? 'Bản in có đầy đủ Quốc hiệu, Tiêu ngữ, số hiệu công văn và chữ ký số điện tử của Phòng Đào tạo HCMUTE. Tài liệu có giá trị pháp lý tương đương bản ký tay trong thời hạn 60 ngày.'
-                  : 'The generated document carries the official national header, university registration serial, and electronic signature from the Academic Affairs Office. Valid for 60 calendar days.'}
+                <strong className="text-foreground">{certCopy.issuedByLabel} </strong>
+                {certCopy.issuedByValue}. {certCopy.issuedByNote}
               </p>
-            </div>
-            <div className="flex items-center justify-between pt-2 border-t border-border/60">
-              <span className="font-mono text-[11px] text-foreground">{certNumber}</span>
-              <button
-                type="button"
-                onClick={handleCopyLink}
-                className="text-primary hover:underline inline-flex items-center gap-1 font-medium text-[11px]"
-              >
-                {copied ? <Check className="h-3 w-3" /> : <Copy className="h-3 w-3" />}
-                {copied ? (isVi ? 'Đã sao chép' : 'Copied') : isVi ? 'Sao chép liên kết' : 'Copy verification link'}
-              </button>
             </div>
           </div>
         </div>
 
-        {/* Printable Official Document Sheet */}
+        {/* Printable Preview Document Sheet */}
         <div className="lg:col-span-7">
           <div className="bg-white text-slate-900 border border-slate-200 rounded-xl shadow-md p-6 sm:p-10 font-serif leading-relaxed text-sm print:p-0 print:border-none print:shadow-none print:m-0 print:w-full">
+            {/* Honest preview banner: the first thing any reader sees, on screen
+                and on paper. This page never mints an official document. */}
+            <div className="mb-6 rounded-lg border-2 border-dashed border-amber-500 bg-amber-50 px-4 py-3 text-center font-sans">
+              <p className="text-sm sm:text-base font-black uppercase tracking-wide text-amber-800">
+                {certCopy.previewBanner}
+              </p>
+              <p className="mt-1 text-[11px] sm:text-xs text-amber-700">{certCopy.previewBannerNote}</p>
+            </div>
+
             {/* Header: National Header & University Header */}
             <div className="grid grid-cols-2 gap-4 pb-6 border-b border-slate-300">
               <div className="text-center font-sans">
                 <p className="text-[11px] uppercase tracking-wider font-medium text-slate-600">
-                  BỘ GIÁO DỤC VÀ ĐÀO TẠO
+                  {certCopy.nationalHeader}
                 </p>
                 <p className="text-xs sm:text-sm font-bold uppercase text-slate-900 mt-0.5">
-                  TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM
+                  {certCopy.universityHeader}
                 </p>
                 <div className="w-16 h-[1.5px] bg-slate-900 mx-auto my-1"></div>
-                <p className="text-[11px] font-mono text-slate-600 mt-1">Số: {certNumber}</p>
+                <p className="text-[11px] font-mono text-slate-600 mt-1">
+                  {certCopy.serialLabel} {missing}
+                </p>
               </div>
 
               <div className="text-center font-sans">
                 <p className="text-xs sm:text-sm font-bold uppercase text-slate-900">
-                  CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM
+                  {certCopy.socialistHeader}
                 </p>
                 <p className="text-xs sm:text-sm font-semibold text-slate-800 mt-0.5">
-                  Độc lập - Tự do - Hạnh phúc
+                  {certCopy.independenceHeader}
                 </p>
                 <div className="w-24 h-[1.5px] bg-slate-900 mx-auto my-1"></div>
-                <p className="text-[11px] italic text-slate-600 mt-1">{isVi ? issueDateVi : issueDateEn}</p>
+                <p className="text-[11px] italic text-slate-600 mt-1">
+                  {isVi
+                    ? `Thành phố Hồ Chí Minh, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`
+                    : `Ho Chi Minh City, ${today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`}
+                </p>
               </div>
             </div>
 
             {/* Document Title */}
             <div className="text-center my-6">
               <h2 className="text-xl sm:text-2xl font-bold uppercase text-slate-950 font-sans tracking-wide">
-                GIẤY XÁC NHẬN SINH VIÊN
+                {certCopy.docTitle}
               </h2>
-              <p className="text-xs text-slate-600 italic font-sans mt-1">
-                (Dùng cho sinh viên đang theo học hệ chính quy tại Trường Đại học Công nghệ Kỹ thuật TP.HCM)
-              </p>
+              <p className="text-xs text-slate-600 italic font-sans mt-1">{certCopy.docSubtitle}</p>
             </div>
 
-            {/* University Declaration Body */}
+            {/* Document Body */}
             <div className="space-y-4 my-6 text-[13px] sm:text-sm text-slate-800">
-              <p className="font-semibold">
-                HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH XÁC NHẬN:
-              </p>
+              <p className="font-semibold">{certCopy.declarationIntro}</p>
 
               <div className="grid grid-cols-1 sm:grid-cols-2 gap-y-2 pt-1 font-sans">
                 <div>
-                  <span className="text-slate-600">Họ và tên sinh viên: </span>
-                  <strong className="text-slate-950">{studentName}</strong>
+                  <span className="text-slate-600">{certCopy.nameLabel}</span>
+                  <strong className="text-slate-950">{studentName || missing}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-600">Mã số sinh viên (MSSV): </span>
-                  <strong className="text-slate-950 font-mono">{studentId}</strong>
+                  <span className="text-slate-600">{certCopy.idLabel}</span>
+                  <strong className="text-slate-950 font-mono">{studentId || missing}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-600">Ngày sinh: </span>
-                  <span>{user?.dateOfBirth ? new Date(user.dateOfBirth).toLocaleDateString('vi-VN') : '15/08/2004'}</span>
+                  <span className="text-slate-600">{certCopy.dobLabel}</span>
+                  <span>{user?.dateOfBirth ? formatDate(user.dateOfBirth) : missing}</span>
                 </div>
                 <div>
-                  <span className="text-slate-600">Giới tính: </span>
-                  <span>{user?.gender === 'FEMALE' ? 'Nữ' : 'Nam'}</span>
+                  <span className="text-slate-600">{certCopy.genderLabel}</span>
+                  <span>{genderValue || missing}</span>
                 </div>
                 <div>
-                  <span className="text-slate-600">Khóa đào tạo: </span>
-                  <strong className="text-slate-900">{cohort}</strong>
+                  <span className="text-slate-600">{certCopy.cohortLabel}</span>
+                  <strong className="text-slate-900">{cohort || missing}</strong>
                 </div>
                 <div>
-                  <span className="text-slate-600">Bậc & Hệ đào tạo: </span>
-                  <strong className="text-slate-900">Đại học chính quy tập trung</strong>
+                  <span className="text-slate-600">{certCopy.programLevelLabel}</span>
+                  <strong className="text-slate-900">{certCopy.programLevelValue}</strong>
                 </div>
                 <div className="sm:col-span-2">
-                  <span className="text-slate-600">Ngành / Chương trình đào tạo: </span>
-                  <strong className="text-slate-900">{departmentName}</strong>
-                </div>
-                <div className="sm:col-span-2">
-                  <span className="text-slate-600">Tình trạng học tập: </span>
-                  <span className="inline-flex items-center gap-1.5 font-semibold text-emerald-800">
-                    <Check className="h-3.5 w-3.5 text-emerald-600" />
-                    Còn đang theo học tại trường (Tiến độ bình thường, không bị kỷ luật)
-                  </span>
+                  <span className="text-slate-600">{certCopy.majorLabel}</span>
+                  <strong className="text-slate-900">{departmentName || missing}</strong>
                 </div>
               </div>
 
+              {/* No academic-standing claim: the session supplies no enrollment /
+                  discipline field, so the draft asserts nothing about standing. */}
+
               <div className="pt-3 border-t border-slate-200 space-y-2">
                 <p>
-                  <strong className="text-slate-950">Mục đích cấp giấy xác nhận: </strong>
+                  <strong className="text-slate-950">{certCopy.purposeLabel} </strong>
                   <span>{isVi ? activeOption.bodyVi : activeOption.bodyEn}</span>
                 </p>
                 <p className="text-xs italic text-slate-600">
-                  <span>Căn cứ pháp lý: </span>
+                  <span>{certCopy.legalBasisLabel} </span>
                   {isVi ? activeOption.decreeVi : activeOption.decreeEn}
                 </p>
                 <p>
-                  <strong className="text-slate-950">Kính gửi đơn vị tiếp nhận: </strong>
+                  <strong className="text-slate-950">{certCopy.recipientLineLabel} </strong>
                   <span>{customRecipient.trim() || (isVi ? activeOption.defaultRecipientVi : activeOption.defaultRecipientEn)}</span>
-                </p>
-                <p className="text-xs text-slate-600 pt-1">
-                  Giấy xác nhận này có giá trị trong vòng <strong>60 ngày</strong> kể từ ngày ký phát hành. Mọi cơ quan, đơn vị có thể đối soát trực tiếp tính xác thực bằng cách quét mã QR phía dưới hoặc truy cập Cổng thông tin học vụ CampusUTE.
                 </p>
               </div>
             </div>
 
-            {/* Signatures & QR Code Section */}
-            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-300 items-end">
-              {/* Left Column: Recipients and QR Code Verification */}
+            {/* Issuance Guidance (replaces the simulated QR / signature area) */}
+            <div className="grid grid-cols-2 gap-6 pt-6 border-t border-slate-300 items-start">
               <div className="space-y-3 font-sans">
                 <div>
-                  <p className="text-[11px] font-bold uppercase text-slate-800">Nơi nhận:</p>
-                  <p className="text-[10px] text-slate-600 leading-tight">- Như trên;</p>
-                  <p className="text-[10px] text-slate-600 leading-tight">- Lưu: VT, ĐT, CTSV.</p>
-                </div>
-
-                {/* Verification Box */}
-                <div className="p-2.5 bg-slate-50 border border-slate-200 rounded-lg flex items-center gap-3">
-                  <div className="p-1 bg-white border border-slate-300 rounded shadow-2xs">
-                    {/* Simulated SVG QR Code */}
-                    <svg
-                      className="h-14 w-14 text-slate-900"
-                      viewBox="0 0 24 24"
-                      fill="none"
-                      stroke="currentColor"
-                      strokeWidth="2"
-                      strokeLinecap="round"
-                      strokeLinejoin="round"
-                    >
-                      <rect width="5" height="5" x="3" y="3" rx="1" />
-                      <rect width="5" height="5" x="16" y="3" rx="1" />
-                      <rect width="5" height="5" x="3" y="16" rx="1" />
-                      <path d="M21 16h-3a2 2 0 0 0-2 2v3" />
-                      <path d="M21 21v.01" />
-                      <path d="M12 7v3a2 2 0 0 1-2 2H7" />
-                      <path d="M3 12h.01" />
-                      <path d="M12 3h.01" />
-                      <path d="M12 16v.01" />
-                      <path d="M16 12h1" />
-                      <path d="M21 12v.01" />
-                      <path d="M12 21v-1" />
-                    </svg>
-                  </div>
-                  <div className="text-[10px] text-slate-600 leading-tight">
-                    <p className="font-bold text-slate-900">XÁC THỰC ĐIỆN TỬ</p>
-                    <p className="font-mono text-[9px] text-slate-500 mt-0.5">{certNumber}</p>
-                    <p className="text-[9px] text-emerald-700 font-semibold mt-0.5">● Chữ ký số hợp lệ</p>
-                  </div>
+                  <p className="text-[11px] font-bold uppercase text-slate-800">{certCopy.receiverTitle}</p>
+                  <p className="text-[10px] text-slate-600 leading-tight">{certCopy.receiverFirst}</p>
+                  <p className="text-[10px] text-slate-600 leading-tight">{certCopy.receiverSecond}</p>
                 </div>
               </div>
 
-              {/* Right Column: Signature & Official Seal */}
-              <div className="text-center font-sans space-y-1">
-                <p className="text-[11px] font-bold uppercase text-slate-900 leading-tight">
-                  TL. HIỆU TRƯỞNG
+              <div className="font-sans space-y-2 text-center">
+                <p className="text-[11px] font-bold uppercase text-slate-800 leading-tight">
+                  {certCopy.issuedByLabel}
                 </p>
                 <p className="text-xs font-bold uppercase text-slate-900 leading-tight">
-                  TRƯỜNG PHÒNG ĐÀO TẠO
+                  {certCopy.issuedByValue}
                 </p>
-
-                {/* Digital Stamp Simulation */}
-                <div className="py-2 flex justify-center">
-                  <div className="border-2 border-dashed border-red-600/80 rounded-md p-2 bg-red-50/50 text-red-700 text-[10px] font-sans text-center max-w-[170px] shadow-xs">
-                    <p className="font-bold uppercase tracking-tight text-[9px]">ĐÃ KÝ ĐIỆN TỬ</p>
-                    <p className="font-semibold text-[8.5px] mt-0.5 leading-tight">
-                      TRƯỜNG ĐH CÔNG NGHỆ KỸ THUẬT TP.HCM
-                    </p>
-                    <p className="text-[8px] text-red-600/90 mt-0.5 font-mono">
-                      Thời gian: {today.toLocaleDateString('vi-VN')}
-                    </p>
-                  </div>
-                </div>
-
-                <p className="text-xs font-bold text-slate-900 pt-1">PGS. TS. NGUYỄN VĂN HẢI</p>
-                <p className="text-[10px] text-slate-500 italic">Trưởng phòng Đào tạo</p>
+                <p className="text-[10px] italic text-slate-600 leading-snug">{certCopy.issuedByNote}</p>
               </div>
             </div>
           </div>

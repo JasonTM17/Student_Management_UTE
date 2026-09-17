@@ -227,7 +227,11 @@ export default function ThesisPage() {
   // Supervisors for current student group's topic
   const [currentTopicSupervisors, setCurrentTopicSupervisors] = useState<ThesisTopicSupervisor[]>([]);
 
-  const myLecturerId = user?.lecturerId || user?.id || '';
+  // Council matching uses the Lecturer-profile id. Falling back to the auth
+  // User id compared unrelated id spaces, so council actions were silently
+  // disabled for lecturers without a profile claim — surface that state
+  // instead of hiding it.
+  const myLecturerId = user?.lecturerId || '';
   const visibleCouncils = useMemo(() => {
     if (!isSupervisorOrAdmin) return [];
     if (isAdmin) return councils;
@@ -1601,6 +1605,11 @@ export default function ThesisPage() {
                 </div>
               </CardHeader>
               <CardContent className="space-y-6">
+                {isLecturer && !isAdmin && !user?.lecturerId ? (
+                  <p className="rounded-lg border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-foreground">
+                    {messages.thesis.councils.profileClaimMissing}
+                  </p>
+                ) : null}
                 {visibleCouncils.map((council) => {
                   const myMembership = council.members?.find(
                     (m) => m.lecturerId === myLecturerId,

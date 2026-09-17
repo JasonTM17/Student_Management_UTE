@@ -262,11 +262,14 @@ test('GpaTrendChart does not plot 10-scale curve on the 4.0 axis', () => {
 
 // ---------- Item 4: conduct certificate contains no QR code ----------
 
-test('conduct certificate modal contains no QR code', () => {
+test('conduct record modal contains no QR code', () => {
   const source = readSource('src/app/dashboard/conduct/page.tsx');
   assert.ok(!source.includes('QrCode'), 'must not render QrCode icon');
   assert.ok(!source.includes('XÁC THỰC SỐ UTE'), 'must not render old QR verification text');
-  assert.ok(source.includes('digitallyVerified'), 'retains modern digital verification badge');
+  // Honesty phase 03 (STUD-P1-4): no digital-verification seal is claimed at
+  // all — the modal is an explicitly labelled preview record.
+  assert.ok(!source.includes('digitallyVerified'), 'must not claim digital verification');
+  assert.ok(source.includes('copy.previewNote'), 'labels itself as an honest preview');
 });
 
 // ---------- Item 8: profile names cannot be edited ----------

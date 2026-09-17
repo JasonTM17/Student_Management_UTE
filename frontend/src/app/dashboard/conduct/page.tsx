@@ -18,7 +18,6 @@ import {
   Sparkles,
   TrendingUp,
   Users,
-  X,
 } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
@@ -30,6 +29,7 @@ import {
 } from '@/lib/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { Modal } from '@/components/ui/modal';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState, ErrorState } from '@/components/ui/state-block';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
@@ -50,8 +50,6 @@ const conductCopy = {
     status: 'Status:',
     approved: 'Approved',
     evaluator: 'Evaluator:',
-    facultyIt: 'IT Faculty',
-    schoolCouncil: 'University council',
     cumulativeTitle: 'Cumulative average',
     cumulativeSubtitle: 'Conduct score across recorded semesters',
     semesters: 'semesters',
@@ -63,8 +61,6 @@ const conductCopy = {
     activitiesSubtitle: 'Extracurricular and community records',
     bonusPoints: 'bonus pts',
     eventCount: 'recognized events',
-    verifiedBy: 'UTE Youth Union:',
-    verified: 'Verified',
     viewCertificates: 'View certificates',
     chooseSemester: 'Semester:',
     optionScoreUnit: 'pts',
@@ -98,6 +94,14 @@ const conductCopy = {
     fair: 'Fair',
     average: 'Average',
     weak: 'Weak / Poor',
+    notClassified: 'Not yet classified',
+    statusPending: 'Pending approval',
+    statusUnknown: 'Unknown',
+    scholarshipBelow: 'Below requirement',
+    recordBadge: 'Recorded in the conduct file',
+    previewTitle: 'Activity record — unofficial preview',
+    previewNote:
+      'This is an on-screen preview of a recorded activity, not an issued certificate. Official confirmation letters are issued by the Student Affairs Office.',
     scholarshipPriority: 'Scholarship priority',
     scholarshipReady: 'Scholarship eligible',
     completed: 'Completed',
@@ -108,9 +112,8 @@ const conductCopy = {
     signHint: 'Signature and full name',
     sealHint: 'Signature, seal, and full name',
     totalScore: 'Total score',
-    certificateTitle: 'Conduct Activity Certificate',
-    certificateSubtitle: 'CampusUTE electronic evidence verification',
-    certValid: 'VALID • ADDED TO CONDUCT RECORD',
+    certificateTitle: 'CONDUCT ACTIVITY RECORD (PREVIEW)',
+    certificateSubtitle: 'Recorded evidence entry — not an issued certificate',
     confirmedStudent: 'Confirmed student:',
     studentId: 'Student ID:',
     classLabel: 'Class:',
@@ -120,8 +123,7 @@ const conductCopy = {
     organizerLabel: 'Organizer:',
     appliedCriteria: 'Applied criterion:',
     bonusConductPoints: 'Bonus conduct points:',
-    digitallyVerified: 'DIGITALLY VERIFIED',
-    printCertificate: 'Print certificate',
+    printCertificate: 'Print record',
     close: 'Close',
     loadErrorTitle: 'Could not load conduct data',
     exportToast: 'Preparing the official conduct report...',
@@ -142,8 +144,6 @@ const conductCopy = {
     status: 'Trạng thái:',
     approved: 'Đã phê duyệt',
     evaluator: 'Người duyệt:',
-    facultyIt: 'Khoa CNTT',
-    schoolCouncil: 'Hội đồng trường',
     cumulativeTitle: 'Điểm TB toàn khóa',
     cumulativeSubtitle: 'Điểm rèn luyện tích lũy đến hiện tại',
     semesters: 'học kỳ',
@@ -155,8 +155,6 @@ const conductCopy = {
     activitiesSubtitle: 'Phong trào và minh chứng ngoại khóa',
     bonusPoints: 'điểm cộng',
     eventCount: 'sự kiện đã tham gia',
-    verifiedBy: 'Đoàn - Hội UTE:',
-    verified: 'Đã xác thực',
     viewCertificates: 'Xem chứng nhận',
     chooseSemester: 'Học kỳ:',
     optionScoreUnit: 'điểm',
@@ -190,6 +188,14 @@ const conductCopy = {
     fair: 'Khá',
     average: 'Trung bình',
     weak: 'Yếu / Kém',
+    notClassified: 'Chưa xếp loại',
+    statusPending: 'Chờ phê duyệt',
+    statusUnknown: 'Chưa rõ',
+    scholarshipBelow: 'Chưa đạt chuẩn',
+    recordBadge: 'Đã ghi nhận trong hồ sơ rèn luyện',
+    previewTitle: 'Hồ sơ hoạt động — bản xem trước',
+    previewNote:
+      'Đây là bản xem trước của hoạt động đã ghi nhận, không phải chứng nhận được cấp. Giấy xác nhận chính thức do Phòng Công tác Sinh viên phát hành.',
     scholarshipPriority: 'Ưu tiên học bổng',
     scholarshipReady: 'Đủ chuẩn học bổng',
     completed: 'Hoàn thành tốt',
@@ -200,9 +206,8 @@ const conductCopy = {
     signHint: 'Ký và ghi rõ họ tên',
     sealHint: 'Ký, đóng dấu và ghi rõ họ tên',
     totalScore: 'Điểm tổng kết',
-    certificateTitle: 'GIẤY CHỨNG NHẬN HOẠT ĐỘNG RÈN LUYỆN',
-    certificateSubtitle: 'Hệ thống xác thực minh chứng điện tử CampusUTE',
-    certValid: 'XÁC NHẬN HỢP LỆ • ĐÃ CẬP NHẬT VÀO HỒ SƠ RÈN LUYỆN',
+    certificateTitle: 'HỒ SƠ HOẠT ĐỘNG RÈN LUYỆN (BẢN XEM TRƯỚC)',
+    certificateSubtitle: 'Bản ghi minh chứng đã lưu — không phải chứng nhận được cấp',
     confirmedStudent: 'Sinh viên xác nhận:',
     studentId: 'Mã số sinh viên:',
     classLabel: 'Lớp:',
@@ -212,8 +217,7 @@ const conductCopy = {
     organizerLabel: 'Đơn vị tổ chức:',
     appliedCriteria: 'Tiêu chí ĐRL áp dụng:',
     bonusConductPoints: 'Điểm cộng rèn luyện:',
-    digitallyVerified: 'ĐÃ XÁC THỰC ĐIỆN TỬ',
-    printCertificate: 'In giấy chứng nhận',
+    printCertificate: 'In bản ghi',
     close: 'Đóng',
     loadErrorTitle: 'Không thể tải dữ liệu điểm rèn luyện',
     exportToast: 'Đang khởi tạo phiếu điểm rèn luyện chính thức...',
@@ -266,7 +270,10 @@ const conductActivityCopy = {
 } as const;
 
 export default function StudentConductPage() {
-  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth(['STUDENT', 'ADMIN', 'SUPER_ADMIN']);
+  // /conduct/my is hasRole('STUDENT')-only on the backend: a staff member has
+  // no "my conduct", so admitting ADMIN/SUPER_ADMIN here only bought them a
+  // load error plus a full-page reload instead of the forbidden screen.
+  const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth(['STUDENT']);
   const { messages, formatDate, formatNumber, locale } = useI18n();
   const vi = locale === 'vi';
   const copy = conductCopy[locale];
@@ -348,7 +355,23 @@ export default function StudentConductPage() {
     if (normalized === 'YEU' || normalized === 'KEM' || normalized.includes('YẾU') || normalized.includes('KÉM')) {
       return copy.weak;
     }
-    return fallback || copy.good;
+    // `fallback` is the raw classification text the API stored, so it is safe
+    // to show; anything genuinely unrecognized gets a neutral label, never a
+    // passing one.
+    return fallback || copy.notClassified;
+  };
+
+  // The API reports a per-semester status; the UI must not claim an approval
+  // the row does not carry. Unknown or blank values stay neutral.
+  const statusView = (status: string | null | undefined) => {
+    const normalized = (status || '').trim().toUpperCase();
+    if (normalized === 'APPROVED') {
+      return { label: copy.approved, approved: true as const };
+    }
+    if (normalized === 'PENDING' || normalized === 'IN_REVIEW' || normalized === 'DRAFT') {
+      return { label: copy.statusPending, approved: false as const };
+    }
+    return { label: copy.statusUnknown, approved: false as const };
   };
 
   const criterionName = (criterion: ConductSemesterScore['criteria'][number]) =>
@@ -393,7 +416,7 @@ export default function StudentConductPage() {
     return <ErrorState title={copy.loadErrorTitle} description={error} onRetry={() => window.location.reload()} />;
   }
 
-  const getRankBadgeClass = (rank: string) => {
+  const getRankBadgeClass = (rank: string | null | undefined) => {
     switch (rank?.toUpperCase()) {
       case 'XUAT_SAC':
       case 'XUẤT SẮC':
@@ -417,6 +440,7 @@ export default function StudentConductPage() {
   };
 
   const selectedActivityDetails = selectedActivity ? activityDetails(selectedActivity) : null;
+  const semesterStatus = statusView(activeSemesterScore?.status);
 
   return (
     <div className="space-y-6">
@@ -468,7 +492,7 @@ export default function StudentConductPage() {
                 <Award className="h-4 w-4 text-primary" />
                 {copy.currentSemester}
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${getRankBadgeClass(activeSemesterScore?.classification || 'TOT')}`}>
+              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${getRankBadgeClass(activeSemesterScore?.classification)}`}>
                 <CheckCircle2 className="h-3 w-3" />
                 {rankLabel(activeSemesterScore?.classification, activeSemesterScore?.classificationVi)}
               </span>
@@ -485,8 +509,13 @@ export default function StudentConductPage() {
               <span className="text-sm font-medium text-muted-foreground">{copy.pointsOutOf}</span>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
-              <span>{copy.status} <strong className="text-status-success-foreground">{copy.approved}</strong></span>
-              <span>{copy.evaluator} {activeSemesterScore?.evaluatorName ? copy.facultyIt : copy.schoolCouncil}</span>
+              <span>
+                {copy.status}{' '}
+                <strong className={semesterStatus.approved ? 'text-status-success-foreground' : 'text-muted-foreground'}>
+                  {semesterStatus.label}
+                </strong>
+              </span>
+              <span>{copy.evaluator} {activeSemesterScore?.evaluatorName || '—'}</span>
             </div>
           </CardContent>
         </Card>
@@ -510,15 +539,37 @@ export default function StudentConductPage() {
           <CardContent className="pt-0">
             <div className="flex items-baseline gap-2">
               <span className="text-4xl font-extrabold tracking-tight text-foreground">
-                {summary ? formatNumber(summary.cumulativeAverageScore) : '88.3'}
+                {summary ? formatNumber(summary.cumulativeAverageScore) : '—'}
               </span>
               <span className="text-sm font-medium text-muted-foreground">/ 100</span>
-              <span className="ml-2 rounded-md bg-status-success/12 px-2 py-0.5 text-xs font-bold text-status-success-foreground">
+              <span className="ml-2 rounded-md bg-primary/10 px-2 py-0.5 text-xs font-semibold text-primary">
                 {copy.rankPrefix} {rankLabel(summary?.cumulativeClassificationVi, summary?.cumulativeClassificationVi)}
               </span>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
-              <span>{copy.scholarshipStatus} <strong className="text-status-success-foreground">{copy.eligible}</strong></span>
+              {/* Scholarship eligibility is asserted only when the reported
+                  cumulative score actually clears the 70-point threshold. */}
+              {(() => {
+                const cumulativeScore = summary?.cumulativeAverageScore;
+                if (cumulativeScore == null) {
+                  return (
+                    <span>
+                      {copy.scholarshipStatus} <strong className="text-muted-foreground">—</strong>
+                    </span>
+                  );
+                }
+                return cumulativeScore >= 70 ? (
+                  <span>
+                    {copy.scholarshipStatus}{' '}
+                    <strong className="text-status-success-foreground">{copy.eligible}</strong>
+                  </span>
+                ) : (
+                  <span>
+                    {copy.scholarshipStatus}{' '}
+                    <strong className="text-muted-foreground">{copy.scholarshipBelow}</strong>
+                  </span>
+                );
+              })()}
               <span>({copy.requirement})</span>
             </div>
           </CardContent>
@@ -548,7 +599,12 @@ export default function StudentConductPage() {
               <span className="text-sm font-medium text-muted-foreground">{copy.eventCount}</span>
             </div>
             <div className="mt-3 flex items-center justify-between text-xs text-muted-foreground border-t border-border/50 pt-2">
-              <span>{copy.verifiedBy} <strong className="text-foreground">{copy.verified}</strong></span>
+              <span>
+                {copy.status}{' '}
+                <strong className={semesterStatus.approved ? 'text-foreground' : 'text-muted-foreground'}>
+                  {semesterStatus.label}
+                </strong>
+              </span>
               <button
                 type="button"
                 onClick={() => {
@@ -687,7 +743,9 @@ export default function StudentConductPage() {
                     </div>
                     <div className="grid grid-cols-[5.5rem_1fr] gap-2">
                       <dt className="text-muted-foreground">{copy.verification}</dt>
-                      <dd className="font-medium text-status-success-foreground">{copy.approvedBadge}</dd>
+                      <dd className={semesterStatus.approved ? 'font-medium text-status-success-foreground' : 'font-medium text-muted-foreground'}>
+                        {semesterStatus.approved ? copy.approvedBadge : semesterStatus.label}
+                      </dd>
                     </div>
                   </dl>
                   <Button
@@ -739,9 +797,13 @@ export default function StudentConductPage() {
                         +{formatNumber(act.points)} {copy.scoreUnit}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className="inline-flex items-center gap-1 rounded-full bg-status-success/12 px-2 py-0.5 text-[11px] font-semibold text-status-success-foreground">
-                          <CheckCircle2 className="h-3 w-3" />
-                          {copy.approvedBadge}
+                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${semesterStatus.approved ? 'bg-status-success/12 text-status-success-foreground' : 'bg-status-neutral/12 text-status-neutral-foreground'}`}>
+                          {semesterStatus.approved ? (
+                            <CheckCircle2 className="h-3 w-3" />
+                          ) : (
+                            <HelpCircle className="h-3 w-3" />
+                          )}
+                          {semesterStatus.approved ? copy.approvedBadge : semesterStatus.label}
                         </span>
                       </td>
                       <td className="px-4 py-3 text-center whitespace-nowrap">
@@ -802,10 +864,19 @@ export default function StudentConductPage() {
                     <span className="font-bold text-primary">
                       {formatNumber(item.totalScore)} {copy.scoreUnit}
                     </span>
-                    <span className="flex items-center gap-1 text-status-success-foreground">
-                      <CheckCircle2 className="h-3.5 w-3.5" />
-                      {copy.official}
-                    </span>
+                    {(() => {
+                      const status = statusView(item.status);
+                      return (
+                        <span className={`flex items-center gap-1 ${status.approved ? 'text-status-success-foreground' : 'text-muted-foreground'}`}>
+                          {status.approved ? (
+                            <CheckCircle2 className="h-3.5 w-3.5" />
+                          ) : (
+                            <HelpCircle className="h-3.5 w-3.5" />
+                          )}
+                          {status.approved ? copy.official : status.label}
+                        </span>
+                      );
+                    })()}
                   </div>
                 </button>
               ))}
@@ -821,35 +892,51 @@ export default function StudentConductPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {summary?.history.map((item) => (
-                    <tr
-                      key={item.semesterId}
-                      onClick={() => setSelectedSemesterId(item.semesterId)}
-                      className={`cursor-pointer transition-colors ${
-                        item.semesterId === selectedSemesterId
-                          ? 'bg-primary/10 font-semibold'
-                          : 'hover:bg-secondary/30'
-                      }`}
-                    >
-                      <td className="px-4 py-3 text-foreground">
-                        {formatSemesterName(item.semesterName)}
-                      </td>
-                      <td className="px-4 py-3 font-bold text-center text-primary">
-                        {formatNumber(item.totalScore)}
-                      </td>
-                      <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
-                          {rankLabel(item.classification, item.classificationVi)}
-                        </span>
-                      </td>
-                      <td className="px-4 py-3 text-xs text-muted-foreground">
-                        <span className="flex items-center gap-1 text-status-success-foreground">
-                          <CheckCircle2 className="h-3.5 w-3.5" />
-                          {copy.official}
-                        </span>
-                      </td>
-                    </tr>
-                  ))}
+                  {summary?.history.map((item) => {
+                    const status = statusView(item.status);
+                    return (
+                      <tr
+                        key={item.semesterId}
+                        onClick={() => setSelectedSemesterId(item.semesterId)}
+                        onKeyDown={(e) => {
+                          if (e.key === 'Enter' || e.key === ' ') {
+                            e.preventDefault();
+                            setSelectedSemesterId(item.semesterId);
+                          }
+                        }}
+                        role="button"
+                        tabIndex={0}
+                        aria-pressed={item.semesterId === selectedSemesterId}
+                        className={`cursor-pointer transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset ${
+                          item.semesterId === selectedSemesterId
+                            ? 'bg-primary/10 font-semibold'
+                            : 'hover:bg-secondary/30'
+                        }`}
+                      >
+                        <td className="px-4 py-3 text-foreground">
+                          {formatSemesterName(item.semesterName)}
+                        </td>
+                        <td className="px-4 py-3 font-bold text-center text-primary">
+                          {formatNumber(item.totalScore)}
+                        </td>
+                        <td className="px-4 py-3 text-center">
+                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
+                            {rankLabel(item.classification, item.classificationVi)}
+                          </span>
+                        </td>
+                        <td className="px-4 py-3 text-xs text-muted-foreground">
+                          <span className={`flex items-center gap-1 ${status.approved ? 'text-status-success-foreground' : 'text-muted-foreground'}`}>
+                            {status.approved ? (
+                              <CheckCircle2 className="h-3.5 w-3.5" />
+                            ) : (
+                              <HelpCircle className="h-3.5 w-3.5" />
+                            )}
+                            {status.approved ? copy.official : status.label}
+                          </span>
+                        </td>
+                      </tr>
+                    );
+                  })}
                 </tbody>
               </table>
             </div>
@@ -913,141 +1000,133 @@ export default function StudentConductPage() {
         </div>
       </div>
 
-      {/* Verified Digital Certificate & Evidence Modal */}
+      {/* Recorded Activity Preview (honest, unissued record — not a certificate) */}
       {selectedActivity && selectedActivityDetails && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/60 backdrop-blur-xs p-4 print:p-0">
-          <div className="relative w-full max-w-2xl rounded-xl border border-border bg-card shadow-2xl overflow-hidden animate-in fade-in-50 zoom-in-95">
-            {/* Modal Close Button */}
-            <button
-              type="button"
-              onClick={() => setSelectedActivity(null)}
-              className="absolute top-4 right-4 z-10 rounded-full p-1.5 text-muted-foreground hover:bg-secondary hover:text-foreground transition-colors print:hidden"
-              aria-label={copy.close}
-            >
-              <X className="h-5 w-5" />
-            </button>
+        <Modal
+          isOpen
+          onClose={() => setSelectedActivity(null)}
+          title={copy.previewTitle}
+          className="max-w-2xl"
+        >
+        <div className="space-y-5 print:p-0">
+          {/* Institutional Record Layout */}
+          <div className="space-y-5 bg-gradient-to-b from-primary/5 via-card to-card rounded-lg p-4 sm:p-6">
+            {/* Record Header */}
+            <div className="border-b-2 border-primary/30 pb-4 text-center space-y-1">
+              <div className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
+                {copy.institution}
+              </div>
+              <div className="text-xs font-extrabold text-primary">
+                {copy.office}
+              </div>
+              <div className="py-2">
+                <h2 className="text-lg sm:text-xl font-black text-foreground uppercase tracking-wide">
+                  {copy.certificateTitle}
+                </h2>
+                <p className="text-xs text-muted-foreground italic">
+                  ({copy.certificateSubtitle})
+                </p>
+              </div>
+            </div>
 
-            {/* Institutional Certificate Layout */}
-            <div className="p-6 sm:p-8 space-y-6 bg-gradient-to-b from-primary/5 via-card to-card">
-              {/* Certificate Header */}
-              <div className="border-b-2 border-primary/30 pb-4 text-center space-y-1">
-                <div className="text-[11px] uppercase font-bold tracking-wider text-muted-foreground">
-                  {copy.institution}
+            {/* Record Status Badge — bound to the status the API reported, and
+                never asserting a validity no system granted */}
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 text-xs font-bold ${semesterStatus.approved ? 'bg-status-success/12 border-status-success/30 text-status-success-foreground' : 'bg-status-neutral/12 border-status-neutral/30 text-status-neutral-foreground'}`}>
+              <div className="flex items-center gap-2">
+                {semesterStatus.approved ? (
+                  <ShieldCheck className="h-4 w-4 shrink-0" />
+                ) : (
+                  <HelpCircle className="h-4 w-4 shrink-0" />
+                )}
+                <span>{semesterStatus.approved ? copy.recordBadge : semesterStatus.label}</span>
+              </div>
+            </div>
+
+            {/* Student & Activity Information */}
+            <div className="space-y-3 text-xs sm:text-sm">
+              <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg bg-secondary/30 p-3.5 border border-border/60">
+                <div>
+                  <span className="text-xs text-muted-foreground">{copy.confirmedStudent}</span>
+                  <p className="font-bold text-foreground text-sm">
+                    {summary?.fullName || '—'}
+                  </p>
                 </div>
-                <div className="text-xs font-extrabold text-primary">
-                  {copy.office}
-                </div>
-                <div className="py-2">
-                  <h2 className="text-lg sm:text-xl font-black text-foreground uppercase tracking-wide">
-                    {copy.certificateTitle}
-                  </h2>
-                  <p className="text-xs text-muted-foreground italic">
-                    ({copy.certificateSubtitle})
+                <div>
+                  <span className="text-xs text-muted-foreground">{copy.studentId}</span>
+                  <p className="font-bold font-mono text-foreground text-sm">
+                    {summary?.studentCode || '—'}
                   </p>
                 </div>
               </div>
 
-              {/* Verification Status Badge */}
-              <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg bg-status-success/12 border border-status-success/30 p-3 text-status-success-foreground">
-                <div className="flex items-center gap-2 text-xs font-bold">
-                  <ShieldCheck className="h-4 w-4 shrink-0" />
-                  <span>{copy.certValid}</span>
+              <div className="rounded-lg border border-border/70 p-4 space-y-3 bg-card">
+                <div>
+                  <span className="text-xs font-semibold text-muted-foreground">{copy.activityLabel}</span>
+                  <p className="font-bold text-foreground text-sm sm:text-base text-primary mt-0.5">
+                    {selectedActivityDetails.title}
+                  </p>
                 </div>
-                <span className="text-[11px] font-mono font-semibold bg-status-success/20 px-2 py-0.5 rounded shrink-0">
-                  UTE-CERT-{selectedActivity.id.toUpperCase()}-2026
-                </span>
-              </div>
 
-              {/* Student & Activity Information */}
-              <div className="space-y-3 text-xs sm:text-sm">
-                <div className="grid grid-cols-1 sm:grid-cols-2 gap-3 rounded-lg bg-secondary/30 p-3.5 border border-border/60">
+                <div className="grid grid-cols-2 gap-3 text-xs">
                   <div>
-                    <span className="text-xs text-muted-foreground">{copy.confirmedStudent}</span>
-                    <p className="font-bold text-foreground text-sm">
-                      {summary?.fullName || '—'}
+                    <span className="text-muted-foreground">{copy.fieldLabel}</span>
+                    <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.category}</p>
+                  </div>
+                  <div>
+                    <span className="text-muted-foreground">{copy.recordedDate}</span>
+                    <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.date}</p>
+                  </div>
+                </div>
+
+                <div>
+                  <span className="text-xs text-muted-foreground">{copy.organizerLabel}</span>
+                  <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.organizer}</p>
+                </div>
+
+                <div className="pt-2 border-t border-border/60 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                  <div>
+                    <span className="text-xs text-muted-foreground">{copy.appliedCriteria}</span>
+                    <p className="font-semibold text-xs text-foreground mt-0.5">
+                      {activityCriterion(selectedActivity)}
                     </p>
                   </div>
-                  <div>
-                    <span className="text-xs text-muted-foreground">{copy.studentId}</span>
-                    <p className="font-bold font-mono text-foreground text-sm">
-                      {summary?.studentCode || '24110054'} ({copy.classLabel} 24110CLA)
+                  <div className="sm:text-right">
+                    <span className="text-xs text-muted-foreground">{copy.bonusConductPoints}</span>
+                    <p className="text-lg font-black text-status-success-foreground">
+                      +{formatNumber(selectedActivity.points)} {copy.scoreUnit}
                     </p>
                   </div>
                 </div>
-
-                <div className="rounded-lg border border-border/70 p-4 space-y-3 bg-card">
-                  <div>
-                    <span className="text-xs font-semibold text-muted-foreground">{copy.activityLabel}</span>
-                    <p className="font-bold text-foreground text-sm sm:text-base text-primary mt-0.5">
-                      {selectedActivityDetails.title}
-                    </p>
-                  </div>
-
-                  <div className="grid grid-cols-2 gap-3 text-xs">
-                    <div>
-                      <span className="text-muted-foreground">{copy.fieldLabel}</span>
-                      <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.category}</p>
-                    </div>
-                    <div>
-                      <span className="text-muted-foreground">{copy.recordedDate}</span>
-                      <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.date}</p>
-                    </div>
-                  </div>
-
-                  <div>
-                    <span className="text-xs text-muted-foreground">{copy.organizerLabel}</span>
-                    <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.organizer}</p>
-                  </div>
-
-                  <div className="pt-2 border-t border-border/60 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                      <span className="text-xs text-muted-foreground">{copy.appliedCriteria}</span>
-                      <p className="font-semibold text-xs text-foreground mt-0.5">
-                        {activityCriterion(selectedActivity)}
-                      </p>
-                    </div>
-                    <div className="sm:text-right">
-                      <span className="text-xs text-muted-foreground">{copy.bonusConductPoints}</span>
-                      <p className="text-lg font-black text-status-success-foreground">
-                        +{formatNumber(selectedActivity.points)} {copy.scoreUnit}
-                      </p>
-                    </div>
-                  </div>
-                </div>
-              </div>
-
-              {/* Official Institutional Verification Seal */}
-              <div className="pt-2 border-t border-border/60 flex items-center justify-end text-xs text-muted-foreground">
-                <div className="text-right">
-                  <span className="inline-flex items-center gap-1 rounded border border-primary/30 bg-primary/5 px-2.5 py-1 text-[11px] font-bold text-primary">
-                    <CheckCircle2 className="h-3 w-3" />
-                    {copy.digitallyVerified}
-                  </span>
-                </div>
-              </div>
-
-              {/* Modal Actions */}
-              <div className="flex items-center justify-end gap-3 pt-2 print:hidden">
-                <Button
-                  variant="outline"
-                  size="sm"
-                  onClick={() => window.print()}
-                  className="gap-1.5 font-semibold text-xs"
-                >
-                  <Printer className="h-3.5 w-3.5" />
-                  {copy.printCertificate}
-                </Button>
-                <Button
-                  size="sm"
-                  onClick={() => setSelectedActivity(null)}
-                  className="text-xs font-semibold px-4"
-                >
-                  {copy.close}
-                </Button>
               </div>
             </div>
+
+            {/* Honest preview note (no digital-verification seal is claimed) */}
+            <p className="rounded-lg border border-dashed border-border/80 bg-muted/40 px-3 py-2 text-[11px] leading-relaxed text-muted-foreground">
+              {copy.previewNote}
+            </p>
+
+            {/* Modal Actions */}
+            <div className="flex items-center justify-end gap-3 pt-1 print:hidden">
+              <Button
+                variant="outline"
+                size="sm"
+                onClick={() => window.print()}
+                className="gap-1.5 font-semibold text-xs"
+              >
+                <Printer className="h-3.5 w-3.5" />
+                {copy.printCertificate}
+              </Button>
+              <Button
+                size="sm"
+                onClick={() => setSelectedActivity(null)}
+                className="text-xs font-semibold px-4"
+              >
+              {copy.close}
+            </Button>
+          </div>
           </div>
         </div>
+        </Modal>
       )}
     </div>
   );

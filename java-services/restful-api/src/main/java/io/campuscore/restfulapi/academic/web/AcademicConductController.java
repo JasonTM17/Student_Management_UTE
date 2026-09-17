@@ -97,10 +97,10 @@ public class AcademicConductController {
             String first = String.valueOf(row.get("firstName"));
             String last = String.valueOf(row.get("lastName"));
             fullName = (last + " " + first).trim();
-        } else if ("student-profile".equals(studentProfileId) || "student-user".equals(studentProfileId)) {
-            studentCode = "24110054";
-            fullName = "Nguyễn Tiến Sơn";
         } else {
+            // No magic-id demo aliasing: a request for an unknown student (or
+            // for the former literal ids) must never return someone else's
+            // hardcoded identity.
             throw new org.springframework.web.server.ResponseStatusException(
                     HttpStatus.NOT_FOUND, "Student not found: " + studentProfileId);
         }
@@ -116,12 +116,6 @@ public class AcademicConductController {
 
         List<Map<String, Object>> scoreRows = jdbc.queryForList(
                 sql, new MapSqlParameterSource("studentId", resolvedProfileId));
-
-        if (scoreRows.isEmpty()) {
-            if ("student-profile".equals(resolvedProfileId) || "student-user".equals(resolvedProfileId)) {
-                scoreRows = jdbc.queryForList(sql, new MapSqlParameterSource("studentId", "student-profile"));
-            }
-        }
 
         if (scoreRows.isEmpty()) {
             return new StudentConductSummaryDto(
@@ -148,9 +142,10 @@ public class AcademicConductController {
         }
 
         ConductSemesterScoreDto current = history.isEmpty() ? null : history.get(0);
-        BigDecimal cumulativeAverage = count > 0
-                ? sumTotal.divide(BigDecimal.valueOf(count), 1, RoundingMode.HALF_UP)
-                : BigDecimal.valueOf(88.0);
+        // scoreRows is non-empty here (the empty case returned above), so the
+        // average is always computed from real rows — no invented 88.0.
+        BigDecimal cumulativeAverage = sumTotal.divide(
+                BigDecimal.valueOf(count), 1, RoundingMode.HALF_UP);
 
         String cumulativeClassification = classifyConductScore(cumulativeAverage);
 
@@ -178,13 +173,6 @@ public class AcademicConductController {
                 sql,
                 new MapSqlParameterSource("studentId", studentProfileId)
                         .addValue("semesterId", semesterId));
-
-        if (rows.isEmpty() && ("student-profile".equals(studentProfileId) || "student-user".equals(studentProfileId))) {
-            rows = jdbc.queryForList(
-                    sql,
-                    new MapSqlParameterSource("studentId", "student-profile")
-                            .addValue("semesterId", semesterId));
-        }
 
         if (rows.isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conduct score not found for semester");
@@ -220,7 +208,7 @@ public class AcademicConductController {
         List<ConductActivityDto> activities = jdbc.query(
                 "SELECT id, title, category, points, activity_date, organizer, certificate_url "
                         + "FROM academic.conduct_activity "
-                        + "WHERE (student_id = :studentId OR (:studentId IN ('student-profile', 'student-user') AND student_id = 'student-profile')) AND semester_id = :semesterId "
+                        + "WHERE student_id = :studentId AND semester_id = :semesterId "
                         + "ORDER BY activity_date DESC",
                 new MapSqlParameterSource("studentId", studentProfileId).addValue("semesterId", semesterId),
                 (rs, rowNum) -> {

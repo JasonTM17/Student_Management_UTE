@@ -96,6 +96,9 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
   };
 
   const remove = (studentId: string) => {
+    // Same confirmation gate as the sibling screen (dashboard/thesis/page.tsx):
+    // a DELETE that removes a member must never fire on a single click.
+    if (!window.confirm(messages.thesis.removeMemberConfirm)) return;
     void run(() => thesisApi.removeMember(group.id, studentId));
   };
 

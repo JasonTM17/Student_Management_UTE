@@ -41,12 +41,11 @@ export async function writeSiteAppearance(
     version: Date.now(),
     updatedAt: new Date().toISOString(),
   });
+  // Persist first, then cache. If the filesystem write fails we throw so the
+  // API route can answer non-2xx — an admin must never be told their branding
+  // change was saved when it was silently dropped (e.g. on serverless).
+  await fs.mkdir(path.dirname(appearancePath()), { recursive: true });
+  await fs.writeFile(appearancePath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
   memory = next;
-  try {
-    await fs.mkdir(path.dirname(appearancePath()), { recursive: true });
-    await fs.writeFile(appearancePath(), `${JSON.stringify(next, null, 2)}\n`, 'utf8');
-  } catch (err) {
-    console.warn('Could not persist site appearance to filesystem:', err);
-  }
   return next;
 }
