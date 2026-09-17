@@ -49,6 +49,7 @@ import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { getLocalizedName } from '@/lib/academic-content';
+import { findAnnouncementLengthViolation } from '@/lib/announcement-limits';
 import { campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
 import { cn } from '@/lib/utils';
 import {
@@ -310,6 +311,8 @@ export default function AdminAnnouncementsPage() {
         missingAudience: 'Hãy chọn ít nhất một nhóm nhận hoặc bật Toàn trường.',
         invalidYears: 'Năm học phải là các số nguyên dương, cách nhau bằng dấu phẩy.',
         invalidDates: 'Ngày kết thúc phải sau ngày bắt đầu.',
+        contentTooLong: (excess: number, limit: number) =>
+          `Nội dung vượt quá giới hạn ${limit.toLocaleString('vi-VN')} ký tự (cần bỏ bớt ${excess.toLocaleString('vi-VN')} ký tự). Hãy rút gọn văn bản hoặc bỏ bớt hình ảnh trước khi lưu.`,
         conflict: 'Bản ghi đã thay đổi. Hãy tải lại và thử lại để không ghi đè dữ liệu mới.',
         archivedEdit: 'Thông báo đã lưu trữ. Hãy khôi phục trước khi chỉnh sửa.',
         genericError: 'Hiện chưa thể hoàn tất thao tác. Hãy thử lại sau.',
@@ -392,6 +395,8 @@ export default function AdminAnnouncementsPage() {
         missingAudience: 'Choose at least one audience group or enable Campus-wide.',
         invalidYears: 'Student years must be positive integers separated by commas.',
         invalidDates: 'The end date must be after the start date.',
+        contentTooLong: (excess: number, limit: number) =>
+          `The content exceeds the ${limit.toLocaleString('en-US')} character limit by ${excess.toLocaleString('en-US')} characters. Shorten the text or remove an image before saving.`,
         conflict: 'This record changed. Refresh and retry so newer work is not overwritten.',
         archivedEdit: 'This notice is archived. Restore it before editing.',
         genericError: 'The action could not be completed. Try again in a moment.',
@@ -565,6 +570,11 @@ export default function AdminAnnouncementsPage() {
 
   const validateDraft = () => {
     if (!draft.title.trim() || !draft.content.trim()) return copy.missingRequired;
+    // Refuse locally instead of letting the server answer with an opaque 400 after
+    // the request: this surface authors through an editor with no per-image cap, so
+    // the document length is the only bound on what it can compose.
+    const overflow = findAnnouncementLengthViolation(draft.content);
+    if (overflow) return copy.contentTooLong(overflow.excessChars, overflow.limit);
     if (!draft.isGlobal && draft.targetRoles.length === 0) return copy.missingAudience;
     if (parseYears(draft.targetYears).invalid) return copy.invalidYears;
     if (draft.publishAt && draft.expiresAt) {

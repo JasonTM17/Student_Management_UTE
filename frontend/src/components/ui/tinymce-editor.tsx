@@ -19,6 +19,7 @@ import {
 import { Button } from '@/components/ui/button';
 import {
   MAX_ANNOUNCEMENT_CONTENT_CHARS,
+  MAX_INLINE_IMAGES,
   MAX_INLINE_IMAGE_BYTES,
   assessAnnouncementContentLength,
 } from '@/lib/announcement-limits';
@@ -679,6 +680,20 @@ export function TinyMceEditor({
                     isVi
                       ? `Ảnh quá lớn (tối đa ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB để vừa hạn mức ký tự của máy chủ). Hãy nén ảnh trước khi chèn.`
                       : `Image too large (max ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB to fit the server character budget). Compress it before inserting.`,
+                  );
+                  return;
+                }
+                // The per-image cap does not bound the whole document: several images
+                // at the cap exceed the server limit together. Refuse the image that
+                // would cross the count budget so the author learns while composing
+                // rather than at publish time.
+                const currentContent = editorRef.current?.getContent({ format: 'raw' }) ?? '';
+                const imagesAlreadyInlined = (currentContent.match(/data:image\//g) ?? []).length;
+                if (imagesAlreadyInlined >= MAX_INLINE_IMAGES) {
+                  reject(
+                    isVi
+                      ? `Chỉ chèn được tối đa ${MAX_INLINE_IMAGES} ảnh trực tiếp trong một thông báo cho vừa hạn mức ký tự của máy chủ. Hãy bỏ bớt ảnh hoặc dùng liên kết.`
+                      : `At most ${MAX_INLINE_IMAGES} inline images per announcement fit the server character budget. Remove one or link to it instead.`,
                   );
                   return;
                 }

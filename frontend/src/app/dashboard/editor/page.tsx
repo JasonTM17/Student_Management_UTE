@@ -59,6 +59,10 @@ import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import {
   UnsavedChangesConfirmDialog,
 } from '@/components/ui/unsaved-changes-confirm';
+import {
+  announcementLengthViolationMessage,
+  findAnnouncementLengthViolation,
+} from '@/lib/announcement-limits';
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { cn } from '@/lib/utils';
@@ -863,6 +867,14 @@ export default function AcademicEditorPage() {
       toast.error(isVi ? 'Vui lòng nhập tiêu đề thông báo!' : 'Please enter announcement title!');
       return;
     }
+    // Gate before the request. Letting an oversized body reach the server returns an
+    // opaque 400 and leaves the author with no idea what to change, which is the
+    // dead-end the content limits exist to prevent.
+    const publishOverflow = findAnnouncementLengthViolation(content);
+    if (publishOverflow) {
+      toast.error(announcementLengthViolationMessage(publishOverflow, locale));
+      return;
+    }
 
     setIsPublishingNotice(true);
     try {
@@ -900,6 +912,12 @@ export default function AcademicEditorPage() {
   const handleUpdateAnnouncement = async () => {
     if (!editingId || !title.trim()) {
       toast.error(isVi ? 'Vui lòng nhập tiêu đề bài viết!' : 'Please enter title!');
+      return;
+    }
+    // Same gate as publish: an update that exceeds the cap fails identically.
+    const updateOverflow = findAnnouncementLengthViolation(content);
+    if (updateOverflow) {
+      toast.error(announcementLengthViolationMessage(updateOverflow, locale));
       return;
     }
 
