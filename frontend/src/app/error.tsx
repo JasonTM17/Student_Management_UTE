@@ -4,18 +4,23 @@ import { useEffect } from 'react';
 import Link from 'next/link';
 import { AlertTriangle, RefreshCw, Home } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+// The i18n provider itself may have crashed, so the brand still reads from the
+// dictionary module directly — one brand string wins.
+import { en } from '@/i18n/messages';
+
+const SITE_NAME = en.meta.defaults.siteName;
 
 const COPY = {
   vi: {
     title: 'Đã xảy ra sự cố không mong muốn',
-    body: 'Hệ thống Cổng học vụ CampusCore đã ghi nhận lỗi. Bạn có thể thử tải lại trang hoặc quay về trang chủ.',
+    body: `Hệ thống Cổng học vụ ${SITE_NAME} đã ghi nhận lỗi. Bạn có thể thử tải lại trang hoặc quay về trang chủ.`,
     digest: 'Mã lỗi',
     retry: 'Thử lại',
     home: 'Về trang chủ',
   },
   en: {
     title: 'Something went wrong',
-    body: 'The CampusCore academic portal logged the error. You can retry the page or return to the homepage.',
+    body: `The ${SITE_NAME} academic portal logged the error. You can retry the page or return to the homepage.`,
     digest: 'Error code',
     retry: 'Try again',
     home: 'Back to home',
@@ -36,7 +41,7 @@ export default function ErrorBoundary({
 }) {
   useEffect(() => {
     // Log client error details for diagnostics
-    console.error('Unhandled CampusCore application error:', error);
+    console.error(`Unhandled ${SITE_NAME} application error:`, error);
   }, [error]);
 
   // The i18n provider itself may be the thing that crashed, so the locale

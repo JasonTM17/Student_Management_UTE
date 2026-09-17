@@ -10,7 +10,17 @@ export interface InputProps
 }
 
 const Input = React.forwardRef<HTMLInputElement, InputProps>(
-  ({ className, type, icon, endAction, error, hint, ...props }, ref) => {
+  ({ className, type, icon, endAction, error, hint, 'aria-describedby': externalDescribedBy, ...props }, ref) => {
+    const generatedId = React.useId().replace(/:/g, '');
+    const errorId = `input-error-${generatedId}`;
+    const hintId = `input-hint-${generatedId}`;
+    const describedBy = [
+      externalDescribedBy,
+      error ? errorId : hint ? hintId : null,
+    ]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return (
       <div className="w-full">
         <div className="relative">
@@ -21,6 +31,8 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
           <input
             type={type}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy || undefined}
             className={cn(
               'flex h-11 w-full rounded-lg border border-input bg-background px-3 py-2 text-base text-foreground ring-offset-background transition-[border-color,box-shadow,background-color] placeholder:text-muted-foreground/90 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-60 sm:text-sm',
               icon && 'pl-10',
@@ -38,10 +50,10 @@ const Input = React.forwardRef<HTMLInputElement, InputProps>(
           )}
         </div>
         {error && (
-          <p className="mt-1 text-sm text-destructive">{error}</p>
+          <p id={errorId} className="mt-1 text-sm text-destructive">{error}</p>
         )}
         {!error && hint ? (
-          <p className="mt-1 text-sm text-muted-foreground">{hint}</p>
+          <p id={hintId} className="mt-1 text-sm text-muted-foreground">{hint}</p>
         ) : null}
       </div>
     )

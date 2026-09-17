@@ -62,8 +62,18 @@ export default async function RootLayout({
         <JsonLd locale={locale} />
         <script
           dangerouslySetInnerHTML={{
+            // Pre-hydration theme bootstrap: stored choice wins, otherwise the
+            // OS preference applies, so dark-mode visitors never get a white
+            // flash. Keep the colors in sync with the `themeColor` viewport
+            // export below.
             __html:
-              "(function(){try{var t=localStorage.getItem('theme');if(t==='dark'){document.documentElement.classList.add('dark');document.documentElement.dataset.theme='dark'}}catch(e){}})();",
+              "(function(){try{var t=null;try{t=localStorage.getItem('theme')}catch(e){}"
+              + "if(t!=='dark'&&t!=='light'){t=(window.matchMedia&&window.matchMedia('(prefers-color-scheme: dark)').matches)?'dark':'light'}"
+              + "var r=document.documentElement;r.classList.toggle('dark',t==='dark');r.dataset.theme=t;"
+              + "var sync=function(){var m=document.getElementsByName('theme-color');"
+              + "for(var i=0;i<m.length;i++){m[i].setAttribute('content',t==='dark'?'#12161d':'#F9F9FF')}};"
+              + "if(document.getElementsByName('theme-color').length>0){sync()}"
+              + "else{document.addEventListener('DOMContentLoaded',sync)}}catch(e){}})();",
           }}
         />
       </head>

@@ -342,7 +342,7 @@ export default function CertificatesPage() {
                 <p className="text-[11px] italic text-slate-600 mt-1">
                   {isVi
                     ? `Thành phố Hồ Chí Minh, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`
-                    : `Ho Chi Minh City, ${today.toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}`}
+                    : `Ho Chi Minh City, ${formatDate(today, { month: 'long', day: 'numeric', year: 'numeric' })}`}
                 </p>
               </div>
             </div>

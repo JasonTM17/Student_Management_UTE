@@ -230,6 +230,7 @@ export default function LecturerSchedulePage() {
           weeklyGrid: 'Lưới thời khóa biểu',
           assignedSectionsList: 'Danh sách lớp học phần giảng dạy',
           noTeachingSlot: 'Chưa có ca giảng dạy nào.',
+          noTeachingSlotHint: 'Các ca giảng dạy của ngày đã chọn sẽ xuất hiện tại đây.',
           items: 'mục',
           item: 'mục',
           sectionPrefix: 'Lớp HP',
@@ -268,6 +269,7 @@ export default function LecturerSchedulePage() {
           weeklyGrid: 'Weekly timetable grid',
           assignedSectionsList: 'Teaching class sections list',
           noTeachingSlot: 'No teaching slot scheduled.',
+          noTeachingSlotHint: 'Teaching slots for the selected day will appear here.',
           items: 'items',
           item: 'item',
           sectionPrefix: 'Section',
@@ -805,10 +807,12 @@ export default function LecturerSchedulePage() {
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
                   {(slotsByDay[selectedDayTab] ?? []).length === 0 ? (
-                    <div className="py-12 text-center text-muted-foreground">
-                      <Clock className="mx-auto h-10 w-10 text-muted-foreground/50" />
-                      <p className="mt-3 text-sm font-medium">{copy.noTeachingSlot}</p>
-                    </div>
+                    <EmptyState
+                      className="min-h-0 border-transparent bg-transparent py-10"
+                      icon={Clock}
+                      title={copy.noTeachingSlot}
+                      description={copy.noTeachingSlotHint}
+                    />
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2">
                       {(slotsByDay[selectedDayTab] ?? []).map((item) => (
