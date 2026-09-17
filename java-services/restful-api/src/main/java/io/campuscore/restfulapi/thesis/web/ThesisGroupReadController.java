@@ -30,7 +30,8 @@ public class ThesisGroupReadController {
     public List<GroupResponse> list(
             @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
-        return groups.list(roundId, roles(actor), actor.getClaimAsString("studentId"));
+        return groups.list(roundId, roles(actor), actor.getClaimAsString("studentId"),
+                actor.getClaimAsString("lecturerId"));
     }
 
     @GetMapping("/{id}")
@@ -38,7 +39,8 @@ public class ThesisGroupReadController {
     public GroupResponse get(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        return groups.get(id, roles(actor), actor.getClaimAsString("studentId"));
+        return groups.get(id, roles(actor), actor.getClaimAsString("studentId"),
+                actor.getClaimAsString("lecturerId"));
     }
 
     private static List<String> roles(Jwt actor) {

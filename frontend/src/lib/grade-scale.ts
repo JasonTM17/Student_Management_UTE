@@ -112,6 +112,50 @@ export function computeGpa4(records: StudentGradeRecord[]): number | null {
   return credits > 0 ? weighted / credits : null;
 }
 
+export interface GradeSummary {
+  gpa: string;
+  courseCount: number;
+  gradedCount: number;
+  completedCredits: number;
+}
+
+/**
+ * One derivation for the grades dashboard: UTE policy counts each course
+ * once via its best attempt, and both the GPA and the "Tín chỉ hoàn tất"
+ * stat must come from that same best-attempt list — summing every non-F
+ * COMPLETED row used to double-count an improved (cải thiện) course.
+ */
+export function summarizeGrades(records: StudentGradeRecord[]): GradeSummary {
+  const gradePoints = GRADE_POINTS;
+  const gradedCourses = records.filter(
+    (grade) => grade.letterGrade && gradePoints[grade.letterGrade] !== undefined,
+  );
+  const bestAttempts = new Map<string, StudentGradeRecord>();
+  for (const grade of gradedCourses) {
+    const current = bestAttempts.get(grade.courseCode);
+    if (!current || gradePoints[grade.letterGrade!] > gradePoints[current.letterGrade!]) {
+      bestAttempts.set(grade.courseCode, grade);
+    }
+  }
+  const countedCourses = [...bestAttempts.values()];
+  const totalCredits = countedCourses.reduce((sum, grade) => sum + grade.credits, 0);
+  const totalPoints = countedCourses.reduce(
+    (sum, grade) => sum + gradePoints[grade.letterGrade!] * grade.credits,
+    0,
+  );
+  const gpa = totalCredits > 0 ? totalPoints / totalCredits : 0;
+  return {
+    gpa: gpa.toFixed(2),
+    courseCount: records.length,
+    gradedCount: gradedCourses.length,
+    completedCredits: countedCourses
+      .filter(
+        (grade) => grade.enrollmentStatus === 'COMPLETED' && grade.letterGrade !== 'F',
+      )
+      .reduce((sum, grade) => sum + grade.credits, 0),
+  };
+}
+
 export type GradeBand =
   | 'EXCELLENT'
   | 'GOOD'

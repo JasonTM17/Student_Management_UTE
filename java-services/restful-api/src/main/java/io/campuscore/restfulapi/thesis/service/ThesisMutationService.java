@@ -167,6 +167,14 @@ public class ThesisMutationService {
         roundReadPort.requireExisting(request.roundId());
         requireProposalPhase(request.roundId(), actor);
         String actorId = subject(actor);
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (isLecturer(actor) && lecturerId.isBlank()) {
+            // thesis_topic_supervisor.lecturer_id joins the Lecturer directory;
+            // falling back to the User id used to seed a supervisor row that
+            // never resolved — silently breaking name display, isSupervisorOf,
+            // review and council eligibility. Fail loudly instead.
+            throw invalid("A lecturerId claim is required to submit a topic as a lecturer");
+        }
         ThesisTopic topic = topics.saveAndFlush(new ThesisTopic(
                 request.roundId(),
                 request.departmentId().trim(),
@@ -174,7 +182,6 @@ public class ThesisMutationService {
                 request.description().trim(),
                 maxGroups,
                 actorId));
-        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
         if (isLecturer(actor) || !lecturerId.isBlank()) {
             String supervisorId = !lecturerId.isBlank() ? lecturerId : actorId;
             if (!supervisorId.isBlank()) {

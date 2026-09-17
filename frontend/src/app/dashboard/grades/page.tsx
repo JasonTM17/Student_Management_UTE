@@ -18,7 +18,7 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { GradeDetailModal } from '@/components/dashboard/GradeDetailModal';
-import { GRADE_POINTS } from '@/lib/grade-scale';
+import { GRADE_POINTS, summarizeGrades } from '@/lib/grade-scale';
 import { useI18n } from '@/i18n';
 
 const gradePoints = GRADE_POINTS;
@@ -114,42 +114,10 @@ export default function GradesPage() {
   }, [locale, selectedSemester, semesters]);
 
   const summary = useMemo(() => {
-    const gradedCourses = grades.filter(
-      (grade) =>
-        grade.letterGrade && gradePoints[grade.letterGrade] !== undefined,
-    );
-    // UTE policy counts each course once — the best attempt (the same rule
-    // the transcript endpoint applies). Grading every attempt made this page
-    // disagree with the official cumulative GPA after a retake.
-    const bestAttempts = new Map<string, (typeof gradedCourses)[number]>();
-    for (const grade of gradedCourses) {
-      const current = bestAttempts.get(grade.courseCode);
-      if (
-        !current ||
-        gradePoints[grade.letterGrade!] > gradePoints[current.letterGrade!]
-      ) {
-        bestAttempts.set(grade.courseCode, grade);
-      }
-    }
-    const countedCourses = [...bestAttempts.values()];
-    const totalCredits = countedCourses.reduce(
-      (sum, grade) => sum + grade.credits,
-      0,
-    );
-    const totalPoints = countedCourses.reduce(
-      (sum, grade) => sum + gradePoints[grade.letterGrade!] * grade.credits,
-      0,
-    );
-    const gpa = totalCredits > 0 ? totalPoints / totalCredits : 0;
-
-    return {
-      gpa: gpa.toFixed(2),
-      courseCount: grades.length,
-      gradedCount: gradedCourses.length,
-      completedCredits: grades
-        .filter((grade) => grade.enrollmentStatus === 'COMPLETED' && grade.letterGrade !== 'F')
-        .reduce((sum, grade) => sum + grade.credits, 0),
-    };
+    // GPA and the completed-credit stat share one best-attempt derivation:
+    // counting every non-F COMPLETED row used to double-count an improved
+    // (cải thiện) course and disagree with the GPA card.
+    return summarizeGrades(grades);
   }, [grades]);
 
   const groupedGrades = useMemo(() => {

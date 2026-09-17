@@ -5,6 +5,7 @@ import static org.assertj.core.api.Assertions.assertThatThrownBy;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
 import io.campuscore.restfulapi.academic.service.AdminCatalogMutationService;
@@ -177,6 +178,205 @@ class AdminCatalogMutationPersistenceTest {
                 .isEqualTo(Instant.parse("2027-06-30T23:59:59Z"));
     }
 
+    // ---------- ADM-P1-1: the date-range validation used to be dead code ----------
+
+    @Test
+    void semesterCreateRejectsInvertedDateOnlyRange() throws Exception {
+        // <input type=date> submits bare calendar dates; Instant.parse threw on
+        // them and the swallowed exception skipped the ordering check entirely.
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Dead Validation", "startDate":"2026-03-01", "endDate":"2026-02-01",
+                                 "academicYearId":"year-old"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
+    }
+
+    @Test
+    void semesterCreateAcceptsDateOnlyValuesAndOrdersThem() throws Exception {
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Date Only", "startDate":"2026-02-01", "endDate":"2026-06-30",
+                                 "academicYearId":"year-old",
+                                 "registrationStart":"2026-01-01", "registrationEnd":"2026-01-31"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void semesterCreateRejectsUnparseableDate() throws Exception {
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Unparseable", "startDate":" Semester 1 ", "endDate":"2026-06-30",
+                                 "academicYearId":"year-old"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_VALUE"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("startDate")));
+    }
+
+    @Test
+    void semesterCreateRejectsOverlapWithSiblingSemesterOfSameAcademicYear() throws Exception {
+        // semester-old covers 2026-08-01..2026-12-31 in year-old.
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Overlapping", "startDate":"2026-10-01", "endDate":"2027-01-31",
+                                 "academicYearId":"year-old"}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SEMESTER_DATES_OVERLAP"));
+
+        // Touching boundaries are not an overlap.
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Adjacent", "startDate":"2027-01-01", "endDate":"2027-05-31",
+                                 "academicYearId":"year-old"}
+                                """))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void semesterCreateRejectsRegistrationWindowThatRunsBackwards() throws Exception {
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"Backwards Window", "startDate":"2027-01-01", "endDate":"2027-05-31",
+                                 "academicYearId":"year-new",
+                                 "registrationStart":"2026-12-01", "registrationEnd":"2026-11-01"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("registrationEnd")));
+    }
+
+    @Test
+    void semesterUpdateRejectsRangeThatEndsBeforeTheStoredStart() throws Exception {
+        mvc.perform(put("/api/v1/semesters/semester-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"startDate":"2027-06-30T00:00:00Z"}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_DATE_RANGE"));
+    }
+
+    // ---------- ADM-P1-2: the update path ran none of the create-time validators ----------
+
+    @Test
+    void courseUpdateRejectsCreditsOutsideTheCreateBounds() throws Exception {
+        mvc.perform(put("/api/v1/courses/course-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credits\":999}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CREDITS"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("credits")));
+
+        mvc.perform(put("/api/v1/courses/course-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credits\":0}"))
+                .andExpect(status().isBadRequest());
+
+        // Inside the bounds keeps working.
+        mvc.perform(put("/api/v1/courses/course-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"credits\":4}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void semesterUpdateRejectsUnknownStatus() throws Exception {
+        mvc.perform(put("/api/v1/semesters/semester-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"SOMEDAY_MAYBE\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_SEMESTER_STATUS"));
+
+        mvc.perform(put("/api/v1/semesters/semester-old")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"status\":\"CLOSED\"}"))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void sectionUpdateRejectsUnknownCourseWithTheOffendingFieldNamed() throws Exception {
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"courseId\":\"course-missing\"}"))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("REFERENCE_NOT_FOUND"))
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("courseId")));
+    }
+
+    @Test
+    void sectionCreateRejectsUnknownSemesterAndLecturerWithTheOffendingFieldNamed() throws Exception {
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sectionNumber":"09", "courseId":"course-old",
+                                 "semesterId":"semester-missing", "capacity":10}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("semesterId")));
+
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sectionNumber":"10", "courseId":"course-old",
+                                 "semesterId":"semester-old", "lecturerId":"lecturer-missing", "capacity":10}
+                                """))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.message").value(org.hamcrest.Matchers.containsString("lecturerId")));
+    }
+
+    @Test
+    void sectionCapacityMustStayInsideTheRoomCapacityOnCreateAndUpdate() throws Exception {
+        // room-1 holds 40: 100 seats are rejected on create... and on update.
+        mvc.perform(post("/api/v1/sections")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"sectionNumber":"11", "courseId":"course-old",
+                                 "semesterId":"semester-old", "classroomId":"room-1", "capacity":100}
+                                """))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAPACITY_EXCEEDS_ROOM"));
+
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":100}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("CAPACITY_EXCEEDS_ROOM"));
+
+        // 35 seats fit the room, so the pair is accepted.
+        mvc.perform(put("/api/v1/sections/section-existing")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":35}"))
+                .andExpect(status().isOk());
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."AcademicYear" (
@@ -204,8 +404,8 @@ class AdminCatalogMutationPersistenceTest {
                     "addDropStart" TIMESTAMP WITH TIME ZONE,
                     "addDropEnd" TIMESTAMP WITH TIME ZONE,
                     "status" VARCHAR(40) NOT NULL,
-                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
-                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
                 )
                 """);
         jdbc.execute("""
@@ -228,6 +428,16 @@ class AdminCatalogMutationPersistenceTest {
                     "type" VARCHAR(80) NOT NULL,
                     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
+                )
+                """);
+        // Section.lecturerId is validated against the academic Lecturer table.
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."Lecturer" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "userId" VARCHAR(120) NOT NULL,
+                    "departmentId" VARCHAR(120) NOT NULL,
+                    "employeeId" VARCHAR(120) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL
                 )
                 """);
         jdbc.execute("""

@@ -156,6 +156,50 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void adminListSerializesRolesAsAnArrayLikeAuthUserResponse() throws Exception {
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "target@campuscore")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].roles").isArray())
+                .andExpect(jsonPath("$.data[0].roles", org.hamcrest.Matchers.hasItem("ADMIN")))
+                .andExpect(jsonPath("$.data[0].roles", org.hamcrest.Matchers.hasItem("AUDITOR")));
+    }
+
+    @Test
+    void userSearchEscapesLikeWildcardsInsteadOfTreatingThemAsPatterns() throws Exception {
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"User\""
+                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
+                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES ('wild-user', 'sale_2026@campuscore.edu', 'x', 'Wild', 'Card', 'ACTIVE',"
+                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        // Pre-fix "%" interpolated into the LIKE pattern and matched everyone.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "%")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(0))
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // "_" is likewise literal: only the row whose email really contains it matches.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "sale_2026")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.data[0].email").value("sale_2026@campuscore.edu"));
+    }
+
+    @Test
     void officeIssuanceReturnsOneTimeSecretForcesRotationAndRejectsDuplicates() throws Exception {
         MvcResult result = mvc.perform(post("/api/v1/users")
                         .with(adminJwt())

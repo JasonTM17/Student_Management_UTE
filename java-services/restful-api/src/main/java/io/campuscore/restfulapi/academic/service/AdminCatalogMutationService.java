@@ -1,9 +1,11 @@
 package io.campuscore.restfulapi.academic.service;
 
 import io.campuscore.restfulapi.web.DomainException;
+import java.time.Instant;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
@@ -25,6 +27,11 @@ public class AdminCatalogMutationService {
     private static final String CLASSROOM = "\"academic\".\"Classroom\"";
     private static final String SECTION = "\"academic\".\"Section\"";
     private static final String SECTION_SCHEDULE = "\"academic\".\"SectionSchedule\"";
+    /** Section.lecturerId joins the academic profile table (the auth schema exposes it as a view). */
+    private static final String LECTURER = "\"academic\".\"Lecturer\"";
+    /** Statuses the academic services and the admin console understand. */
+    private static final Set<String> SEMESTER_STATUSES =
+            Set.of("DRAFT", "OPEN", "REGISTRATION_OPEN", "ADD_DROP_OPEN", "ACTIVE", "IN_PROGRESS", "CLOSED");
 
     private final NamedParameterJdbcTemplate jdbc;
 
@@ -70,9 +77,7 @@ public class AdminCatalogMutationService {
         String id = id(input);
         required(input, "name");
         int credits = number(input, "credits", 3);
-        if (credits <= 0 || credits > 30) {
-            throw new IllegalArgumentException("credits must be between 1 and 30");
-        }
+        requireCreditsInRange(credits);
         jdbc.update(
                 "INSERT INTO " + COURSE
                         + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\", \"credits\", \"departmentId\")"
@@ -100,23 +105,37 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createSemester(Map<String, Object> input) {
         String id = id(input);
         required(input, "name");
-        requireOrderedRange(input.get("startDate"), input.get("endDate"));
+        String academicYearId = text(input, "academicYearId", "academic-year-demo");
+        validateSemesterDates(null, academicYearId,
+                input.get("startDate"), input.get("endDate"),
+                input.get("registrationStart"), input.get("registrationEnd"));
+        String status = text(input, "status", "DRAFT");
+        requireSemesterStatus(status);
+        // Missing dates keep the historic server defaults (now / now + 5
+        // months); they are computed here because Postgres accepts
+        // INTERVAL '5 months' while H2 does not parse that literal.
+        java.sql.Timestamp startFallback = input.get("startDate") == null
+                ? java.sql.Timestamp.from(Instant.now()) : null;
+        java.sql.Timestamp endFallback = input.get("endDate") == null
+                ? java.sql.Timestamp.from(Instant.now().plusSeconds(15_778_800)) : null;
         jdbc.update(
                 "INSERT INTO " + SEMESTER
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"type\", \"academicYearId\","
                         + " \"startDate\", \"endDate\", \"registrationStart\", \"registrationEnd\", \"status\")"
                         + " VALUES (:id, :name, :nameEn, :nameVi, :type, :academicYearId,"
-                        + " COALESCE(CAST(:startDate AS TIMESTAMP WITH TIME ZONE), CURRENT_TIMESTAMP),"
-                        + " COALESCE(CAST(:endDate AS TIMESTAMP WITH TIME ZONE), CURRENT_TIMESTAMP + INTERVAL '5 months'),"
+                        + " COALESCE(CAST(:startDate AS TIMESTAMP WITH TIME ZONE), :startFallback),"
+                        + " COALESCE(CAST(:endDate AS TIMESTAMP WITH TIME ZONE), :endFallback),"
                         + " :registrationStart, :registrationEnd, :status)",
                 params(input, id)
                         .addValue("type", text(input, "type", "FIRST"))
-                        .addValue("academicYearId", text(input, "academicYearId", "academic-year-demo"))
+                        .addValue("academicYearId", academicYearId)
                         .addValue("startDate", input.get("startDate"))
+                        .addValue("startFallback", startFallback)
                         .addValue("endDate", input.get("endDate"))
+                        .addValue("endFallback", endFallback)
                         .addValue("registrationStart", input.get("registrationStart"))
                         .addValue("registrationEnd", input.get("registrationEnd"))
-                        .addValue("status", text(input, "status", "DRAFT")));
+                        .addValue("status", status));
         return get(SEMESTER, id);
     }
 
@@ -124,8 +143,19 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createSection(Map<String, Object> input) {
         String id = id(input);
         int capacity = number(input, "capacity", 30);
-        if (capacity < 1) {
-            throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Section capacity must be at least 1");
+        requireSectionCapacity(capacity);
+        String courseId = required(input, "courseId");
+        String semesterId = required(input, "semesterId");
+        requireCatalogReference(COURSE, "courseId", courseId);
+        requireCatalogReference(SEMESTER, "semesterId", semesterId);
+        String lecturerId = text(input, "lecturerId", null);
+        if (lecturerId != null) {
+            requireCatalogReference(LECTURER, "lecturerId", lecturerId);
+        }
+        String classroomId = text(input, "classroomId", null);
+        if (classroomId != null) {
+            requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+            requireRoomFitsCapacity(classroomId, capacity);
         }
         jdbc.update(
                 "INSERT INTO " + SECTION
@@ -133,8 +163,8 @@ public class AdminCatalogMutationService {
                         + " VALUES (:id, :sectionNumber, :courseId, :semesterId, :lecturerId, :classroomId, :capacity, :status)",
                 params(input, id)
                         .addValue("sectionNumber", text(input, "sectionNumber", text(input, "code", "SECTION-01")))
-                        .addValue("courseId", required(input, "courseId"))
-                        .addValue("semesterId", required(input, "semesterId"))
+                        .addValue("courseId", courseId)
+                        .addValue("semesterId", semesterId)
                         .addValue("lecturerId", input.get("lecturerId"))
                         .addValue("classroomId", input.get("classroomId"))
                         .addValue("capacity", number(input, "capacity", 30))
@@ -148,6 +178,28 @@ public class AdminCatalogMutationService {
     @Transactional
     public Map<String, Object> update(String table, String id, Map<String, Object> input) {
         Map<String, String> columns = allowedColumns(table);
+        // Update runs the same invariants as create: without them a course
+        // could gain 999 credits or a section a five-digit capacity through a
+        // plain edit. One validator per invariant serves both paths.
+        if (COURSE.equals(table) && input.containsKey("credits")) {
+            requireCreditsInRange(number(input, "credits", 3));
+        }
+        if (SEMESTER.equals(table) && input.containsKey("status")) {
+            requireSemesterStatus(text(input, "status", null));
+        }
+        if (SEMESTER.equals(table)) {
+            validateSemesterUpdate(id, input);
+        }
+        if (ACADEMIC_YEAR.equals(table)
+                && (input.containsKey("startDate") || input.containsKey("endDate"))) {
+            Map<String, Object> currentYear = requireRow(table, id);
+            requireOrderedRange(
+                    mergedUpdateValue(input, currentYear, "startDate"),
+                    mergedUpdateValue(input, currentYear, "endDate"));
+        }
+        if (SECTION.equals(table)) {
+            validateSectionUpdate(id, input);
+        }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
         boolean replacesSchedules = SECTION.equals(table) && input.containsKey("schedules");
@@ -167,19 +219,6 @@ public class AdminCatalogMutationService {
                 sql.append(':').append(entry.getKey());
             }
             parameters.addValue(entry.getKey(), input.get(entry.getKey()));
-        }
-        if (SECTION.equals(table) && input.containsKey("capacity")) {
-            // A section cannot shrink below the students already seated: the
-            // count would silently contradict every capacity read.
-            int requestedCapacity = Integer.parseInt(String.valueOf(input.get("capacity")));
-            Integer enrolled = jdbc.queryForObject(
-                    "SELECT \"enrolledCount\" FROM " + SECTION + " WHERE \"id\" = :id",
-                    new MapSqlParameterSource("id", id),
-                    Integer.class);
-            if (enrolled != null && requestedCapacity < enrolled) {
-                throw problem(HttpStatus.CONFLICT, "CAPACITY_BELOW_ENROLLED",
-                        "Capacity cannot go below the number of enrolled students (" + enrolled + ")");
-            }
         }
         if (first) {
             if (!replacesSchedules) {
@@ -355,19 +394,210 @@ public class AdminCatalogMutationService {
         }
     }
 
-    /** Provided start/end pairs must be ordered; missing values keep server defaults. */
+    /**
+     * Provided start/end pairs must be ordered; missing values keep server
+     * defaults. Parsing is lenient — an {@code <input type=date>} submits
+     * bare calendar dates ("2026-01-01") while the API also accepts full ISO
+     * instants — but a value that parses as neither is rejected instead of
+     * silently skipping the ordering check (the old swallow made this
+     * validation dead code).
+     */
     private void requireOrderedRange(Object start, Object end) {
-        if (start == null || end == null) {
+        Instant startAt = start == null ? null : parseTimestamp(start, "startDate");
+        Instant endAt = end == null ? null : parseTimestamp(end, "endDate");
+        if (startAt != null && endAt != null && !endAt.isAfter(startAt)) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                    "endDate must be after startDate");
+        }
+    }
+
+    /**
+     * Semester calendar invariants shared by create and update: ordered main
+     * range, ordered registration window, and no overlap with a sibling
+     * semester of the same academic year. Null values skip their check (create
+     * falls back to server defaults; update keeps the stored value).
+     */
+    private void validateSemesterDates(
+            String selfId,
+            String academicYearId,
+            Object start,
+            Object end,
+            Object registrationStart,
+            Object registrationEnd) {
+        Instant startAt = start == null ? null : parseTimestamp(start, "startDate");
+        Instant endAt = end == null ? null : parseTimestamp(end, "endDate");
+        Instant regStartAt = registrationStart == null ? null : parseTimestamp(registrationStart, "registrationStart");
+        Instant regEndAt = registrationEnd == null ? null : parseTimestamp(registrationEnd, "registrationEnd");
+        if (startAt != null && endAt != null && !endAt.isAfter(startAt)) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                    "endDate must be after startDate");
+        }
+        if (regStartAt != null && regEndAt != null && !regEndAt.isAfter(regStartAt)) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                    "registrationEnd must be after registrationStart");
+        }
+        if (academicYearId == null || academicYearId.isBlank() || startAt == null || endAt == null) {
             return;
         }
-        try {
-            if (java.time.Instant.parse(String.valueOf(end))
-                    .isBefore(java.time.Instant.parse(String.valueOf(start)))) {
-                throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
-                        "endDate must be after startDate");
+        MapSqlParameterSource parameters = new MapSqlParameterSource()
+                .addValue("academicYearId", academicYearId)
+                .addValue("startDate", java.time.OffsetDateTime.ofInstant(startAt, java.time.ZoneOffset.UTC))
+                .addValue("endDate", java.time.OffsetDateTime.ofInstant(endAt, java.time.ZoneOffset.UTC));
+        String selfFilter = "";
+        if (selfId != null) {
+            selfFilter = " AND \"id\" <> :selfId";
+            parameters.addValue("selfId", selfId);
+        }
+        Long overlapping = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SEMESTER + " WHERE \"academicYearId\" = :academicYearId"
+                        + " AND \"startDate\" < :endDate AND \"endDate\" > :startDate" + selfFilter,
+                parameters, Long.class);
+        if (overlapping != null && overlapping > 0) {
+            throw problem(HttpStatus.CONFLICT, "SEMESTER_DATES_OVERLAP",
+                    "Another semester of the same academic year already covers part of this date range");
+        }
+    }
+
+    /** Update variant: merges the submitted date fields with the stored row before validating. */
+    private void validateSemesterUpdate(String id, Map<String, Object> input) {
+        boolean touchesDates = input.containsKey("startDate") || input.containsKey("endDate")
+                || input.containsKey("registrationStart") || input.containsKey("registrationEnd")
+                || input.containsKey("academicYearId");
+        if (!touchesDates) {
+            return;
+        }
+        Map<String, Object> current = requireRow(SEMESTER, id);
+        validateSemesterDates(
+                id,
+                input.containsKey("academicYearId") ? text(input, "academicYearId", null)
+                        : (String) current.get("academicYearId"),
+                mergedUpdateValue(input, current, "startDate"),
+                mergedUpdateValue(input, current, "endDate"),
+                mergedUpdateValue(input, current, "registrationStart"),
+                mergedUpdateValue(input, current, "registrationEnd"));
+    }
+
+    private static Object mergedUpdateValue(Map<String, Object> input, Map<String, Object> current, String field) {
+        return input.containsKey(field) ? input.get(field) : current.get(field);
+    }
+
+    /** course credits stay inside the published 1..30 bound on create and update alike. */
+    private static void requireCreditsInRange(int credits) {
+        if (credits <= 0 || credits > 30) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_CREDITS", "credits must be between 1 and 30");
+        }
+    }
+
+    private static void requireSectionCapacity(int capacity) {
+        if (capacity < 1) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Section capacity must be at least 1");
+        }
+    }
+
+    private static void requireSemesterStatus(String status) {
+        if (status == null || !SEMESTER_STATUSES.contains(status)) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_SEMESTER_STATUS",
+                    "status must be one of " + String.join(", ", SEMESTER_STATUSES));
+        }
+    }
+
+    /** Bogus foreign keys used to surface as an opaque 409 from the database constraint. */
+    private void requireCatalogReference(String table, String field, String id) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + table + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", id),
+                Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.NOT_FOUND, "REFERENCE_NOT_FOUND",
+                    field + " '" + id + "' does not exist");
+        }
+    }
+
+    /** A section must not promise more seats than the room it meets in. */
+    private void requireRoomFitsCapacity(String classroomId, int capacity) {
+        Integer roomCapacity = jdbc.queryForObject(
+                "SELECT \"capacity\" FROM " + CLASSROOM + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", classroomId),
+                Integer.class);
+        if (roomCapacity != null && capacity > roomCapacity) {
+            throw problem(HttpStatus.BAD_REQUEST, "CAPACITY_EXCEEDS_ROOM",
+                    "capacity exceeds the room capacity (" + roomCapacity + ") of classroom '" + classroomId + "'");
+        }
+    }
+
+    private void validateSectionUpdate(String id, Map<String, Object> input) {
+        boolean touchesCapacity = input.containsKey("capacity");
+        boolean touchesRoom = input.containsKey("classroomId");
+        if (touchesCapacity || touchesRoom) {
+            Map<String, Object> current = requireRow(SECTION, id);
+            int capacity = touchesCapacity
+                    ? number(input, "capacity", 0)
+                    : ((Number) current.get("capacity")).intValue();
+            requireSectionCapacity(capacity);
+            if (touchesCapacity) {
+                // A section cannot shrink below the students already seated: the
+                // count would silently contradict every capacity read.
+                Object enrolledCount = current.get("enrolledCount");
+                int enrolled = enrolledCount instanceof Number seats ? seats.intValue() : 0;
+                if (capacity < enrolled) {
+                    throw problem(HttpStatus.CONFLICT, "CAPACITY_BELOW_ENROLLED",
+                            "Capacity cannot go below the number of enrolled students (" + enrolled + ")");
+                }
             }
+            String classroomId = touchesRoom
+                    ? text(input, "classroomId", null)
+                    : (String) current.get("classroomId");
+            if (classroomId != null) {
+                requireCatalogReference(CLASSROOM, "classroomId", classroomId);
+                requireRoomFitsCapacity(classroomId, capacity);
+            }
+        }
+        String courseId = text(input, "courseId", null);
+        if (input.containsKey("courseId") && courseId != null) {
+            requireCatalogReference(COURSE, "courseId", courseId);
+        }
+        String semesterId = text(input, "semesterId", null);
+        if (input.containsKey("semesterId") && semesterId != null) {
+            requireCatalogReference(SEMESTER, "semesterId", semesterId);
+        }
+        String lecturerId = text(input, "lecturerId", null);
+        if (input.containsKey("lecturerId") && lecturerId != null) {
+            requireCatalogReference(LECTURER, "lecturerId", lecturerId);
+        }
+    }
+
+    private Map<String, Object> requireRow(String table, String id) {
+        try {
+            return get(table, id);
+        } catch (org.springframework.dao.EmptyResultDataAccessException exception) {
+            throw problem(HttpStatus.NOT_FOUND, "RESOURCE_NOT_FOUND", "Resource not found");
+        }
+    }
+
+    /** Lenient ISO instant or calendar-date parse; anything else is rejected. */
+    private static Instant parseTimestamp(Object value, String field) {
+        if (value instanceof Instant instant) {
+            return instant;
+        }
+        if (value instanceof java.sql.Timestamp timestamp) {
+            return timestamp.toInstant();
+        }
+        if (value instanceof java.time.OffsetDateTime offsetDateTime) {
+            return offsetDateTime.toInstant();
+        }
+        if (value instanceof java.time.LocalDateTime localDateTime) {
+            return localDateTime.toInstant(java.time.ZoneOffset.UTC);
+        }
+        String text = String.valueOf(value).trim();
+        try {
+            return Instant.parse(text);
         } catch (java.time.format.DateTimeParseException ignored) {
-            // Non-ISO values fall through to the persistence layer's own casting.
+            try {
+                return java.time.LocalDate.parse(text).atStartOfDay(java.time.ZoneOffset.UTC).toInstant();
+            } catch (java.time.format.DateTimeParseException alsoIgnored) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_VALUE",
+                        field + " '" + text + "' is not a valid ISO date");
+            }
         }
     }
 

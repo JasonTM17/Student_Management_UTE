@@ -11,6 +11,7 @@ import java.time.Instant;
 import java.time.LocalDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
+import java.util.Map;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -82,6 +83,113 @@ class GradePublicationLockTest {
                         .content(payload))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GRADES_PUBLISHED_LOCKED"));
+    }
+
+    @Test
+    void gradesAreRejectedForADroppedEnrollment() throws Exception {
+        dropEnrollment1();
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("ENROLLMENT_NOT_GRADEABLE"));
+
+        // The dropped row keeps its empty grade record.
+        assertEnrollmentGrade("enrollment-1", null, null, "DRAFT");
+    }
+
+    @Test
+    void publishIgnoresDroppedRowsAndReportsNoPublishWhenOnlyTheyAreGraded() throws Exception {
+        // A dropped enrollment whose components were recorded before the drop:
+        // publish must not resurrect it as COMPLETED.
+        dropEnrollment1();
+        insertCompleteComponents("enrollment-1");
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GRADES_EMPTY"));
+
+        assertEnrollmentStatus("enrollment-1", "DROPPED", "DRAFT");
+    }
+
+    @Test
+    void publishCompletesOnlyTheGradeableEnrollments() throws Exception {
+        insertEnrollment("enrollment-2-dropped", "DROPPED");
+        insertCompleteComponents("enrollment-2-dropped");
+
+        mvc.perform(put("/api/v1/sections/section-1/grades")
+                        .with(lecturerJwt("lecturer-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"grades":[{"enrollmentId":"enrollment-1","processScore":8.0,"finalExamScore":9.0}]}
+                                """))
+                .andExpect(status().isOk());
+
+        mvc.perform(post("/api/v1/sections/section-1/grades/publish")
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.message").value("Grades published successfully"));
+
+        assertEnrollmentStatus("enrollment-1", "COMPLETED", "PUBLISHED");
+        // The dropped row was fully graded, yet publish must leave it alone.
+        assertEnrollmentStatus("enrollment-2-dropped", "DROPPED", "DRAFT");
+    }
+
+    private void dropEnrollment1() {
+        jdbc.update("UPDATE \"academic\".\"Enrollment\" SET \"status\" = 'DROPPED',"
+                        + " \"droppedAt\" = ? WHERE \"id\" = 'enrollment-1'",
+                timestamp(BASE_TIME));
+    }
+
+    private void insertEnrollment(String id, String status) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\", \"droppedAt\","
+                        + " \"gradeStatus\", \"finalGrade\", \"letterGrade\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (?, 'student-1', 'section-1', 'semester-1', ?, ?, NULL, 'DRAFT', NULL, NULL, ?, ?)",
+                id, status, timestamp(BASE_TIME), timestamp(BASE_TIME), timestamp(BASE_TIME));
+    }
+
+    /** Plants PROCESS + FINAL component scores directly (as an earlier save would have). */
+    private void insertCompleteComponents(String enrollmentId) {
+        jdbc.update(
+                "MERGE INTO \"academic\".\"GradeItem\" (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
+                        + " KEY (\"id\") VALUES (?, 'section-1', 'ĐQT', 'PROCESS', 10, 50, ?)",
+                enrollmentId + "-process-50", timestamp(BASE_TIME));
+        jdbc.update(
+                "MERGE INTO \"academic\".\"GradeItem\" (\"id\", \"sectionId\", \"name\", \"type\", \"maxScore\", \"weight\", \"gradedAt\")"
+                        + " KEY (\"id\") VALUES (?, 'section-1', 'ĐKTHP', 'FINAL', 10, 50, ?)",
+                enrollmentId + "-final-50", timestamp(BASE_TIME));
+        jdbc.update(
+                "INSERT INTO \"academic\".\"StudentGrade\" (\"id\", \"enrollmentId\", \"gradeItemId\", \"score\") VALUES (?, ?, ?, 8.0)",
+                enrollmentId + "-sg-p", enrollmentId, enrollmentId + "-process-50");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"StudentGrade\" (\"id\", \"enrollmentId\", \"gradeItemId\", \"score\") VALUES (?, ?, ?, 9.0)",
+                enrollmentId + "-sg-f", enrollmentId, enrollmentId + "-final-50");
+    }
+
+    private void assertEnrollmentStatus(String enrollmentId, String expectedStatus, String expectedGradeStatus) {
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT \"status\", \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                enrollmentId);
+        org.assertj.core.api.Assertions.assertThat(row)
+                .containsEntry("status", expectedStatus)
+                .containsEntry("gradeStatus", expectedGradeStatus);
+    }
+
+    private void assertEnrollmentGrade(String enrollmentId, Object finalGrade, Object letterGrade, String gradeStatus) {
+        Map<String, Object> row = jdbc.queryForMap(
+                "SELECT \"finalGrade\", \"letterGrade\", \"gradeStatus\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = ?",
+                enrollmentId);
+        org.assertj.core.api.Assertions.assertThat(row)
+                .containsEntry("finalGrade", finalGrade)
+                .containsEntry("letterGrade", letterGrade)
+                .containsEntry("gradeStatus", gradeStatus);
     }
 
     private static RequestPostProcessor lecturerJwt(String lecturerId) {

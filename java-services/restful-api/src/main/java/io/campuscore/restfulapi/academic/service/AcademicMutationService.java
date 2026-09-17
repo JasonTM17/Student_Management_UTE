@@ -33,6 +33,13 @@ public class AcademicMutationService {
     private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String GRADE_ITEM = "\"academic\".\"GradeItem\"";
     private static final String STUDENT_GRADE = "\"academic\".\"StudentGrade\"";
+    /**
+     * Statuses that may still receive or publish grades. Without the guard a
+     * crafted API call could grade — and resurrect as COMPLETED — an
+     * enrollment the student already dropped; the UI never shows such rows,
+     * so the server has to be the boundary.
+     */
+    private static final List<String> GRADEABLE_STATUSES = List.of("ENROLLED", "CONFIRMED", "COMPLETED");
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
@@ -157,6 +164,10 @@ public class AcademicMutationService {
             if (!sectionId.equals(enrollment.get("section_id"))) {
                 throw problem(HttpStatus.BAD_REQUEST, "GRADE_SECTION_MISMATCH", "Grade enrollment is outside this section");
             }
+            if (!GRADEABLE_STATUSES.contains(String.valueOf(enrollment.get("status")))) {
+                throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_GRADEABLE",
+                        "Enrollment status '" + enrollment.get("status") + "' cannot receive grades");
+            }
             if ("PUBLISHED".equals(enrollment.get("grade_status"))) {
                 // Published grades are the official record: an API replay must
                 // not silently flip them back to draft.
@@ -185,17 +196,18 @@ public class AcademicMutationService {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         // Completeness uses the same gradeable-population predicate as the
-        // grading read model (ENROLLED/CONFIRMED/COMPLETED). Counting PENDING
+        // grading read model (GRADEABLE_STATUSES). Counting PENDING
         // rows here used to deadlock publication: no visible student row to
         // grade, yet publish answered 409 forever.
         Long incomplete = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
-                        + " AND e.\"status\" IN ('ENROLLED', 'CONFIRMED', 'COMPLETED')"
+                        + " AND e.\"status\" IN (:gradeableStatuses)"
                         + " AND (SELECT COUNT(DISTINCT gi.\"type\")"
                         + " FROM " + STUDENT_GRADE + " sg JOIN " + GRADE_ITEM + " gi ON gi.\"id\" = sg.\"gradeItemId\""
                         + " WHERE sg.\"enrollmentId\" = e.\"id\" AND sg.\"score\" IS NOT NULL"
                         + " AND gi.\"type\" IN ('PROCESS', 'FINAL')) < 2",
-                new MapSqlParameterSource("sectionId", sectionId), Long.class);
+                new MapSqlParameterSource("sectionId", sectionId)
+                        .addValue("gradeableStatuses", GRADEABLE_STATUSES), Long.class);
         if (incomplete != null && incomplete > 0) {
             Long blockers = jdbc.queryForObject(
                     "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
@@ -210,9 +222,14 @@ public class AcademicMutationService {
         int updated = jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"
                         + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"sectionId\" = :sectionId"
+                        + " AND \"status\" IN (:gradeableStatuses)"
                         + " AND \"finalGrade\" IS NOT NULL AND \"letterGrade\" IS NOT NULL",
-                new MapSqlParameterSource("sectionId", sectionId));
+                new MapSqlParameterSource("sectionId", sectionId)
+                        .addValue("gradeableStatuses", GRADEABLE_STATUSES));
         if (updated == 0) {
+            // Zero matching rows must never read as success: either nothing is
+            // graded yet, or the only graded rows sit in a non-gradeable
+            // (dropped/cancelled) enrollment that publish must not resurrect.
             throw problem(HttpStatus.CONFLICT, "GRADES_EMPTY", "No complete grades are ready to publish");
         }
     }

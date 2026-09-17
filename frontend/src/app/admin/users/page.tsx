@@ -47,34 +47,33 @@ interface UserRecord {
   firstName: string;
   lastName: string;
   status: string;
-  roles?: string | string[];
+  // The admin API serializes roles as an array (matching AuthUserResponse);
+  // it used to send a comma-joined string and every consumer split it back.
+  roles?: string[];
   createdAt: string;
 }
 
 type ManagedRole = 'STUDENT' | 'LECTURER' | 'ADMIN' | 'SUPER_ADMIN';
 const defaultRole: ManagedRole = 'STUDENT';
 
-function primaryRole(roles?: string | string[]): ManagedRole {
-  const values = Array.isArray(roles) ? roles : roles?.split(',') ?? [];
+function primaryRole(roles?: string[]): ManagedRole {
   return (
-    values.find((role): role is ManagedRole =>
+    (roles ?? []).find((role): role is ManagedRole =>
       ['STUDENT', 'LECTURER', 'ADMIN', 'SUPER_ADMIN'].includes(role.trim().toUpperCase()),
     )?.trim().toUpperCase() as ManagedRole | undefined
   ) ?? defaultRole;
 }
 
-function roleLabel(roles?: string | string[]) {
-  const values = Array.isArray(roles) ? roles : roles?.split(',') ?? [];
-  return values.filter(Boolean).join(', ') || defaultRole;
+function roleLabel(roles?: string[]) {
+  return (roles ?? []).filter(Boolean).join(', ') || defaultRole;
 }
 
 function isRecordSuperAdmin(record: UserRecord): boolean {
-  const values = Array.isArray(record.roles) ? record.roles : record.roles?.split(',') ?? [];
-  return values.some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
+  return (record.roles ?? []).some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
 }
 
 function recordRoles(record: UserRecord): string[] {
-  return Array.isArray(record.roles) ? record.roles : record.roles?.split(',') ?? [];
+  return record.roles ?? [];
 }
 
 function isRecordAdministrator(record: UserRecord): boolean {
@@ -216,10 +215,7 @@ export default function AdminUsersPage() {
 
   const filteredUsers = useMemo(() => {
     if (roleFilter === 'ALL') return users;
-    return users.filter((u) => {
-      const roles = Array.isArray(u.roles) ? u.roles : u.roles?.split(',') ?? [];
-      return roles.some((r) => r.trim().toUpperCase() === roleFilter);
-    });
+    return users.filter((u) => recordRoles(u).some((r) => r.trim().toUpperCase() === roleFilter));
   }, [users, roleFilter]);
 
   const pageSummary = useMemo(() => {
