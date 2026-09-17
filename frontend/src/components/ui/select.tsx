@@ -2,15 +2,26 @@ import * as React from 'react';
 import { cn } from '@/lib/utils';
 import { ChevronDown } from 'lucide-react';
 
+export interface SelectOption {
+  value: string;
+  label: string;
+}
+
+export interface SelectOptionGroup {
+  label: string;
+  options: SelectOption[];
+}
+
 export interface SelectProps
   extends React.SelectHTMLAttributes<HTMLSelectElement> {
-  label?: string
-  error?: string
-  options: { value: string; label: string }[]
+  label?: string;
+  error?: string;
+  options?: SelectOption[];
+  groups?: SelectOptionGroup[];
 }
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, ...props }, ref) => {
+  ({ className, label, error, options, groups, ...props }, ref) => {
     const generatedId = React.useId().replace(/:/g, '');
     const controlId = props.id ?? `select-${generatedId}`;
     return (
@@ -31,19 +42,29 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
             {...props}
             id={controlId}
           >
-            {options.map((option) => (
-              <option key={option.value} value={option.value}>
-                {option.label}
-              </option>
-            ))}
+            {groups
+              ? groups.map((group) => (
+                  <optgroup key={group.label} label={group.label}>
+                    {group.options.map((option) => (
+                      <option key={option.value} value={option.value}>
+                        {option.label}
+                      </option>
+                    ))}
+                  </optgroup>
+                ))
+              : options?.map((option) => (
+                  <option key={option.value} value={option.value}>
+                    {option.label}
+                  </option>
+                ))}
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
         {error && <p className="mt-1 text-sm text-destructive">{error}</p>}
       </div>
-    )
+    );
   }
-)
+);
 Select.displayName = 'Select';
 
 export { Select };
