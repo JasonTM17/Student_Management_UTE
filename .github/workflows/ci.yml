@@ -97,6 +97,7 @@ jobs:
             exit 1
           fi
           node scripts/check-assistant-secrets.mjs
+          node scripts/check-doc-hygiene.mjs
       - name: Build and start fresh course stack
         run: docker compose up -d --build --wait
       - name: Verify database image boundary
