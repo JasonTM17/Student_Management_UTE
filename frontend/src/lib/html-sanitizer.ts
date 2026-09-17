@@ -15,12 +15,16 @@
  * what is safe.
  */
 
-const ALLOWED_TAGS = new Set([
+// RT-P2-2: the editor's `accordion` plugin emits <details>/<summary>, so the
+// allowlist must accept them or authored accordions silently flatten. Both the
+// frontend sets and the Java write-time policy are pinned to the shared
+// fixture in `tests/fixtures/announcement-content-policy.json` (RT-P2-5).
+export const ALLOWED_TAGS = new Set([
   'a', 'abbr', 'b', 'blockquote', 'br', 'caption', 'code', 'col', 'colgroup',
-  'dd', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'h1', 'h2', 'h3', 'h4',
-  'h5', 'h6', 'hr', 'i', 'img', 'li', 'mark', 'ol', 'p', 'pre', 's', 'small',
-  'span', 'strong', 'sub', 'sup', 'table', 'tbody', 'td', 'tfoot', 'th',
-  'thead', 'time', 'tr', 'u', 'ul',
+  'dd', 'details', 'div', 'dl', 'dt', 'em', 'figcaption', 'figure', 'h1', 'h2',
+  'h3', 'h4', 'h5', 'h6', 'hr', 'i', 'img', 'li', 'mark', 'ol', 'p', 'pre',
+  's', 'small', 'span', 'strong', 'sub', 'summary', 'sup', 'table', 'tbody',
+  'td', 'tfoot', 'th', 'thead', 'time', 'tr', 'u', 'ul',
 ]);
 
 /**
@@ -37,9 +41,21 @@ const VOID_TAGS = new Set(['br', 'hr', 'col', 'img']);
 // `style` is allowlisted as an attribute but each value must pass the
 // UNSAFE_STYLE scheme/expression screen below, so template letterheads keep
 // their centering and colors without opening CSS-based scheme injection.
-const GLOBAL_ATTRS = new Set(['class', 'title', 'dir', 'lang', 'align', 'style']);
+export const GLOBAL_ATTRS = new Set(['class', 'title', 'dir', 'lang', 'align', 'style']);
 
-const TAG_ATTRS: Record<string, readonly string[]> = {
+// RT-P2-2: the editor's `anchor` plugin sets `id` on the block around the
+// cursor so in-document links (`#slug`) can jump to it. `id` is therefore
+// allowlisted only on block-level targets and only for values that are valid
+// HTML ids (letter first, no quotes/whitespace/entities), which keeps the
+// attribute inert as an injection channel.
+const ID_ATTR_TAGS = new Set([
+  'article', 'blockquote', 'details', 'div', 'figcaption', 'figure', 'h1',
+  'h2', 'h3', 'h4', 'h5', 'h6', 'li', 'ol', 'p', 'section', 'summary',
+  'table', 'td', 'th', 'tr', 'ul',
+]);
+export const ID_VALUE_RE = /^[a-zA-Z][a-zA-Z0-9_-]{0,127}$/;
+
+export const TAG_ATTRS: Record<string, readonly string[]> = {
   a: ['href', 'target', 'rel'],
   img: ['src', 'alt', 'width', 'height', 'loading'],
   td: ['colspan', 'rowspan', 'scope', 'headers'],
@@ -55,7 +71,7 @@ const SAFE_URL = /^(?:https?:|mailto:|tel:|#|\/(?!\/)|\.{1,2}\/)/i;
 /** `src` additionally permits the base64 image payloads the editor inlines. */
 const SAFE_IMAGE_URL =
   /^(?:https?:|data:image\/(?:png|jpe?g|gif|webp|bmp);base64,[a-z0-9+/=\s]+$|\/(?!\/)|\.{1,2}\/)/i;
-const UNSAFE_STYLE =
+export const UNSAFE_STYLE =
   /(?:expression\s*\(|javascript:|vbscript:|@import|behavior\s*:|-moz-binding|url\s*\(\s*['"]?\s*(?:javascript|vbscript|data\s*:\s*text\/html))/i;
 
 const TAG_RE = /<(\/?)([a-zA-Z][a-zA-Z0-9-]*)((?:"[^"]*"|'[^']*'|[^>"'])*?)(\/?)>/g;
@@ -87,6 +103,26 @@ function normalizeForSchemeCheck(value: string): string {
     .toLowerCase();
 }
 
+/**
+ * RT-P1-1: the one URL-scheme policy for announcement content. Both the HTML
+ * branch (attributes) and the markdown branch (links/images in the renderer)
+ * must call these — a local `startsWith('javascript:')` test in the renderer
+ * was bypassable because browsers strip `\t\n\r` from URLs before resolving
+ * (`[x](java\tscript:alert(1))`), while this check normalizes control
+ * characters and entities away and rejects every scheme not on the list.
+ *
+ * The same enumeration lives in the Java write-time sanitizer and is pinned by
+ * the shared fixture `tests/fixtures/announcement-content-policy.json`.
+ */
+export function isSafeAnnouncementUrl(value: string): boolean {
+  return SAFE_URL.test(normalizeForSchemeCheck(value));
+}
+
+/** `src` additionally permits the base64 image payloads the editor inlines. */
+export function isSafeAnnouncementImageUrl(value: string): boolean {
+  return SAFE_IMAGE_URL.test(normalizeForSchemeCheck(value));
+}
+
 function escapeText(text: string): string {
   return text
     // Keep already-valid entities intact so "&amp;" is not double-escaped.
@@ -97,6 +133,9 @@ function escapeText(text: string): string {
 
 function sanitizeAttributes(tag: string, rawAttributes: string): string {
   const allowed = new Set([...GLOBAL_ATTRS, ...(TAG_ATTRS[tag] ?? [])]);
+  if (ID_ATTR_TAGS.has(tag)) {
+    allowed.add('id');
+  }
   let out = '';
   let match: RegExpExecArray | null;
   ATTR_RE.lastIndex = 0;
@@ -114,9 +153,11 @@ function sanitizeAttributes(tag: string, rawAttributes: string): string {
     if (name === 'style') {
       if (UNSAFE_STYLE.test(normalizeForSchemeCheck(value))) continue;
     } else if (name === 'href') {
-      if (!SAFE_URL.test(normalizeForSchemeCheck(value))) continue;
+      if (!isSafeAnnouncementUrl(value)) continue;
     } else if (name === 'src') {
-      if (!SAFE_IMAGE_URL.test(normalizeForSchemeCheck(value))) continue;
+      if (!isSafeAnnouncementImageUrl(value)) continue;
+    } else if (name === 'id') {
+      if (!ID_VALUE_RE.test(value)) continue;
     } else if (name === 'target' && !/^_(?:blank|self|parent|top)$/i.test(value)) {
       continue;
     }

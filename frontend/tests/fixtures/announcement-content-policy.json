@@ -1,0 +1,47 @@
+{
+  "description": "Shared announcement content allowlist (RT-P2-2/RT-P2-5). Single source of truth for BOTH the TypeScript read-time sanitizer (frontend/src/lib/html-sanitizer.ts) and the Java write-time sanitizer (AnnouncementHtmlSanitizer.java). Each suite asserts its policy matches this fixture, so the two hand-maintained policies cannot drift apart silently.",
+  "allowedTags": [
+    "a", "abbr", "b", "blockquote", "br", "caption", "code", "col", "colgroup",
+    "dd", "details", "div", "dl", "dt", "em", "figcaption", "figure", "h1",
+    "h2", "h3", "h4", "h5", "h6", "hr", "i", "img", "li", "mark", "ol", "p",
+    "pre", "s", "small", "span", "strong", "sub", "summary", "sup", "table",
+    "tbody", "td", "tfoot", "th", "thead", "time", "tr", "u", "ul"
+  ],
+  "droppedWithContent": [
+    "script", "style", "template", "iframe", "object", "embed", "noscript",
+    "svg", "math", "form"
+  ],
+  "globalAttributes": ["class", "title", "dir", "lang", "align", "style"],
+  "tagAttributes": {
+    "a": ["href", "target", "rel"],
+    "img": ["src", "alt", "width", "height", "loading"],
+    "td": ["colspan", "rowspan", "scope", "headers"],
+    "th": ["colspan", "rowspan", "scope", "headers"],
+    "ol": ["start", "type"],
+    "time": ["datetime"],
+    "col": ["span", "width"],
+    "colgroup": ["span"]
+  },
+  "idAttributeTags": [
+    "article", "blockquote", "details", "div", "figcaption", "figure", "h1",
+    "h2", "h3", "h4", "h5", "h6", "li", "ol", "p", "section", "summary",
+    "table", "td", "th", "tr", "ul"
+  ],
+  "idValuePattern": "^[a-zA-Z][a-zA-Z0-9_-]{0,127}$",
+  "linkSchemes": ["http", "https", "mailto", "tel", "relative"],
+  "imageSchemes": [
+    "http", "https", "relative",
+    "data:image/png;base64", "data:image/jpeg;base64", "data:image/gif;base64",
+    "data:image/webp;base64", "data:image/bmp;base64"
+  ],
+  "unsafeStylePattern": "(?:expression\\s*\\(|javascript:|vbscript:|@import|behavior\\s*:|-moz-binding|url\\s*\\(\\s*['\"]?\\s*(?:javascript|vbscript|data\\s*:\\s*text/html))",
+  "pluginsKept": ["accordion", "anchor"],
+  "pluginsRemoved": ["media"],
+  "editorLimits": {
+    "maxContentChars": 200000,
+    "textReserveChars": 20000,
+    "imageMarkupOverheadChars": 200,
+    "maxInlineImageBytes": 134838,
+    "base64Expansion": 1.3333333333333333
+  }
+}

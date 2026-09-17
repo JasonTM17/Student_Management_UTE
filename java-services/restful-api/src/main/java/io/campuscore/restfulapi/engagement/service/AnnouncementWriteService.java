@@ -23,6 +23,8 @@ import java.time.Instant;
 import java.util.List;
 import java.util.Set;
 import java.util.UUID;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.stereotype.Service;
@@ -33,6 +35,8 @@ import org.springframework.web.server.ResponseStatusException;
 @Service
 @Profile("persistence")
 public class AnnouncementWriteService {
+
+    private static final Logger LOGGER = LoggerFactory.getLogger(AnnouncementWriteService.class);
 
     private static final Set<String> PRIORITIES = Set.of("LOW", "NORMAL", "HIGH", "URGENT");
     private static final Set<String> TARGET_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "SUPER_ADMIN");
@@ -141,10 +145,14 @@ public class AnnouncementWriteService {
         }
         requireEditableField(request);
         Instant now = Instant.now(clock);
+        // RT-P2-5: sanitize before persist and keep the removed-element count
+        // so the write-time mutation is observable in the audit trail.
+        SanitizedContent contentPatch =
+                request.has("content") ? sanitizePublicHtml(request.content()) : null;
         int changed = announcements.update(new UpdateAnnouncementCommand(
                 id,
                 patch(request, "title", request.title()),
-                patch(request, "content", request.has("content") ? requirePublicHtml(request.content()) : null),
+                patch(request, "content", contentPatch == null ? null : contentPatch.html()),
                 patch(request, "priority", request.priority()),
                 patch(
                         request,
@@ -166,7 +174,16 @@ public class AnnouncementWriteService {
             throw conflict("ANNOUNCEMENT_VERSION_CONFLICT", "Announcement was changed by another administrator");
         }
         AnnouncementResponse after = requireAnnouncement(id);
-        appendAudit("UPDATED", actor, label, reason, before, after, now);
+        int sanitizedElements = contentPatch == null ? 0 : contentPatch.removedElements();
+        String auditReason = sanitizedElements > 0
+                ? reason + " (sanitizer removed " + sanitizedElements + " element(s))"
+                : reason;
+        if (sanitizedElements > 0) {
+            LOGGER.info(
+                    "Announcement {} updated by {}: sanitization removed {} element(s) before persist",
+                    id, actor, sanitizedElements);
+        }
+        appendAudit("UPDATED", actor, label, auditReason, before, after, now);
         return after;
     }
 
@@ -400,10 +417,19 @@ public class AnnouncementWriteService {
                     + "|<[^>]*[\\s/\"']on[a-z]{3,}\\s*="
                     + "|(?:href|src|xlink:href)\\s*=\\s*[\"']?\\s*(?:javascript|vbscript|data\\s*:\\s*text/html)");
 
-    private static String requirePublicHtml(String value) {
+    /**
+     * RT-P2-5: validated, length-capped, blacklisted and finally sanitized
+     * through the vetted Jsoup policy (defence in depth, in that order).
+     * Applied on create/update writes ONLY — historical rows are deliberately
+     * not backfilled: they stay safe because every read path renders through
+     * the frontend sanitizer, and re-sanitizing history would destructively
+     * rewrite user content with no undo.
+     */
+    private static SanitizedContent sanitizePublicHtml(String value) {
         String content = requireValue(value, "content");
         // Inline base64 images can push a single announcement into multiple
-        // megabytes; the editor already rejects >1MB images client-side, this
+        // megabytes; the editor already rejects oversized images client-side
+        // (cap derived from this limit — see lib/announcement-limits.ts), this
         // is the server-side backstop (content is TEXT but every reader pays).
         if (content.codePointCount(0, content.length()) > 200_000) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "ANNOUNCEMENT_CONTENT_TOO_LONG",
@@ -413,8 +439,22 @@ public class AnnouncementWriteService {
             throw new DomainException(HttpStatus.BAD_REQUEST, "UNSAFE_ANNOUNCEMENT_CONTENT",
                     "Announcement content must not contain scripts, embedded frames, or event handlers");
         }
-        return content;
+        AnnouncementHtmlSanitizer.SanitizationResult sanitized =
+                AnnouncementHtmlSanitizer.sanitize(content);
+        return new SanitizedContent(sanitized.html(), sanitized.removedElements());
     }
+
+    private static String requirePublicHtml(String value) {
+        SanitizedContent sanitized = sanitizePublicHtml(value);
+        if (sanitized.removedElements() > 0) {
+            LOGGER.warn(
+                    "Announcement sanitization removed {} element(s) from an authored body",
+                    sanitized.removedElements());
+        }
+        return sanitized.html();
+    }
+
+    private record SanitizedContent(String html, int removedElements) {}
 
     private static String requireValue(String value, String name) {
         if (value == null) {
