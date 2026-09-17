@@ -19,7 +19,7 @@ services:
       - key: RATE_LIMIT_TRUST_PROXY_HEADERS
         value: "true"
       - key: JAVA_TOOL_OPTIONS
-        value: "-XX:+UseSerialGC -Xmx350m -Xss512k -XX:MaxMetaspaceSize=160m -XX:ReservedCodeCacheSize=48m -XX:+ExitOnOutOfMemoryError"
+        value: "-XX:+UseSerialGC -Xmx300m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=36m -XX:+ExitOnOutOfMemoryError"
       - key: SECURITY_JWT_REJECT_KNOWN_DEFAULTS
         value: "true"
       - key: SPRING_DATASOURCE_URL

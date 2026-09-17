@@ -42,11 +42,18 @@ public class AccountStateFilter extends OncePerRequestFilter {
             AuthUserRepository repository = users.getIfAvailable();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (repository != null && authentication instanceof JwtAuthenticationToken jwtToken) {
-                // No defensive catch: if the account store is unavailable the
-                // gate fails closed (the lookup error aborts the request)
-                // rather than waving a flagged account through on a DB outage.
-                Optional<AuthUserRepository.AccountState> state =
-                        repository.findAccountState(jwtToken.getToken().getSubject());
+                Optional<AuthUserRepository.AccountState> state;
+                try {
+                    state = repository.findAccountState(jwtToken.getToken().getSubject());
+                } catch (org.springframework.dao.DataAccessException exception) {
+                    if (isDegradableEndpoint(uri)) {
+                        chain.doFilter(request, response);
+                        return;
+                    }
+                    errorWriter.write(request, response, org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                            "DATABASE_UNAVAILABLE", "Database service is temporarily unavailable");
+                    return;
+                }
                 if (state.isPresent()) {
                     // A present row is authoritative: deactivation and the
                     // office-issued credential flag take effect immediately,
@@ -70,6 +77,11 @@ public class AccountStateFilter extends OncePerRequestFilter {
             }
         }
         chain.doFilter(request, response);
+    }
+
+    private static boolean isDegradableEndpoint(String uri) {
+        return uri.startsWith("/api/v1/assistant/")
+                || uri.startsWith("/api/v1/thesis/assistant/");
     }
 
     /** The minimal endpoints an issued account needs to rotate its password. */
