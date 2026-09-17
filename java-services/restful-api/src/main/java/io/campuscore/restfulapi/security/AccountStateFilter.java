@@ -42,10 +42,22 @@ public class AccountStateFilter extends OncePerRequestFilter {
             AuthUserRepository repository = users.getIfAvailable();
             Authentication authentication = SecurityContextHolder.getContext().getAuthentication();
             if (repository != null && authentication instanceof JwtAuthenticationToken jwtToken) {
+                if (DatabaseAvailabilityTracker.isRecentlyUnavailable()) {
+                    if (isDegradableEndpoint(uri)) {
+                        chain.doFilter(request, response);
+                        return;
+                    }
+                    errorWriter.write(request, response, org.springframework.http.HttpStatus.SERVICE_UNAVAILABLE,
+                            "DATABASE_UNAVAILABLE", "Database service is temporarily unavailable");
+                    return;
+                }
+
                 Optional<AuthUserRepository.AccountState> state;
                 try {
                     state = repository.findAccountState(jwtToken.getToken().getSubject());
+                    DatabaseAvailabilityTracker.recordSuccess();
                 } catch (org.springframework.dao.DataAccessException exception) {
+                    DatabaseAvailabilityTracker.recordFailure();
                     if (isDegradableEndpoint(uri)) {
                         chain.doFilter(request, response);
                         return;

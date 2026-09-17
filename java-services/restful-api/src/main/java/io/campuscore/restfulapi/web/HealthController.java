@@ -50,7 +50,9 @@ public class HealthController {
 
         try {
             jdbc.queryForObject("SELECT 1", Integer.class);
+            io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.recordSuccess();
         } catch (DataAccessException exception) {
+            io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.recordFailure();
             throw new ResponseStatusException(
                     HttpStatus.SERVICE_UNAVAILABLE,
                     "Database unavailable",
