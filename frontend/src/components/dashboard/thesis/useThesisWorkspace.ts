@@ -30,18 +30,36 @@ export function useThesisWorkspace(
   const [roundsLoading, setRoundsLoading] = useState(true);
   const [workspaceLoading, setWorkspaceLoading] = useState(false);
   const [error, setError] = useState('');
+  const topicCacheRef = useState(() => new Map<string, ThesisTopic[]>())[0];
 
   const loadRounds = useCallback(async () => {
     setRoundsLoading(true);
     setError('');
     try {
       const nextRounds = await thesisApi.listRounds();
-      setRounds(nextRounds);
+      const sortedRounds = [...nextRounds].sort((a, b) => {
+        // Prioritize canonical registration round holding the full topic catalog
+        if (a.id === '22222222-2222-2222-2222-222222222101') return -1;
+        if (b.id === '22222222-2222-2222-2222-222222222101') return 1;
+        const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
+        const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
+        if (isOpenA !== isOpenB) return isOpenA - isOpenB;
+        return (b.registrationStart || '').localeCompare(a.registrationStart || '');
+      });
+      setRounds(sortedRounds);
       setSelectedRoundId((current) => {
-        if (initialRoundId && nextRounds.some((round) => round.id === initialRoundId)) {
+        if (initialRoundId && sortedRounds.some((round) => round.id === initialRoundId)) {
           return initialRoundId;
         }
-        return current || nextRounds[0]?.id || '';
+        if (current && sortedRounds.some((round) => round.id === current)) {
+          return current;
+        }
+        const preferred = sortedRounds.find(
+          (r) => r.id === '22222222-2222-2222-2222-222222222101' && r.status === 'REGISTRATION_OPEN',
+        ) || sortedRounds.find(
+          (r) => r.status === 'REGISTRATION_OPEN',
+        ) || sortedRounds[0];
+        return preferred?.id || '';
       });
     } catch {
       setError(loadFailedMessage);
@@ -60,11 +78,20 @@ export function useThesisWorkspace(
       setGroups([]);
       return;
     }
+    // Fast path: render cached topics instantly if available
+    if (topicsEnabled && topicCacheRef.has(selectedRoundId)) {
+      setTopics(topicCacheRef.get(selectedRoundId)!);
+    }
     setWorkspaceLoading(true);
     setError('');
     try {
-      const nextGroups = await thesisApi.listGroups(selectedRoundId);
-      const nextTopics = topicsEnabled ? await thesisApi.listTopics(selectedRoundId) : [];
+      const [nextGroups, nextTopics] = await Promise.all([
+        thesisApi.listGroups(selectedRoundId),
+        topicsEnabled ? thesisApi.listTopics(selectedRoundId) : Promise.resolve([]),
+      ]);
+      if (topicsEnabled) {
+        topicCacheRef.set(selectedRoundId, nextTopics);
+      }
       setTopics(nextTopics);
       setGroups(nextGroups);
     } catch {
@@ -72,7 +99,7 @@ export function useThesisWorkspace(
     } finally {
       setWorkspaceLoading(false);
     }
-  }, [loadFailedMessage, selectedRoundId, topicsEnabled]);
+  }, [loadFailedMessage, selectedRoundId, topicCacheRef, topicsEnabled]);
 
   useEffect(() => {
     void refreshWorkspace();
@@ -101,8 +128,25 @@ export function useThesisWorkspace(
     [commonStatuses, thesisStatus],
   );
 
+  const cohortGroups = useMemo(() => {
+    const map = new Map<string, ThesisRound[]>();
+    for (const r of rounds) {
+      const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
+      const cohortKey = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
+      if (!map.has(cohortKey)) {
+        map.set(cohortKey, []);
+      }
+      map.get(cohortKey)!.push(r);
+    }
+    return Array.from(map.entries()).map(([cohort, groupedRounds]) => ({
+      cohort,
+      rounds: groupedRounds,
+    }));
+  }, [rounds]);
+
   return {
     rounds,
+    cohortGroups,
     topics,
     groups,
     selectedRoundId,
@@ -111,6 +155,8 @@ export function useThesisWorkspace(
     currentGroup,
     statusLabel,
     isLoading: roundsLoading || workspaceLoading,
+    roundsLoading,
+    workspaceLoading,
     error,
     reload: loadRounds,
     refreshWorkspace,

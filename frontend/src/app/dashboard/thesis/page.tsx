@@ -335,10 +335,22 @@ export default function ThesisPage() {
       try {
         const nextRounds = await thesisApi.listRounds();
         if (cancelled) return;
-        setRounds(nextRounds);
+        const sortedRounds = [...nextRounds].sort((a, b) => {
+          if (a.id === '22222222-2222-2222-2222-222222222101') return -1;
+          if (b.id === '22222222-2222-2222-2222-222222222101') return 1;
+          const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
+          const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
+          if (isOpenA !== isOpenB) return isOpenA - isOpenB;
+          return (b.registrationStart || '').localeCompare(a.registrationStart || '');
+        });
+        setRounds(sortedRounds);
         setSelectedRoundId((current) => {
           if (current) return current;
-          const preferred = nextRounds.find((r) => r.id === '22222222-2222-2222-2222-222222222101') || nextRounds[0];
+          const preferred = sortedRounds.find(
+            (r) => r.id === '22222222-2222-2222-2222-222222222101' && r.status === 'REGISTRATION_OPEN',
+          ) || sortedRounds.find(
+            (r) => r.status === 'REGISTRATION_OPEN',
+          ) || sortedRounds[0];
           return preferred?.id || '';
         });
       } catch {
@@ -505,6 +517,16 @@ export default function ThesisPage() {
   }, [isSupervisorOrAdmin, loadCouncilDetails, messages.thesis.loadFailed, refreshTopics, selectedRoundId]);
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
+  const roundGroups = useMemo(() => {
+    const map = new Map<string, { value: string; label: string }[]>();
+    for (const r of rounds) {
+      const match = r.name.match(/Ni\u00ean kh\u00f3a\s+\d{4}\s*[-–]\s*\d{4}/i);
+      const cohort = match ? match[0] : (r.thesisType === 'KLTN' ? 'Khóa luận Tốt nghiệp' : 'Học phần Tốt nghiệp / Chuyên ngành');
+      if (!map.has(cohort)) map.set(cohort, []);
+      map.get(cohort)!.push({ value: r.id, label: r.name });
+    }
+    return Array.from(map.entries()).map(([label, opts]) => ({ label, options: opts }));
+  }, [rounds]);
   const studentId = user?.studentId ?? '';
   const currentGroup = groups.find(
     (group) =>
@@ -1839,6 +1861,7 @@ export default function ThesisPage() {
                 value={selectedRoundId}
                 onChange={(event) => setSelectedRoundId(event.target.value)}
                 aria-label={messages.thesis.selectRound}
+                groups={roundGroups}
                 options={rounds.map((round) => ({
                   value: round.id,
                   label: round.name,

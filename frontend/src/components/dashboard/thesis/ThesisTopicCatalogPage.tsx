@@ -1,7 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
-import { ArrowUpRight, FileStack, Search } from 'lucide-react';
+import { ArrowUpRight, FileStack, Loader2, Search } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
@@ -20,21 +20,25 @@ export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages, locale } = useI18n();
   const [searchInput, setSearchInput] = useState('');
+  const [showAll, setShowAll] = useState(false);
   // Course requirement: the topic catalog only appears after a search, so no
   // topic is fetched or rendered until the query is submitted.
   const [submittedQuery, setSubmittedQuery] = useState('');
-  const searchActive = submittedQuery.trim().length > 0;
+  const searchActive = showAll || submittedQuery.trim().length > 0;
   const workspace = useThesisWorkspace('', { topicsEnabled: searchActive });
 
   const normalizedQuery = submittedQuery.trim().toLowerCase();
   const matchingTopics = useMemo(() => {
     if (!searchActive) return [];
+    if (showAll || !normalizedQuery || normalizedQuery === 'all') {
+      return workspace.topics;
+    }
     return workspace.topics.filter((topic) =>
       [topic.title, topic.description]
         .filter(Boolean)
         .some((value) => String(value).toLowerCase().includes(normalizedQuery)),
     );
-  }, [normalizedQuery, searchActive, workspace.topics]);
+  }, [normalizedQuery, searchActive, showAll, workspace.topics]);
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -44,7 +48,7 @@ export default function ThesisTopicCatalogPage() {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
-  if (workspace.isLoading) {
+  if (workspace.roundsLoading && workspace.rounds.length === 0) {
     return <LoadingState label={messages.thesis.loading} />;
   }
 
@@ -62,26 +66,63 @@ export default function ThesisTopicCatalogPage() {
   const searchCopy = locale === 'vi'
     ? {
         label: 'Tìm kiếm đề tài',
-        placeholder: 'Nhập tên đề tài hoặc mô tả để xem danh mục…',
+        placeholder: 'Nhập tên đề tài, chuyên ngành hoặc từ khóa…',
         action: 'Tìm kiếm',
+        viewAll: 'Xem tất cả đề tài đợt này',
+        quickSuggest: 'Gợi ý chuyên ngành:',
         requiredTitle: 'Tìm kiếm để xem danh mục đề tài',
         requiredDescription:
-          'Danh mục đề tài chỉ hiển thị sau khi bạn nhập từ khóa tìm kiếm và bấm tìm.',
+          'Bạn có thể nhập từ khóa, chọn chuyên ngành gợi ý hoặc bấm "Xem tất cả đề tài đợt này".',
         noMatch: 'Không có đề tài nào khớp từ khóa.',
       }
     : {
         label: 'Search topics',
-        placeholder: 'Enter a topic title or description to browse the catalog…',
+        placeholder: 'Enter topic title, specialization, or keyword…',
         action: 'Search',
+        viewAll: 'Browse all topics in this round',
+        quickSuggest: 'Suggested topics:',
         requiredTitle: 'Search to view the topic catalog',
         requiredDescription:
-          'The topic catalog appears only after you enter a keyword and submit the search.',
+          'Enter a keyword, click a quick suggestion, or click "Browse all topics in this round".',
         noMatch: 'No topic matches your search.',
       };
 
+  const quickPills = locale === 'vi'
+    ? [
+        'Trí tuệ nhân tạo (AI)',
+        'Phần mềm & Web',
+        'Cơ điện tử & Robot',
+        'Hệ thống thông tin',
+        'IoT & Viễn thông',
+        'Kỹ thuật Ô tô',
+        'Xây dựng',
+      ]
+    : [
+        'Artificial Intelligence',
+        'Software & Web',
+        'Robotics & Mechatronics',
+        'Information Systems',
+        'IoT & Telecom',
+        'Automotive',
+        'Civil Engineering',
+      ];
+
   const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
-    setSubmittedQuery(searchInput);
+    if (!searchInput.trim()) {
+      setShowAll(true);
+      setSubmittedQuery('all');
+    } else {
+      setShowAll(false);
+      setSubmittedQuery(searchInput.trim());
+    }
+  };
+
+  const handleSelectPill = (pill: string) => {
+    const query = pill.split('(')[0].trim();
+    setSearchInput(query);
+    setShowAll(false);
+    setSubmittedQuery(query);
   };
 
   return (
@@ -98,7 +139,7 @@ export default function ThesisTopicCatalogPage() {
       />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex min-w-[15rem] flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
+        <label className="flex min-w-[15rem] flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {messages.thesis.selectRound}
           <select
             value={workspace.selectedRoundId}
@@ -106,13 +147,29 @@ export default function ThesisTopicCatalogPage() {
             className="h-11 rounded-lg border border-border/80 bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
             aria-label={messages.thesis.selectRound}
           >
-            {workspace.rounds.map((round) => (
-              <option key={round.id} value={round.id}>{round.name}</option>
-            ))}
+            {workspace.cohortGroups && workspace.cohortGroups.length > 0 ? (
+              workspace.cohortGroups.map((group) => (
+                <optgroup key={group.cohort} label={group.cohort}>
+                  {group.rounds.map((round) => (
+                    <option key={round.id} value={round.id}>
+                      {round.name}
+                    </option>
+                  ))}
+                </optgroup>
+              ))
+            ) : (
+              workspace.rounds.map((round) => (
+                <option key={round.id} value={round.id}>
+                  {round.name}
+                </option>
+              ))
+            )}
           </select>
         </label>
         {workspace.selectedRound ? (
-          <StatusBadge status={workspace.selectedRound.status} />
+          <div className="sm:self-end sm:pb-1">
+            <StatusBadge status={workspace.selectedRound.status} />
+          </div>
         ) : null}
       </div>
 
@@ -127,20 +184,60 @@ export default function ThesisTopicCatalogPage() {
             className="h-11 normal-case tracking-normal"
           />
         </label>
-        <Button type="submit" className="h-11 sm:w-32">
-          <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+        <Button type="submit" disabled={workspace.workspaceLoading} className="h-11 sm:w-32">
+          {workspace.workspaceLoading ? (
+            <Loader2 className="mr-2 h-4 w-4 animate-spin" aria-hidden="true" />
+          ) : (
+            <Search className="mr-2 h-4 w-4" aria-hidden="true" />
+          )}
           {searchCopy.action}
         </Button>
       </form>
 
       {workspace.error ? (
         <ErrorState title={messages.thesis.loadFailed} description={workspace.error} />
+      ) : workspace.workspaceLoading && workspace.topics.length === 0 ? (
+        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-12 text-center">
+          <Loader2 className="h-8 w-8 animate-spin text-primary" />
+          <p className="mt-3 text-sm text-muted-foreground">{messages.thesis.loading}</p>
+        </div>
       ) : !searchActive ? (
-        <EmptyState
-          icon={FileStack}
-          title={searchCopy.requiredTitle}
-          description={searchCopy.requiredDescription}
-        />
+        <div className="space-y-6">
+          <EmptyState
+            icon={FileStack}
+            title={searchCopy.requiredTitle}
+            description={searchCopy.requiredDescription}
+          />
+          <div className="flex flex-col items-center justify-center gap-4">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => {
+                setShowAll(true);
+                setSubmittedQuery('all');
+              }}
+              className="gap-2 border-primary/40 bg-primary/5 text-primary hover:bg-primary/10 hover:text-primary transition"
+            >
+              <FileStack className="h-4 w-4" />
+              {searchCopy.viewAll}
+            </Button>
+            <div className="flex flex-wrap items-center justify-center gap-2 max-w-2xl px-4">
+              <span className="text-xs font-semibold text-muted-foreground mr-1">
+                {searchCopy.quickSuggest}
+              </span>
+              {quickPills.map((pill) => (
+                <button
+                  key={pill}
+                  type="button"
+                  onClick={() => handleSelectPill(pill)}
+                  className="rounded-full border border-border/80 bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-muted/80"
+                >
+                  {pill}
+                </button>
+              ))}
+            </div>
+          </div>
+        </div>
       ) : matchingTopics.length === 0 ? (
         <EmptyState
           icon={FileStack}
@@ -150,8 +247,15 @@ export default function ThesisTopicCatalogPage() {
       ) : (
         <Card variant="muted">
           <CardHeader>
-            <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
-            <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
+                <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {matchingTopics.length} {locale === 'vi' ? 'đề tài' : 'topics'}
+              </span>
+            </div>
           </CardHeader>
           <CardContent className="grid gap-4 sm:grid-cols-2 xl:grid-cols-3">
             {matchingTopics.map((topic) => (
