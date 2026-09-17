@@ -92,10 +92,23 @@ public final class AssistantInputGuard {
 
     public static GuardResult inspect(String message) {
         String normalized = normalizeMessage(message);
-        String sensitiveReason = sensitiveReason(normalized);
+        String sensitiveReason = sensitiveReason(normalized, false);
         if (sensitiveReason != null) return new GuardResult(false, sensitiveReason, normalized);
         if (injectionDetected(normalized)) return new GuardResult(false, "PROMPT_INJECTION", normalized);
         return new GuardResult(true, null, normalized);
+    }
+
+    /**
+     * Inspects text at the provider-output boundary. A student typing an
+     * arbitrary address is personal data; an answer quoting the university's
+     * own published contact address (which the curated corpus itself contains,
+     * e.g. {@code studentId@student.hcmute.edu.vn}) is institutional content.
+     * Every address in the text must sit under a national academic domain
+     * ({@code *.edu.vn}) for the email rule to be waived; phone/id/secret
+     * rules stay strict.
+     */
+    public static GuardResult inspectProviderOutput(String value) {
+        return inspectInternal(value, true);
     }
 
     /**
@@ -114,8 +127,16 @@ public final class AssistantInputGuard {
      * identifier, credential, or prompt-injection payload.
      */
     public static GuardResult inspectPublicKnowledge(String value) {
+        // The curated corpus legitimately contains the university's own
+        // published *.edu.vn contact addresses; a strict gate here would
+        // silently drop those documents from retrieval. Arbitrary addresses
+        // are still rejected, and user input stays strict via inspect().
+        return inspectInternal(value, true);
+    }
+
+    private static GuardResult inspectInternal(String value, boolean institutionalEmailsAllowed) {
         String normalized = normalizeMessage(value);
-        String sensitiveReason = sensitiveReason(normalized);
+        String sensitiveReason = sensitiveReason(normalized, institutionalEmailsAllowed);
         if (sensitiveReason != null) return new GuardResult(false, sensitiveReason, normalized);
         if (injectionDetected(normalized)) return new GuardResult(false, "PROMPT_INJECTION", normalized);
         return new GuardResult(true, null, normalized);
@@ -132,12 +153,26 @@ public final class AssistantInputGuard {
         return inspectPublicKnowledge(value).allowed();
     }
 
-    private static String sensitiveReason(String normalized) {
-        if (EMAIL.matcher(normalized).find()) return "SENSITIVE_EMAIL";
+    private static String sensitiveReason(String normalized, boolean institutionalEmailsAllowed) {
+        if (EMAIL.matcher(normalized).find()
+                && !(institutionalEmailsAllowed && allEmailsInstitutional(normalized))) return "SENSITIVE_EMAIL";
         if (containsPhone(normalized)) return "SENSITIVE_PHONE";
         if (STUDENT_ID.matcher(normalized).find()) return "SENSITIVE_STUDENT_ID";
         if (SECRET.matcher(normalized).find()) return "SENSITIVE_CREDENTIAL";
         return null;
+    }
+
+    /** True only when every address in the text is under an academic *.edu.vn domain. */
+    private static boolean allEmailsInstitutional(String normalized) {
+        Matcher matcher = EMAIL.matcher(normalized);
+        boolean found = false;
+        while (matcher.find()) {
+            found = true;
+            String email = matcher.group();
+            String domain = email.substring(email.indexOf('@') + 1).toLowerCase(Locale.ROOT);
+            if (!domain.endsWith(".edu.vn")) return false;
+        }
+        return found;
     }
 
     /**

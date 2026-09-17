@@ -124,6 +124,8 @@ assistant:
   # ASSISTANT_QUOTA_ENFORCED=false without changing the production default.
   quota-enforced: ${ASSISTANT_QUOTA_ENFORCED:true}
   retention-days: ${ASSISTANT_RETENTION_DAYS:90}
+  # Lexical retrieval window (documents handed to the provider), clamped 3-10.
+  top-k: ${ASSISTANT_TOP_K:5}
   recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
   recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
   rag:

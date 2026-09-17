@@ -32,7 +32,8 @@ import org.springframework.stereotype.Service;
 @Profile("persistence")
 public class ThesisAssistantService {
     static final String MODEL = "curated-lexical-rag";
-    static final int TOP_K = 5;
+    /** Default retrieval window when no properties are bound (lexical-only constructor). */
+    static final int DEFAULT_TOP_K = AssistantProperties.DEFAULT_TOP_K;
     private static final String DEFAULT_LOCALE = "vi";
 
     /**
@@ -161,15 +162,123 @@ public class ThesisAssistantService {
     private static final java.util.regex.Pattern COURSE_CODE = java.util.regex.Pattern.compile(
             "(?i)(?<![\\p{L}\\p{N}_])[A-Z]{2,}[0-9]{2,}(?![\\p{L}\\p{N}_])");
     /**
+     * Stop words for retrieval-term extraction. Vietnamese function words are
+     * listed in both accented and folded form because the folded query view is
+     * filtered through the same set.
+     */
+    static final Set<String> STOP_WORDS = Set.of(
+            "a", "an", "and", "are", "can", "could", "do", "does", "for", "how", "i", "is", "it", "may", "me", "of", "on", "or", "please", "should", "tell", "the", "to", "what", "when", "where", "why", "with", "would",
+            "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi",
+            "bi", "bị", "da", "đã", "se", "sẽ", "phai", "phải", "mot", "một",
+            "của", "để", "là", "làm", "nên", "như", "những", "gì", "nào", "tôi", "và", "về", "với", "các", "có", "được", "không", "thì", "ra", "sao");
+    /**
+     * Folded-phrase aliases: an unaccented keyboard phrase is expanded into its
+     * accented corpus twin before lexical search. This map is ALSO the source
+     * of the public-scope pre-gate vocabulary (see {@link #PUBLIC_SCOPE_SIGNAL}),
+     * so an alias added for retrieval automatically admits its topic past the
+     * gate — the two vocabularies cannot drift apart.
+     */
+    static final Map<String, String> VIETNAMESE_FOLDED_PHRASE_ALIASES = Map.ofEntries(
+            Map.entry("dang ky", "đăng ký"),
+            Map.entry("hoc phan", "học phần"),
+            Map.entry("lich hoc", "lịch học"),
+            Map.entry("thoi khoa bieu", "thời khóa biểu"),
+            Map.entry("diem", "điểm"),
+            Map.entry("thong bao", "thông báo"),
+            Map.entry("khoa luan", "khóa luận"),
+            Map.entry("hoc vu", "học vụ"),
+            Map.entry("tin chi", "tín chỉ"),
+            Map.entry("mon hoc", "môn học"),
+            Map.entry("lop hoc phan", "lớp học phần"),
+            Map.entry("thuc tap", "thực tập"),
+            Map.entry("bao luu", "bảo lưu"),
+            Map.entry("bao ve", "bảo vệ"),
+            Map.entry("giang vien", "giảng viên"),
+            Map.entry("chuong trinh", "chương trình"),
+            Map.entry("hoc bong", "học bổng"),
+            Map.entry("hoc phi", "học phí"),
+            Map.entry("tai khoan", "tài khoản"),
+            Map.entry("mat khau", "mật khẩu"),
+            Map.entry("thu tuc", "thủ tục"),
+            Map.entry("quy dinh", "quy định"),
+            Map.entry("dieu kien", "điều kiện"),
+            Map.entry("toi da", "tối đa"),
+            Map.entry("toi thieu", "tối thiểu"),
+            Map.entry("gioi han", "giới hạn"),
+            Map.entry("khoi luong", "khối lượng"),
+            Map.entry("hoc ky", "học kỳ"),
+            Map.entry("nam hoc", "năm học"),
+            Map.entry("ky hoc", "kỳ học"),
+            Map.entry("thoi gian", "thời gian"),
+            Map.entry("ket qua", "kết quả"),
+            // Regulation phrases that unaccented keyboards hit most: without
+            // these the folded query missed the corpus its accented twin hit.
+            Map.entry("hoc lai", "học lại"),
+            Map.entry("cai thien", "cải thiện"),
+            Map.entry("canh bao", "cảnh báo"),
+            Map.entry("tien quyet", "tiên quyết"),
+            Map.entry("hoc truoc", "học trước"),
+            Map.entry("song hanh", "song hành"),
+            Map.entry("tot nghiep", "tốt nghiệp"),
+            Map.entry("chuan dau ra", "chuẩn đầu ra"),
+            Map.entry("ren luyen", "rèn luyện"),
+            Map.entry("xep loai", "xếp loại"),
+            Map.entry("do an", "đồ án"),
+            Map.entry("de tai", "đề tài"),
+            Map.entry("hoi dong", "hội đồng"),
+            Map.entry("phan bien", "phản biện"),
+            Map.entry("diem so", "điểm số"),
+            Map.entry("diem chuan", "điểm chuẩn"),
+            Map.entry("hinh thuc", "hình thức"),
+            Map.entry("quy che", "quy chế"),
+            // Frequent unaccented phrases that previously degraded to noisy
+            // per-syllable matches.
+            Map.entry("sinh vien", "sinh viên"),
+            Map.entry("xet tuyen", "xét tuyển"),
+            Map.entry("giay xac nhan", "giấy xác nhận"),
+            Map.entry("giay to", "giấy tờ"),
+            Map.entry("nghi hoc", "nghỉ học"),
+            Map.entry("lam lai", "làm lại"));
+    /**
+     * Curated campus topic vocabulary for the pre-gate, kept as data so the
+     * pattern below can be rebuilt from it.
+     */
+    static final List<String> PUBLIC_SCOPE_TOPICS = List.of(
+            "academic", "campus", "course", "courses", "register", "registered", "registration", "schedule",
+            "class", "classes", "grade", "grades", "gpa", "transcript", "credit", "credits", "semester", "term",
+            "tuition", "fee", "fees", "announcement", "announcements", "notice", "notices", "thesis", "capstone",
+            "topic", "topics", "defen[cs]e", "supervisor", "supervision", "lecturer", "faculty", "department",
+            "student", "portal", "curriculum", "prerequisite", "corequisite", "exam", "examination", "scholarship",
+            "graduation", "internship", "library", "dormitory", "wifi", "email", "account", "password", "research",
+            "appeal", "regrade", "withdrawal", "withdraw", "retake", "conduct", "training", "attendance",
+            "classroom", "room", "phan",
+            "hoc", "dang\\s+ky", "dang\\s+nhap", "lich", "diem", "bang\\s+diem", "tin\\s+chi", "hoc\\s+ky",
+            "hoc\\s+phi", "thong\\s+bao", "luan\\s+van", "do\\s+an", "de\\s+tai", "bao\\s+ve", "giang\\s+vien",
+            "khoa", "bo\\s+mon", "sinh\\s+vien", "cong", "chuong\\s+trinh", "tien\\s+quyet", "song\\s+hanh",
+            "thi", "hoc\\s+bong", "tot\\s+nghiep", "thuc\\s+tap", "thu\\s+vien", "ky\\s+tuc\\s+xa",
+            "tai\\s+khoan", "mat\\s+khau", "nghien\\s+cuu", "phuc\\s+khao", "rut\\s+hoc\\s+phan", "hoc\\s+lai",
+            "ren\\s+luyen", "diem\\s+danh", "phong", "giay\\s+xac\\s+nhan");
+    /**
      * Retrieval is deliberately scoped before the database query.  A generic
      * lexical overlap (for example "thời" or "hôm nay") is not evidence that
-     * a public academic document answers the question.  Keep this vocabulary
-     * broad enough for the campus services actually represented in the
-     * corpus, while leaving greetings and unrelated small talk to the FE
-     * resolver/no-match path.
+     * a public academic document answers the question.  The vocabulary is
+     * DERIVED, not hand-maintained: it is the union of the curated campus
+     * topics above and every folded phrase alias that lexical retrieval can
+     * expand. Deriving the gate from the same alias source retrieval uses makes
+     * it structurally impossible for the gate to be narrower than the
+     * vocabulary it guards — an alias added for retrieval automatically admits
+     * its topic past this pre-gate instead of being refused before search.
      */
-    private static final java.util.regex.Pattern PUBLIC_SCOPE_SIGNAL = java.util.regex.Pattern.compile(
-            "(?i)(?<![\\p{L}\\p{N}_])(?:academic|campus|course|courses|register|registered|registration|schedule|class|classes|grade|grades|gpa|transcript|credit|credits|semester|term|tuition|fee|fees|announcement|announcements|notice|notices|thesis|capstone|topic|topics|defen[cs]e|supervisor|supervision|lecturer|faculty|department|student|portal|curriculum|prerequisite|corequisite|exam|examination|scholarship|graduation|internship|library|dormitory|wifi|email|account|password|research|appeal|regrade|withdrawal|withdraw|retake|conduct|training|attendance|classroom|room|hoc|dang\\s+ky|dang\\s+nhap|lich|diem|bang\\s+diem|tin\\s+chi|hoc\\s+ky|hoc\\s+phi|thong\\s+bao|luan\\s+van|do\\s+an|de\\s+tai|bao\\s+ve|giang\\s+vien|khoa|bo\\s+mon|sinh\\s+vien|cong|chuong\\s+trinh|tien\\s+quyet|song\\s+hanh|thi|hoc\\s+bong|tot\\s+nghiep|thuc\\s+tap|thu\\s+vien|ky\\s+tuc\\s+xa|tai\\s+khoan|mat\\s+khau|nghien\\s+cuu|phuc\\s+khao|rut\\s+hoc\\s+phan|hoc\\s+lai|ren\\s+luyen|diem\\s+danh|phong)(?![\\p{L}\\p{N}_])");
+    private static final java.util.regex.Pattern PUBLIC_SCOPE_SIGNAL = buildPublicScopeSignal();
+
+    static java.util.regex.Pattern buildPublicScopeSignal() {
+        java.util.LinkedHashSet<String> signals = new java.util.LinkedHashSet<>(PUBLIC_SCOPE_TOPICS);
+        VIETNAMESE_FOLDED_PHRASE_ALIASES.keySet().forEach(foldedPhrase ->
+                signals.add(foldedPhrase.trim().replaceAll("\\s+", "\\\\s+")));
+        String alternation = String.join("|", signals);
+        return java.util.regex.Pattern.compile(
+                "(?i)(?<![\\p{L}\\p{N}_])(?:" + alternation + ")(?![\\p{L}\\p{N}_])");
+    }
     private static final java.util.regex.Pattern REGISTRATION_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:register(?:ed|ing)?|registration|enroll(?:ed|ing|ment)?|enrolment|add\\s*[/-]?\\s*drop)\\b|\\b(?:dang\\s+ky|hoc\\s+phan|mon(?:\\s+hoc)?)\\b)");
     private static final java.util.regex.Pattern COURSE_SIGNAL = java.util.regex.Pattern.compile(
@@ -410,6 +519,11 @@ public class ThesisAssistantService {
         this.properties = properties;
     }
 
+    /** Retrieval window; clamped 3-10 by {@link AssistantProperties}. */
+    private int topK() {
+        return properties == null ? DEFAULT_TOP_K : properties.topK();
+    }
+
     /** Pure lexical path used by tests and by safe fallback when persistence is unavailable. */
     public ChatResponse answer(String message, String locale) {
         return lexicalAnswer(message, locale);
@@ -591,8 +705,13 @@ public class ThesisAssistantService {
                                 // segments. Reject it before the unsafe frame
                                 // crosses the stream boundary; any already-
                                 // rendered safe prefix is replaced below.
+                                // The OUTPUT-side inspection waives institutional
+                                // *.edu.vn addresses, which the curated corpus
+                                // itself contains and an answer may legitimately
+                                // quote; arbitrary addresses and every other
+                                // sensitive class still reject.
                                 String candidate = providerAnswer + segment.text();
-                                if (!AssistantInputGuard.inspect(candidate).allowed()
+                                if (!AssistantInputGuard.inspectProviderOutput(candidate).allowed()
                                         || !AssistantOutputGuard.isSafe(candidate)) {
                                     throw new ProviderOutputRejectedException();
                                 }
@@ -652,7 +771,16 @@ public class ThesisAssistantService {
                         emit(sink, new StreamReplace(answer, fallbackSourceIds, reason));
                     }
                 } else if ("QUOTA_EXCEEDED".equals(dispatch.reasonCode())) {
-                    throw problem(429, "QUOTA_EXCEEDED", "The daily assistant quota has been reached");
+                    // Quota exhaustion must not throw away the grounded answer
+                    // that was already retrieved. The turn stays SNAPSHOT_READY
+                    // (the repository no longer downgrades it), so the lexical
+                    // answer is completed with the quota-degraded reason instead
+                    // of hard-failing with a 429: a deterministic, cited,
+                    // corpus-grounded answer is strictly better than an error,
+                    // and the degraded flag is the honest signal.
+                    reason = "QUOTA_EXCEEDED";
+                    degraded = true;
+                    answer = lexical.answer();
                 } else if (!"DISPATCHED".equals(dispatch.reasonCode())) {
                     throw problem(409, dispatch.reasonCode(), "The assistant turn lease is no longer current");
                 }
@@ -660,11 +788,12 @@ public class ThesisAssistantService {
             if (!providerAttempt && lexical.documents().isEmpty()) {
                 degraded = false;
             }
-            // A disabled provider still has a deterministic lexical answer. Emit it as a
-            // normal delta so clients can render a useful fallback while retaining the
-            // terminal degraded reason in the committed turn.
+            // A disabled provider or an exhausted quota still has a deterministic
+            // lexical answer. Emit it as a normal delta so clients can render a
+            // useful fallback while retaining the terminal degraded reason in
+            // the committed turn.
             if (!providerAttempt && ("PROVIDER_DISABLED".equals(reason) || "RAG_GROUNDED".equals(reason)
-                    || "NO_MATCH".equals(reason))) {
+                    || "NO_MATCH".equals(reason) || "QUOTA_EXCEEDED".equals(reason))) {
                 emit(sink, new StreamDelta(0, answer, fallbackSourceIds));
             }
             List<Citation> terminalCitations = "ANSWERED".equals(reason)
@@ -755,17 +884,18 @@ public class ThesisAssistantService {
         // Scoped intents need a wider candidate window before their semantic
         // filter runs. A noisy top-five window could otherwise hide the one
         // authoritative credit-limit document behind broad "học kỳ" matches.
-        int retrievalLimit = isCreditLimitQuery(message) ? TOP_K * 2 : TOP_K;
+        int topK = topK();
+        int retrievalLimit = isCreditLimitQuery(message) ? topK * 2 : topK;
         try {
             addDocuments(documents, seen, knowledge.search(locale, terms, retrievalLimit));
             String alternateLocale = DEFAULT_LOCALE.equals(locale) ? "en" : DEFAULT_LOCALE;
-            if (documents.size() < TOP_K) addDocuments(documents, seen, knowledge.search(alternateLocale, terms, TOP_K - documents.size()));
+            if (documents.size() < topK) addDocuments(documents, seen, knowledge.search(alternateLocale, terms, topK - documents.size()));
         } catch (DataAccessException exception) {
             return new LexicalResult(unavailableMessage(locale), List.of(), List.of(), "", true, true);
         }
-        if (catalog != null && documents.size() < TOP_K) {
+        if (catalog != null && documents.size() < topK) {
             try {
-                for (ThesisAssistantCatalogRepository.CatalogDocument row : catalog.search(locale, terms, TOP_K - documents.size())) {
+                for (ThesisAssistantCatalogRepository.CatalogDocument row : catalog.search(locale, terms, topK - documents.size())) {
                     String sourceId = row.entityType() + ":" + row.entityId();
                     ThesisAssistantKnowledgeRepository.KnowledgeDocument candidate = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                             sourceId, sourceId, locale, row.title(), row.text(), "academic-catalog", row.entityType(), row.entityId(), row.updatedAt() == null ? null : row.updatedAt().toInstant());
@@ -776,7 +906,7 @@ public class ThesisAssistantService {
                 // discard a valid curated answer or leak a database error to clients.
             }
         }
-        documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
+        documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(topK).toList();
         if (isCreditLimitQuery(message)) {
             documents = documents.stream()
                     .filter(ThesisAssistantService::isCreditLimitDocument)
@@ -793,10 +923,8 @@ public class ThesisAssistantService {
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale)
                 : answerFromDocument(message, documents.get(0)), locale);
-        String context = documents.stream()
-                .map(d -> "### " + safe(d.title()) + "\n" + safe(d.content()))
-                .collect(Collectors.joining("\n\n"));
-        if (properties != null && context.length() > properties.maxContextChars()) context = context.substring(0, properties.maxContextChars());
+        String context = buildGroundedContext(documents,
+                properties == null ? Integer.MAX_VALUE : properties.maxContextChars());
         List<String> sourceIds = citations.stream().map(Citation::sourceId).filter(value -> value != null && !value.isBlank()).toList();
         String snapshotMaterial = documents.stream().map(document -> String.join("|",
                 safe(document.id()), safe(document.slug()), safe(document.locale()), safe(document.title()),
@@ -815,6 +943,49 @@ public class ThesisAssistantService {
     private static LexicalResult noMatchResult(String locale) {
         String answer = noMatchMessage(locale);
         return new LexicalResult(answer, List.of(), List.of(), "", false, false, List.of(), sha256(answer));
+    }
+
+    /**
+     * Builds the provider context under a character budget without slicing a
+     * document mid-word. Whole documents are accumulated while they fit; the
+     * first document that would overflow the remaining budget is dropped, not
+     * truncated. A single document longer than the whole budget is cut at the
+     * last sentence or paragraph boundary inside the limit — and if no such
+     * boundary exists the document is omitted entirely, because a half-sentence
+     * must never reach the model as a "complete" source.
+     */
+    static String buildGroundedContext(List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents,
+            int maxContextChars) {
+        if (maxContextChars <= 0) return "";
+        StringBuilder context = new StringBuilder();
+        for (ThesisAssistantKnowledgeRepository.KnowledgeDocument document : documents) {
+            String block = "### " + safe(document.title()) + "\n" + safe(document.content());
+            if (context.length() == 0) {
+                String fitted = truncateAtBoundary(block, maxContextChars);
+                if (fitted.isBlank()) continue;
+                context.append(fitted);
+                continue;
+            }
+            if (context.length() + 2 + block.length() > maxContextChars) break;
+            context.append("\n\n").append(block);
+        }
+        return context.toString();
+    }
+
+    /** A sentence terminator followed by whitespace, or a paragraph break. */
+    private static final java.util.regex.Pattern SENTENCE_BOUNDARY =
+            java.util.regex.Pattern.compile("[.!?](?=\\s)|\\R");
+
+    static String truncateAtBoundary(String text, int limit) {
+        if (text == null) return "";
+        if (limit <= 0) return "";
+        if (text.length() <= limit) return text;
+        String cut = text.substring(0, limit);
+        java.util.regex.Matcher matcher = SENTENCE_BOUNDARY.matcher(cut);
+        int end = -1;
+        while (matcher.find()) end = matcher.end();
+        if (end <= 0) return "";
+        return cut.substring(0, end).stripTrailing();
     }
 
     static boolean hasPublicScopeSignal(String message) {
@@ -991,63 +1162,6 @@ public class ThesisAssistantService {
                 && AssistantOutputGuard.isSafe(document.content())
                 && AssistantOutputGuard.isSafe(document.source());
     }
-    private static final Set<String> STOP_WORDS = Set.of(
-            "a", "an", "and", "are", "can", "could", "do", "does", "for", "how", "i", "is", "it", "may", "me", "of", "on", "or", "please", "should", "tell", "the", "to", "what", "when", "where", "why", "with", "would",
-            "em", "anh", "chi", "cho", "cua", "de", "la", "lam", "nen", "nhu", "nhung", "gi", "nao", "toi", "va", "ve", "voi",
-            "của", "để", "là", "làm", "nên", "như", "những", "gì", "nào", "tôi", "và", "về", "với", "các", "có", "được", "không", "thì", "ra", "sao");
-    private static final Map<String, String> VIETNAMESE_FOLDED_PHRASE_ALIASES = Map.ofEntries(
-            Map.entry("dang ky", "đăng ký"),
-            Map.entry("hoc phan", "học phần"),
-            Map.entry("lich hoc", "lịch học"),
-            Map.entry("thoi khoa bieu", "thời khóa biểu"),
-            Map.entry("diem", "điểm"),
-            Map.entry("thong bao", "thông báo"),
-            Map.entry("khoa luan", "khóa luận"),
-            Map.entry("hoc vu", "học vụ"),
-            Map.entry("tin chi", "tín chỉ"),
-            Map.entry("mon hoc", "môn học"),
-            Map.entry("lop hoc phan", "lớp học phần"),
-            Map.entry("thuc tap", "thực tập"),
-            Map.entry("bao luu", "bảo lưu"),
-            Map.entry("bao ve", "bảo vệ"),
-            Map.entry("giang vien", "giảng viên"),
-            Map.entry("chuong trinh", "chương trình"),
-            Map.entry("hoc bong", "học bổng"),
-            Map.entry("hoc phi", "học phí"),
-            Map.entry("tai khoan", "tài khoản"),
-            Map.entry("mat khau", "mật khẩu"),
-            Map.entry("thu tuc", "thủ tục"),
-            Map.entry("quy dinh", "quy định"),
-            Map.entry("dieu kien", "điều kiện"),
-            Map.entry("toi da", "tối đa"),
-            Map.entry("toi thieu", "tối thiểu"),
-            Map.entry("gioi han", "giới hạn"),
-            Map.entry("khoi luong", "khối lượng"),
-            Map.entry("hoc ky", "học kỳ"),
-            Map.entry("nam hoc", "năm học"),
-            Map.entry("ky hoc", "kỳ học"),
-            Map.entry("thoi gian", "thời gian"),
-            Map.entry("ket qua", "kết quả"),
-            // Regulation phrases that unaccented keyboards hit most: without
-            // these the folded query missed the corpus its accented twin hit.
-            Map.entry("hoc lai", "học lại"),
-            Map.entry("cai thien", "cải thiện"),
-            Map.entry("canh bao", "cảnh báo"),
-            Map.entry("tien quyet", "tiên quyết"),
-            Map.entry("hoc truoc", "học trước"),
-            Map.entry("song hanh", "song hành"),
-            Map.entry("tot nghiep", "tốt nghiệp"),
-            Map.entry("chuan dau ra", "chuẩn đầu ra"),
-            Map.entry("ren luyen", "rèn luyện"),
-            Map.entry("xep loai", "xếp loại"),
-            Map.entry("do an", "đồ án"),
-            Map.entry("de tai", "đề tài"),
-            Map.entry("hoi dong", "hội đồng"),
-            Map.entry("phan bien", "phản biện"),
-            Map.entry("diem so", "điểm số"),
-            Map.entry("diem chuan", "điểm chuẩn"),
-            Map.entry("hinh thuc", "hình thức"),
-            Map.entry("quy che", "quy chế"));
     static List<String> retrievalTerms(String message) {
         String source = message == null ? "" : message;
         List<String> baseTerms = java.util.Arrays.stream(source.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))

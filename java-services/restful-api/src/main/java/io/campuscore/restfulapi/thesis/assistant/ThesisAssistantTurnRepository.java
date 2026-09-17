@@ -6,7 +6,6 @@ import java.sql.ResultSet;
 import java.sql.Timestamp;
 import java.time.Instant;
 import java.time.LocalDate;
-import java.time.ZoneOffset;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.UUID;
@@ -148,14 +147,19 @@ public class ThesisAssistantTurnRepository {
             return new DispatchDecision(false, row.quotaReserved(),
                     "DISPATCHED".equals(row.state()) ? "ALREADY_DISPATCHED" : row.state());
         }
-        LocalDate date = LocalDate.now(ZoneOffset.UTC);
+        // Bucket by the campus wall clock (Asia/Ho_Chi_Minh): a "daily" quota
+        // that resets at 07:00 ICT would surprise students. See AssistantTimezone.
+        LocalDate date = AssistantTimezone.currentBucketDate();
         ensureBucket(date, ownerId, "USER");
         ensureBucket(date, "*", "GLOBAL");
         Integer user = lockedCount(date, ownerId, "USER");
         Integer global = lockedCount(date, "*", "GLOBAL");
         if (user == null || global == null || user >= Math.max(1, userLimit) || global >= Math.max(1, globalLimit)) {
-            jdbc.update("UPDATE assistant.chat_turn_ledger SET state='FAILED_PRE_DISPATCH',terminal_reason='QUOTA_EXCEEDED',updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND state='SNAPSHOT_READY'",
-                    p().addValue("turn", turnId).addValue("owner", ownerId));
+            // Deliberately leave the turn in SNAPSHOT_READY: the service answers
+            // quota-blocked turns with the grounded lexical fallback through the
+            // normal terminal CAS. Downgrading to FAILED_PRE_DISPATCH here would
+            // make that completion impossible (and would throw away a good,
+            // cited answer that was already computed).
             return new DispatchDecision(false, false, "QUOTA_EXCEEDED");
         }
         int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='DISPATCHED',dispatched_at=CURRENT_TIMESTAMP,quota_reserved=TRUE,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='SNAPSHOT_READY' AND lease_expires_at>CURRENT_TIMESTAMP",
