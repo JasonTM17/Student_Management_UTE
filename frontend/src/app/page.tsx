@@ -101,7 +101,7 @@ export default function HomePage() {
             subtitle={messages.home.navSubtitle}
             compact
             className="min-w-0"
-            markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+            markClassName="border-0 bg-white p-1 shadow-xs"
             titleClassName="max-sm:sr-only text-[var(--portal-sidebar-text)]"
             subtitleClassName="hidden sm:block text-[var(--portal-sidebar-muted)]"
           />
@@ -254,7 +254,7 @@ export default function HomePage() {
               <BrandMark
                 href="/"
                 compact
-                markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+                markClassName="border-0 bg-white p-1 shadow-xs"
                 titleClassName="text-[var(--portal-sidebar-text)]"
                 subtitleClassName="text-[var(--portal-sidebar-muted)]"
                 subtitle={messages.home.footerSubtitle}
