@@ -73,7 +73,7 @@ export function AuthShell({
                       ? messages.authShell.lecturerSubtitle
                       : messages.authShell.desktopSubtitle
                 }
-                markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]"
+                markClassName="border-0 bg-white p-1 shadow-xs"
                 titleClassName="text-[var(--portal-sidebar-text)]"
                 subtitleClassName="text-[var(--portal-sidebar-muted)]"
               />

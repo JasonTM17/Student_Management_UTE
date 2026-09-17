@@ -19,7 +19,7 @@ export function CampusUteEmblem({ className, size = 44 }: { className?: string; 
   return (
     <div
       className={cn(
-        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg shadow-sm',
+        'relative flex shrink-0 items-center justify-center overflow-hidden rounded-lg bg-white p-1 shadow-sm',
         className,
       )}
       style={{ width: size, height: size }}

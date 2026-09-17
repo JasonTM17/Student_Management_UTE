@@ -241,7 +241,7 @@ export function AdminFrame({
           <BrandMark
             href="/admin"
             compact
-            markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)] shadow-none"
+            markClassName="border-0 bg-white p-1 shadow-none"
             titleClassName="text-[var(--portal-sidebar-text)]"
             subtitle={messages.adminShell.portalTitle}
             subtitleClassName="text-[var(--portal-sidebar-muted)]"

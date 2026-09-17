@@ -734,7 +734,7 @@ export default function DashboardLayout({
             href={isAdmin ? '/admin' : isLecturer ? '/dashboard/lecturer' : '/dashboard'}
             compact
             className={cn(sidebarCollapsed && 'justify-center gap-0')}
-            markClassName="border-0 bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)] shadow-none"
+            markClassName="border-0 bg-white p-1 shadow-none"
             titleClassName={cn(
               'text-[var(--portal-sidebar-text)]',
               sidebarCollapsed && 'hidden',
