@@ -150,7 +150,8 @@ export default function SectionGradingPage() {
           },
           unavailableEmail: 'Chưa có',
           noLetterGrade: 'Chưa chọn',
-          finalScoreLabel: (studentName: string) => `Điểm thành phần cho ${studentName}`,
+          processScoreLabel: (studentName: string) => `ĐQT (50%) cho ${studentName}`,
+          finalExamScoreLabel: (studentName: string) => `ĐCK (50%) cho ${studentName}`,
           letterGradeLabel: (studentName: string) => `Xếp loại cho ${studentName}`,
           publishedStatus: 'Đã công bố',
           draftStatus: 'Bản nháp',
@@ -201,7 +202,8 @@ export default function SectionGradingPage() {
           },
           unavailableEmail: 'Unavailable',
           noLetterGrade: 'Not selected',
-          finalScoreLabel: (studentName: string) => `Final score for ${studentName}`,
+          processScoreLabel: (studentName: string) => `Process score (50%) for ${studentName}`,
+          finalExamScoreLabel: (studentName: string) => `Final exam score (50%) for ${studentName}`,
           letterGradeLabel: (studentName: string) => `Letter grade for ${studentName}`,
           publishedStatus: 'Published',
           draftStatus: 'Draft',
@@ -617,7 +619,7 @@ export default function SectionGradingPage() {
                           }
                           error={scoreErrors.get(`${enrollment.id}:processScore`)}
                           disabled={isPublished}
-                          aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))}
+                          aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                         />
                       </label>
                       <label className="space-y-1.5 text-sm">
@@ -631,7 +633,7 @@ export default function SectionGradingPage() {
                           }
                           error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
                           disabled={isPublished}
-                          aria-label={copy.finalScoreLabel(formatVietnameseName(enrollment.studentName))} />
+                          aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                       </label>
                     </div>
                     <p className="mt-3 text-sm font-medium text-foreground">

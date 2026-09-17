@@ -228,7 +228,8 @@ export default function TranscriptPage() {
       ? {
           eyebrow: 'Cổng Sinh viên',
           title: 'Bảng điểm',
-          description: `GPA, tín chỉ và kết quả môn học cho ${selectedSemesterName}.`,
+          description:
+            'GPA hệ 4 và tín chỉ tính tích lũy toàn khóa; chọn học kỳ để xem kết quả từng môn học.',
           selectSemester: 'Chọn học kỳ cho bảng điểm',
           allSemesters: 'Tất cả học kỳ',
           openGrades: 'Mở điểm số',
@@ -238,7 +239,7 @@ export default function TranscriptPage() {
           emptyTitle: 'Chưa có hồ sơ bảng điểm',
           emptyDescription:
             'Các môn học hoàn tất và điểm đã công bố sẽ được tích lũy tại đây khi có kết quả học tập.',
-          cumulativeGpa: 'GPA hệ 4 tích lũy',
+          cumulativeGpa: 'GPA hệ 4 tích lũy toàn khóa',
           earnedCredits: 'Tín chỉ đã đạt',
           completedCourses: 'Môn đã hoàn tất',
           inProgressCourses: 'Môn đang học',
@@ -282,7 +283,8 @@ export default function TranscriptPage() {
       : {
           eyebrow: 'Student area',
           title: 'Transcript',
-          description: `GPA, credits, and course outcomes for ${selectedSemesterName}.`,
+          description:
+            'Cumulative GPA and credits across all semesters; select a semester for per-course outcomes.',
           selectSemester: 'Select semester for transcript',
           allSemesters: 'All semesters',
           openGrades: 'Open grades',
@@ -292,7 +294,7 @@ export default function TranscriptPage() {
           emptyTitle: 'No transcript records yet',
           emptyDescription:
             'Completed courses and published grades will accumulate here once academic outcomes are available.',
-          cumulativeGpa: 'Cumulative GPA (4.0 scale)',
+          cumulativeGpa: 'Cumulative GPA, all semesters (4.0 scale)',
           earnedCredits: 'Credits earned',
           completedCourses: 'Completed courses',
           inProgressCourses: 'In progress',

@@ -228,7 +228,10 @@ test('feedback polish: transcript semester selector is singular and chart contro
   assert.match(page, /aria-pressed=\{gpaMode === 'cumulative'\}/);
   assert.match(page, /aria-pressed=\{gpaMode === 'semester'\}/);
   assert.match(page, /aria-pressed=\{gpaMode === 'both'\}/);
-  assert.match(page, /description: `GPA, credits, and course outcomes for \$\{selectedSemesterName\}\.`/);
+  // Honesty (phase 04, STUD-P2-6): the header must not claim a per-semester
+  // GPA while the card shows the cumulative figure.
+  assert.doesNotMatch(page, /description: `GPA, credits, and course outcomes for \$\{selectedSemesterName\}\.`/);
+  assert.match(page, /Cumulative GPA and credits across all semesters; select a semester for per-course outcomes\./);
   assert.match(page, /clickToViewDetail: 'Midterm\/final detail'/);
   assert.doesNotMatch(page, /Click on a course to view Midterm & Final score breakdown/);
   assert.doesNotMatch(page, /Nhấn vào môn học để xem chi tiết điểm/);

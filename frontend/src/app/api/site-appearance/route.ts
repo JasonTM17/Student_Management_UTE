@@ -59,7 +59,19 @@ export async function PUT(request: NextRequest) {
   }
 
   const body = await request.json().catch(() => null);
-  const appearance = await writeSiteAppearance(body);
+  let appearance: Awaited<ReturnType<typeof writeSiteAppearance>>;
+  try {
+    appearance = await writeSiteAppearance(body);
+  } catch (err) {
+    // Honesty over optimism: if the config could not be persisted, say so with
+    // a non-2xx response so the admin UI reports "not saved" instead of a
+    // success that vanishes on the next cold start (e.g. on serverless).
+    console.error('Could not persist site appearance:', err);
+    return NextResponse.json(
+      { message: 'SITE_APPEARANCE_NOT_SAVED' },
+      { status: 500 },
+    );
+  }
   return NextResponse.json(appearance, {
     headers: {
       'Cache-Control': 'no-store',

@@ -55,86 +55,6 @@ type NoticeCategory =
 
 type ViewMode = 'magazine' | 'dispatch';
 
-const FALLBACK_OFFICIAL_NOTICES: AnnouncementRecord[] = [
-  {
-    id: 'notice-official-05',
-    title: 'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
-    content: `<p>Khoa Công nghệ Thông tin - Trường Đại học Công nghệ Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo.</p>
-<ul>
-  <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core, hệ thống lưu trữ phân tán Ceph 500TB và mạng InfiniBand 200Gbps.</li>
-  <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào tạo',
-    createdAt: '2026-09-08T08:00:00Z',
-    publishAt: '2026-09-08T08:00:00Z',
-  },
-  {
-    id: 'notice-official-06',
-    title: 'Ngày hội việc làm và Kết nối doanh nghiệp công nghệ thông tin UTE Tech Career Expo 2026',
-    content: `<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp phần mềm hàng đầu tổ chức Ngày hội Việc làm UTE Tech Career Expo.</p>
-<ul>
-  <li>Hơn 1.200 vị trí tuyển dụng thực tập sinh và kỹ sư chính thức (Fresher/Junior Software Engineer, Data Engineer, AI Engineer).</li>
-  <li>Phỏng vấn tuyển dụng trực tiếp tại gian hàng (On-site Fast-track Interview).</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Trung Tâm Hướng Nghiệp & Quan Hệ Doanh Nghiệp',
-    createdAt: '2026-09-09T10:00:00Z',
-    publishAt: '2026-09-09T10:00:00Z',
-  },
-  {
-    id: 'notice-official-01',
-    title: 'Kế hoạch mở cổng Đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
-    content: `<p>Phòng Đào tạo thông báo kế hoạch đăng ký học phần chính thức dành cho toàn thể sinh viên các khóa như sau:</p>
-<ul>
-  <li><strong>Hạn mức tín chỉ:</strong> Học kỳ chính tối đa 28 tín chỉ; chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</li>
-  <li><strong>Thời gian mở cổng:</strong> Từ 08:00 ngày 25/08/2026 đến 17:00 ngày 15/09/2026.</li>
-  <li><strong>Lưu ý:</strong> Sinh viên kiểm tra điều kiện tiên quyết và trùng lịch trước khi xác nhận lưu đăng ký. Mọi thắc mắc liên hệ trực tiếp bàn số 3 Phòng Đào tạo (Tòa nhà Trung tâm).</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Phòng Đào tạo UTE',
-    createdAt: '2026-08-25T08:00:00Z',
-    publishAt: '2026-08-25T08:00:00Z',
-  },
-  {
-    id: 'notice-official-02',
-    title: 'Thông báo mở đợt đăng ký Khóa luận tốt nghiệp (KLTN) & Tiểu luận chuyên ngành (TLCN) Khoa CNTT',
-    content: `<p>Văn phòng Khoa Công nghệ Thông tin phối hợp cùng Phòng Đào tạo thông báo mở đợt đăng ký đề tài tốt nghiệp:</p>
-<ul>
-  <li><strong>Hình thức:</strong> Nhóm sinh viên từ 1 đến tối đa 3 thành viên (nhóm trưởng đại diện đăng ký và nộp báo cáo).</li>
-  <li><strong>Danh mục đề tài:</strong> Đã được các Bộ môn phê duyệt và công bố công khai trên Cổng thông tin.</li>
-  <li><strong>Hạn chót GVPB nộp điểm:</strong> Áp dụng nghiêm ngặt theo mốc thời gian đã ấn định của đợt.</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Khoa CNTT & Phòng Đào tạo',
-    createdAt: '2026-09-01T07:30:00Z',
-    publishAt: '2026-09-01T07:30:00Z',
-  },
-  {
-    id: 'notice-official-03',
-    title: 'Danh sách sinh viên đủ điều kiện xét Học bổng khuyến khích học tập Học kỳ vừa qua',
-    content: `<p>Hội đồng xét học bổng Nhà trường thông báo kết quả rà soát điểm học tập (GPA) kết hợp điểm rèn luyện (ĐRL):</p>
-<ul>
-  <li>Sinh viên có ĐRL từ <strong>80 điểm trở lên</strong> (Xếp loại Tốt và Xuất sắc) và không nợ môn học đủ điều kiện xét cấp các mức học bổng loại A, B, C.</li>
-  <li>Thời gian tiếp nhận phản hồi và đối soát minh chứng: đến hết 17:00 ngày 20/09/2026.</li>
-</ul>`,
-    priority: 'NORMAL',
-    publishedBy: 'Phòng Công Tác Sinh Viên & Đào Tạo',
-    createdAt: '2026-09-05T09:00:00Z',
-    publishAt: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'notice-official-04',
-    title: 'Quy định kiểm tra học kỳ, lịch thi kết thúc học phần và nộp đơn phúc khảo',
-    content: `<p>Nhằm đảm bảo kỳ thi diễn ra nghiêm túc, công bằng và đúng quy chế học vụ:</p>
-<p>Sinh viên phải mang theo Thẻ sinh viên hoặc CCCD khi vào phòng thi. Thời hạn nộp đơn xin phúc khảo điểm thi là 07 ngày làm việc kể từ thời điểm giảng viên công bố điểm tổng kết trên hệ thống.</p>`,
-    priority: 'LOW',
-    publishedBy: 'Phòng Khảo Thí & Đảm Bảo Chất Lượng',
-    createdAt: '2026-09-08T14:00:00Z',
-    publishAt: '2026-09-08T14:00:00Z',
-  },
-];
-
 export default function StudentAnnouncementsPage() {
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -229,17 +149,18 @@ export default function StudentAnnouncementsPage() {
     try {
       const response = await announcementsApi.getMy({ page: 1, limit: 50 });
       const data = response.data ?? [];
-      if (data.length === 0) {
-        setItems(FALLBACK_OFFICIAL_NOTICES);
-      } else {
-        setItems(data);
-      }
+      // An empty feed renders an honest empty state; nothing is invented to
+      // fill it.
+      setItems(data);
     } catch {
-      setItems(FALLBACK_OFFICIAL_NOTICES);
+      // A failed load must never be papered over with fabricated official
+      // notices: surface the real error and let the student retry.
+      setItems([]);
+      setError(copy.loadFailed);
     } finally {
       setIsLoading(false);
     }
-  }, []);
+  }, [copy.loadFailed]);
 
   useEffect(() => {
     if (hasAccess) {
@@ -259,7 +180,7 @@ export default function StudentAnnouncementsPage() {
   }, [searchParams, items]);
 
   const filteredNotices = useMemo(() => {
-    const list = orderedItems.length > 0 ? orderedItems : FALLBACK_OFFICIAL_NOTICES;
+    const list = orderedItems;
     return list.filter((item) => {
       // Category filter
       if (selectedCategory === 'GLOBAL') {

@@ -2,10 +2,11 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { KeyRound, ShieldCheck } from 'lucide-react';
+import { ShieldCheck } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { useI18n } from '@/i18n';
+import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 
@@ -83,23 +84,18 @@ export function ForcedPasswordRotationGate() {
   };
 
   return (
-    <div
-      role="dialog"
-      aria-modal="true"
-      aria-label={copy.title}
-      className="fixed inset-0 z-50 flex items-center justify-center bg-background/95 p-4"
+    // A forced security gate: non-dismissible so Escape/backdrop cannot skip
+    // the rotation, but still focus-trapped and screen-reader labelled via the
+    // shared Modal (role="dialog" + aria-modal).
+    <Modal
+      isOpen
+      onClose={() => {}}
+      dismissible={false}
+      title={copy.title}
+      description={copy.description}
+      className="max-w-md"
     >
-      <div className="w-full max-w-md space-y-5 rounded-2xl border border-border bg-card p-6 shadow-sm">
-        <div className="flex items-start gap-3">
-          <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-            <KeyRound className="h-5 w-5" aria-hidden="true" />
-          </span>
-          <div className="min-w-0 space-y-1">
-            <h2 className="text-lg font-semibold text-foreground">{copy.title}</h2>
-            <p className="text-sm leading-6 text-muted-foreground">{copy.description}</p>
-          </div>
-        </div>
-
+      <div className="space-y-5">
         <p className="flex items-center gap-2 rounded-lg bg-secondary/40 px-3 py-2 text-xs text-muted-foreground">
           <ShieldCheck className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
           {user.email}
@@ -157,6 +153,6 @@ export function ForcedPasswordRotationGate() {
           </Button>
         </form>
       </div>
-    </div>
+    </Modal>
   );
 }

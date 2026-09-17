@@ -16,6 +16,10 @@ interface ModalProps {
   closeLabel?: string;
   showCloseButton?: boolean;
   printable?: boolean;
+  /** When false the dialog cannot be dismissed (backdrop, close button and
+   *  Escape are inert) but keeps its focus trap — for forced gates such as
+   *  password rotation. Defaults to true. */
+  dismissible?: boolean;
 }
 
 export function Modal({
@@ -28,6 +32,7 @@ export function Modal({
   closeLabel,
   showCloseButton = false,
   printable = false,
+  dismissible = true,
 }: ModalProps) {
   const { messages } = useI18n();
   const titleId = React.useId();
@@ -43,8 +48,11 @@ export function Modal({
   React.useEffect(() => {
     const handleKeyDown = (event: KeyboardEvent) => {
       if (event.key === 'Escape') {
-        event.preventDefault();
-        onCloseRef.current();
+        // Forced (non-dismissible) dialogs swallow Escape but never close.
+        if (dismissible) {
+          event.preventDefault();
+          onCloseRef.current();
+        }
         return;
       }
 
@@ -105,7 +113,8 @@ export function Modal({
   // Keep the focus trap tied to the open/closed transition. Parent forms often
   // recreate onClose while typing; re-running this effect would steal focus
   // from the active field and return it to the dialog close button.
-  }, [isOpen]);
+  // `dismissible` is static per call site, so including it is safe.
+  }, [isOpen, dismissible]);
 
   if (!isOpen) return null;
 
@@ -113,7 +122,7 @@ export function Modal({
     <div className={cn('fixed inset-0 z-50 overflow-y-auto overscroll-contain', printable && 'printable-backdrop')}>
       <div
         className="absolute inset-0 bg-black/55 backdrop-blur-sm print:hidden"
-        onClick={onClose}
+        onClick={dismissible ? onClose : undefined}
         aria-hidden="true"
       />
       <div className="relative z-50 flex min-h-full items-start justify-center px-4 py-4 sm:py-8 print:p-0">
@@ -130,7 +139,7 @@ export function Modal({
             className,
           )}
         >
-          {showCloseButton && !title && !description && (
+          {dismissible && showCloseButton && !title && !description && (
             <button
               ref={closeButtonRef}
               type="button"
@@ -155,15 +164,17 @@ export function Modal({
                   </p>
                 )}
               </div>
-              <button
-                ref={closeButtonRef}
-                type="button"
-                onClick={onClose}
-                className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
-                aria-label={closeLabel || messages.common.states.closeModal}
-              >
-                <X className="h-5 w-5" />
-              </button>
+              {dismissible && (
+                <button
+                  ref={closeButtonRef}
+                  type="button"
+                  onClick={onClose}
+                  className="flex h-11 w-11 shrink-0 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
+                  aria-label={closeLabel || messages.common.states.closeModal}
+                >
+                  <X className="h-5 w-5" />
+                </button>
+              )}
             </div>
           )}
           <div className="min-h-0 overflow-y-auto p-5 print:p-0 print:overflow-visible">{children}</div>

@@ -65,7 +65,9 @@ test('shared modal keeps typing focus when a parent callback changes', () => {
   const modal = read('src/components/ui/modal.tsx');
 
   assert.match(modal, /onCloseRef\.current\(\)/);
-  assert.match(modal, /\}, \[isOpen\]\);/);
+  // The keydown effect is tied to the open/closed transition (plus the static
+  // per-call-site `dismissible` flag) — never to a recreated onClose.
+  assert.match(modal, /\}, \[isOpen, dismissible\]\);/);
   assert.match(modal, /re-running this effect would steal focus/);
 });
 
