@@ -18,7 +18,7 @@ import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import type { AssistantCitation } from '@/lib/thesis-api';
-import type { ChatMessage } from './assistant-reducer';
+import { isFeedbackEligibleAssistantMessage, type ChatMessage } from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
 import {
   isAssistantOutputSafe,
@@ -367,7 +367,7 @@ export function AssistantMessages({
                           <Copy className="h-3.5 w-3.5" aria-hidden="true" />
                         )}
                       </Button>
-                      {!message.id.startsWith('local-') ? (
+                      {isFeedbackEligibleAssistantMessage(message) ? (
                         <>
                           <Button
                             type="button"
@@ -413,7 +413,7 @@ export function AssistantMessages({
                   !message.pending &&
                   message.feedback === 'DOWN' &&
                   !message.feedbackReason &&
-                  !message.id.startsWith('local-') ? (
+                  isFeedbackEligibleAssistantMessage(message) ? (
                     <div className="ml-9 mt-1 flex flex-wrap items-center gap-1.5">
                       <span className="text-[11px] font-medium text-muted-foreground">
                         {messages.assistant.feedbackReasonPrompt}

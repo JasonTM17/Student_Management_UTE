@@ -37,10 +37,13 @@ public class ThesisAssistantKnowledgeRepository {
     }
 
     public List<KnowledgeDocument> search(String locale, List<String> terms, int limit) {
+        // The service budget is 16 terms and puts folded-phrase aliases first;
+        // an 8-term cap here silently dropped exactly those aliases, so
+        // unaccented Vietnamese queries degraded to NO_MATCH.
         List<String> usableTerms = terms.stream()
                 .filter(term -> term.length() >= 2)
                 .distinct()
-                .limit(8)
+                .limit(16)
                 .toList();
         if (usableTerms.isEmpty()) {
             return List.of();

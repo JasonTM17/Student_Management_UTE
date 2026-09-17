@@ -57,8 +57,18 @@ const CONDUCT_REGEX =
   /(?:điểm\s*)?(?:rèn\s*luyện|ren\s*luyen)|\bđrl\b|\bdrl\b/i;
 
 // 4. GRADES, GPA & TRANSCRIPT REGEX
+// The score word alone is deliberately NOT enough: "điểm chuẩn ngành X"
+// (admission cutoff), "điểm sàn" and "điểm ưu tiên" are public policy
+// questions that must reach the backend knowledge base instead of being
+// answered with the asker's private transcript card. The score-kind group is
+// therefore REQUIRED, not optional.
 const GRADES_REGEX =
-  /(?:điểm|diem)\s*(?:số|so|thi|chữ|chu|học\s*phần|hoc\s*phan|môn|mon|của\s*tôi|cua\s*toi|tổng\s*kết|tong\s*ket)?|(?:kết\s*quả\s*học\s*tập|ket\s*qua\s*hoc\s*tap)|\bgpa\b|(?:bảng\s*điểm|bang\s*diem)|học\s*lực|hoc\s*luc|tín\s*chỉ\s*tích\s*lũy|tin\s*chi\s*tich\s*luy|\btranscript\b|\bgrades?\b|\bgrade\s*point\b/i;
+  /(?:điểm|diem)\s*(?:số|so|thi|chữ|chu|học\s*phần|hoc\s*phan|môn|mon|của\s*tôi|cua\s*toi|tổng\s*kết|tong\s*ket|quá\s*trình|qua\s*trinh|thành\s*phần|thanh\s*phan|kết\s*thúc|ket\s*thuc|hiện\s*tại|hien\s*tai|lịch\s*sử|lich\s*su)|(?:kết\s*quả\s*học\s*tập|ket\s*qua\s*hoc\s*tap)|\bgpa\b|(?:bảng\s*điểm|bang\s*diem)|học\s*lực|hoc\s*luc|tín\s*chỉ\s*tích\s*lũy|tin\s*chi\s*tich\s*luy|\btranscript\b|\bgrades?\b|\bgrade\s*point\b/i;
+
+// Public admission/selection scores are regulation content, never the
+// asker's record; keep them out of every personal branch.
+const PUBLIC_SCORE_POLICY_REGEX =
+  /(?:điểm\s*(?:chuẩn|sàn|ưu\s*tiên)|diem\s*(?:chuan|san|uu\s*tien))/i;
 
 // 5. ANNOUNCEMENTS REGEX
 const ANNOUNCEMENT_REGEX =
@@ -168,7 +178,7 @@ const ACADEMIC_REGULATION_REGEX =
   /(?:quy\s*(?:định|chế|trình)|quy\s*(?:dinh|che|trinh)|nội\s*quy|noi\s*quy|chính\s*sách|chinh\s*sach|thủ\s*tục|thu\s*tuc|tiêu\s*chuẩn|tieu\s*chuan|tiêu\s*chí|tieu\s*chi|chuẩn\s*đầu\s*ra|chuan\s*dau\s*ra|tiên\s*quyết|tien\s*quyet|học\s*trước|hoc\s*truoc|song\s*hành|song\s*hanh|học\s*lại|hoc\s*lai|cải\s*thiện\s*điểm|cai\s*thien\s*diem|học\s*cải\s*thiện|hoc\s*cai\s*thien|rớt\s*môn|rot\s*mon|điểm\s*f\b|diem\s*f\b|cảnh\s*báo\s*học\s*vụ|canh\s*bao\s*hoc\s*vu|buộc\s*thôi\s*học|buoc\s*thoi\s*hoc|học\s*bổng|hoc\s*bong|học\s*phí|hoc\s*phi|công\s*nợ|cong\s*no|tiền\s*học|tien\s*hoc|\btuition\b|(?:hạn|thời\s*hạn|cách|phương\s*thức)\s*(?:nộp|đóng)\s*học\s*phí|(?:han|thoi\s*han|cach|phuong\s*thuc)\s*(?:nop|dong)\s*hoc\s*phi|quy\s*chế\s*thi|quy\s*che\s*thi|điều\s*kiện\s*(?:dự\s*thi|xét\s*tốt\s*nghiệp|tốt\s*nghiệp|xét\s*học\s*bổng)|dieu\s*kien\s*(?:du\s*thi|xet\s*tot\s*nghiep|tot\s*nghiep|xet\s*hoc\s*bong)|\bpolicy\b|\bregulation\b|\bprerequisite\b|\bcorequisite\b|academic\s*warning)/i;
 
 export function isPolicyQuestion(message: string): boolean {
-  if (ACADEMIC_REGULATION_REGEX.test(message)) {
+  if (ACADEMIC_REGULATION_REGEX.test(message) || PUBLIC_SCORE_POLICY_REGEX.test(message)) {
     return true;
   }
   return (
@@ -199,7 +209,8 @@ export function isRegulationLookup(message: string): boolean {
     ACADEMIC_REGULATION_REGEX.test(message) ||
     POLICY_QUESTION_REGEX.test(message) ||
     COURSE_REGISTRATION_POLICY_REGEX.test(message) ||
-    COURSE_REGISTRATION_ASCII_POLICY_REGEX.test(message);
+    COURSE_REGISTRATION_ASCII_POLICY_REGEX.test(message) ||
+    PUBLIC_SCORE_POLICY_REGEX.test(message);
   return regulation && !hasPersonalMarker(message);
 }
 
@@ -1031,7 +1042,12 @@ export async function resolveStudentAssistantQuery(
   }
 
   // B3. Handle Grades, GPA & Transcript queries
-  if (GRADES_REGEX.test(message) && !DEADLINE_INTENT_REGEX.test(message) && !policyQuestion) {
+  if (
+    GRADES_REGEX.test(message) &&
+    !DEADLINE_INTENT_REGEX.test(message) &&
+    !PUBLIC_SCORE_POLICY_REGEX.test(message) &&
+    !policyQuestion
+  ) {
     try {
       const transcript = await gradesApi.getMyTranscript();
       const grades = await gradesApi.getMyGrades();

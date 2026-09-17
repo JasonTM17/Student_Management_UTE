@@ -969,14 +969,45 @@ public class ThesisAssistantService {
             Map.entry("nam hoc", "năm học"),
             Map.entry("ky hoc", "kỳ học"),
             Map.entry("thoi gian", "thời gian"),
-            Map.entry("ket qua", "kết quả"));
+            Map.entry("ket qua", "kết quả"),
+            // Regulation phrases that unaccented keyboards hit most: without
+            // these the folded query missed the corpus its accented twin hit.
+            Map.entry("hoc lai", "học lại"),
+            Map.entry("cai thien", "cải thiện"),
+            Map.entry("canh bao", "cảnh báo"),
+            Map.entry("tien quyet", "tiên quyết"),
+            Map.entry("hoc truoc", "học trước"),
+            Map.entry("song hanh", "song hành"),
+            Map.entry("tot nghiep", "tốt nghiệp"),
+            Map.entry("chuan dau ra", "chuẩn đầu ra"),
+            Map.entry("ren luyen", "rèn luyện"),
+            Map.entry("xep loai", "xếp loại"),
+            Map.entry("do an", "đồ án"),
+            Map.entry("de tai", "đề tài"),
+            Map.entry("hoi dong", "hội đồng"),
+            Map.entry("phan bien", "phản biện"),
+            Map.entry("diem so", "điểm số"),
+            Map.entry("diem chuan", "điểm chuẩn"),
+            Map.entry("hinh thuc", "hình thức"),
+            Map.entry("quy che", "quy chế"));
     static List<String> retrievalTerms(String message) {
         String source = message == null ? "" : message;
         List<String> baseTerms = java.util.Arrays.stream(source.toLowerCase(Locale.ROOT).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().limit(16).toList();
         List<String> foldedTerms = java.util.Arrays.stream(foldForMatching(source).split("[^\\p{L}\\p{N}]+"))
                 .filter(term -> term.length() >= 2 && !STOP_WORDS.contains(term)).distinct().toList();
+        String foldedPhraseSource = " " + foldForMatching(source)
+                .replaceAll("[^\\p{L}\\p{N}]+", " ")
+                .trim() + " ";
         List<String> expanded = new ArrayList<>();
+        // Accented phrase aliases come FIRST: the repository keeps the first
+        // 16 terms, so base tokens must never crowd the aliases that an
+        // unaccented query depends on.
+        VIETNAMESE_FOLDED_PHRASE_ALIASES.forEach((foldedPhrase, accentedPhrase) -> {
+            if (foldedPhraseSource.contains(" " + foldedPhrase + " ")) {
+                expanded.add(accentedPhrase);
+            }
+        });
         for (String term : baseTerms) {
             expanded.add(term);
             switch (term) {
@@ -993,14 +1024,6 @@ public class ThesisAssistantService {
                 default -> { }
             }
         }
-        String foldedPhraseSource = " " + foldForMatching(source)
-                .replaceAll("[^\\p{L}\\p{N}]+", " ")
-                .trim() + " ";
-        VIETNAMESE_FOLDED_PHRASE_ALIASES.forEach((foldedPhrase, accentedPhrase) -> {
-            if (foldedPhraseSource.contains(" " + foldedPhrase + " ")) {
-                expanded.add(accentedPhrase);
-            }
-        });
         if ((baseTerms.contains("đăng") && baseTerms.contains("ký"))
                 || (foldedTerms.contains("dang") && foldedTerms.contains("ky"))) expanded.add("đăng ký");
         if ((baseTerms.contains("học") && baseTerms.contains("phần"))

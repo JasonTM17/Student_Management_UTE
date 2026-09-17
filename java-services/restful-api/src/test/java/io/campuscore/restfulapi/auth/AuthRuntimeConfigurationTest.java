@@ -13,6 +13,7 @@ import org.springframework.boot.test.autoconfigure.web.servlet.AutoConfigureMock
 import org.springframework.boot.test.context.SpringBootTest;
 import org.springframework.context.ApplicationContext;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.web.servlet.MockMvc;
 
@@ -27,14 +28,38 @@ class AuthRuntimeConfigurationTest {
     @Autowired
     private MockMvc mvc;
 
+    @Autowired
+    private JdbcTemplate jdbc;
+
     @Test
     void authSessionContractIsAvailableWithoutLegacyFeatureFlag() {
         assertThat(context.getBean(AuthLoginService.class)).isNotNull();
         assertThat(context.getBean(AuthLoginController.class)).isNotNull();
     }
 
+    /**
+     * V15 (twin of production V48) locks every seeded demo account because its
+     * credentials are published in the README. On a freshly migrated database
+     * the documented password must therefore be refused; the local demo
+     * unlocks the account with explicit SQL — exactly what the CI compose job
+     * and the README "Local demo accounts" section describe — and only then
+     * starts a session.
+     */
     @Test
-    void migratedDemoStudentCanStartAnApiSession() throws Exception {
+    void migratedDemoStudentIsLockedUntilExplicitlyUnlocked() throws Exception {
+        mvc.perform(post("/api/v1/auth/login")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"email\":\"student@campuscore.edu\",\"password\":\"password123\"}"))
+                .andExpect(status().isUnauthorized());
+
+        String status = jdbc.queryForObject(
+                "SELECT \"status\" FROM campuscore_auth.\"User\" WHERE \"email\" = 'student@campuscore.edu'",
+                String.class);
+        assertThat(status).isEqualTo("LOCKED");
+
+        jdbc.update(
+                "UPDATE campuscore_auth.\"User\" SET \"status\" = 'ACTIVE' WHERE \"email\" = 'student@campuscore.edu'");
+
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"student@campuscore.edu\",\"password\":\"password123\"}"))

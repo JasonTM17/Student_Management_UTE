@@ -128,8 +128,9 @@ public class AcademicEnrollmentReadService {
             return enrollment;
         }
         if (enrollment.studentId().equals(normalizeOptional("studentId", studentId))) {
+            // The owner keeps seeing the enrollment itself; only the draft
+            // grade summary is masked (see studentEnrollment).
             return academic.findEnrollmentById(normalizeRequired("id", id))
-                    .filter(row -> gradesVisibleToStudent(row.gradeStatus()))
                     .map(row -> studentEnrollment(row, schedules(List.of(row))))
                     .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found"));
         }

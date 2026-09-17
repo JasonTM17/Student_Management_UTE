@@ -34,6 +34,18 @@ public final class AssistantInputGuard {
                     + "|(?:in|đọc|xem|hiển\\s*thị|lấy|cho\\s+(?:tôi|ta)\\s+xem)\\s+(?:ra\\s+|cho\\s+(?:tôi|ta)\\s+)?(?:toàn\\s*bộ\\s+)?(?:system\\s+prompt|prompt\\s+hệ\\s+thống|câu\\s+lệnh\\s+hệ\\s+thống|lệnh\\s+hệ\\s+thống|api[\\s_-]?key|jwt[\\s_-]?secret|mật\\s*khẩu|password)"
                     + "|giả\\s*mạo\\s+(?:quản\\s*trị\\s*viên|admin|hệ\\s*thống))");
     private static final String NEW_CONVERSATION = "new-conversation";
+
+    /**
+     * Vietnamese is typed unaccented at least as often as not (telex-less
+     * keyboards are the norm), so every injection pattern runs a second time
+     * against a fully diacritic-folded view of the text: "bo qua tat ca huong
+     * dan he thong" must be treated exactly like its accented twin. The folded
+     * pattern is derived by folding the pattern string itself, which keeps the
+     * two views in lockstep by construction.
+     */
+    private static final Pattern PROMPT_INJECTION_FOLDED = Pattern.compile(
+            foldForMatching(PROMPT_INJECTION.pattern()));
+
     /**
      * Invisible formatting characters (soft hyphen, zero-width spaces and
      * joins, directional marks, BOM) split banned keywords across otherwise
@@ -45,6 +57,28 @@ public final class AssistantInputGuard {
             "[\\u00AD\\u200B-\\u200F\\u2060-\\u2064\\u206A-\\u206F\\uFEFF]");
 
     private AssistantInputGuard() { }
+
+    /**
+     * Lossless fold used for pattern matching only: NFD decomposition strips
+     * every combining mark, đ/Đ fold onto d, and the result is lowercased.
+     * Word boundaries and whitespace survive untouched. Callers pass text that
+     * already went through normalizeMessage, so invisible characters are gone.
+     */
+    static String foldForMatching(String value) {
+        if (value == null) return "";
+        String decomposed = Normalizer.normalize(value, Normalizer.Form.NFD);
+        StringBuilder folded = new StringBuilder(decomposed.length());
+        for (int index = 0; index < decomposed.length(); index++) {
+            char current = decomposed.charAt(index);
+            if (Character.getType(current) == Character.NON_SPACING_MARK) continue;
+            if (current == 'đ' || current == 'Đ') {
+                folded.append('d');
+                continue;
+            }
+            folded.append(Character.toLowerCase(current));
+        }
+        return folded.toString();
+    }
 
     public static String normalizeMessage(String message) {
         if (message == null) return "";
@@ -60,7 +94,7 @@ public final class AssistantInputGuard {
         String normalized = normalizeMessage(message);
         String sensitiveReason = sensitiveReason(normalized);
         if (sensitiveReason != null) return new GuardResult(false, sensitiveReason, normalized);
-        if (PROMPT_INJECTION.matcher(normalized).find()) return new GuardResult(false, "PROMPT_INJECTION", normalized);
+        if (injectionDetected(normalized)) return new GuardResult(false, "PROMPT_INJECTION", normalized);
         return new GuardResult(true, null, normalized);
     }
 
@@ -83,8 +117,14 @@ public final class AssistantInputGuard {
         String normalized = normalizeMessage(value);
         String sensitiveReason = sensitiveReason(normalized);
         if (sensitiveReason != null) return new GuardResult(false, sensitiveReason, normalized);
-        if (PROMPT_INJECTION.matcher(normalized).find()) return new GuardResult(false, "PROMPT_INJECTION", normalized);
+        if (injectionDetected(normalized)) return new GuardResult(false, "PROMPT_INJECTION", normalized);
         return new GuardResult(true, null, normalized);
+    }
+
+    /** accented text against the original patterns, folded text against folded patterns. */
+    private static boolean injectionDetected(String normalized) {
+        if (PROMPT_INJECTION.matcher(normalized).find()) return true;
+        return PROMPT_INJECTION_FOLDED.matcher(foldForMatching(normalized)).find();
     }
 
     /** Defensive read-time gate for legacy rows that predate the publish check. */
@@ -139,7 +179,7 @@ public final class AssistantInputGuard {
 
     /** Used at the provider boundary for retrieved text and streamed output. */
     public static boolean containsPromptInjection(String value) {
-        return value != null && PROMPT_INJECTION.matcher(normalizeMessage(value)).find();
+        return value != null && injectionDetected(normalizeMessage(value));
     }
 
     public static String canonicalHash(String message, String locale, UUID conversationId) {
