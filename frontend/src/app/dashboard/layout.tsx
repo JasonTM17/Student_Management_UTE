@@ -63,6 +63,7 @@ type DashboardMenuLabelKey =
   | 'transcript'
   | 'conduct'
   | 'thesis'
+  | 'certificates'
   | 'editor'
   | 'announcements'
   | 'notifications'
@@ -104,6 +105,7 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
     sectionKey: 'campus',
     items: [
       { href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
+      { href: '/dashboard/certificates', icon: ClipboardCheck, labelKey: 'certificates' },
       { href: '/dashboard/announcements', icon: Megaphone, labelKey: 'announcements' },
       { href: '/dashboard/notifications', icon: Bell, labelKey: 'notifications' },
     ],
@@ -368,6 +370,10 @@ export default function DashboardLayout({
       '/dashboard/thesis': {
         title: messages.dashboardShell.menu.thesis,
         description: messages.dashboardShell.routeDescriptions.thesis,
+      },
+      '/dashboard/certificates': {
+        title: messages.dashboardShell.menu.certificates,
+        description: messages.dashboardShell.routeDescriptions.certificates,
       },
       '/dashboard/thesis/topics': {
         title: messages.thesis.catalogTitle,

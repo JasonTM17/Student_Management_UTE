@@ -166,14 +166,12 @@ public class RegistrationService {
             String idempotencyKey) {
         requireKey(idempotencyKey);
         String hash = sha256("ENROLL|" + sectionId);
-        EnrollmentResponse response = transactions.execute(status -> {
-            EnrollmentResponse enrollment = enrollLocked(studentId, sectionId, roles, idempotencyKey, hash);
-            persistSlip(studentId, enrollment);
-            return enrollment;
-        });
+        EnrollmentResponse response = transactions.execute(status ->
+                enrollLocked(studentId, sectionId, roles, idempotencyKey, hash));
         if (response == null) {
             throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED", "Enrollment transaction returned no result");
         }
+        persistSlip(studentId, response);
         return response;
     }
 
