@@ -117,6 +117,78 @@ test('RT-P1-2 editor enforces the derived image cap and warns before the server 
   assert.match(source, /role="status"/);
 });
 
+test('RT-P1-2 several images at the cap cannot compose an unpublishable document', () => {
+  const limits = loadTs('src/lib/announcement-limits.ts');
+  const serverCap = FIXTURE.editorLimits.maxContentChars;
+
+  // The per-image cap alone does not bound the document. Two images at the cap
+  // are ~360k characters against a 200k server cap, which is the same publish
+  // dead-end reached with two files instead of one — so the count must be
+  // derived from the same budget rather than left unbounded.
+  assert.ok(limits.MAX_INLINE_IMAGES >= 1, 'at least one image must be allowed');
+
+  const worstCase = limits.worstCaseContentChars();
+  assert.ok(
+    worstCase < serverCap,
+    `every permitted image at the cap plus the text reserve is ${worstCase} chars, which must stay under ${serverCap}`,
+  );
+
+  // One image beyond the budget must not fit — otherwise the count is too generous
+  // and the invariant above would be a coincidence rather than a guarantee.
+  const oneImageWorstCase =
+    4 * Math.ceil(limits.MAX_INLINE_IMAGE_BYTES / 3) + 200;
+  assert.ok(
+    limits.MAX_INLINE_IMAGES * oneImageWorstCase + limits.TEXT_RESERVE_CHARS + oneImageWorstCase >
+      serverCap,
+    `permitting ${limits.MAX_INLINE_IMAGES + 1} images would exceed the server cap, so the count is at its maximum`,
+  );
+});
+
+test('RT-P1-2 publish is blocked client-side on every authoring surface', () => {
+  const limits = loadTs('src/lib/announcement-limits.ts');
+
+  // A warning is not a gate: content over the cap that still reaches the server
+  // comes back as an opaque 400 with nothing actionable, which is the dead-end
+  // this whole contract exists to close.
+  const overCap = 'x'.repeat(limits.MAX_ANNOUNCEMENT_CONTENT_CHARS + 1);
+  const violation = limits.findAnnouncementLengthViolation(overCap);
+  assert.ok(violation, 'over-cap content must produce a blocking decision');
+  assert.equal(violation.excessChars, 1);
+  assert.equal(violation.state, 'exceeded');
+  assert.equal(
+    limits.findAnnouncementLengthViolation('x'.repeat(limits.MAX_ANNOUNCEMENT_CONTENT_CHARS)),
+    null,
+    'content exactly at the cap is publishable — the gate must not over-block',
+  );
+
+  // The message names both numbers so the author knows what to change.
+  for (const locale of ['vi', 'en']) {
+    const message = limits.announcementLengthViolationMessage(violation, locale);
+    assert.match(message, /1/, `${locale} message must state how much to remove`);
+  }
+
+  // Both surfaces must consult the gate. The TinyMCE editor page had no length
+  // check at all, and the admin page authors through a second editor with no
+  // per-image cap, so a gate on only one of them leaves the other open.
+  const editorPage = read('src/app/dashboard/editor/page.tsx');
+  const adminPage = read('src/app/admin/announcements/page.tsx');
+  for (const [name, source] of [
+    ['dashboard/editor', editorPage],
+    ['admin/announcements', adminPage],
+  ]) {
+    assert.match(
+      source,
+      /findAnnouncementLengthViolation/,
+      `${name} must gate the publish path on the shared length decision`,
+    );
+  }
+  // Publish and update are separate paths on the editor page; both must be gated.
+  assert.ok(
+    (editorPage.match(/findAnnouncementLengthViolation/g) ?? []).length >= 2,
+    'both the publish and the update path must be gated',
+  );
+});
+
 test('RT-P3-1 editor loads the self-hosted Vietnamese language pack', () => {
   const source = read('src/components/ui/tinymce-editor.tsx');
   assert.match(source, /language: isVi \? 'vi' : undefined/);
