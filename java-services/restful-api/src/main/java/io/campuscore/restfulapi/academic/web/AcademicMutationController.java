@@ -48,7 +48,6 @@ public class AcademicMutationController {
                 idempotencyKey);
         return ResponseEntity.ok()
                 .header("Deprecation", "true")
-                .header("Sunset", "true")
                 .body(body);
     }
 
@@ -61,7 +60,6 @@ public class AcademicMutationController {
         mutations.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey);
         return ResponseEntity.ok()
                 .header("Deprecation", "true")
-                .header("Sunset", "true")
                 .body(Map.of("message", "Enrollment dropped successfully"));
     }
 

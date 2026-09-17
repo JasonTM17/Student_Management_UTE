@@ -458,6 +458,61 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void pendingApplicationCanBeReviewedAfterTheRoundCloses() throws Exception {
+        MvcResult submitted = mvc.perform(post("/api/v1/me/registration/credit-limit-applications")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"round-open\",\"reason\":\"Tôi cần hoàn thành thêm học phần bắt buộc trong học kỳ cuối.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andReturn();
+        String applicationId = objectMapper.readTree(submitted.getResponse().getContentAsString()).get("id").asText();
+
+        // The round closes with the application still PENDING.
+        jdbc.update(
+                "UPDATE \"academic\".\"RegistrationRound\" SET \"status\" = 'CLOSED', \"windowEnd\" = ? WHERE \"id\" = ?",
+                localDateTime(Instant.parse("2026-08-19T00:00:00Z")),
+                "round-open");
+
+        // Reviewing is a pure state transition on the submitted item and must
+        // stay possible after close (pre-fix this answered 409 WINDOW_CLOSED
+        // and the application was stuck forever).
+        mvc.perform(post("/api/v1/admin/registration/credit-limit-applications/" + applicationId + "/review")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"APPROVED\",\"note\":\"Đã đối chiếu hồ sơ sau khi vòng đăng ký đóng.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"));
+
+        // ... and the round must not be reopened as a side effect.
+        assertThat(jdbc.queryForObject(
+                "SELECT \"status\" FROM \"academic\".\"RegistrationRound\" WHERE \"id\" = ?",
+                String.class,
+                "round-open"))
+                .isEqualTo("CLOSED");
+    }
+
+    @Test
+    void adminApplicationListingIsBounded() throws Exception {
+        for (int index = 0; index < 505; index++) {
+            jdbc.update(
+                    "INSERT INTO \"academic\".\"CreditLimitApplication\""
+                            + " (\"id\", \"studentId\", \"semesterId\", \"roundId\", \"requestedLimit\", \"reason\", \"status\")"
+                            + " VALUES (?, 'student-1', 'semester-1', 'round-open', 30, ?, 'PENDING')",
+                    "cl-bulk-" + index,
+                    "Cần đăng ký vượt định mức vì thiếu tín chỉ tốt nghiệp, đã được cố vấn học tập xác nhận.");
+        }
+
+        mvc.perform(get("/api/v1/admin/registration/credit-limit-applications")
+                        .queryParam("status", "ALL")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                // The console feed is newest-first and capped at 500 rows
+                // (pre-fix the listing was unbounded).
+                .andExpect(jsonPath("$.length()").value(500));
+    }
+
+    @Test
     void adminDropCompletesIdempotencySoRetriesReplayInsteadOfConflicting() throws Exception {
         MvcResult enrolled = mvc.perform(post("/api/v1/me/enrollments")
                         .with(studentJwt("student-user-1", "student-1"))

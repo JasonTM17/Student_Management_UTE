@@ -719,8 +719,12 @@ public class AcademicReadRepository {
         return jdbc.query(
                 "SELECT e.\"courseId\" AS course_id,"
                         + " MAX(CASE"
-                        + "   WHEN e.\"status\" = 'COMPLETED'"
-                        + "        OR (e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F') THEN 2"
+                        // publishGrades stamps status='COMPLETED' on every graded row,
+                        // including failures: completion must require a published
+                        // passing letter, exactly like the passed_grade/passed_letter
+                        // arms below. The bare status arm used to mark an F course as
+                        // finished curriculum progress.
+                        + "   WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F' THEN 2"
                         + "   WHEN e.\"status\" IN ('ENROLLED', 'CONFIRMED', 'PENDING') THEN 1"
                         + "   ELSE 0 END) AS progress_level,"
                         + " MAX(CASE WHEN e.\"gradeStatus\" = 'PUBLISHED' AND e.\"letterGrade\" IS NOT NULL AND e.\"letterGrade\" <> 'F'"

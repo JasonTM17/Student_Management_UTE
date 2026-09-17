@@ -199,9 +199,9 @@ public class ThesisMutationController {
         return mutations.updateProgress(id, request, actor);
     }
 
-    /** Brief R5: only the group leader submits the topic report. */
+    /** Brief R5: only the group leader submits the topic report (the service 403s everyone else). */
     @PostMapping("/groups/{id}/report")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ReportResponse submitReport(
             @PathVariable UUID id,
             @RequestBody Map<String, String> request,
@@ -214,9 +214,9 @@ public class ThesisMutationController {
                 actor);
     }
 
-    /** Feedback item 7: submit the report as an attached Word/PDF document. */
+    /** Feedback item 7: submit the report as an attached Word/PDF document (leader only). */
     @PostMapping(value = "/groups/{id}/report/file", consumes = MediaType.MULTIPART_FORM_DATA_VALUE)
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasRole('STUDENT')")
     public ReportResponse submitReportFile(
             @PathVariable UUID id,
             @RequestPart("file") MultipartFile file,

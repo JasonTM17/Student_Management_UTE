@@ -164,7 +164,7 @@ class ThesisTopicPersistenceTest {
     }
 
     @Test
-    void studentGroupReadsAreLimitedToMembershipWhileStaffCanReadTheRound() throws Exception {
+    void studentGroupReadsAreLimitedToMembershipAndLecturersToTheirSupervisedGroups() throws Exception {
         UUID roundId = insertRound();
         UUID studentId = UUID.randomUUID();
         UUID ownGroup = insertGroup(
@@ -197,11 +197,14 @@ class ThesisTopicPersistenceTest {
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("THESIS_GROUP_NOT_FOUND"));
 
+        // LEC-P2-1: a lecturer who supervises no topic in this round no longer
+        // receives every group (their rosters carry external members' contact
+        // details); the listing comes back empty for them instead.
         mvc.perform(get("/api/v1/thesis/groups")
                         .queryParam("roundId", roundId.toString())
                         .with(lecturerJwt("lecturer-user")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(2));
+                .andExpect(jsonPath("$.length()").value(0));
     }
 
     @Test
@@ -961,7 +964,12 @@ class ThesisTopicPersistenceTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor lecturerJwt(String userId) {
-        return jwt().jwt(token -> token.subject(userId).claim("roles", List.of("LECTURER")))
+        // Production lecturer tokens carry the lecturerId claim (AuthTokenService),
+        // and createTopic rejects a LECTURER creator without it (LEC-P2-2) instead
+        // of silently mis-keying the supervisor row with the User id.
+        return jwt().jwt(token -> token.subject(userId)
+                        .claim("roles", List.of("LECTURER"))
+                        .claim("lecturerId", userId))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
     }
 

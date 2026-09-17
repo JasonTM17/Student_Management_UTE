@@ -30,6 +30,8 @@ public class CreditLimitApplicationService {
 
     public static final int STANDARD_LIMIT = 28;
     public static final int APPROVED_LIMIT = 30;
+    /** Upper bound for the admin console listing; the feed is newest-first. */
+    static final int MAX_LIST_RESULTS = 500;
 
     private static final String APPLICATION = "academic.\"CreditLimitApplication\"";
     private static final String ROUND = "academic.\"RegistrationRound\"";
@@ -111,7 +113,7 @@ public class CreditLimitApplicationService {
             sql += " WHERE application.\"status\" = :status";
             parameters.addValue("status", filter);
         }
-        sql += " ORDER BY application.\"createdAt\" DESC";
+        sql += " ORDER BY application.\"createdAt\" DESC LIMIT " + MAX_LIST_RESULTS;
         return jdbc.queryForList(sql, parameters).stream().map(this::map).toList();
     }
 
@@ -135,7 +137,12 @@ public class CreditLimitApplicationService {
             throw problem(HttpStatus.CONFLICT, "CREDIT_LIMIT_APPLICATION_NOT_PENDING",
                     "Only a pending credit-limit application can be reviewed");
         }
-        openRound(String.valueOf(current.get("round_id")));
+        // Reviewing is a pure state transition on an already-submitted item:
+        // it must stay possible after the round closes, otherwise PENDING
+        // applications could never be dispositioned. The round is NOT
+        // reopened — only its existence is required here; submit() still
+        // enforces the open window via openRound().
+        requireRoundExists(String.valueOf(current.get("round_id")));
         int changed = jdbc.update(
                 "UPDATE " + APPLICATION
                         + " SET \"status\" = :status, \"reviewedBy\" = :reviewedBy,"
@@ -215,6 +222,16 @@ public class CreditLimitApplicationService {
             throw problem(HttpStatus.CONFLICT, "WINDOW_CLOSED", "Registration window is closed");
         }
         return round;
+    }
+
+    /** Existence-only round check; deliberately ignores window/status so review() works after close. */
+    private void requireRoundExists(String roundId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + ROUND + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", roundId), Long.class);
+        if (count == null || count == 0) {
+            throw problem(HttpStatus.NOT_FOUND, "ROUND_NOT_FOUND", "Registration round not found");
+        }
     }
 
     private void ensureStudent(String studentId) {
