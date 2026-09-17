@@ -5,6 +5,9 @@ import io.campuscore.restfulapi.academic.registration.RegistrationDtos.Eligibili
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.RoundResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationService.SlipPayload;
+import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.CreateRequest;
+import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.Response;
+import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.ReviewRequest;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.EnrollRequest;
@@ -35,10 +38,15 @@ public class RegistrationController {
 
     private final RegistrationService registration;
     private final AcademicEnrollmentReadService enrollments;
+    private final CreditLimitApplicationService creditLimitApplications;
 
-    public RegistrationController(RegistrationService registration, AcademicEnrollmentReadService enrollments) {
+    public RegistrationController(
+            RegistrationService registration,
+            AcademicEnrollmentReadService enrollments,
+            CreditLimitApplicationService creditLimitApplications) {
         this.registration = registration;
         this.enrollments = enrollments;
+        this.creditLimitApplications = creditLimitApplications;
     }
 
     @GetMapping("registration/rounds")
@@ -71,6 +79,41 @@ public class RegistrationController {
             @AuthenticationPrincipal Jwt jwt,
             @RequestParam(required = false) String semesterId) {
         return registration.summary(jwt.getClaimAsString("studentId"), semesterId);
+    }
+
+    @GetMapping("me/registration/credit-limit-application")
+    @PreAuthorize("hasRole('STUDENT')")
+    public ResponseEntity<Response> creditLimitApplication(
+            @AuthenticationPrincipal Jwt jwt,
+            @RequestParam String roundId) {
+        Response application = creditLimitApplications.findForStudent(
+                jwt.getClaimAsString("studentId"), roundId);
+        return application == null ? ResponseEntity.noContent().build() : ResponseEntity.ok(application);
+    }
+
+    @PostMapping("me/registration/credit-limit-applications")
+    @PreAuthorize("hasRole('STUDENT')")
+    public Response submitCreditLimitApplication(
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody CreateRequest request) {
+        return creditLimitApplications.submit(
+                jwt.getClaimAsString("studentId"), request.roundId(), request.reason());
+    }
+
+    @GetMapping("admin/registration/credit-limit-applications")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public List<Response> creditLimitApplications(
+            @RequestParam(required = false, defaultValue = "PENDING") String status) {
+        return creditLimitApplications.list(status);
+    }
+
+    @PostMapping("admin/registration/credit-limit-applications/{id}/review")
+    @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public Response reviewCreditLimitApplication(
+            @AuthenticationPrincipal Jwt jwt,
+            @PathVariable String id,
+            @Valid @RequestBody ReviewRequest request) {
+        return creditLimitApplications.review(id, request.decision(), jwt.getSubject(), request.note());
     }
 
     @GetMapping("me/registration/slip")

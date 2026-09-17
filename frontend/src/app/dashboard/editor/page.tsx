@@ -136,11 +136,11 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
     id: 'block-clauses',
     type: 'clauses',
     title: '5. Các Điều khoản Quy chế & Hạn mức',
-    description: 'Hạn mức tối đa 28 tín chỉ / kỳ và quy trình hủy/rút học phần hợp lệ',
+    description: 'Hạn mức chuẩn 28 tín chỉ / kỳ; tối đa 30 chỉ khi đơn được Phòng Đào tạo phê duyệt',
     enabled: true,
     htmlContent: `  <div style="margin-bottom: 20px;">
     <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">2. Quy định thực hiện và Hạn mức tín chỉ</h3>
-    <p><strong>- Hạn mức tín chỉ:</strong> Sinh viên không được phép đăng ký vượt quá 28 tín chỉ/học kỳ chính theo quy chế học vụ.</p>
+    <p><strong>- Hạn mức tín chỉ:</strong> Sinh viên không được đăng ký vượt quá 28 tín chỉ/học kỳ chính. Chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</p>
     <p><strong>- Hủy học phần:</strong> Thời hạn xin rút/hủy học phần kết thúc vào tuần thứ 2 kể từ ngày bắt đầu học kỳ.</p>
   </div>`,
   },

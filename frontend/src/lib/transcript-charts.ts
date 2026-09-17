@@ -85,9 +85,15 @@ export function buildTenScaleTrendPoints(
       const graded = semester.records.filter(
         (record) => typeof record.finalGrade === 'number',
       );
-      const average =
-        graded.reduce((sum, record) => sum + (record.finalGrade ?? 0), 0) /
-        graded.length;
+      // ĐTB hệ 10 is credit-weighted: a 4-credit course moves the average
+      // four times as much as a 1-credit one. A simple mean under-weighted
+      // heavy courses and disagreed with the registrar's number.
+      const weighted = graded.reduce(
+        (sum, record) => sum + (record.finalGrade ?? 0) * (record.credits || 0),
+        0,
+      );
+      const credits = graded.reduce((sum, record) => sum + (record.credits || 0), 0);
+      const average = credits > 0 ? weighted / credits : 0;
 
       return {
         label: locale === 'vi' ? `HK${index + 1}` : `T${index + 1}`,

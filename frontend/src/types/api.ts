@@ -96,7 +96,7 @@ export interface SectionSchedule {
   id: string;
   sectionId: string;
   classroomId: string;
-  dayOfWeek: number; // 0=Sunday, 1=Monday, etc.
+  dayOfWeek: number; // 1=Sunday .. 7=Saturday (the seeded schedule convention)
   startTime: string; // HH:mm format
   endTime: string; // HH:mm format
   classroom?: Classroom;
@@ -120,7 +120,7 @@ export interface Enrollment {
   status: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
   enrolledAt: string;
   droppedAt?: string;
-  gradeStatus: 'DRAFT' | 'PUBLISHED' | 'APPEALED';
+  gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
   finalGrade?: number;
   letterGrade?: string;
   createdAt: string;
@@ -237,8 +237,8 @@ export interface StudentGradeRecord {
   finalGrade: number | null;
   letterGrade: string | null;
   gradePoint?: number | null;
-  gradeStatus: 'DRAFT' | 'PUBLISHED' | 'APPEALED';
-  enrollmentStatus: 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
+  gradeStatus: 'NOT_GRADED' | 'DRAFT' | 'PUBLISHED' | 'APPEALED';
+  enrollmentStatus: 'ENROLLED' | 'PENDING' | 'CONFIRMED' | 'DROPPED' | 'COMPLETED' | 'CANCELLED';
 }
 
 export interface StudentTranscriptSemester {

@@ -61,6 +61,7 @@ export function AssistantComposer({
           maxLength={2000}
           className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
           aria-label={messages.assistant.placeholder}
+          aria-describedby="assistant-composer-hint assistant-composer-count"
         />
         {isSending ? (
           <Button
@@ -86,8 +87,8 @@ export function AssistantComposer({
         )}
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground px-1">
-        <span>{messages.assistant.composerHint}</span>
-        <span>{input.length}/2000</span>
+        <span id="assistant-composer-hint">{messages.assistant.composerHint}</span>
+        <span id="assistant-composer-count">{input.length}/2000</span>
       </div>
     </form>
   );

@@ -8,6 +8,7 @@ import {
   ChevronUp,
   Copy,
   FileText,
+  LockKeyhole,
   ShieldCheck,
   Sparkles,
   ThumbsDown,
@@ -125,6 +126,15 @@ function messageTimeLabel(
     minute: '2-digit',
     timeZone: 'Asia/Ho_Chi_Minh',
   }).format(date);
+}
+
+function isLocalOnlyAssistantMessage(message: ChatMessage): boolean {
+  return (
+    message.role === 'assistant' &&
+    !message.pending &&
+    (message.reasonCode === 'PERSONAL_CONTEXT' ||
+      message.reasonCode === 'LOCAL_ASSIST')
+  );
 }
 
 export function AssistantMessages({
@@ -290,6 +300,16 @@ export function AssistantMessages({
                       )}
                     </div>
                   )}
+
+                  {isLocalOnlyAssistantMessage(message) ? (
+                    <p className="mt-2 flex items-start gap-1.5 rounded-lg bg-secondary/60 px-2 py-1.5 text-[11px] leading-4 text-muted-foreground">
+                      <LockKeyhole
+                        className="mt-0.5 h-3.5 w-3.5 shrink-0 text-primary"
+                        aria-hidden="true"
+                      />
+                      <span>{messages.assistant.localOnlyNotice}</span>
+                    </p>
+                  ) : null}
 
                   {/* Collapsible Citations Card */}
                   {!isUser && visibleCitations.length ? (

@@ -19,6 +19,14 @@ class AssistantDifficultyRouterTest {
     }
 
     @Test
+    void creditCapQuestionStaysDeterministicDespiteVietnameseStopWords() {
+        assertFalse(AssistantDifficultyRouter.requiresSynthesis(
+                "Hạn mức tín chỉ học kỳ này là bao nhiêu?", List.of(document("REGISTRATION"))));
+        assertFalse(AssistantDifficultyRouter.requiresSynthesis(
+                "What is the credit cap this term?", List.of(document("REGISTRATION"))));
+    }
+
+    @Test
     void academicRegulationQuestionsTriggerSynthesis() {
         assertTrue(AssistantDifficultyRouter.requiresSynthesis(
                 "Phân biệt học phần tiên quyết và học phần học trước",

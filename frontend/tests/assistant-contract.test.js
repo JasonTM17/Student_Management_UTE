@@ -6,6 +6,10 @@ const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 
+const assistantEnrollmentStatusModule = {
+  ACTIVE_ENROLLMENT_STATUSES: ['ENROLLED', 'PENDING', 'CONFIRMED'],
+};
+
 function load(relativePath) {
   const source = fs.readFileSync(path.join(root, relativePath), 'utf8');
   const output = ts.transpileModule(source, {
@@ -338,6 +342,9 @@ test('student assistant resolves schedules and materials from portal APIs', asyn
         gradesApi: {},
         registrationApi: {},
       };
+    }
+    if (moduleName === '@/lib/enrollment-status') {
+      return assistantEnrollmentStatusModule;
     }
     return {};
   };
@@ -736,7 +743,9 @@ test('regulation questions fall through the resolver to the server', async () =>
           sectionsApi: { getMySchedule: async () => [] },
           curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
         }
-      : {}),
+      : name === '@/lib/enrollment-status'
+        ? assistantEnrollmentStatusModule
+        : {}),
   );
   const schedule = await scheduleModule.exports.resolveStudentAssistantQuery('lịch học của tôi tuần này có những môn nào?', 'vi');
   assert.ok(schedule, 'personal schedule question must still resolve locally');
@@ -764,7 +773,9 @@ test('student schedule resolver does not claim an empty timetable when enrollmen
           sectionsApi: { getMySchedule: async () => [] },
           curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
         }
-      : {}),
+      : name === '@/lib/enrollment-status'
+        ? assistantEnrollmentStatusModule
+        : {}),
   );
 
   const resolution = await moduleRecord.exports.resolveStudentAssistantQuery(
@@ -860,6 +871,7 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(messagesSource, /sensitiveBlocked:\s*'Vui lòng không nhập email/);
   assert.match(messagesSource, /personalContext: 'Answered from your personal academic records'/);
   assert.match(messagesSource, /personalContext: 'Trả lời từ dữ liệu học vụ cá nhân của bạn'/);
+  assert.match(messagesSource, /localOnlyNotice:/);
   assert.match(messagesSource, /followUpsByDomain: \{/);
 
   const composerSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantComposer.tsx'), 'utf8');
@@ -868,6 +880,9 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(composerSource, /text-base[\s\S]*md:text-sm/);
   assert.match(composerSource, /name="assistant-message"/);
   assert.match(composerSource, /autoComplete="off"/);
+  assert.match(composerSource, /aria-describedby="assistant-composer-hint assistant-composer-count"/);
+  assert.match(composerSource, /id="assistant-composer-hint"/);
+  assert.match(composerSource, /id="assistant-composer-count"/);
 
   const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
   assert.doesNotMatch(panelSource, /aria-label="Cuộc trò chuyện mới"/);
@@ -877,7 +892,10 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(panelSource, /followUpsByDomain/);
   // Mobile opens as a full-screen sheet; desktop keeps the floating card.
   assert.match(panelSource, /inset-0 md:inset-auto/);
+  assert.match(panelSource, /md:h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/);
+  assert.doesNotMatch(panelSource, /md:h-auto/);
   assert.match(panelSource, /overscroll-contain/);
+  assert.match(panelSource, /overflow-y-auto bg-background px-3\.5 py-3\.5 pb-20 md:pb-4/);
   assert.match(panelSource, /min-h-0 flex-1/);
   assert.doesNotMatch(panelSource, /animate-ping/);
   assert.match(panelSource, /dark:from-\[#0b3a70\]/);
@@ -887,6 +905,8 @@ test('assistant UI strings are localized and reason labels cover personal contex
   assert.match(messagesComponent, /motion-reduce:animate-none/);
   assert.match(messagesComponent, /aria-expanded=\{isCitationOpen\}/);
   assert.match(messagesComponent, /aria-controls=\{`assistant-citations-\$\{message\.id\}`\}/);
+  assert.match(messagesComponent, /isLocalOnlyAssistantMessage/);
+  assert.match(messagesComponent, /messages\.assistant\.localOnlyNotice/);
 
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   assert.match(hookSource, /inspectAssistantInput/);

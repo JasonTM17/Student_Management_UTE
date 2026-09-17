@@ -13,6 +13,7 @@ import { thesisApi } from '@/lib/thesis-api';
 import type { Enrollment, LecturerSection, User } from '@/types/api';
 import type { AssistantCitation } from '@/lib/thesis-api';
 import { announcementPriorityLabel } from '@/lib/announcement-presentation';
+import { ACTIVE_ENROLLMENT_STATUSES } from '@/lib/enrollment-status';
 
 export interface StudentAssistantResolution {
   answer: string;
@@ -399,11 +400,15 @@ interface ScheduleMeeting {
   isTeaching?: boolean;
 }
 
-const ACTIVE_ENROLLMENT_STATUSES = new Set(['ENROLLED', 'CONFIRMED', 'PENDING']);
-
+// Seat accounting mirrors the backend (ENROLLED, PENDING, CONFIRMED all
+// occupy a seat and count toward the credit cap). The shared definition in
+// lib/enrollment-status.ts is the single source of truth; this module just
+// adapts it to its local Enrollment type.
 function isActiveEnrollment(enrollment: Enrollment): boolean {
-  return ACTIVE_ENROLLMENT_STATUSES.has(enrollment.status);
+  return ACTIVE_SEAT_STATUSES.has(enrollment.status);
 }
+
+const ACTIVE_SEAT_STATUSES = new Set<string>(ACTIVE_ENROLLMENT_STATUSES);
 
 function stripRichText(content: string | null | undefined): string {
   return (content ?? '').replace(/<[^>]*>/g, ' ').replace(/\s+/g, ' ').trim();

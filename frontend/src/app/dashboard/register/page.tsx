@@ -1,14 +1,15 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
-import { BookOpen, CheckCircle2, Search, Trash2, UserPlus } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { AlertCircle, BookOpen, CheckCircle2, Clock3, Search, Send, ShieldCheck, Trash2, UserPlus } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { enrollmentsApi, registrationApi } from '@/lib/api';
+import { enrollmentsApi, registrationApi, type CreditLimitApplication } from '@/lib/api';
 import type { Enrollment } from '@/types/api';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Textarea } from '@/components/ui/textarea';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
@@ -42,6 +43,10 @@ export default function RegisterPage() {
   const [courseNameSearch, setCourseNameSearch] = useState('');
   const [selectedCourseId, setSelectedCourseId] = useState('');
   const [creditLimit, setCreditLimit] = useState(28);
+  const [currentRoundId, setCurrentRoundId] = useState('');
+  const [creditApplication, setCreditApplication] = useState<CreditLimitApplication | null>(null);
+  const [applicationReason, setApplicationReason] = useState('');
+  const [applicationBusy, setApplicationBusy] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [pending, setPending] = useState('');
@@ -65,16 +70,28 @@ export default function RegisterPage() {
         const open = rounds.some((round) => round.status === 'OPEN');
         setRoundOpen(open);
         const currentRound = rounds.find((round) => round.status === 'OPEN');
-        if (currentRound && typeof currentRound.creditLimit === 'number' && currentRound.creditLimit > 0) {
-          setCreditLimit(currentRound.creditLimit);
-        } else {
-          setCreditLimit(28);
-        }
+        setCurrentRoundId(currentRound?.id ?? '');
         if (!open) {
+          setCreditLimit(28);
+          setCreditApplication(null);
           setSections([]);
           return;
         }
-        const catalog = await registrationApi.sections();
+        if (!currentRound) return;
+        const [eligibility, application] = await Promise.all([
+          registrationApi.eligibility({
+            semesterId: currentRound.semesterId,
+            roundId: currentRound.id,
+          }),
+          registrationApi.creditLimitApplication(currentRound.id),
+        ]);
+        if (generation !== loadGeneration.current) return;
+        setCreditLimit(Math.min(30, Math.max(1, eligibility.creditLimit || 28)));
+        setCreditApplication(application);
+        const catalog = await registrationApi.sections({
+          semesterId: currentRound.semesterId,
+          roundId: currentRound.id,
+        });
         if (generation !== loadGeneration.current) return;
         setSections(catalog);
       } catch (catalogError) {
@@ -194,7 +211,7 @@ export default function RegisterPage() {
     const section = sections.find((item) => item.id === sectionId);
     const creditsToAdd = section?.credits ?? 0;
     if (totalRegisteredCredits + creditsToAdd > creditLimit) {
-      const message = `Đăng ký học phần này sẽ vượt giới hạn tối đa ${creditLimit} tín chỉ của học kỳ.`;
+      const message = copy.creditLimitExceeded.replace('{limit}', String(creditLimit));
       setActionError(message);
       toast.error(message);
       return;
@@ -249,6 +266,38 @@ export default function RegisterPage() {
     }
   };
 
+  const submitCreditLimitApplication = async (event: FormEvent<HTMLFormElement>) => {
+    event.preventDefault();
+    const reason = applicationReason.trim();
+    if (!currentRoundId || reason.length < 20) {
+      const message = copy.applicationReasonInvalid;
+      setActionError(message);
+      toast.error(message);
+      return;
+    }
+
+    setApplicationBusy(true);
+    setActionError('');
+    try {
+      const application = await registrationApi.submitCreditLimitApplication(currentRoundId, reason);
+      setCreditApplication(application);
+      setApplicationReason('');
+      // A pending request never changes the effective limit. Only the PĐT
+      // approval returned by the API may move this student from 28 to 30.
+      setCreditLimit(28);
+      toast.success(copy.applicationSubmitted);
+    } catch (cause) {
+      const code = campusErrorCode(cause);
+      const message = code === 'CREDIT_LIMIT_APPLICATION_EXISTS'
+        ? copy.applicationAlreadyExists
+        : campusCodeMessage(cause, messages.common.campusErrors);
+      setActionError(message);
+      toast.error(message);
+    } finally {
+      setApplicationBusy(false);
+    }
+  };
+
   if (authLoading) {
     return <LoadingState label={messages.common.states.loadingContent} />;
   }
@@ -262,6 +311,30 @@ export default function RegisterPage() {
     return <ErrorState title={copy.loadFailed} description={error} onRetry={() => void load()} />;
   }
 
+  const applicationStatus = creditApplication?.status === 'APPROVED'
+    ? {
+        label: copy.applicationStatusApproved,
+        description: copy.applicationApproved,
+        icon: CheckCircle2,
+        tone: 'text-status-success-foreground bg-status-success/12',
+      }
+    : creditApplication?.status === 'REJECTED'
+      ? {
+          label: copy.applicationStatusRejected,
+          description: copy.applicationRejected,
+          icon: AlertCircle,
+          tone: 'text-status-danger-foreground bg-status-danger/12',
+        }
+      : creditApplication
+        ? {
+            label: copy.applicationStatusPending,
+            description: copy.applicationPending,
+            icon: Clock3,
+            tone: 'text-status-warning-foreground bg-status-warning/12',
+          }
+        : null;
+  const canSubmitApplication = !creditApplication || creditApplication.status === 'REJECTED';
+
   return (
     <div className="registration-workspace space-y-6">
       <PageHeader
@@ -274,6 +347,83 @@ export default function RegisterPage() {
       ) : (
         <div className="grid min-w-0 gap-6 lg:grid-cols-12">
           <div className="min-w-0 space-y-6 lg:col-span-9">
+            <Card className="overflow-hidden border-primary/20 bg-gradient-to-br from-primary/[0.06] via-card to-card">
+              <CardHeader className="border-b border-primary/10 pb-4">
+                <CardTitle className="flex items-center gap-2 text-base">
+                  <ShieldCheck className="h-5 w-5 text-primary" aria-hidden="true" />
+                  {copy.limitPolicyTitle}
+                </CardTitle>
+                <p className="text-sm leading-6 text-muted-foreground">{copy.limitPolicyDescription}</p>
+              </CardHeader>
+              <CardContent className="space-y-4 p-4">
+                <div className="grid gap-3 sm:grid-cols-2">
+                  <div className="rounded-xl border border-border/70 bg-card/80 p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-muted-foreground">
+                      {copy.standardLimitLabel}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                      28 <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
+                    </p>
+                  </div>
+                  <div className="rounded-xl border border-primary/20 bg-primary/[0.05] p-4">
+                    <p className="text-xs font-semibold uppercase tracking-[0.14em] text-primary">
+                      {copy.approvedLimitLabel}
+                    </p>
+                    <p className="mt-2 text-2xl font-semibold text-foreground">
+                      30 <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
+                    </p>
+                    <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.approvedLimitHint}</p>
+                  </div>
+                </div>
+
+                {applicationStatus ? (
+                  <div className={`rounded-xl p-3 ${applicationStatus.tone}`} role="status" aria-live="polite">
+                    <div className="flex items-start gap-3">
+                      <applicationStatus.icon className="mt-0.5 h-5 w-5 shrink-0" aria-hidden="true" />
+                      <div className="min-w-0 space-y-1">
+                        <p className="font-semibold">{applicationStatus.label}</p>
+                        <p className="text-sm leading-6 opacity-90">{applicationStatus.description}</p>
+                        {creditApplication?.reviewerNote ? (
+                          <p className="border-t border-current/15 pt-2 text-sm leading-6">
+                            <span className="font-semibold">{copy.applicationReviewNote}: </span>
+                            {creditApplication.reviewerNote}
+                          </p>
+                        ) : null}
+                      </div>
+                    </div>
+                  </div>
+                ) : null}
+
+                {canSubmitApplication ? (
+                  <form className="space-y-3 border-t border-border/70 pt-4" onSubmit={submitCreditLimitApplication}>
+                    <div>
+                      <h3 className="text-sm font-semibold text-foreground">{copy.applicationTitle}</h3>
+                      <p className="mt-1 text-sm leading-6 text-muted-foreground">{copy.applicationDescription}</p>
+                    </div>
+                    <label htmlFor="credit-limit-application-reason" className="block text-sm font-medium text-foreground">
+                      {copy.applicationReasonLabel}
+                    </label>
+                    <Textarea
+                      id="credit-limit-application-reason"
+                      value={applicationReason}
+                      onChange={(event) => setApplicationReason(event.target.value)}
+                      placeholder={copy.applicationReasonPlaceholder}
+                      minLength={20}
+                      maxLength={1000}
+                      required
+                      hint={`${copy.applicationReasonHint} ${applicationReason.length}/1000`}
+                    />
+                    <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+                      <p className="text-xs leading-5 text-muted-foreground">{copy.applicationOfficeOnly}</p>
+                      <Button type="submit" disabled={applicationBusy}>
+                        <Send className="mr-2 h-4 w-4" aria-hidden="true" />
+                        {applicationBusy ? copy.applicationSubmitting : copy.applicationSubmit}
+                      </Button>
+                    </div>
+                  </form>
+                ) : null}
+              </CardContent>
+            </Card>
             {actionError ? (
               <div
                 role="alert"
@@ -431,7 +581,7 @@ export default function RegisterPage() {
                             const alreadyHasCourse = enrolledCourseIds.has(section.courseId);
                             const isDisabled = !roundOpen || seats === 0 || pending === section.id || section.status !== 'OPEN' || willExceedLimit || isConflict || alreadyHasCourse;
                             const disabledTitle = willExceedLimit
-                              ? `Vượt quá giới hạn tối đa ${creditLimit} tín chỉ/học kỳ`
+                              ? copy.creditLimitExceeded.replace('{limit}', String(creditLimit))
                               : isConflict
                                 ? 'Trùng thời khóa biểu với môn đã đăng ký'
                                 : alreadyHasCourse
@@ -487,8 +637,8 @@ export default function RegisterPage() {
               </div>
               <p className="text-[11px] text-muted-foreground">
                 {totalRegisteredCredits >= creditLimit
-                  ? `Đã đạt hạn mức tối đa ${creditLimit} tín chỉ cho học kỳ này.`
-                  : `Còn có thể đăng ký thêm ${creditLimit - totalRegisteredCredits} tín chỉ.`}
+                  ? copy.creditLimitReached.replace('{limit}', String(creditLimit))
+                  : copy.creditLimitRemaining.replace('{count}', String(creditLimit - totalRegisteredCredits))}
               </p>
             </div>
             {registered.length === 0 ? (

@@ -5,6 +5,7 @@ import { usePathname } from 'next/navigation';
 import {
   ArrowLeft,
   Bell,
+  ClipboardCheck,
   Megaphone,
   BrainCircuit,
   BookMarked,
@@ -131,6 +132,7 @@ export function AdminFrame({
         { href: '/admin/announcements', icon: Megaphone, label: messages.admin.menuItems[9]?.[0] },
         { href: '/admin/assistant-knowledge', icon: BrainCircuit, label: messages.admin.menuItems[10]?.[0] },
         { href: '/admin/appearance', icon: Palette, label: messages.admin.menuItems[11]?.[0] },
+        { href: '/admin/credit-limit-applications', icon: ClipboardCheck, label: messages.admin.menuItems[12]?.[0] },
       ],
     },
   ];

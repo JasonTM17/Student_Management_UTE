@@ -87,6 +87,7 @@ ops/db-production-update/
 
 .vercel
 frontend-scan/
+dogfood-output/
 
 
 # Local-only tool artifacts and database backups

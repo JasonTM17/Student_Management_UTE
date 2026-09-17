@@ -45,7 +45,7 @@ INSERT INTO engagement."Announcement" (
     'Kế hoạch tổ chức đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
     '<p>Phòng Đào tạo thông báo kế hoạch chi tiết về việc đăng ký học phần chính thức dành cho sinh viên bậc Đại học chính quy các khóa như sau:</p>
 <ul>
-  <li><strong>Hạn mức tín chỉ tối đa:</strong> 28 tín chỉ/học kỳ theo Điều 14 Quy chế Đào tạo tín chỉ HCMUTE. Sinh viên đạt GPA học kỳ trước &ge; 3.20 được đăng ký tối đa 30 tín chỉ theo phê duyệt của Cố vấn học tập.</li>
+  <li><strong>Hạn mức tín chỉ:</strong> Hạn mức chuẩn là 28 tín chỉ/học kỳ theo Điều 14 Quy chế Đào tạo tín chỉ HCMUTE. Chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</li>
   <li><strong>Khung thời gian mở cổng đăng ký:</strong>
     <ul>
       <li>Khóa 2023 (Năm 4): Từ 08:00 ngày 25/08/2026 đến 17:00 ngày 27/08/2026.</li>

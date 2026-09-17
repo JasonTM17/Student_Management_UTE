@@ -148,8 +148,10 @@ public class AcademicMutationService {
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
+        // Official HCMUTE terminology for the two 50% components; the
+        // canonical ids are stable so existing grade rows keep their item.
         String processItemId = canonicalGradeItem(sectionId, "PROCESS", "Điểm quá trình (ĐQT - 50%)");
-        String finalItemId = canonicalGradeItem(sectionId, "FINAL", "Điểm cuối kỳ (ĐCK - 50%)");
+        String finalItemId = canonicalGradeItem(sectionId, "FINAL", "Điểm kết thúc học phần (ĐKTHP - 50%)");
         for (GradeUpdate grade : grades) {
             Map<String, Object> enrollment = enrollment(grade.enrollmentId());
             if (!sectionId.equals(enrollment.get("section_id"))) {
@@ -182,15 +184,28 @@ public class AcademicMutationService {
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
+        // Completeness uses the same gradeable-population predicate as the
+        // grading read model (ENROLLED/CONFIRMED/COMPLETED). Counting PENDING
+        // rows here used to deadlock publication: no visible student row to
+        // grade, yet publish answered 409 forever.
         Long incomplete = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
-                        + " AND e.\"status\" NOT IN ('DROPPED', 'CANCELLED') AND (SELECT COUNT(DISTINCT gi.\"type\")"
+                        + " AND e.\"status\" IN ('ENROLLED', 'CONFIRMED', 'COMPLETED')"
+                        + " AND (SELECT COUNT(DISTINCT gi.\"type\")"
                         + " FROM " + STUDENT_GRADE + " sg JOIN " + GRADE_ITEM + " gi ON gi.\"id\" = sg.\"gradeItemId\""
                         + " WHERE sg.\"enrollmentId\" = e.\"id\" AND sg.\"score\" IS NOT NULL"
                         + " AND gi.\"type\" IN ('PROCESS', 'FINAL')) < 2",
                 new MapSqlParameterSource("sectionId", sectionId), Long.class);
         if (incomplete != null && incomplete > 0) {
-            throw problem(HttpStatus.CONFLICT, "GRADE_COMPONENTS_INCOMPLETE", "All students require process and final exam scores before publishing");
+            Long blockers = jdbc.queryForObject(
+                    "SELECT COUNT(*) FROM " + ENROLLMENT + " e WHERE e.\"sectionId\" = :sectionId"
+                            + " AND e.\"status\" NOT IN ('ENROLLED', 'CONFIRMED', 'COMPLETED', 'DROPPED', 'CANCELLED')",
+                    new MapSqlParameterSource("sectionId", sectionId), Long.class);
+            String detail = blockers != null && blockers > 0
+                    ? "All gradeable students require process and final exam scores before publishing"
+                            + " (" + blockers + " enrollment(s) in a non-gradeable state need attention)"
+                    : "All students require process and final exam scores before publishing";
+            throw problem(HttpStatus.CONFLICT, "GRADE_COMPONENTS_INCOMPLETE", detail);
         }
         int updated = jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"gradeStatus\" = 'PUBLISHED', \"status\" = 'COMPLETED',"

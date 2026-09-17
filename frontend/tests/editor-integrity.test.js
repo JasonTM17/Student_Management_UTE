@@ -125,7 +125,7 @@ test('dashboard course chip counts live registrations only', () => {
     'the raw enrollment list length (includes DROPPED/CANCELLED) must not feed the chip',
   );
   assert.ok(
-    dashboardPage.includes('formatNumber(activeCourses.length + pendingCourses.length)'),
-    'the chip counts active + pending rows',
+    dashboardPage.includes('formatNumber(activeCourses.length)'),
+    'the chip counts live registrations, including pending rows',
   );
 });
