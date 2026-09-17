@@ -35,6 +35,7 @@ class AccountStateFilterTest {
     @BeforeEach
     @SuppressWarnings("unchecked")
     void setUp() {
+        DatabaseAvailabilityTracker.recordSuccess();
         repository = mock(AuthUserRepository.class);
         objectProvider = mock(ObjectProvider.class);
         when(objectProvider.getIfAvailable()).thenReturn(repository);
@@ -44,6 +45,7 @@ class AccountStateFilterTest {
 
     @AfterEach
     void tearDown() {
+        DatabaseAvailabilityTracker.recordSuccess();
         SecurityContextHolder.clearContext();
     }
 
@@ -154,5 +156,39 @@ class AccountStateFilterTest {
         assertEquals(503, response.getStatus());
         assertTrue(response.getContentAsString().contains("DATABASE_UNAVAILABLE"));
         verify(chain, never()).doFilter(request, response);
+    }
+
+    @Test
+    void trackerOutageShortCircuitsDegradableEndpointImmediately() throws Exception {
+        authenticate("user-6");
+        DatabaseAvailabilityTracker.recordFailure();
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/assistant/chat");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(200, response.getStatus());
+        verify(chain).doFilter(request, response);
+        // Repository should not even be called when breaker is open
+        verify(repository, never()).findAccountState("user-6");
+    }
+
+    @Test
+    void trackerOutageShortCircuitsNonDegradableEndpointTo503() throws Exception {
+        authenticate("user-7");
+        DatabaseAvailabilityTracker.recordFailure();
+
+        MockHttpServletRequest request = new MockHttpServletRequest("GET", "/api/v1/student/enrollments");
+        MockHttpServletResponse response = new MockHttpServletResponse();
+        FilterChain chain = mock(FilterChain.class);
+
+        filter.doFilter(request, response, chain);
+
+        assertEquals(503, response.getStatus());
+        assertTrue(response.getContentAsString().contains("DATABASE_UNAVAILABLE"));
+        verify(chain, never()).doFilter(request, response);
+        verify(repository, never()).findAccountState("user-7");
     }
 }
