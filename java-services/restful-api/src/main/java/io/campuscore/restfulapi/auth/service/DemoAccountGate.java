@@ -42,7 +42,12 @@ public class DemoAccountGate implements ApplicationRunner {
             "student@campuscore.edu", "lecturer@campuscore.edu", "admin@campuscore.edu");
 
     private static final String ACTIVE = "ACTIVE";
-    private static final String DISABLED = "DISABLED";
+    /**
+     * The same restrict state V48 applies to these accounts. Reusing LOCKED rather
+     * than inventing a second "off" value keeps one convention in the repository
+     * and keeps this gate consistent with the migration that locks them by default.
+     */
+    private static final String LOCKED = "LOCKED";
 
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean enabled;
@@ -56,7 +61,7 @@ public class DemoAccountGate implements ApplicationRunner {
 
     @Override
     public void run(ApplicationArguments args) {
-        String status = enabled ? ACTIVE : DISABLED;
+        String status = enabled ? ACTIVE : LOCKED;
         try {
             int affected = jdbc.update(
                     "UPDATE campuscore_auth.\"User\" SET \"status\" = :status, \"failedLoginAttempts\" = 0,"
