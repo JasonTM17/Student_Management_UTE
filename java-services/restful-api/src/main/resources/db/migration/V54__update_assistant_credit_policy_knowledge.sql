@@ -15,16 +15,26 @@ UPDATE assistant.knowledge_document
 SET content = 'Rules on course withdrawal and credit workload at CampusUTE: 1. Course withdrawal: Students may request course withdrawal during the first 2 weeks of a regular semester. Approved courses receive grade W and are excluded from GPA calculation. Late withdrawal requests are rejected with no refund. 2. Credit limits: Each regular semester requires a minimum of 14 credits (except final semester) and a standard maximum of 28 credits. Students may exceed the standard limit only with an application approved by Academic Affairs, capped at 30 credits. Summer terms allow a maximum of 8 to 10 credits.'
 WHERE slug = 'withdrawal-credit-limits-en' AND locale = 'en';
 
--- 3. Also update any announcements or notifications mentioning CampusCore
-UPDATE academic."Announcement"
-SET content = REPLACE(content, 'CampusCore', 'CampusUTE'),
-    title = REPLACE(title, 'CampusCore', 'CampusUTE')
-WHERE title LIKE '%CampusCore%' OR content LIKE '%CampusCore%';
-
-UPDATE academic."Notification"
-SET content = REPLACE(content, 'CampusCore', 'CampusUTE'),
-    title = REPLACE(title, 'CampusCore', 'CampusUTE')
-WHERE title LIKE '%CampusCore%' OR content LIKE '%CampusCore%';
+-- 3. Also update any announcements or notifications mentioning CampusCore.
+-- The tables live under engagement/notifications (see V3); the to_regclass
+-- guards keep this branding sweep from ever blocking the migration chain if a
+-- deployment trimmed those schemas.
+DO $$
+BEGIN
+    IF to_regclass('engagement."Announcement"') IS NOT NULL THEN
+        UPDATE engagement."Announcement"
+        SET content = REPLACE(content, 'CampusCore', 'CampusUTE'),
+            title = REPLACE(title, 'CampusCore', 'CampusUTE')
+        WHERE title LIKE '%CampusCore%' OR content LIKE '%CampusCore%';
+    END IF;
+    -- notifications.notification stores the body in "message", not "content".
+    IF to_regclass('notifications.notification') IS NOT NULL THEN
+        UPDATE notifications.notification
+        SET "message" = REPLACE("message", 'CampusCore', 'CampusUTE'),
+            "title" = REPLACE("title", 'CampusCore', 'CampusUTE')
+        WHERE "title" LIKE '%CampusCore%' OR "message" LIKE '%CampusCore%';
+    END IF;
+END $$;
 
 -- 4. Archive currently published revisions of updated documents
 UPDATE assistant.knowledge_document_revision r
