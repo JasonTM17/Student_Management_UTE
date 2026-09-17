@@ -98,6 +98,8 @@ export default function SchedulePage() {
   const [viewMode, setViewMode] = useState<'grid' | 'day' | 'list'>('grid');
   const [selectedDetail, setSelectedDetail] = useState<ScheduleDetailData | null>(null);
 
+  const [semestersLoaded, setSemestersLoaded] = useState(false);
+
   // Today indicator
   const todayDow = useMemo(() => {
     const jsDay = new Date().getDay();
@@ -109,11 +111,13 @@ export default function SchedulePage() {
   /** Loads semester choices and selects the best current term for the weekly agenda. */
   const fetchSemesters = useCallback(async () => {
     const response = await semestersApi.getAll();
-    setSemesters(response.data ?? []);
-    const preferredSemesterId = pickPreferredSemesterId(response.data);
+    const semesterList = response.data ?? [];
+    setSemesters(semesterList);
+    const preferredSemesterId = pickPreferredSemesterId(semesterList);
     if (preferredSemesterId) {
       setSelectedSemester((current) => current || preferredSemesterId);
     }
+    setSemestersLoaded(true);
   }, []);
 
   /** Loads the student's enrollment records whose section schedules form the timetable. */
@@ -149,7 +153,7 @@ export default function SchedulePage() {
   }, [hasAccess, loadData]);
 
   useEffect(() => {
-    if (!hasAccess) {
+    if (!hasAccess || !semestersLoaded) {
       return;
     }
 

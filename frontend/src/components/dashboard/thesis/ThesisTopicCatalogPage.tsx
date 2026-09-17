@@ -25,7 +25,7 @@ export default function ThesisTopicCatalogPage() {
   // topic is fetched or rendered until the query is submitted.
   const [submittedQuery, setSubmittedQuery] = useState('');
   const searchActive = showAll || submittedQuery.trim().length > 0;
-  const workspace = useThesisWorkspace('', { topicsEnabled: searchActive });
+  const workspace = useThesisWorkspace('', { topicsEnabled: searchActive, groupsEnabled: false });
 
   const normalizedQuery = submittedQuery.trim().toLowerCase();
   const matchingTopics = useMemo(() => {

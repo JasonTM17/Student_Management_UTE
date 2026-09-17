@@ -200,16 +200,12 @@ export default function DashboardPage() {
       const preferredSemesterId = pickPreferredSemesterId(semestersRes.data);
       if (preferredSemesterId) {
         setCurrentSemester(preferredSemesterId);
-        const enrollmentData = await enrollmentsApi.getMyEnrollments(preferredSemesterId);
+        const [enrollmentData, summary] = await Promise.all([
+          enrollmentsApi.getMyEnrollments(preferredSemesterId),
+          registrationApi.summary(preferredSemesterId).catch(() => null),
+        ]);
         setEnrollments(enrollmentData);
-        // The registration round owns the credit cap; read it instead of a
-        // hardcoded constant so the dashboard never contradicts registration.
-        try {
-          const summary = await registrationApi.summary(preferredSemesterId);
-          setTermCreditCap(summary.creditLimit);
-        } catch {
-          setTermCreditCap(null);
-        }
+        setTermCreditCap(summary?.creditLimit ?? null);
       } else {
         setEnrollments([]);
       }
