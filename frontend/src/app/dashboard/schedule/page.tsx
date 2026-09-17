@@ -184,7 +184,7 @@ export default function SchedulePage() {
     return () => {
       cancelled = true;
     };
-  }, [fetchEnrollments, hasAccess, locale, selectedSemester]);
+  }, [fetchEnrollments, hasAccess, locale, selectedSemester, semestersLoaded]);
 
   /** Projects active enrollments into sorted weekday meeting cards for the selected term. */
   const agenda = useMemo(() => {

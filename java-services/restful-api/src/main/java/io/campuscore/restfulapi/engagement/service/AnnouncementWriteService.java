@@ -402,6 +402,13 @@ public class AnnouncementWriteService {
 
     private static String requirePublicHtml(String value) {
         String content = requireValue(value, "content");
+        // Inline base64 images can push a single announcement into multiple
+        // megabytes; the editor already rejects >1MB images client-side, this
+        // is the server-side backstop (content is TEXT but every reader pays).
+        if (content.codePointCount(0, content.length()) > 200_000) {
+            throw new DomainException(HttpStatus.BAD_REQUEST, "ANNOUNCEMENT_CONTENT_TOO_LONG",
+                    "Announcement content must stay under 200,000 characters");
+        }
         if (ACTIVE_CONTENT.matcher(content).find()) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "UNSAFE_ANNOUNCEMENT_CONTENT",
                     "Announcement content must not contain scripts, embedded frames, or event handlers");
