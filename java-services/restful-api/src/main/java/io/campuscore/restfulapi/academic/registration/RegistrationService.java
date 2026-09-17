@@ -166,12 +166,23 @@ public class RegistrationService {
             String idempotencyKey) {
         requireKey(idempotencyKey);
         String hash = sha256("ENROLL|" + sectionId);
-        EnrollmentResponse response = transactions.execute(status ->
-                enrollLocked(studentId, sectionId, roles, idempotencyKey, hash));
+        // The registration slip is part of the enrollment contract: it must be
+        // produced inside the same transaction, so a renderer failure rolls
+        // the seat back instead of committing an enrollment whose slip is
+        // missing.
+        EnrollmentResponse response = transactions.execute(status -> {
+            EnrollmentResponse enrolled =
+                    enrollLocked(studentId, sectionId, roles, idempotencyKey, hash);
+            if (enrolled == null) {
+                throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED",
+                        "Enrollment transaction returned no result");
+            }
+            persistSlip(studentId, enrolled);
+            return enrolled;
+        });
         if (response == null) {
             throw problem(HttpStatus.INTERNAL_SERVER_ERROR, "ENROLLMENT_FAILED", "Enrollment transaction returned no result");
         }
-        persistSlip(studentId, response);
         return response;
     }
 

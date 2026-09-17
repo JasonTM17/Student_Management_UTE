@@ -273,7 +273,7 @@ export function AdminFrame({
                 {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
               </div>
               <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
-                {user?.email ?? 'daotao@hcmute.edu.vn'}
+                {user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}
               </div>
               <div className="mt-2">
                 <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
@@ -394,7 +394,7 @@ export function AdminFrame({
                       {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
                     </div>
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
-                      <span>{user?.email ?? 'daotao@hcmute.edu.vn'}</span>
+                      <span>{user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}</span>
                       {isDemoUser(user) && (
                         <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
                           ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
@@ -419,7 +419,7 @@ export function AdminFrame({
                           {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
                         </p>
                         <p className="truncate text-xs text-muted-foreground">
-                          {user?.email ?? 'daotao@hcmute.edu.vn'}
+                          {user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
                           <div className="inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">

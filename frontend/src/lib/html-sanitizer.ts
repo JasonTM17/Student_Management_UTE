@@ -34,7 +34,10 @@ const DROP_WITH_CONTENT = new Set([
 
 const VOID_TAGS = new Set(['br', 'hr', 'col', 'img']);
 
-const GLOBAL_ATTRS = new Set(['class', 'title', 'dir', 'lang', 'align']);
+// `style` is allowlisted as an attribute but each value must pass the
+// UNSAFE_STYLE scheme/expression screen below, so template letterheads keep
+// their centering and colors without opening CSS-based scheme injection.
+const GLOBAL_ATTRS = new Set(['class', 'title', 'dir', 'lang', 'align', 'style']);
 
 const TAG_ATTRS: Record<string, readonly string[]> = {
   a: ['href', 'target', 'rel'],

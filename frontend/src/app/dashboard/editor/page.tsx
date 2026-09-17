@@ -310,6 +310,7 @@ const TEMPLATES = [
     nameVi: 'Quyết định Thành lập Hội đồng Bảo vệ KLTN',
     nameEn: 'Thesis Defense Council Establishment Decision',
     descVi: 'Mẫu quyết định bổ nhiệm Chủ tịch, Thư ký và Ủy viên theo quy chế R6.',
+    descEn: 'Decision template appointing the chair, secretary and members under regulation R6.',
     contentVi: `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
   <div style="text-align: center; border-bottom: 2px solid #0d509d; padding-bottom: 12px; margin-bottom: 20px;">
@@ -346,6 +347,7 @@ const TEMPLATES = [
     nameVi: 'Thông báo Mở Cổng Đăng ký Tín chỉ & Hạn mức',
     nameEn: 'Course Registration & Credit Limit Official Notice',
     descVi: 'Thông báo khung giờ đăng ký, điều kiện tiên quyết và hạn mức tín chỉ tối đa.',
+    descEn: 'Registration windows, prerequisites and the term credit cap notice.',
     contentVi: DEFAULT_TINYMCE_VI,
   },
   {
@@ -353,6 +355,7 @@ const TEMPLATES = [
     nameVi: 'Thông báo Xét duyệt Học bổng Khuyến khích Học tập',
     nameEn: 'Merit-based Scholarship Evaluation Notice',
     descVi: 'Tiêu chuẩn xét cấp học bổng loại Xuất sắc, Giỏi và Khá cho sinh viên.',
+    descEn: 'Criteria for Excellent, Very good and Good scholarship consideration.',
     contentVi: `
 <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
   <div style="text-align: center; border-bottom: 2px solid #16a34a; padding-bottom: 12px; margin-bottom: 20px;">
@@ -466,6 +469,7 @@ export default function AcademicEditorPage() {
             publishAnnouncement: 'Đăng lên Bảng tin Học vụ',
             copiedToast: 'Đã sao chép nội dung vào bộ nhớ tạm',
             savedToast: 'Đã lưu bản nháp vào trình duyệt',
+            draftSaveFailed: 'Không thể lưu bản nháp (bộ nhớ trình duyệt đầy). Hãy xuất file trước khi tiếp tục.',
             newDocConfirm: 'Bạn có chắc chắn muốn làm mới toàn bộ nội dung tài liệu?',
             savedAt: 'Lưu gần nhất',
             statsTitle: 'Thống kê tài liệu',
@@ -506,6 +510,7 @@ export default function AcademicEditorPage() {
             publishAnnouncement: 'Publish to Campus Feed',
             copiedToast: 'Content copied to clipboard',
             savedToast: 'Draft saved to browser storage',
+            draftSaveFailed: 'Could not save the draft (browser storage is full). Export the file before continuing.',
             newDocConfirm: 'Reset and create a new document?',
             savedAt: 'Last saved',
             statsTitle: 'Document Statistics',
@@ -596,9 +601,11 @@ export default function AcademicEditorPage() {
       setLastSaved(timestamp);
       toast.success(copy.savedToast);
     } catch {
-      // ignore
+      // Quota errors (large inline images) used to fail with zero feedback,
+      // so the author believed a draft existed that did not.
+      toast.error(copy.draftSaveFailed);
     }
-  }, [category, content, copy.savedToast, editorType, title]);
+  }, [category, content, copy.draftSaveFailed, copy.savedToast, editorType, title]);
 
   const handleCopy = useCallback(async () => {
     try {
@@ -1690,7 +1697,7 @@ export default function AcademicEditorPage() {
                   {isVi ? tmpl.nameVi : tmpl.nameEn}
                 </CardTitle>
                 <p className="text-xs text-muted-foreground mt-1">
-                  {isVi ? tmpl.descVi : tmpl.descVi}
+                  {isVi ? tmpl.descVi : tmpl.descEn}
                 </p>
               </CardHeader>
               <CardContent className="pt-2 flex justify-end gap-2 border-t border-border/50">

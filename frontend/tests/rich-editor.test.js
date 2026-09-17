@@ -79,6 +79,19 @@ test('announcement HTML sanitizer neutralizes stored-XSS payloads', () => {
     sanitizeAnnouncementHtml('<p>Đào tạo &amp; Khoa học</p>'),
     '<p>Đào tạo &amp; Khoa học</p>',
   );
+
+  // T-P1-4: vetted inline styles survive so the reader matches the editor
+  // preview (template letterheads, callouts, seals), while scheme-bearing
+  // style values are stripped with the attribute.
+  const styled = sanitizeAnnouncementHtml(
+    '<div style="text-align: center; border-bottom: 2px solid #0284c7; color: #0f172a">Trường Đại học</div>',
+  );
+  assert.match(styled, /style="[^"]*text-align:\s*center/);
+  assert.match(styled, /border-bottom:\s*2px solid #0284c7/);
+  const unsafeStyled = sanitizeAnnouncementHtml(
+    '<div style="background:url(javascript:alert(1));color:red">x</div>',
+  );
+  assert.doesNotMatch(unsafeStyled, /javascript/i);
   assert.equal(sanitizeAnnouncementHtml(''), '');
 });
 

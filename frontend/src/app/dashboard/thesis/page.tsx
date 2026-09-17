@@ -1653,10 +1653,14 @@ export default function ThesisPage() {
                               topic?.createdBy === myLecturerId;
 
                             const isFinalized = topic?.finalScore != null;
+                            // Mirror the backend eligibility rule exactly
+                            // (ThesisCouncilService.eligibleGraderCount): a
+                            // member is ineligible only when a supervisor row
+                            // exists for them. Excluding topic.createdBy here
+                            // made the button enable before the server agreed
+                            // and finalize then failed with SCORES_INCOMPLETE.
                             const eligibleGraderCount = (council.members || []).filter(
-                              (m) =>
-                                !sups.includes(m.lecturerId) &&
-                                m.lecturerId !== topic?.createdBy,
+                              (m) => !sups.includes(m.lecturerId),
                             ).length;
                             const submittedCount = scores.length;
                             const canFinalize =

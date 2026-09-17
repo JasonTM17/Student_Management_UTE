@@ -267,11 +267,19 @@ export function TinyMceEditor({
 
   const isVi = locale === 'vi';
 
-  // Apply academic template
+  // Apply academic template. Insert at the cursor instead of replacing the
+  // document: the label says "chèn" and a misclick must not wipe the content
+  // being edited.
   const handleInsertTemplate = (templateHtml: string) => {
     if (editorRef.current) {
-      editorRef.current.setContent(templateHtml);
-      onChange(templateHtml);
+      const current = editorRef.current.getContent({ format: 'raw' });
+      if (current && String(current).trim()) {
+        editorRef.current.insertContent(templateHtml);
+        onChange(editorRef.current.getContent());
+      } else {
+        editorRef.current.setContent(templateHtml);
+        onChange(templateHtml);
+      }
       setTemplatesOpen(false);
     }
   };
@@ -545,9 +553,24 @@ export function TinyMceEditor({
             image_title: true,
             automatic_uploads: true,
             file_picker_types: 'image',
+            // Pasted screenshots go through the same upload handler instead of
+            // being silently dropped (TinyMCE's default rejects data images).
+            paste_data_images: true,
             images_upload_handler: (blobInfo: any) =>
-              new Promise((resolve) => {
-                resolve(`data:${blobInfo.blob().type};base64,${blobInfo.base64()}`);
+              new Promise((resolve, reject) => {
+                // Inline base64 payloads land in the announcement content and
+                // the browser's draft storage; past ~1MB they bloat the feed
+                // and silently break the local draft save.
+                const blob = blobInfo.blob();
+                if (blob.size > 1_000_000) {
+                  reject(
+                    isVi
+                      ? 'Ảnh quá lớn (tối đa 1 MB). Hãy nén ảnh trước khi chèn.'
+                      : 'Image too large (max 1 MB). Compress it before inserting.',
+                  );
+                  return;
+                }
+                resolve(`data:${blob.type};base64,${blobInfo.base64()}`);
               }),
             file_picker_callback: (callback: any, _value: any, meta: any) => {
               if (meta.filetype === 'image') {
