@@ -69,7 +69,7 @@ export default function HomePage() {
   const homepageStructuredData = {
     '@context': 'https://schema.org',
     '@type': 'SoftwareApplication',
-    name: 'CampusCore',
+    name: messages.meta.defaults.siteName,
     applicationCategory: 'BusinessApplication',
     operatingSystem: 'Web',
     url: buildSiteUrl(buildCanonicalPath('/', locale)),
@@ -299,7 +299,7 @@ export default function HomePage() {
             </div>
           </div>
           <div className="mt-8 border-t border-white/10 pt-6 text-sm text-[var(--portal-sidebar-muted)]">
-            &copy; {currentYear} CampusCore. {messages.home.footerCopyright}
+            &copy; {currentYear} {messages.meta.defaults.siteName}. {messages.home.footerCopyright}
           </div>
         </div>
       </footer>

@@ -300,6 +300,7 @@ export default function SchedulePage() {
           weeklyGrid: 'Lưới thời khóa biểu',
           upcomingClassList: 'Danh sách lớp học phần',
           noMeetings: 'Chưa có buổi học nào.',
+          noMeetingsHint: 'Các buổi học của ngày đã chọn sẽ xuất hiện tại đây.',
           noSlot: 'Chưa có lịch dạy.',
           items: 'mục',
           item: 'mục',
@@ -342,6 +343,7 @@ export default function SchedulePage() {
           weeklyGrid: 'Weekly timetable grid',
           upcomingClassList: 'Class section list',
           noMeetings: 'No scheduled meetings.',
+          noMeetingsHint: 'Classes for the selected day will appear here.',
           noSlot: 'No teaching slot scheduled.',
           items: 'items',
           item: 'item',
@@ -857,10 +859,12 @@ export default function SchedulePage() {
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
                   {(agendaByDay[selectedDayTab] ?? []).length === 0 ? (
-                    <div className="py-12 text-center text-muted-foreground">
-                      <Clock className="mx-auto h-10 w-10 text-muted-foreground/50" />
-                      <p className="mt-3 text-sm font-medium">{copy.noMeetings}</p>
-                    </div>
+                    <EmptyState
+                      className="min-h-0 border-transparent bg-transparent py-10"
+                      icon={Clock}
+                      title={copy.noMeetings}
+                      description={copy.noMeetingsHint}
+                    />
                   ) : (
                     <div className="grid gap-4 sm:grid-cols-2">
                       {(agendaByDay[selectedDayTab] ?? []).map((item) => (

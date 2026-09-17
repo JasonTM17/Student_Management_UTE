@@ -227,32 +227,32 @@ export function StudentUteProfileGradeView({
               <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{card.semesterBadge}</span>
             </div>
             <div className="divide-y divide-border text-xs">
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsStudentId}</span>
-                <span className="col-span-3 font-semibold text-foreground">{studentInfo.studentId}</span>
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
+                <span className="sm:col-span-2 text-muted-foreground font-medium">{card.fieldsStudentId}</span>
+                <span className="sm:col-span-3 font-semibold text-foreground">{studentInfo.studentId}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsFullName}</span>
-                <span className="col-span-3 font-semibold text-foreground">{studentInfo.name}</span>
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
+                <span className="sm:col-span-2 text-muted-foreground font-medium">{card.fieldsFullName}</span>
+                <span className="sm:col-span-3 font-semibold text-foreground">{studentInfo.name}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsDateOfBirth}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.dateOfBirth}</span>
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
+                <span className="sm:col-span-2 text-muted-foreground font-medium">{card.fieldsDateOfBirth}</span>
+                <span className="sm:col-span-3 text-foreground">{studentInfo.dateOfBirth}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.fieldsGender}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.gender}</span>
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
+                <span className="sm:col-span-2 text-muted-foreground font-medium">{card.fieldsGender}</span>
+                <span className="sm:col-span-3 text-foreground">{studentInfo.gender}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5">
-                <span className="col-span-2 text-muted-foreground font-medium">{card.curriculum}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.curriculumName}</span>
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
+                <span className="sm:col-span-2 text-muted-foreground font-medium">{card.curriculum}</span>
+                <span className="sm:col-span-3 text-foreground">{studentInfo.curriculumName}</span>
               </div>
-              <div className="grid grid-cols-5 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20">
-                <span className="col-span-2 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20">
+                <span className="sm:col-span-2 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
                   <Award className="h-3.5 w-3.5 shrink-0" />
                   {card.fieldsConductPoints}
                 </span>
-                <span className="col-span-3 font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+                <span className="sm:col-span-3 font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
                   <span>{card.conductSeeRecord}</span>
                   <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] hover:underline font-normal">{card.fieldsDetails}</LocalizedLink>
                 </span>
@@ -365,7 +365,7 @@ export function StudentUteProfileGradeView({
                 <svg
                   id="grade-combo-chart"
                   viewBox={`0 0 ${chartWidth} ${chartHeight}`}
-                  className="w-full h-auto min-w-[420px]"
+                  className="w-full h-auto"
                 >
                   {/* Grid lines (0, 2.5, 5, 7.5, 10) */}
                   {[0, 2.5, 5, 7.5, 10].map((val) => {
@@ -537,17 +537,17 @@ export function StudentUteProfileGradeView({
               {card.contactTitle}
             </div>
             <div className="divide-y divide-border text-xs">
-              <div className="grid grid-cols-4 px-4 py-2.5">
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-4 px-4 py-2.5">
                 <span className="text-muted-foreground font-medium">{card.address}</span>
-                <span className="col-span-3 text-foreground">{studentInfo.address}</span>
+                <span className="sm:col-span-3 text-foreground">{studentInfo.address}</span>
               </div>
-              <div className="grid grid-cols-4 px-4 py-2.5">
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-4 px-4 py-2.5">
                 <span className="text-muted-foreground font-medium">{card.phone}</span>
-                <span className="col-span-3 text-foreground">{user?.phone || card.notAvailable}</span>
+                <span className="sm:col-span-3 text-foreground">{user?.phone || card.notAvailable}</span>
               </div>
-              <div className="grid grid-cols-4 px-4 py-2.5">
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-4 px-4 py-2.5">
                 <span className="text-muted-foreground font-medium">{card.fieldsEmail}</span>
-                <span className="col-span-3 text-foreground">{user?.email || card.notAvailable}</span>
+                <span className="sm:col-span-3 text-foreground">{user?.email || card.notAvailable}</span>
               </div>
             </div>
           </div>

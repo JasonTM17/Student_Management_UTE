@@ -5,11 +5,13 @@ import { useState } from 'react';
 import {
   BarChart3,
   GraduationCap,
+  Info,
   School,
   TrendingUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 
 export interface AdminAnalyticsData {
@@ -24,44 +26,82 @@ interface AdminAnalyticsChartsProps {
   className?: string;
 }
 
+// Illustrative sample datasets. The headline totals passed in through `stats`
+// come from live campus records; everything below only demonstrates the chart
+// layout and is labelled as sample data in the UI (see `illustrativeNotice`).
+type DepartmentCode = 'CNTT' | 'ĐĐT' | 'CKM' | 'CKĐ' | 'KT' | 'XD' | 'CNHH-TP' | 'NN';
+
+const DEPARTMENTS: Array<{
+  code: DepartmentCode;
+  students: number;
+  courses: number;
+  sections: number;
+}> = [
+  { code: 'CNTT', students: 68, courses: 24, sections: 18 },
+  { code: 'ĐĐT', students: 42, courses: 16, sections: 12 },
+  { code: 'CKM', students: 38, courses: 14, sections: 10 },
+  { code: 'CKĐ', students: 34, courses: 12, sections: 9 },
+  { code: 'KT', students: 28, courses: 11, sections: 8 },
+  { code: 'XD', students: 20, courses: 9, sections: 7 },
+  { code: 'CNHH-TP', students: 14, courses: 8, sections: 6 },
+  { code: 'NN', students: 10, courses: 6, sections: 5 },
+];
+
+const SEMESTER_TRENDS = [
+  { semester: 'HK1 2025-2026', count: 1120, completionRate: 95.2, activeStudents: 238 },
+  { semester: 'HK2 2025-2026', count: 1185, completionRate: 96.8, activeStudents: 246 },
+  { semester: 'HK1 2026-2027', count: 1076, completionRate: 94.5, activeStudents: 254 },
+];
+
+// Monochromatic ramp built from theme status tokens (DESIGN.md: no raw
+// Tailwind palettes on shared primitives).
+const FACULTY_RANK_TOKENS = ['bg-status-info', 'bg-status-info/70', 'bg-status-info/40'] as const;
+const GRADE_BAND_TOKENS = [
+  'bg-status-info',
+  'bg-status-info/75',
+  'bg-status-info/55',
+  'bg-status-info/35',
+  'bg-status-danger',
+] as const;
+
 export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsProps) {
+  const { messages, formatNumber } = useI18n();
+  const copy = messages.admin.analytics;
   const [activeTab, setActiveTab] = useState<'departments' | 'enrollments' | 'faculty' | 'grades'>('departments');
   const [departmentMetric, setDepartmentMetric] = useState<'students' | 'courses' | 'sections'>('students');
 
-  // Department distribution data (aligned with HCMUTE official faculties)
-  const departments = [
-    { code: 'CNTT', name: 'Khoa Công nghệ Thông tin', students: 68, courses: 24, sections: 18 },
-    { code: 'ĐĐT', name: 'Khoa Điện - Điện tử', students: 42, courses: 16, sections: 12 },
-    { code: 'CKM', name: 'Khoa Cơ khí Chế tạo máy', students: 38, courses: 14, sections: 10 },
-    { code: 'CKĐ', name: 'Khoa Cơ khí Động lực', students: 34, courses: 12, sections: 9 },
-    { code: 'KT', name: 'Khoa Kinh tế', students: 28, courses: 11, sections: 8 },
-    { code: 'XD', name: 'Khoa Xây dựng', students: 20, courses: 9, sections: 7 },
-    { code: 'CNHH-TP', name: 'Khoa Công nghệ Hóa học & Thực phẩm', students: 14, courses: 8, sections: 6 },
-    { code: 'NN', name: 'Khoa Ngoại ngữ', students: 10, courses: 6, sections: 5 },
-  ];
+  const departments = DEPARTMENTS.map((dept) => ({
+    ...dept,
+    name: copy.departments[dept.code],
+  }));
 
-  // Semester enrollment trend data
-  const semesterTrends = [
-    { semester: 'HK1 2025-2026', count: 1120, completionRate: 95.2, activeStudents: 238 },
-    { semester: 'HK2 2025-2026', count: 1185, completionRate: 96.8, activeStudents: 246 },
-    { semester: 'HK1 2026-2027', count: 1076, completionRate: 94.5, activeStudents: 254 },
-  ];
-
-  // Faculty composition data (total: 25 lecturers) - Monochromatic blue scale
   const facultyRanks = [
-    { rank: 'Giáo sư & Phó Giáo sư (PGS.TS)', count: 7, percentage: 28, color: '#1e40af', bgClass: 'bg-blue-800 dark:bg-blue-700' },
-    { rank: 'Tiến sĩ (TS)', count: 11, percentage: 44, color: '#2563eb', bgClass: 'bg-blue-600 dark:bg-blue-500' },
-    { rank: 'Thạc sĩ (ThS)', count: 7, percentage: 28, color: '#93c5fd', bgClass: 'bg-blue-300 dark:bg-blue-400' },
-  ];
+    { rank: copy.facultyRanks.professor, count: 7, tone: FACULTY_RANK_TOKENS[0] },
+    { rank: copy.facultyRanks.doctor, count: 11, tone: FACULTY_RANK_TOKENS[1] },
+    { rank: copy.facultyRanks.master, count: 7, tone: FACULTY_RANK_TOKENS[2] },
+  ].map((item) => {
+    const total = 25; // sample total; see illustrativeNotice
+    return { ...item, percentage: Math.round((item.count / total) * 100) };
+  });
 
-  // Grade performance distribution data (total: 254 students) - Monochromatic blue scale
   const gradeDistribution = [
-    { grade: 'Xuất sắc (A/A+)', count: 56, percentage: 22, bgClass: 'bg-blue-800 dark:bg-blue-700' },
-    { grade: 'Giỏi (B/B+)', count: 114, percentage: 45, bgClass: 'bg-blue-700 dark:bg-blue-600' },
-    { grade: 'Khá (C/C+)', count: 66, percentage: 26, bgClass: 'bg-blue-600 dark:bg-blue-500' },
-    { grade: 'Trung bình (D/D+)', count: 15, percentage: 6, bgClass: 'bg-blue-500 dark:bg-blue-400' },
-    { grade: 'Cảnh báo (F)', count: 3, percentage: 1, bgClass: 'bg-slate-400 dark:bg-slate-500' },
-  ];
+    { grade: copy.gradeBands.excellent, count: 56, tone: GRADE_BAND_TOKENS[0] },
+    { grade: copy.gradeBands.veryGood, count: 114, tone: GRADE_BAND_TOKENS[1] },
+    { grade: copy.gradeBands.good, count: 66, tone: GRADE_BAND_TOKENS[2] },
+    { grade: copy.gradeBands.average, count: 15, tone: GRADE_BAND_TOKENS[3] },
+    { grade: copy.gradeBands.warning, count: 3, tone: GRADE_BAND_TOKENS[4] },
+  ].map((item) => ({ ...item, percentage: Math.round((item.count / 254) * 100) }));
+
+  const gradeTotal = gradeDistribution.reduce((sum, item) => sum + item.count, 0);
+  const atLeastGoodCount = gradeDistribution
+    .slice(0, 4)
+    .reduce((sum, item) => sum + item.count, 0);
+  const atLeastGoodPercent = Math.round((atLeastGoodCount / gradeTotal) * 100);
+
+  const averageCompletionRate =
+    SEMESTER_TRENDS.reduce((sum, item) => sum + item.completionRate, 0) /
+    SEMESTER_TRENDS.length;
+  const currentTermLoad = SEMESTER_TRENDS[SEMESTER_TRENDS.length - 1];
 
   const maxDeptValue = Math.max(...departments.map((d) => d[departmentMetric]));
 
@@ -69,13 +109,16 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
     <Card className={cn('border-border/80 shadow-xs', className)}>
       <CardHeader className="border-b border-border/70 pb-4">
         <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-          <div className="flex items-center gap-2.5">
+          <div className="flex flex-wrap items-center gap-2.5">
             <CardTitle className="text-base font-semibold text-foreground">
-              Trung Tâm Phân Tích & Đồ Thị Giám Sát Học Vụ
+              {copy.title}
             </CardTitle>
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-medium text-primary">
-              <span className="h-1.5 w-1.5 rounded-full bg-primary animate-pulse" />
-              Thời gian thực
+            <span
+              title={copy.illustrativeNotice}
+              className="inline-flex items-center gap-1.5 rounded-full bg-status-warning/15 px-2.5 py-0.5 text-xs font-medium text-status-warning-foreground"
+            >
+              <Info className="h-3 w-3" aria-hidden="true" />
+              {copy.illustrativeBadge}
             </span>
           </div>
 
@@ -88,7 +131,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               onClick={() => setActiveTab('departments')}
             >
               <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
-              Theo Khoa / Viện
+              {copy.tabs.departments}
             </Button>
             <Button
               type="button"
@@ -98,7 +141,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               onClick={() => setActiveTab('enrollments')}
             >
               <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
-              Xu hướng ĐKHP
+              {copy.tabs.enrollments}
             </Button>
             <Button
               type="button"
@@ -108,7 +151,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               onClick={() => setActiveTab('faculty')}
             >
               <School className="mr-1.5 h-3.5 w-3.5" />
-              Đội ngũ Giảng viên
+              {copy.tabs.faculty}
             </Button>
             <Button
               type="button"
@@ -118,10 +161,13 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               onClick={() => setActiveTab('grades')}
             >
               <GraduationCap className="mr-1.5 h-3.5 w-3.5" />
-              Xếp loại Học lực
+              {copy.tabs.grades}
             </Button>
           </div>
         </div>
+        <p className="mt-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs leading-5 text-status-warning-foreground">
+          {copy.illustrativeNotice}
+        </p>
       </CardHeader>
 
       <CardContent className="p-6">
@@ -131,7 +177,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h4 className="text-sm font-semibold text-foreground">
-                  Phân bổ Quy mô Đào tạo theo 8 Khoa & Bộ môn trọng điểm
+                  {copy.departmentsTitle}
                 </h4>
               </div>
               <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-1 text-xs">
@@ -143,7 +189,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                     departmentMetric === 'students' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  Sinh viên ({stats.totalStudents})
+                  {copy.metricStudents} ({formatNumber(stats.totalStudents)})
                 </button>
                 <button
                   type="button"
@@ -153,7 +199,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                     departmentMetric === 'courses' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  Môn học ({stats.totalCourses})
+                  {copy.metricCourses} ({formatNumber(stats.totalCourses)})
                 </button>
                 <button
                   type="button"
@@ -163,14 +209,14 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                     departmentMetric === 'sections' ? 'bg-primary text-primary-foreground' : 'text-muted-foreground hover:text-foreground',
                   )}
                 >
-                  Lớp mở
+                  {copy.metricSections}
                 </button>
               </div>
             </div>
 
             {/* SVG Monochromatic Bar Chart */}
             <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-              <svg viewBox="0 0 800 230" className="h-auto w-full" role="img" aria-label="Biểu đồ phân bổ quy mô đào tạo theo khoa">
+              <svg viewBox="0 0 800 230" className="h-auto w-full" role="img" aria-label={copy.chartAria}>
                 <defs>
                   <linearGradient id="deptMonoGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#2563eb" stopOpacity="0.95" />
@@ -200,6 +246,12 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                   const value = dept[departmentMetric];
                   const barHeight = maxDeptValue === 0 ? 0 : (value / maxDeptValue) * 140;
                   const y = 180 - barHeight;
+                  const unitLabel =
+                    departmentMetric === 'students'
+                      ? copy.studentsShort
+                      : departmentMetric === 'courses'
+                        ? copy.coursesShort
+                        : copy.sectionsShort;
 
                   return (
                     <g key={dept.code} className="group cursor-pointer">
@@ -212,7 +264,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                         fill="url(#deptMonoGradient)"
                         className="transition-all duration-200 group-hover:brightness-115 group-hover:opacity-100"
                       >
-                        <title>{`${dept.name} (${dept.code}): ${value} ${departmentMetric === 'students' ? 'sinh viên' : departmentMetric === 'courses' ? 'môn học' : 'lớp mở'}`}</title>
+                        <title>{`${dept.name} (${dept.code}): ${formatNumber(value)} ${unitLabel}`}</title>
                       </rect>
                       {/* Value label on top of bar */}
                       <text
@@ -253,7 +305,10 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                   </span>
                   <div className="min-w-0 flex-1 text-xs">
                     <p className="font-semibold text-foreground truncate">{dept.name}</p>
-                    <p className="text-muted-foreground">{dept.students} SV &bull; {dept.courses} Môn</p>
+                    <p className="text-muted-foreground">
+                      {formatNumber(dept.students)} {copy.studentShortBadge} &bull;{' '}
+                      {formatNumber(dept.courses)} {copy.courseShortBadge}
+                    </p>
                   </div>
                 </div>
               ))}
@@ -267,18 +322,18 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
               <div>
                 <h4 className="text-sm font-semibold text-foreground">
-                  Tiến độ & Xu hướng Đăng Ký Học Phần Qua Các Học Kỳ
+                  {copy.enrollmentsTitle}
                 </h4>
               </div>
               <div className="flex items-center gap-1.5 text-xs text-muted-foreground">
                 <span className="h-2 w-2 rounded-full bg-primary" />
-                <span>Số lượt đăng ký học phần</span>
+                <span>{copy.enrollmentLegend}</span>
               </div>
             </div>
 
             {/* SVG Trend Line & Area Chart */}
             <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-              <svg viewBox="0 0 760 220" className="h-auto w-full" role="img" aria-label="Biểu đồ xu hướng đăng ký học phần">
+              <svg viewBox="0 0 760 220" className="h-auto w-full" role="img" aria-label={copy.enrollmentChartAria}>
                 <defs>
                   <linearGradient id="enrollmentGradient" x1="0" y1="0" x2="0" y2="1">
                     <stop offset="0%" stopColor="#2563eb" stopOpacity="0.25" />
@@ -316,20 +371,20 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                 />
 
                 {/* Data Points */}
-                {semesterTrends.map((s, idx) => {
+                {SEMESTER_TRENDS.map((s, idx) => {
                   const x = 140 + idx * 240;
                   const y = 170 - (s.count / 1400) * 130;
                   return (
                     <g key={s.semester}>
                       <circle cx={x} cy={y} r={6} fill="#2563eb" stroke="#ffffff" strokeWidth={2} />
                       <text x={x} y={y - 12} fontSize={12} fontWeight={700} fill="#2563eb" textAnchor="middle">
-                        {s.count.toLocaleString('vi-VN')}
+                        {formatNumber(s.count)}
                       </text>
                       <text x={x} y={192} fontSize={11} fontWeight={600} fill="currentColor" textAnchor="middle">
                         {s.semester}
                       </text>
                       <text x={x} y={208} fontSize={10} fill="currentColor" fillOpacity={0.6} textAnchor="middle">
-                        {s.activeStudents} sinh viên &bull; Hoàn tất {s.completionRate}%
+                        {formatNumber(s.activeStudents)} {copy.studentsShort} &bull; {formatNumber(s.completionRate, { maximumFractionDigits: 1 })}%
                       </text>
                     </g>
                   );
@@ -340,30 +395,30 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             {/* Quick summary metrics */}
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-3">
               <div className="rounded-lg border border-border/60 bg-secondary/20 p-3">
-                <p className="text-xs text-muted-foreground">Tổng lượt đăng ký tích lũy</p>
+                <p className="text-xs text-muted-foreground">{copy.totalSubmissions}</p>
                 <p className="mt-1 text-xl font-bold text-foreground">
-                  {stats.totalEnrollments.toLocaleString('vi-VN')} hồ sơ
+                  {formatNumber(stats.totalEnrollments)} {copy.submissionsUnit}
                 </p>
                 <p className="mt-1 text-xs text-primary font-medium">
-                  100% xử lý trên hệ thống
+                  {copy.systemProcessed}
                 </p>
               </div>
               <div className="rounded-lg border border-border/60 bg-secondary/20 p-3">
-                <p className="text-xs text-muted-foreground">Tỷ lệ qua môn trung bình</p>
+                <p className="text-xs text-muted-foreground">{copy.averagePassRate}</p>
                 <p className="mt-1 text-xl font-bold text-foreground">
-                  95.5%
+                  {formatNumber(averageCompletionRate, { maximumFractionDigits: 1 })}%
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Chuẩn bảo đảm chất lượng đào tạo
+                  {copy.qualityStandard}
                 </p>
               </div>
               <div className="rounded-lg border border-border/60 bg-secondary/20 p-3">
-                <p className="text-xs text-muted-foreground">Tải đăng ký kỳ hiện tại</p>
+                <p className="text-xs text-muted-foreground">{copy.currentLoad}</p>
                 <p className="mt-1 text-xl font-bold text-foreground">
-                  1.076 lượt
+                  {formatNumber(currentTermLoad.count)} {copy.loadsUnit}
                 </p>
                 <p className="mt-1 text-xs text-muted-foreground">
-                  Học kỳ 1 năm học 2026-2027
+                  {currentTermLoad.semester}
                 </p>
               </div>
             </div>
@@ -375,59 +430,59 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
           <div className="space-y-6">
             <div>
               <h4 className="text-sm font-semibold text-foreground">
-                Cơ Cấu Học Hàm & Trình Độ Đội Ngũ Giảng Viên ({stats.totalLecturers} Giảng viên)
+                {copy.facultyTitle} ({formatNumber(stats.totalLecturers)} {copy.lecturersUnit})
               </h4>
             </div>
 
             <div className="grid grid-cols-1 gap-6 md:grid-cols-2 md:items-center">
               {/* SVG Monochromatic Donut Chart */}
               <div className="flex items-center justify-center p-4">
-                <svg viewBox="0 0 240 240" className="h-56 w-56" role="img" aria-label="Biểu đồ cơ cấu giảng viên">
-                  <circle cx={120} cy={120} r={80} fill="none" stroke="#f1f5f9" strokeWidth={28} className="dark:stroke-slate-800" />
-                  
-                  {/* PGS.TS (28% -> strokeDasharray: 140.7 362) - Deep Navy */}
+                <svg viewBox="0 0 240 240" className="h-56 w-56" role="img" aria-label={copy.lecturersChartAria}>
+                  <circle cx={120} cy={120} r={80} fill="none" strokeWidth={28} className="stroke-secondary" />
+
+                  {/* PGS.TS (28% -> strokeDasharray: 140.7 362) */}
                   <circle
                     cx={120}
                     cy={120}
                     r={80}
                     fill="none"
-                    stroke="#1e40af"
                     strokeWidth={28}
                     strokeDasharray="140.7 362"
                     strokeDashoffset="0"
                     transform="rotate(-90 120 120)"
+                    className="stroke-status-info"
                   />
-                  {/* TS (44% -> strokeDasharray: 221.1 281) - Primary Blue */}
+                  {/* TS (44% -> strokeDasharray: 221.1 281) */}
                   <circle
                     cx={120}
                     cy={120}
                     r={80}
                     fill="none"
-                    stroke="#2563eb"
                     strokeWidth={28}
                     strokeDasharray="221.1 281"
                     strokeDashoffset="-140.7"
                     transform="rotate(-90 120 120)"
+                    className="stroke-status-info/70"
                   />
-                  {/* ThS (28% -> strokeDasharray: 140.7 362) - Soft Blue */}
+                  {/* ThS (28% -> strokeDasharray: 140.7 362) */}
                   <circle
                     cx={120}
                     cy={120}
                     r={80}
                     fill="none"
-                    stroke="#93c5fd"
                     strokeWidth={28}
                     strokeDasharray="140.7 362"
                     strokeDashoffset="-361.8"
                     transform="rotate(-90 120 120)"
+                    className="stroke-status-info/40"
                   />
 
                   {/* Center Text */}
                   <text x={120} y={114} fontSize={28} fontWeight={800} fill="currentColor" textAnchor="middle">
-                    {stats.totalLecturers}
+                    {formatNumber(stats.totalLecturers)}
                   </text>
                   <text x={120} y={134} fontSize={11} fill="currentColor" fillOpacity={0.6} textAnchor="middle">
-                    Thầy Cô
+                    {copy.lecturerShort}
                   </text>
                 </svg>
               </div>
@@ -438,16 +493,16 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                   <div key={item.rank} className="rounded-xl border border-border/70 bg-card/60 p-3.5 space-y-1.5">
                     <div className="flex items-center justify-between">
                       <div className="flex items-center gap-2">
-                        <span className={cn('h-3 w-3 rounded-full', item.bgClass)} />
+                        <span className={cn('h-3 w-3 rounded-full', item.tone)} />
                         <span className="text-xs font-semibold text-foreground">{item.rank}</span>
                       </div>
                       <span className="text-xs font-bold text-foreground">
-                        {item.count} giảng viên ({item.percentage}%)
+                        {formatNumber(item.count)} {copy.lecturersUnit} ({formatNumber(item.percentage)}%)
                       </span>
                     </div>
                     {/* Monochromatic Progress bar */}
                     <div className="h-2 w-full overflow-hidden rounded-full bg-secondary">
-                      <div className={cn('h-full rounded-full', item.bgClass)} style={{ width: `${item.percentage}%` }} />
+                      <div className={cn('h-full rounded-full', item.tone)} style={{ width: `${item.percentage}%` }} />
                     </div>
                   </div>
                 ))}
@@ -461,7 +516,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
           <div className="space-y-6">
             <div>
               <h4 className="text-sm font-semibold text-foreground">
-                Phân Bố Xếp Loại Kết Quả Học Vụ Toàn Trường ({stats.totalStudents} Sinh viên)
+                {copy.gradesTitle} ({formatNumber(stats.totalStudents)} {copy.studentsUnit})
               </h4>
             </div>
 
@@ -472,12 +527,12 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                   <div className="flex items-center justify-between text-xs">
                     <span className="font-semibold text-foreground">{item.grade}</span>
                     <span className="text-muted-foreground">
-                      <strong className="text-foreground">{item.count}</strong> sinh viên ({item.percentage}%)
+                      <strong className="text-foreground">{formatNumber(item.count)}</strong> {copy.studentsUnit} ({formatNumber(item.percentage)}%)
                     </span>
                   </div>
                   <div className="h-3 w-full overflow-hidden rounded-full bg-secondary">
                     <div
-                      className={cn('h-full rounded-full transition-all duration-300', item.bgClass)}
+                      className={cn('h-full rounded-full transition-all duration-300', item.tone)}
                       style={{ width: `${item.percentage}%` }}
                     />
                   </div>
@@ -485,12 +540,12 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               ))}
             </div>
 
-            <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 flex items-center justify-between text-xs">
+            <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between text-xs">
               <span className="text-muted-foreground">
-                Tỷ lệ sinh viên đạt loại Khá trở lên (GPA &ge; 2.5):
+                {copy.atLeastGoodLabel}
               </span>
               <span className="font-bold text-foreground text-sm">
-                93.0% (236 / 254 sinh viên)
+                {formatNumber(atLeastGoodPercent)}% ({formatNumber(atLeastGoodCount)} / {formatNumber(gradeTotal)} {copy.studentsUnit})
               </span>
             </div>
           </div>

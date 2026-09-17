@@ -21,9 +21,14 @@ export interface SelectProps
 }
 
 const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
-  ({ className, label, error, options, groups, ...props }, ref) => {
+  ({ className, label, error, options, groups, 'aria-describedby': externalDescribedBy, ...props }, ref) => {
     const generatedId = React.useId().replace(/:/g, '');
     const controlId = props.id ?? `select-${generatedId}`;
+    const errorId = `select-error-${generatedId}`;
+    const describedBy = [externalDescribedBy, error ? errorId : null]
+      .filter(Boolean)
+      .join(' ')
+      .trim();
     return (
       <div className="w-full">
         {label && (
@@ -38,6 +43,8 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
               error && 'border-destructive focus:ring-destructive',
               className
             )}
+            aria-invalid={error ? true : undefined}
+            aria-describedby={describedBy || undefined}
             ref={ref}
             {...props}
             id={controlId}
@@ -60,7 +67,9 @@ const Select = React.forwardRef<HTMLSelectElement, SelectProps>(
           </select>
           <ChevronDown className="pointer-events-none absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
         </div>
-        {error && <p className="mt-1 text-sm text-destructive">{error}</p>}
+        {error && (
+          <p id={errorId} className="mt-1 text-sm text-destructive">{error}</p>
+        )}
       </div>
     );
   }

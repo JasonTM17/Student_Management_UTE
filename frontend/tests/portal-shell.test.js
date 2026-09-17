@@ -206,8 +206,10 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
   const globals = read('src/app/globals.css');
   const status = read('src/components/ui/status.ts');
   const badge = read('src/components/thesis/StatusBadge.tsx');
-  const table = read('src/components/ui/data-table.tsx');
   const layout = read('src/app/layout.tsx');
+  // The unused data-table primitive was deleted (UX-P2-6); assert it stays
+  // gone instead of scanning it for raw palettes.
+  assert.equal(fs.existsSync(path.join(root, 'src/components/ui/data-table.tsx')), false);
 
   assert.match(globals, /--status-success:/);
   assert.match(globals, /--status-warning:/);
@@ -226,7 +228,6 @@ test('status primitives use semantic tokens instead of raw Tailwind palettes', (
   assert.doesNotMatch(status, /bg-emerald-500/);
   assert.doesNotMatch(badge, /bg-(red|amber|blue|violet)-500/);
   assert.doesNotMatch(status, /bg-(emerald|red|amber|blue|violet|yellow)-/);
-  assert.doesNotMatch(table, /bg-gray-50|text-gray-500/);
   assert.match(layout, /QueryProvider/);
   assert.doesNotMatch(layout, /richColors/);
 });

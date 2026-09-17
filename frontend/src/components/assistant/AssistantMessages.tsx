@@ -114,18 +114,18 @@ function citationDomainLabel(
 
 function messageTimeLabel(
   createdAt: string | undefined,
-  locale: string,
+  formatDateTime: ReturnType<typeof useI18n>['formatDateTime'],
 ): string | null {
   if (!createdAt) return null;
   const date = new Date(createdAt);
   if (Number.isNaN(date.getTime())) return null;
-  return new Intl.DateTimeFormat(locale === 'vi' ? 'vi-VN' : 'en-GB', {
+  return formatDateTime(date, {
     day: '2-digit',
     month: '2-digit',
     hour: '2-digit',
     minute: '2-digit',
     timeZone: 'Asia/Ho_Chi_Minh',
-  }).format(date);
+  });
 }
 
 function isLocalOnlyAssistantMessage(message: ChatMessage): boolean {
@@ -144,7 +144,7 @@ export function AssistantMessages({
   followUpsLabel,
   onFollowUp,
 }: AssistantMessagesProps) {
-  const { messages, locale } = useI18n();
+  const { messages, locale, formatDateTime } = useI18n();
   const [openCitations, setOpenCitations] = useState<Record<string, boolean>>({});
   const [copiedId, setCopiedId] = useState<string | null>(null);
 
@@ -184,7 +184,7 @@ export function AssistantMessages({
       {messageList.map((message, index) => {
         const isUser = message.role === 'user';
         const isCitationOpen = Boolean(openCitations[message.id]);
-        const timeLabel = messageTimeLabel(message.createdAt, locale);
+        const timeLabel = messageTimeLabel(message.createdAt, formatDateTime);
         const visibleContent = isUser
           ? message.content
           : sanitizeAssistantOutput(

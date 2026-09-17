@@ -37,7 +37,12 @@ import {
   X,
 } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { en } from '@/i18n/messages';
 import { RichContentRenderer } from './rich-content-renderer';
+
+// Single brand source: every visible mention reads the canonical site name
+// from the dictionary instead of a literal.
+const SITE_NAME = en.meta.defaults.siteName;
 
 export interface RichTextEditorProps {
   value: string;
@@ -89,7 +94,7 @@ Các lớp học phần và hoạt động thi kết thúc học phần được
 - [ ] Cán bộ quản lý lớp kiểm tra sĩ số và báo cáo nếu có xung đột lịch.
 
 > [!NOTE]
-> Mọi thắc mắc vui lòng liên hệ Văn phòng Đào tạo (Phòng A1-101) hoặc gửi hỗ trợ trực tuyến qua Trợ lý AI CampusCore.`,
+> Mọi thắc mắc vui lòng liên hệ Văn phòng Đào tạo (Phòng A1-101) hoặc gửi hỗ trợ trực tuyến qua Trợ lý AI ${SITE_NAME}.`,
   },
   {
     nameVi: 'Kế hoạch đăng ký tín chỉ học phần',
@@ -834,7 +839,7 @@ export function RichTextEditor({
                   value={linkText}
                   onChange={(e) => setLinkText(e.target.value)}
                   className="w-full rounded-md border border-input bg-background px-3 py-1.5 text-sm focus:outline-none focus:ring-2 focus:ring-primary"
-                  placeholder="CampusCore Portal"
+                  placeholder={`${SITE_NAME} Portal`}
                 />
               </div>
               <div>

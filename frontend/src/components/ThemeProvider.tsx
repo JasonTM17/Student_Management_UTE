@@ -5,6 +5,7 @@ import {
   applyThemeClass,
   nextTheme,
   resolveStoredTheme,
+  systemPreferredTheme,
   type ThemeName,
 } from '@/lib/apply-theme';
 
@@ -23,7 +24,12 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
   const userToggled = useRef(false);
 
   useEffect(() => {
-    const initialTheme = resolveStoredTheme(localStorage.getItem('theme'));
+    // Falls back to the OS preference when no stored choice exists so the
+    // React state matches what the pre-hydration bootstrap script applied.
+    const initialTheme = resolveStoredTheme(
+      localStorage.getItem('theme'),
+      systemPreferredTheme(),
+    );
     if (!userToggled.current) {
       setTheme(initialTheme);
       applyThemeClass(initialTheme, document.documentElement);
@@ -36,8 +42,16 @@ export function ThemeProvider({ children }: { children: React.ReactNode }) {
       return;
     }
 
-    localStorage.setItem('theme', theme);
     applyThemeClass(theme, document.documentElement);
+    // Persist only an explicit choice; visitors without one keep following
+    // their OS preference on later visits.
+    if (userToggled.current) {
+      try {
+        localStorage.setItem('theme', theme);
+      } catch {
+        // Private mode can block storage; the class still flips this click.
+      }
+    }
   }, [mounted, theme]);
 
   const toggleTheme = useCallback(() => {

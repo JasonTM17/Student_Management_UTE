@@ -35,10 +35,7 @@ type PresetKey = 'LEAVE_MAKEUP' | 'ASSIGNMENT_DEADLINE' | 'EXAM_SCHEDULE' | 'COU
 
 interface PresetItem {
   key: PresetKey;
-  label: string;
   icon: React.ElementType;
-  badge: string;
-  defaultTitle: string;
   defaultPriority: 'NORMAL' | 'HIGH' | 'URGENT';
   defaultContent: string;
 }
@@ -46,11 +43,8 @@ interface PresetItem {
 const PRESETS: PresetItem[] = [
   {
     key: 'LEAVE_MAKEUP',
-    label: 'Nghỉ học & Học bù',
     icon: CalendarOff,
-    badge: 'Nghỉ học / Học bù',
     defaultPriority: 'HIGH',
-    defaultTitle: '[THÔNG BÁO] Nghỉ học và Kế hoạch học bù lớp học phần',
     defaultContent: `<p>Kính gửi các bạn sinh viên lớp học phần,</p>
 <p>Giảng viên phụ trách thông báo về việc hoãn buổi học và kế hoạch học bù như sau:</p>
 <ul>
@@ -63,11 +57,8 @@ const PRESETS: PresetItem[] = [
   },
   {
     key: 'ASSIGNMENT_DEADLINE',
-    label: 'Nhắc nhở nộp bài tập lớn/đồ án',
     icon: FileCheck,
-    badge: 'Hạn nộp bài tập',
     defaultPriority: 'HIGH',
-    defaultTitle: '[NHẮC NHỞ] Hạn chót nộp Bài tập lớn / Đồ án môn học',
     defaultContent: `<p>Kính gửi sinh viên các nhóm lớp học phần,</p>
 <p>Giảng viên xin nhắc nhở về thời hạn và quy cách nộp sản phẩm Bài tập lớn / Đồ án môn học như sau:</p>
 <ul>
@@ -79,11 +70,8 @@ const PRESETS: PresetItem[] = [
   },
   {
     key: 'EXAM_SCHEDULE',
-    label: 'Lịch thi & Kiểm tra',
     icon: GraduationCap,
-    badge: 'Kiểm tra giữa kỳ',
     defaultPriority: 'URGENT',
-    defaultTitle: '[THÔNG BÁO] Kế hoạch kiểm tra giữa kỳ & Nội dung ôn tập',
     defaultContent: `<p>Kính gửi các bạn sinh viên,</p>
 <p>Kế hoạch bài kiểm tra giữa kỳ (chiếm 50% điểm quá trình học phần) được sắp xếp cụ thể như sau:</p>
 <ul>
@@ -96,11 +84,8 @@ const PRESETS: PresetItem[] = [
   },
   {
     key: 'COURSE_GENERAL',
-    label: 'Thông báo lớp học phần',
     icon: BookOpen,
-    badge: 'Tài liệu / Dặn dò',
     defaultPriority: 'NORMAL',
-    defaultTitle: '[THÔNG BÁO] Cập nhật tài liệu học tập và Yêu cầu môn học',
     defaultContent: `<p>Kính gửi các bạn sinh viên lớp học phần,</p>
 <p>Giảng viên gửi đến các bạn một số thông tin và dặn dò quan trọng cho tuần học tiếp theo:</p>
 <ul>
@@ -119,10 +104,13 @@ export function LecturerAnnouncementCreateModal({
   onSuccess,
   lecturerName,
 }: LecturerAnnouncementCreateModalProps) {
-  const { locale } = useI18n();
+  const { locale, messages } = useI18n();
   const isVi = locale === 'vi';
+  const templateCopy = messages.announcementTemplates;
+  const templateMeta = (key: PresetKey) => templateCopy[key];
+  const initialTemplate = templateMeta(PRESETS[0].key);
 
-  const [title, setTitle] = useState(PRESETS[0].defaultTitle);
+  const [title, setTitle] = useState(initialTemplate.defaultTitle);
   const [content, setContent] = useState(PRESETS[0].defaultContent);
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('HIGH');
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('LEAVE_MAKEUP');
@@ -132,7 +120,7 @@ export function LecturerAnnouncementCreateModal({
 
   const handleApplyPreset = (preset: PresetItem) => {
     setSelectedPreset(preset.key);
-    setTitle(preset.defaultTitle);
+    setTitle(templateMeta(preset.key).defaultTitle);
     setContent(preset.defaultContent);
     setPriority(preset.defaultPriority);
     setValidationError('');
@@ -193,6 +181,7 @@ export function LecturerAnnouncementCreateModal({
             {PRESETS.map((p) => {
               const Icon = p.icon;
               const isSelected = selectedPreset === p.key;
+              const presetCopy = templateMeta(p.key);
               return (
                 <button
                   key={p.key}
@@ -207,10 +196,10 @@ export function LecturerAnnouncementCreateModal({
                 >
                   <div className="flex items-center gap-1.5 font-semibold text-xs">
                     <Icon className="h-3.5 w-3.5 shrink-0" />
-                    <span>{p.label}</span>
+                    <span>{presetCopy.label}</span>
                   </div>
                   <span className="text-[11px] text-muted-foreground line-clamp-1">
-                    {p.badge}
+                    {presetCopy.badge}
                   </span>
                 </button>
               );

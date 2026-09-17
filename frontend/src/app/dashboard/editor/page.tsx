@@ -402,7 +402,7 @@ export default function AcademicEditorPage() {
     'ADMIN',
     'SUPER_ADMIN',
   ]);
-  const { locale } = useI18n();
+  const { locale, formatDate } = useI18n();
   const isVi = locale === 'vi';
 
   // Navigation tab state: 'announcement' (Editor) | 'hero' (Site Controls) | 'templates' (Document Library)
@@ -1679,7 +1679,7 @@ export default function AcademicEditorPage() {
                             {ann.publishedBy || 'Phòng Đào tạo'}
                           </td>
                           <td className="py-3 px-3 whitespace-nowrap text-muted-foreground text-[11.5px]">
-                            {ann.createdAt ? new Date(ann.createdAt).toLocaleDateString('vi-VN') : '—'}
+                            {ann.createdAt ? formatDate(ann.createdAt) : '—'}
                           </td>
                           <td className="sticky right-0 z-10 bg-card/95 backdrop-blur-xs py-3 px-4 min-w-[190px] text-right whitespace-nowrap shadow-[-4px_0_6px_-2px_rgba(0,0,0,0.08)]">
                             <div className="flex items-center justify-end gap-2">

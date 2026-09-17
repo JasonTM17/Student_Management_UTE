@@ -583,9 +583,9 @@ export default function RegisterPage() {
                             const disabledTitle = willExceedLimit
                               ? copy.creditLimitExceeded.replace('{limit}', String(creditLimit))
                               : isConflict
-                                ? 'Trùng thời khóa biểu với môn đã đăng ký'
+                                ? copy.scheduleConflictTooltip
                                 : alreadyHasCourse
-                                  ? 'Bạn đã đăng ký một lớp học phần khác của môn học này'
+                                  ? copy.duplicateCourseTooltip
                                   : undefined;
                             return (
                               <Button
@@ -620,7 +620,7 @@ export default function RegisterPage() {
           <CardContent className="space-y-3">
             <div className="rounded-lg border border-border/70 bg-secondary/30 p-3 space-y-2">
               <div className="flex items-center justify-between text-xs">
-                <span className="font-medium text-muted-foreground">Định mức học kỳ:</span>
+                <span className="font-medium text-muted-foreground">{copy.termCreditLimitLabel}</span>
                 <span className="font-bold text-foreground">
                   {totalRegisteredCredits}/{creditLimit} {copy.creditsUnit}
                 </span>

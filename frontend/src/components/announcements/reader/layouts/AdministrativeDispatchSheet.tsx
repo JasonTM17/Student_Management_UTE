@@ -12,6 +12,7 @@ import {
 import { cn } from '@/lib/utils';
 import type { AnnouncementRecord } from '@/lib/api';
 import type { Locale } from '@/i18n/config';
+import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import {
   announcementAudienceBadge,
@@ -37,6 +38,7 @@ export function AdministrativeDispatchSheet({
   locale = 'vi',
 }: AdministrativeDispatchSheetProps) {
   const isVi = locale === 'vi';
+  const { formatDate, formatDateTime } = useI18n();
   const publishDate = announcement.publishAt || announcement.createdAt;
   const dateObj = publishDate ? new Date(publishDate) : new Date();
   const day = String(dateObj.getDate()).padStart(2, '0');
@@ -83,7 +85,7 @@ export function AdministrativeDispatchSheet({
         departmentName: 'FACULTY OF IT & ACADEMIC AFFAIRS OFFICE',
         nationalMotto1: 'SOCIALIST REPUBLIC OF VIETNAM',
         nationalMotto2: 'Independence - Freedom - Happiness',
-        datePrefix: `Ho Chi Minh City, ${month}/${day}/${year}`,
+        datePrefix: `Ho Chi Minh City, ${formatDate(dateObj)}`,
         docRef: `Ref: ${docRefNumber}`,
         officialDocBadge: 'OFFICIAL DOCUMENT',
         noticeHeader: 'ANNOUNCEMENT',
@@ -388,7 +390,7 @@ export function AdministrativeDispatchSheet({
               <p className="font-semibold">Đơn vị: {signer.sealUnit || publisherName}</p>
               <p>Người ký: {signer.name}</p>
               <p>
-                Ngày ký: {day}/{month}/{year} {dateObj.toLocaleTimeString('vi-VN', { hour: '2-digit', minute: '2-digit' })}
+                Ngày ký: {formatDateTime(dateObj)}
               </p>
               <p
                 className={cn(
