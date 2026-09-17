@@ -33,8 +33,15 @@ public class AdminUserMutationService {
      * because a faculty head governs the thesis round lifecycle, which the role
      * ceiling reserves above a plain administrator: without it one administrator
      * could mint a dean and escalate through that account.
+     *
+     * <p>The same set governs {@link #requireSuperAdminForProtectedAccount}: a role
+     * a plain administrator may not grant is also one whose existing holders it may
+     * not take over, disable or delete. Blocking only the grant leaves the identical
+     * escalation reachable through the account instead of the role.
+     *
+     * <p>Ordered so the refusal message names the same role every time.
      */
-    private static final Set<String> SUPER_ADMIN_ONLY_ROLES = Set.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA");
+    private static final List<String> SUPER_ADMIN_ONLY_ROLES = List.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA");
     /** Lifecycle values the account-state filter and the UI understand. */
     private static final Set<String> ACCOUNT_STATUSES = Set.of("ACTIVE", "PENDING", "SUSPENDED", "LOCKED", "DISABLED");
     private static final String TEMP_PASSWORD_ALPHABET =
@@ -140,12 +147,9 @@ public class AdminUserMutationService {
                     "SELF_PASSWORD_RESET_NOT_ALLOWED",
                     "Use change-password to rotate your own password");
         }
-        if (!canManageSuperAdmin && (hasRole(id, "SUPER_ADMIN") || hasRole(id, "ADMIN"))) {
-            throw problem(
-                    HttpStatus.FORBIDDEN,
-                    "ROLE_ESCALATION",
-                    "Only a super administrator can reset administrator accounts");
-        }
+        // Rotating a protected account's password hands out a working credential
+        // for the role it holds, so this is the same ceiling as granting the role.
+        requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "reset the password of");
         String temporaryPassword = generateTemporaryPassword();
         int updated = jdbc.update(
                 "UPDATE " + USER + " SET \"password\" = :password, \"mustChangePassword\" = TRUE,"
@@ -169,16 +173,17 @@ public class AdminUserMutationService {
 
     @Transactional
     public Map<String, Object> update(String id, Map<String, Object> input, boolean canManageSuperAdmin, String currentUserId) {
-        String requestedRole = input.get("role") == null
+        // A blank role means "the caller did not send one", not "make this account a
+        // student". `text()` would substitute its fallback for the blank, so a client
+        // that echoes an empty role back would silently strip a dean's role.
+        Object rawRole = input.get("role");
+        String requestedRole = rawRole == null || rawRole.toString().isBlank()
                 ? null
                 : text(input, "role", "STUDENT").toUpperCase(java.util.Locale.ROOT);
         if (requestedRole != null) {
             guardRoleMutation(id, requestedRole, canManageSuperAdmin);
-        } else if (!canManageSuperAdmin && hasRole(id, "SUPER_ADMIN")) {
-            throw problem(
-                    HttpStatus.FORBIDDEN,
-                    "ROLE_ESCALATION",
-                    "Only a super administrator can manage super administrator accounts");
+        } else {
+            requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "manage");
         }
         if (currentUserId != null && currentUserId.equals(id)) {
             if (requestedRole != null && !hasRole(id, requestedRole)) {
@@ -202,6 +207,13 @@ public class AdminUserMutationService {
                     "Only a super administrator can manage administrator accounts");
         }
         String requestedStatus = input.get("status") == null ? null : text(input, "status", "");
+        // Disabling a protected account is the same refusal as deleting it: the role
+        // stops functioning either way. Re-sending an unchanged role is not covered
+        // by that guard, so this closes the gap the grant-side exemption leaves.
+        if (requestedStatus != null && !requestedStatus.isBlank()
+                && !"ACTIVE".equalsIgnoreCase(requestedStatus)) {
+            requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "disable");
+        }
         if (requestedStatus != null && !requestedStatus.isBlank()
                 && !ACCOUNT_STATUSES.contains(requestedStatus.toUpperCase(java.util.Locale.ROOT))) {
             // Free-form status values would silently break the account-state
@@ -257,14 +269,9 @@ public class AdminUserMutationService {
                     "SELF_DELETION_NOT_ALLOWED",
                     "You cannot delete your own account");
         }
-        if (!canManageSuperAdmin && (hasRole(id, "ADMIN") || hasRole(id, "SUPER_ADMIN"))) {
-            // Same ceiling as update()/resetPassword(): a plain administrator
-            // can neither edit, reset, nor hard-delete another administrator.
-            throw problem(
-                    HttpStatus.FORBIDDEN,
-                    "ROLE_ESCALATION",
-                    "Only a super administrator can manage administrator accounts");
-        }
+        // Same ceiling as update()/resetPassword(): a plain administrator can
+        // neither edit, reset, nor hard-delete an account holding a reserved role.
+        requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "delete");
         // Revoke live sessions while the row still exists: after the hard
         // delete there is no account state left for the filter to consult.
         revokeSessions(id);
@@ -332,6 +339,32 @@ public class AdminUserMutationService {
                         + " SELECT :id, :userId, :roleId WHERE NOT EXISTS"
                         + " (SELECT 1 FROM " + USER_ROLE + " WHERE \"userId\" = :userId AND \"roleId\" = :roleId)",
                 params.addValue("id", UUID.randomUUID().toString()));
+    }
+
+    /**
+     * The account-level half of the role ceiling.
+     *
+     * <p>{@link #guardRoleMutation} stops a plain administrator from <em>granting</em>
+     * a reserved role. This stops it from reaching the same powers through an
+     * account that already holds one: resetting a dean's password returns a working
+     * credential for that dean, deleting the account removes the incumbent, and
+     * disabling it removes the role from service — none of which requires ever
+     * assigning a role, so the grant-side guard alone does not cover them.
+     */
+    private void requireSuperAdminForProtectedAccount(
+            String userId, boolean canManageSuperAdmin, String action) {
+        if (canManageSuperAdmin || userId == null) {
+            return;
+        }
+        for (String role : SUPER_ADMIN_ONLY_ROLES) {
+            if (hasRole(userId, role)) {
+                throw problem(
+                        HttpStatus.FORBIDDEN,
+                        "ROLE_ESCALATION",
+                        "Only a super administrator can " + action
+                                + " an account holding the " + role + " role");
+            }
+        }
     }
 
     private void guardRoleMutation(String userId, String roleName, boolean canManageSuperAdmin) {
