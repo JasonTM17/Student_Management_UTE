@@ -52,7 +52,7 @@ import { useI18n } from '@/i18n';
 import { notificationsApi } from '@/lib/api';
 import { cn } from '@/lib/utils';
 import { stripLocaleFromPathname } from '@/i18n/paths';
-import { loginHref, portalFromPathname } from '@/lib/login-portal';
+import { isDemoUser, loginHref, portalFromPathname } from '@/lib/login-portal';
 
 type DashboardMenuLabelKey =
   | 'dashboard'
@@ -834,10 +834,16 @@ export default function DashboardLayout({
                   <div className="truncate text-xs text-[var(--portal-sidebar-muted)]">
                     {user.email}
                   </div>
-                  <div className="mt-2">
+                  <div className="mt-2 flex flex-wrap items-center gap-1.5">
                     <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
                       {roleLabel}
                     </span>
+                    {isDemoUser(user) && (
+                      <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30">
+                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                        {locale === 'vi' ? 'TK Demo trải nghiệm' : 'Demo account'}
+                      </span>
+                    )}
                   </div>
                 </div>
               ) : null}
@@ -1158,8 +1164,13 @@ export default function DashboardLayout({
                     <div className="truncate text-sm font-semibold text-foreground">
                       {fullName}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {user.email}
+                    <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
+                      <span>{user.email}</span>
+                      {isDemoUser(user) && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                          ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -1189,8 +1200,16 @@ export default function DashboardLayout({
                         <p className="truncate text-sm text-muted-foreground">
                           {user.email}
                         </p>
-                        <div className="mt-1.5 inline-flex rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
-                          {user.roles?.[0] || 'USER'}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <div className="inline-flex rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
+                            {user.roles?.[0] || 'USER'}
+                          </div>
+                          {isDemoUser(user) && (
+                            <div className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

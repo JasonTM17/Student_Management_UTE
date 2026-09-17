@@ -14,6 +14,7 @@ import { useAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { authApi } from '@/lib/api';
 import { LocalizedLink } from '@/components/LocalizedLink';
+import { isDemoUser } from '@/lib/login-portal';
 import { StudentTranscriptSemester, MyCurriculumResponse } from '@/types/api';
 
 interface StudentUteProfileGradeViewProps {
@@ -32,7 +33,7 @@ export function StudentUteProfileGradeView({
   availableSemesters = [],
 }: StudentUteProfileGradeViewProps) {
   const { user, refreshUser } = useAuth();
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const card = messages.studentCard;
   const [chartType, setChartType] = useState<'combo' | 'bar' | 'line'>('combo');
   const [avatarPreview, setAvatarPreview] = useState<string | null>(null);
@@ -195,6 +196,14 @@ export function StudentUteProfileGradeView({
             <h3 className="font-bold text-base text-foreground tracking-tight text-center">
               {studentInfo.name}
             </h3>
+            {isDemoUser(user) && (
+              <div className="mt-1 flex justify-center">
+                <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo account'}
+                </span>
+              </div>
+            )}
             <input
               type="file"
               ref={fileInputRef}

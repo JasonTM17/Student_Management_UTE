@@ -190,10 +190,11 @@ export default function LoginPage() {
         <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
 
         {SHOW_DEMO_CREDENTIALS ? (
-        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2 shadow-xs">
+        <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2.5 shadow-xs">
           <div className="flex items-center justify-between">
-            <span className="font-semibold text-foreground">
-              {locale === 'vi' ? 'Tài khoản demo sẵn có:' : 'Demo account for this role:'}
+            <span className="font-semibold text-foreground flex items-center gap-1.5">
+              <span className="h-2 w-2 rounded-full bg-primary animate-pulse" />
+              {locale === 'vi' ? 'Tài khoản demo để trải nghiệm:' : 'Demo account to experience the system:'}
             </span>
             <button
               type="button"
@@ -202,18 +203,23 @@ export default function LoginPage() {
                 setEmail(creds.email);
                 setPassword(creds.password);
               }}
-              className="inline-flex min-h-8 items-center text-primary hover:underline font-semibold text-xs gap-1"
+              className="inline-flex min-h-8 items-center text-primary hover:underline font-semibold text-xs gap-1 cursor-pointer"
             >
               <ArrowRight className="h-3.5 w-3.5" />
               {locale === 'vi' ? 'Điền nhanh' : 'Quick fill'}
             </button>
           </div>
           <div className="text-muted-foreground flex items-center justify-between">
-            <code>{DEMO_CREDENTIALS[portal].email}</code>
-            <span className="text-[11px] bg-secondary px-1.5 py-0.5 rounded text-foreground font-mono">
+            <code className="font-semibold text-foreground/90">{DEMO_CREDENTIALS[portal].email}</code>
+            <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
               {DEMO_CREDENTIALS[portal].password}
             </span>
           </div>
+          <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/10">
+            {locale === 'vi'
+              ? '💡 Đây là tài khoản demo dùng để trải nghiệm đầy đủ các tính năng của hệ thống CampusUTE.'
+              : '💡 This is a demo account provided to experience all features of CampusUTE.'}
+          </p>
         </div>
         ) : null}
 
@@ -311,12 +317,20 @@ export default function LoginPage() {
           aria-describedby={formError ? 'login-error' : undefined}
         >
           <div className="space-y-2">
-            <label
-              htmlFor="email"
-              className="text-sm font-medium text-foreground"
-            >
-              {messages.login.emailLabel}
-            </label>
+            <div className="flex items-center justify-between">
+              <label
+                htmlFor="email"
+                className="text-sm font-medium text-foreground"
+              >
+                {messages.login.emailLabel}
+              </label>
+              {email === DEMO_CREDENTIALS[portal].email ? (
+                <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
+                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                  {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
+                </span>
+              ) : null}
+            </div>
             <Input
               id="email"
               type="email"
