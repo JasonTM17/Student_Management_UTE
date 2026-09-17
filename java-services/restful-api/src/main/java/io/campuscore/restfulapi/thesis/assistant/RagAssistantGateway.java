@@ -277,6 +277,10 @@ public class RagAssistantGateway {
         List<ThesisAssistantService.StreamCitation> citations = new ArrayList<>();
         Set<String> sourceIds = new LinkedHashSet<>();
         boolean[] blocked = { false };
+        // Set once the first provider delta reaches the client: the done frame
+        // must then NOT re-emit the whole answer, or the client concatenates
+        // and renders it twice.
+        boolean[] forwardedDelta = { false };
         return event -> {
             if (event instanceof ThesisAssistantService.StreamDelta delta) {
                 if (blocked[0]) return;
@@ -293,6 +297,13 @@ public class RagAssistantGateway {
                 answer.append(text);
                 if (delta.sourceIds() != null) {
                     delta.sourceIds().stream().filter(id -> id != null && !id.isBlank()).forEach(sourceIds::add);
+                }
+                if (!text.isEmpty()) {
+                    // Live forwarding: the accumulated-prefix guard above stays
+                    // the fence, so every prefix already on the wire was safe
+                    // and a violation surfaces as StreamReplace instead.
+                    forwardedDelta[0] = true;
+                    downstream.accept(delta);
                 }
                 return;
             }
@@ -329,11 +340,16 @@ public class RagAssistantGateway {
                             done.messageId(), "PROVIDER_UNSAFE_OUTPUT", true, done.terminalStatus()));
                     return;
                 }
-                String normalized = ThesisAssistantService.normalizeAssistantCopy(answer.toString(), normalizedLocale);
                 boolean noMatch = "NO_MATCH".equals(done.reasonCode());
-                if (normalized != null && !normalized.isBlank()) {
-                    downstream.accept(new ThesisAssistantService.StreamDelta(
-                            0, normalized, noMatch ? List.of() : List.copyOf(sourceIds)));
+                if (!forwardedDelta[0]) {
+                    // Buffered fallback: nothing streamed yet, so the whole
+                    // answer goes out in one delta exactly as before.
+                    String normalized = ThesisAssistantService.normalizeAssistantCopy(
+                            answer.toString(), normalizedLocale);
+                    if (normalized != null && !normalized.isBlank()) {
+                        downstream.accept(new ThesisAssistantService.StreamDelta(
+                                0, normalized, noMatch ? List.of() : List.copyOf(sourceIds)));
+                    }
                 }
                 if (!noMatch) citations.forEach(downstream);
                 downstream.accept(done);

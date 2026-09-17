@@ -17,6 +17,20 @@ export interface ChatMessage {
 export type AssistantError =
   'unavailable' | 'quota' | 'offline' | 'unauthorized' | 'forbidden';
 
+/**
+ * A message is only feedback-eligible once the server has replaced the
+ * optimistic id with a real turn UUID. Guard-blocked, quota, cancelled and
+ * personal-context answers keep a client-only id forever; showing thumbs on
+ * those made every click a silent 400 and lost exactly the worst-answer
+ * signal the feedback loop exists for.
+ */
+const PERSISTED_MESSAGE_ID_PATTERN =
+  /^[0-9a-f]{8}-[0-9a-f]{4}-[1-5][0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}$/i;
+
+export function isFeedbackEligibleAssistantMessage(message: ChatMessage): boolean {
+  return PERSISTED_MESSAGE_ID_PATTERN.test(message.id);
+}
+
 export interface AssistantState {
   messages: ChatMessage[];
   conversationId?: string;
@@ -71,6 +85,9 @@ export const TRANSIENT_TERMINAL_CODES = new Set([
   'TURN_NOT_ACTIVE',
   'FAILED_AMBIGUOUS',
   'PURGED',
+  // The server emits TURN_PURGED; both spellings stay transient so a
+  // replayable-key retry shows purposeful copy instead of a wasted replay.
+  'TURN_PURGED',
 ]);
 
 export function assistantReducer(

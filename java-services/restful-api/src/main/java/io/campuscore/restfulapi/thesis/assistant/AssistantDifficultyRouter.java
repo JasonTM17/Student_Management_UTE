@@ -39,9 +39,23 @@ final class AssistantDifficultyRouter {
                 .trim();
         if (normalized.length() > LONG_QUESTION_CHARS
                 || normalized.split("\\s+").length >= MANY_TERMS) return true;
-        if (COMPLEX_MARKERS.stream().anyMatch(normalized::contains)) return true;
+        if (containsComplexMarker(normalized)) return true;
         return documents.size() >= 3
                 || documents.stream().map(ThesisAssistantKnowledgeRepository.KnowledgeDocument::domain)
                         .filter(domain -> domain != null && !domain.isBlank()).distinct().count() >= 2;
+    }
+
+    /**
+     * Markers match on folded word boundaries: a substring contains() used to
+     * fire "how" inside "show" or "case" inside "showcase", and every false
+     * positive burns one of the user's twenty daily provider dispatches.
+     */
+    private static final List<java.util.regex.Pattern> COMPLEX_MARKER_PATTERNS = COMPLEX_MARKERS.stream()
+            .map(marker -> java.util.regex.Pattern.compile(
+                    "\\b" + java.util.regex.Pattern.quote(marker.trim()) + "\\b"))
+            .toList();
+
+    private static boolean containsComplexMarker(String normalized) {
+        return COMPLEX_MARKER_PATTERNS.stream().anyMatch(pattern -> pattern.matcher(normalized).find());
     }
 }

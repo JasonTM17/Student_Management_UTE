@@ -174,7 +174,7 @@ class RagAssistantGatewayTest {
     }
 
     @Test
-    void streamNormalizesRemoteCopyAndSuppressesNoMatchCitations() throws Exception {
+    void streamForwardsProviderDeltasLiveWithoutReEmittingTheAnswerAtDone() throws Exception {
         UUID messageId = UUID.randomUUID();
         startServer(exchange -> {
             byte[] response = ("""
@@ -197,12 +197,49 @@ class RagAssistantGatewayTest {
         List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
         gateway().stream(new ChatRequest("Thời tiết", "vi", UUID.randomUUID(), null), "owner-a", events::add);
 
-        ThesisAssistantService.StreamDelta delta = assertInstanceOf(
-                ThesisAssistantService.StreamDelta.class,
-                events.stream().filter(ThesisAssistantService.StreamDelta.class::isInstance).findFirst().orElseThrow());
-        assertEquals("1. Đăng ký lớp\n\nMở Cổng sinh viên tương đương 4.0", delta.text());
-        assertTrue(delta.sourceIds().isEmpty());
+        // The provider delta reaches the client live and exactly once: the
+        // done frame no longer re-emits the whole answer, or the client would
+        // render the response twice.
+        List<ThesisAssistantService.StreamDelta> deltas = events.stream()
+                .filter(ThesisAssistantService.StreamDelta.class::isInstance)
+                .map(ThesisAssistantService.StreamDelta.class::cast)
+                .toList();
+        assertEquals(1, deltas.size());
+        assertEquals("1. Đăng ký lớp Mở Cổng sinh viên tương đương4.0", deltas.get(0).text());
         assertTrue(events.stream().noneMatch(ThesisAssistantService.StreamCitation.class::isInstance));
+        assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
+    }
+
+    @Test
+    void streamedContentIsNotDuplicatedByTheDoneFrame() throws Exception {
+        startServer(exchange -> {
+            byte[] response = """
+                    event: delta
+                    data: {"sequence":0,"text":"Phần một.","sourceIds":[],"type":"delta"}
+
+                    event: delta
+                    data: {"sequence":1,"text":" Phần hai.","sourceIds":[],"type":"delta"}
+
+                    event: done
+                    data: {"messageId":null,"reasonCode":null,"degraded":false,"terminalStatus":"COMPLETED","type":"done"}
+
+                    """.getBytes(StandardCharsets.UTF_8);
+            exchange.getResponseHeaders().add("Content-Type", "text/event-stream");
+            exchange.sendResponseHeaders(200, response.length);
+            exchange.getResponseBody().write(response);
+            exchange.close();
+        }, "/chat/stream");
+
+        List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
+        gateway().stream(new ChatRequest("Quy chế", "vi", UUID.randomUUID(), null), "owner-a", events::add);
+
+        List<ThesisAssistantService.StreamDelta> deltas = events.stream()
+                .filter(ThesisAssistantService.StreamDelta.class::isInstance)
+                .map(ThesisAssistantService.StreamDelta.class::cast)
+                .toList();
+        assertEquals(2, deltas.size());
+        assertEquals("Phần một. Phần hai.",
+                deltas.get(0).text() + deltas.get(1).text());
         assertEquals(1, events.stream().filter(ThesisAssistantService.StreamDone.class::isInstance).count());
     }
 

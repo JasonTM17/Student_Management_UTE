@@ -42,8 +42,26 @@ const PROMPT_INJECTION = new RegExp(
   'i',
 );
 
+const PROMPT_INJECTION_FOLDED = new RegExp(foldForMatching(PROMPT_INJECTION.source), 'i');
+
 export function normalizeAssistantMessage(message: string): string {
   return message.trim().replace(INVISIBLE, '').normalize('NFC');
+}
+
+/**
+ * Lossless fold for matching only: NFD decomposition strips every combining
+ * mark, đ/Đ fold onto d, the result is lowercased. Vietnamese is typed
+ * unaccented at least as often as not, so the injection patterns also run
+ * against this folded view; the folded pattern is derived from the original
+ * pattern text, which keeps both views in lockstep with the Java guard.
+ */
+function foldForMatching(value: string): string {
+  return value
+    .replace(INVISIBLE, '')
+    .normalize('NFD')
+    .replace(/\p{M}+/gu, '')
+    .replace(/[đĐ]/g, 'd')
+    .toLowerCase();
 }
 
 function containsPhone(normalized: string): boolean {
@@ -101,6 +119,9 @@ export function inspectAssistantInput(message: string): AssistantGuardResult {
     return { allowed: false, reasonCode: 'SENSITIVE_CREDENTIAL', normalizedMessage };
   }
   if (PROMPT_INJECTION.test(normalizedMessage)) {
+    return { allowed: false, reasonCode: 'PROMPT_INJECTION', normalizedMessage };
+  }
+  if (PROMPT_INJECTION_FOLDED.test(foldForMatching(normalizedMessage))) {
     return { allowed: false, reasonCode: 'PROMPT_INJECTION', normalizedMessage };
   }
   if (TECHNICAL_REQUEST.test(normalizedMessage)) {

@@ -42,6 +42,26 @@ class AnnouncementReadPersistenceTest {
     @BeforeEach
     void prepareReadOnlyFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"engagement\"");
+        // The account-state gate consults the issuing table on every business
+        // request and fails closed when the store is unreadable, so this
+        // fixture must own a readable (empty) auth user table.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(320) NOT NULL,
+                    "password" VARCHAR(200),
+                    "firstName" VARCHAR(120),
+                    "lastName" VARCHAR(120),
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "isSuperAdmin" BOOLEAN,
+                    "failedLoginAttempts" INTEGER,
+                    "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbc.execute("DELETE FROM \"campuscore_auth\".\"User\"");
         // The reader scopes section-targeted notices to enrolled students, so the
         // fixture owns the enrollment table it consults (the H2 mirror excludes it
         // by design; Postgres V14 owns the real unique indexes).
