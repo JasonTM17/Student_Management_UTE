@@ -2,7 +2,11 @@
 
 import React, { useState } from 'react';
 
-import { sanitizeAnnouncementHtml } from '@/lib/html-sanitizer';
+import {
+  isSafeAnnouncementImageUrl,
+  isSafeAnnouncementUrl,
+  sanitizeAnnouncementHtml,
+} from '@/lib/html-sanitizer';
 import {
   AlertCircle,
   AlertTriangle,
@@ -59,14 +63,14 @@ function SafeImage({ src, alt }: { src: string; alt: string }) {
   );
 }
 
-// Sanitization: disallow dangerous protocols
-function isSafeUrl(url: string): boolean {
-  const trimmed = url.trim().toLowerCase();
-  if (trimmed.startsWith('javascript:') || trimmed.startsWith('data:') || trimmed.startsWith('vbscript:')) {
-    return false;
-  }
-  return true;
-}
+// RT-P1-1: the markdown branch once carried its own weaker `isSafeUrl` that
+// only looked for a `javascript:`/`data:`/`vbscript:` prefix after a trim.
+// Browsers strip `\t\n\r` from URLs before resolving them, so
+// `[x](java\tscript:alert(1))` slipped past and fired in every reader's
+// browser — stored XSS authored by anyone with announcement rights. The
+// markdown branch now delegates to the same scheme policy the HTML branch
+// uses, exported from `lib/html-sanitizer.ts`; there is deliberately no
+// second regex here.
 
 // Inline token rendering
 function renderInline(text: string): React.ReactNode[] {
@@ -96,7 +100,7 @@ function renderInline(text: string): React.ReactNode[] {
       // Image
       const alt = match[2] || '';
       const url = match[3] || '';
-      if (isSafeUrl(url)) {
+      if (isSafeAnnouncementImageUrl(url)) {
         parts.push(
           <SafeImage key={`img-${keyIndex++}`} src={url} alt={alt} />
         );
@@ -107,7 +111,7 @@ function renderInline(text: string): React.ReactNode[] {
       // Link
       const label = match[2] || '';
       const url = match[3] || '';
-      if (isSafeUrl(url)) {
+      if (isSafeAnnouncementUrl(url)) {
         const isExternal = url.startsWith('http://') || url.startsWith('https://');
         parts.push(
           <a
@@ -333,21 +337,19 @@ function sanitizeHtml(html: string): string {
   return sanitizeAnnouncementHtml(html);
 }
 
-function isHtmlDocument(raw: string): boolean {
+/**
+ * RT-P2-3: TinyMCE emits bare fragments from ordinary authoring — a bulleted
+ * list is `<ul><li>…</li></ul>`, a quote is `<blockquote>…</blockquote>` — and
+ * the old leading-tag allowlist missed all of them, so those announcements
+ * fell into the markdown converter, which does not understand those constructs
+ * and printed the raw tags as literal text to students. Detection is now
+ * structural: any element-shaped markup outside a fenced code block means the
+ * body is HTML and must go through the sanitizer/render branch.
+ */
+export function isHtmlDocument(raw: string): boolean {
   if (!raw) return false;
-  const trimmed = raw.trim();
-  return (
-    trimmed.startsWith('<div') ||
-    trimmed.startsWith('<p') ||
-    trimmed.startsWith('<table') ||
-    trimmed.startsWith('<h') ||
-    trimmed.startsWith('<span') ||
-    trimmed.startsWith('<article') ||
-    trimmed.startsWith('<section') ||
-    (trimmed.includes('<table') && trimmed.includes('</table>')) ||
-    (trimmed.includes('<div') && trimmed.includes('</div>')) ||
-    (trimmed.includes('<p') && trimmed.includes('</p>'))
-  );
+  const withoutFences = raw.replace(/```[\s\S]*?```/g, '');
+  return /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?>/.test(withoutFences);
 }
 
 function normalizeHtmlToMarkdown(raw: string): string {

@@ -56,6 +56,10 @@ import { LoadingState } from '@/components/ui/state-block';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { TinyMceEditor } from '@/components/ui/tinymce-editor';
 import { SortableList, DragHandle } from '@/components/ui/sortable-list';
+import {
+  UnsavedChangesConfirmDialog,
+} from '@/components/ui/unsaved-changes-confirm';
+import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { cn } from '@/lib/utils';
 import { shouldSeedDefaultEditorDocument } from '@/lib/editor-document';
@@ -421,6 +425,24 @@ export default function AcademicEditorPage() {
   const [previewingNotice, setPreviewingNotice] = useState<AnnouncementRecord | null>(null);
   const [editingNoticeModal, setEditingNoticeModal] = useState<AnnouncementRecord | null>(null);
 
+  // RT-P3-3: unsaved-changes guard (beforeunload + in-app confirm) shared with
+  // the other editors via lib/use-unsaved-changes-guard.ts. A document is
+  // dirty once the author typed a title or moved the body off the template.
+  const defaultBodyFor = useCallback(
+    () =>
+      editorType === 'tinymce'
+        ? (isVi ? DEFAULT_TINYMCE_VI : DEFAULT_TINYMCE_EN)
+        : DEFAULT_MARKDOWN_VI,
+    [editorType, isVi],
+  );
+  const unsaved = useUnsavedChangesGuard({
+    isDirty: useCallback(
+      () => title.trim() !== '' || content !== defaultBodyFor(),
+      [title, content, defaultBodyFor],
+    ),
+    enabled: !isPublishingNotice,
+  });
+
   // Sortable Content Blocks Builder State
   const [showBlockBuilder, setShowBlockBuilder] = useState(true);
   const [blocks, setBlocks] = useState<ContentBlock[]>(DEFAULT_BLOCKS);
@@ -636,13 +658,19 @@ export default function AcademicEditorPage() {
   }, [content, editorType, title]);
 
   const handleReset = useCallback(() => {
-    if (window.confirm(copy.newDocConfirm)) {
+    // RT-P3-3: routed through the unsaved-changes guard so the confirm text
+    // and the beforeunload protection come from one mechanism.
+    unsaved.requestLeave(() => {
       setTitle('');
-      setContent(editorType === 'tinymce' ? (isVi ? DEFAULT_TINYMCE_VI : DEFAULT_TINYMCE_EN) : DEFAULT_MARKDOWN_VI);
+      setContent(defaultBodyFor());
       setLastSaved(null);
-      localStorage.removeItem(STORAGE_KEY);
-    }
-  }, [copy.newDocConfirm, editorType, isVi]);
+      try {
+        localStorage.removeItem(STORAGE_KEY);
+      } catch {
+        // ignore
+      }
+    });
+  }, [defaultBodyFor, unsaved]);
 
   // Reorder content blocks via SortableJS
   const handleReorderBlocks = (newBlocks: ContentBlock[]) => {
@@ -818,11 +846,15 @@ export default function AcademicEditorPage() {
 
   // Cancel edit mode and start new
   const handleCancelEdit = () => {
-    setEditingId(null);
-    setEditingVersion(0);
-    setTitle('');
-    setContent(editorType === 'tinymce' ? (isVi ? DEFAULT_TINYMCE_VI : DEFAULT_TINYMCE_EN) : DEFAULT_MARKDOWN_VI);
-    toast.info(isVi ? 'Đã hủy chế độ sửa, bắt đầu soạn thảo văn bản mới' : 'Cancelled edit mode');
+    // RT-P3-3: the announcement being edited is lost on cancel, so the same
+    // unsaved-changes guard protects it.
+    unsaved.requestLeave(() => {
+      setEditingId(null);
+      setEditingVersion(0);
+      setTitle('');
+      setContent(defaultBodyFor());
+      toast.info(isVi ? 'Đã hủy chế độ sửa, bắt đầu soạn thảo văn bản mới' : 'Cancelled edit mode');
+    });
   };
 
   // Publish announcement to backend feed
@@ -1743,6 +1775,21 @@ export default function AcademicEditorPage() {
           }}
         />
       )}
+
+      {/* RT-P3-3: unsaved-changes confirm for destructive in-page actions */}
+      <UnsavedChangesConfirmDialog
+        open={unsaved.confirmOpen}
+        title={isVi ? 'Nội dung chưa được lưu' : 'Unsaved changes'}
+        description={
+          isVi
+            ? 'Bạn có nội dung chưa được lưu. Tiếp tục sẽ mất các thay đổi chưa phát hành. Tiếp tục?'
+            : 'You have unsaved changes. Continuing will discard anything not yet published. Continue?'
+        }
+        confirmLabel={isVi ? 'Tiếp tục' : 'Continue'}
+        cancelLabel={isVi ? 'Ở lại soạn thảo' : 'Keep editing'}
+        onConfirm={unsaved.confirmLeave}
+        onCancel={unsaved.cancelLeave}
+      />
     </div>
   );
 }

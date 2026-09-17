@@ -19,6 +19,38 @@ function loadTs(relativePath) {
   return moduleRecord.exports;
 }
 
+// Loader for TS modules with import specifiers (alias paths, JSX components):
+// `stubs` maps import specifiers to module records, everything else resolves
+// through Node's require (e.g. the real 'react').
+function loadTsModule(relativePath, stubs) {
+  const ts = require('typescript');
+  const output = ts.transpileModule(read(relativePath), {
+    compilerOptions: {
+      module: ts.ModuleKind.CommonJS,
+      target: ts.ScriptTarget.ES2020,
+      jsx: ts.JsxEmit.React,
+    },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  const stubRequire = (name) => {
+    if (Object.prototype.hasOwnProperty.call(stubs, name)) return stubs[name];
+    return require(name);
+  };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, stubRequire);
+  return moduleRecord.exports;
+}
+
+function loadRichContentRenderer() {
+  const dummyComponent = function DummyComponent() {
+    return null;
+  };
+  return loadTsModule('src/components/ui/rich-content-renderer.tsx', {
+    '@/lib/html-sanitizer': loadTs('src/lib/html-sanitizer.ts'),
+    '@/lib/utils': { cn: (...args) => args.filter(Boolean).join(' ') },
+    'lucide-react': new Proxy({}, { get: () => dummyComponent }),
+  });
+}
+
 test('announcement HTML sanitizer neutralizes stored-XSS payloads', () => {
   const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');
 
@@ -97,7 +129,7 @@ test('announcement HTML sanitizer neutralizes stored-XSS payloads', () => {
 
 test('rich-content-renderer delegates HTML sanitizing to the allowlist module', () => {
   const source = read('src/components/ui/rich-content-renderer.tsx');
-  assert.match(source, /import \{ sanitizeAnnouncementHtml \} from '@\/lib\/html-sanitizer'/);
+  assert.match(source, /from '@\/lib\/html-sanitizer'/);
   assert.match(source, /return sanitizeAnnouncementHtml\(html\)/);
   // The bypassable attribute blacklist must not come back.
   assert.doesNotMatch(source, /\\son\\w\+/);
@@ -157,11 +189,13 @@ test('rich-content-renderer securely parses and renders markdown structures and 
   assert.match(source, /export function RichContentRenderer/);
   assert.match(source, /export interface RichContentRendererProps/);
 
-  // Security: Protocol sanitization against XSS
-  assert.match(source, /isSafeUrl/);
-  assert.match(source, /javascript:/);
-  assert.match(source, /data:/);
-  assert.match(source, /vbscript:/);
+  // Security: RT-P1-1 — the markdown branch must not carry its own scheme
+  // check; it delegates to the sanitizer's policy (asserted behaviorally
+  // below). The old weak `isSafeUrl` must stay gone.
+  assert.doesNotMatch(source, /function isSafeUrl/);
+  assert.doesNotMatch(source, /trim\(\)\.toLowerCase\(\)\.startsWith\('javascript:'/);
+  assert.match(source, /isSafeAnnouncementUrl/);
+  assert.match(source, /isSafeAnnouncementImageUrl/);
 
   // Callouts support
   assert.match(source, /alertMatch/);
@@ -180,8 +214,72 @@ test('rich-content-renderer securely parses and renders markdown structures and 
   assert.match(source, /type="checkbox"/);
 });
 
-test('admin announcements integration uses RichTextEditor and RichContentRenderer', () => {
-  const page = read('src/app/admin/announcements/page.tsx');
+test('RT-P1-1 markdown link and image schemes share the sanitizer policy', () => {
+  // Regression for the stored-XSS markdown bypass: the pre-fix renderer kept
+  // its own `trim().toLowerCase().startsWith('javascript:')` guard, which
+  // interior tab/newline/carriage-return defeats because browsers strip
+  // \t\n\r from URLs before resolving them. The shared check normalizes
+  // control characters and entities away and rejects unknown schemes.
+  const { isSafeAnnouncementUrl, isSafeAnnouncementImageUrl } = loadTs('src/lib/html-sanitizer.ts');
+
+  const bypasses = [
+    'java\tscript:alert(1)',
+    'java\nscript:alert(1)',
+    'java\rscript:alert(1)',
+    'JavaScript:alert(1)',
+    'JaVaScRiPt:alert(1)',
+    'jav&#x61;script:alert(1)',
+    ' javascript:alert(1)',
+    'data:text/html,<script>alert(1)</script>',
+    'vbscript:msgbox(1)',
+  ];
+  for (const url of bypasses) {
+    assert.equal(isSafeAnnouncementUrl(url), false, `scheme must be rejected: ${JSON.stringify(url)}`);
+  }
+  // Only base64 image payloads are allowed, matching the HTML branch's src rule.
+  assert.equal(isSafeAnnouncementImageUrl('data:text/html,<script>'), false);
+  assert.equal(isSafeAnnouncementImageUrl('data:image/png;base64,iVBORw0KGgoAAAANSUhEUg'), true);
+
+  // Control: legitimate links and images still pass and the renderer still
+  // renders an https link as a link.
+  assert.equal(isSafeAnnouncementUrl('https://campusute.io.vn/vi/dashboard'), true);
+  assert.equal(isSafeAnnouncementUrl('mailto:phongdaotao@campusute.edu.vn'), true);
+  assert.equal(isSafeAnnouncementUrl('/vi/dashboard/thesis'), true);
+});
+
+test('RT-P2-3 list-only and blockquote-only HTML bodies render as HTML, not literal tags', () => {
+  const renderer = loadRichContentRenderer();
+  const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');
+
+  // TinyMCE emits exactly these bare fragments from ordinary authoring; the
+  // old leading-tag allowlist missed them and printed the raw tags as text.
+  for (const fragment of [
+    '<ul><li>Điểm F phải học lại</li></ul>',
+    '<ol><li>Đăng ký tín chỉ</li></ol>',
+    '<blockquote>Trích dẫn quy định</blockquote>',
+    '<figure><img src="/logo.png" alt="logo"><figcaption>Chú thích</figcaption></figure>',
+    '<pre><code>let x = 1;</code></pre>',
+    '<details><summary>Mục lục</summary><p>Nội dung</p></details>',
+  ]) {
+    assert.equal(renderer.isHtmlDocument(fragment), true, `must be detected as HTML: ${fragment}`);
+  }
+
+  // Plain markdown and prose with a bare "<" stay on the markdown branch.
+  assert.equal(renderer.isHtmlDocument('Văn bản thuần\n- mục 1\n- mục 2\n# Tiêu đề'), false);
+  assert.equal(renderer.isHtmlDocument('điểm < 4.0 là không đạt'), false);
+  // HTML inside a fenced code block does not flip the document to HTML mode.
+  assert.equal(renderer.isHtmlDocument('Mã mẫu:\n```html\n<p>markup</p>\n```\nHết.'), false);
+
+  // With structural detection routing the fragment to the sanitizer branch,
+  // the list survives as real elements and no literal tag text leaks.
+  const sanitized = sanitizeAnnouncementHtml('<ul><li>a</li></ul>');
+  assert.match(sanitized, /<ul><li>/);
+  assert.equal(sanitized.includes('&lt;li&gt;'), false);
+  const quoted = sanitizeAnnouncementHtml('<blockquote>x</blockquote>');
+  assert.match(quoted, /<blockquote>/);
+});
+
+test('admin announcements integration uses RichTextEditor and RichContentRenderer', () => {  const page = read('src/app/admin/announcements/page.tsx');
 
   assert.match(page, /import \{ RichTextEditor \} from '@\/components\/ui\/rich-text-editor'/);
   assert.match(page, /import \{ RichContentRenderer \} from '@\/components\/ui\/rich-content-renderer'/);

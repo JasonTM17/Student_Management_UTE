@@ -1,7 +1,6 @@
 'use client';
 
-import React, { useEffect, useId, useMemo, useRef, useState } from 'react';
-import dynamic from 'next/dynamic';
+import React, { useCallback, useEffect, useId, useMemo, useRef, useState } from 'react';
 import {
   BookOpen,
   Check,
@@ -13,18 +12,21 @@ import {
   Loader2,
   Maximize2,
   Minimize2,
+  RefreshCw,
   Sparkles,
+  TriangleAlert,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
+import {
+  MAX_ANNOUNCEMENT_CONTENT_CHARS,
+  MAX_INLINE_IMAGE_BYTES,
+  assessAnnouncementContentLength,
+} from '@/lib/announcement-limits';
 import { cn } from '@/lib/utils';
 
 // Loading shell rendered while the editor chunk resolves. Locale is picked from
 // <html lang> because the dynamic wrapper has no access to the component props.
-function EditorLoading() {
-  const [isVi, setIsVi] = React.useState(true);
-  React.useEffect(() => {
-    setIsVi(!document.documentElement.lang || document.documentElement.lang.toLowerCase().startsWith('vi'));
-  }, []);
+function EditorLoading({ isVi }: { isVi: boolean }) {
   return (
     <div className="flex h-96 w-full items-center justify-center rounded-lg border border-border/70 bg-card/60">
       <div className="flex flex-col items-center gap-2 text-muted-foreground">
@@ -37,11 +39,66 @@ function EditorLoading() {
   );
 }
 
-// Dynamically import TinyMCE Editor to guarantee zero SSR issues in Next.js App Router
-const Editor = dynamic(
-  () => import('@tinymce/tinymce-react').then((mod) => mod.Editor as unknown as React.ComponentType<any>),
-  { ssr: false, loading: EditorLoading }
-);
+// RT-P3-2: the previous `dynamic()` wrapper only had a `loading` state, so a
+// blocked or timed-out editor chunk left an eternal spinner on a flaky campus
+// network. The loader below tracks failure and offers a real retry: webpack
+// evicts a failed chunk from its cache, so a re-import re-downloads it.
+type EditorModuleState =
+  | { status: 'loading' }
+  | { status: 'error' }
+  | { status: 'ready'; Editor: React.ComponentType<any> };
+
+let editorModulePromise: Promise<React.ComponentType<any>> | null = null;
+
+function loadEditorModule(): Promise<React.ComponentType<any>> {
+  if (!editorModulePromise) {
+    editorModulePromise = import('@tinymce/tinymce-react').then(
+      (mod) => mod.Editor as unknown as React.ComponentType<any>,
+    );
+  }
+  return editorModulePromise;
+}
+
+function useEditorModule(): [EditorModuleState, () => void] {
+  const [state, setState] = useState<EditorModuleState>({ status: 'loading' });
+  const attemptRef = useRef(0);
+  const load = useCallback(() => {
+    const attempt = ++attemptRef.current;
+    setState({ status: 'loading' });
+    loadEditorModule().then(
+      (Editor) => {
+        if (attemptRef.current === attempt) setState({ status: 'ready', Editor });
+      },
+      () => {
+        if (attemptRef.current === attempt) setState({ status: 'error' });
+      },
+    );
+  }, []);
+  useEffect(() => {
+    load();
+  }, [load]);
+  return [state, load];
+}
+
+function EditorLoadError({ isVi, onRetry }: { isVi: boolean; onRetry: () => void }) {
+  return (
+    <div
+      role="alert"
+      className="flex h-96 w-full flex-col items-center justify-center gap-3 rounded-lg border border-destructive/40 bg-destructive/5 p-6 text-center"
+    >
+      <TriangleAlert className="h-8 w-8 text-destructive" aria-hidden="true" />
+      <p className="max-w-md text-sm font-medium text-foreground">
+        {isVi
+          ? 'Không tải được trình soạn thảo trực quan (mạng chặn hoặc quá tải tệp TinyMCE). Bạn có thể chuyển sang chế độ soạn thảo Markdown ở thanh công cụ phía trên.'
+          : 'The visual editor could not be loaded (blocked network or failed TinyMCE download). You can switch to the Markdown editor mode using the toolbar above.'}
+      </p>
+      <Button type="button" variant="outline" size="sm" onClick={onRetry} className="gap-1.5">
+        <RefreshCw className="h-3.5 w-3.5" />
+        {isVi ? 'Thử tải lại' : 'Retry'}
+      </Button>
+    </div>
+  );
+}
 
 export interface TinyMceEditorProps {
   value: string;
@@ -247,6 +304,12 @@ export function TinyMceEditor({
   const [templatesOpen, setTemplatesOpen] = useState(false);
   const [isFullscreen, setIsFullscreen] = useState(false);
   const [copied, setCopied] = useState(false);
+  const [editorState, reloadEditor] = useEditorModule();
+
+  // RT-P1-2: the server refuses bodies over MAX_ANNOUNCEMENT_CONTENT_CHARS,
+  // so tell the author BEFORE they try to publish instead of surfacing a quota
+  // error after they have finished writing.
+  const contentLengthState = assessAnnouncementContentLength(value);
 
   // Detect dark mode in document element
   useEffect(() => {
@@ -430,14 +493,45 @@ export function TinyMceEditor({
         </div>
       </div>
 
+      {/* RT-P1-2: warn while composing — the server rejects bodies over the
+          200k-character cap, so the author must see the budget shrinking
+          before they hit publish, not as a quota error afterwards. */}
+      {contentLengthState !== 'ok' ? (
+        <div
+          role="status"
+          className={cn(
+            'flex items-center gap-2 border-b px-3 py-2 text-xs font-medium',
+            contentLengthState === 'exceeded'
+              ? 'border-destructive/40 bg-destructive/10 text-destructive'
+              : 'border-amber-500/40 bg-amber-500/10 text-amber-700 dark:text-amber-400',
+          )}
+        >
+          <TriangleAlert className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+          <span>
+            {contentLengthState === 'exceeded'
+              ? isVi
+                ? `Nội dung ${value.length.toLocaleString('vi-VN')} ký tự, vượt hạn mức ${MAX_ANNOUNCEMENT_CONTENT_CHARS.toLocaleString('vi-VN')} của máy chủ — hãy rút gọn hoặc xoá bớt ảnh nhúng trước khi phát hành.`
+                : `Content is ${value.length.toLocaleString('en-US')} characters, over the server limit of ${MAX_ANNOUNCEMENT_CONTENT_CHARS.toLocaleString('en-US')} — shorten it or remove embedded images before publishing.`
+              : isVi
+                ? `Nội dung đã dùng ${value.length.toLocaleString('vi-VN')}/${MAX_ANNOUNCEMENT_CONTENT_CHARS.toLocaleString('vi-VN')} ký tự — gần đạt hạn mức của máy chủ.`
+                : `Content uses ${value.length.toLocaleString('en-US')}/${MAX_ANNOUNCEMENT_CONTENT_CHARS.toLocaleString('en-US')} characters — approaching the server limit.`}
+          </span>
+        </div>
+      ) : null}
+
       {/* TinyMCE Self-Hosted Container. The key forces a remount when the
           theme flips: the React wrapper only reads `init` at mount, so without
           it a light-to-dark switch would keep the light skin and content CSS. */}
       <div className="flex-1 overflow-hidden">
-        <Editor
-          key={`${editorId}-${isDark ? 'dark' : 'light'}`}
-          id={editorId}
-          tinymceScriptSrc="/tinymce/tinymce.min.js"
+        {editorState.status === 'loading' ? <EditorLoading isVi={isVi} /> : null}
+        {editorState.status === 'error' ? (
+          <EditorLoadError isVi={isVi} onRetry={reloadEditor} />
+        ) : null}
+        {editorState.status === 'ready' ? (
+          <editorState.Editor
+            key={`${editorId}-${isDark ? 'dark' : 'light'}`}
+            id={editorId}
+            tinymceScriptSrc="/tinymce/tinymce.min.js"
           value={value}
           disabled={disabled || readOnly}
           onEditorChange={(newContent: string) => {
@@ -457,7 +551,11 @@ export function TinyMceEditor({
               file: { title: 'File', items: 'newdocument restoredraft | preview | print' },
               edit: { title: 'Edit', items: 'undo redo | cut copy paste pastetext | selectall | searchreplace' },
               view: { title: 'View', items: 'code | visualaid visualchars visualblocks | preview fullscreen' },
-              insert: { title: 'Insert', items: 'image link media codesample inserttable | charmap emoticons hr | pagebreak nonbreaking anchor | insertdatetime' },
+              // RT-P2-2: `media` was removed from the insert menu and plugin
+              // list — its output is <iframe>/<video>, which the announcement
+              // allowlist drops (no upload endpoint exists, RT-P2-6), so the
+              // feature produced content that silently vanished for readers.
+              insert: { title: 'Insert', items: 'image link codesample inserttable | charmap emoticons hr | pagebreak nonbreaking anchor | insertdatetime' },
               format: { title: 'Format', items: 'bold italic underline strikethrough superscript subscript codeformat | styles blocks fontfamily fontsize align lineheight | forecolor backcolor | removeformat' },
               tools: { title: 'Tools', items: 'code wordcount' },
               table: { title: 'Table', items: 'inserttable | cell row column | tableprops deletetable' },
@@ -480,7 +578,6 @@ export function TinyMceEditor({
               'insertdatetime',
               'link',
               'lists',
-              'media',
               'nonbreaking',
               'pagebreak',
               'preview',
@@ -491,9 +588,22 @@ export function TinyMceEditor({
               'visualchars',
               'wordcount',
             ],
+            // RT-P2-2: accordion + anchor are kept because their output
+            // (<details>/<summary> and a restricted `id`) is allowlisted by
+            // the sanitizer on both the read and write paths; RT-P3-4:
+            // `wordcount` is only offered when `showWordCount` is set.
             toolbar: [
               'undo redo | blocks fontfamily fontsize lineheight | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent',
-              'table link image media codesample emoticons | accordion pagebreak charmap insertdatetime | visualblocks visualchars searchreplace wordcount | preview fullscreen | code help',
+              [
+                'table link image codesample emoticons',
+                'accordion pagebreak charmap insertdatetime',
+                'visualblocks visualchars searchreplace',
+                showWordCount ? 'wordcount' : null,
+                'preview fullscreen',
+                'code help',
+              ]
+                .filter(Boolean)
+                .join(' | '),
             ],
             toolbar_mode: 'sliding',
             font_family_formats:
@@ -558,15 +668,17 @@ export function TinyMceEditor({
             paste_data_images: true,
             images_upload_handler: (blobInfo: any) =>
               new Promise((resolve, reject) => {
-                // Inline base64 payloads land in the announcement content and
-                // the browser's draft storage; past ~1MB they bloat the feed
-                // and silently break the local draft save.
+                // RT-P1-2: inline base64 payloads land in the announcement
+                // content, so the cap is DERIVED from the server's 200k-char
+                // body limit (see lib/announcement-limits.ts) instead of the
+                // old independent 1MB number, which made the base64-encoded
+                // image alone ~6.8x the entire server budget.
                 const blob = blobInfo.blob();
-                if (blob.size > 1_000_000) {
+                if (blob.size > MAX_INLINE_IMAGE_BYTES) {
                   reject(
                     isVi
-                      ? 'Ảnh quá lớn (tối đa 1 MB). Hãy nén ảnh trước khi chèn.'
-                      : 'Image too large (max 1 MB). Compress it before inserting.',
+                      ? `Ảnh quá lớn (tối đa ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB để vừa hạn mức ký tự của máy chủ). Hãy nén ảnh trước khi chèn.`
+                      : `Image too large (max ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB to fit the server character budget). Compress it before inserting.`,
                   );
                   return;
                 }
@@ -580,6 +692,16 @@ export function TinyMceEditor({
                 input.onchange = function () {
                   const file = (this as HTMLInputElement).files?.[0];
                   if (file) {
+                    if (file.size > MAX_INLINE_IMAGE_BYTES) {
+                      // Fail before reading so the author gets the same quota
+                      // message as the paste path instead of a silent drop.
+                      alert(
+                        isVi
+                          ? `Ảnh quá lớn (tối đa ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB để vừa hạn mức ký tự của máy chủ). Hãy nén ảnh trước khi chèn.`
+                          : `Image too large (max ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB to fit the server character budget). Compress it before inserting.`,
+                      );
+                      return;
+                    }
                     const reader = new FileReader();
                     reader.onload = function () {
                       callback(reader.result as string, { title: file.name, alt: file.name });
@@ -637,10 +759,15 @@ export function TinyMceEditor({
             branding: false,
             promotion: false,
             placeholder: placeholder || (isVi ? 'Bắt đầu soạn thảo nội dung với đầy đủ công cụ TinyMCE chuyên nghiệp...' : 'Start composing content with professional TinyMCE tools...'),
-            language_url: undefined,
+            // RT-P3-1: self-hosted Vietnamese language pack (copied from
+            // tinymce-i18n by scripts/copy-tinymce.mjs to /tinymce/langs/vi.js);
+            // the English locale uses TinyMCE's built-in strings.
+            language: isVi ? 'vi' : undefined,
+            language_url: isVi ? '/tinymce/langs/vi.js' : undefined,
             contextmenu: 'link image table',
           }}
-        />
+          />
+        ) : null}
       </div>
     </div>
   );
