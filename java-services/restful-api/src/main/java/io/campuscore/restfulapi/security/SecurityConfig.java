@@ -73,7 +73,7 @@ public class SecurityConfig {
      */
     static final String DEFAULT_CORS_ORIGIN_PATTERNS =
             "http://localhost:[*],http://127.0.0.1:[*],http://localhost:3000,http://127.0.0.1:3000,"
-                    + "http://127.0.0.1:3100,https://campusute.io.vn";
+                    + "http://127.0.0.1:3100,https://campusute.io.vn,https://www.campusute.io.vn";
 
     @Bean
     CorsConfigurationSource corsConfigurationSource(
