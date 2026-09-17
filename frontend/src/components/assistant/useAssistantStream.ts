@@ -118,7 +118,7 @@ export function useAssistantStream({
       } else if (event.type === 'delta') {
         dispatch({ type: 'delta', text: event.text });
       } else if (event.type === 'replace') {
-        dispatch({ type: 'replace', text: event.text });
+        dispatch({ type: 'replace', text: event.text, reasonCode: event.reasonCode });
       } else if (event.type === 'citation') {
         dispatch({ type: 'citation', citation: event.citation });
       } else if (event.type === 'done') {

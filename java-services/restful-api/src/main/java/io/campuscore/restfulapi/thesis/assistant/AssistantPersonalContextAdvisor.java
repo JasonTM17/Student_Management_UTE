@@ -316,11 +316,11 @@ public class AssistantPersonalContextAdvisor {
         String lower = message.toLowerCase();
 
         if (lower.contains("hôm nay") || lower.contains("hom nay") || lower.contains("today")) {
-            java.time.DayOfWeek dow = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).getDayOfWeek();
+            java.time.DayOfWeek dow = java.time.LocalDate.now(AssistantTimezone.ZONE).getDayOfWeek();
             return dow == java.time.DayOfWeek.SUNDAY ? 1 : dow.getValue() + 1;
         }
         if (lower.contains("ngày mai") || lower.contains("ngay mai") || lower.contains("tomorrow")) {
-            java.time.DayOfWeek dow = java.time.LocalDate.now(java.time.ZoneId.of("Asia/Ho_Chi_Minh")).plusDays(1).getDayOfWeek();
+            java.time.DayOfWeek dow = java.time.LocalDate.now(AssistantTimezone.ZONE).plusDays(1).getDayOfWeek();
             return dow == java.time.DayOfWeek.SUNDAY ? 1 : dow.getValue() + 1;
         }
 

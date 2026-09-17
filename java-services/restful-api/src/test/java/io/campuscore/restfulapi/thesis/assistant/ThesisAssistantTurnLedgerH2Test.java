@@ -65,16 +65,29 @@ class ThesisAssistantTurnLedgerH2Test {
     }
 
     @Test
-    void failedPreDispatchCanBeReacquiredWithFencedGeneration() {
+    void quotaExhaustedTurnStaysCompletableWithDegradedAnswer() {
         String owner = "quota-owner-" + UUID.randomUUID();
         UUID key = UUID.randomUUID();
         ThesisAssistantTurnRepository.Reservation reservation = turns.reserve(owner, key, AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-a", 90);
         turns.markSnapshotReady(reservation.turnId(), owner, reservation.leaseGeneration(), "b".repeat(64));
         assertEquals("QUOTA_EXCEEDED", turns.dispatch(reservation.turnId(), owner, reservation.leaseGeneration(), 1, 1).reasonCode());
-        ThesisAssistantTurnRepository.Reservation retry = turns.reserve(owner, key, reservationHash("topic", "en"), null, "en", "lease-b", 90);
-        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.RETRYABLE, retry.status());
-        assertEquals(reservation.leaseGeneration() + 1, retry.leaseGeneration());
-        assertTrue(turns.markSnapshotReady(retry.turnId(), owner, retry.leaseGeneration(), "c".repeat(64)));
+        // CB-P2-5: a quota block no longer downgrades the turn to
+        // FAILED_PRE_DISPATCH. The row stays SNAPSHOT_READY so the service can
+        // complete the grounded lexical answer with the QUOTA_EXCEEDED reason,
+        // and the quota buckets stay uncharged.
+        ThesisAssistantTurnRepository.TerminalResult result = turns.complete(reservation.turnId(), owner,
+                reservation.leaseGeneration(), "topic", "curated-lexical-rag",
+                "grounded answer", true, "QUOTA_EXCEEDED", List.of());
+        assertEquals("COMPLETED", result.terminalStatus());
+        assertEquals("QUOTA_EXCEEDED", result.reasonCode());
+        assertTrue(result.degraded());
+        assertEquals(0, jdbc.queryForObject(
+                "SELECT request_count FROM assistant.usage_bucket WHERE owner_id=:owner AND scope='USER'",
+                p("owner", owner), Integer.class));
+        // The completed turn is replayable under the same idempotency key.
+        ThesisAssistantTurnRepository.Reservation replay = turns.reserve(owner, key,
+                AssistantInputGuard.canonicalHash("topic", "en", null), null, "en", "lease-b", 90);
+        assertEquals(ThesisAssistantTurnRepository.ReservationStatus.REPLAY, replay.status());
     }
 
     @Test

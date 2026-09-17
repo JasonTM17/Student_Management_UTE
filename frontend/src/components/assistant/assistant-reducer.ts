@@ -57,7 +57,7 @@ export type AssistantAction =
   | { type: 'assistant-start'; message: ChatMessage }
   | { type: 'retry-start'; prompt: string }
   | { type: 'delta'; text: string }
-  | { type: 'replace'; text: string }
+  | { type: 'replace'; text: string; reasonCode?: string }
   | { type: 'meta'; model?: string; conversationId?: string }
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
@@ -152,11 +152,18 @@ export function assistantReducer(
     case 'replace': {
       const index = state.messages.length - 1;
       if (index < 0 || state.messages[index].role !== 'assistant') return state;
+      // A replace carrying reason ANSWERED is a deterministic spacing repair of
+      // an otherwise fully successful answer (the server normalizes glued
+      // numbers at the provider boundary). It must not flash the degraded
+      // badge; every other replace reason (or an untagged local replace from
+      // the guard/cancel paths) is a genuine degradation.
+      const isSuccessfulRepair = action.reasonCode === 'ANSWERED';
       const messages = [...state.messages];
       messages[index] = {
         ...messages[index],
         content: action.text,
-        degraded: true,
+        degraded: isSuccessfulRepair ? false : true,
+        reasonCode: isSuccessfulRepair ? action.reasonCode : messages[index].reasonCode,
         pending: true,
       };
       return { ...state, messages };

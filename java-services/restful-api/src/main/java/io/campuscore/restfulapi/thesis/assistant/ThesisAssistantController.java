@@ -97,11 +97,31 @@ public class ThesisAssistantController {
         return chat(request, actor);
     }
 
+    /** Comment frame cadence: a proxy/CDN idle timeout is typically 30-60 s. */
+    private static final long HEARTBEAT_INTERVAL_MS = 15_000L;
+    private static final java.util.concurrent.ScheduledExecutorService HEARTBEAT_SCHEDULER =
+            java.util.concurrent.Executors.newSingleThreadScheduledExecutor(runnable -> {
+                Thread thread = new Thread(runnable, "assistant-sse-heartbeat");
+                thread.setDaemon(true);
+                return thread;
+            });
+
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
         SseEmitter emitter = new SseEmitter(120_000L);
+        // Emit an SSE comment frame while the emitter is open so a proxy or CDN
+        // cannot idle-kill the connection during a slow model start. Comment
+        // frames (":heartbeat") are transport-level noise: SSE clients ignore
+        // them, and the frontend stream parser skips them without disturbing
+        // event ordering or the delta sequence.
+        java.util.concurrent.ScheduledFuture<?> heartbeat = HEARTBEAT_SCHEDULER.scheduleWithFixedDelay(
+                () -> sendHeartbeat(emitter), HEARTBEAT_INTERVAL_MS, HEARTBEAT_INTERVAL_MS,
+                java.util.concurrent.TimeUnit.MILLISECONDS);
+        Runnable stopHeartbeat = () -> heartbeat.cancel(false);
+        emitter.onCompletion(stopHeartbeat);
+        emitter.onTimeout(stopHeartbeat);
         String owner = subject(actor);
         Consumer<ThesisAssistantService.StreamEvent> sink = event -> send(emitter, event);
         try {
@@ -134,6 +154,8 @@ public class ThesisAssistantController {
             LOG.warn("assistant stream failed with {}", exception.getClass().getSimpleName());
             sendError(emitter, "ASSISTANT_UNAVAILABLE", true);
             emitter.complete();
+        } finally {
+            stopHeartbeat.run();
         }
         return emitter;
     }
@@ -251,12 +273,27 @@ public class ThesisAssistantController {
     private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {
         try {
             String name = eventName(event);
-            emitter.send(SseEmitter.event().name(name).data(event));
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().name(name).data(event));
+            }
         } catch (Exception exception) {
             // A browser disconnect is a transport concern, not a provider or
             // ledger failure. Mark the emitter closed and let the service finish
             // its terminal CAS so the same clientRequestId can replay safely.
             try { emitter.completeWithError(exception); } catch (Exception ignored) { }
+        }
+    }
+
+    /** Transport-level keepalive; an SSE comment is ignored by every conforming parser. */
+    private static void sendHeartbeat(SseEmitter emitter) {
+        try {
+            synchronized (emitter) {
+                emitter.send(SseEmitter.event().comment("heartbeat"));
+            }
+        } catch (Exception exception) {
+            // The connection died while the model was still working. The
+            // worker thread's own send will fail and complete the emitter,
+            // which cancels the heartbeat via onCompletion.
         }
     }
 
