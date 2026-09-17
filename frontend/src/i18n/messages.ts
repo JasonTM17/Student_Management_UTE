@@ -89,7 +89,7 @@ export const en = {
     },
     campusErrors: {
       network:
-        'CampusCore could not reach the campus portal right now. Try again in a moment.',
+        'CampusUTE could not reach the campus portal right now. Try again in a moment.',
       validation: 'Please check the details and try again.',
       conflict:
         'That change could not be completed. Please check the current records and try again.',
@@ -110,6 +110,14 @@ export const en = {
         WINDOW_CLOSED: 'The registration window is closed for this round.',
         PREREQUISITE_UNMET: 'You have not met the prerequisite for this course yet.',
         COREQUISITE_UNMET: 'Register the co-requisite course together with this one.',
+        COHORT_INELIGIBLE:
+          'This course is only open to students in the eligible academic cohort.',
+        SUPERVISOR_CANNOT_CHAIR_COUNCIL:
+          'A supervisor cannot serve as the council chair for their supervised topic.',
+        COUNCIL_SIZE_INVALID:
+          'An evaluation council must consist of 3 to 5 members per academic regulations.',
+        CREDIT_LIMIT_APPLICATION_EXISTS:
+          'You already have a pending credit limit exception application.',
         IDEMPOTENCY_IN_PROGRESS: 'Your previous request is still being processed. Try again in a moment.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Only a submitted group with a topic can be reviewed.',
         // Thesis group/member management
@@ -298,15 +306,15 @@ export const en = {
           'One portal for students, lecturers, and admins with sharper states, fewer dead ends, and calmer navigation.',
       },
     ],
-    whyEyebrow: 'Why CampusCore stays on one campus portal',
+    whyEyebrow: 'Why CampusUTE stays on one campus portal',
     whyTitle: 'Keep the course project focused and reproducible',
     whyDescription:
-      'CampusCore keeps academic records in one campus portal so registration, access, and the class demonstration remain easy to understand.',
+      'CampusUTE keeps academic records in one campus portal so registration, access, and the class demonstration remain easy to understand.',
     whyPoints: [
       {
         title: 'One campus portal',
         description:
-          'Students, lecturers, and admins work from the same CampusCore home.',
+          'Students, lecturers, and admins work from the same CampusUTE home.',
       },
       {
         title: 'The right place to start',
@@ -389,7 +397,7 @@ export const en = {
       {
         title: 'One campus portal',
         description:
-          'Students, lecturers, and admins share the same CampusCore home.',
+          'Students, lecturers, and admins share the same CampusUTE home.',
       },
       {
         title: 'Records you can trust',
@@ -452,7 +460,7 @@ export const en = {
     reasonMessages: {
       sessionExpired: {
         title: 'Your session ended',
-        body: 'Sign in again to continue working in CampusCore.',
+        body: 'Sign in again to continue working in CampusUTE.',
       },
       unauthorized: {
         title: 'Sign in required',
@@ -475,7 +483,7 @@ export const en = {
       invalidCredentials: 'The email address or password is incorrect.',
       blocked: 'This sign-in attempt was blocked. Refresh the page and try again.',
       backendUnavailable:
-        'CampusCore could not reach sign-in right now. Try again in a moment.',
+        'CampusUTE could not reach sign-in right now. Try again in a moment.',
       temporaryUnavailable:
         'Sign-in is temporarily unavailable. Please try again in a moment.',
     },
@@ -670,7 +678,7 @@ export const en = {
   },
   resetPassword: {
     eyebrow: 'Reset password',
-    title: 'Set a new password and get back into CampusCore.',
+    title: 'Set a new password and get back into CampusUTE.',
     description:
       'Choose a fresh password for your campus account. Once complete, you will sign in again with the updated credentials.',
     featureTitles: ['One secure path', 'Clear requirements', 'Consistent recovery'],
@@ -741,7 +749,7 @@ export const en = {
       ['Departments', 'Manage departmental structure and faculty mappings.'],
       ['Classrooms', 'Track rooms, buildings, and capacity readiness.'],
       ['Announcements', 'Publish updates that flow out to the rest of the campus.'],
-      ['Campus assistant knowledge', 'Review the public campus guidance available to the CampusCore assistant.'],
+      ['Campus assistant knowledge', 'Review the public campus guidance available to the CampusUTE assistant.'],
       ['Site appearance', 'Change the public campus look and the order of notices.'],
       ['Credit-limit applications', 'Review student requests to register up to 30 credits.'],
     ],
@@ -886,6 +894,7 @@ export const en = {
       announcements: 'Academic Affairs Notices',
       notifications: 'Notifications',
       thesis: 'Thesis area',
+      certificates: 'Student Certificates',
       editor: 'Academic Editor',
       teachingSchedule: 'Teaching schedule',
       gradeManagement: 'Grade management',
@@ -969,6 +978,7 @@ export const en = {
       grades: 'Review published grades and current academic standing.',
       transcript: 'View cumulative academic history and semester outcomes.',
       conduct: 'Track conduct score, 5 evaluation criteria, and extracurricular activities.',
+      certificates: 'Generate and print official student verification certificates.',
       announcements: 'Read campus-wide updates and shared notices.',
       notifications:
         'Review account alerts, academic deadlines, and workflow updates in one focused inbox.',
@@ -1326,7 +1336,7 @@ export const en = {
       submitFailed: 'The report could not be submitted.',
       fileLabel: 'Report document',
       fileHint: 'Upload a Word/PDF document (max 20 MB).',
-      uploadPrimaryHint: 'Recommended: store the final document securely in CampusCore storage.',
+      uploadPrimaryHint: 'Recommended: store the final document securely in CampusUTE storage.',
       selectedFile: 'Selected file',
       urlAlternative: 'Use an external link instead (optional)',
       fileRequired: 'Attach a document or provide a report link.',
@@ -1458,15 +1468,15 @@ export const en = {
   },
   assistant: {
     label: 'Campus helpdesk',
-    title: 'CampusCore assistant',
+    title: 'CampusUTE assistant',
     description: 'Ask about registration, schedules, announcements, the academic catalog, policies, or your thesis journey.',
-    open: 'Open CampusCore assistant',
-    close: 'Close CampusCore assistant',
+    open: 'Open CampusUTE assistant',
+    close: 'Close CampusUTE assistant',
     placeholder: 'Ask about registration, schedules, announcements, or your thesis journey…',
     send: 'Send message',
-    thinking: 'Checking the public CampusCore knowledge base…',
+    thinking: 'Checking the public CampusUTE knowledge base…',
     empty: 'Start with a focused question about campus services or your thesis journey.',
-    launcherHint: 'Ask CampusCore AI',
+    launcherHint: 'Ask CampusUTE AI',
     slotLabel: 'Assistant',
     greeting: 'Hello! How can I help you?',
     followUpsLabel: 'Keep asking',
@@ -1734,7 +1744,7 @@ export const vi: I18nMessages = {
     },
     campusErrors: {
       network:
-        'CampusCore chưa kết nối được cổng học vụ lúc này. Hãy thử lại sau một lát.',
+        'CampusUTE chưa kết nối được cổng học vụ lúc này. Hãy thử lại sau một lát.',
       validation: 'Hãy kiểm tra lại thông tin rồi thử lại.',
       conflict:
         'Thay đổi này chưa thể hoàn tất. Hãy kiểm tra hồ sơ hiện tại rồi thử lại.',
@@ -1753,8 +1763,16 @@ export const vi: I18nMessages = {
         DUPLICATE_COURSE: 'Bạn đã đăng ký một lớp khác của học phần này.',
         CREDIT_CAP_EXCEEDED: 'Đăng ký học phần này sẽ vượt giới hạn tín chỉ tối đa của học kỳ.',
         WINDOW_CLOSED: 'Cửa sổ đăng ký của đợt này đã đóng.',
-        PREREQUISITE_UNMET: 'Bạn chưa hoàn thành học phần tiền điều kiện.',
+        PREREQUISITE_UNMET: 'Bạn chưa hoàn thành học phần tiên quyết.',
         COREQUISITE_UNMET: 'Hãy đăng ký học phần song hành cùng học phần này.',
+        COHORT_INELIGIBLE:
+          'Học phần này chỉ mở cho sinh viên thuộc đúng niên khóa/chương trình đào tạo.',
+        SUPERVISOR_CANNOT_CHAIR_COUNCIL:
+          'Giảng viên hướng dẫn không được đảm nhiệm vị trí Chủ tịch hội đồng bảo vệ cho đề tài này.',
+        COUNCIL_SIZE_INVALID:
+          'Hội đồng đánh giá phải có từ 3 đến 5 thành viên theo quy chế.',
+        CREDIT_LIMIT_APPLICATION_EXISTS:
+          'Sinh viên đã có đơn xin nâng hạn mức tín chỉ đang chờ xử lý.',
         IDEMPOTENCY_IN_PROGRESS: 'Yêu cầu trước của bạn đang được xử lý. Vui lòng thử lại sau chốc lát.',
         GROUP_APPROVAL_STATE_CONFLICT: 'Chỉ nhóm đã gửi kèm đề tài mới có thể được duyệt.',
         // Quản lý nhóm/thành viên khóa luận
@@ -1871,7 +1889,7 @@ export const vi: I18nMessages = {
     },
   },
   home: {
-    navSubtitle: 'Cổng học vụ CampusCore',
+    navSubtitle: 'Cổng học vụ CampusUTE',
     eyebrow: 'ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH',
     title: 'Cổng Thông Tin Đào Tạo & Học Vụ Trực Tuyến',
     description:
@@ -1944,15 +1962,15 @@ export const vi: I18nMessages = {
           'Một cổng chung cho sinh viên, giảng viên và quản trị với trạng thái rõ hơn, ít ngõ cụt hơn và điều hướng điềm tĩnh hơn.',
       },
     ],
-    whyEyebrow: 'Vì sao CampusCore giữ một cổng học vụ',
+    whyEyebrow: 'Vì sao CampusUTE giữ một cổng học vụ',
     whyTitle: 'Giữ đồ án tập trung và dễ tái lập',
     whyDescription:
-      'CampusCore giữ hồ sơ học vụ trong một cổng để đăng ký, phân quyền và bản trình diễn môn học dễ hiểu.',
+      'CampusUTE giữ hồ sơ học vụ trong một cổng để đăng ký, phân quyền và bản trình diễn môn học dễ hiểu.',
     whyPoints: [
       {
         title: 'Một cổng học vụ',
         description:
-          'Sinh viên, giảng viên và quản trị làm việc trên cùng cổng CampusCore.',
+          'Sinh viên, giảng viên và quản trị làm việc trên cùng cổng CampusUTE.',
       },
       {
         title: 'Đúng khu vực học vụ',
@@ -2035,7 +2053,7 @@ export const vi: I18nMessages = {
       {
         title: 'Một cổng học vụ',
         description:
-          'Sinh viên, giảng viên và quản trị dùng chung một cổng CampusCore.',
+          'Sinh viên, giảng viên và quản trị dùng chung một cổng CampusUTE.',
       },
       {
         title: 'Hồ sơ học vụ đáng tin',
@@ -2067,14 +2085,14 @@ export const vi: I18nMessages = {
     footerCopyright: 'Mọi quyền được bảo lưu.',
   },
   authShell: {
-    desktopSubtitle: 'Cổng học vụ CampusCore',
+    desktopSubtitle: 'Cổng học vụ CampusUTE',
     mobileSubtitle: 'Truy cập học vụ',
     lecturerSubtitle: 'Không gian giảng viên',
     adminSubtitle: 'Công cụ quản trị nhà trường',
   },
   login: {
     eyebrow: 'Truy cập an toàn',
-    title: 'Đăng nhập vào cổng học vụ CampusCore.',
+    title: 'Đăng nhập vào cổng học vụ CampusUTE.',
     description:
       'Đăng nhập bằng tài khoản nhà trường để tiếp tục đăng ký học phần, xem điểm và nhận thông báo.',
     featureTitles: ['Đúng nơi bắt đầu', 'Một lần đăng nhập', 'Sẵn sàng cho buổi học'],
@@ -2098,7 +2116,7 @@ export const vi: I18nMessages = {
     reasonMessages: {
       sessionExpired: {
         title: 'Lần đăng nhập của bạn đã kết thúc',
-        body: 'Hãy đăng nhập lại để tiếp tục làm việc trong CampusCore.',
+        body: 'Hãy đăng nhập lại để tiếp tục làm việc trong CampusUTE.',
       },
       unauthorized: {
         title: 'Cần đăng nhập',
@@ -2121,7 +2139,7 @@ export const vi: I18nMessages = {
       invalidCredentials: 'Email hoặc mật khẩu không đúng.',
       blocked: 'Lần đăng nhập này đã bị chặn. Hãy làm mới trang rồi thử lại.',
       backendUnavailable:
-        'CampusCore hiện chưa kết nối được tới dịch vụ đăng nhập. Hãy thử lại sau ít phút.',
+        'CampusUTE hiện chưa kết nối được tới dịch vụ đăng nhập. Hãy thử lại sau ít phút.',
       temporaryUnavailable:
         'Đăng nhập tạm thời chưa sẵn sàng. Vui lòng thử lại sau ít phút.',
     },
@@ -2133,7 +2151,7 @@ export const vi: I18nMessages = {
         eyebrow: 'Cổng Sinh viên',
         title: 'Đăng nhập Cổng Sinh viên.',
         description:
-          'Đăng ký học phần, xem thời khóa biểu và theo dõi điểm từ bàn làm việc sinh viên.',
+          'Đăng ký học phần, xem thời khóa biểu và theo dõi điểm từ Cổng thông tin sinh viên.',
         heading: 'Đăng nhập sinh viên',
         subheading: 'Dùng tài khoản sinh viên để mở đăng ký và hồ sơ lớp học.',
         officeSupport: 'Phòng Đào tạo',
@@ -2316,7 +2334,7 @@ export const vi: I18nMessages = {
   },
   resetPassword: {
     eyebrow: 'Đặt lại mật khẩu',
-    title: 'Tạo mật khẩu mới và quay lại CampusCore.',
+    title: 'Tạo mật khẩu mới và quay lại CampusUTE.',
     description:
       'Chọn mật khẩu mới cho tài khoản nhà trường của bạn. Sau khi xong, bạn sẽ đăng nhập lại bằng thông tin vừa cập nhật.',
     featureTitles: ['Một đường đi an toàn', 'Yêu cầu rõ ràng', 'Khôi phục nhất quán'],
@@ -2387,7 +2405,7 @@ export const vi: I18nMessages = {
       ['Bộ môn', 'Quản lý cấu trúc bộ môn và ánh xạ khoa.'],
       ['Phòng học', 'Theo dõi phòng, tòa nhà và mức sẵn sàng về sức chứa.'],
       ['Thông báo', 'Đăng cập nhật đến toàn trường.'],
-      ['Kho tri thức trợ lý CampusCore', 'Quản lý nội dung campus công khai mà trợ lý CampusCore sử dụng.'],
+      ['Kho tri thức trợ lý CampusUTE', 'Quản lý nội dung campus công khai mà trợ lý CampusUTE sử dụng.'],
       ['Diện mạo cổng', 'Đổi giao diện công khai và thứ tự thông báo.'],
       ['Đơn xin vượt hạn mức tín chỉ', 'Xét duyệt đơn xin đăng ký tối đa 30 tín chỉ.'],
     ],
@@ -2532,6 +2550,7 @@ export const vi: I18nMessages = {
       announcements: 'Thông báo Phòng Đào tạo',
       notifications: 'Trung tâm thông báo',
       thesis: 'Đồ án – Khóa luận',
+      certificates: 'Giấy xác nhận điện tử',
       editor: 'Trình soạn thảo',
       teachingSchedule: 'Lịch giảng dạy',
       gradeManagement: 'Quản lý điểm',
@@ -2615,6 +2634,7 @@ export const vi: I18nMessages = {
       grades: 'Xem điểm đã công bố và trạng thái học tập hiện tại.',
       transcript: 'Xem lịch sử học tập tích lũy và kết quả theo học kỳ.',
       conduct: 'Theo dõi điểm rèn luyện, 5 tiêu chí đánh giá và hoạt động phong trào UTE.',
+      certificates: 'Tạo và in giấy xác nhận sinh viên điện tử phục vụ các thủ tục hành chính.',
       announcements: 'Đọc các cập nhật dùng chung của nhà trường.',
       notifications:
         'Xem cảnh báo tài khoản, hạn học vụ và cập nhật quy trình trong một hộp thư tập trung.',
@@ -2640,7 +2660,7 @@ export const vi: I18nMessages = {
     currentTermFallback: 'Chưa có học kỳ hoạt động',
     currentDateLabel: 'Hôm nay',
     metrics: {
-      coursesInScope: 'Môn học trong phạm vi',
+      coursesInScope: 'Học phần đã đăng ký',
       confirmedEnrollments: 'Đăng ký đang hoạt động',
       pendingDecisions: 'Mục chờ xử lý',
       currentSemester: 'Học kỳ hiện tại',
@@ -2852,9 +2872,9 @@ export const vi: I18nMessages = {
     description: 'Đợt, đề tài, nhóm, báo cáo và kết quả ở cùng một nơi.',
     selectRound: 'Chọn đợt đăng ký đề tài',
     noRound: 'Chưa có đợt đăng ký đề tài nào.',
-    loading: 'Đang tải khu đồ án',
+    loading: 'Đang tải phân hệ khóa luận tốt nghiệp',
     loadFailed: 'Hiện chưa thể tải dữ liệu luận văn.',
-    retry: 'Thử tải lại khu luận văn',
+    retry: 'Thử tải lại phân hệ khóa luận',
     roundStatus: 'Trạng thái đợt',
     registrationWindow: 'Cửa sổ đăng ký',
     topics: 'Đề tài đã công bố',
@@ -2972,7 +2992,7 @@ export const vi: I18nMessages = {
       submitFailed: 'Không thể nộp báo cáo.',
       fileLabel: 'Tài liệu báo cáo',
       fileHint: 'Nộp file Word/PDF (tối đa 20 MB).',
-      uploadPrimaryHint: 'Khuyến nghị: lưu tài liệu hoàn chỉnh an toàn trong kho lưu trữ CampusCore.',
+      uploadPrimaryHint: 'Khuyến nghị: lưu tài liệu hoàn chỉnh an toàn trong kho lưu trữ CampusUTE.',
       selectedFile: 'File đã chọn',
       urlAlternative: 'Dùng liên kết ngoài thay thế (không bắt buộc)',
       fileRequired: 'Hãy đính kèm tài liệu hoặc nhập liên kết báo cáo.',
@@ -2983,10 +3003,10 @@ export const vi: I18nMessages = {
     },
     results: {
       title: 'Kết quả',
-      description: 'Điểm cuối do hội đồng công bố cho đợt này.',
+      description: 'Điểm bảo vệ do hội đồng công bố cho đợt này.',
       notPublished: 'Kết quả chưa được công bố',
       noResults: 'Bạn chưa có kết quả nào trong đợt này.',
-      finalScore: 'Điểm cuối',
+      finalScore: 'Điểm bảo vệ',
       council: 'Hội đồng',
     },
     councils: {
@@ -3024,7 +3044,7 @@ export const vi: I18nMessages = {
       scoreInputLabel: 'Điểm bảo vệ (0 - 10)',
       saveScore: 'Lưu điểm',
       scoreSaved: 'Đã lưu điểm bảo vệ thành công.',
-      finalScoreLabel: 'Điểm cuối (Trung bình)',
+      finalScoreLabel: 'Điểm bảo vệ (Trung bình)',
       finalizeButton: 'Tổng hợp & Chốt điểm',
       finalizedBadge: 'Đã chốt điểm',
       waitingGrades: 'Đang chờ thành viên chấm đủ ({submitted}/{total})',
@@ -3103,16 +3123,16 @@ export const vi: I18nMessages = {
     },
   },
   assistant: {
-    label: 'Trợ lý học vụ CampusCore',
-    title: 'Trợ lý CampusCore',
+    label: 'Trợ lý học vụ CampusUTE',
+    title: 'Trợ lý CampusUTE',
     description: 'Hỏi về đăng ký học phần, lịch học, thông báo, học liệu, chính sách hoặc hành trình luận văn.',
-    open: 'Mở trợ lý CampusCore',
-    close: 'Đóng trợ lý CampusCore',
+    open: 'Mở trợ lý CampusUTE',
+    close: 'Đóng trợ lý CampusUTE',
     placeholder: 'Hỏi về đăng ký, lịch học, thông báo hoặc hành trình luận văn…',
     send: 'Gửi tin nhắn',
-    thinking: 'Đang kiểm tra kho kiến thức CampusCore công khai…',
+    thinking: 'Đang kiểm tra kho kiến thức CampusUTE công khai…',
     empty: 'Đặt câu hỏi về quy chế học vụ, đăng ký học phần, thời khóa biểu hoặc khóa luận tốt nghiệp.',
-    launcherHint: 'Hỏi trợ lý CampusCore',
+    launcherHint: 'Hỏi trợ lý CampusUTE',
     slotLabel: 'Trợ lý',
     greeting: 'Xin chào! Mình có thể giúp gì cho bạn?',
     followUpsLabel: 'Gợi ý tiếp theo',
@@ -3133,7 +3153,7 @@ export const vi: I18nMessages = {
       REGISTRATION: 'Đăng ký học phần',
       ACADEMIC_CATALOG: 'Danh mục học vụ',
       ANNOUNCEMENT: 'Thông báo',
-      POLICY: 'Chính sách CampusCore',
+      POLICY: 'Chính sách CampusUTE',
       GENERAL_FAQ: 'Câu hỏi thường gặp',
     },
     you: 'Bạn',
@@ -3147,7 +3167,7 @@ export const vi: I18nMessages = {
     historyEmpty: 'Chưa có hội thoại nào được lưu.',
     loadMoreHistory: 'Tải thêm hội thoại',
     loadMoreMessages: 'Tải tin nhắn cũ hơn',
-    untitledConversation: 'Hội thoại CampusCore',
+    untitledConversation: 'Hội thoại CampusUTE',
     model: 'Ghi chú nguồn',
     stop: 'Dừng tạo câu trả lời',
     retry: 'Thử lại',

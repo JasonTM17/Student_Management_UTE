@@ -38,14 +38,14 @@ export default function manifest(): MetadataRoute.Manifest {
         sizes: '1440x1024',
         type: 'image/svg+xml',
         form_factor: 'wide',
-        label: 'CampusCore homepage in English',
+        label: 'CampusUTE homepage in English',
       },
       {
         src: '/screenshots/home-vi.svg',
         sizes: '1440x1024',
         type: 'image/svg+xml',
         form_factor: 'wide',
-        label: 'Trang chủ CampusCore bằng tiếng Việt',
+        label: 'Trang chủ CampusUTE bằng tiếng Việt',
       },
     ],
   };

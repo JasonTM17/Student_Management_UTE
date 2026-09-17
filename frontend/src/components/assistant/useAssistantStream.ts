@@ -282,7 +282,7 @@ export function useAssistantStream({
               applyStreamEvent({
                 type: 'meta',
                 conversationId: requestedConversationId,
-                model: 'CampusCore Student Assistant',
+                model: 'CampusUTE Student Assistant',
               });
               applyStreamEvent({
                 type: 'delta',

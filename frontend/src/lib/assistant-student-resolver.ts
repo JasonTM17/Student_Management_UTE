@@ -589,8 +589,8 @@ export async function resolveStudentAssistantQuery(
   ) {
     const greetingHeader =
       locale === 'vi'
-        ? `Chào **${displayName}**! Mình là **Trợ lý học vụ CampusCore**.`
-        : `Hello **${displayName}**! I’m the **CampusCore academic assistant**.`;
+        ? `Chào **${displayName}**! Mình là **Trợ lý học vụ CampusUTE**.`
+        : `Hello **${displayName}**! I’m the **CampusUTE academic assistant**.`;
 
     const answer =
       locale === 'vi'
@@ -618,13 +618,13 @@ export async function resolveStudentAssistantQuery(
   if (CAPABILITIES_REGEX.test(message)) {
     const answer =
       locale === 'vi'
-        ? `Mình là **Trợ lý học vụ CampusCore**.\n\n` +
+        ? `Mình là **Trợ lý học vụ CampusUTE**.\n\n` +
           `Mình có thể:\n` +
           `- Tra cứu lịch học, điểm số, thông báo và tiến độ học tập của bạn khi dữ liệu được cung cấp.\n` +
           `- Giải thích các hướng dẫn học vụ công khai dựa trên nguồn đã được duyệt.\n` +
           `- Hỗ trợ sinh viên và giảng viên theo quyền truy cập của từng tài khoản.\n\n` +
           `Nếu chưa đủ căn cứ, mình sẽ nói rõ thay vì tự suy đoán. Bạn có thể hỏi: *"Hôm nay tôi có lịch học không?"* hoặc *"Điểm GPA của tôi là bao nhiêu?"*.`
-        : `I’m the **CampusCore academic assistant**.\n\n` +
+        : `I’m the **CampusUTE academic assistant**.\n\n` +
           `I can:\n` +
           `- Check your schedules, grades, announcements, and academic progress when the records are available.\n` +
           `- Explain public academic guidance from approved sources.\n` +

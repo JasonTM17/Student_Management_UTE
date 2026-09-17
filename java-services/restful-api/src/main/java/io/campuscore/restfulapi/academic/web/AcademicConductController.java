@@ -74,8 +74,7 @@ public class AcademicConductController {
         if (!profileIds.isEmpty()) {
             return profileIds.get(0);
         }
-        // Fallback to default demo student
-        return "student-profile";
+        throw new ResponseStatusException(HttpStatus.FORBIDDEN, "STUDENT_PROFILE_REQUIRED");
     }
 
     private StudentConductSummaryDto buildStudentConductSummary(String studentProfileId) {

@@ -38,7 +38,7 @@ import { toast } from 'sonner';
 const conductCopy = {
   en: {
     institution: 'Ho Chi Minh City University of Technology and Engineering',
-    office: 'Student Affairs Office • CampusCore',
+    office: 'Student Affairs Office • CampusUTE',
     printTitle: 'Student Conduct Evaluation Report',
     pageEyebrow: 'HCMUTE • Student Affairs Office',
     pageTitle: 'Conduct score',
@@ -130,7 +130,7 @@ const conductCopy = {
   },
   vi: {
     institution: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
-    office: 'PHÒNG CÔNG TÁC SINH VIÊN • CAMPUSCORE',
+    office: 'PHÒNG CÔNG TÁC SINH VIÊN • CAMPUSUTE',
     printTitle: 'PHIẾU ĐÁNH GIÁ KẾT QUẢ RÈN LUYỆN SINH VIÊN',
     pageEyebrow: 'HCM-UTE • PHÒNG CTSV',
     pageTitle: 'Điểm rèn luyện',
