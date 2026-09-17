@@ -193,6 +193,11 @@ app:
     login-limit: ${RATE_LIMIT_LOGIN:15}
     default-limit: ${RATE_LIMIT_DEFAULT:40}
     default-window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
+  demo:
+    # The seeded showcase accounts carry passwords published in this repository's
+    # history, so they are DISABLED unless a deployment opts in. Local and
+    # evaluation builds set DEMO_ACCOUNTS_ENABLED=true; a public host must not.
+    accounts-enabled: ${DEMO_ACCOUNTS_ENABLED:false}
 
 deepseek:
   enabled: ${DEEPSEEK_ENABLED:false}

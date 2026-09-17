@@ -28,6 +28,13 @@ public class AdminUserMutationService {
     private static final String STUDENT = "\"campuscore_auth\".\"Student\"";
     private static final String LECTURER = "\"campuscore_auth\".\"Lecturer\"";
     private static final Set<String> SYSTEM_ROLES = Set.of("STUDENT", "LECTURER", "ADMIN", "TRUONG_KHOA", "SUPER_ADMIN");
+    /**
+     * Roles a plain administrator may not hand out. {@code TRUONG_KHOA} is here
+     * because a faculty head governs the thesis round lifecycle, which the role
+     * ceiling reserves above a plain administrator: without it one administrator
+     * could mint a dean and escalate through that account.
+     */
+    private static final Set<String> SUPER_ADMIN_ONLY_ROLES = Set.of("ADMIN", "SUPER_ADMIN", "TRUONG_KHOA");
     /** Lifecycle values the account-state filter and the UI understand. */
     private static final Set<String> ACCOUNT_STATUSES = Set.of("ACTIVE", "PENDING", "SUSPENDED", "LOCKED", "DISABLED");
     private static final String TEMP_PASSWORD_ALPHABET =
@@ -320,6 +327,18 @@ public class AdminUserMutationService {
                     HttpStatus.FORBIDDEN,
                     "ROLE_ESCALATION",
                     "Only a super administrator can manage super administrator accounts");
+        }
+        // A dean account carries the thesis round lifecycle, so granting it is a
+        // super-administrator action. Re-sending the role a user already holds is
+        // not a grant, though: the admin edit form echoes the unchanged role back,
+        // and refusing that would make every other field on the account unsavable.
+        if (!canManageSuperAdmin
+                && "TRUONG_KHOA".equals(roleName)
+                && !(userId != null && hasRole(userId, "TRUONG_KHOA"))) {
+            throw problem(
+                    HttpStatus.FORBIDDEN,
+                    "ROLE_ESCALATION",
+                    "Only a super administrator can assign the faculty head role");
         }
     }
 

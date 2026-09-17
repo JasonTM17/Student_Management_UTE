@@ -14,9 +14,21 @@ FROM node:20-alpine@sha256:fb4cd12c85ee03686f6af5362a0b0d56d50c58a04632e6c0fb836
 WORKDIR /app
 ARG JAVA_API_ORIGIN=http://restful-api:4010
 ARG NEXT_PUBLIC_API_URL=/api/v1
+# Demo quick-fill is opt-in and the passwords have no in-source fallback, so both
+# the flag and the values must be supplied at build time. Next.js inlines
+# NEXT_PUBLIC_* into the client bundle, so enabling this publishes the demo
+# credentials — correct for a local or evaluation image, never for a public host.
+ARG NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=false
+ARG NEXT_PUBLIC_DEMO_STUDENT_PASSWORD=
+ARG NEXT_PUBLIC_DEMO_LECTURER_PASSWORD=
+ARG NEXT_PUBLIC_DEMO_ADMIN_PASSWORD=
 ENV NEXT_TELEMETRY_DISABLED=1
 ENV JAVA_API_ORIGIN=${JAVA_API_ORIGIN}
 ENV NEXT_PUBLIC_API_URL=${NEXT_PUBLIC_API_URL}
+ENV NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=${NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS}
+ENV NEXT_PUBLIC_DEMO_STUDENT_PASSWORD=${NEXT_PUBLIC_DEMO_STUDENT_PASSWORD}
+ENV NEXT_PUBLIC_DEMO_LECTURER_PASSWORD=${NEXT_PUBLIC_DEMO_LECTURER_PASSWORD}
+ENV NEXT_PUBLIC_DEMO_ADMIN_PASSWORD=${NEXT_PUBLIC_DEMO_ADMIN_PASSWORD}
 
 COPY --from=deps /app/node_modules ./node_modules
 COPY frontend/ ./

@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.thesis.domain.ThesisTopic;
+import io.campuscore.restfulapi.thesis.domain.TopicStatus;
 import io.campuscore.restfulapi.thesis.repository.ThesisTopicRepository;
 import io.campuscore.restfulapi.web.DomainException;
 import java.util.List;
@@ -32,9 +33,18 @@ public class ThesisSupervisorService {
         this.topics = topics;
     }
 
+    /**
+     * Reads the supervisor list. Visibility follows the same rule as
+     * {@code ThesisTopicService.get}: a hidden (non-published, non-approved)
+     * topic is a 404 for everyone except its owner and staff, so the endpoint
+     * cannot be used to enumerate drafts. Supervisors' email addresses are
+     * staff/owner-only — students receive the display name they need for their
+     * group view and nothing more.
+     */
     @Transactional(readOnly = true)
-    public List<SupervisorRow> list(UUID topicId) {
-        requireTopic(topicId);
+    public List<SupervisorRow> list(UUID topicId, Jwt actor) {
+        ThesisTopic topic = requireVisible(topicId, actor);
+        boolean maySeeContactDetails = maySeeContactDetails(topic, actor);
         // The name travels with the row because the lecturer directory endpoint
         // is closed to students, which left their group view showing the raw
         // lecturer id instead of the supervisor's name.
@@ -53,7 +63,7 @@ public class ThesisSupervisorService {
                         rs.getInt("supervisor_order"),
                         rs.getString("first_name"),
                         rs.getString("last_name"),
-                        rs.getString("email")));
+                        maySeeContactDetails ? rs.getString("email") : null));
     }
 
     @Transactional
@@ -110,12 +120,52 @@ public class ThesisSupervisorService {
                             .addValue("lecturerId", lecturerId)
                             .addValue("order", order++));
         }
-        return list(topicId);
+        return list(topicId, actor);
     }
 
     private ThesisTopic requireTopic(UUID topicId) {
         return topics.findById(topicId)
                 .orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
+    }
+
+    /**
+     * Mirrors {@code ThesisTopicService.get}: a topic that is neither PUBLISHED
+     * nor APPROVED is invisible (404, not 403 — a 403 would confirm the id
+     * exists) to anyone who is not staff or its owner.
+     */
+    private ThesisTopic requireVisible(UUID topicId, Jwt actor) {
+        ThesisTopic topic = requireTopic(topicId);
+        if (isVisible(topic, actor)) {
+            return topic;
+        }
+        throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
+    }
+
+    private static boolean isVisible(ThesisTopic topic, Jwt actor) {
+        return topic.getStatus() == TopicStatus.PUBLISHED
+                || topic.getStatus() == TopicStatus.APPROVED
+                || isStaff(actor)
+                || isOwner(topic, actor);
+    }
+
+    private static boolean isStaff(Jwt actor) {
+        return hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+    }
+
+    private static boolean isOwner(ThesisTopic topic, Jwt actor) {
+        String actorId = subject(actor);
+        if (!StringUtils.hasText(actorId) || !StringUtils.hasText(topic.getCreatedBy())) {
+            return false;
+        }
+        if (topic.getCreatedBy().equals(actorId)) {
+            return true;
+        }
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        return StringUtils.hasText(lecturerId) && topic.getCreatedBy().equals(lecturerId);
+    }
+
+    private static boolean maySeeContactDetails(ThesisTopic topic, Jwt actor) {
+        return isStaff(actor) || isOwner(topic, actor);
     }
 
     private void authorize(ThesisTopic topic, Jwt actor) {
