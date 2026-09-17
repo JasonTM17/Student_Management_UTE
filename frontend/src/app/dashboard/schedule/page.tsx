@@ -187,7 +187,11 @@ export default function SchedulePage() {
     const items: DayAgendaItem[] = [];
 
     enrollments
-      .filter((enrollment) => isActiveEnrollment(enrollment.status))
+      .filter(
+        (enrollment) =>
+          isActiveEnrollment(enrollment.status) ||
+          enrollment.status === 'COMPLETED',
+      )
       .forEach((enrollment) => {
         const section = enrollment.section;
         const lecturerName =
@@ -200,7 +204,10 @@ export default function SchedulePage() {
           items.push({
             id: `${enrollment.id}-${index}`,
             courseCode: section.course?.code ?? 'Course',
-            courseName: section.course?.name ?? 'Unavailable',
+            courseName:
+              (locale === 'vi'
+                ? section.course?.nameVi || section.course?.name
+                : section.course?.nameEn || section.course?.name) ?? 'Unavailable',
             courseNameEn: section.course?.nameEn,
             courseNameVi: section.course?.nameVi,
             sectionNumber: section.sectionNumber,
@@ -222,7 +229,7 @@ export default function SchedulePage() {
       }
       return (left.startTime || '').localeCompare(right.startTime || '');
     });
-  }, [enrollments]);
+  }, [enrollments, locale]);
 
   const agendaByDay = useMemo(() => {
     return agenda.reduce<Record<number, DayAgendaItem[]>>((groups, item) => {
