@@ -2,54 +2,86 @@
 -- Purpose: Standardize thesis registration rounds by Academic Cohorts (Niên khóa) and Semesters/Academic Years
 -- according to HCMUTE academic regulations. Clean up test names and seed realistic topics.
 
--- 1. Standardize Thesis Rounds by Niên khóa
-UPDATE thesis.thesis_registration_round
-SET name = 'Khóa luận Tốt nghiệp - Niên khóa 2022 - 2026 (Năm học 2026 - 2027)',
-    thesis_type = 'KLTN',
-    status = 'REGISTRATION_OPEN',
-    registration_start = '2026-09-15 00:00:00+00',
-    registration_end = '2026-11-30 23:59:59+00'
-WHERE id = '22222222-2222-2222-2222-222222222101';
-
-UPDATE thesis.thesis_registration_round
-SET name = 'Tiểu luận Chuyên ngành - Niên khóa 2023 - 2027 (Học kỳ 1, Năm học 2026 - 2027)',
-    thesis_type = 'TLCN',
-    status = 'REGISTRATION_OPEN',
-    registration_start = '2026-09-10 00:00:00+00',
-    registration_end = '2026-10-31 23:59:59+00'
-WHERE id = '22d65ee6-f485-40ae-a66b-528d35007745';
-
-UPDATE thesis.thesis_registration_round
-SET name = 'Khóa luận Tốt nghiệp (Đợt 2) - Niên khóa 2022 - 2026 (Học kỳ 2, Năm học 2026 - 2027)',
-    thesis_type = 'KLTN',
-    status = 'PROPOSAL_OPEN',
-    registration_start = '2027-01-10 00:00:00+00',
-    registration_end = '2027-02-28 23:59:59+00'
-WHERE id = 'b3d980d4-8d69-4fa8-a423-6e8582b66aea';
-
-UPDATE thesis.thesis_registration_round
-SET name = 'Tiểu luận Chuyên ngành - Niên khóa 2022 - 2026 (Học kỳ 2, Năm học 2025 - 2026)',
-    thesis_type = 'TLCN',
-    status = 'RESULTS_PUBLISHED',
-    registration_start = '2026-02-15 00:00:00+00',
-    registration_end = '2026-03-31 23:59:59+00'
-WHERE id = 'bad8eba0-2d12-4414-8aab-7424174b3b97';
-
-UPDATE thesis.thesis_registration_round
-SET name = 'Khóa luận Tốt nghiệp - Niên khóa 2021 - 2025 (Đợt 1, Năm học 2025 - 2026)',
-    thesis_type = 'KLTN',
-    status = 'RESULTS_PUBLISHED',
-    registration_start = '2025-09-01 00:00:00+00',
-    registration_end = '2025-10-31 23:59:59+00'
-WHERE id = 'be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1';
-
-UPDATE thesis.thesis_registration_round
-SET name = 'Đồ án Chuyên ngành - Niên khóa 2021 - 2025 (Học kỳ 2, Năm học 2024 - 2025)',
-    thesis_type = 'TLCN',
-    status = 'RESULTS_PUBLISHED',
-    registration_start = '2025-02-15 00:00:00+00',
-    registration_end = '2025-03-31 23:59:59+00'
-WHERE id = 'b35e9ff1-1eb8-4e73-812e-04e1a66041f1';
+-- 1. Standardize Thesis Rounds by Niên khóa (Insert if fresh database, update if existing)
+INSERT INTO thesis.thesis_registration_round (
+    id,
+    name,
+    thesis_type,
+    status,
+    registration_start,
+    registration_end,
+    lecturer_submit_start,
+    lecturer_submit_end
+) VALUES
+    (
+        '22222222-2222-2222-2222-222222222101'::UUID,
+        'Khóa luận Tốt nghiệp - Niên khóa 2022 - 2026 (Năm học 2026 - 2027)',
+        'KLTN',
+        'REGISTRATION_OPEN',
+        '2026-09-15 00:00:00+00',
+        '2026-11-30 23:59:59+00',
+        '2026-08-01 00:00:00+00',
+        '2026-09-14 23:59:59+00'
+    ),
+    (
+        '22d65ee6-f485-40ae-a66b-528d35007745'::UUID,
+        'Tiểu luận Chuyên ngành - Niên khóa 2023 - 2027 (Học kỳ 1, Năm học 2026 - 2027)',
+        'TLCN',
+        'REGISTRATION_OPEN',
+        '2026-09-10 00:00:00+00',
+        '2026-10-31 23:59:59+00',
+        '2026-08-01 00:00:00+00',
+        '2026-09-09 23:59:59+00'
+    ),
+    (
+        'b3d980d4-8d69-4fa8-a423-6e8582b66aea'::UUID,
+        'Khóa luận Tốt nghiệp (Đợt 2) - Niên khóa 2022 - 2026 (Học kỳ 2, Năm học 2026 - 2027)',
+        'KLTN',
+        'PROPOSAL_OPEN',
+        '2027-01-10 00:00:00+00',
+        '2027-02-28 23:59:59+00',
+        '2026-12-01 00:00:00+00',
+        '2027-01-09 23:59:59+00'
+    ),
+    (
+        'bad8eba0-2d12-4414-8aab-7424174b3b97'::UUID,
+        'Tiểu luận Chuyên ngành - Niên khóa 2022 - 2026 (Học kỳ 2, Năm học 2025 - 2026)',
+        'TLCN',
+        'RESULTS_PUBLISHED',
+        '2026-02-15 00:00:00+00',
+        '2026-03-31 23:59:59+00',
+        '2026-01-01 00:00:00+00',
+        '2026-02-14 23:59:59+00'
+    ),
+    (
+        'be1aa853-f153-4f2e-a5cb-ed1b6c3c1bf1'::UUID,
+        'Khóa luận Tốt nghiệp - Niên khóa 2021 - 2025 (Đợt 1, Năm học 2025 - 2026)',
+        'KLTN',
+        'RESULTS_PUBLISHED',
+        '2025-09-01 00:00:00+00',
+        '2025-10-31 23:59:59+00',
+        '2025-08-01 00:00:00+00',
+        '2025-08-31 23:59:59+00'
+    ),
+    (
+        'b35e9ff1-1eb8-4e73-812e-04e1a66041f1'::UUID,
+        'Đồ án Chuyên ngành - Niên khóa 2021 - 2025 (Học kỳ 2, Năm học 2024 - 2025)',
+        'TLCN',
+        'RESULTS_PUBLISHED',
+        '2025-02-15 00:00:00+00',
+        '2025-03-31 23:59:59+00',
+        '2025-01-01 00:00:00+00',
+        '2025-02-14 23:59:59+00'
+    )
+ON CONFLICT (id) DO UPDATE SET
+    name = EXCLUDED.name,
+    thesis_type = EXCLUDED.thesis_type,
+    status = EXCLUDED.status,
+    registration_start = EXCLUDED.registration_start,
+    registration_end = EXCLUDED.registration_end,
+    lecturer_submit_start = EXCLUDED.lecturer_submit_start,
+    lecturer_submit_end = EXCLUDED.lecturer_submit_end,
+    updated_at = CURRENT_TIMESTAMP;
 
 -- 2. Standardize scratch topic titles into formal academic topics
 UPDATE thesis.thesis_topic
