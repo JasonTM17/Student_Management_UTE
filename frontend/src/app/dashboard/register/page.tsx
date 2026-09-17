@@ -61,12 +61,13 @@ export default function RegisterPage() {
     setLoading(true);
     setError('');
     try {
-      const enrollmentData = await enrollmentsApi.getMyEnrollments();
+      const [enrollmentData, rounds] = await Promise.all([
+        enrollmentsApi.getMyEnrollments(),
+        registrationApi.rounds(),
+      ]);
       if (generation !== loadGeneration.current) return;
       setEnrollments(enrollmentData);
       try {
-        const rounds = await registrationApi.rounds();
-        if (generation !== loadGeneration.current) return;
         const open = rounds.some((round) => round.status === 'OPEN');
         setRoundOpen(open);
         const currentRound = rounds.find((round) => round.status === 'OPEN');
@@ -78,21 +79,20 @@ export default function RegisterPage() {
           return;
         }
         if (!currentRound) return;
-        const [eligibility, application] = await Promise.all([
+        const [eligibility, application, catalog] = await Promise.all([
           registrationApi.eligibility({
             semesterId: currentRound.semesterId,
             roundId: currentRound.id,
           }),
           registrationApi.creditLimitApplication(currentRound.id),
+          registrationApi.sections({
+            semesterId: currentRound.semesterId,
+            roundId: currentRound.id,
+          }),
         ]);
         if (generation !== loadGeneration.current) return;
         setCreditLimit(Math.min(30, Math.max(1, eligibility.creditLimit || 28)));
         setCreditApplication(application);
-        const catalog = await registrationApi.sections({
-          semesterId: currentRound.semesterId,
-          roundId: currentRound.id,
-        });
-        if (generation !== loadGeneration.current) return;
         setSections(catalog);
       } catch (catalogError) {
         if (generation !== loadGeneration.current) return;
