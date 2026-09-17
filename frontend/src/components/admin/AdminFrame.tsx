@@ -35,6 +35,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
 import { stripLocaleFromPathname } from '@/i18n/paths';
+import { isDemoUser } from '@/lib/login-portal';
 import { cn } from '@/lib/utils';
 
 interface AdminFrameProps {
@@ -392,8 +393,13 @@ export function AdminFrame({
                     <div className="truncate text-sm font-semibold text-foreground">
                       {locale === 'vi' ? 'Phòng Đào tạo' : 'Office of Academic Affairs'}
                     </div>
-                    <div className="truncate text-xs text-muted-foreground">
-                      {user?.email ?? 'daotao@hcmute.edu.vn'}
+                    <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
+                      <span>{user?.email ?? 'daotao@hcmute.edu.vn'}</span>
+                      {isDemoUser(user) && (
+                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                          ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
+                        </span>
+                      )}
                     </div>
                   </div>
                 </button>
@@ -415,8 +421,16 @@ export function AdminFrame({
                         <p className="truncate text-xs text-muted-foreground">
                           {user?.email ?? 'daotao@hcmute.edu.vn'}
                         </p>
-                        <div className="mt-1.5 inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">
-                          {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
+                        <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
+                          <div className="inline-flex rounded-none bg-primary/10 border border-primary/20 px-2 py-0.5 text-[11px] font-medium text-primary">
+                            {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
+                          </div>
+                          {isDemoUser(user) && (
+                            <div className="inline-flex items-center gap-1 rounded-none bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                              <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
+                              {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
+                            </div>
+                          )}
                         </div>
                       </div>
                     </div>

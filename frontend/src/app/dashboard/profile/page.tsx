@@ -10,6 +10,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState } from '@/components/ui/state-block';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
+import { isDemoUser } from '@/lib/login-portal';
 import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
 
@@ -155,7 +156,7 @@ function PasswordField({
 
 export default function ProfilePage() {
   const { user, refreshUser } = useAuth();
-  const { messages } = useI18n();
+  const { messages, locale } = useI18n();
   const [isLoading, setIsLoading] = useState(false);
   const [isUpdatingPassword, setIsUpdatingPassword] = useState(false);
   const [profileError, setProfileError] = useState('');
@@ -359,7 +360,7 @@ export default function ProfilePage() {
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">{messages.profile.photoHint}</p>
-                <div className="flex flex-wrap gap-2 pt-1">
+                <div className="flex flex-wrap items-center gap-2 pt-1">
                   {user?.roles?.map((role) => (
                     <span
                       key={role}
@@ -368,6 +369,12 @@ export default function ProfilePage() {
                       {roleLabel(role, messages.dashboardShell.roles)}
                     </span>
                   ))}
+                  {isDemoUser(user) && (
+                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
+                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                      {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
+                    </span>
+                  )}
                 </div>
               </div>
             </div>

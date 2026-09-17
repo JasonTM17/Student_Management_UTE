@@ -90,3 +90,15 @@ export function loginHref(
 
   return `${localize('/login')}?${params.toString()}`;
 }
+
+export function isDemoUser(user: { email?: string } | null | undefined): boolean {
+  if (!user?.email) return false;
+  const email = user.email.toLowerCase().trim();
+  return (
+    email === 'student@campuscore.edu' ||
+    email === 'lecturer@campuscore.edu' ||
+    email === 'admin@campuscore.edu' ||
+    email.endsWith('@campuscore.edu') ||
+    email.includes('demo')
+  );
+}
