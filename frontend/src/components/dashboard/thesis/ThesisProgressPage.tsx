@@ -17,9 +17,13 @@ function getProgressIndex(
   hasTopic: boolean,
   groupStatus?: string,
   roundStatus?: string,
+  approvalStatus?: string,
 ) {
   if (groupStatus === 'COMPLETED' || roundStatus === 'CLOSED') return 4;
-  if (groupStatus === 'APPROVED' || roundStatus === 'PROPOSALS_PUBLISHED') return 3;
+  // Approval lives on `approvalStatus` (the group `status` never holds
+  // APPROVED — it stays ASSIGNED/COMPLETED), so an approved group reached
+  // the council step even while the round is still publishing proposals.
+  if (approvalStatus === 'APPROVED' || roundStatus === 'PROPOSALS_PUBLISHED') return 3;
   if (hasTopic) return 2;
   if (hasGroup) return 1;
   return hasRound ? 0 : -1;
@@ -36,6 +40,7 @@ export default function ThesisProgressPage() {
     Boolean(workspace.currentGroup?.topicId),
     workspace.currentGroup?.status,
     selectedRound?.status,
+    workspace.currentGroup?.approvalStatus,
   );
 
   if (authLoading) {

@@ -3,17 +3,19 @@
 Supabase is an optional authoring mirror for the curated thesis assistant. The
 Java application continues to read `assistant.knowledge_document` from the
 local PostgreSQL database through Flyway. Supabase is not a runtime dependency,
-does not receive public chatbot traffic, and is not a production cutover.
+does not receive public chatbot traffic, and is not a production cutover. The
+active authoring project must be verified before any import/export; a Supabase
+project containing a different application's tables is not evidence that the
+CampusCore assistant corpus is present.
 
 ## Schema and access
 
 Apply `supabase/migrations/20260823073842_assistant_knowledge_authoring.sql`
 only after the controller verifies the intended Supabase project. The migration
 is idempotent against the existing `assistant.knowledge_document` table and
-creates no `public.assistant_knowledge_documents` duplicate. The controller
-applied the equivalent RLS hardening to the configured project and verified the
-table and advisor results; this file remains the reproducible source for another
-project.
+creates no `public.assistant_knowledge_documents` duplicate. RLS and advisor
+results must be checked again against that exact project after a migration; this
+file remains the reproducible source for another project.
 
 The migration ensures `assistant.knowledge_document` has the required `id`,
 `slug`, `title`, `content`, `locale`, `source`, `active`, `visibility`,
@@ -104,9 +106,9 @@ local PostgreSQL plus Java Flyway remains the runtime authority.
 ## Verification
 
 The local validation command above is the seed-count and duplicate `slug`
-invariant. It should pass before import and after export. The
-configured remote table was verified through Supabase MCP with 10 rows, 10
-active/public rows, RLS enabled, and no remaining security advisor lints after
-the controller revoked an unrelated public `rls_auto_enable()` RPC execute
-grant. An authenticated Data API request still requires a real staff token and
-was not run in this workspace; no service key is stored locally.
+invariant for the checked-in authoring fixture. It should pass before import and
+after export. Do not record a remote row count, RLS result, or advisor verdict
+unless the exact intended project has been identified and the read-only check
+has just been run against it. An authenticated Data API request still requires
+a real staff token and should only be run when explicitly authorized; no service
+key is stored locally.

@@ -37,7 +37,7 @@ public class OpenApiConfig {
                                 #### Các phân hệ nghiệp vụ chính:
                                 - **Xác thực & Định danh (Auth)**: JWT Token, đăng nhập đa vai trò (Sinh viên, Giảng viên, Phòng Đào tạo).
                                 - **Quản lý Học vụ & CTĐT (Academic)**: 8 Khoa đào tạo HCM-UTE, học phần, thời khóa biểu tuần, cơ chế điểm 50% Quá trình + 50% Cuối kỳ.
-                                - **Đăng ký Học phần (Registration)**: Kiểm tra xung đột lịch học, sĩ số lớp, giới hạn tối đa 28 tín chỉ/học kỳ.
+                                - **Đăng ký Học phần (Registration)**: Kiểm tra xung đột lịch học, sĩ số lớp, hạn mức chuẩn 28 tín chỉ/học kỳ; chỉ đơn được Phòng Đào tạo phê duyệt mới mở tối đa 30 tín chỉ cho đúng sinh viên.
                                 - **Điểm Rèn Luyện (Conduct - ĐRL)**: 5 tiêu chí rèn luyện chính thức theo Quyết định số 24/2020/QĐ-BGDĐT.
                                 - **Khóa luận Tốt nghiệp & Đồ án (Thesis Lifecycle)**:
                                   - Đợt đăng ký (NCKH, TLCN, KLTN).

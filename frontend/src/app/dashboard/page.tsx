@@ -15,7 +15,8 @@ import {
   TrendingUp,
 } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
-import { enrollmentsApi, semestersApi } from '@/lib/api';
+import { enrollmentsApi, registrationApi, semestersApi } from '@/lib/api';
+import { isActiveEnrollment } from '@/lib/enrollment-status';
 import { getLocalizedName } from '@/lib/academic-content';
 import { pickPreferredSemesterId } from '@/lib/semesters';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
@@ -88,7 +89,9 @@ function getMeetingShift(startTime: string, locale: string) {
   };
 }
 
-const TERM_CREDIT_CAP = 24;
+// The live cap comes from the registration round (registrationApi.summary);
+// without it the widget shows the earned credits only instead of inventing a
+// limit that would contradict the registration page.
 
 const quickAccess = [
   {
@@ -137,6 +140,7 @@ export default function DashboardPage() {
   const [currentSemester, setCurrentSemester] = useState<string>('');
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  const [termCreditCap, setTermCreditCap] = useState<number | null>(null);
 
   const copy =
     locale === 'vi'
@@ -157,6 +161,7 @@ export default function DashboardPage() {
           progressStatus: (pct: number) => `Đã đạt ${pct}% chỉ tiêu học kỳ`,
           creditsAvailable: (rem: number) => `Còn có thể đăng ký thêm ${rem} tín chỉ`,
           creditsCapped: 'Đã đạt hạn mức tín chỉ tối đa',
+          creditsEarnedOnly: 'Tín chỉ đã đăng ký kỳ này',
           pendingBadge: (count: string) => `${count} đăng ký chờ xử lý`,
           quickAccessTitle: 'Truy cập nhanh',
           coursesUnit: 'môn',
@@ -178,6 +183,7 @@ export default function DashboardPage() {
           progressStatus: (pct: number) => `${pct}% of term credit capacity`,
           creditsAvailable: (rem: number) => `Can register up to ${rem} more credits`,
           creditsCapped: 'Maximum credit limit reached',
+          creditsEarnedOnly: 'Credits registered this term',
           pendingBadge: (count: string) => `${count} registrations pending`,
           quickAccessTitle: 'Quick access',
           coursesUnit: 'courses',
@@ -196,6 +202,14 @@ export default function DashboardPage() {
         setCurrentSemester(preferredSemesterId);
         const enrollmentData = await enrollmentsApi.getMyEnrollments(preferredSemesterId);
         setEnrollments(enrollmentData);
+        // The registration round owns the credit cap; read it instead of a
+        // hardcoded constant so the dashboard never contradicts registration.
+        try {
+          const summary = await registrationApi.summary(preferredSemesterId);
+          setTermCreditCap(summary.creditLimit);
+        } catch {
+          setTermCreditCap(null);
+        }
       } else {
         setEnrollments([]);
       }
@@ -227,11 +241,10 @@ export default function DashboardPage() {
     semesters,
   ]);
 
-  // The API marks live registrations ENROLLED; CONFIRMED is the post-approval
-  // state. Counting only CONFIRMED showed "0" for students with active courses.
-  const activeCourses = enrollments.filter(
-    (enrollment) =>
-      enrollment.status === 'CONFIRMED' || enrollment.status === 'ENROLLED',
+  // Seat accounting mirrors the backend: PENDING rows occupy a seat and count
+  // toward the credit cap exactly like ENROLLED ones (lib/enrollment-status).
+  const activeCourses = enrollments.filter((enrollment) =>
+    isActiveEnrollment(enrollment.status),
   );
   const pendingCourses = enrollments.filter(
     (enrollment) => enrollment.status === 'PENDING',
@@ -242,11 +255,11 @@ export default function DashboardPage() {
     (sum, enrollment) => sum + (enrollment.section?.course?.credits ?? 0),
     0,
   );
-  const creditPercent = Math.min(
-    100,
-    Math.round((activeCredits / TERM_CREDIT_CAP) * 100),
-  );
-  const creditRemaining = Math.max(0, TERM_CREDIT_CAP - activeCredits);
+  const creditCap = termCreditCap;
+  const creditPercent = creditCap
+    ? Math.min(100, Math.round((activeCredits / creditCap) * 100))
+    : null;
+  const creditRemaining = creditCap ? Math.max(0, creditCap - activeCredits) : null;
 
   // Next class meetings derived from active sections.
   // DB schedule.dayOfWeek: 1=Sunday, 2=Monday, ..., 7=Saturday (0=Sunday).
@@ -296,8 +309,9 @@ export default function DashboardPage() {
     {
       label: copy.stats.courses,
       // Live registrations only: dropped/cancelled rows from add/drop
-      // experiments must not inflate the term count.
-      value: formatNumber(activeCourses.length + pendingCourses.length),
+      // experiments must not inflate the term count (PENDING included —
+      // activeCourses follows the seat-accounting definition).
+      value: formatNumber(activeCourses.length),
       icon: BookOpen,
       tone: metricToneClass('info'),
       href: '/dashboard/enrollments',
@@ -508,22 +522,24 @@ export default function DashboardPage() {
               <div className="flex items-center justify-between gap-2 text-sm">
                 <span className="font-medium text-foreground">{copy.creditLabel}</span>
                 <span className="font-semibold tabular-nums text-foreground">
-                  {formatNumber(activeCredits)} / {TERM_CREDIT_CAP}
+                  {formatNumber(activeCredits)}{creditCap ? ` / ${formatNumber(creditCap)}` : ''}
                 </span>
               </div>
               <div className="h-2.5 w-full overflow-hidden rounded-full bg-secondary">
                 <div
                   className="h-full rounded-full bg-primary transition-all duration-300"
-                  style={{ width: `${creditPercent}%` }}
+                  style={{ width: `${creditPercent ?? 0}%` }}
                 />
               </div>
               <div className="flex flex-wrap items-center justify-between gap-2 text-xs text-muted-foreground pt-0.5">
-                <span>{copy.progressStatus(creditPercent)}</span>
-                <span className="font-medium text-foreground/80">
-                  {creditRemaining > 0
-                    ? copy.creditsAvailable(creditRemaining)
-                    : copy.creditsCapped}
-                </span>
+                <span>{creditPercent === null ? copy.creditsEarnedOnly : copy.progressStatus(creditPercent)}</span>
+                {creditRemaining !== null ? (
+                  <span className="font-medium text-foreground/80">
+                    {creditRemaining > 0
+                      ? copy.creditsAvailable(creditRemaining)
+                      : copy.creditsCapped}
+                  </span>
+                ) : null}
               </div>
               {pendingCourses.length > 0 ? (
                 <div className="pt-0.5">

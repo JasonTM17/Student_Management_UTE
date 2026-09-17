@@ -45,10 +45,12 @@ public class RegistrationService {
     private static final String COURSE = "academic.\"Course\"";
     private static final String STUDENT = "academic.\"Student\"";
     private static final String SCHEDULE = "academic.\"SectionSchedule\"";
+    private static final int STANDARD_CREDIT_LIMIT = CreditLimitApplicationService.STANDARD_LIMIT;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
     private final RegistrationPdfRenderer pdfRenderer;
+    private final CreditLimitApplicationService creditLimitApplications;
     private final TransactionTemplate transactions;
     private final boolean postgres;
 
@@ -56,10 +58,12 @@ public class RegistrationService {
             NamedParameterJdbcTemplate jdbc,
             AcademicEnrollmentReadService reads,
             RegistrationPdfRenderer pdfRenderer,
+            CreditLimitApplicationService creditLimitApplications,
             PlatformTransactionManager transactionManager) {
         this.jdbc = jdbc;
         this.reads = reads;
         this.pdfRenderer = pdfRenderer;
+        this.creditLimitApplications = creditLimitApplications;
         this.transactions = new TransactionTemplate(transactionManager);
         this.postgres = jdbc.getJdbcOperations().execute((ConnectionCallback<Boolean>) connection ->
                 "PostgreSQL".equalsIgnoreCase(connection.getMetaData().getDatabaseProductName()));
@@ -82,7 +86,7 @@ public class RegistrationService {
                 rs.getString("status"),
                 timestamp(rs.getTimestamp("windowStart")),
                 timestamp(rs.getTimestamp("windowEnd")),
-                rs.getInt("creditLimit")));
+                Math.min(STANDARD_CREDIT_LIMIT, rs.getInt("creditLimit"))));
     }
 
     @Transactional
@@ -93,7 +97,7 @@ public class RegistrationService {
                 : round(roundId);
         assertEligible(student, round, Instant.now());
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
-        int limit = ((Number) round.get("credit_limit")).intValue();
+        int limit = creditLimitApplications.effectiveLimit(studentId, round);
         return new EligibilityResponse(
                 String.valueOf(round.get("id")),
                 String.valueOf(round.get("semester_id")),
@@ -148,7 +152,7 @@ public class RegistrationService {
         requireStudent(studentId);
         Map<String, Object> round = openReadRound(semesterId);
         int used = creditsUsed(studentId, String.valueOf(round.get("semester_id")));
-        int limit = ((Number) round.get("credit_limit")).intValue();
+        int limit = creditLimitApplications.effectiveLimit(studentId, round);
         List<String> ids = activeEnrollments(studentId, String.valueOf(round.get("semester_id"))).stream()
                 .map(row -> String.valueOf(row.get("id")))
                 .toList();
@@ -226,7 +230,7 @@ public class RegistrationService {
             throw problem(HttpStatus.CONFLICT, "DUPLICATE_COURSE", "Student already has this course this term");
         }
         int used = active.stream().mapToInt(row -> ((Number) row.get("credits")).intValue()).sum();
-        int limit = ((Number) round.get("credit_limit")).intValue();
+        int limit = creditLimitApplications.effectiveLimit(studentId, round);
         if (used + credits > limit) {
             throw problem(HttpStatus.UNPROCESSABLE_ENTITY, "CREDIT_CAP_EXCEEDED", "Credit cap exceeded");
         }

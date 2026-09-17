@@ -109,7 +109,7 @@ Các lớp học phần và hoạt động thi kết thúc học phần được
 | **Đợt 3** | Sinh viên năm 1 & Đăng ký bù | 08:00 ngày 19/09/2026 | 17:00 ngày 20/09/2026 |
 
 ### 2. Quy định bắt buộc
-1. Số tín chỉ đăng ký tối thiểu: **12 tín chỉ**, tối đa: **24 tín chỉ**.
+1. Học kỳ chính: đăng ký tối thiểu **14 tín chỉ** (trừ học kỳ cuối), hạn mức chuẩn tối đa **28 tín chỉ**. Chỉ khi có đơn được **Phòng Đào tạo phê duyệt**, sinh viên mới được đăng ký tối đa **30 tín chỉ**.
 2. Kiểm tra điều kiện học phần tiên quyết trước khi nhấn đăng ký.
 3. Học phí cần hoàn tất theo quy định sau khi chốt danh sách chính thức.
 

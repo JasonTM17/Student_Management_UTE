@@ -37,6 +37,10 @@ final class AssistantDifficultyRouter {
                 .replaceAll("\\p{M}", "")
                 .toLowerCase(Locale.ROOT)
                 .trim();
+        // Credit-cap questions have one deterministic, curated answer. Do not
+        // spend a provider dispatch or invite paraphrase drift just because a
+        // Vietnamese sentence contains several stop words.
+        if (ThesisAssistantService.isCreditLimitQuery(normalized)) return false;
         if (normalized.length() > LONG_QUESTION_CHARS
                 || normalized.split("\\s+").length >= MANY_TERMS) return true;
         if (containsComplexMarker(normalized)) return true;

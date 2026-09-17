@@ -87,7 +87,7 @@ const FALLBACK_OFFICIAL_NOTICES: AnnouncementRecord[] = [
     title: 'Kế hoạch mở cổng Đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
     content: `<p>Phòng Đào tạo thông báo kế hoạch đăng ký học phần chính thức dành cho toàn thể sinh viên các khóa như sau:</p>
 <ul>
-  <li><strong>Hạn mức tín chỉ:</strong> Tối đa 28 tín chỉ/học kỳ theo đúng quy chế đào tạo tín chỉ UTE.</li>
+  <li><strong>Hạn mức tín chỉ:</strong> Học kỳ chính tối đa 28 tín chỉ; chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</li>
   <li><strong>Thời gian mở cổng:</strong> Từ 08:00 ngày 25/08/2026 đến 17:00 ngày 15/09/2026.</li>
   <li><strong>Lưu ý:</strong> Sinh viên kiểm tra điều kiện tiên quyết và trùng lịch trước khi xác nhận lưu đăng ký. Mọi thắc mắc liên hệ trực tiếp bàn số 3 Phòng Đào tạo (Tòa nhà Trung tâm).</li>
 </ul>`,

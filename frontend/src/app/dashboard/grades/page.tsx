@@ -118,11 +118,25 @@ export default function GradesPage() {
       (grade) =>
         grade.letterGrade && gradePoints[grade.letterGrade] !== undefined,
     );
-    const totalCredits = gradedCourses.reduce(
+    // UTE policy counts each course once — the best attempt (the same rule
+    // the transcript endpoint applies). Grading every attempt made this page
+    // disagree with the official cumulative GPA after a retake.
+    const bestAttempts = new Map<string, (typeof gradedCourses)[number]>();
+    for (const grade of gradedCourses) {
+      const current = bestAttempts.get(grade.courseCode);
+      if (
+        !current ||
+        gradePoints[grade.letterGrade!] > gradePoints[current.letterGrade!]
+      ) {
+        bestAttempts.set(grade.courseCode, grade);
+      }
+    }
+    const countedCourses = [...bestAttempts.values()];
+    const totalCredits = countedCourses.reduce(
       (sum, grade) => sum + grade.credits,
       0,
     );
-    const totalPoints = gradedCourses.reduce(
+    const totalPoints = countedCourses.reduce(
       (sum, grade) => sum + gradePoints[grade.letterGrade!] * grade.credits,
       0,
     );

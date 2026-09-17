@@ -34,7 +34,7 @@ INSERT INTO engagement."Announcement" (
 <ul>
   <li>Kiện toàn hệ sinh thái số CampusUTE: Tích hợp chữ ký số e-Office chính thức cho Bảng điểm học tập điện tử và các biểu mẫu học vụ.</li>
   <li>Đưa vào vận hành Cụm máy chủ tính toán hiệu năng cao (HPC Cluster 8x A100 GPU) tại Khoa CNTT phục vụ đề tài NCKH, Khóa luận tốt nghiệp chuyên sâu về AI & Big Data.</li>
-  <li>Bảo đảm quyền lợi học tập, đăng ký tín chỉ tối đa 28 tín chỉ/học kỳ, chính sách học bổng khuyến khích học tập và xét điểm rèn luyện minh bạch.</li>
+  <li>Bảo đảm quyền lợi học tập, đăng ký theo hạn mức chuẩn 28 tín chỉ/học kỳ; trường hợp có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ, cùng chính sách học bổng và xét điểm rèn luyện minh bạch.</li>
 </ul>
 <p><strong>Điều 3.</strong> Các Phó Hiệu trưởng (TS. Quách Thanh Hải, TS. Trương Thị Hiền, PGS. TS. Châu Đình Thành), Trưởng Phòng Đào tạo, Trưởng Khoa CNTT và các đơn vị trực thuộc chịu trách nhiệm thi hành Quyết định này.</p>',
     'URGENT',

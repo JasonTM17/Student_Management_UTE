@@ -179,7 +179,12 @@ public class ThesisAssistantService {
     private static final java.util.regex.Pattern CREDIT_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:credit|credits)\\b|\\b(?:tin\\s+chi)\\b)");
     private static final java.util.regex.Pattern CREDIT_LIMIT_SIGNAL = java.util.regex.Pattern.compile(
-            "(?i)(?:\\b(?:maximum|minimum|limit|limits|workload)\\b|\\b(?:toi\\s+(?:da|thieu)|gioi\\s+han|khoi\\s+luong)\\b)");
+            "(?i)(?:\\b(?:cap|maximum|minimum|limit|limits|quota|workload)\\b|\\b(?:han\\s+muc|toi\\s+(?:da|thieu)|gioi\\s+han|khoi\\s+luong)\\b)");
+    /** Section labels let a scoped answer omit adjacent policy material from the same source. */
+    private static final java.util.regex.Pattern CREDIT_LIMIT_SECTION = java.util.regex.Pattern.compile(
+            "(?iu)\\b(?:giới\\s+hạn\\s+(?:tín\\s+chỉ|khối\\s+lượng)|credit\\s+(?:limits?|workload))\\s*[:\\-]");
+    private static final java.util.regex.Pattern NUMBERED_SECTION = java.util.regex.Pattern.compile(
+            "(?m)\\s+(?=\\d{1,2}\\.\\s+)");
     private static final java.util.regex.Pattern THESIS_SIGNAL = java.util.regex.Pattern.compile(
             "(?i)(?:\\b(?:thesis|capstone|report|defen[cs]e|council|reviewer)\\b|\\b(?:do\\s+an|khoa\\s+luan|bao\\s+cao|bao\\s+ve|hoi\\s+dong|phan\\s+bien)\\b)");
 
@@ -747,8 +752,12 @@ public class ThesisAssistantService {
         List<String> terms = retrievalTerms(message);
         List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
         Set<String> seen = new LinkedHashSet<>();
+        // Scoped intents need a wider candidate window before their semantic
+        // filter runs. A noisy top-five window could otherwise hide the one
+        // authoritative credit-limit document behind broad "học kỳ" matches.
+        int retrievalLimit = isCreditLimitQuery(message) ? TOP_K * 2 : TOP_K;
         try {
-            addDocuments(documents, seen, knowledge.search(locale, terms, TOP_K));
+            addDocuments(documents, seen, knowledge.search(locale, terms, retrievalLimit));
             String alternateLocale = DEFAULT_LOCALE.equals(locale) ? "en" : DEFAULT_LOCALE;
             if (documents.size() < TOP_K) addDocuments(documents, seen, knowledge.search(alternateLocale, terms, TOP_K - documents.size()));
         } catch (DataAccessException exception) {
@@ -768,7 +777,11 @@ public class ThesisAssistantService {
             }
         }
         documents = documents.stream().filter(document -> containsAnyTerm(document, terms)).limit(TOP_K).toList();
-        if (isCourseRegistrationQuery(message) || isCreditLimitQuery(message)) {
+        if (isCreditLimitQuery(message)) {
+            documents = documents.stream()
+                    .filter(ThesisAssistantService::isCreditLimitDocument)
+                    .toList();
+        } else if (isCourseRegistrationQuery(message)) {
             List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> registrationDocuments = documents.stream()
                     .filter(document -> "REGISTRATION".equalsIgnoreCase(safe(document.domain())))
                     .toList();
@@ -778,7 +791,8 @@ public class ThesisAssistantService {
             documents = registrationDocuments;
         }
         List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
-        String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale) : documents.get(0).content(), locale);
+        String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale)
+                : answerFromDocument(message, documents.get(0)), locale);
         String context = documents.stream()
                 .map(d -> "### " + safe(d.title()) + "\n" + safe(d.content()))
                 .collect(Collectors.joining("\n\n"));
@@ -825,6 +839,50 @@ public class ThesisAssistantService {
         if (message == null || message.isBlank()) return false;
         String folded = foldForMatching(message);
         return CREDIT_SIGNAL.matcher(folded).find() && CREDIT_LIMIT_SIGNAL.matcher(folded).find();
+    }
+
+    /**
+     * Keep a credit-limit answer grounded in a document that actually defines
+     * the limit. Other academic documents often mention credits or a minimum
+     * threshold incidentally (for example thesis eligibility), which is not
+     * enough to present them as sources for a capacity question.
+     */
+    static boolean isCreditLimitDocument(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        if (document == null) return false;
+        String folded = foldForMatching(safe(document.title()) + " " + safe(document.content()));
+        boolean hasCreditTerm = folded.contains("tin chi") || folded.matches(".*\\bcredits?\\b.*");
+        boolean hasLimitTopic = folded.contains("han muc")
+                || folded.contains("gioi han")
+                || folded.contains("khoi luong")
+                || folded.contains("credit cap")
+                || folded.contains("credit limit")
+                || (folded.contains("toi da") && folded.contains("toi thieu"))
+                || (folded.contains("maximum") && folded.contains("minimum"));
+        return hasCreditTerm && hasLimitTopic;
+    }
+
+    /**
+     * Keep scoped credit-limit answers concise while preserving the exact facts
+     * from the cited document. If the source has no explicit section marker,
+     * fall back to the full source instead of guessing which sentence is safe.
+     */
+    private static String answerFromDocument(String message,
+            ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        String content = safe(document.content()).trim();
+        if (!isCreditLimitQuery(message) || content.isBlank()) return content;
+        java.util.regex.Matcher section = CREDIT_LIMIT_SECTION.matcher(content);
+        if (!section.find()) return content;
+
+        int end = content.length();
+        java.util.regex.Matcher nextSection = NUMBERED_SECTION.matcher(content);
+        nextSection.region(section.end(), content.length());
+        if (nextSection.find()) end = nextSection.start();
+        String scoped = content.substring(section.end(), end).trim();
+        if (scoped.isBlank()) return content;
+
+        String heading = "en".equalsIgnoreCase(safe(document.locale()))
+                ? "Credit limits" : "Giới hạn tín chỉ";
+        return "**" + heading + "**\n\n" + scoped;
     }
 
     private ChatResponse lexicalAnswer(String message, String locale) {

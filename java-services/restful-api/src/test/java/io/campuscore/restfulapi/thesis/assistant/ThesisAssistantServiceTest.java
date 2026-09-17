@@ -186,6 +186,9 @@ class ThesisAssistantServiceTest {
         assertTrue(ThesisAssistantService.isCourseRegistrationQuery("Khi nao dang ky hoc phan?"));
         assertTrue(ThesisAssistantService.isCourseRegistrationQuery("How does add/drop work for registration?"));
         assertTrue(ThesisAssistantService.isCreditLimitQuery("Quy dinh tin chi toi da la gi?"));
+        assertTrue(ThesisAssistantService.isCreditLimitQuery("Hạn mức tín chỉ học kỳ này là bao nhiêu?"));
+        assertTrue(ThesisAssistantService.isCreditLimitQuery("What is the credit cap this term?"));
+        assertTrue(!ThesisAssistantService.isCreditLimitQuery("Có bao nhiêu tín chỉ trong chương trình đào tạo?"));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("registration"));
         assertTrue(ThesisAssistantService.retrievalTerms("When can I enroll in classes?").contains("sections"));
         assertTrue(ThesisAssistantService.retrievalTerms("Khi nao dang ky hoc phan?").contains("đăng ký"));
@@ -209,10 +212,19 @@ class ThesisAssistantServiceTest {
                 "registrar", "REGISTRATION", UUID.randomUUID(), 1);
         var creditLimitVietnamese = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "credit-limit-vi", "credit-limit-vi", "vi", "Giới hạn tín chỉ",
-                "Quy định tín chỉ tối đa mỗi học kỳ là 28 tín chỉ.",
+                "Quy chế về rút môn học và giới hạn khối lượng học tập: 1. Rút học phần: "
+                        + "Sinh viên được nộp đơn rút môn học trong vòng 2 tuần đầu của học kỳ chính. "
+                        + "2. Giới hạn tín chỉ: Mỗi học kỳ chính, sinh viên được đăng ký tối thiểu 14 tín chỉ "
+                        + "và tối đa 24 tín chỉ (sinh viên có điểm GPA loại Khá, Giỏi có thể làm đơn xin đăng ký "
+                        + "tối đa 28 tín chỉ). Học kỳ phụ được đăng ký tối đa 8 đến 10 tín chỉ.",
                 "registrar", "REGISTRATION", UUID.randomUUID(), 1);
+        var incidentalCreditPolicy = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "incidental-credit", "incidental-credit", "vi", "Điều kiện bảo vệ khóa luận",
+                "Sinh viên phải tích lũy tối thiểu 75% số tín chỉ của chương trình.",
+                "registrar", "POLICY", UUID.randomUUID(), 1);
         when(knowledge.search(anyString(), anyList(), anyInt()))
-                .thenReturn(List.of(unrelated, registration, registrationVietnamese, creditLimitVietnamese));
+                .thenReturn(List.of(unrelated, registration, registrationVietnamese, creditLimitVietnamese,
+                        incidentalCreditPolicy));
 
         ChatResponse response = new ThesisAssistantService(knowledge)
                 .answer("When can I enroll in classes?", "en");
@@ -243,6 +255,17 @@ class ThesisAssistantServiceTest {
         assertTrue(!creditLimitResponse.citations().isEmpty());
         assertTrue(creditLimitResponse.citations().stream()
                 .allMatch(citation -> "REGISTRATION".equalsIgnoreCase(citation.domain())));
+
+        ChatResponse scopedCreditLimitResponse = new ThesisAssistantService(knowledge)
+                .answer("Hạn mức tín chỉ học kỳ này là bao nhiêu?", "vi");
+
+        assertEquals(1, scopedCreditLimitResponse.citations().size());
+        assertEquals("credit-limit-vi", scopedCreditLimitResponse.citations().get(0).slug());
+        assertTrue(scopedCreditLimitResponse.answer().contains("Giới hạn tín chỉ"));
+        assertTrue(scopedCreditLimitResponse.answer().contains("tối đa 24"));
+        assertTrue(!scopedCreditLimitResponse.answer().contains("Rút học phần"));
+        assertTrue(ThesisAssistantService.isCreditLimitDocument(creditLimitVietnamese));
+        assertTrue(!ThesisAssistantService.isCreditLimitDocument(incidentalCreditPolicy));
     }
 
     @Test

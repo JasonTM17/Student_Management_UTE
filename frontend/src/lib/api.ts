@@ -103,6 +103,27 @@ export type AnnouncementRecord = {
   } | null;
   lecturer?: { id?: string; displayName?: string } | null;
 };
+
+export type CreditLimitApplication = {
+  id: string;
+  studentId: string;
+  studentCode: string;
+  studentName: string;
+  studentEmail: string;
+  semesterId: string;
+  semesterName: string;
+  roundId: string;
+  roundName: string;
+  standardLimit: number;
+  requestedLimit: number;
+  reason: string;
+  status: 'PENDING' | 'APPROVED' | 'REJECTED';
+  reviewedBy?: string | null;
+  reviewedAt?: string | null;
+  reviewerNote?: string | null;
+  createdAt: string;
+  updatedAt: string;
+};
 export type AnnouncementMutation = Partial<Pick<AnnouncementRecord,
   'title' | 'content' | 'priority' | 'targetRoles' | 'targetYears' | 'isGlobal' |
   'publishAt' | 'expiresAt' | 'semesterId' | 'sectionId' | 'lecturerId'>> & {
@@ -498,6 +519,46 @@ export const registrationApi = {
       creditsRemaining: number;
       enrollmentIds: string[];
     }>('/me/registration/summary', { params: { semesterId } });
+    return response.data;
+  },
+  creditLimitApplication: async (roundId: string): Promise<CreditLimitApplication | null> => {
+    const response = await api.get<CreditLimitApplication>(
+      '/me/registration/credit-limit-application',
+      { params: { roundId } },
+    );
+    return response.status === 204 ? null : response.data;
+  },
+  submitCreditLimitApplication: async (
+    roundId: string,
+    reason: string,
+  ): Promise<CreditLimitApplication> => {
+    const response = await api.post<CreditLimitApplication>(
+      '/me/registration/credit-limit-applications',
+      { roundId, reason },
+    );
+    return response.data;
+  },
+};
+
+export const adminRegistrationApi = {
+  creditLimitApplications: async (
+    status: 'PENDING' | 'APPROVED' | 'REJECTED' | 'ALL' = 'PENDING',
+  ): Promise<CreditLimitApplication[]> => {
+    const response = await api.get<CreditLimitApplication[]>(
+      '/admin/registration/credit-limit-applications',
+      { params: { status } },
+    );
+    return response.data;
+  },
+  reviewCreditLimitApplication: async (
+    id: string,
+    decision: 'APPROVED' | 'REJECTED',
+    note?: string,
+  ): Promise<CreditLimitApplication> => {
+    const response = await api.post<CreditLimitApplication>(
+      `/admin/registration/credit-limit-applications/${id}/review`,
+      { decision, note },
+    );
     return response.data;
   },
 };

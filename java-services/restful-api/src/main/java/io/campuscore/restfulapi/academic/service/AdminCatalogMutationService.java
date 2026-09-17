@@ -48,6 +48,9 @@ public class AdminCatalogMutationService {
     @Transactional
     public Map<String, Object> createAcademicYear(Map<String, Object> input) {
         String id = id(input);
+        String startDate = required(input, "startDate");
+        String endDate = required(input, "endDate");
+        requireOrderedRange(startDate, endDate);
         jdbc.update(
                 "INSERT INTO " + ACADEMIC_YEAR
                         + " (\"id\", \"year\", \"startDate\", \"endDate\", \"isCurrent\")"
@@ -56,8 +59,8 @@ public class AdminCatalogMutationService {
                 new MapSqlParameterSource()
                         .addValue("id", id)
                         .addValue("year", number(input, "year", java.time.Year.now().getValue()))
-                        .addValue("startDate", required(input, "startDate"))
-                        .addValue("endDate", required(input, "endDate"))
+                        .addValue("startDate", startDate)
+                        .addValue("endDate", endDate)
                         .addValue("isCurrent", Boolean.parseBoolean(text(input, "isCurrent", "false"))));
         return get(ACADEMIC_YEAR, id);
     }
@@ -97,6 +100,7 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createSemester(Map<String, Object> input) {
         String id = id(input);
         required(input, "name");
+        requireOrderedRange(input.get("startDate"), input.get("endDate"));
         jdbc.update(
                 "INSERT INTO " + SEMESTER
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"type\", \"academicYearId\","
@@ -119,6 +123,10 @@ public class AdminCatalogMutationService {
     @Transactional
     public Map<String, Object> createSection(Map<String, Object> input) {
         String id = id(input);
+        int capacity = number(input, "capacity", 30);
+        if (capacity < 1) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Section capacity must be at least 1");
+        }
         jdbc.update(
                 "INSERT INTO " + SECTION
                         + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\", \"classroomId\", \"capacity\", \"status\")"
@@ -159,6 +167,19 @@ public class AdminCatalogMutationService {
                 sql.append(':').append(entry.getKey());
             }
             parameters.addValue(entry.getKey(), input.get(entry.getKey()));
+        }
+        if (SECTION.equals(table) && input.containsKey("capacity")) {
+            // A section cannot shrink below the students already seated: the
+            // count would silently contradict every capacity read.
+            int requestedCapacity = Integer.parseInt(String.valueOf(input.get("capacity")));
+            Integer enrolled = jdbc.queryForObject(
+                    "SELECT \"enrolledCount\" FROM " + SECTION + " WHERE \"id\" = :id",
+                    new MapSqlParameterSource("id", id),
+                    Integer.class);
+            if (enrolled != null && requestedCapacity < enrolled) {
+                throw problem(HttpStatus.CONFLICT, "CAPACITY_BELOW_ENROLLED",
+                        "Capacity cannot go below the number of enrolled students (" + enrolled + ")");
+            }
         }
         if (first) {
             if (!replacesSchedules) {
@@ -246,13 +267,29 @@ public class AdminCatalogMutationService {
         if (!(value instanceof List<?> schedules)) {
             throw new IllegalArgumentException("schedules must be an array");
         }
-        jdbc.update(
-                "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
-                new MapSqlParameterSource("sectionId", sectionId));
         for (Object item : schedules) {
             if (!(item instanceof Map<?, ?> schedule)) {
                 throw new IllegalArgumentException("Each schedule must be an object");
             }
+            int dayOfWeek = requiredScheduleNumber(schedule, "dayOfWeek");
+            if (dayOfWeek < 1 || dayOfWeek > 7) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
+                        "dayOfWeek must be between 1 and 7");
+            }
+            String startTime = requiredScheduleText(schedule, "startTime");
+            String endTime = requiredScheduleText(schedule, "endTime");
+            // Zero-padded HH:mm compares lexicographically the same as it does
+            // chronologically.
+            if (startTime.compareTo(endTime) >= 0) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_SCHEDULE",
+                        "startTime must be before endTime");
+            }
+        }
+        jdbc.update(
+                "DELETE FROM " + SECTION_SCHEDULE + " WHERE \"sectionId\" = :sectionId",
+                new MapSqlParameterSource("sectionId", sectionId));
+        for (Object item : schedules) {
+            Map<?, ?> schedule = (Map<?, ?>) item;
             jdbc.update(
                     "INSERT INTO " + SECTION_SCHEDULE
                             + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
@@ -264,6 +301,73 @@ public class AdminCatalogMutationService {
                             .addValue("dayOfWeek", requiredScheduleNumber(schedule, "dayOfWeek"))
                             .addValue("startTime", requiredScheduleText(schedule, "startTime"))
                             .addValue("endTime", requiredScheduleText(schedule, "endTime")));
+        }
+        assertNoSectionConflicts(sectionId);
+    }
+
+    /**
+     * A section's schedule must not double-book its rooms or its lecturer
+     * within the same semester. Silent overlaps used to produce timetable
+     * collisions the registrar then had to resolve by hand.
+     */
+    private void assertNoSectionConflicts(String sectionId) {
+        String semesterOf = "(SELECT \"semesterId\" FROM " + SECTION + " WHERE \"id\" = :sectionId)";
+        Long roomClash = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SECTION_SCHEDULE + " ss2"
+                        + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
+                        + " WHERE ss2.\"sectionId\" <> :sectionId"
+                        + " AND s2.\"semesterId\" = " + semesterOf
+                        + " AND ss2.\"classroomId\" IN (SELECT \"classroomId\" FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId)"
+                        + " AND ss2.\"dayOfWeek\" IN (SELECT \"dayOfWeek\" FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId)"
+                        + " AND ss2.\"startTime\" < (SELECT MAX(\"endTime\") FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\""
+                        + "   AND \"classroomId\" = ss2.\"classroomId\")"
+                        + " AND ss2.\"endTime\" > (SELECT MIN(\"startTime\") FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\""
+                        + "   AND \"classroomId\" = ss2.\"classroomId\")",
+                new MapSqlParameterSource("sectionId", sectionId),
+                Long.class);
+        if (roomClash != null && roomClash > 0) {
+            throw problem(HttpStatus.CONFLICT, "SCHEDULE_CONFLICT",
+                    "The room is already booked for an overlapping slot in this semester");
+        }
+        Long lecturerClash = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + SECTION_SCHEDULE + " ss2"
+                        + " JOIN " + SECTION + " s2 ON s2.\"id\" = ss2.\"sectionId\""
+                        + " JOIN " + SECTION + " me ON me.\"id\" = :sectionId"
+                        + " WHERE ss2.\"sectionId\" <> :sectionId"
+                        + " AND me.\"lecturerId\" IS NOT NULL"
+                        + " AND s2.\"lecturerId\" = me.\"lecturerId\""
+                        + " AND s2.\"semesterId\" = me.\"semesterId\""
+                        + " AND ss2.\"dayOfWeek\" IN (SELECT \"dayOfWeek\" FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId)"
+                        + " AND ss2.\"startTime\" < (SELECT MAX(\"endTime\") FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\")"
+                        + " AND ss2.\"endTime\" > (SELECT MIN(\"startTime\") FROM " + SECTION_SCHEDULE
+                        + " WHERE \"sectionId\" = :sectionId AND \"dayOfWeek\" = ss2.\"dayOfWeek\")",
+                new MapSqlParameterSource("sectionId", sectionId),
+                Long.class);
+        if (lecturerClash != null && lecturerClash > 0) {
+            throw problem(HttpStatus.CONFLICT, "SCHEDULE_CONFLICT",
+                    "The lecturer already teaches an overlapping slot in this semester");
+        }
+    }
+
+    /** Provided start/end pairs must be ordered; missing values keep server defaults. */
+    private void requireOrderedRange(Object start, Object end) {
+        if (start == null || end == null) {
+            return;
+        }
+        try {
+            if (java.time.Instant.parse(String.valueOf(end))
+                    .isBefore(java.time.Instant.parse(String.valueOf(start)))) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_DATE_RANGE",
+                        "endDate must be after startDate");
+            }
+        } catch (java.time.format.DateTimeParseException ignored) {
+            // Non-ISO values fall through to the persistence layer's own casting.
         }
     }
 

@@ -377,6 +377,87 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     @Test
+    void onlyAnApprovedApplicationRaisesOneStudentFromTwentyEightToThirtyCredits() throws Exception {
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Enrollment\""
+                        + " (\"id\", \"studentId\", \"sectionId\", \"semesterId\", \"status\", \"enrolledAt\","
+                        + " \"gradeStatus\", \"courseId\", \"roundId\", \"creditsSnapshot\", \"version\")"
+                        + " VALUES (?, ?, ?, ?, 'ENROLLED', ?, 'NOT_GRADED', ?, ?, ?, 0)",
+                "enrollment-standard-cap",
+                "student-1",
+                "section-open",
+                "semester-1",
+                now,
+                "course-open",
+                "round-open",
+                28);
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(28))
+                .andExpect(jsonPath("$.creditsUsed").value(28))
+                .andExpect(jsonPath("$.creditsRemaining").value(0));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "standard-cap-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isUnprocessableEntity())
+                .andExpect(jsonPath("$.code").value("CREDIT_CAP_EXCEEDED"));
+
+        MvcResult submitted = mvc.perform(post("/api/v1/me/registration/credit-limit-applications")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"round-open\",\"reason\":\"Tôi cần hoàn thành thêm học phần bắt buộc trong học kỳ cuối.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("PENDING"))
+                .andExpect(jsonPath("$.requestedLimit").value(30))
+                .andReturn();
+        String applicationId = objectMapper.readTree(submitted.getResponse().getContentAsString()).get("id").asText();
+
+        mvc.perform(post("/api/v1/me/registration/credit-limit-applications")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"round-open\",\"reason\":\"Tôi cần hoàn thành thêm học phần bắt buộc trong học kỳ cuối.\"}"))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("CREDIT_LIMIT_APPLICATION_EXISTS"));
+
+        mvc.perform(get("/api/v1/admin/registration/credit-limit-applications")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].studentCode").value("S001"))
+                .andExpect(jsonPath("$[0].status").value("PENDING"));
+
+        mvc.perform(post("/api/v1/admin/registration/credit-limit-applications/" + applicationId + "/review")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"decision\":\"APPROVED\",\"note\":\"Đã đối chiếu hồ sơ và chấp thuận theo quy định.\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.status").value("APPROVED"))
+                .andExpect(jsonPath("$.reviewedBy").value("admin-user"));
+
+        mvc.perform(get("/api/v1/me/registration/eligibility")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .param("roundId", "round-open"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.creditLimit").value(30))
+                .andExpect(jsonPath("$.creditsUsed").value(28))
+                .andExpect(jsonPath("$.creditsRemaining").value(2));
+
+        mvc.perform(post("/api/v1/me/enrollments")
+                        .with(studentJwt("student-user-1", "student-1"))
+                        .header("Idempotency-Key", "approved-cap-enroll")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"sectionId\":\"section-two\"}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.sectionId").value("section-two"));
+    }
+
+    @Test
     void adminDropCompletesIdempotencySoRetriesReplayInsteadOfConflicting() throws Exception {
         MvcResult enrolled = mvc.perform(post("/api/v1/me/enrollments")
                         .with(studentJwt("student-user-1", "student-1"))
@@ -616,6 +697,23 @@ class AcademicEnrollmentMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."CreditLimitApplication" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "studentId" VARCHAR(120) NOT NULL,
+                    "semesterId" VARCHAR(120) NOT NULL,
+                    "roundId" VARCHAR(120) NOT NULL,
+                    "requestedLimit" INTEGER NOT NULL DEFAULT 30,
+                    "reason" VARCHAR(1000) NOT NULL,
+                    "status" VARCHAR(24) NOT NULL DEFAULT 'PENDING',
+                    "reviewedBy" VARCHAR(120),
+                    "reviewedAt" TIMESTAMP,
+                    "reviewerNote" VARCHAR(1000),
+                    "createdAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+                    "version" INTEGER NOT NULL DEFAULT 0
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."RegistrationRoundCohort" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "roundId" VARCHAR(120) NOT NULL,
@@ -676,6 +774,7 @@ class AcademicEnrollmentMutationPersistenceTest {
     }
 
     private void clearTables() {
+        jdbc.update("DELETE FROM \"academic\".\"CreditLimitApplication\"");
         jdbc.update("DELETE FROM \"academic\".\"RegistrationSlip\"");
         jdbc.update("DELETE FROM \"academic\".\"EnrollmentEvent\"");
         jdbc.update("DELETE FROM \"academic\".\"RegistrationIdempotency\"");
@@ -806,6 +905,39 @@ class AcademicEnrollmentMutationPersistenceTest {
                 "section-overlap",
                 "01",
                 "course-overlap",
+                "semester-1",
+                null,
+                null,
+                35,
+                0,
+                "OPEN",
+                0);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Course\""
+                        + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\","
+                        + " \"descriptionVi\", \"credits\", \"departmentId\", \"semesterId\", \"isActive\","
+                        + " \"createdAt\", \"updatedAt\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "course-two",
+                "SE404",
+                "Academic Writing",
+                "Academic Writing",
+                "Viet hoc thuat",
+                null,
+                null,
+                null,
+                2,
+                "department-1",
+                "semester-1",
+                true,
+                now,
+                now);
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Section\""
+                        + " (\"id\", \"sectionNumber\", \"courseId\", \"semesterId\", \"lecturerId\", \"classroomId\","
+                        + " \"capacity\", \"enrolledCount\", \"status\", \"version\") VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?)",
+                "section-two",
+                "01",
+                "course-two",
                 "semester-1",
                 null,
                 null,
