@@ -32,6 +32,11 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
+      # The seeded showcase accounts carry passwords published in this repository's
+      # history. This deployment is public, so the accounts stay DISABLED. Flip to
+      # "true" only on a host you are willing to expose an administrator login on.
+      - key: DEMO_ACCOUNTS_ENABLED
+        value: "false"
       - key: DEEPSEEK_ENABLED
         value: "true"
       - key: DEEPSEEK_API_KEY

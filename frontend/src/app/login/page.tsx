@@ -19,17 +19,46 @@ import {
 } from '@/lib/login-portal';
 import { cn } from '@/lib/utils';
 
-const DEMO_CREDENTIALS: Record<LoginPortal, { email: string; password: string }> = {
-  student: { email: 'student@campuscore.edu', password: 'password123' },
-  lecturer: { email: 'lecturer@campuscore.edu', password: 'password123' },
-  admin: { email: 'admin@campuscore.edu', password: 'admin123' },
+/**
+ * Seeded demo account identifiers. These are public account names, not secrets —
+ * they appear in the README and the seed migrations.
+ */
+const DEMO_ACCOUNT_EMAILS: Record<LoginPortal, string> = {
+  student: 'student@campuscore.edu',
+  lecturer: 'lecturer@campuscore.edu',
+  admin: 'admin@campuscore.edu',
 };
 
 /**
- * Course demo builds show the seeded accounts; a deployment can hide them by
- * setting NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=false.
+ * Demo passwords are read from the environment and have no in-source fallback,
+ * so a build that was not explicitly given them cannot print one.
+ *
+ * The references are static member accesses on purpose: Next.js inlines
+ * `process.env.NEXT_PUBLIC_*` only when it can see the literal key, so a computed
+ * lookup would silently read `undefined` in the browser.
  */
-const SHOW_DEMO_CREDENTIALS = process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS !== 'false';
+const DEMO_PASSWORDS: Record<LoginPortal, string | undefined> = {
+  student: process.env.NEXT_PUBLIC_DEMO_STUDENT_PASSWORD,
+  lecturer: process.env.NEXT_PUBLIC_DEMO_LECTURER_PASSWORD,
+  admin: process.env.NEXT_PUBLIC_DEMO_ADMIN_PASSWORD,
+};
+
+/**
+ * The quick-fill panel is opt-in. Enabling it publishes the demo passwords in the
+ * client bundle by construction, which is fine for a local or evaluation build and
+ * wrong for a public deployment — hence the safe default and why the deploy config
+ * sets it explicitly. When it is enabled without passwords configured, the panel
+ * stays hidden rather than showing a credential that cannot work.
+ */
+const SHOW_DEMO_CREDENTIALS = process.env.NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS === 'true';
+
+function demoCredentialsFor(portal: LoginPortal): { email: string; password: string } | null {
+  const password = DEMO_PASSWORDS[portal];
+  if (!SHOW_DEMO_CREDENTIALS || !password) {
+    return null;
+  }
+  return { email: DEMO_ACCOUNT_EMAILS[portal], password };
+}
 
 export const dynamic = 'force-dynamic';
 export default function LoginPage() {
@@ -47,6 +76,8 @@ export default function LoginPage() {
   const searchParams = useSearchParams();
   const portal = parseLoginPortal(searchParams.get('portal'));
   const portalCopy = messages.login.portals[portal];
+  // Memoized so the prefill effect below depends on a stable reference.
+  const demoCredentials = useMemo(() => demoCredentialsFor(portal), [portal]);
 
   useEffect(() => {
     setIsClientReady(true);
@@ -54,11 +85,12 @@ export default function LoginPage() {
 
   useEffect(() => {
     setFormError('');
-    if (!SHOW_DEMO_CREDENTIALS) return;
-    const creds = DEMO_CREDENTIALS[portal];
-    setEmail(creds.email);
-    setPassword(creds.password);
-  }, [portal]);
+    // Prefill only what the deployment actually configured; a missing password
+    // leaves the fields empty rather than the panel showing a broken account.
+    if (!demoCredentials) return;
+    setEmail(demoCredentials.email);
+    setPassword(demoCredentials.password);
+  }, [portal, demoCredentials]);
   useEffect(() => {
     if (formError) {
       formErrorRef.current?.focus();
@@ -189,7 +221,7 @@ export default function LoginPage() {
         </div>
         <p className="text-xs leading-5 text-muted-foreground">{portalCopy.destination}</p>
 
-        {SHOW_DEMO_CREDENTIALS ? (
+        {demoCredentials ? (
         <div className="rounded-xl border border-primary/25 bg-primary/5 p-3.5 text-xs space-y-2.5 shadow-xs">
           <div className="flex items-center justify-between">
             <span className="font-semibold text-foreground flex items-center gap-1.5">
@@ -199,9 +231,8 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
-                const creds = DEMO_CREDENTIALS[portal];
-                setEmail(creds.email);
-                setPassword(creds.password);
+                setEmail(demoCredentials.email);
+                setPassword(demoCredentials.password);
               }}
               className="inline-flex min-h-8 items-center text-primary hover:underline font-semibold text-xs gap-1 cursor-pointer"
             >
@@ -210,9 +241,9 @@ export default function LoginPage() {
             </button>
           </div>
           <div className="text-muted-foreground flex items-center justify-between">
-            <code className="font-semibold text-foreground/90">{DEMO_CREDENTIALS[portal].email}</code>
+            <code className="font-semibold text-foreground/90">{demoCredentials.email}</code>
             <span className="text-[11px] bg-secondary px-2 py-0.5 rounded text-foreground font-mono font-medium">
-              {DEMO_CREDENTIALS[portal].password}
+              {demoCredentials.password}
             </span>
           </div>
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/10">
@@ -324,7 +355,7 @@ export default function LoginPage() {
               >
                 {messages.login.emailLabel}
               </label>
-              {email === DEMO_CREDENTIALS[portal].email ? (
+              {demoCredentials && email === demoCredentials.email ? (
                 <span className="inline-flex items-center gap-1 text-[11px] font-medium text-amber-600 dark:text-amber-400">
                   <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
                   {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}

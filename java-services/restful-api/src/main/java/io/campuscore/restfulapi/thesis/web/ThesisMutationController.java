@@ -136,10 +136,17 @@ public class ThesisMutationController {
         return supervisors.setSupervisors(id, lecturerIds, actor);
     }
 
+    /**
+     * Students may read this because their group view needs the supervisor's
+     * name. The service applies the topic visibility rule (drafts 404) and
+     * withholds contact details from anyone who is not staff or the owner.
+     */
     @GetMapping("/topics/{id}/supervisors")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','STUDENT')")
-    public List<ThesisSupervisorService.SupervisorRow> listSupervisors(@PathVariable UUID id) {
-        return supervisors.list(id);
+    public List<ThesisSupervisorService.SupervisorRow> listSupervisors(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return supervisors.list(id, actor);
     }
 
     @PostMapping("/groups")

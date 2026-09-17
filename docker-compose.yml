@@ -89,6 +89,10 @@ services:
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
       COOKIE_SECURE: ${COOKIE_SECURE:-false}
       FLYWAY_ENABLED: "false"
+      # The seeded showcase accounts carry passwords published in this repository's
+      # history, so they stay DISABLED unless a deployment opts in. This local stack
+      # opts in so the demo works; a public host must leave it false.
+      DEMO_ACCOUNTS_ENABLED: ${DEMO_ACCOUNTS_ENABLED:-true}
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "sql"
       ASSISTANT_RAG_BASE_URL: http://rag-service:4011/internal/rag/assistant
       ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
@@ -144,6 +148,14 @@ services:
         JAVA_API_ORIGIN: ${JAVA_API_ORIGIN:-http://restful-api:4010}
         # Same-origin browser path. Do not interpolate host/Expo NEXT_PUBLIC_API_URL.
         NEXT_PUBLIC_API_URL: /api/v1
+        # Demo quick-fill is opt-in and the passwords have no in-source fallback,
+        # so the flag and the values must both reach the build. Next.js inlines
+        # them into the client bundle, which is why a public host must leave the
+        # flag false and the passwords empty.
+        NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS: ${NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS:-true}
+        NEXT_PUBLIC_DEMO_STUDENT_PASSWORD: ${NEXT_PUBLIC_DEMO_STUDENT_PASSWORD:-}
+        NEXT_PUBLIC_DEMO_LECTURER_PASSWORD: ${NEXT_PUBLIC_DEMO_LECTURER_PASSWORD:-}
+        NEXT_PUBLIC_DEMO_ADMIN_PASSWORD: ${NEXT_PUBLIC_DEMO_ADMIN_PASSWORD:-}
     image: student-management-ute-frontend:local
     environment:
       NODE_ENV: production

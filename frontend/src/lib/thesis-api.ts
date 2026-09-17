@@ -45,15 +45,12 @@ export interface ThesisTopicSupervisor {
   /** Resolved server-side; null only when the lecturer has no directory row. */
   firstName?: string | null;
   lastName?: string | null;
+  /** Staff/owner only — the server redacts this for students. */
   email?: string | null;
 }
 
-export type ThesisCouncilMemberRole =
-  | 'CHAIR'
-  | 'SECRETARY'
-  | 'REVIEWER'
-  | 'MEMBER'
-  | string;
+/** The server's `normalizeRole` accepts exactly these three seats. */
+export type ThesisCouncilMemberRole = 'CHAIR' | 'SECRETARY' | 'MEMBER';
 
 export interface ThesisCouncilMember {
   councilId?: string;
