@@ -426,7 +426,11 @@ export default function DashboardLayout({
       router.replace(loginHref(href, portal, 'unauthorized'));
       return;
     }
-    if (isAdmin && pathname !== '/dashboard/editor') {
+    if (
+      isAdmin &&
+      pathname !== '/dashboard/editor' &&
+      !pathname.startsWith('/dashboard/thesis')
+    ) {
       router.replace(href('/admin'));
     }
   }, [href, user, isLoading, isLoggingOut, isAdmin, isLecturer, router, pathname]);

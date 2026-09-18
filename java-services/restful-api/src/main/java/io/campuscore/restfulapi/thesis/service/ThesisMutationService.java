@@ -267,6 +267,7 @@ public class ThesisMutationService {
         requireActiveStudent(studentId);
         requireNotInAnotherActiveGroup(group.roundId(), studentId);
         jdbc.update("INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) VALUES (:id, :groupId, :roundId, :studentId, :memberOrder, FALSE)", params().addValue("id", UUID.randomUUID()).addValue("groupId", groupId).addValue("roundId", group.roundId()).addValue("studentId", studentId).addValue("memberOrder", nextMemberOrder(groupId)));
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
         return groups.findById(groupId);
     }
 
@@ -295,6 +296,7 @@ public class ThesisMutationService {
                         .addValue("memberOrder", nextMemberOrder(group.id()))
                         .addValue("displayName", displayName)
                         .addValue("contact", contact.isBlank() ? null : contact));
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", group.id()));
     }
 
     @Transactional
@@ -312,6 +314,7 @@ public class ThesisMutationService {
         if (jdbc.update("DELETE FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId", params().addValue("groupId", groupId).addValue("studentId", normalized)) != 1) {
             throw notFound("MEMBER_NOT_FOUND", "Group member not found");
         }
+        jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", groupId));
         return groups.findById(groupId);
     }
 
@@ -433,7 +436,10 @@ public class ThesisMutationService {
                         + " LEFT JOIN academic.\"Curriculum\" cur ON cur.\"id\" = s.\"curriculumId\""
                         + " WHERE s.\"status\" = 'ACTIVE'"
                         + " AND (LOWER(s.\"studentId\") LIKE :pattern ESCAPE '\\'"
-                        + "   OR LOWER(u.\"firstName\" || ' ' || u.\"lastName\") LIKE :pattern ESCAPE '\\')"
+                        + "   OR LOWER(u.\"firstName\" || ' ' || u.\"lastName\") LIKE :pattern ESCAPE '\\'"
+                        + "   OR LOWER(u.\"lastName\" || ' ' || u.\"firstName\") LIKE :pattern ESCAPE '\\'"
+                        + "   OR LOWER(u.\"lastName\") LIKE :pattern ESCAPE '\\'"
+                        + "   OR LOWER(u.\"firstName\") LIKE :pattern ESCAPE '\\')"
                         + " ORDER BY s.\"studentId\" LIMIT 8",
                 params().addValue("pattern", pattern),
                 (rs, ignored) -> new StudentSearchResponse(

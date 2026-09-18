@@ -572,6 +572,13 @@ export const thesisApi = {
     }
   },
 
+  listRoundReports: async (roundId: string): Promise<ThesisGroupReport[]> => {
+    const response = await api.get<ThesisGroupReport[]>(
+      '/thesis/rounds/' + roundId + '/reports',
+    );
+    return response.data || [];
+  },
+
   createCouncil: async (
     roundId: string,
     name: string,

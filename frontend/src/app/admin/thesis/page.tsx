@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  Archive,
   CalendarDays,
   Check,
   ChevronDown,
@@ -466,13 +467,22 @@ export default function AdminThesisPage() {
                           ) : null}
                         </div>
 
-                        <LocalizedLink
-                          href={`/dashboard/thesis?roundId=${round.id}`}
-                          className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-primary hover:bg-secondary/60 hover:border-primary/40 transition-all shadow-2xs"
-                        >
-                          <ExternalLink className="h-3.5 w-3.5" />
-                          <span>{locale === 'vi' ? 'Quản lý Đề tài & Nhóm trong Workspace →' : 'Manage Topics & Groups in Workspace →'}</span>
-                        </LocalizedLink>
+                        <div className="flex flex-wrap items-center gap-2">
+                          <LocalizedLink
+                            href={`/dashboard/thesis?roundId=${round.id}&tab=repository`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-primary/30 bg-primary/10 px-3 py-1.5 text-xs font-semibold text-primary hover:bg-primary/20 hover:border-primary transition-all shadow-2xs"
+                          >
+                            <Archive className="h-3.5 w-3.5" />
+                            <span>{locale === 'vi' ? 'Kho lưu trữ luận án & báo cáo →' : 'Thesis & Report Archive →'}</span>
+                          </LocalizedLink>
+                          <LocalizedLink
+                            href={`/dashboard/thesis?roundId=${round.id}`}
+                            className="inline-flex items-center gap-1.5 rounded-lg border border-border/80 bg-card px-3 py-1.5 text-xs font-semibold text-primary hover:bg-secondary/60 hover:border-primary/40 transition-all shadow-2xs"
+                          >
+                            <ExternalLink className="h-3.5 w-3.5" />
+                            <span>{locale === 'vi' ? 'Quản lý Đề tài & Nhóm trong Workspace →' : 'Manage Topics & Groups in Workspace →'}</span>
+                          </LocalizedLink>
+                        </div>
                       </div>
 
                       {/* Defense Councils Management Section */}

@@ -263,6 +263,14 @@ public class ThesisMutationController {
         return org.springframework.http.ResponseEntity.ok(response);
     }
 
+    @GetMapping("/rounds/{id}/reports")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    public List<ReportResponse> listReportsByRound(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return reports.listByRound(id, actor);
+    }
+
     @PostMapping("/groups/{id}/approve")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
     public GroupResponse approveGroup(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {

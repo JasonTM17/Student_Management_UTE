@@ -32,6 +32,8 @@ class ThesisReportSubmitGateContractTest {
         // Deliberately unchanged by the LEC-P2-5 fix.
         assertThat(gateOf("getReport", UUID.class, Jwt.class)).contains("ADMIN");
         assertThat(gateOf("downloadReportFile", UUID.class, Jwt.class)).contains("ADMIN");
+        assertThat(gateOf("listReportsByRound", UUID.class, Jwt.class)).contains("ADMIN");
+        assertThat(gateOf("listReportsByRound", UUID.class, Jwt.class)).contains("LECTURER");
     }
 
     private static String gateOf(String methodName, Class<?>... parameterTypes)
