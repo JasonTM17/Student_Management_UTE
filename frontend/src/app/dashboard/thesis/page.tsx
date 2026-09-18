@@ -380,7 +380,7 @@ export default function ThesisPage() {
     return () => {
       cancelled = true;
     };
-  }, [messages.thesis.loadFailed]);
+  }, [explicitRoundId, messages.thesis.loadFailed]);
 
   // The round default above is a student-facing preference. A lecturer whose
   // supervision lives in another round would otherwise land on an empty
