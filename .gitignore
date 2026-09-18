@@ -16,6 +16,7 @@ java-services/**/target/
 .env.test.local
 .env.production.local
 .env.production
+.env.vercel*
 
 # Logs
 logs

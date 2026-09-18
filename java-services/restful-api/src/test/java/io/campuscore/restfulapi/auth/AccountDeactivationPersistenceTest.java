@@ -60,6 +60,7 @@ class AccountDeactivationPersistenceTest {
     @BeforeEach
     void prepareAuthFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_audit");
         createTables();
         clearTables();
         insertManagedUser("student-user", "student@campuscore.edu", "password123", "STUDENT", "role-student");
@@ -265,9 +266,24 @@ class AccountDeactivationPersistenceTest {
                     "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120),
+                    "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(48) NOT NULL,
+                    "entityType" VARCHAR(48) NOT NULL,
+                    "entityId" VARCHAR(120),
+                    "summary" VARCHAR(500),
+                    "beforeState" TEXT,
+                    "afterState" TEXT,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
     }
 
     private void clearTables() {
+        jdbc.update("DELETE FROM campuscore_audit.\"AdminAudit\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Session\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Student\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Lecturer\"");
