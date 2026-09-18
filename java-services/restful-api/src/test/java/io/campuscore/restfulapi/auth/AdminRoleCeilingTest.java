@@ -71,7 +71,8 @@ class AdminRoleCeilingTest {
 
     private AdminUserMutationService service() {
         return new AdminUserMutationService(
-                jdbc, mock(PasswordEncoder.class), mock(AuthUserRepository.class));
+                jdbc, mock(PasswordEncoder.class), mock(AuthUserRepository.class),
+                mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
     }
 
     // ---------------------------------------------------------------- grant side

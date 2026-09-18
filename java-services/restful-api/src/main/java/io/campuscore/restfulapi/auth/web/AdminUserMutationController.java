@@ -40,7 +40,7 @@ public class AdminUserMutationController {
     public Map<String, Object> create(
             @RequestBody Map<String, Object> input,
             Authentication authentication) {
-        return users.create(input, isSuperAdmin(authentication));
+        return users.create(input, isSuperAdmin(authentication), actorId(authentication));
     }
 
     @PostMapping("/{id}/password-reset")
@@ -72,5 +72,10 @@ public class AdminUserMutationController {
     private static boolean isSuperAdmin(Authentication authentication) {
         return authentication != null && authentication.getAuthorities().stream()
                 .anyMatch(authority -> "ROLE_SUPER_ADMIN".equals(authority.getAuthority()));
+    }
+
+    /** The JWT subject, used as the actor on audit rows. */
+    private static String actorId(Authentication authentication) {
+        return authentication != null ? authentication.getName() : null;
     }
 }
