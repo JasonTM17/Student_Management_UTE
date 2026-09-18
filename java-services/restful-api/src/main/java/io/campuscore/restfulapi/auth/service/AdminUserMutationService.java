@@ -406,6 +406,22 @@ public class AdminUserMutationService {
                     "ROLE_ESCALATION",
                     "Only a super administrator can assign the faculty head role");
         }
+        // Removing a reserved role is the mirror of granting one, and it is worse
+        // than it looks: no migration seeds a SUPER_ADMIN, so on a clean deployment
+        // nobody can put the role back. A plain administrator sending the held role
+        // as something else would strip it permanently, with no actor able to undo
+        // it — so this refuses a CHANGE, not merely an assignment.
+        if (!canManageSuperAdmin && userId != null) {
+            for (String reserved : SUPER_ADMIN_ONLY_ROLES) {
+                if (!reserved.equals(roleName) && hasRole(userId, reserved)) {
+                    throw problem(
+                            HttpStatus.FORBIDDEN,
+                            "ROLE_ESCALATION",
+                            "Only a super administrator can remove the " + reserved
+                                    + " role from an account");
+                }
+            }
+        }
     }
 
     private boolean roleExists(String roleName) {

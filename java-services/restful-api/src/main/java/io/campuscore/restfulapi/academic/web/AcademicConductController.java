@@ -46,10 +46,50 @@ public class AcademicConductController {
         return buildStudentConductSummary(studentProfileId);
     }
 
+    /**
+     * LEC-P1-5: a lecturer may read conduct only for students they actually teach.
+     *
+     * <p>Without this, any lecturer could read every student's conduct record by id
+     * — the same over-broad read the attendance endpoints already avoided with their
+     * section-ownership check. Staff keep the full read; the endpoint exists so a
+     * lecturer can look at their own class, not so it can serve as a directory of
+     * the student body.
+     */
     @GetMapping("student/{studentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
-    public StudentConductSummaryDto getStudentConductSummary(@PathVariable String studentId) {
+    public StudentConductSummaryDto getStudentConductSummary(
+            @PathVariable String studentId, @AuthenticationPrincipal Jwt actor) {
+        requireConductReadAccess(studentId, actor);
         return buildStudentConductSummary(studentId);
+    }
+
+    private void requireConductReadAccess(String studentId, Jwt actor) {
+        List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
+        if (roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"))) {
+            return;
+        }
+        String lecturerId = actor == null ? null : actor.getClaimAsString("lecturerId");
+        if (lecturerId == null || lecturerId.isBlank()) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "CONDUCT_READ_REQUIRES_SECTION_OWNERSHIP");
+        }
+        // The path parameter accepts either the profile id or the student code, so
+        // match both against the Student table before looking at enrollments.
+        Integer taught = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.\"Enrollment\" e"
+                        + " JOIN academic.\"Section\" sec ON sec.\"id\" = e.\"sectionId\""
+                        + " WHERE sec.\"lecturerId\" = :lecturerId"
+                        + " AND e.\"studentId\" IN ("
+                        + "   SELECT s.\"id\" FROM academic.\"Student\" s"
+                        + "   WHERE s.\"id\" = :studentId OR s.\"studentId\" = :studentId)",
+                new MapSqlParameterSource()
+                        .addValue("lecturerId", lecturerId)
+                        .addValue("studentId", studentId),
+                Integer.class);
+        if (taught == null || taught == 0) {
+            throw new ResponseStatusException(
+                    HttpStatus.FORBIDDEN, "CONDUCT_READ_REQUIRES_SECTION_OWNERSHIP");
+        }
     }
 
     @GetMapping("my/semester/{semesterId}")

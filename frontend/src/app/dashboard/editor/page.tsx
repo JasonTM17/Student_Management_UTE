@@ -776,6 +776,14 @@ export default function AcademicEditorPage() {
 
   // Save modal edit changes directly
   const handleSaveModalEdit = async (id: string, payload: any) => {
+    // The modal edits content through a plain textarea, making it a third authoring
+    // surface. Gating only the publish and update buttons left this path able to
+    // send an oversized body and receive the same opaque 400.
+    const modalOverflow = findAnnouncementLengthViolation(String(payload?.content ?? ''));
+    if (modalOverflow) {
+      toast.error(announcementLengthViolationMessage(modalOverflow, locale));
+      return;
+    }
     const updated = await announcementsApi.update(id, payload);
     toast.success(isVi ? 'Đã lưu thay đổi thông báo thành công!' : 'Notice updated successfully!');
     setPublishedNotices((prev) =>

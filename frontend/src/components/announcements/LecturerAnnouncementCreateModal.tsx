@@ -15,6 +15,10 @@ import {
   Sparkles,
 } from 'lucide-react';
 import { announcementsApi, type AnnouncementMutation } from '@/lib/api';
+import {
+  announcementLengthViolationMessage,
+  findAnnouncementLengthViolation,
+} from '@/lib/announcement-limits';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -134,6 +138,16 @@ export function LecturerAnnouncementCreateModal({
     }
     if (!content.trim()) {
       setValidationError(isVi ? 'Vui lòng nhập nội dung thông báo' : 'Please enter notice content');
+      return;
+    }
+    // A fourth authoring surface: this modal writes announcements directly, so it
+    // must consult the same length contract as the editor page rather than letting
+    // the server answer with an opaque 400.
+    const overflow = findAnnouncementLengthViolation(content);
+    if (overflow) {
+      setValidationError(
+        announcementLengthViolationMessage(overflow, isVi ? 'vi' : 'en'),
+      );
       return;
     }
 

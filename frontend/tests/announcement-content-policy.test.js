@@ -169,23 +169,29 @@ test('RT-P1-2 publish is blocked client-side on every authoring surface', () => 
 
   // Both surfaces must consult the gate. The TinyMCE editor page had no length
   // check at all, and the admin page authors through a second editor with no
-  // per-image cap, so a gate on only one of them leaves the other open.
+  // per-image cap, so a gate on only one of them leaves the other open. A second
+  // sweep then found two MORE surfaces inside those files - the editor page's modal
+  // save path and the lecturer create modal - so the count matters, not just the
+  // import.
   const editorPage = read('src/app/dashboard/editor/page.tsx');
   const adminPage = read('src/app/admin/announcements/page.tsx');
+  const lecturerModal = read('src/components/announcements/LecturerAnnouncementCreateModal.tsx');
   for (const [name, source] of [
     ['dashboard/editor', editorPage],
     ['admin/announcements', adminPage],
+    ['lecturer announcement modal', lecturerModal],
   ]) {
     assert.match(
       source,
       /findAnnouncementLengthViolation/,
-      `${name} must gate the publish path on the shared length decision`,
+      `${name} must gate its submit path on the shared length decision`,
     );
   }
-  // Publish and update are separate paths on the editor page; both must be gated.
+  // Publish, update and modal-save are three separate paths on the editor page;
+  // all three must be gated.
   assert.ok(
-    (editorPage.match(/findAnnouncementLengthViolation/g) ?? []).length >= 2,
-    'both the publish and the update path must be gated',
+    (editorPage.match(/findAnnouncementLengthViolation/g) ?? []).length >= 3,
+    'the publish, update and modal-save paths must all be gated',
   );
 });
 

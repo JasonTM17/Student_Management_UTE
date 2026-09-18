@@ -51,6 +51,17 @@ curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
 
 ### B. Bảng tài khoản trải nghiệm đã seed sẵn trong CSDL
 
+> **Điều kiện tiên quyết — đọc trước khi demo.** Các tài khoản dưới đây bị **KHOÁ** ở trạng thái seed
+> (`V48`), và `DemoAccountGate` **áp lại trạng thái đó ở mỗi lần khởi động** theo công tắc
+> `DEMO_ACCOUNTS_ENABLED`. Vì vậy:
+>
+> - Cụm demo cục bộ phải có `DEMO_ACCOUNTS_ENABLED=true` trong `.env` (đây cũng là giá trị mặc định
+>   của `docker-compose.yml`); nếu không, mọi tài khoản bên dưới sẽ trả 401.
+> - Nút **"Điền nhanh"** chỉ hiện khi `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=true` **và** mật khẩu demo đã
+>   được điền vào các biến `NEXT_PUBLIC_DEMO_*_PASSWORD`. Thiếu mật khẩu thì nút ẩn — hãy đăng nhập thủ công.
+> - Câu lệnh `UPDATE ... SET status='ACTIVE'` **không còn tác dụng qua một lần restart**; hãy dùng
+>   công tắc môi trường. Chi tiết ở mục "Tài khoản demo kiểm thử" trong `README.md`.
+
 | Vai trò | Email đăng nhập | Mật khẩu | Phạm vi quyền hạn & Dữ liệu sẵn có |
 | --- | --- | --- | --- |
 | **Sinh viên (Chính)** | `student@campuscore.edu` | `password123` | Đầy đủ lịch học kỳ hiện tại, điểm số, đăng ký học phần, hỏi Trợ lý AI |
