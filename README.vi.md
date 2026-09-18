@@ -563,9 +563,26 @@ Ngoài ra, dữ liệu demo còn seed sẵn một danh bạ giảng viên phụ 
 **Mở khoá tài khoản demo trong môi trường local** (chỉ làm trên cụm demo của bạn, không bao giờ
 trên cơ sở dữ liệu thật):
 
-```powershell
-docker compose exec postgres psql -U campuscore -d campuscore_restful -c "UPDATE campuscore_auth.\"User\" SET \"status\" = 'ACTIVE' WHERE \"email\" IN ('student@campuscore.edu','lecturer@campuscore.edu','admin@campuscore.edu','admin002@campuscore.demo')"
+Trạng thái tài khoản demo do một công tắc môi trường quyết định, **được áp lại ở mỗi lần khởi động**
+bởi `DemoAccountGate`. Vì vậy câu lệnh SQL mở khoá thủ công không còn tồn tại qua một lần restart —
+hãy đặt công tắc thay vì sửa trực tiếp cơ sở dữ liệu:
+
+```bash
+# .env (đã bị gitignore) — bật cho cụm demo cục bộ
+DEMO_ACCOUNTS_ENABLED=true
+NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=true
+# Rồi điền mật khẩu demo đã seed vào ba biến sau (không commit giá trị thật):
+NEXT_PUBLIC_DEMO_STUDENT_PASSWORD=...
+NEXT_PUBLIC_DEMO_LECTURER_PASSWORD=...
+NEXT_PUBLIC_DEMO_ADMIN_PASSWORD=...
 ```
+
+Sau đó chạy `docker compose up -d --build` để áp dụng. Đặt `DEMO_ACCOUNTS_ENABLED=false` (hoặc để
+trống) sẽ **khoá** các tài khoản này ở lần khởi động kế tiếp — đó là cấu hình đúng cho mọi bản triển
+khai công khai, và là giá trị `render.yaml` đặt tường minh.
+
+Nếu không đặt `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=true` kèm mật khẩu, nút "Điền nhanh" sẽ **ẩn**.
+Đăng nhập bằng tay vẫn hoạt động bình thường — trang đăng nhập chỉ không quảng cáo thông tin đăng nhập.
 
 ---
 

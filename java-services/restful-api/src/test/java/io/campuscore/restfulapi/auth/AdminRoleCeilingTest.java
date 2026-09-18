@@ -218,6 +218,35 @@ class AdminRoleCeilingTest {
     }
 
     @Test
+    void plainAdminCannotStripAReservedRoleFromAnAccountThatHoldsIt() {
+        rolesTheTargetHolds.put(FACULTY_HEAD, true);
+        AdminUserMutationService service = service();
+
+        // Demotion is the mirror of escalation, and on a clean deployment it is
+        // unrecoverable: no migration seeds a SUPER_ADMIN, so once the dean role is
+        // gone nobody can grant it back. The grant-side guard alone does not cover
+        // it, because sending a DIFFERENT role is not a request to grant one.
+        DomainException denied = assertThrows(DomainException.class,
+                () -> service.update(TARGET, Map.of("role", "STUDENT"), false, ACTOR));
+
+        assertThat(denied.getStatus()).isEqualTo(HttpStatus.FORBIDDEN);
+        assertThat(denied.getCode()).isEqualTo("ROLE_ESCALATION");
+        verify(jdbc, never()).update(contains("DELETE FROM"), any(SqlParameterSource.class));
+    }
+
+    @Test
+    void superAdminCanStillChangeAReservedRole() {
+        rolesTheTargetHolds.put(FACULTY_HEAD, true);
+        AdminUserMutationService service = service();
+
+        try {
+            service.update(TARGET, Map.of("role", "LECTURER"), true, ACTOR);
+        } catch (DomainException unexpected) {
+            assertNotEquals("ROLE_ESCALATION", unexpected.getCode());
+        }
+    }
+
+    @Test
     void blankRoleOnAnUnprotectedAccountIsTreatedAsNoRoleChange() {
         AdminUserMutationService service = service();
 
