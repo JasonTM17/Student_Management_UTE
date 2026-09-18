@@ -12,7 +12,9 @@ type RouteContext = {
 
 async function handle(request: NextRequest, context: RouteContext) {
   const { path } = await context.params;
-  const origin = (process.env.JAVA_API_ORIGIN || 'http://127.0.0.1:4010').replace(/\/$/, '');
+  const origin = (process.env.JAVA_API_ORIGIN ||
+    process.env.BACKEND_INTERNAL_ORIGIN ||
+    (process.env.NODE_ENV === 'production' ? 'https://campuscore-backend-p4em.onrender.com' : 'http://127.0.0.1:4010')).replace(/\/$/, '');
   const headers = new Headers(request.headers);
   headers.delete('host');
   headers.set('accept-encoding', 'identity');

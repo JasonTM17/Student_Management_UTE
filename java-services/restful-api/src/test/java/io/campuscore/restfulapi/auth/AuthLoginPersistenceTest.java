@@ -66,6 +66,7 @@ class AuthLoginPersistenceTest {
     @BeforeEach
     void prepareAuthFixture() {
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS campuscore_audit");
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
                     "id" VARCHAR(120) PRIMARY KEY,
@@ -161,6 +162,21 @@ class AuthLoginPersistenceTest {
                     "createdAt" TIMESTAMP NOT NULL
                 )
                 """);
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS campuscore_audit."AdminAudit" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "actorId" VARCHAR(120),
+                    "actorLabel" VARCHAR(240),
+                    "action" VARCHAR(48) NOT NULL,
+                    "entityType" VARCHAR(48) NOT NULL,
+                    "entityId" VARCHAR(120),
+                    "summary" VARCHAR(500),
+                    "beforeState" TEXT,
+                    "afterState" TEXT,
+                    "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbc.update("DELETE FROM campuscore_audit.\"AdminAudit\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Session\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Student\"");
         jdbc.update("DELETE FROM \"campuscore_auth\".\"Lecturer\"");
