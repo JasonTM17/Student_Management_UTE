@@ -2,7 +2,7 @@
 -- Presence/conditional business rules remain in ThesisMutationService so
 -- existing historical rows can be upgraded without rewriting academic data.
 -- Fence round writes while the historical shape is censused and constrained;
--- after V64, rollback is forward-fix only (the old writer does not know the
+-- after V66, rollback is forward-fix only (the old writer does not know the
 -- schedule oracle).
 LOCK TABLE thesis.thesis_registration_round IN SHARE ROW EXCLUSIVE MODE;
 
@@ -34,7 +34,7 @@ BEGIN
        OR (defense_date IS NOT NULL AND report_date IS NOT NULL AND defense_date < report_date);
     IF invalid_round_count > 0 THEN
         RAISE EXCEPTION
-            'V64 stopped: % thesis rounds have authored schedule dates that require governance review',
+            'V66 stopped: % thesis rounds have authored schedule dates that require governance review',
             invalid_round_count;
     END IF;
 END $$;

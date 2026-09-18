@@ -1296,7 +1296,7 @@ test('thesis knowledge release covers the faculty process rules', () => {
     'utf8',
   );
   const migration = fs.readFileSync(
-    path.join(root, '../java-services/restful-api/src/main/resources/db/migration/V65__align_thesis_group_size_knowledge.sql'),
+    path.join(root, '../java-services/restful-api/src/main/resources/db/migration/V67__align_thesis_group_size_knowledge.sql'),
     'utf8',
   );
   for (const slug of [
@@ -1315,8 +1315,8 @@ test('thesis knowledge release covers the faculty process rules', () => {
   assert.match(seedMigration, /từ 03 đến 05 thành viên/);
   assert.match(seedMigration, /trung bình cộng các điểm thành phần/);
   assert.match(seedMigration, /không được chấm đề tài mà mình đang hướng dẫn/);
-  // The release must be projected and activated like V20/V23.
-  assert.match(migration, /thesis-group-size-v65/);
+  // The release must be projected and activated after the integrated V61-V66 chain.
+  assert.match(migration, /thesis-group-size-v67/);
   assert.match(migration, /active_release_id = EXCLUDED\.active_release_id/);
 });
 
