@@ -194,6 +194,53 @@ class ThesisReportFileTest {
                 .andExpect(jsonPath("$.code").value("REPORT_FILE_NOT_FOUND"));
     }
 
+    @Test
+    void lecturerAndAdminCanAccessRepositoryAndDownloadAnyReport() throws Exception {
+        UUID groupId = seedApprovedGroup();
+        UUID roundId = jdbc.queryForObject(
+                "SELECT round_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId);
+        MockMultipartFile file = new MockMultipartFile(
+                "file", "Thesis-Archive.docx", MediaType.APPLICATION_OCTET_STREAM_VALUE, DOCX_BYTES);
+
+        mvc.perform(multipart("/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .file(file)
+                        .param("title", "Archive Thesis Report")
+                        .param("note", "repository archival check")
+                        .with(studentJwt("rf-leader")))
+                .andExpect(status().isOk());
+
+        // Any lecturer can list reports in the round
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(lecturerJwt("lec-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].groupId").value(groupId.toString()))
+                .andExpect(jsonPath("$[0].fileName").value("Thesis-Archive.docx"));
+
+        // Admin can list reports in the round
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].groupId").value(groupId.toString()));
+
+        // Lecturer can download the report file
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(lecturerJwt("lec-other")))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(DOCX_BYTES));
+
+        // Admin can download the report file
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(content().bytes(DOCX_BYTES));
+    }
+
+    @Test
+    void studentCannotAccessRoundReportsList() throws Exception {
+        UUID groupId = seedApprovedGroup();
+        UUID roundId = jdbc.queryForObject(
+                "SELECT round_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId);
+
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(studentJwt("rf-leader")))
+                .andExpect(status().isForbidden());
+    }
+
     private UUID seedApprovedGroup() {
         UUID roundId = UUID.randomUUID();
         jdbc.update(
@@ -245,5 +292,20 @@ class ThesisReportFileTest {
                         .claim("roles", List.of("STUDENT"))
                         .claim("studentId", studentId))
                 .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
+    }
+
+    private RequestPostProcessor lecturerJwt(String lecturerId) {
+        return jwt().jwt(token -> token
+                        .subject("rf-user-lecturer-" + lecturerId)
+                        .claim("roles", List.of("LECTURER"))
+                        .claim("lecturerId", lecturerId))
+                .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private RequestPostProcessor adminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("rf-user-admin")
+                        .claim("roles", List.of("ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
     }
 }

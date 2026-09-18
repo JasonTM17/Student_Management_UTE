@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.thesis.service;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
 import java.util.HexFormat;
+import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import org.springframework.context.annotation.Profile;
@@ -157,9 +158,10 @@ public class ThesisReportService {
                         + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId",
                         params().addValue("topicId", group.topicId()).addValue("lecturerId", lecturerId(actor))) > 0;
         boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
-        if (!member && !supervisor && !councilMember && !admin) {
+        boolean lecturer = hasRole(actor, "LECTURER") || StringUtils.hasText(lecturerId(actor));
+        if (!member && !supervisor && !councilMember && !admin && !lecturer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_MEMBER_REQUIRED",
-                    "Only group members, supervisors, council reviewers, or staff can read the report");
+                    "Only group members, supervisors, council reviewers, lecturers, or staff can read the report");
         }
         try {
             return jdbc.queryForObject(
@@ -173,14 +175,40 @@ public class ThesisReportService {
                             rs.getString("url"),
                             rs.getString("note"),
                             rs.getString("submitted_by"),
-                            rs.getObject("submitted_at", java.time.OffsetDateTime.class).toInstant(),
-                            rs.getObject("updated_at", java.time.OffsetDateTime.class).toInstant(),
+                            instantOf(rs.getObject("submitted_at")),
+                            instantOf(rs.getObject("updated_at")),
                             rs.getString("file_name"),
                             rs.getString("file_type"),
                             (Long) rs.getObject("file_size")));
         } catch (EmptyResultDataAccessException exception) {
             throw notFound("REPORT_NOT_FOUND", "The group has not submitted a report yet");
         }
+    }
+
+    @Transactional(readOnly = true)
+    public List<ReportResponse> listByRound(UUID roundId, Jwt actor) {
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean lecturer = hasRole(actor, "LECTURER") || StringUtils.hasText(lecturerId(actor));
+        if (!admin && !lecturer) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
+                    "Only lecturers or academic staff can access the round thesis archive");
+        }
+        return jdbc.query(
+                "SELECT group_id, title, url, note, submitted_by, submitted_at, updated_at, "
+                        + "file_name, file_type, file_size "
+                        + "FROM thesis.thesis_group_report WHERE round_id = :roundId ORDER BY submitted_at DESC",
+                params().addValue("roundId", roundId),
+                (rs, ignored) -> new ReportResponse(
+                        UUID.fromString(rs.getString("group_id")),
+                        rs.getString("title"),
+                        rs.getString("url"),
+                        rs.getString("note"),
+                        rs.getString("submitted_by"),
+                        instantOf(rs.getObject("submitted_at")),
+                        instantOf(rs.getObject("updated_at")),
+                        rs.getString("file_name"),
+                        rs.getString("file_type"),
+                        (Long) rs.getObject("file_size")));
     }
 
     @Transactional(readOnly = true)

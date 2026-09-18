@@ -3,6 +3,7 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
+  Archive,
   ArrowUpRight,
   Award,
   BookOpen,
@@ -19,6 +20,7 @@ import {
   Layers,
   Plus,
   Scale,
+  Search,
   Shield,
   ShieldCheck,
   Sparkles,
@@ -149,6 +151,7 @@ export default function ThesisPage() {
   const { locale, formatDateTime, messages } = useI18n();
   const pageCopy = messages.thesisWorkflow.page;
   const searchParams = useSearchParams();
+  const explicitRoundId = searchParams.get('roundId') || '';
   const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
   const [groups, setGroups] = useState<ThesisGroup[]>([]);
@@ -221,8 +224,14 @@ export default function ThesisPage() {
   const [supervisedReports, setSupervisedReports] = useState<Record<string, ThesisGroupReport | null>>({});
   const [topicReports, setTopicReports] = useState<Record<string, ThesisGroupReport | null>>({});
 
-  // Lecturer navigation tab (supervision vs council defense)
-  const [lecturerTab, setLecturerTab] = useState<'supervision' | 'defense'>('supervision');
+  // Lecturer navigation tab (supervision vs council defense vs repository)
+  const [lecturerTab, setLecturerTab] = useState<'supervision' | 'defense' | 'repository'>('supervision');
+
+  // Thesis Repository State (Faculty archive of submitted theses)
+  const [repositoryReports, setRepositoryReports] = useState<ThesisGroupReport[]>([]);
+  const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
+  const [repositorySearch, setRepositorySearch] = useState('');
+  const [topicSupervisorsDetails, setTopicSupervisorsDetails] = useState<Record<string, ThesisTopicSupervisor[]>>({});
 
   // Supervisors for current student group's topic
   const [currentTopicSupervisors, setCurrentTopicSupervisors] = useState<ThesisTopicSupervisor[]>([]);
@@ -349,6 +358,9 @@ export default function ThesisPage() {
         });
         setRounds(sortedRounds);
         setSelectedRoundId((current) => {
+          if (explicitRoundId && sortedRounds.some((r) => r.id === explicitRoundId)) {
+            return explicitRoundId;
+          }
           if (current) return current;
           const preferred = sortedRounds.find(
             (r) => r.id === '22222222-2222-2222-2222-222222222101' && r.status === 'REGISTRATION_OPEN',
@@ -374,7 +386,6 @@ export default function ThesisPage() {
   // supervision lives in another round would otherwise land on an empty
   // workspace, so once the workload is known, follow the round that actually
   // holds supervised groups.
-  const explicitRoundId = searchParams.get('roundId');
   useEffect(() => {
     // The data-loading effect can run before auth resolves, so the workload is
     // fetched here where `isSupervisorOrAdmin` is reliable.
@@ -496,11 +507,23 @@ export default function ThesisPage() {
           }),
         ];
         if (isSupervisorOrAdmin) {
+          setIsRepositoryLoading(true);
           promises.push(
             thesisApi.listCouncils(selectedRoundId).then((cList) => {
               if (!cancelled) {
                 setCouncils(cList);
                 void loadCouncilDetails(cList);
+              }
+            }),
+            thesisApi.listRoundReports(selectedRoundId).then((rList) => {
+              if (!cancelled) {
+                setRepositoryReports(rList);
+                setIsRepositoryLoading(false);
+              }
+            }).catch(() => {
+              if (!cancelled) {
+                setRepositoryReports([]);
+                setIsRepositoryLoading(false);
               }
             }),
           );
@@ -678,6 +701,63 @@ export default function ThesisPage() {
     }
   }, [isSupervisorOrAdmin, supervisedGroups, supervisedReports]);
 
+  useEffect(() => {
+    if (!isSupervisorOrAdmin || topics.length === 0) return;
+    for (const t of topics) {
+      if (!topicSupervisorsDetails[t.id]) {
+        void thesisApi.listSupervisors(t.id).then((sups) => {
+          setTopicSupervisorsDetails((prev) => ({ ...prev, [t.id]: sups }));
+        }).catch(() => {});
+      }
+    }
+  }, [isSupervisorOrAdmin, topicSupervisorsDetails, topics]);
+
+  const filteredRepositoryReports = useMemo(() => {
+    if (!repositorySearch.trim()) return repositoryReports;
+    const q = repositorySearch.trim().toLowerCase();
+    return repositoryReports.filter((report) => {
+      const group = groups.find((g) => g.id === report.groupId);
+      const topic = group?.topicId ? topics.find((t) => t.id === group.topicId) : null;
+      const topicTitle = (topic?.title || report.title || '').toLowerCase();
+      const reportNote = (report.note || '').toLowerCase();
+      const fileName = (report.fileName || '').toLowerCase();
+      const groupId = report.groupId.toLowerCase();
+
+      const sups = topic?.id ? topicSupervisorsDetails[topic.id] || [] : [];
+      const supervisorMatch = sups.some((s: ThesisTopicSupervisor) => {
+        const full1 = `${s.lastName || ''} ${s.firstName || ''}`.toLowerCase();
+        const full2 = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
+        return full1.includes(q) || full2.includes(q) || s.lecturerId.toLowerCase().includes(q);
+      });
+
+      const memberMatch =
+        group?.members?.some((m: ThesisGroupMember) => {
+          const name = (m.displayName || '').toLowerCase();
+          const studentNumber = (m.studentNumber || m.studentId || '').toLowerCase();
+          return name.includes(q) || studentNumber.includes(q);
+        }) ||
+        group?.memberStudentIds?.some((id: string) => id.toLowerCase().includes(q));
+
+      return (
+        topicTitle.includes(q) ||
+        reportNote.includes(q) ||
+        fileName.includes(q) ||
+        groupId.includes(q) ||
+        Boolean(supervisorMatch) ||
+        Boolean(memberMatch)
+      );
+    });
+  }, [groups, repositoryReports, repositorySearch, topicSupervisorsDetails, topics]);
+
+  const handleDownloadRepositoryReport = async (report: ThesisGroupReport) => {
+    try {
+      await thesisApi.downloadReportFile(report.groupId, report);
+      toast.success(locale === 'vi' ? 'Đã tải tài liệu báo cáo' : 'Downloaded report artifact');
+    } catch {
+      toast.error(locale === 'vi' ? 'Không thể tải tài liệu báo cáo' : 'Failed to download report artifact');
+    }
+  };
+
   const getTopicTitle = (topicId?: string | null) => {
     if (!topicId) return '—';
     const found = topics.find((topic) => topic.id === topicId);
@@ -719,12 +799,25 @@ export default function ThesisPage() {
   }, [currentGroup?.topicId]);
 
   useEffect(() => {
+    const tabParam = searchParams.get('tab');
+    if (tabParam === 'repository') {
+      setLecturerTab('repository');
+      return;
+    }
+    if (tabParam === 'defense') {
+      setLecturerTab('defense');
+      return;
+    }
+    if (tabParam === 'supervision') {
+      setLecturerTab('supervision');
+      return;
+    }
     if (supervisedGroups.length === 0 && visibleCouncils.length > 0) {
       setLecturerTab('defense');
     } else if (supervisedGroups.length > 0) {
       setLecturerTab('supervision');
     }
-  }, [selectedRoundId, supervisedGroups.length, visibleCouncils.length]);
+  }, [searchParams, selectedRoundId, supervisedGroups.length, visibleCouncils.length]);
 
   useEffect(() => {
     const topicId = searchParams.get('topicId');
@@ -1848,6 +1941,275 @@ export default function ThesisPage() {
             </Card>
   );
 
+  const renderRepositoryWorkspace = () => {
+    const totalReports = repositoryReports.length;
+    const totalFiles = repositoryReports.filter((r) => r.fileName).length;
+    const totalUrls = repositoryReports.filter((r) => r.url).length;
+
+    return (
+      <Card className="rounded-xl border-border/80 shadow-xs">
+        <CardHeader>
+          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+            <div className="space-y-1">
+              <CardTitle className="flex items-center gap-2 text-lg">
+                <Archive className="h-5 w-5 text-primary" />
+                {pageCopy.repositoryTitle}
+              </CardTitle>
+              <CardDescription className="text-xs sm:text-sm">
+                {pageCopy.repositoryDescription}
+              </CardDescription>
+            </div>
+            {/* Quick Metrics */}
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
+                <FileStack className="h-3.5 w-3.5" />
+                {fillCopy(pageCopy.reportsCount, { count: totalReports })}
+              </span>
+              <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
+                <FileDown className="h-3.5 w-3.5" />
+                {totalFiles} {locale === 'vi' ? 'tài liệu đính kèm' : 'attached files'}
+              </span>
+              {totalUrls > 0 && (
+                <span className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
+                  <ExternalLink className="h-3.5 w-3.5" />
+                  {totalUrls} {locale === 'vi' ? 'liên kết ngoài' : 'external links'}
+                </span>
+              )}
+            </div>
+          </div>
+
+          {/* Search bar */}
+          <div className="pt-2">
+            <div className="relative">
+              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
+              <Input
+                type="text"
+                value={repositorySearch}
+                onChange={(e) => setRepositorySearch(e.target.value)}
+                placeholder={pageCopy.repositorySearchPlaceholder}
+                className="pl-9 pr-8 text-xs sm:text-sm h-10 rounded-xl"
+              />
+              {repositorySearch ? (
+                <button
+                  type="button"
+                  onClick={() => setRepositorySearch('')}
+                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                >
+                  <X className="h-4 w-4" />
+                </button>
+              ) : null}
+            </div>
+          </div>
+        </CardHeader>
+
+        <CardContent className="space-y-4">
+          {isRepositoryLoading ? (
+            <div className="py-12 flex justify-center">
+              <LoadingState label={messages.common.states.loading} />
+            </div>
+          ) : repositoryReports.length === 0 ? (
+            <EmptyState
+              icon={Archive}
+              title={pageCopy.noRoundReportsYet}
+              description={locale === 'vi' ? 'Các nhóm nghiên cứu sau khi hoàn thành sẽ nộp báo cáo tại đây để lưu trữ và thẩm định.' : 'Research groups will submit their thesis reports here once ready for archival.'}
+              className="min-h-[220px]"
+            />
+          ) : filteredRepositoryReports.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title={pageCopy.noReportsFound}
+              description={locale === 'vi' ? 'Thử thay đổi từ khóa tìm kiếm theo tên đề tài, mã số sinh viên hoặc giảng viên hướng dẫn.' : 'Try adjusting your search keywords by topic, student ID or supervisor.'}
+              className="min-h-[200px]"
+            />
+          ) : (
+            <div className="space-y-4">
+              <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
+                <span>{fillCopy(pageCopy.allReports, { count: filteredRepositoryReports.length })}</span>
+                <span>{locale === 'vi' ? 'Đợt:' : 'Round:'} <strong className="text-foreground">{selectedRound?.name}</strong></span>
+              </div>
+
+              <div className="grid grid-cols-1 gap-4">
+                {filteredRepositoryReports.map((report) => {
+                  const group = groups.find((g) => g.id === report.groupId);
+                  const topic = group?.topicId ? topics.find((t) => t.id === group.topicId) : null;
+                  const topicTitle = topic?.title || report.title || pageCopy.thesisDocumentLabel;
+                  const supervisors = topic ? topicSupervisorsDetails[topic.id] || [] : [];
+                  const members = group?.members || [];
+
+                  return (
+                    <div
+                      key={report.groupId}
+                      className="rounded-xl border border-border/70 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-xs space-y-4"
+                    >
+                      {/* Header row: Topic title & status badges */}
+                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
+                        <div className="space-y-1 min-w-0 flex-1">
+                          <div className="flex flex-wrap items-center gap-2">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold text-primary">
+                              {locale === 'vi' ? 'Nhóm:' : 'Group:'} {group ? group.id.slice(0, 8).toUpperCase() : report.groupId.slice(0, 8).toUpperCase()}
+                            </span>
+                            {topic && (
+                              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
+                                {locale === 'vi' ? 'Đề tài:' : 'Topic:'} {topic.id.slice(0, 8).toUpperCase()}
+                              </span>
+                            )}
+                            {group && (
+                              <div className="flex flex-wrap items-center gap-1.5">
+                                <StatusBadge status={group.status} />
+                                <StatusBadge status={group.approvalStatus} variant="approval" />
+                              </div>
+                            )}
+                          </div>
+                          <h4 className="text-base font-bold text-foreground leading-snug">
+                            {topicTitle}
+                          </h4>
+                          {topic?.description && (
+                            <p className="text-xs text-muted-foreground line-clamp-2">
+                              {topic.description}
+                            </p>
+                          )}
+                        </div>
+
+                        {/* Submission timestamp badge */}
+                        <div className="flex flex-col sm:items-end text-xs text-muted-foreground shrink-0">
+                          <span>
+                            {pageCopy.submittedAtLabel} <strong className="text-foreground">{formatDateTime(report.submittedAt)}</strong>
+                          </span>
+                          {report.updatedAt && report.updatedAt !== report.submittedAt && (
+                            <span className="text-[11px]">
+                              {pageCopy.lastUpdatedLabel} {formatDateTime(report.updatedAt)}
+                            </span>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Roster & Guidance grid */}
+                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
+                        {/* Supervisors */}
+                        <div className="space-y-1.5">
+                          <span className="font-semibold text-foreground flex items-center gap-1.5">
+                            <BookOpen className="h-3.5 w-3.5 text-primary" />
+                            {pageCopy.archiveSupervisorLabel}
+                          </span>
+                          {supervisors.length === 0 ? (
+                            <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa phân công' : 'Not assigned'}</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {supervisors.map((s: ThesisTopicSupervisor) => (
+                                <div key={s.lecturerId} className="flex items-center gap-2">
+                                  <span className="font-medium text-foreground">
+                                    {[s.lastName, s.firstName].filter(Boolean).join(' ') || s.lecturerId}
+                                  </span>
+                                  {s.email && (
+                                    <span className="text-muted-foreground text-[11px]">({s.email})</span>
+                                  )}
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+
+                        {/* Research group members */}
+                        <div className="space-y-1.5">
+                          <span className="font-semibold text-foreground flex items-center gap-1.5">
+                            <Users className="h-3.5 w-3.5 text-primary" />
+                            {pageCopy.membersLabel} ({members.length})
+                          </span>
+                          {members.length === 0 ? (
+                            <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa có thông tin thành viên' : 'No roster details'}</span>
+                          ) : (
+                            <div className="space-y-1">
+                              {members.map((m: ThesisGroupMember) => {
+                                const name = m.displayName || m.studentNumber || m.studentId;
+                                return (
+                                  <div key={m.studentId} className="flex flex-wrap items-center gap-1.5">
+                                    <span className="font-medium text-foreground">{name}</span>
+                                    {m.studentNumber && (
+                                      <span className="font-mono text-muted-foreground text-[11px] bg-background/80 px-1.5 py-0.5 rounded">
+                                        MSSV: {m.studentNumber}
+                                      </span>
+                                    )}
+                                    {m.isLeader && (
+                                      <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                                        {messages.thesis.leaderBadge}
+                                      </span>
+                                    )}
+                                    {m.isExternal && (
+                                      <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                                        {messages.thesis.externalBadge}
+                                      </span>
+                                    )}
+                                  </div>
+                                );
+                              })}
+                            </div>
+                          )}
+                        </div>
+                      </div>
+
+                      {/* Notes / Abstract */}
+                      {report.note && (
+                        <div className="rounded-lg border border-border/50 bg-background/50 p-3 text-xs">
+                          <span className="font-semibold text-foreground block mb-1">
+                            {pageCopy.reportNotesLabel}
+                          </span>
+                          <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
+                            {report.note}
+                          </p>
+                        </div>
+                      )}
+
+                      {/* Attached File Download & External Link */}
+                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/50">
+                        <div className="flex flex-wrap items-center gap-2">
+                          {report.fileName ? (
+                            <Button
+                              type="button"
+                              size="sm"
+                              variant="outline"
+                              onClick={() => void handleDownloadRepositoryReport(report)}
+                              className="gap-2 border-primary/30 hover:bg-primary/10 hover:border-primary font-semibold text-xs"
+                            >
+                              <FileDown className="h-4 w-4 text-primary" />
+                              <span>{report.fileName}</span>
+                              <span className="text-muted-foreground text-[11px] font-normal">
+                                ({[report.fileType, formatReportFileSize(report.fileSize, locale)].filter(Boolean).join(' · ')})
+                              </span>
+                            </Button>
+                          ) : (
+                            <span className="text-xs text-muted-foreground italic">
+                              {locale === 'vi' ? 'Không có file đính kèm' : 'No attached file'}
+                            </span>
+                          )}
+
+                          {report.url && (
+                            <a
+                              href={report.url}
+                              target="_blank"
+                              rel="noreferrer"
+                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5"
+                            >
+                              <ExternalLink className="h-3.5 w-3.5" />
+                              <span>{pageCopy.openExternalLink}</span>
+                            </a>
+                          )}
+                        </div>
+
+                        <div className="text-[11px] text-muted-foreground">
+                          {locale === 'vi' ? 'Người nộp:' : 'Submitted by:'} <strong className="font-mono text-foreground">{report.submittedBy}</strong>
+                        </div>
+                      </div>
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
+        </CardContent>
+      </Card>
+    );
+  };
+
   return (
     <div className="space-y-8">
       <PageHeader
@@ -2009,6 +2371,29 @@ export default function ThesisPage() {
                       {fillCopy(pageCopy.councilsCount, { count: visibleCouncils.length })}
                     </span>
                   </button>
+                  <button
+                    type="button"
+                    onClick={() => setLecturerTab('repository')}
+                    className={cn(
+                      'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
+                      lecturerTab === 'repository'
+                        ? 'border-primary bg-primary text-primary-foreground shadow-xs'
+                        : 'border-border/70 bg-card text-muted-foreground hover:text-foreground hover:bg-muted/40',
+                    )}
+                  >
+                    <Archive className="h-4 w-4" />
+                    <span>{pageCopy.tabRepository}</span>
+                    <span
+                      className={cn(
+                        'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
+                        lecturerTab === 'repository'
+                          ? 'bg-primary-foreground/20 text-primary-foreground'
+                          : 'bg-muted text-foreground',
+                      )}
+                    >
+                      {fillCopy(pageCopy.reportsCount, { count: repositoryReports.length })}
+                    </span>
+                  </button>
                 </div>
                 <span className="text-xs text-muted-foreground font-medium">
                     {pageCopy.workspaceAreaLabel} <strong className="text-primary">{isAdmin ? pageCopy.roleAdmin : pageCopy.roleLecturer}</strong> {pageCopy.facultySuffix}
@@ -2159,8 +2544,10 @@ export default function ThesisPage() {
               </CardContent>
             </Card>
                 </div>
-              ) : (
+              ) : lecturerTab === 'defense' ? (
                 renderCouncilDefenseWorkspace()
+              ) : (
+                renderRepositoryWorkspace()
               )}
         </div>
       ) : null}
