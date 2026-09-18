@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.auth.service;
 
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
 import io.campuscore.restfulapi.web.DomainException;
 import java.security.SecureRandom;
@@ -50,15 +51,18 @@ public class AdminUserMutationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final PasswordEncoder passwordEncoder;
     private final AuthUserRepository authUsers;
+    private final AdminAuditRecorder audit;
     private final SecureRandom random = new SecureRandom();
 
     public AdminUserMutationService(
             NamedParameterJdbcTemplate jdbc,
             PasswordEncoder passwordEncoder,
-            AuthUserRepository authUsers) {
+            AuthUserRepository authUsers,
+            AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.passwordEncoder = passwordEncoder;
         this.authUsers = authUsers;
+        this.audit = audit;
     }
 
     @Transactional(readOnly = true)
@@ -109,6 +113,12 @@ public class AdminUserMutationService {
 
     @Transactional
     public Map<String, Object> create(Map<String, Object> input, boolean canManageSuperAdmin) {
+        return create(input, canManageSuperAdmin, null);
+    }
+
+    @Transactional
+    public Map<String, Object> create(
+            Map<String, Object> input, boolean canManageSuperAdmin, String actorId) {
         String email = required(input, "email").toLowerCase();
         // The Academic Office never accepts an admin-chosen start credential:
         // a server-generated one-time temporary password is issued and shown
@@ -136,6 +146,9 @@ public class AdminUserMutationService {
         }
         assignRole(id, role);
         ensureProfile(id, role, input);
+        // Recorded without the request map: it carries a credential by design.
+        audit.record(actorId, null, "CREATED", "USER", id,
+                "Created " + role + " account " + email);
         return withTemporaryPassword(find(id), temporaryPassword);
     }
 
@@ -158,6 +171,11 @@ public class AdminUserMutationService {
                         .addValue("password", passwordEncoder.encode(temporaryPassword)));
         if (updated == 0) throw problem(HttpStatus.NOT_FOUND, "USER_NOT_FOUND", "User not found");
         revokeSessions(id);
+        // Recorded as an event, never as state: the new credential must not reach
+        // the audit table, and a password reset is exactly the operation whose
+        // author an investigation needs to know.
+        audit.record(currentUserId, null, "PASSWORD_RESET", "USER", id,
+                "Issued a one-time password for user " + id);
         return withTemporaryPassword(find(id), temporaryPassword);
     }
 
@@ -248,6 +266,15 @@ public class AdminUserMutationService {
             removeObsoleteProfiles(id, requestedRole);
             ensureProfile(id, requestedRole, input);
         }
+        // Records the transition, not the payload: the request map can carry a
+        // credential, and a role or status change is what an investigation looks for.
+        audit.record(currentUserId, null, requestedRole != null ? "ROLE_OR_DETAILS_CHANGED" : "UPDATED",
+                "USER", id,
+                "Updated user " + id
+                        + (requestedRole != null ? " to role " + requestedRole : "")
+                        + (newStatus != null && !newStatus.isBlank() ? " status " + newStatus : ""),
+                Map.of("status", String.valueOf(previousStatus), "role", String.valueOf(requestedRole)),
+                Map.of("status", String.valueOf(newStatus), "role", String.valueOf(requestedRole)));
         return find(id);
     }
 
@@ -272,6 +299,15 @@ public class AdminUserMutationService {
         // Same ceiling as update()/resetPassword(): a plain administrator can
         // neither edit, reset, nor hard-delete an account holding a reserved role.
         requireSuperAdminForProtectedAccount(id, canManageSuperAdmin, "delete");
+        // Capture the row first: a hard delete leaves nothing to describe afterwards,
+        // and "which account was destroyed and by whom" is the whole point of the
+        // record. A read failure is not fatal — the DELETE below reports not-found.
+        Map<String, Object> before = null;
+        try {
+            before = find(id);
+        } catch (RuntimeException ignored) {
+            // Left null; the audit row then records the id and the action only.
+        }
         // Revoke live sessions while the row still exists: after the hard
         // delete there is no account state left for the filter to consult.
         revokeSessions(id);
@@ -281,6 +317,7 @@ public class AdminUserMutationService {
         } catch (DataIntegrityViolationException exception) {
             throw problem(HttpStatus.CONFLICT, "USER_IN_USE", "User is still referenced by an academic profile");
         }
+        audit.recordDeletion(currentUserId, null, "USER", id, before);
     }
 
     private Map<String, Object> find(String id) {
