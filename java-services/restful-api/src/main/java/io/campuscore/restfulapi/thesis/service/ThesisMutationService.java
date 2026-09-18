@@ -127,6 +127,13 @@ public class ThesisMutationService {
         if (updated != 1) {
             throw conflict("ROUND_STATE_CONFLICT", "Round must be in " + expected.name() + " before it can become " + next.name());
         }
+        if (next == RoundStatus.PROPOSAL_OPEN) {
+            jdbc.update(
+                    "UPDATE thesis.thesis_registration_round "
+                            + "SET lecturer_submit_start = LEAST(lecturer_submit_start, CURRENT_TIMESTAMP) "
+                            + "WHERE id = :id AND lecturer_submit_start IS NOT NULL AND lecturer_submit_start > CURRENT_TIMESTAMP",
+                    params().addValue("id", id));
+        }
         return roundReads.get(id);
     }
 
@@ -587,7 +594,11 @@ public class ThesisMutationService {
         Instant now = Instant.now();
         Instant start = instantOf(round.get("lecturer_submit_start"));
         Instant end = instantOf(round.get("lecturer_submit_end"));
-        if (start == null || end == null || now.isBefore(start) || !now.isBefore(end)) {
+        if (start != null && now.isBefore(start)) {
+            throw conflict("LECTURER_WINDOW_NOT_OPEN",
+                    "The lecturer topic-submission window has not opened yet for this round (opens: " + start + ")");
+        }
+        if (end == null || !now.isBefore(end) || start == null) {
             throw conflict("LECTURER_WINDOW_CLOSED", "The lecturer topic-submission window is closed for this round");
         }
     }

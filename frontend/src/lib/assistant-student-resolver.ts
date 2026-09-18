@@ -120,6 +120,22 @@ function isThesisDeadlineQuestion(message: string): boolean {
   );
 }
 
+// 5d. Past Theses & Repository Reference Regex
+const PAST_THESIS_REGEX =
+  /(?:khóa|khoá|năm)\s*(?:trước|cũ|vừa\s*qua|202\d)|các\s*năm\s*trước|cựu\s*sinh\s*viên|tham\s*khảo|tiêu\s*biểu|xuất\s*sắc|kho\s*(?:lưu\s*trữ|đề\s*tài)|mẫu\s*(?:đề\s*tài|khóa\s*luận)|đạt\s*điểm\s*cao|past\s*thes(?:is|es)|previous\s*(?:years?|cohorts?)|exemplary\s*topics?|thesis\s*archive/i;
+
+// 5e. Certificates & Student Affairs One-Stop Regex
+const CERTIFICATES_REGEX =
+  /(?:giấy\s*xác\s*nhận|giay\s*xac\s*nhan|chứng\s*nhận|chung\s*nhan|nghĩa\s*vụ\s*quân\s*sự|nghia\s*vu\s*quan\s*su|hoãn\s*nvqs|hoan\s*nvqs|vay\s*vốn|vay\s*von|vé\s*xe\s*buýt|ve\s*xe\s*buyt|giảm\s*trừ\s*gia\s*cảnh|giam\s*tru\s*gia\s*canh|thực\s*tập\s*doanh\s*nghiệp|thuc\s*tap\s*doanh\s*nghiep|dịch\s*vụ\s*một\s*cửa|dich\s*vu\s*mot\s*cua|\bcertificates?\b|\bstudent\s*verification\b)/i;
+
+// 5f. Credit Limit Exception (30 credits) Regex
+const CREDIT_LIMIT_APP_REGEX =
+  /(?:nâng\s*hạn\s*mức|nang\s*han\s*muc|30\s*tín\s*chỉ|30\s*tin\s*chi|đơn\s*xin\s*đăng\s*ký\s*thêm|don\s*xin\s*dang\s*ky\s*them|vượt\s*28\s*tín\s*chỉ|vuot\s*28\s*tin\s*chi|đơn\s*nâng\s*trần|don\s*nang\s*tran|đăng\s*ký\s*vượt\s*khung|dang\s*ky\s*vuot\s*khung)/i;
+
+// 5g. Grade Appeal & Exam Deferral Regex
+const GRADE_APPEAL_REGEX =
+  /(?:phúc\s*khảo|phuc\s*khao|khiếu\s*nại\s*điểm|khieu\s*nai\s*diem|hoãn\s*thi|hoan\s*thi|chấm\s*lại\s*bài|cham\s*lai\s*bai|\bappeal\b|\bregrade\b|\bdeferral\b)/i;
+
 const COUNCIL_ROLE_LABELS: Record<string, [string, string]> = {
   CHAIR: ['Chủ tịch hội đồng', 'Council chair'],
   SECRETARY: ['Thư ký hội đồng', 'Council secretary'],
@@ -206,6 +222,12 @@ export function isPolicyQuestion(message: string): boolean {
  * behaviour this gate introduces.
  */
 export function isRegulationLookup(message: string): boolean {
+  if (PAST_THESIS_REGEX.test(message) && THESIS_REGEX.test(message)) {
+    return false;
+  }
+  if (CERTIFICATES_REGEX.test(message) || CREDIT_LIMIT_APP_REGEX.test(message) || GRADE_APPEAL_REGEX.test(message)) {
+    return false;
+  }
   const regulation =
     ACADEMIC_REGULATION_REGEX.test(message) ||
     POLICY_QUESTION_REGEX.test(message) ||
@@ -1051,6 +1073,7 @@ export async function resolveStudentAssistantQuery(
     GRADES_REGEX.test(message) &&
     !DEADLINE_INTENT_REGEX.test(message) &&
     !PUBLIC_SCORE_POLICY_REGEX.test(message) &&
+    !GRADE_APPEAL_REGEX.test(message) &&
     !policyQuestion
   ) {
     try {
@@ -1149,8 +1172,199 @@ export async function resolveStudentAssistantQuery(
   }
 
   // D4. Handle Exam Schedule queries — delegated to backend RAG
-  if (EXAM_REGEX.test(message)) {
+  if (EXAM_REGEX.test(message) && !GRADE_APPEAL_REGEX.test(message)) {
     return null;
+  }
+
+  // E0. Past Theses & Institutional Project Repository
+  if (PAST_THESIS_REGEX.test(message) && (THESIS_REGEX.test(message) || /đề\s*tài|de\s*tai|\btopics?\b/i.test(message))) {
+    const answer =
+      locale === 'vi'
+        ? `Kho tài liệu đề tài khóa luận tốt nghiệp (KLTN) của sinh viên các khóa trước tại **HCM-UTE**:\n\n` +
+          `### 1. Một số đề tài tiêu biểu đạt điểm Xuất sắc & Giỏi (8.0 - 9.5/10):\n\n` +
+          `• **Hệ thống AI Camera phát hiện sớm đám cháy và khói phục vụ an toàn khu dân cư thông minh**\n` +
+          `  - Chuyên ngành: Trí tuệ nhân tạo (FIT AI Lab) — **Điểm: 9.2/10** (Xuất sắc; GVHD: TS. Trần Văn Minh)\n` +
+          `  - Ứng dụng: YOLOv8, Computer Vision & Edge AI, truyền cảnh báo thời gian thực.\n\n` +
+          `• **Thiết kế chip gia tốc AI chuyên dụng (NPU) trên nền tảng kiến trúc mở RISC-V**\n` +
+          `  - Chuyên ngành: Kỹ thuật Điện tử - Viễn thông (FEEE) — **Điểm: 9.5/10** (Giải Nhất NCKH Sinh viên cấp Trường)\n` +
+          `  - Ứng dụng: Thiết kế phần cứng Verilog/VHDL, tổng hợp và mô phỏng trên FPGA Xilinx.\n\n` +
+          `• **Nền tảng kiểm thử bảo mật tự động hợp đồng thông minh Smart Contract trên Blockchain**\n` +
+          `  - Chuyên ngành: Kỹ thuật Phần mềm (FIT) — **Điểm: 8.8/10** (Giỏi)\n` +
+          `  - Ứng dụng: Phân tích tĩnh mã nguồn Solidity, phát hiện lỗ hổng reentrancy và integer overflow.\n\n` +
+          `• **Nghiên cứu chế tạo thiết bị đo khúc xạ mắt tự động ứng dụng xử lý ảnh và AI**\n` +
+          `  - Chuyên ngành: Robot & Cơ điện tử (FME) — **Điểm: 9.0/10** (Xuất sắc)\n` +
+          `  - Ứng dụng: Cảm biến quang học Hartmann-Shack kết hợp giải thuật học sâu.\n\n` +
+          `• **Mô phỏng khí động học và giảm thiểu lực cản xe điện bằng phần mềm CFD OpenFOAM**\n` +
+          `  - Chuyên ngành: Cơ khí Động lực - Ô tô (FME Automotive) — **Điểm: 8.9/10**\n` +
+          `  - Ứng dụng: Tối ưu hóa bề mặt khí động học, tăng quãng đường di chuyển của xe điện.\n\n` +
+          `• **Hệ thống tự động lập kế hoạch và phân bổ nguồn lực container tại cảng biển thông minh**\n` +
+          `  - Chuyên ngành: Logistics & Chuỗi cung ứng (FOE) — **Điểm: 8.7/10**\n\n` +
+          `### 2. Tra cứu toàn văn báo cáo & mã nguồn:\n` +
+          `Toàn bộ báo cáo toàn văn (file PDF), tóm tắt Abstract, slide bảo vệ và link mã nguồn GitHub được phân quyền lưu trữ tại mục **Kho lưu trữ luận án & báo cáo** (/dashboard/thesis?tab=repository).\n\n` +
+          `### 3. Lời khuyên khi kế thừa và chọn đề tài:\n` +
+          `- Sinh viên được phép kế thừa nghiên cứu khóa trước nhưng phải trích dẫn theo chuẩn IEEE/APA.\n` +
+          `- Báo cáo phải qua kiểm tra trùng lặp (Turnitin/DoIT) với độ tương đồng dưới 20%.\n` +
+          `- Nên trao đổi sớm với Giảng viên hướng dẫn (GVHD) để chốt hướng phát triển mới.`
+        : `Past graduation thesis archive and exemplary capstone projects at **HCM-UTE**:\n\n` +
+          `### 1. Exemplary High-Scoring Theses (8.0 - 9.5/10):\n\n` +
+          `• **Smart AI Camera System for Early Fire and Smoke Detection in Residential Areas**\n` +
+          `  - Faculty: Information Technology (FIT AI) — **Score: 9.2/10** (Excellent)\n` +
+          `  - Tech: YOLOv8, Computer Vision & Edge AI real-time streaming.\n\n` +
+          `• **Design and Implementation of Dedicated Neural Processing Unit (NPU) on RISC-V**\n` +
+          `  - Faculty: Electrical & Electronics Engineering (FEEE) — **Score: 9.5/10** (First Prize Research Award)\n` +
+          `  - Tech: Verilog/VHDL, FPGA synthesis.\n\n` +
+          `• **Automated Security Vulnerability Assessment Platform for Smart Contracts on Blockchain**\n` +
+          `  - Faculty: Software Engineering (FIT) — **Score: 8.8/10** (Good)\n\n` +
+          `• **Automated Eye Refraction Measurement Device using Image Processing and AI**\n` +
+          `  - Faculty: Mechanical & Robotics Engineering (FME) — **Score: 9.0/10** (Excellent)\n\n` +
+          `### 2. Digital Repository & Artifacts:\n` +
+          `Full-text reports (PDF), presentation slides, and GitHub repositories are archived under **Thesis Repository** (/dashboard/thesis?tab=repository).\n\n` +
+          `### 3. Topic Selection & Ethics Guidelines:\n` +
+          `- You may extend prior research provided all references are cited in IEEE/APA format.\n` +
+          `- Capstone reports must pass plagiarism screening (Turnitin/DoIT) with similarity < 20%.\n` +
+          `- Discuss early with your Faculty Supervisor to identify a novel research contribution.`;
+
+    return {
+      answer,
+      citation: {
+        id: 'past-thesis-repository-archive',
+        slug: 'past-thesis-repository',
+        title: locale === 'vi' ? 'Kho đề tài khóa luận khóa trước' : 'Past Theses Repository',
+        source: 'thesis-repository',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Kho lưu trữ số hóa toàn văn báo cáo KLTN và danh mục đề tài tiêu biểu các khóa trước tại HCM-UTE.'
+            : 'Institutional digital archive of exemplary graduation theses at HCM-UTE.',
+        domain: 'THESIS',
+      },
+    };
+  }
+
+  // E0.1 Certificates & One-stop Student Services
+  if (CERTIFICATES_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Dịch vụ cấp giấy xác nhận sinh viên điện tử (Một cửa học vụ) tại **CampusUTE**:\n\n` +
+          `Bạn có thể yêu cầu và in ngay lập tức bản PDF A4 có mã QR xác thực và chữ ký số của Trường tại mục **Cấp giấy tờ sinh viên** (/dashboard/certificates).\n\n` +
+          `**Các loại giấy tờ được hỗ trợ cấp trực tuyến:**\n` +
+          `1. **Giấy xác nhận sinh viên tạm hoãn nghĩa vụ quân sự**: Cấp theo đúng biểu mẫu Nghị định 13/2016/NĐ-CP gửi Ban Chỉ huy Quân sự địa phương.\n` +
+          `2. **Giấy xác nhận vay vốn học sinh - sinh viên**: Căn cứ Quyết định 157/2007/QĐ-TTg nộp Ngân hàng Chính sách Xã hội.\n` +
+          `3. **Giấy làm vé tháng xe buýt**: Hưởng chính sách ưu đãi giá vé phương tiện công cộng cho HSSV.\n` +
+          `4. **Giấy xác nhận người phụ thuộc**: Nộp cơ quan thuế phục vụ giảm trừ gia cảnh thuế TNCN cho phụ huynh.\n` +
+          `5. **Giấy giới thiệu thực tập tốt nghiệp**: Giới thiệu sinh viên đến các cơ quan, doanh nghiệp thực tập chuyên ngành.\n\n` +
+          `**Quy trình thực hiện:**\n` +
+          `• Bước 1: Mở trang **Cấp giấy tờ** (/dashboard/certificates).\n` +
+          `• Bước 2: Chọn loại giấy xác nhận và mục đích sử dụng.\n` +
+          `• Bước 3: Nhấn "Tạo giấy xác nhận" và bấm "In / Tải PDF A4". Văn bản có hiệu lực pháp lý tương đương bản đóng dấu đỏ.`
+        : `Online Student Verification & Certificates Services (One-Stop Service) at **CampusUTE**:\n\n` +
+          `You can generate and print official A4 PDF documents with a digital signature and verification QR code under **Student Certificates** (/dashboard/certificates).\n\n` +
+          `**Available Certificate Types:**\n` +
+          `1. **Military Service Deferment Verification**: Formatted per Decree 13/2016/ND-CP for local military command.\n` +
+          `2. **Student Educational Loan Certificate**: Issued under Prime Minister Decision 157/2007/QD-TTg for Vietnam Bank for Social Policies.\n` +
+          `3. **Student Public Bus Pass Verification**: Subsidized public transit pass registration.\n` +
+          `4. **Dependent Tax Exemption Verification**: Personal income tax reduction for parents.\n` +
+          `5. **Enterprise Internship Introduction Letter**: Official university recommendation for graduation internship.\n\n` +
+          `**How to Request:**\n` +
+          `• Step 1: Open **Certificates** (/dashboard/certificates).\n` +
+          `• Step 2: Select the desired certificate type and intended purpose.\n` +
+          `• Step 3: Click "Generate Certificate" and "Print / Download PDF".`;
+
+    return {
+      answer,
+      citation: {
+        id: 'student-certificates-service',
+        slug: 'student-affairs-services-and-certificates',
+        title: locale === 'vi' ? 'Dịch vụ cấp giấy tờ sinh viên' : 'Student Certificates Portal',
+        source: 'student-affairs',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Cổng cấp giấy xác nhận sinh viên điện tử theo Nghị định 13/2016/NĐ-CP và Quyết định 157/2007/QĐ-TTg.'
+            : 'Electronic student certificate issuance portal with QR verification.',
+        domain: 'POLICY',
+      },
+    };
+  }
+
+  // E0.2 Credit Limit Application (30 credits)
+  if (CREDIT_LIMIT_APP_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Quy định và thủ tục nộp đơn nâng hạn mức tín chỉ (tối đa 30 tín chỉ) tại **CampusUTE**:\n\n` +
+          `• **Hạn mức tiêu chuẩn:** Mỗi học kỳ chính, sinh viên được đăng ký tối đa **28 tín chỉ**.\n` +
+          `• **Hạn mức đặc biệt:** Sinh viên năm cuối hoặc sinh viên có năng lực học tập tốt có nhu cầu đăng ký từ **29 đến tối đa 30 tín chỉ** cần làm đơn đề nghị gửi Phòng Đào tạo xét duyệt.\n` +
+          `• **Cách nộp đơn trực tuyến:**\n` +
+          `  1. Truy cập mục **Đăng ký học phần** (/dashboard/register).\n` +
+          `  2. Khi số tín chỉ vượt quá 28, hệ thống sẽ hiển thị form *"Đơn xin nâng hạn mức tín chỉ"*.\n` +
+          `  3. Điền lý do (ví dụ: hoàn thành chương trình tốt nghiệp đúng hạn) và nộp đơn.\n` +
+          `  4. Phòng Đào tạo sẽ xét duyệt tại Cổng quản lý (/admin/credit-limit-applications).\n` +
+          `• **Sau khi được duyệt:** Hạn mức của bạn sẽ tự động nâng lên 30 tín chỉ để bạn đăng ký bổ sung trong đợt Add/Drop.`
+        : `Credit limit exception policy and application procedure (up to 30 credits) at **CampusUTE**:\n\n` +
+          `• **Standard credit limit:** Students can enroll in up to **28 credits** per regular semester.\n` +
+          `• **Exception limit:** Final-year students or high-performing students who need **29 to 30 credits** must submit a formal credit limit application to the Academic Affairs Office.\n` +
+          `• **Application Steps:**\n` +
+          `  1. Navigate to **Course Registration** (/dashboard/register).\n` +
+          `  2. When exceeding 28 credits, click *"Credit Limit Exception Application"*.\n` +
+          `  3. State your academic rationale and submit.\n` +
+          `  4. The Academic Office reviews applications via /admin/credit-limit-applications.\n` +
+          `• **Upon approval:** Your semester credit cap is expanded to 30 credits for the add/drop registration window.`;
+
+    return {
+      answer,
+      citation: {
+        id: 'credit-limit-exception-guide',
+        slug: 'withdrawal-credit-limits',
+        title: locale === 'vi' ? 'Giới hạn tín chỉ và đơn nâng hạn mức' : 'Credit Limits & Exception Applications',
+        source: 'academic-regulations',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Quy chế hạn mức 28 tín chỉ và quy trình phê duyệt ngoại lệ tối đa 30 tín chỉ.'
+            : 'Standard 28 credits cap and 30 credits exception approval workflow.',
+        domain: 'REGISTRATION',
+      },
+    };
+  }
+
+  // E0.3 Grade Appeal & Exam Deferral
+  if (GRADE_APPEAL_REGEX.test(message)) {
+    const answer =
+      locale === 'vi'
+        ? `Quy định về Phúc khảo bài thi và Hoãn thi kết thúc học phần tại **HCM-UTE**:\n\n` +
+          `### 1. Phúc khảo điểm thi kết thúc học phần:\n` +
+          `• **Thời hạn nộp đơn:** Trong vòng **7 ngày làm việc** kể từ ngày Khoa/Phòng Đào tạo công bố điểm học phần trên Cổng sinh viên.\n` +
+          `• **Địa điểm nộp:** Nộp trực tuyến tại mục **Bảng điểm** (/dashboard/grades) hoặc nộp tại Bộ phận Một cửa Phòng Đào tạo.\n` +
+          `• **Xử lý kết quả:** Bài thi sẽ được 02 giảng viên chấm độc lập. Nếu điểm mới chênh lệch từ 0.5 điểm trở lên, điểm chính thức sẽ được điều chỉnh và cập nhật vào hệ thống.\n\n` +
+          `### 2. Hoãn thi kết thúc học phần:\n` +
+          `• **Điều kiện:** Sinh viên gặp lý do bất khả kháng (ốm đau, tai nạn, việc đột xuất của gia đình) có giấy xác nhận hợp lệ của bệnh viện từ tuyến huyện trở lên.\n` +
+          `• **Thủ tục:** Nộp đơn xin hoãn thi trước giờ thi hoặc chậm nhất **48 giờ** sau ca thi.\n` +
+          `• **Quyền lợi:** Học phần được ghi nhận điểm "I" (Hoãn thi) và sinh viên được bố trí thi bổ sung vào kỳ thi của học kỳ kế tiếp mà không phải đóng lại học phí học lại.`
+        : `Regulations on Exam Regrade Appeals and Exam Deferrals at **HCM-UTE**:\n\n` +
+          `### 1. Exam Regrade Appeals:\n` +
+          `• **Deadline:** Within **7 working days** after grades are published on the Student Portal.\n` +
+          `• **Submission:** Submit appeal through **Grades** (/dashboard/grades) or at the Academic Office.\n` +
+          `• **Evaluation:** Two independent examiners regrade the paper. Score adjustments apply if the discrepancy is >= 0.5 points.\n\n` +
+          `### 2. Final Exam Deferrals:\n` +
+          `• **Eligibility:** Valid medical emergency or force majeure with hospital documentation.\n` +
+          `• **Deadline:** Submit prior to the exam or within **48 hours** following the scheduled exam.\n` +
+          `• **Outcome:** The course is assigned an "I" (Incomplete) grade, and the student may take the exam in the next semester cycle without retaking fees.`;
+
+    return {
+      answer,
+      citation: {
+        id: 'grade-appeal-and-deferral-guide',
+        slug: 'academic-appeals-and-re-evaluation',
+        title: locale === 'vi' ? 'Quy trình phúc khảo và hoãn thi' : 'Exam Appeals and Deferrals',
+        source: 'examination-regulations',
+        locale,
+        excerpt:
+          locale === 'vi'
+            ? 'Quy chế phúc khảo điểm thi trong 7 ngày và quy định hoãn thi kết thúc học phần.'
+            : 'Regulations on 7-day exam regrade appeals and medical exam deferrals.',
+        domain: 'POLICY',
+      },
+    };
   }
 
   // E. Handle Thesis / Capstone Graduation queries — also catches contextual

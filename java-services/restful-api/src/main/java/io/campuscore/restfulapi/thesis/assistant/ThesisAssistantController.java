@@ -62,7 +62,7 @@ public class ThesisAssistantController {
     }
 
     @PostMapping("/chat")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
@@ -92,7 +92,7 @@ public class ThesisAssistantController {
     /** Deprecated compatibility alias; clients should use /chat. */
     @Deprecated
     @PostMapping("/chat/complete")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public ChatResponse complete(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
         return chat(request, actor);
     }
@@ -107,7 +107,7 @@ public class ThesisAssistantController {
             });
 
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
         SseEmitter emitter = new SseEmitter(120_000L);
@@ -161,7 +161,7 @@ public class ThesisAssistantController {
     }
 
     @PostMapping("/requests/{clientRequestId}/cancel")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public CancelResponse cancel(@PathVariable UUID clientRequestId, @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
         if (remoteRag()) {
@@ -181,7 +181,7 @@ public class ThesisAssistantController {
     }
 
     @PutMapping("/messages/{messageId}/feedback")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public FeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
@@ -193,7 +193,7 @@ public class ThesisAssistantController {
     }
 
     @DeleteMapping("/messages/{messageId}/feedback")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFeedback(@PathVariable UUID messageId, @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
@@ -205,7 +205,7 @@ public class ThesisAssistantController {
     }
 
     @GetMapping("/conversations")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public List<ThesisAssistantRepository.Conversation> conversations(
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
@@ -222,7 +222,7 @@ public class ThesisAssistantController {
     }
 
     @PostMapping("/conversations")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public ConversationCreated createConversation(@RequestBody(required = false) CreateConversationRequest request,
             @AuthenticationPrincipal Jwt actor) {
         String locale = request == null ? "vi" : request.locale();
@@ -238,7 +238,7 @@ public class ThesisAssistantController {
     }
 
     @GetMapping("/conversations/{id}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public List<ThesisAssistantRepository.Message> messages(@PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
             @RequestParam(required = false) String cursor, HttpServletResponse response) {
@@ -255,7 +255,7 @@ public class ThesisAssistantController {
     }
 
     @DeleteMapping("/conversations/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);

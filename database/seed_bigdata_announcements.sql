@@ -20,14 +20,20 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-bigdata-ai-center',
     'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
-    '<p>Khoa Công nghệ Thông tin - Trường Đại học Công nghệ Kỹ thuật TP.HCM trân trọng thông báo đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Big Data và Trí tuệ nhân tạo:</p>
+    '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo chính thức khánh thành và đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Dữ liệu lớn (Big Data) và Trí tuệ nhân tạo (AI Lab) tại cơ sở chính.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/bigdata-ai-lab.jpg" alt="Phòng Nghiên cứu Big Data & AI Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Cụm máy chủ điện toán GPU NVIDIA A100 và hạ tầng lưu trữ phân tán 500TB tại Phòng Nghiên cứu Big Data & AI Khoa CNTT HCM-UTE
+  </figcaption>
+</figure>
+<p>Dự án là bước tiến chiến lược trong đề án chuyển đổi số giáo dục đại học và nâng cao năng lực nghiên cứu ứng dụng thực tiễn của Nhà trường:</p>
 <ul>
-  <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core, hệ thống lưu trữ phân tán Ceph 500TB và mạng InfiniBand 200Gbps.</li>
-  <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, học viên cao học, nhóm nghiên cứu sinh viên (Lab AI & Data Science) và các đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
-  <li><strong>Quy trình đăng ký tài khoản:</strong> Sinh viên nộp đề cương nghiên cứu hoặc thư giới thiệu của Giảng viên hướng dẫn tại Văn phòng Bộ môn Kỹ thuật Dữ liệu (Phòng A1-402) trước ngày 30/09/2026.</li>
-  <li><strong>Hội thảo đào tạo:</strong> Khóa huấn luyện "Xử lý dữ liệu lớn với Apache Spark & Distributed Deep Learning" diễn ra vào 08:30 thứ Bảy ngày 19/09/2026 tại Hội trường Lớn Khu A.</li>
-</ul>
-<p>Mọi chi tiết xin liên hệ PGS.TS. Trần Văn Bình - Trưởng nhóm nghiên cứu Big Data Lab (Email: binhtv@campuscore.edu).</p>',
+  <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core (80GB VRAM), hệ thống lưu trữ phân tán Ceph 500TB NVMe và mạng kết nối InfiniBand tốc độ cao 200Gbps.</li>
+  <li><strong>Nền tảng phần mềm:</strong> Triển khai môi trường ảo hóa Kubernetes, hỗ trợ xử lý luồng Kafka, Apache Spark, PyTorch Distributed và cụm huấn luyện mô hình ngôn ngữ lớn (LLM).</li>
+  <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, nghiên cứu sinh, học viên cao học, nhóm sinh viên nghiên cứu khoa học (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
+  <li><strong>Quy trình đăng ký tài nguyên:</strong> Giảng viên và nhóm nghiên cứu nộp đề cương tại Văn phòng Bộ môn Kỹ thuật Dữ liệu (Phòng A1-402) trước ngày 30/09/2026.</li>
+</ul>',
     'HIGH',
     ARRAY['STUDENT', 'LECTURER', 'ADMIN']::text[],
     ARRAY[]::integer[],
@@ -43,9 +49,16 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-course-reg-official',
     'Kế hoạch tổ chức đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
-    '<p>Phòng Đào tạo thông báo kế hoạch chi tiết về việc đăng ký học phần chính thức dành cho sinh viên bậc Đại học chính quy các khóa như sau:</p>
+    '<p>Phòng Đào tạo thông báo kế hoạch tổ chức đăng ký học phần chính thức cho Học kỳ 1 năm học 2026-2027 trên hệ thống quản lý học tập tích hợp CampusUTE.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/course-registration.jpg" alt="Cổng đăng ký học phần trực tuyến CampusUTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Sinh viên tra cứu thời khóa biểu và thực hiện đăng ký học phần trực tuyến trên cổng CampusUTE
+  </figcaption>
+</figure>
+<p>Để đảm bảo công tác tổ chức đào tạo diễn ra thuận lợi, sinh viên cần nắm vững các mốc thời gian và quy định học vụ sau:</p>
 <ul>
-  <li><strong>Hạn mức tín chỉ:</strong> Hạn mức chuẩn là 28 tín chỉ/học kỳ theo Điều 14 Quy chế Đào tạo tín chỉ HCMUTE. Chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</li>
+  <li><strong>Hạn mức tín chỉ:</strong> Sinh viên được đăng ký tối đa <strong>28 tín chỉ</strong> trong học kỳ chính; chỉ trường hợp có đơn xin vượt hạn mức được Ban Chủ nhiệm Khoa và Phòng Đào tạo duyệt mới được nâng lên trần 30 tín chỉ.</li>
   <li><strong>Khung thời gian mở cổng đăng ký:</strong>
     <ul>
       <li>Khóa 2023 (Năm 4): Từ 08:00 ngày 25/08/2026 đến 17:00 ngày 27/08/2026.</li>
@@ -71,7 +84,14 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-thesis-registration-fall',
     'Thông báo mở đợt đăng ký Khóa luận tốt nghiệp (KLTN) & Tiểu luận chuyên ngành Khoa CNTT',
-    '<p>Ban Chủ nhiệm Khoa Công nghệ Thông tin phối hợp cùng Phòng Đào tạo thông báo mở đợt đăng ký đề tài tốt nghiệp đợt 1 năm học 2026-2027:</p>
+    '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM long trọng tổ chức Lễ bảo vệ Khóa luận tốt nghiệp (KLTN) đợt 2 cho sinh viên các chuyên ngành Kỹ thuật phần mềm, Hệ thống thông tin, An toàn thông tin và Trí tuệ nhân tạo.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/thesis-defense.jpg" alt="Lễ bảo vệ Khóa luận tốt nghiệp Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Sinh viên Khoa Công nghệ Thông tin tự tin báo cáo đề tài khóa luận trước Hội đồng chấm thi học thuật HCM-UTE
+  </figcaption>
+</figure>
+<p>Đợt bảo vệ ghi nhận sự trưởng thành vượt bậc về hàm lượng khoa học, tính ứng dụng thực tiễn và khả năng làm chủ công nghệ của sinh viên:</p>
 <ul>
   <li><strong>Điều kiện đăng ký KLTN:</strong> Sinh viên tích lũy tối thiểu 110 tín chỉ, điểm trung bình tích lũy CPA &ge; 2.00, không bị cảnh báo học vụ mức 2.</li>
   <li><strong>Hình thức thực hiện:</strong> Mỗi nhóm từ 1 đến tối đa 3 sinh viên; Nhóm trưởng trực tiếp khởi tạo đề tài và mời thành viên cùng Giảng viên hướng dẫn (GVHD) trên Cổng thông tin.</li>
@@ -83,6 +103,7 @@ INSERT INTO engagement."Announcement" (
       <li>Hội đồng bảo vệ chính thức: Dự kiến từ ngày 05/01/2027 đến 10/01/2027.</li>
     </ul>
   </li>
+  <li><strong>Kho lưu trữ số hóa:</strong> Toàn bộ báo cáo toàn văn, slide thuyết trình và mã nguồn đề tài được tích hợp lưu trữ tại Phân hệ Kho Luận án & Đồ án tốt nghiệp trên nền tảng CampusUTE.</li>
 </ul>',
     'HIGH',
     ARRAY['STUDENT', 'LECTURER']::text[],
@@ -99,7 +120,14 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-scholarship-dr-criteria',
     'Thông báo xét cấp Học bổng Khuyến khích học tập & Tiêu chuẩn Điểm rèn luyện (ĐRL) đợt 1',
-    '<p>Hội đồng Thi đua - Khen thưởng Nhà trường thông báo quy định xét duyệt học bổng khuyến khích học tập cho học kỳ:</p>
+    '<p>Hội đồng xét duyệt Học bổng Nhà trường trân trọng thông báo kết quả đối soát điểm trung bình chung học tập (GPA) kết hợp điểm rèn luyện (ĐRL) xét cấp Học bổng Khuyến khích học tập.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/scholarship-ceremony.jpg" alt="Lễ trao học bổng khuyến khích học tập HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Lễ trao Học bổng Khuyến khích học tập và Học bổng Doanh nghiệp vinh danh các sinh viên xuất sắc HCM-UTE
+  </figcaption>
+</figure>
+<p>Chính sách học bổng nhằm động viên tinh thần nỗ lực vươn lên trong học tập và rèn luyện của sinh viên toàn trường theo các tiêu chuẩn học vụ hiện hành:</p>
 <ul>
   <li><strong>Học bổng Xuất sắc (Loại A):</strong> GPA &ge; 3.60 và Điểm rèn luyện &ge; 90 điểm (Xếp loại Xuất sắc), hoàn thành tối thiểu 15 tín chỉ trong học kỳ xét. Mức cấp: 120% học phí học kỳ.</li>
   <li><strong>Học bổng Giỏi (Loại B):</strong> GPA &ge; 3.20 và Điểm rèn luyện &ge; 80 điểm (Xếp loại Tốt trở lên). Mức cấp: 100% học phí học kỳ.</li>
@@ -142,7 +170,14 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-career-fair-tech-2026',
     'Ngày hội việc làm và Kết nối doanh nghiệp công nghệ thông tin UTE Tech Career Expo 2026',
-    '<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp phần mềm hàng đầu tổ chức Ngày hội Việc làm UTE Tech Career Expo:</p>
+    '<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp công nghệ thông tin hàng đầu tổ chức Ngày hội Việc làm và Kết nối Doanh nghiệp UTE Tech Career Expo 2026 tại khuôn viên sảnh A & B.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/tech-career-expo.jpg" alt="Ngày hội việc làm UTE Tech Career Expo" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Không khí sôi nổi tại UTE Tech Career Expo 2026 với hơn 60 tập đoàn công nghệ và 1.200 vị trí tuyển dụng kỹ sư
+  </figcaption>
+</figure>
+<p>Sự kiện mang đến hàng nghìn cơ hội nghề nghiệp chất lượng cao và định hướng phát triển sự nghiệp vững chắc cho sinh viên các khối ngành kỹ thuật công nghệ:</p>
 <ul>
   <li><strong>Thời gian:</strong> 07:30 - 16:30 thứ Sáu ngày 23/10/2026.</li>
   <li><strong>Địa điểm:</strong> Quảng trường trung tâm Khu A và Hội trường Trịnh Công Sơn, Trường ĐH Công nghệ Kỹ thuật TP.HCM.</li>
@@ -247,7 +282,14 @@ INSERT INTO engagement."Announcement" (
 (
     'announcement-ute-student-scientific-research-awards',
     'Phát động Giải thưởng Nghiên cứu Khoa học Sinh viên và Khởi nghiệp Đổi mới Sáng tạo 2026-2027',
-    '<p>Khoa Công nghệ Thông tin phối hợp cùng Phòng Đào tạo thông báo phát động phong trào Sinh viên Nghiên cứu Khoa học (NCKH) năm học 2026-2027:</p>
+    '<p>Trường Đại học Sư phạm Kỹ thuật TP.HCM phối hợp cùng Khoa Công nghệ Thông tin thông báo phát động phong trào Sinh viên Nghiên cứu Khoa học (NCKH) & Đổi mới Sáng tạo Công nghệ năm học 2026-2027.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/scientific-research.jpg" alt="Lễ vinh danh Giải thưởng Nghiên cứu Khoa học Sinh viên HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Đại diện Ban Giám hiệu Nhà trường trao bằng khen và cúp lưu niệm cho các nhóm sinh viên đạt giải thưởng Nghiên cứu Khoa học 2026
+  </figcaption>
+</figure>
+<p>Phong trào nghiên cứu khoa học sinh viên năm nay tiếp tục khẳng định vị thế tiên phong của HCM-UTE trong sáng tạo kỹ thuật và giải quyết các bài toán thực tiễn của xã hội:</p>
 <ul>
   <li><strong>Lĩnh vực ưu tiên tài trợ kinh phí:</strong>
     <ul>

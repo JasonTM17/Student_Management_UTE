@@ -22,9 +22,11 @@ import {
   calculateReadingTime,
   extractAnnouncementExcerpt,
   extractCoverImage,
+  extractCoverImageDetails,
   formatAnnouncementPublisher,
   formatRelativeTime,
   resolveAnnouncementDomain,
+  stripFirstCoverImage,
 } from '@/lib/announcement-presentation';
 import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
 import { TableOfContents } from '../TableOfContents';
@@ -49,7 +51,9 @@ export function EditorialArticleMagazine({
   const isVi = locale === 'vi';
   const domain = resolveAnnouncementDomain(announcement, locale);
   const readingTime = calculateReadingTime(announcement.content);
-  const coverImage = extractCoverImage(announcement.content);
+  const coverDetails = extractCoverImageDetails(announcement.content);
+  const coverImage = coverDetails?.url || extractCoverImage(announcement.content);
+  const bodyContent = coverImage ? stripFirstCoverImage(announcement.content) : announcement.content;
   const sapo = extractAnnouncementExcerpt(announcement.content, 220);
   const publisher = formatAnnouncementPublisher(announcement.publishedBy, locale);
   const relativeTime = formatRelativeTime(announcement.publishAt || announcement.createdAt, locale);
@@ -174,14 +178,21 @@ export function EditorialArticleMagazine({
 
       {/* 4. Hero Banner (16:9 Cover Image or Editorial Graphic) */}
       {coverImage ? (
-        <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/60 shadow-md">
-          {/* eslint-disable-next-line @next/next/no-img-element */}
-          <img
-            src={coverImage}
-            alt={announcement.title}
-            className="h-full w-full object-cover"
-          />
-        </div>
+        <figure className="space-y-2">
+          <div className="relative aspect-video w-full overflow-hidden rounded-xl border border-border/60 shadow-md">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src={coverImage}
+              alt={coverDetails?.alt || announcement.title}
+              className="h-full w-full object-cover"
+            />
+          </div>
+          {coverDetails?.caption ? (
+            <figcaption className="text-center text-xs font-medium text-muted-foreground italic px-2">
+              {coverDetails.caption}
+            </figcaption>
+          ) : null}
+        </figure>
       ) : (
         <div
           className={cn(
@@ -218,7 +229,7 @@ export function EditorialArticleMagazine({
               getFontSizeClass(),
             )}
           >
-            <RichContentRenderer content={announcement.content} />
+            <RichContentRenderer content={bodyContent} />
           </div>
 
           {/* Official Attached Documents */}

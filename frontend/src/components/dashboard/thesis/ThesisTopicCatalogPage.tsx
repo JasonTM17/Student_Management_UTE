@@ -1,6 +1,7 @@
 'use client';
 
 import { useMemo, useState } from 'react';
+import { useSearchParams } from 'next/navigation';
 import { ArrowUpRight, FileStack, Loader2, Search } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
@@ -19,13 +20,15 @@ import { useThesisWorkspace } from './useThesisWorkspace';
 export default function ThesisTopicCatalogPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
   const { messages, locale } = useI18n();
+  const searchParams = useSearchParams();
+  const explicitRoundId = searchParams.get('roundId') || '';
   const [searchInput, setSearchInput] = useState('');
   const [showAll, setShowAll] = useState(false);
   // Course requirement: the topic catalog only appears after a search, so no
   // topic is fetched or rendered until the query is submitted.
   const [submittedQuery, setSubmittedQuery] = useState('');
   const searchActive = showAll || submittedQuery.trim().length > 0;
-  const workspace = useThesisWorkspace('', { topicsEnabled: searchActive, groupsEnabled: false });
+  const workspace = useThesisWorkspace(explicitRoundId, { topicsEnabled: searchActive, groupsEnabled: false });
 
   const normalizedQuery = submittedQuery.trim().toLowerCase();
   const matchingTopics = useMemo(() => {

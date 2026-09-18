@@ -1,29 +1,9 @@
-'use client';
+-- Flyway Migration V61: Add Announcement Rich Media (Images, Figures, and Captions)
+-- Enriches top academic announcements in engagement."Announcement" with authentic 16:9 news photography and figcaptions
 
-import React, { useEffect, useState } from 'react';
-import {
-  ArrowRight,
-  BookOpen,
-  Calendar,
-  Clock,
-  GraduationCap,
-  Newspaper,
-  Sparkles,
-} from 'lucide-react';
-import { useAuth } from '@/context/AuthContext';
-import { announcementsApi, type AnnouncementRecord } from '@/lib/api';
-import { AnnouncementReaderModal } from '@/components/announcements/AnnouncementReaderModal';
-import { AnnouncementFeedCard } from '@/components/announcements/feed/AnnouncementFeedCard';
-import { SectionEyebrow } from '@/components/ui/page-header';
-import { LocalizedLink } from '@/components/LocalizedLink';
-import { useI18n } from '@/i18n';
-import { cn } from '@/lib/utils';
-
-const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
-  {
-    id: 'notice-home-01',
-    title: 'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
-    content: `<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo chính thức khánh thành và đưa vào vận hành cụm máy chủ điện toán hiệu năng cao phục vụ nghiên cứu Dữ liệu lớn (Big Data) và Trí tuệ nhân tạo (AI Lab) tại cơ sở chính.</p>
+-- 1. Big Data & AI Research Lab
+UPDATE engagement."Announcement"
+SET content = '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo chính thức khánh thành và đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Dữ liệu lớn (Big Data) và Trí tuệ nhân tạo (AI Lab) tại cơ sở chính.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/bigdata-ai-lab.jpg" alt="Phòng Nghiên cứu Big Data & AI Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -35,17 +15,15 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core (80GB VRAM), hệ thống lưu trữ phân tán Ceph 500TB NVMe và mạng kết nối InfiniBand tốc độ cao 200Gbps.</li>
   <li><strong>Nền tảng phần mềm:</strong> Triển khai môi trường ảo hóa Kubernetes, hỗ trợ xử lý luồng Kafka, Apache Spark, PyTorch Distributed và cụm huấn luyện mô hình ngôn ngữ lớn (LLM).</li>
   <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, nghiên cứu sinh, học viên cao học, nhóm sinh viên nghiên cứu khoa học (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
-</ul>
-<p>Giảng viên và các nhóm nghiên cứu có nhu cầu cấp tài nguyên tính toán đăng ký trực tiếp qua Cổng thông tin đào tạo hoặc liên hệ Văn phòng Khoa CNTT (Phòng E1-201).</p>`,
-    priority: 'HIGH',
-    publishedBy: 'Khoa Công nghệ Thông tin & Phòng Đào tạo',
-    createdAt: '2026-09-08T08:00:00Z',
-    publishAt: '2026-09-08T08:00:00Z',
-  },
-  {
-    id: 'notice-home-02',
-    title: 'Ngày hội việc làm và Kết nối doanh nghiệp công nghệ thông tin UTE Tech Career Expo 2026',
-    content: `<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp công nghệ thông tin hàng đầu tổ chức Ngày hội Việc làm và Kết nối Doanh nghiệp UTE Tech Career Expo 2026 tại khuôn viên sảnh A & B.</p>
+  <li><strong>Quy trình đăng ký tài nguyên:</strong> Giảng viên và nhóm nghiên cứu nộp đề cương tại Văn phòng Bộ môn Kỹ thuật Dữ liệu (Phòng A1-402) trước ngày 30/09/2026.</li>
+</ul>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-bigdata-ai-center', 'announcement-v32-smart-campus');
+
+-- 2. Tech Career Expo & Job Fair
+UPDATE engagement."Announcement"
+SET content = '<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp công nghệ thông tin hàng đầu tổ chức Ngày hội Việc làm và Kết nối Doanh nghiệp UTE Tech Career Expo 2026 tại khuôn viên sảnh A & B.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/tech-career-expo.jpg" alt="Ngày hội việc làm UTE Tech Career Expo" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -58,16 +36,14 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Phỏng vấn nhanh tại chỗ (On-site Fast-track):</strong> Hơn 30 doanh nghiệp tổ chức phỏng vấn và trao thư mời nhận việc (Offer Letter) trực tiếp ngay tại gian hàng.</li>
   <li><strong>Hoạt động cố vấn:</strong> Gian hàng tư vấn sửa CV 1-on-1 cùng các chuyên gia nhân sự kỳ cựu và hội thảo định hướng "Kỹ sư thích ứng kỷ nguyên AI".</li>
 </ul>
-<p>Sinh viên tham dự chuẩn bị trang phục lịch sự, mang theo CV bản cứng hoặc quét mã QR hồ sơ năng lực số trên ứng dụng CampusUTE.</p>`,
-    priority: 'HIGH',
-    publishedBy: 'Trung Tâm Hướng Nghiệp & Quan Hệ Doanh Nghiệp',
-    createdAt: '2026-09-09T10:00:00Z',
-    publishAt: '2026-09-09T10:00:00Z',
-  },
-  {
-    id: 'notice-home-03',
-    title: 'Danh sách sinh viên đủ điều kiện xét Học bổng khuyến khích học tập Học kỳ vừa qua',
-    content: `<p>Hội đồng xét duyệt Học bổng Nhà trường trân trọng thông báo kết quả đối soát điểm trung bình chung học tập (GPA) kết hợp điểm rèn luyện (ĐRL) xét cấp Học bổng Khuyến khích học tập.</p>
+<p>Sinh viên tham dự chuẩn bị trang phục lịch sự, mang theo CV bản cứng hoặc quét mã QR hồ sơ năng lực số trên ứng dụng CampusUTE.</p>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-career-fair-tech-2026', 'announcement-v32-job-fair', 'announcement-ute-fpt-ojt-career-day');
+
+-- 3. Academic Scholarship & Conduct Scoring Criteria
+UPDATE engagement."Announcement"
+SET content = '<p>Hội đồng xét duyệt Học bổng Nhà trường trân trọng thông báo kết quả đối soát điểm trung bình chung học tập (GPA) kết hợp điểm rèn luyện (ĐRL) xét cấp Học bổng Khuyến khích học tập.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/scholarship-ceremony.jpg" alt="Lễ trao học bổng khuyến khích học tập HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -80,16 +56,14 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Các định mức học bổng:</strong> Loại Xuất sắc (120% học phí kỳ), Loại Giỏi (100% học phí kỳ) và Loại Khá (75% học phí kỳ).</li>
   <li><strong>Thời hạn đối soát minh chứng:</strong> Sinh viên kiểm tra danh sách công bố trên cổng cá nhân và phản hồi phúc khảo trước 17:00 ngày 20/09/2026.</li>
 </ul>
-<p>Kinh phí học bổng sẽ được Phòng Kế hoạch - Tài chính chuyển khoản trực tiếp vào tài khoản ngân hàng liên kết của sinh viên đủ điều kiện.</p>`,
-    priority: 'NORMAL',
-    publishedBy: 'Phòng Công Tác Sinh Viên & Đào Tạo',
-    createdAt: '2026-09-05T09:00:00Z',
-    publishAt: '2026-09-05T09:00:00Z',
-  },
-  {
-    id: 'notice-home-04',
-    title: 'Kế hoạch mở cổng Đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
-    content: `<p>Phòng Đào tạo thông báo kế hoạch tổ chức đăng ký học phần chính thức cho Học kỳ 1 năm học 2026-2027 trên hệ thống quản lý học tập tích hợp CampusUTE.</p>
+<p>Kinh phí học bổng sẽ được Phòng Kế hoạch - Tài chính chuyển khoản trực tiếp vào tài khoản ngân hàng liên kết của sinh viên đủ điều kiện.</p>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-scholarship-dr-criteria', 'announcement-ute-samsung-scholarship-2026', 'announcement-ute-intel-stem-women-2026', 'announcement-v26-scholarship');
+
+-- 4. Course Registration Schedule & Limits
+UPDATE engagement."Announcement"
+SET content = '<p>Phòng Đào tạo thông báo kế hoạch tổ chức đăng ký học phần chính thức cho Học kỳ 1 năm học 2026-2027 trên hệ thống quản lý học tập tích hợp CampusUTE.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/course-registration.jpg" alt="Cổng đăng ký học phần trực tuyến CampusUTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -101,16 +75,14 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Hạn mức tín chỉ:</strong> Sinh viên được đăng ký tối đa <strong>28 tín chỉ</strong> trong học kỳ chính; chỉ trường hợp có đơn xin vượt hạn mức được Ban Chủ nhiệm Khoa và Phòng Đào tạo duyệt mới được nâng lên trần 30 tín chỉ.</li>
   <li><strong>Lịch mở cổng phân luồng:</strong> Khóa 2022 và 2023 mở từ 08:00 ngày 25/08; Khóa 2024 và 2025 mở từ 08:00 ngày 28/08; Đăng ký bổ sung và điều chỉnh toàn trường đến 17:00 ngày 15/09/2026.</li>
   <li><strong>Lưu ý quan trọng:</strong> Kiểm tra kỹ điều kiện môn học tiên quyết, tránh xung đột lịch thi và thực hiện ấn nút "Xác nhận lưu đăng ký" để ghi nhận vào cơ sở dữ liệu.</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Phòng Đào tạo UTE',
-    createdAt: '2026-08-25T08:00:00Z',
-    publishAt: '2026-08-25T08:00:00Z',
-  },
-  {
-    id: 'notice-home-05',
-    title: 'Lễ bảo vệ Khóa luận tốt nghiệp (KLTN) Khoa Công nghệ Thông tin đợt 2 năm học 2025-2026',
-    content: `<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM long trọng tổ chức Lễ bảo vệ Khóa luận tốt nghiệp (KLTN) đợt 2 cho sinh viên các chuyên ngành Kỹ thuật phần mềm, Hệ thống thông tin, An toàn thông tin và Trí tuệ nhân tạo.</p>
+</ul>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-course-reg-official', 'announcement-registration-window');
+
+-- 5. Thesis Registration & Defense (KLTN)
+UPDATE engagement."Announcement"
+SET content = '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM long trọng tổ chức Lễ bảo vệ Khóa luận tốt nghiệp (KLTN) đợt 2 cho sinh viên các chuyên ngành Kỹ thuật phần mềm, Hệ thống thông tin, An toàn thông tin và Trí tuệ nhân tạo.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/thesis-defense.jpg" alt="Lễ bảo vệ Khóa luận tốt nghiệp Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -122,16 +94,14 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Quy mô hội đồng:</strong> 18 hội đồng chuyên môn với sự tham gia của các Giáo sư, Tiến sĩ đầu ngành và các chuyên gia cấp cao (Chief Architect, Engineering Lead) từ các doanh nghiệp đối tác.</li>
   <li><strong>Số lượng đề tài:</strong> Hơn 120 nhóm sinh viên tham gia bảo vệ với các hướng nghiên cứu tiêu biểu: Hệ thống phân tán chịu tải cao, Thị giác máy tính trong y tế số, An toàn mạng dựa trên Zero-Trust và Giải pháp quản trị trường đại học thông minh.</li>
   <li><strong>Kho lưu trữ số hóa:</strong> Toàn bộ báo cáo toàn văn, slide thuyết trình và mã nguồn đề tài được tích hợp lưu trữ tại Phân hệ Kho Luận án & Đồ án tốt nghiệp trên nền tảng CampusUTE.</li>
-</ul>`,
-    priority: 'HIGH',
-    publishedBy: 'Khoa Công nghệ Thông tin',
-    createdAt: '2026-09-12T08:30:00Z',
-    publishAt: '2026-09-12T08:30:00Z',
-  },
-  {
-    id: 'notice-home-06',
-    title: 'Vinh danh các nhóm sinh viên đạt Giải thưởng Nghiên cứu Khoa học & Sáng tạo Đổi mới Công nghệ cấp Trường',
-    content: `<p>Trường Đại học Sư phạm Kỹ thuật TP.HCM tổ chức Lễ tổng kết và trao giải thưởng Nghiên cứu Khoa học Sinh viên (NCKH) & Đổi mới Sáng tạo Công nghệ năm học 2025-2026 tại Hội trường Lớn Khu A.</p>
+</ul>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-thesis-registration-fall', 'announcement-v26-thesis-round');
+
+-- 6. Student Scientific Research & Innovation Awards (NCKH)
+UPDATE engagement."Announcement"
+SET content = '<p>Trường Đại học Sư phạm Kỹ thuật TP.HCM tổ chức Lễ tổng kết và trao giải thưởng Nghiên cứu Khoa học Sinh viên (NCKH) & Đổi mới Sáng tạo Công nghệ năm học 2025-2026 tại Hội trường Lớn Khu A.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/scientific-research.jpg" alt="Lễ vinh danh Giải thưởng Nghiên cứu Khoa học Sinh viên HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -143,110 +113,7 @@ const HOMEPAGE_FALLBACK_NEWS: AnnouncementRecord[] = [
   <li><strong>Kết quả chung cuộc:</strong> Ban giám khảo đã chấm chọn và trao 05 Giải Nhất, 10 Giải Nhì, 15 Giải Ba cùng 20 Giải Khuyến khích từ hơn 350 công trình dự thi trên toàn trường.</li>
   <li><strong>Ứng dụng chuyển giao:</strong> Nhiều đề tài xuất sắc đã công bố bài báo tại các hội nghị quốc tế uy tín thuộc danh mục Scopus/IEEE và nhận được tài trợ thương mại hóa từ Quỹ đầu tư mạo hiểm công nghệ.</li>
   <li><strong>Chính sách ưu đãi:</strong> Sinh viên đạt giải được cộng điểm rèn luyện tối đa (100 điểm), ưu tiên xét tuyển đề tài Khóa luận tốt nghiệp và nhận học bổng tài năng của Nhà trường.</li>
-</ul>`,
-    priority: 'NORMAL',
-    publishedBy: 'Phòng Khoa học Công nghệ & Hợp tác Quốc tế',
-    createdAt: '2026-09-10T14:00:00Z',
-    publishAt: '2026-09-10T14:00:00Z',
-  },
-];
-
-export function HomeNewsSection() {
-  const { user } = useAuth();
-  const { locale } = useI18n();
-  const [items, setItems] = useState<AnnouncementRecord[]>(HOMEPAGE_FALLBACK_NEWS);
-  const [selectedNotice, setSelectedNotice] = useState<AnnouncementRecord | null>(null);
-
-  const isVi = locale === 'vi';
-
-  useEffect(() => {
-    let isMounted = true;
-    if (!user) {
-      return;
-    }
-    announcementsApi
-      .getMy({ page: 1, limit: 6 })
-      .then((res) => {
-        if (isMounted && res.data && res.data.length > 0) {
-          setItems(res.data);
-        }
-      })
-      .catch(() => {
-        // Fallback to static editorial notices
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
-
-  const featured = items[0] || HOMEPAGE_FALLBACK_NEWS[0];
-  const restItems = items.slice(1, 4);
-
-  return (
-    <section className="border-t border-border/70 bg-secondary/15 py-12 sm:py-16">
-      <div className="mx-auto max-w-[1280px] px-4 sm:px-6 lg:px-12 space-y-8">
-        {/* Section Header */}
-        <div className="flex flex-col gap-3 sm:flex-row sm:items-end sm:justify-between">
-          <div className="space-y-1.5">
-            <SectionEyebrow>
-              {isVi ? 'TIN TỨC & SỰ KIỆN HỌC THUẬT' : 'CAMPUS NEWS & EVENTS'}
-            </SectionEyebrow>
-            <h2 className="text-2xl sm:text-3xl font-extrabold tracking-tight text-foreground">
-              {isVi ? 'Bản Tin Đại Học HCMUTE' : 'HCMUTE University News & Press'}
-            </h2>
-            <p className="text-sm text-muted-foreground max-w-2xl">
-              {isVi
-                ? 'Cập nhật các thành tựu nghiên cứu khoa học, chuyển đổi số đào tạo, hoạt động khởi nghiệp và công văn học vụ mới nhất.'
-                : 'Latest updates on scientific research, academic digital transformation, career fairs, and administrative dispatches.'}
-            </p>
-          </div>
-
-          <LocalizedLink
-            href="/dashboard/announcements"
-            className="group inline-flex min-h-8 items-center gap-1.5 font-bold text-sm text-primary hover:underline self-start sm:self-end"
-          >
-            <span>{isVi ? 'Xem tất cả thông báo' : 'View all announcements'}</span>
-            <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />
-          </LocalizedLink>
-        </div>
-
-        {/* News Grid */}
-        <div className="grid grid-cols-1 gap-6 lg:grid-cols-12 items-stretch">
-          {/* Featured Article (7 columns on desktop) */}
-          <div className="lg:col-span-7 flex flex-col">
-            <AnnouncementFeedCard
-              announcement={featured}
-              onClick={() => setSelectedNotice(featured)}
-              variant="featured"
-              layout="vertical"
-              locale={locale}
-              className="h-full"
-            />
-          </div>
-
-          {/* Secondary News Stream (5 columns on desktop) */}
-          <div className="lg:col-span-5 flex flex-col justify-between gap-4">
-            {restItems.map((ann) => (
-              <AnnouncementFeedCard
-                key={ann.id}
-                announcement={ann}
-                onClick={() => setSelectedNotice(ann)}
-                variant="standard"
-                locale={locale}
-              />
-            ))}
-          </div>
-        </div>
-      </div>
-
-      {/* Embedded Announcement Reader Modal */}
-      <AnnouncementReaderModal
-        announcement={selectedNotice}
-        isOpen={Boolean(selectedNotice)}
-        onClose={() => setSelectedNotice(null)}
-        allAnnouncements={items}
-        onSelectAnnouncement={(ann) => setSelectedNotice(ann)}
-      />
-    </section>
-  );
-}
+</ul>',
+    "updatedAt" = NOW(),
+    version = version + 1
+WHERE id IN ('announcement-ute-student-scientific-research-awards', 'announcement-v32-ute-research', 'announcement-ute-innovation-awards-2026');

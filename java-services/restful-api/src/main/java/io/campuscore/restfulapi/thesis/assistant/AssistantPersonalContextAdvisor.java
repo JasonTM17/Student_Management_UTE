@@ -10,30 +10,35 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Semester
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.UUID;
 import java.util.function.Consumer;
 import java.util.regex.Pattern;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.dao.DataAccessException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
  * Answers personal timetable questions (lịch học / thời khóa biểu / schedule)
- * from the asker's real enrollments or teaching assignments. The public RAG
- * snapshot intentionally never sees personal rows, so without this advisor the
- * assistant could only reply that it cannot see personal schedules.
+ * and thesis supervision / registration queries from the asker's real enrollments,
+ * teaching assignments, and thesis workloads. The public RAG snapshot intentionally
+ * never sees personal rows, so this advisor provides accurate, grounded answers.
  *
  * Intercepted answers are not charged against the daily RAG quota and are not
  * persisted as conversation turns; the controller falls back to the RAG path
- * whenever the question is not clearly a timetable question or the actor has
+ * whenever the question is not clearly a personal context question or the actor has
  * no personal context to answer from.
  */
 @Service
@@ -57,6 +62,36 @@ public class AssistantPersonalContextAdvisor {
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    private static final Pattern FIRST_PERSON_PRONOUN = Pattern.compile(
+            "\\b(?:tôi|toi|mình|minh|my|i)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static final Pattern THESIS_ACTION_OR_OWNERSHIP = Pattern.compile(
+            "của\\s*(?:tôi|mình)|cua\\s*(?:toi|minh)|do\\s*(?:tôi|mình)|do\\s*(?:toi|minh)"
+                    + "|hướng\\s*dẫn|huong\\s*dan|phụ\\s*trách|phu\\s*trach|chấm|cham|đăng\\s*ký|dang\\s*ky"
+                    + "|\\bmy\\b|supervis\\w*|assigned\\s+to\\s+me",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static final Pattern THESIS_NOUN = Pattern.compile(
+            "đề\\s*tài|de\\s*tai|khóa\\s*luận|khoa\\s*luan|đồ\\s*án|do\\s*an|tiểu\\s*luận|tieu\\s*luan|kltn|tlcn|hội\\s*đồng|hoi\\s*dong|\\bthesis\\b|\\btopics?\\b|\\bcouncils?\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static final Pattern THESIS_ARCHIVE_INTENT = Pattern.compile(
+            "(?:khóa|khoá|năm)\\s*(?:trước|cũ|vừa\\s*qua|202\\d)|các\\s*năm\\s*trước|cựu\\s*sinh\\s*viên"
+                    + "|tham\\s*khảo|tiêu\\s*biểu|xuất\\s*sắc|kho\\s*(?:lưu\\s*trữ|đề\\s*tài)|mẫu\\s*(?:đề\\s*tài|khóa\\s*luận)"
+                    + "|đạt\\s*điểm\\s*cao|past\\s*thes(?:is|es)|previous\\s*(?:years?|cohorts?)|exemplary\\s*topics?|thesis\\s*archive",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static boolean isThesisPersonalIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (THESIS_ARCHIVE_INTENT.matcher(message).find()) {
+            return false;
+        }
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && THESIS_ACTION_OR_OWNERSHIP.matcher(message).find()
+                && THESIS_NOUN.matcher(message).find();
+    }
+
     private static final String[] DAY_LABELS_VI =
             {"", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"};
     private static final String[] DAY_LABELS_EN =
@@ -64,17 +99,30 @@ public class AssistantPersonalContextAdvisor {
 
     private final AcademicEnrollmentReadService enrollments;
     private final AcademicSectionReadService sections;
+    private final ThesisLecturerWorkloadService lecturerWorkload;
+    private final NamedParameterJdbcTemplate jdbc;
 
     public AssistantPersonalContextAdvisor(
             AcademicEnrollmentReadService enrollments,
             AcademicSectionReadService sections) {
-        this.enrollments = enrollments;
-        this.sections = sections;
+        this(enrollments, sections, null, null);
     }
 
-    /** True when the question is clearly about the asker's personal timetable. */
+    @Autowired
+    public AssistantPersonalContextAdvisor(
+            AcademicEnrollmentReadService enrollments,
+            AcademicSectionReadService sections,
+            @Autowired(required = false) ThesisLecturerWorkloadService lecturerWorkload,
+            @Autowired(required = false) NamedParameterJdbcTemplate jdbc) {
+        this.enrollments = enrollments;
+        this.sections = sections;
+        this.lecturerWorkload = lecturerWorkload;
+        this.jdbc = jdbc;
+    }
+
+    /** True when the question is clearly about personal schedule or thesis status. */
     public boolean handles(String message) {
-        return message != null && SCHEDULE_INTENT.matcher(message).find();
+        return message != null && (SCHEDULE_INTENT.matcher(message).find() || isThesisPersonalIntent(message));
     }
 
     /**
@@ -132,6 +180,17 @@ public class AssistantPersonalContextAdvisor {
     }
 
     private String composeAnswer(Jwt actor, String locale, String message) {
+        if (isThesisPersonalIntent(message)) {
+            String lecturerId = claim(actor, "lecturerId");
+            if (StringUtils.hasText(lecturerId) && lecturerWorkload != null) {
+                return lecturerThesisAnswer(lecturerId, locale);
+            }
+            String studentId = claim(actor, "studentId");
+            if (StringUtils.hasText(studentId) && jdbc != null) {
+                return studentThesisAnswer(studentId, locale);
+            }
+            return null;
+        }
         Integer requestedDay = detectRequestedDay(message);
         String studentId = claim(actor, "studentId");
         if (StringUtils.hasText(studentId)) {
@@ -142,6 +201,108 @@ public class AssistantPersonalContextAdvisor {
             return lecturerAnswer(lecturerId, locale, requestedDay);
         }
         return null;
+    }
+
+    private String lecturerThesisAnswer(String lecturerId, String locale) {
+        if (lecturerWorkload == null) return null;
+        boolean vi = "vi".equals(locale);
+        var workload = lecturerWorkload.workload(lecturerId);
+        if (workload == null || (workload.topics().isEmpty() && workload.councils().isEmpty() && workload.gradingTasks().isEmpty())) {
+            return vi
+                    ? "Hiện tại bạn chưa có đề tài khóa luận nào đang hướng dẫn hoặc hội đồng bảo vệ nào được phân công."
+                    : "You are not currently supervising any thesis topics or assigned to any thesis defense councils.";
+        }
+        StringBuilder answer = new StringBuilder();
+        if (!workload.topics().isEmpty()) {
+            answer.append(vi ? "Danh sách đề tài khóa luận bạn đang hướng dẫn:\n" : "Thesis topics you are supervising:\n");
+            for (var topic : workload.topics()) {
+                answer.append("\n• ").append(topic.title());
+                if (StringUtils.hasText(topic.roundName())) {
+                    answer.append(vi ? " (Đợt: " : " (Round: ").append(topic.roundName()).append(")");
+                }
+                answer.append(vi ? "\n  - Trạng thái: " : "\n  - Status: ").append(topic.topicStatus());
+                answer.append(vi ? " | Số nhóm: " : " | Groups: ").append(topic.groupCount());
+                if (topic.pendingGroupCount() > 0) {
+                    answer.append(vi ? " (" + topic.pendingGroupCount() + " nhóm chờ duyệt)" : " (" + topic.pendingGroupCount() + " pending approval)");
+                }
+                answer.append("\n");
+            }
+        }
+        if (!workload.councils().isEmpty()) {
+            if (answer.length() > 0) answer.append("\n");
+            answer.append(vi ? "Hội đồng đánh giá bạn tham gia:\n" : "Defense councils you are assigned to:\n");
+            for (var council : workload.councils()) {
+                answer.append("\n• ").append(council.name());
+                if (StringUtils.hasText(council.memberRole())) {
+                    answer.append(vi ? " — Vai trò: " : " — Role: ").append(council.memberRole());
+                }
+                if (StringUtils.hasText(council.roundName())) {
+                    answer.append(vi ? " (Đợt: " : " (Round: ").append(council.roundName()).append(")");
+                }
+                answer.append(vi ? "\n  - Số đề tài: " : "\n  - Topics: ").append(council.topicCount());
+                answer.append("\n");
+            }
+        }
+        if (!workload.gradingTasks().isEmpty()) {
+            long pendingGrading = workload.gradingTasks().stream().filter(g -> g.myScoreRows() == 0).count();
+            if (pendingGrading > 0) {
+                if (answer.length() > 0) answer.append("\n");
+                answer.append(vi
+                        ? "Bạn có " + pendingGrading + " đề tài cần chấm điểm trong hội đồng.\n"
+                        : "You have " + pendingGrading + " topics pending score entry in your councils.\n");
+            }
+        }
+        answer.append(vi
+                ? "\nBạn có thể xem chi tiết và xét duyệt nhóm tại trang Quản lý Khóa luận."
+                : "\nYou can review details and approve student groups on the Thesis Management page.");
+        return answer.toString();
+    }
+
+    private String studentThesisAnswer(String studentId, String locale) {
+        if (jdbc == null) return null;
+        boolean vi = "vi".equals(locale);
+        List<Map<String, Object>> rows = jdbc.queryForList(
+                "SELECT g.id AS group_id, g.status AS group_status, g.approval_status, "
+                        + "t.id AS topic_id, t.title AS topic_title, t.status AS topic_status, "
+                        + "t.final_score, r.name AS round_name, r.status AS round_status "
+                        + "FROM thesis.thesis_group_member m "
+                        + "JOIN thesis.thesis_group g ON g.id = m.group_id "
+                        + "JOIN thesis.thesis_registration_round r ON r.id = m.round_id "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE m.student_id = :studentId "
+                        + "ORDER BY r.created_at DESC",
+                new MapSqlParameterSource("studentId", studentId));
+        if (rows.isEmpty()) {
+            return vi
+                    ? "Bạn hiện chưa đăng ký tham gia nhóm hoặc đề tài khóa luận nào. Bạn có thể theo dõi các đợt mở đăng ký tại trang Khóa luận tốt nghiệp."
+                    : "You are not currently registered in any thesis group or topic. You can check open registration rounds on the Thesis page.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Thông tin đăng ký khóa luận của bạn:\n" : "Your thesis registration status:\n");
+        for (Map<String, Object> row : rows) {
+            String roundName = (String) row.get("round_name");
+            String topicTitle = (String) row.get("topic_title");
+            String approvalStatus = (String) row.get("approval_status");
+            Object finalScore = row.get("final_score");
+
+            answer.append("\n• ").append(StringUtils.hasText(roundName) ? roundName : (vi ? "Đợt khóa luận" : "Thesis Round"));
+            if (StringUtils.hasText(topicTitle)) {
+                answer.append(vi ? "\n  - Đề tài: " : "\n  - Topic: ").append(topicTitle);
+            } else {
+                answer.append(vi ? "\n  - Đề tài: Chưa chọn đề tài" : "\n  - Topic: Not selected yet");
+            }
+            if (StringUtils.hasText(approvalStatus)) {
+                answer.append(vi ? "\n  - Trạng thái duyệt: " : "\n  - Approval status: ").append(approvalStatus);
+            }
+            if (finalScore != null) {
+                answer.append(vi ? "\n  - Điểm tổng kết: " : "\n  - Final score: ").append(finalScore);
+            }
+            answer.append("\n");
+        }
+        answer.append(vi
+                ? "\nBạn có thể xem chi tiết tiến độ tại trang Khóa luận tốt nghiệp."
+                : "\nYou can track your thesis progress on the Thesis page.");
+        return answer.toString();
     }
 
     private String studentAnswer(String studentId, String locale, Integer requestedDay) {

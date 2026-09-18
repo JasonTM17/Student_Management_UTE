@@ -116,11 +116,14 @@ public class ThesisCouncilController {
 
     /** Brief R9: students read their own graded result after publication. */
     @GetMapping("/me/results")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public List<StudentResultRow> studentResults(
             @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
         String studentId = actor == null ? null : actor.getClaimAsString("studentId");
+        if (studentId == null || studentId.isBlank()) {
+            return java.util.Collections.emptyList();
+        }
         return councils.studentResults(roundId, studentId);
     }
 

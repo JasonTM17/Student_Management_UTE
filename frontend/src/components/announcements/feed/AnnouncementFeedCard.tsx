@@ -34,6 +34,7 @@ interface AnnouncementFeedCardProps {
   locale?: Locale;
   className?: string;
   variant?: 'standard' | 'featured';
+  layout?: 'horizontal' | 'vertical';
 }
 
 export function AnnouncementFeedCard({
@@ -42,6 +43,7 @@ export function AnnouncementFeedCard({
   locale = 'vi',
   className,
   variant = 'standard',
+  layout = 'horizontal',
 }: AnnouncementFeedCardProps) {
   const isVi = locale === 'vi';
   const [copied, setCopied] = useState(false);
@@ -89,11 +91,13 @@ export function AnnouncementFeedCard({
   };
 
   if (variant === 'featured') {
+    const isVertical = layout === 'vertical';
     return (
       <article
         onClick={onClick}
         className={cn(
-          'group relative flex flex-col md:flex-row overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm transition-all hover:border-primary/50 hover:shadow-lg cursor-pointer focus-within:ring-2 focus-within:ring-primary',
+          'group relative flex overflow-hidden rounded-2xl border border-border/70 bg-card shadow-sm transition-all hover:border-primary/50 hover:shadow-lg cursor-pointer focus-within:ring-2 focus-within:ring-primary',
+          isVertical ? 'flex-col' : 'flex-col md:flex-row',
           className,
         )}
         role="button"
@@ -105,8 +109,13 @@ export function AnnouncementFeedCard({
           }
         }}
       >
-        {/* Featured 16:9 Left Banner */}
-        <div className="relative aspect-video w-full md:w-1/2 overflow-hidden bg-muted">
+        {/* Featured 16:9 Banner */}
+        <div
+          className={cn(
+            'relative aspect-video overflow-hidden bg-muted',
+            isVertical ? 'w-full' : 'w-full md:w-1/2',
+          )}
+        >
           {coverImage ? (
             // eslint-disable-next-line @next/next/no-img-element
             <img
