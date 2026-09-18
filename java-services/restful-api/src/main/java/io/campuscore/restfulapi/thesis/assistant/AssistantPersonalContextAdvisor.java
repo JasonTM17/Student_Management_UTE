@@ -63,28 +63,32 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern FIRST_PERSON_PRONOUN = Pattern.compile(
-            "\\b(?:tôi|toi|mình|minh|my|i)\\b",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            "(?U)\\b(?:tôi|toi|mình|minh|em|my|me|i)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern THESIS_ACTION_OR_OWNERSHIP = Pattern.compile(
-            "của\\s*(?:tôi|mình)|cua\\s*(?:toi|minh)|do\\s*(?:tôi|mình)|do\\s*(?:toi|minh)"
-                    + "|hướng\\s*dẫn|huong\\s*dan|phụ\\s*trách|phu\\s*trach|chấm|cham|đăng\\s*ký|dang\\s*ky"
+            "của\\s*(?:tôi|mình|em)|cua\\s*(?:toi|minh|em)|do\\s*(?:tôi|mình|em)|do\\s*(?:toi|minh|em)"
+                    + "|hướng\\s*dẫn|huong\\s*dan|phụ\\s*trách|phu\\s*trach|chấm|cham"
                     + "|\\bmy\\b|supervis\\w*|assigned\\s+to\\s+me",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern THESIS_NOUN = Pattern.compile(
             "đề\\s*tài|de\\s*tai|khóa\\s*luận|khoa\\s*luan|đồ\\s*án|do\\s*an|tiểu\\s*luận|tieu\\s*luan|kltn|tlcn|hội\\s*đồng|hoi\\s*dong|\\bthesis\\b|\\btopics?\\b|\\bcouncils?\\b",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern THESIS_ARCHIVE_INTENT = Pattern.compile(
             "(?:khóa|khoá|năm)\\s*(?:trước|cũ|vừa\\s*qua|202\\d)|các\\s*năm\\s*trước|cựu\\s*sinh\\s*viên"
                     + "|tham\\s*khảo|tiêu\\s*biểu|xuất\\s*sắc|kho\\s*(?:lưu\\s*trữ|đề\\s*tài)|mẫu\\s*(?:đề\\s*tài|khóa\\s*luận)"
                     + "|đạt\\s*điểm\\s*cao|past\\s*thes(?:is|es)|previous\\s*(?:years?|cohorts?)|exemplary\\s*topics?|thesis\\s*archive",
-            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
+
+    private static final Pattern THESIS_POLICY_OR_GENERAL_INTENT = Pattern.compile(
+            "điều\\s*kiện|dieu\\s*kien|quy\\s*định|quy\\s*dinh|quy\\s*chế|quy\\s*che|thủ\\s*tục|thu\\s*tuc|tiêu\\s*chí|tieu\\s*chi|hướng\\s*dẫn\\s*(?:chung|đăng\\s*ký)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static boolean isThesisPersonalIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
-        if (THESIS_ARCHIVE_INTENT.matcher(message).find()) {
+        if (THESIS_ARCHIVE_INTENT.matcher(message).find() || THESIS_POLICY_OR_GENERAL_INTENT.matcher(message).find()) {
             return false;
         }
         return FIRST_PERSON_PRONOUN.matcher(message).find()

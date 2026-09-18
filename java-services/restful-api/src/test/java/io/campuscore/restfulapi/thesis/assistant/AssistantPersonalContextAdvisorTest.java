@@ -69,6 +69,7 @@ class AssistantPersonalContextAdvisorTest {
 
         // General thesis policy questions must NOT be intercepted as personal workload
         assertFalse(advisor.handles("Điều kiện làm khóa luận tốt nghiệp là gì?"));
+        assertFalse(advisor.handles("Điều kiện đăng ký đề tài là gì?"));
         assertFalse(advisor.handles("Quy định điểm GPA để làm KLTN?"));
         assertFalse(advisor.handles("Các đề tài khóa trước về Trí tuệ nhân tạo là gì?"));
         assertFalse(advisor.handles("Cho tôi xem các đề tài khóa trước để tham khảo"));
