@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.service;
 
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.HexFormat;
 import java.util.List;
 import java.util.Map;
@@ -146,22 +147,32 @@ public class ThesisReportService {
     @Transactional(readOnly = true)
     public ReportResponse get(UUID groupId, Jwt actor) {
         GroupContext group = loadGroup(groupId);
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean lecturer = !admin && isActiveLecturerActor(actor);
+        String actorLecturerId = lecturer ? lecturerId(actor) : "";
         boolean member = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId",
                 params().addValue("groupId", groupId).addValue("studentId", studentId(actor))) > 0;
-        boolean supervisor = StringUtils.hasText(lecturerId(actor))
+        boolean supervisor = lecturer
                 && count("SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId AND lecturer_id = :lecturerId",
-                        params().addValue("topicId", group.topicId()).addValue("lecturerId", lecturerId(actor))) > 0;
-        boolean councilMember = StringUtils.hasText(lecturerId(actor))
+                        params().addValue("topicId", group.topicId()).addValue("lecturerId", actorLecturerId)) > 0;
+        boolean councilMember = lecturer
                 && group.topicId() != null
                 && count("SELECT COUNT(*) FROM thesis.thesis_council_member cm "
                         + "JOIN thesis.thesis_council_topic ct ON ct.council_id = cm.council_id "
                         + "WHERE ct.topic_id = :topicId AND cm.lecturer_id = :lecturerId",
-                        params().addValue("topicId", group.topicId()).addValue("lecturerId", lecturerId(actor))) > 0;
-        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
-        boolean lecturer = hasRole(actor, "LECTURER") || StringUtils.hasText(lecturerId(actor));
+                        params().addValue("topicId", group.topicId()).addValue("lecturerId", actorLecturerId)) > 0;
+        boolean sameDepartmentArchive = lecturer
+                && "APPROVED".equals(group.approvalStatus())
+                && !"CANCELLED".equals(group.status())
+                && sameDepartment(group.topicDepartmentId(), actor);
+        if (lecturer && !member && !supervisor && !councilMember && !admin && !sameDepartmentArchive) {
+            // Do not disclose whether a report exists to a lecturer outside the
+            // department archive scope.
+            throw notFound("REPORT_NOT_FOUND", "The report is not available in your department archive");
+        }
         if (!member && !supervisor && !councilMember && !admin && !lecturer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "GROUP_MEMBER_REQUIRED",
-                    "Only group members, supervisors, council reviewers, lecturers, or staff can read the report");
+                    "Only group members, supervisors, council reviewers, or staff can read the report");
         }
         try {
             return jdbc.queryForObject(
@@ -188,16 +199,26 @@ public class ThesisReportService {
     @Transactional(readOnly = true)
     public List<ReportResponse> listByRound(UUID roundId, Jwt actor) {
         boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
-        boolean lecturer = hasRole(actor, "LECTURER") || StringUtils.hasText(lecturerId(actor));
+        boolean lecturer = !admin && isActiveLecturerActor(actor);
         if (!admin && !lecturer) {
             throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
                     "Only lecturers or academic staff can access the round thesis archive");
         }
+        MapSqlParameterSource parameters = params().addValue("roundId", roundId);
+        String scope = "";
+        if (!admin) {
+            parameters.addValue("departmentId", activeLecturerDepartment(actor));
+            scope = " AND t.department_id = :departmentId";
+        }
         return jdbc.query(
-                "SELECT group_id, title, url, note, submitted_by, submitted_at, updated_at, "
-                        + "file_name, file_type, file_size "
-                        + "FROM thesis.thesis_group_report WHERE round_id = :roundId ORDER BY submitted_at DESC",
-                params().addValue("roundId", roundId),
+                "SELECT r.group_id, r.title, r.url, r.note, r.submitted_by, r.submitted_at, r.updated_at, "
+                        + "r.file_name, r.file_type, r.file_size "
+                        + "FROM thesis.thesis_group_report r "
+                        + "JOIN thesis.thesis_group g ON g.id = r.group_id "
+                        + "JOIN thesis.thesis_topic t ON t.id = g.topic_id "
+                        + "WHERE r.round_id = :roundId AND g.approval_status = 'APPROVED' "
+                        + "AND g.status <> 'CANCELLED'" + scope + " ORDER BY r.submitted_at DESC",
+                parameters,
                 (rs, ignored) -> new ReportResponse(
                         UUID.fromString(rs.getString("group_id")),
                         rs.getString("title"),
@@ -209,6 +230,124 @@ public class ThesisReportService {
                         rs.getString("file_name"),
                         rs.getString("file_type"),
                         (Long) rs.getObject("file_size")));
+    }
+
+    /**
+     * Server-owned archive projection. The query is already authorization
+     * scoped; callers must not rebuild this response from lecturer-scoped
+     * groups or topic endpoints.
+     */
+    @Transactional(readOnly = true)
+    public List<RepositoryReportResponse> listRepository(UUID roundId, Jwt actor) {
+        boolean admin = hasRole(actor, "ADMIN") || hasRole(actor, "TRUONG_KHOA");
+        boolean lecturer = !admin && isActiveLecturerActor(actor);
+        if (!admin && !lecturer) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_OR_STAFF_REQUIRED",
+                    "Only lecturers or academic staff can access the round thesis archive");
+        }
+        MapSqlParameterSource parameters = params().addValue("roundId", roundId);
+        String scope = "";
+        if (!admin) {
+            parameters.addValue("departmentId", activeLecturerDepartment(actor));
+            scope = " AND t.department_id = :departmentId";
+        }
+        String sql = """
+                SELECT r.id AS report_id, r.title, r.url, r.note, r.submitted_at, r.updated_at,
+                       r.file_name, r.file_type, r.file_size,
+                       t.title AS topic_title, t.description AS topic_description,
+                       COALESCE(d."name", t.department_id) AS department_name,
+                       g.status AS group_status, g.approval_status,
+                       gm.student_id, gm.display_name AS external_display_name,
+                       gm.is_external, gm.is_leader, gm.member_order,
+                       s."studentId" AS student_number,
+                       member_user."firstName" AS member_first_name,
+                       member_user."lastName" AS member_last_name,
+                       sup.lecturer_id, sup.supervisor_order,
+                       supervisor_user."firstName" AS supervisor_first_name,
+                       supervisor_user."lastName" AS supervisor_last_name,
+                       submitted_student."studentId" AS submitter_student_number,
+                       submitter_user."firstName" AS submitter_first_name,
+                       submitter_user."lastName" AS submitter_last_name
+                FROM thesis.thesis_group_report r
+                 JOIN thesis.thesis_group g ON g.id = r.group_id
+                 JOIN thesis.thesis_topic t ON t.id = g.topic_id
+                 LEFT JOIN academic."Department" d ON d."id" = t.department_id
+                LEFT JOIN thesis.thesis_group_member gm ON gm.group_id = g.id
+                LEFT JOIN campuscore_auth."Student" s ON s."id" = gm.student_id
+                LEFT JOIN campuscore_auth."User" member_user ON member_user."id" = s."userId"
+                LEFT JOIN thesis.thesis_topic_supervisor sup ON sup.topic_id = t.id
+                LEFT JOIN campuscore_auth."Lecturer" supervisor_profile
+                    ON supervisor_profile."id" = sup.lecturer_id
+                LEFT JOIN campuscore_auth."User" supervisor_user
+                    ON supervisor_user."id" = supervisor_profile."userId"
+                LEFT JOIN campuscore_auth."Student" submitted_student
+                    ON submitted_student."id" = r.submitted_by
+                LEFT JOIN campuscore_auth."User" submitter_user
+                    ON submitter_user."id" = submitted_student."userId"
+                WHERE r.round_id = :roundId
+                  AND g.approval_status = 'APPROVED'
+                  AND g.status <> 'CANCELLED'
+                """ + scope + " ORDER BY r.submitted_at DESC, gm.member_order, sup.supervisor_order";
+        Map<UUID, RepositoryBuilder> builders = new LinkedHashMap<>();
+        jdbc.query(sql, parameters, rs -> {
+            UUID reportId = UUID.fromString(rs.getString("report_id"));
+            RepositoryBuilder builder = builders.get(reportId);
+            if (builder == null) {
+                builder = new RepositoryBuilder(
+                        reportId,
+                        rs.getString("title"),
+                        rs.getString("url"),
+                        rs.getString("note"),
+                        instantOf(rs.getObject("submitted_at")),
+                        instantOf(rs.getObject("updated_at")),
+                        rs.getString("file_name"),
+                        rs.getString("file_type"),
+                        (Long) rs.getObject("file_size"),
+                        rs.getString("topic_title"),
+                        rs.getString("topic_description"),
+                        rs.getString("department_name"),
+                        rs.getString("group_status"),
+                        rs.getString("approval_status"),
+                        displayName(rs.getString("submitter_first_name"), rs.getString("submitter_last_name")),
+                        rs.getString("submitter_student_number"));
+                builders.put(reportId, builder);
+            }
+            String memberId = rs.getString("student_id");
+            if (memberId != null) {
+                builder.members.putIfAbsent(memberKey(memberId, rs.getInt("member_order")),
+                        new RepositoryMemberResponse(
+                                displayName(rs.getString("member_first_name"), rs.getString("member_last_name"),
+                                        rs.getString("external_display_name"), rs.getString("student_number")),
+                                rs.getString("student_number"),
+                                rs.getBoolean("is_external"),
+                                rs.getBoolean("is_leader")));
+            }
+            String supervisorId = rs.getString("lecturer_id");
+            if (supervisorId != null) {
+                builder.supervisors.putIfAbsent(supervisorId,
+                        new RepositorySupervisorResponse(
+                                displayName(rs.getString("supervisor_first_name"), rs.getString("supervisor_last_name")),
+                                rs.getInt("supervisor_order")));
+            }
+        });
+        return builders.values().stream().map(RepositoryBuilder::build).toList();
+    }
+
+    /** Download by opaque report id for the repository projection. */
+    @Transactional(readOnly = true)
+    public StoredReport downloadByReport(UUID reportId, Jwt actor) {
+        UUID groupId = oneUuid("SELECT group_id FROM thesis.thesis_group_report WHERE id = :reportId",
+                params().addValue("reportId", reportId), "REPORT_NOT_FOUND", "The report was not found");
+        get(groupId, actor);
+        try {
+            return jdbc.queryForObject(
+                    "SELECT file_name, file_type, file_data, storage_provider, storage_bucket, storage_key, file_sha256 "
+                            + "FROM thesis.thesis_group_report WHERE id = :reportId",
+                    params().addValue("reportId", reportId),
+                    (rs, ignored) -> storedReportFromRow(rs));
+        } catch (EmptyResultDataAccessException exception) {
+            throw notFound("REPORT_FILE_NOT_FOUND", "The current report is a link, not an attached document");
+        }
     }
 
     @Transactional(readOnly = true)
@@ -232,8 +371,10 @@ public class ThesisReportService {
 
     private GroupContext loadGroup(UUID groupId) {
         Map<String, Object> group = one(
-                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, r.gvpb_deadline "
+                "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, g.approval_status, "
+                        + "t.department_id AS topic_department_id, r.gvpb_deadline "
                         + "FROM thesis.thesis_group g JOIN thesis.thesis_registration_round r ON r.id = g.round_id "
+                        + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE g.id = :groupId",
                 params().addValue("groupId", groupId), "GROUP_NOT_FOUND", "Thesis group not found");
         return new GroupContext(
@@ -241,10 +382,62 @@ public class ThesisReportService {
                 (UUID) group.get("round_id"),
                 (String) group.get("leader_student_id"),
                 (UUID) group.get("topic_id"),
-                group.get("gvpb_deadline") == null ? null : instantOf(group.get("gvpb_deadline")));
+                group.get("gvpb_deadline") == null ? null : instantOf(group.get("gvpb_deadline")),
+                (String) group.get("status"),
+                (String) group.get("approval_status"),
+                (String) group.get("topic_department_id"));
     }
 
-    private record GroupContext(UUID id, UUID roundId, String leaderStudentId, UUID topicId, Instant gvpbDeadline) { }
+    private boolean sameDepartment(String topicDepartmentId, Jwt actor) {
+        if (!StringUtils.hasText(topicDepartmentId)) return false;
+        return topicDepartmentId.equals(activeLecturerDepartment(actor));
+    }
+
+    private String activeLecturerDepartment(Jwt actor) {
+        String id = lecturerId(actor);
+        if (!StringUtils.hasText(id)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required for the thesis archive");
+        }
+        try {
+            String department = jdbc.queryForObject(
+                    "SELECT \"departmentId\" FROM campuscore_auth.\"Lecturer\" "
+                            + "WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
+                    params().addValue("lecturerId", id), String.class);
+            if (!StringUtils.hasText(department)) throw new EmptyResultDataAccessException(1);
+            return department;
+        } catch (EmptyResultDataAccessException exception) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required for the thesis archive");
+        }
+    }
+
+    /**
+     * A lecturer identifier is an identity attribute, not an authority by
+     * itself.  Only a token carrying the lecturer role and an active database
+     * profile may enter lecturer-scoped archive/supervisor/council branches.
+     * Governance roles short-circuit before this helper is called.
+     */
+    private boolean isActiveLecturerActor(Jwt actor) {
+        if (!hasRole(actor, "LECTURER")) {
+            return false;
+        }
+        String id = lecturerId(actor);
+        if (!StringUtils.hasText(id)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required for the thesis archive");
+        }
+        if (count("SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" "
+                        + "WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
+                params().addValue("lecturerId", id)) == 0) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required for the thesis archive");
+        }
+        return true;
+    }
+
+    private record GroupContext(UUID id, UUID roundId, String leaderStudentId, UUID topicId, Instant gvpbDeadline,
+                                String status, String approvalStatus, String topicDepartmentId) { }
 
     private record StoredObjectRef(String provider, String bucket, String key) { }
 
@@ -259,6 +452,85 @@ public class ThesisReportService {
             String fileName,
             String fileType,
             Long fileSize) { }
+
+    public record RepositoryReportResponse(
+            UUID reportId,
+            String title,
+            String url,
+            String note,
+            Instant submittedAt,
+            Instant updatedAt,
+            String fileName,
+            String fileType,
+            Long fileSize,
+            String topicTitle,
+            String topicDescription,
+            String departmentName,
+            String groupStatus,
+            String approvalStatus,
+            String submittedByDisplayName,
+            String submittedByStudentNumber,
+            List<RepositorySupervisorResponse> supervisors,
+            List<RepositoryMemberResponse> members) { }
+
+    public record RepositorySupervisorResponse(String displayName, int supervisorOrder) { }
+
+    public record RepositoryMemberResponse(
+            String displayName,
+            String studentNumber,
+            boolean isExternal,
+            boolean isLeader) { }
+
+    private static final class RepositoryBuilder {
+        private final UUID reportId;
+        private final String title;
+        private final String url;
+        private final String note;
+        private final Instant submittedAt;
+        private final Instant updatedAt;
+        private final String fileName;
+        private final String fileType;
+        private final Long fileSize;
+        private final String topicTitle;
+        private final String topicDescription;
+        private final String departmentName;
+        private final String groupStatus;
+        private final String approvalStatus;
+        private final String submittedByDisplayName;
+        private final String submittedByStudentNumber;
+        private final Map<String, RepositoryMemberResponse> members = new LinkedHashMap<>();
+        private final Map<String, RepositorySupervisorResponse> supervisors = new LinkedHashMap<>();
+
+        private RepositoryBuilder(UUID reportId, String title, String url, String note, Instant submittedAt,
+                                  Instant updatedAt, String fileName, String fileType, Long fileSize,
+                                  String topicTitle, String topicDescription, String departmentName,
+                                  String groupStatus, String approvalStatus, String submittedByDisplayName,
+                                  String submittedByStudentNumber) {
+            this.reportId = reportId;
+            this.title = title;
+            this.url = url;
+            this.note = note;
+            this.submittedAt = submittedAt;
+            this.updatedAt = updatedAt;
+            this.fileName = fileName;
+            this.fileType = fileType;
+            this.fileSize = fileSize;
+            this.topicTitle = topicTitle;
+            this.topicDescription = topicDescription;
+            this.departmentName = departmentName;
+            this.groupStatus = groupStatus;
+            this.approvalStatus = approvalStatus;
+            this.submittedByDisplayName = submittedByDisplayName;
+            this.submittedByStudentNumber = submittedByStudentNumber;
+        }
+
+        private RepositoryReportResponse build() {
+            return new RepositoryReportResponse(reportId, title, url, note, submittedAt, updatedAt, fileName,
+                    fileType, fileSize, topicTitle, topicDescription, departmentName, groupStatus,
+                    approvalStatus, submittedByDisplayName, submittedByStudentNumber,
+                    List.copyOf(supervisors.values()), List.copyOf(members.values()));
+        }
+    }
 
     /** The attached document bytes, served only through the authorized download path. */
     public record StoredReport(String fileName, String contentType, byte[] data) { }
@@ -383,6 +655,34 @@ public class ThesisReportService {
         } catch (EmptyResultDataAccessException exception) {
             throw notFound(code, message);
         }
+    }
+
+    private UUID oneUuid(String sql, MapSqlParameterSource parameters, String code, String message) {
+        try {
+            Object value = jdbc.queryForObject(sql, parameters, Object.class);
+            if (value == null) throw new EmptyResultDataAccessException(1);
+            return value instanceof UUID uuid ? uuid : UUID.fromString(value.toString());
+        } catch (EmptyResultDataAccessException exception) {
+            throw notFound(code, message);
+        }
+    }
+
+    private static String memberKey(String studentId, int order) {
+        return studentId + ":" + order;
+    }
+
+    private static String displayName(String firstName, String lastName) {
+        return displayName(firstName, lastName, null, null);
+    }
+
+    private static String displayName(String firstName, String lastName, String fallback, String secondFallback) {
+        String first = firstName == null ? "" : firstName.trim();
+        String last = lastName == null ? "" : lastName.trim();
+        String name = (last + " " + first).trim();
+        if (!name.isBlank()) return name;
+        if (fallback != null && !fallback.isBlank()) return fallback.trim();
+        if (secondFallback != null && !secondFallback.isBlank()) return secondFallback.trim();
+        return null;
     }
 
     private static String subject(Jwt actor) {
