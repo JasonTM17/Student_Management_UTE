@@ -18,7 +18,8 @@ public final class ThesisMutationDtos {
             Instant registrationEnd,
             Instant gvpbDeadline,
             Instant proposalPublishAt,
-            Instant reportDate) {
+            Instant reportDate,
+            Instant defenseDate) {
     }
 
     public record TopicCreateRequest(

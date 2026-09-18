@@ -41,7 +41,8 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 public class ThesisMutationService {
 
-    private static final int MAX_GROUP_MEMBERS = 3;
+    private static final int MIN_GROUP_MEMBERS = 3;
+    private static final int MAX_GROUP_MEMBERS = 4;
 
     private final NamedParameterJdbcTemplate jdbc;
     private final ThesisRegistrationRoundRepository rounds;
@@ -70,40 +71,58 @@ public class ThesisMutationService {
         requireText(request == null ? null : request.name(), "name");
         requireText(request == null ? null : request.thesisType(), "thesisType");
         RoundType roundType = requireRoundType(request.thesisType());
-        if (roundType == RoundType.TLCN && request.gvpbDeadline() == null) {
-            throw invalid("TLCN rounds require a gvpbDeadline");
+        if (roundType.requiresGvpbDeadline() && request.gvpbDeadline() == null) {
+            throw invalid(roundType == RoundType.KLTN
+                    ? "KLTN rounds require a gvpbDeadline"
+                    : "TLCN rounds require a gvpbDeadline");
         }
-        if (roundType == RoundType.NCKH && request.gvpbDeadline() != null) {
-            throw invalid("NCKH rounds must not specify a gvpbDeadline");
+        if (!roundType.requiresGvpbDeadline() && request.gvpbDeadline() != null) {
+            throw invalid(roundType + " rounds must not specify a gvpbDeadline");
         }
-        if (roundType == RoundType.KLTN && request.reportDate() == null) {
-            throw invalid("KLTN rounds require a reportDate");
+        if (roundType.requiresCouncilReportDate() && request.reportDate() == null) {
+            throw invalid(roundType + " rounds require a reportDate");
         }
-        if (roundType == RoundType.KLTN && request.gvpbDeadline() == null) {
-            // Without a GVPB deadline the report freeze has no anchor and
-            // submissions stay editable indefinitely.
-            throw invalid("KLTN rounds require a gvpbDeadline");
+        if (!roundType.requiresCouncilReportDate() && request.reportDate() != null) {
+            throw invalid(roundType + " rounds must not specify a reportDate");
+        }
+        if (roundType.requiresDefenseDate() && request.defenseDate() == null) {
+            throw invalid("KLTN rounds require a defenseDate");
+        }
+        if (!roundType.requiresDefenseDate() && request.defenseDate() != null) {
+            throw invalid(roundType + " rounds must not specify a defenseDate");
         }
         Instant regStart = request.registrationStart();
         Instant regEnd = request.registrationEnd();
         requireDates(regStart, regEnd);
-        Instant letStart = request.lecturerSubmitStart() != null ? request.lecturerSubmitStart() : regStart;
-        Instant letEnd = request.lecturerSubmitEnd() != null ? request.lecturerSubmitEnd() : regEnd;
-        if (request.lecturerSubmitStart() != null && request.lecturerSubmitEnd() != null) {
-            requireDates(letStart, letEnd);
-            if (regStart != null && regStart.isBefore(letEnd)) {
-                throw invalid("registrationStart must not be before lecturerSubmitEnd");
-            }
+        Instant letStart = request.lecturerSubmitStart();
+        Instant letEnd = request.lecturerSubmitEnd();
+        requireDates(letStart, letEnd);
+        if (regStart.isBefore(letEnd)) {
+            throw invalid("registrationStart must not be before lecturerSubmitEnd");
+        }
+        if (request.proposalPublishAt() != null && request.proposalPublishAt().isBefore(letEnd)) {
+            throw invalid("proposalPublishAt must not be before lecturerSubmitEnd");
+        }
+        if (request.gvpbDeadline() != null && request.gvpbDeadline().isBefore(regEnd)) {
+            throw invalid("gvpbDeadline must not be before registrationEnd");
+        }
+        if (request.reportDate() != null && request.gvpbDeadline() != null
+                && request.reportDate().isBefore(request.gvpbDeadline())) {
+            throw invalid("reportDate must not be before gvpbDeadline");
+        }
+        if (request.defenseDate() != null && request.reportDate() != null
+                && request.defenseDate().isBefore(request.reportDate())) {
+            throw invalid("defenseDate must not be before reportDate");
         }
         UUID id = UUID.randomUUID();
         jdbc.update("""
                 INSERT INTO thesis.thesis_registration_round
                     (id, name, thesis_type, lecturer_submit_start, lecturer_submit_end,
                      registration_start, registration_end,
-                     proposal_publish_at, gvpb_deadline, report_date, status)
+                     proposal_publish_at, gvpb_deadline, report_date, defense_date, status)
                 VALUES (:id, :name, :thesisType, :lecturerSubmitStart, :lecturerSubmitEnd,
                         :registrationStart, :registrationEnd,
-                        :proposalPublishAt, :gvpbDeadline, :reportDate, 'DRAFT')
+                        :proposalPublishAt, :gvpbDeadline, :reportDate, :defenseDate, 'DRAFT')
                 """, params()
                 .addValue("id", id)
                 .addValue("name", request.name().trim())
@@ -114,7 +133,8 @@ public class ThesisMutationService {
                 .addValue("registrationEnd", tsOf(regEnd))
                 .addValue("proposalPublishAt", tsOf(request.proposalPublishAt()))
                 .addValue("gvpbDeadline", tsOf(request.gvpbDeadline()))
-                .addValue("reportDate", tsOf(request.reportDate())));
+                .addValue("reportDate", tsOf(request.reportDate()))
+                .addValue("defenseDate", tsOf(request.defenseDate())));
         return roundReads.get(id);
     }
 
@@ -182,9 +202,15 @@ public class ThesisMutationService {
             // review and council eligibility. Fail loudly instead.
             throw invalid("A lecturerId claim is required to submit a topic as a lecturer");
         }
+        String departmentId = request.departmentId().trim();
+        if (isLecturer(actor)) {
+            requireLecturerDepartment(actor, departmentId);
+        } else {
+            requireActiveDepartment(departmentId);
+        }
         ThesisTopic topic = topics.saveAndFlush(new ThesisTopic(
                 request.roundId(),
-                request.departmentId().trim(),
+                departmentId,
                 request.title().trim(),
                 request.description().trim(),
                 maxGroups,
@@ -222,7 +248,13 @@ public class ThesisMutationService {
         if (maxGroups < 1 || maxGroups > 20) {
             throw invalid("maxGroups must be between 1 and 20");
         }
-        topic.update(request.departmentId().trim(), request.title().trim(), request.description().trim(), maxGroups);
+        String departmentId = request.departmentId().trim();
+        if (isLecturer(actor)) {
+            requireLecturerDepartment(actor, departmentId);
+        } else {
+            requireActiveDepartment(departmentId);
+        }
+        topic.update(departmentId, request.title().trim(), request.description().trim(), maxGroups);
         return TopicResponse.from(topics.save(topic));
     }
 
@@ -231,6 +263,13 @@ public class ThesisMutationService {
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
         authorizeTopicOwner(topic, actor);
         requireProposalPhase(topic.getRoundId(), actor);
+        Integer supervisorCount = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_supervisor WHERE topic_id = :topicId",
+                params().addValue("topicId", id), Integer.class);
+        if (supervisorCount == null || supervisorCount < 1 || supervisorCount > 2) {
+            throw conflict("TOPIC_SUPERVISOR_REQUIRED",
+                    "A topic must have one or two active supervisors before it can be published");
+        }
         try {
             topic.publish();
         } catch (IllegalStateException exception) {
@@ -264,7 +303,7 @@ public class ThesisMutationService {
             requireMutableMembership(group, actor);
         }
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
-            throw conflict("GROUP_FULL", "A thesis group can have at most three members");
+            throw conflict("GROUP_FULL", "A thesis group can have at most four members");
         }
         String studentId = normalize(request == null ? null : request.studentId());
         if (studentId.isBlank()) {
@@ -317,6 +356,10 @@ public class ThesisMutationService {
         String normalized = normalize(studentId);
         if (group.leaderStudentId().equals(normalized)) {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
+        }
+        if (group.approvalStatus() == ApprovalStatus.APPROVED
+                && count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) <= MIN_GROUP_MEMBERS) {
+            throw conflict("GROUP_TOO_SMALL", "An approved thesis group must retain at least three members");
         }
         if (jdbc.update("DELETE FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId", params().addValue("groupId", groupId).addValue("studentId", normalized)) != 1) {
             throw notFound("MEMBER_NOT_FOUND", "Group member not found");
@@ -389,8 +432,23 @@ public class ThesisMutationService {
         if (group.status() != GroupStatus.SUBMITTED || group.topicId() == null) {
             throw conflict("GROUP_APPROVAL_STATE_CONFLICT", "Only a submitted group with a topic can be approved");
         }
-        if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) < 2) {
-            throw conflict("GROUP_TOO_SMALL", "A thesis group needs at least two members before it can be approved");
+        Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId);
+        if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
+            throw conflict("GROUP_TOO_SMALL", "A thesis group needs at least three members before it can be approved");
+        }
+        if (memberCount > MAX_GROUP_MEMBERS) {
+            throw conflict("GROUP_TOO_LARGE", "A thesis group can have at most four members");
+        }
+        Integer leaderCount = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND is_leader = TRUE",
+                groupId);
+        Integer matchingLeader = count(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member gm "
+                        + "JOIN thesis.thesis_group g ON g.id = gm.group_id "
+                        + "WHERE gm.group_id = :groupId AND gm.is_leader = TRUE AND gm.student_id = g.leader_student_id",
+                groupId);
+        if (leaderCount == null || leaderCount != 1 || matchingLeader == null || matchingLeader != 1) {
+            throw conflict("GROUP_LEADER_INVALID", "A thesis group must have exactly one matching leader");
         }
         int changed = jdbc.update("UPDATE thesis.thesis_group SET approval_status='APPROVED', approved_by=:actor, approved_at=CURRENT_TIMESTAMP, rejection_reason=NULL, updated_at=CURRENT_TIMESTAMP, version=version+1 WHERE id=:id AND approval_status='PENDING'",
                 params().addValue("id", groupId).addValue("actor", subject(actor)));
@@ -674,6 +732,37 @@ public class ThesisMutationService {
         }
     }
 
+    private void requireLecturerDepartment(Jwt actor, String requestedDepartment) {
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        if (lecturerId.isBlank()) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required");
+        }
+        String department;
+        try {
+            department = jdbc.queryForObject(
+                    "SELECT \"departmentId\" FROM campuscore_auth.\"Lecturer\" "
+                            + "WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
+                    params().addValue("lecturerId", lecturerId), String.class);
+        } catch (EmptyResultDataAccessException exception) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "LECTURER_PROFILE_REQUIRED",
+                    "An active lecturer profile is required");
+        }
+        if (department == null || !department.equals(requestedDepartment)) {
+            throw new DomainException(HttpStatus.FORBIDDEN, "TOPIC_DEPARTMENT_FORBIDDEN",
+                    "A lecturer may submit topics only for their active department");
+        }
+    }
+
+    private void requireActiveDepartment(String departmentId) {
+        Integer count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM academic.\"Department\" WHERE \"id\" = :departmentId AND \"isActive\" = TRUE",
+                params().addValue("departmentId", departmentId), Integer.class);
+        if (count == null || count == 0) {
+            throw invalid("departmentId must reference an active department");
+        }
+    }
+
     private Map<String, Object> one(String sql, MapSqlParameterSource parameters, String code, String message) {
         try {
             return jdbc.queryForMap(sql, parameters);
@@ -710,7 +799,7 @@ public class ThesisMutationService {
             return false;
         }
         List<String> roles = actor.getClaimAsStringList("roles");
-        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN") || roles.contains("TRUONG_KHOA"));
     }
     private static boolean isLecturer(Jwt actor) {
         if (actor == null) {

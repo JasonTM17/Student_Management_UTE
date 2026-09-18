@@ -161,16 +161,16 @@ export function RoundMilestoneCard({
           )}
         </div>
 
-        {/* Milestone 4: Council Report Date (KLTN only) */}
+        {/* Milestone 4: report/defense date (TLCN/KLTN) */}
         <div className="p-4 sm:p-5 space-y-1.5">
           <div className="flex items-center gap-2 text-xs font-bold uppercase tracking-wider text-muted-foreground">
             <GraduationCap className="h-4 w-4 text-indigo-600 dark:text-indigo-400" />
             <span>{rm.councilReport}</span>
           </div>
-          {isKLTN && round.reportDate ? (
+          {(isKLTN || isHasGVPB) && (round.defenseDate || round.reportDate) ? (
             <>
               <p className="text-xs font-semibold text-foreground leading-relaxed">
-                {formatDateTime(round.reportDate)}
+                {formatDateTime(round.defenseDate || round.reportDate || '')}
               </p>
               <p className="text-[11px] text-muted-foreground">
                 {rm.councilDesc}
@@ -179,10 +179,10 @@ export function RoundMilestoneCard({
           ) : (
             <>
               <p className="text-xs text-muted-foreground italic">
-                {isKLTN ? rm.notScheduled : rm.notApplicable}
+                {isKLTN || isHasGVPB ? rm.notScheduled : rm.notApplicable}
               </p>
               <p className="text-[11px] text-muted-foreground">
-                {isKLTN ? rm.councilScope : rm.councilScopeOnly}
+                {isKLTN || isHasGVPB ? rm.councilScope : rm.councilScopeOnly}
               </p>
             </>
           )}

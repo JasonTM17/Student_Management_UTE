@@ -65,6 +65,7 @@ import {
   type ThesisGroup,
   type ThesisGroupMember,
   type ThesisGroupReport,
+  type ThesisRepositoryReport,
   type ThesisRound,
   type ThesisRoundResult,
   type ThesisStudentResult,
@@ -146,7 +147,8 @@ function getGradeClassification(score: number): {
 }
 
 export default function ThesisPage() {
-  const { user, isStudent, isLecturer, isAdmin } = useAuth();
+  const { user, isStudent, isLecturer, isAdmin: isAdminRole, isFacultyHead } = useAuth();
+  const isAdmin = Boolean(isAdminRole || isFacultyHead);
   const isSupervisorOrAdmin = Boolean(isLecturer || isAdmin);
   const { locale, formatDateTime, messages } = useI18n();
   const pageCopy = messages.thesisWorkflow.page;
@@ -238,10 +240,9 @@ export default function ThesisPage() {
   const [lecturerTab, setLecturerTab] = useState<'supervision' | 'defense' | 'repository'>('supervision');
 
   // Thesis Repository State (Faculty archive of submitted theses)
-  const [repositoryReports, setRepositoryReports] = useState<ThesisGroupReport[]>([]);
+  const [repositoryReports, setRepositoryReports] = useState<ThesisRepositoryReport[]>([]);
   const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
   const [repositorySearch, setRepositorySearch] = useState('');
-  const [topicSupervisorsDetails, setTopicSupervisorsDetails] = useState<Record<string, ThesisTopicSupervisor[]>>({});
 
   // Supervisors for current student group's topic
   const [currentTopicSupervisors, setCurrentTopicSupervisors] = useState<ThesisTopicSupervisor[]>([]);
@@ -399,7 +400,11 @@ export default function ThesisPage() {
   useEffect(() => {
     // The data-loading effect can run before auth resolves, so the workload is
     // fetched here where `isSupervisorOrAdmin` is reliable.
-    if (!isSupervisorOrAdmin || !selectedRoundId) return;
+    // The workload endpoint is intentionally self-scoped to LECTURER. Admin
+    // and faculty-head workspaces use the global group/council/repository
+    // projections below and must not turn that expected 403 into a page-level
+    // warning when opening the archive.
+    if (!isLecturer || !selectedRoundId) return;
     let cancelled = false;
     thesisApi
       .myWorkload()
@@ -417,7 +422,7 @@ export default function ThesisPage() {
     return () => {
       cancelled = true;
     };
-  }, [isSupervisorOrAdmin, messages.thesis.loadFailed, selectedRoundId]);
+  }, [isLecturer, messages.thesis.loadFailed, selectedRoundId]);
 
   const hasAutoSelectedRoundRef = useRef(false);
 
@@ -528,7 +533,7 @@ export default function ThesisPage() {
                 void loadCouncilDetails(cList);
               }
             }),
-            thesisApi.listRoundReports(selectedRoundId).then((rList) => {
+            thesisApi.listRoundRepository(selectedRoundId).then((rList) => {
               if (!cancelled) {
                 setRepositoryReports(rList);
                 setIsRepositoryLoading(false);
@@ -714,57 +719,38 @@ export default function ThesisPage() {
     }
   }, [isSupervisorOrAdmin, supervisedGroups, supervisedReports]);
 
-  useEffect(() => {
-    if (!isSupervisorOrAdmin || topics.length === 0) return;
-    for (const t of topics) {
-      if (!topicSupervisorsDetails[t.id]) {
-        void thesisApi.listSupervisors(t.id).then((sups) => {
-          setTopicSupervisorsDetails((prev) => ({ ...prev, [t.id]: sups }));
-        }).catch(() => {});
-      }
-    }
-  }, [isSupervisorOrAdmin, topicSupervisorsDetails, topics]);
-
   const filteredRepositoryReports = useMemo(() => {
     if (!repositorySearch.trim()) return repositoryReports;
     const q = repositorySearch.trim().toLowerCase();
     return repositoryReports.filter((report) => {
-      const group = groups.find((g) => g.id === report.groupId);
-      const topic = group?.topicId ? topics.find((t) => t.id === group.topicId) : null;
-      const topicTitle = (topic?.title || report.title || '').toLowerCase();
+      const topicTitle = (report.topicTitle || report.title || '').toLowerCase();
+      const topicDescription = (report.topicDescription || '').toLowerCase();
       const reportNote = (report.note || '').toLowerCase();
       const fileName = (report.fileName || '').toLowerCase();
-      const groupId = report.groupId.toLowerCase();
-
-      const sups = topic?.id ? topicSupervisorsDetails[topic.id] || [] : [];
-      const supervisorMatch = sups.some((s: ThesisTopicSupervisor) => {
-        const full1 = `${s.lastName || ''} ${s.firstName || ''}`.toLowerCase();
-        const full2 = `${s.firstName || ''} ${s.lastName || ''}`.toLowerCase();
-        return full1.includes(q) || full2.includes(q) || s.lecturerId.toLowerCase().includes(q);
-      });
-
-      const memberMatch =
-        group?.members?.some((m: ThesisGroupMember) => {
-          const name = (m.displayName || '').toLowerCase();
-          const studentNumber = (m.studentNumber || m.studentId || '').toLowerCase();
-          return name.includes(q) || studentNumber.includes(q);
-        }) ||
-        group?.memberStudentIds?.some((id: string) => id.toLowerCase().includes(q));
+      const submitter = `${report.submittedByDisplayName || ''} ${report.submittedByStudentNumber || ''}`.toLowerCase();
+      const supervisorMatch = report.supervisors.some((s) =>
+        s.displayName.toLowerCase().includes(q),
+      );
+      const memberMatch = report.members.some((m) =>
+        `${m.displayName} ${m.studentNumber || ''}`.toLowerCase().includes(q),
+      );
 
       return (
         topicTitle.includes(q) ||
+        topicDescription.includes(q) ||
         reportNote.includes(q) ||
         fileName.includes(q) ||
-        groupId.includes(q) ||
+        (report.departmentName || '').toLowerCase().includes(q) ||
+        submitter.includes(q) ||
         Boolean(supervisorMatch) ||
         Boolean(memberMatch)
       );
     });
-  }, [groups, repositoryReports, repositorySearch, topicSupervisorsDetails, topics]);
+  }, [repositoryReports, repositorySearch]);
 
-  const handleDownloadRepositoryReport = async (report: ThesisGroupReport) => {
+  const handleDownloadRepositoryReport = async (report: ThesisRepositoryReport) => {
     try {
-      await thesisApi.downloadReportFile(report.groupId, report);
+      await thesisApi.downloadRepositoryReportFile(report.reportId, report);
       toast.success(locale === 'vi' ? 'Đã tải tài liệu báo cáo' : 'Downloaded report artifact');
     } catch {
       toast.error(locale === 'vi' ? 'Không thể tải tài liệu báo cáo' : 'Failed to download report artifact');
@@ -880,7 +866,7 @@ export default function ThesisPage() {
           addShort: 'Thêm',
           addedShort: 'Đã trong nhóm',
           curriculumLabel: 'CTĐT',
-          groupFull: 'Nhóm đã đủ 3 thành viên, không thể thêm mới.',
+          groupFull: 'Nhóm đã đủ 4 thành viên, không thể thêm mới.',
           studentAlreadyInGroup: 'Sinh viên này đã thuộc một nhóm trong đợt này.',
         } as const)
       : ({
@@ -893,7 +879,7 @@ export default function ThesisPage() {
           addShort: 'Add',
           addedShort: 'Already in group',
           curriculumLabel: 'Curriculum',
-          groupFull: 'The group already has the maximum of 3 members.',
+          groupFull: 'The group already has the maximum of 4 members.',
           studentAlreadyInGroup: 'This student already belongs to a group in this round.',
         } as const);
 
@@ -1396,7 +1382,7 @@ export default function ThesisPage() {
                         </h4>
                       </div>
 
-                      {canManageMembers && groupMemberList.length < 3 ? (
+                      {canManageMembers && groupMemberList.length < 4 ? (
                         <Button
                           type="button"
                           size="sm"
@@ -1452,7 +1438,7 @@ export default function ThesisPage() {
                           {messages.thesis.memberCount.replace('{count}', String(groupMemberList.length))}
                         </span>
                         <span className="text-xs text-muted-foreground">
-                          {groupMemberList.length >= 3 ? messages.thesis.maxMembersReached : ''}
+                          {groupMemberList.length >= 4 ? messages.thesis.maxMembersReached : ''}
                         </span>
                       </div>
 
@@ -2125,42 +2111,27 @@ export default function ThesisPage() {
 
               <div className="grid grid-cols-1 gap-4">
                 {filteredRepositoryReports.map((report) => {
-                  const group = groups.find((g) => g.id === report.groupId);
-                  const topic = group?.topicId ? topics.find((t) => t.id === group.topicId) : null;
-                  const topicTitle = topic?.title || report.title || pageCopy.thesisDocumentLabel;
-                  const supervisors = topic ? topicSupervisorsDetails[topic.id] || [] : [];
-                  const members = group?.members || [];
-
                   return (
                     <div
-                      key={report.groupId}
+                      key={report.reportId}
                       className="rounded-xl border border-border/70 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-xs space-y-4"
                     >
                       {/* Header row: Topic title & status badges */}
                       <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
                         <div className="space-y-1 min-w-0 flex-1">
                           <div className="flex flex-wrap items-center gap-2">
-                            <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 font-mono text-[11px] font-bold text-primary">
-                              {locale === 'vi' ? 'Nhóm:' : 'Group:'} {group ? group.id.slice(0, 8).toUpperCase() : report.groupId.slice(0, 8).toUpperCase()}
+                            <StatusBadge status={report.groupStatus} />
+                            <StatusBadge status={report.approvalStatus} variant="approval" />
+                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
+                              <Building2 className="h-3 w-3" /> {report.departmentName}
                             </span>
-                            {topic && (
-                              <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 font-mono text-[11px] text-muted-foreground">
-                                {locale === 'vi' ? 'Đề tài:' : 'Topic:'} {topic.id.slice(0, 8).toUpperCase()}
-                              </span>
-                            )}
-                            {group && (
-                              <div className="flex flex-wrap items-center gap-1.5">
-                                <StatusBadge status={group.status} />
-                                <StatusBadge status={group.approvalStatus} variant="approval" />
-                              </div>
-                            )}
                           </div>
                           <h4 className="text-base font-bold text-foreground leading-snug">
-                            {topicTitle}
+                            {report.topicTitle || report.title || pageCopy.thesisDocumentLabel}
                           </h4>
-                          {topic?.description && (
+                          {report.topicDescription && (
                             <p className="text-xs text-muted-foreground line-clamp-2">
-                              {topic.description}
+                              {report.topicDescription}
                             </p>
                           )}
                         </div>
@@ -2186,18 +2157,15 @@ export default function ThesisPage() {
                             <BookOpen className="h-3.5 w-3.5 text-primary" />
                             {pageCopy.archiveSupervisorLabel}
                           </span>
-                          {supervisors.length === 0 ? (
+                          {report.supervisors.length === 0 ? (
                             <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa phân công' : 'Not assigned'}</span>
                           ) : (
                             <div className="space-y-1">
-                              {supervisors.map((s: ThesisTopicSupervisor) => (
-                                <div key={s.lecturerId} className="flex items-center gap-2">
+                              {report.supervisors.map((s) => (
+                                <div key={`${s.supervisorOrder}-${s.displayName}`} className="flex items-center gap-2">
                                   <span className="font-medium text-foreground">
-                                    {[s.lastName, s.firstName].filter(Boolean).join(' ') || s.lecturerId}
+                                    {s.displayName || (locale === 'vi' ? 'Chưa có tên' : 'Unnamed supervisor')}
                                   </span>
-                                  {s.email && (
-                                    <span className="text-muted-foreground text-[11px]">({s.email})</span>
-                                  )}
                                 </div>
                               ))}
                             </div>
@@ -2208,16 +2176,16 @@ export default function ThesisPage() {
                         <div className="space-y-1.5">
                           <span className="font-semibold text-foreground flex items-center gap-1.5">
                             <Users className="h-3.5 w-3.5 text-primary" />
-                            {pageCopy.membersLabel} ({members.length})
+                            {pageCopy.membersLabel} ({report.members.length})
                           </span>
-                          {members.length === 0 ? (
+                          {report.members.length === 0 ? (
                             <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa có thông tin thành viên' : 'No roster details'}</span>
                           ) : (
                             <div className="space-y-1">
-                              {members.map((m: ThesisGroupMember) => {
-                                const name = m.displayName || m.studentNumber || m.studentId;
+                              {report.members.map((m) => {
+                                const name = m.displayName || m.studentNumber || (locale === 'vi' ? 'Thành viên' : 'Member');
                                 return (
-                                  <div key={m.studentId} className="flex flex-wrap items-center gap-1.5">
+                                  <div key={`${m.studentNumber || name}-${m.isLeader ? 'leader' : 'member'}`} className="flex flex-wrap items-center gap-1.5">
                                     <span className="font-medium text-foreground">{name}</span>
                                     {m.studentNumber && (
                                       <span className="font-mono text-muted-foreground text-[11px] bg-background/80 px-1.5 py-0.5 rounded">
@@ -2291,7 +2259,13 @@ export default function ThesisPage() {
                         </div>
 
                         <div className="text-[11px] text-muted-foreground">
-                          {locale === 'vi' ? 'Người nộp:' : 'Submitted by:'} <strong className="font-mono text-foreground">{report.submittedBy}</strong>
+                          {locale === 'vi' ? 'Người nộp:' : 'Submitted by:'}{' '}
+                          <strong className="text-foreground">
+                            {report.submittedByDisplayName || report.submittedByStudentNumber || (locale === 'vi' ? 'Không rõ' : 'Unavailable')}
+                          </strong>
+                          {report.submittedByDisplayName && report.submittedByStudentNumber && (
+                            <span className="ml-1 font-mono">({report.submittedByStudentNumber})</span>
+                          )}
                         </div>
                       </div>
                     </div>

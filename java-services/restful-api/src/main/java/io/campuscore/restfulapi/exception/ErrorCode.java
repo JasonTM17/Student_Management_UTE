@@ -36,7 +36,7 @@ public enum ErrorCode {
     REPORT_DEADLINE_PASSED(HttpStatus.CONFLICT, "The report submission deadline has passed"),
     STUDENT_ALREADY_IN_GROUP(HttpStatus.CONFLICT, "Student is already a member of an active thesis group"),
     GROUP_FULL(HttpStatus.CONFLICT, "Thesis group has reached maximum member capacity"),
-    GROUP_TOO_SMALL(HttpStatus.CONFLICT, "Thesis group must have at least two members to be approved");
+    GROUP_TOO_SMALL(HttpStatus.CONFLICT, "Thesis group must have at least three members to be approved");
 
     private final HttpStatus httpStatus;
     private final String defaultMessage;

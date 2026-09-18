@@ -167,14 +167,22 @@ class ThesisGroupSupervisorScopeTest {
         UUID roundId = UUID.randomUUID();
         Instant windowStart = Instant.now().minusSeconds(3_600);
         Instant windowEnd = Instant.now().plusSeconds(3_600);
+        Instant lecturerStart = "PROPOSAL_OPEN".equals(status)
+                ? windowStart : windowStart.minusSeconds(7_200);
+        Instant lecturerEnd = "PROPOSAL_OPEN".equals(status)
+                ? windowEnd : windowStart.minusSeconds(3_600);
+        Instant registrationStart = "PROPOSAL_OPEN".equals(status)
+                ? windowEnd : windowStart;
+        Instant registrationEnd = "PROPOSAL_OPEN".equals(status)
+                ? windowEnd.plusSeconds(31L * 24 * 60 * 60) : windowEnd;
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
                         + "registration_start, registration_end, status) "
                         + "VALUES (?, ?, 'KLTN', ?, ?, ?, ?, ?)",
                 roundId, name,
-                Timestamp.from(windowStart), Timestamp.from(windowEnd),
-                Timestamp.from(windowStart), Timestamp.from(windowEnd),
+                Timestamp.from(lecturerStart), Timestamp.from(lecturerEnd),
+                Timestamp.from(registrationStart), Timestamp.from(registrationEnd),
                 status);
         return roundId;
     }

@@ -1204,10 +1204,10 @@ test('assistant markdown groups wrapped sentences into single paragraphs', () =>
   const { splitAssistantBlocks } = load('src/lib/assistant-inline-markdown-regex.ts');
 
   // A model that wraps mid-sentence must render as ONE paragraph.
-  const wrapped = splitAssistantBlocks('Mỗi nhóm có tối đa\n03 thành viên, gồm một nhóm trưởng.');
+  const wrapped = splitAssistantBlocks('Mỗi nhóm có\n3–4 thành viên, gồm một nhóm trưởng.');
   assert.equal(wrapped.length, 1);
   assert.equal(wrapped[0].type, 'text');
-  assert.equal(wrapped[0].lines[0], 'Mỗi nhóm có tối đa 03 thành viên, gồm một nhóm trưởng.');
+  assert.equal(wrapped[0].lines[0], 'Mỗi nhóm có 3–4 thành viên, gồm một nhóm trưởng.');
 
   // Blank lines separate paragraphs; lists/headings/quotes stay line-scoped.
   const mixed = splitAssistantBlocks(
@@ -1291,8 +1291,12 @@ test('campus services knowledge release covers accounts, notices, and permission
 });
 
 test('thesis knowledge release covers the faculty process rules', () => {
-  const migration = fs.readFileSync(
+  const seedMigration = fs.readFileSync(
     path.join(root, '../java-services/restful-api/src/main/resources/db/migration/V38__seed_thesis_process_regulations_knowledge.sql'),
+    'utf8',
+  );
+  const migration = fs.readFileSync(
+    path.join(root, '../java-services/restful-api/src/main/resources/db/migration/V65__align_thesis_group_size_knowledge.sql'),
     'utf8',
   );
   for (const slug of [
@@ -1303,16 +1307,16 @@ test('thesis knowledge release covers the faculty process rules', () => {
     'thesis-grading-rules-vi',
     'thesis-results-viewing-vi',
   ]) {
-    assert.ok(migration.includes(`'${slug}'`), `${slug} must be seeded`);
+    assert.ok(seedMigration.includes(`'${slug}'`), `${slug} must be seeded`);
   }
-  assert.ok(migration.includes('thesis-round-phases-en'), 'English mirror must be seeded');
+  assert.ok(seedMigration.includes('thesis-round-phases-en'), 'English mirror must be seeded');
   // Rule content must state the concrete numbers from the specification.
-  assert.match(migration, /tối đa 03 thành viên/);
-  assert.match(migration, /từ 03 đến 05 thành viên/);
-  assert.match(migration, /trung bình cộng các điểm thành phần/);
-  assert.match(migration, /không được chấm đề tài mà mình đang hướng dẫn/);
+  assert.match(migration, /3 đến 4 thành viên/);
+  assert.match(seedMigration, /từ 03 đến 05 thành viên/);
+  assert.match(seedMigration, /trung bình cộng các điểm thành phần/);
+  assert.match(seedMigration, /không được chấm đề tài mà mình đang hướng dẫn/);
   // The release must be projected and activated like V20/V23.
-  assert.match(migration, /local-demo-v38/);
+  assert.match(migration, /thesis-group-size-v65/);
   assert.match(migration, /active_release_id = EXCLUDED\.active_release_id/);
 });
 

@@ -64,8 +64,9 @@ class ThesisReportFileTest {
         jdbc.update("DELETE FROM thesis.thesis_group");
         jdbc.update("DELETE FROM thesis.thesis_topic");
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
+        jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'rf-lecturer-%'");
         jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'rf-member-%'");
-        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'rf-user-%'");
+        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'rf-user-%' OR \"id\" LIKE 'rf-lecturer-user-%'");
     }
 
     @Test
@@ -165,6 +166,25 @@ class ThesisReportFileTest {
     }
 
     @Test
+    void onlyGroupLeaderCanSubmitLinkReport() throws Exception {
+        UUID groupId = seedApprovedGroup();
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/v1/thesis/groups/{id}/report", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://drive.example.com/leader-only.pdf\"}")
+                        .with(studentJwt("rf-peer")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_OWNER_REQUIRED"));
+
+        mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post(
+                        "/api/v1/thesis/groups/{id}/report", groupId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"url\":\"https://drive.example.com/leader-only.pdf\"}")
+                        .with(studentJwt("rf-leader")))
+                .andExpect(status().isOk());
+    }
+
+    @Test
     void unrelatedStudentCannotReadTheReport() throws Exception {
         UUID groupId = seedApprovedGroup();
         seedStudent("rf-outsider", "rf-user-outsider");
@@ -195,10 +215,12 @@ class ThesisReportFileTest {
     }
 
     @Test
-    void lecturerAndAdminCanAccessRepositoryAndDownloadAnyReport() throws Exception {
+    void sameDepartmentLecturerCanAccessRepositoryButOtherDepartmentCannot() throws Exception {
         UUID groupId = seedApprovedGroup();
         UUID roundId = jdbc.queryForObject(
                 "SELECT round_id FROM thesis.thesis_group WHERE id = ?", UUID.class, groupId);
+        seedLecturerProfile("rf-lecturer-same", "department-demo");
+        seedLecturerProfile("rf-lecturer-other", "department-other");
         MockMultipartFile file = new MockMultipartFile(
                 "file", "Thesis-Archive.docx", MediaType.APPLICATION_OCTET_STREAM_VALUE, DOCX_BYTES);
 
@@ -209,21 +231,46 @@ class ThesisReportFileTest {
                         .with(studentJwt("rf-leader")))
                 .andExpect(status().isOk());
 
-        // Any lecturer can list reports in the round
-        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(lecturerJwt("lec-other")))
+        // A lecturer in the topic's department can list the report.
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(lecturerJwt("rf-lecturer-same")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].groupId").value(groupId.toString()))
                 .andExpect(jsonPath("$[0].fileName").value("Thesis-Archive.docx"));
+
+        // The enriched repository projection contains safe searchable fields,
+        // not the legacy raw submittedBy identifier.
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/repository", roundId)
+                        .with(lecturerJwt("rf-lecturer-same")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$[0].reportId").isNotEmpty())
+                .andExpect(jsonPath("$[0].submittedBy").doesNotExist())
+                .andExpect(jsonPath("$[0].members").isArray());
+
+        // An unrelated department cannot enumerate or fetch the report.
+        mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId)
+                        .with(lecturerJwt("rf-lecturer-other")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$").isEmpty());
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report", groupId)
+                        .with(lecturerJwt("rf-lecturer-other")))
+                .andExpect(status().isNotFound());
 
         // Admin can list reports in the round
         mvc.perform(get("/api/v1/thesis/rounds/{id}/reports", roundId).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].groupId").value(groupId.toString()));
 
-        // Lecturer can download the report file
-        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(lecturerJwt("lec-other")))
+        // Same-department lecturer can download the report file.
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .with(lecturerJwt("rf-lecturer-same")))
                 .andExpect(status().isOk())
                 .andExpect(content().bytes(DOCX_BYTES));
+
+        String reportId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_group_report WHERE group_id = ?", String.class, groupId);
+        mvc.perform(get("/api/v1/thesis/reports/{id}/file", reportId)
+                        .with(lecturerJwt("rf-lecturer-other")))
+                .andExpect(status().isNotFound());
 
         // Admin can download the report file
         mvc.perform(get("/api/v1/thesis/groups/{id}/report/file", groupId).with(adminJwt()))
@@ -241,6 +288,24 @@ class ThesisReportFileTest {
                 .andExpect(status().isForbidden());
     }
 
+    @Test
+    void lecturerIdClaimWithoutLecturerRoleCannotEnterArchiveScope() throws Exception {
+        UUID groupId = seedApprovedGroup();
+        seedLecturerProfile("rf-lecturer-same", "department-demo");
+        mvc.perform(multipart("/api/v1/thesis/groups/{id}/report/file", groupId)
+                        .file(new MockMultipartFile("file", "spoof-check.docx",
+                                MediaType.APPLICATION_OCTET_STREAM_VALUE, DOCX_BYTES))
+                        .with(studentJwt("rf-leader")))
+                .andExpect(status().isOk());
+
+        // A copied/forged lecturerId claim is not an authority.  The token is
+        // still a student token and must not read another group's report.
+        mvc.perform(get("/api/v1/thesis/groups/{id}/report", groupId)
+                        .with(studentJwtWithLecturerClaim("rf-outsider", "rf-lecturer-same")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("GROUP_MEMBER_REQUIRED"));
+    }
+
     private UUID seedApprovedGroup() {
         UUID roundId = UUID.randomUUID();
         jdbc.update(
@@ -249,14 +314,14 @@ class ThesisReportFileTest {
                         + "registration_start, registration_end, status, gvpb_deadline) "
                         + "VALUES (?, ?, 'KLTN', ?, ?, ?, ?, 'REGISTRATION_CLOSED', ?)",
                 roundId, "Report File Round",
-                Timestamp.from(Instant.now().minusSeconds(3_600)), Timestamp.from(Instant.now().plusSeconds(3_600)),
+                Timestamp.from(Instant.now().minusSeconds(7_200)), Timestamp.from(Instant.now().minusSeconds(3_600)),
                 Timestamp.from(Instant.now().minusSeconds(3_600)), Timestamp.from(Instant.now().plusSeconds(3_600)),
                 Timestamp.from(Instant.now().plusSeconds(86_400)));
         UUID topicId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO thesis.thesis_topic (id, round_id, department_id, title, description, max_groups, status, created_by) "
-                        + "VALUES (?, ?, ?, 'Report File Topic', 'fixture', 1, 'PUBLISHED', ?)",
-                topicId, roundId, UUID.randomUUID(), UUID.randomUUID());
+                        + "VALUES (?, ?, 'department-demo', 'Report File Topic', 'fixture', 1, 'PUBLISHED', ?)",
+                topicId, roundId, UUID.randomUUID());
         UUID groupId = UUID.randomUUID();
         jdbc.update(
                 "INSERT INTO thesis.thesis_group (id, round_id, leader_student_id, topic_id, status, approval_status) "
@@ -270,8 +335,18 @@ class ThesisReportFileTest {
                 "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
                         + "VALUES (?, ?, ?, 'rf-peer', 2, FALSE)",
                 UUID.randomUUID(), groupId, roundId);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, 'rf-member-3', 3, FALSE)",
+                UUID.randomUUID(), groupId, roundId);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_member (id, group_id, round_id, student_id, member_order, is_leader) "
+                        + "VALUES (?, ?, ?, 'rf-member-4', 4, FALSE)",
+                UUID.randomUUID(), groupId, roundId);
         seedStudent("rf-leader", "rf-user-leader");
         seedStudent("rf-peer", "rf-user-peer");
+        seedStudent("rf-member-3", "rf-user-member-3");
+        seedStudent("rf-member-4", "rf-user-member-4");
         return groupId;
     }
 
@@ -284,6 +359,18 @@ class ThesisReportFileTest {
                 "INSERT INTO campuscore_auth.\"Student\" (\"id\", \"userId\", \"studentId\", \"curriculumId\", \"year\", \"admissionDate\") "
                         + "VALUES (?, ?, ?, 'curriculum-demo', 2, CURRENT_TIMESTAMP)",
                 studentId, userId, "CODE-" + studentId);
+    }
+
+    private void seedLecturerProfile(String lecturerId, String departmentId) {
+        String userId = "rf-lecturer-user-" + lecturerId;
+        jdbc.update(
+                "INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                        + "VALUES (?, ?, 'test-password', 'RF', 'Lecturer', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                userId, lecturerId + "@campuscore.edu");
+        jdbc.update(
+                "INSERT INTO campuscore_auth.\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\") "
+                        + "VALUES (?, ?, ?, ?, TRUE)",
+                lecturerId, userId, departmentId, "GV-" + lecturerId);
     }
 
     private RequestPostProcessor studentJwt(String studentId) {
@@ -300,6 +387,15 @@ class ThesisReportFileTest {
                         .claim("roles", List.of("LECTURER"))
                         .claim("lecturerId", lecturerId))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private RequestPostProcessor studentJwtWithLecturerClaim(String studentId, String lecturerId) {
+        return jwt().jwt(token -> token
+                        .subject("rf-user-spoof-" + studentId)
+                        .claim("roles", List.of("STUDENT"))
+                        .claim("studentId", studentId)
+                        .claim("lecturerId", lecturerId))
+                .authorities(new SimpleGrantedAuthority("ROLE_STUDENT"));
     }
 
     private RequestPostProcessor adminJwt() {

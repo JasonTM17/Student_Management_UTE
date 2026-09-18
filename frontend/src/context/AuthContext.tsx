@@ -24,6 +24,7 @@ interface AuthContextType {
   isLecturer: boolean;
   isAdmin: boolean;
   isSuperAdmin: boolean;
+  isFacultyHead: boolean;
   login: (email: string, password: string) => Promise<User>;
   logout: (options?: { redirect?: boolean }) => Promise<void>;
   refreshUser: () => Promise<void>;
@@ -96,6 +97,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const isLecturer = user?.roles?.includes('LECTURER') ?? false;
   const isAdmin = user?.roles?.includes('ADMIN') ?? false;
   const isSuperAdmin = user?.roles?.includes('SUPER_ADMIN') ?? false;
+  const isFacultyHead = user?.roles?.includes('TRUONG_KHOA') ?? false;
 
   return (
     <AuthContext.Provider
@@ -107,6 +109,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isLecturer,
         isAdmin,
         isSuperAdmin,
+        isFacultyHead,
         login,
         logout,
         refreshUser,
