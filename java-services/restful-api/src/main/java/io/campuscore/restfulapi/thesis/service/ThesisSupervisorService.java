@@ -71,6 +71,24 @@ public class ThesisSupervisorService {
         ThesisTopic topic = requireTopic(topicId);
         authorize(topic, actor);
 
+        // Council assignment and supervisor replacement share this topic row
+        // as their serialization point.  Without the lock, each transaction
+        // could pass its precondition check against the other's uncommitted
+        // state and create a supervisor/chair conflict.
+        lockTopic(topicId);
+
+        Integer assignedTopics = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE topic_id = :topicId",
+                new MapSqlParameterSource().addValue("topicId", topicId), Integer.class);
+        Integer submittedScores = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE topic_id = :topicId",
+                new MapSqlParameterSource().addValue("topicId", topicId), Integer.class);
+        if ((assignedTopics != null && assignedTopics > 0)
+                || (submittedScores != null && submittedScores > 0)) {
+            throw conflict("SUPERVISOR_STATE_CONFLICT",
+                    "Supervisors cannot change after a council is assigned or scoring has started");
+        }
+
         List<String> normalized = lecturerIds == null ? List.of() : lecturerIds.stream()
                 .filter(StringUtils::hasText)
                 .map(String::trim)
@@ -186,6 +204,16 @@ public class ThesisSupervisorService {
                 "SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = :lecturerId AND \"isActive\" = TRUE",
                 new MapSqlParameterSource().addValue("lecturerId", lecturerId), Integer.class);
         return count != null && count > 0;
+    }
+
+    private void lockTopic(UUID topicId) {
+        try {
+            jdbc.queryForObject(
+                    "SELECT id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+                    new MapSqlParameterSource().addValue("topicId", topicId), UUID.class);
+        } catch (org.springframework.dao.EmptyResultDataAccessException exception) {
+            throw notFound("TOPIC_NOT_FOUND", "Thesis topic not found");
+        }
     }
 
     private static boolean hasRole(Jwt actor, String role) {

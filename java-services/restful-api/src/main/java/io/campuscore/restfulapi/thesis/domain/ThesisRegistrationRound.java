@@ -46,6 +46,9 @@ public class ThesisRegistrationRound {
     @Column(name = "report_date")
     private Instant reportDate;
 
+    @Column(name = "defense_date")
+    private Instant defenseDate;
+
     @Enumerated(EnumType.STRING)
     @Column(nullable = false, length = 32)
     private RoundStatus status;
@@ -63,5 +66,6 @@ public class ThesisRegistrationRound {
     public Instant getLecturerSubmitEnd() { return lecturerSubmitEnd; }
     public Instant getGvpbDeadline() { return gvpbDeadline; }
     public Instant getReportDate() { return reportDate; }
+    public Instant getDefenseDate() { return defenseDate; }
     public RoundStatus getStatus() { return status; }
 }

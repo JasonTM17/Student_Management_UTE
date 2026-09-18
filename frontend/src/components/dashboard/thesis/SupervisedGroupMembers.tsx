@@ -34,7 +34,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
   const [isPending, setIsPending] = useState(false);
   const [error, setError] = useState('');
 
-  const isFull = group.memberStudentIds.length >= 3;
+  const isFull = group.memberStudentIds.length >= 4;
   const members: ThesisGroupMember[] = group.members ?? [];
 
   const run = async (action: () => Promise<ThesisGroup>) => {
@@ -113,7 +113,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
         <UserPlus className="h-3.5 w-3.5" />
         {messages.thesis.manageMembers}
         <span className="font-normal text-muted-foreground">
-          ({formatNumber(group.memberStudentIds.length)}/3)
+          ({formatNumber(group.memberStudentIds.length)}/4)
         </span>
       </button>
 

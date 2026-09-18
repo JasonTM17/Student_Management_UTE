@@ -15,6 +15,7 @@ import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicAssignmentReq
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicCreateRequest;
 import io.campuscore.restfulapi.thesis.web.ThesisMutationDtos.TopicUpdateRequest;
 import io.campuscore.restfulapi.thesis.service.ThesisReportService.ReportResponse;
+import io.campuscore.restfulapi.thesis.service.ThesisReportService.RepositoryReportResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisRoundDtos.RoundResponse;
 import io.campuscore.restfulapi.thesis.web.ThesisTopicDtos.TopicResponse;
 import java.util.List;
@@ -247,6 +248,27 @@ public class ThesisMutationController {
                 .body(stored.data());
     }
 
+    /** Download a repository artifact by its opaque report id. */
+    @GetMapping("/reports/{id}/file")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    public org.springframework.http.ResponseEntity<byte[]> downloadRepositoryReportFile(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        ThesisReportService.StoredReport stored = reports.downloadByReport(id, actor);
+        String fileName = stored.fileName() == null ? "report" : stored.fileName();
+        String encoded = java.net.URLEncoder.encode(fileName, java.nio.charset.StandardCharsets.UTF_8)
+                .replace("+", "%20");
+        String contentType = StringUtils.hasText(stored.contentType())
+                ? stored.contentType()
+                : MediaType.APPLICATION_OCTET_STREAM_VALUE;
+        return org.springframework.http.ResponseEntity.ok()
+                .header(org.springframework.http.HttpHeaders.CONTENT_DISPOSITION,
+                        "attachment; filename*=UTF-8''" + encoded)
+                .header(org.springframework.http.HttpHeaders.CACHE_CONTROL, "no-store")
+                .contentType(MediaType.parseMediaType(contentType))
+                .body(stored.data());
+    }
+
     @GetMapping("/groups/{id}/report")
     @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
     public ReportResponse getReport(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
@@ -269,6 +291,14 @@ public class ThesisMutationController {
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
         return reports.listByRound(id, actor);
+    }
+
+    @GetMapping("/rounds/{id}/repository")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    public List<RepositoryReportResponse> listRepository(
+            @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return reports.listRepository(id, actor);
     }
 
     @PostMapping("/groups/{id}/approve")

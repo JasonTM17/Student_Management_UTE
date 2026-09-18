@@ -260,6 +260,7 @@ class ThesisTopicPersistenceTest {
         ensureStudent("test-member-2", "test-user-2", "member2@campuscore.edu");
         ensureStudent("test-member-3", "test-user-3", "member3@campuscore.edu");
         ensureStudent("test-member-4", "test-user-4", "member4@campuscore.edu");
+        ensureStudent("test-member-5", "test-user-5", "member5@campuscore.edu");
 
         mvc.perform(post("/api/v1/thesis/groups")
                         .contentType(MediaType.APPLICATION_JSON)
@@ -282,7 +283,8 @@ class ThesisTopicPersistenceTest {
                 .andExpect(jsonPath("$.members[1].contact").value("member2@campuscore.edu"))
                 .andExpect(jsonPath("$.members[1].isExternal").value(false));
         addMember(groupId, "test-member-3").andExpect(status().isOk());
-        addMember(groupId, "test-member-4")
+        addMember(groupId, "test-member-4").andExpect(status().isOk());
+        addMember(groupId, "test-member-5")
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GROUP_FULL"));
 
@@ -347,7 +349,8 @@ class ThesisTopicPersistenceTest {
                 "\"registrationStart\":\"2027-01-01T00:00:00Z\"," +
                 "\"registrationEnd\":\"2027-02-01T00:00:00Z\"," +
                 "\"gvpbDeadline\":\"2027-03-01T00:00:00Z\"," +
-                "\"reportDate\":\"2027-03-10T00:00:00Z\"}";
+                "\"reportDate\":\"2027-03-10T00:00:00Z\"," +
+                "\"defenseDate\":\"2027-03-20T00:00:00Z\"}";
         mvc.perform(post("/api/v1/thesis/rounds")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content(body)
@@ -470,6 +473,8 @@ class ThesisTopicPersistenceTest {
         // A one-leader group is not a group: add a member before approval.
         ensureStudent("student-review-1b", "user-student-1b", "student1b@campuscore.edu");
         addMember(groupId, "student-review-1b").andExpect(status().isOk());
+        ensureStudent("student-review-1c", "user-student-1c", "student1c@campuscore.edu");
+        addMember(groupId, "student-review-1c").andExpect(status().isOk());
 
         mvc.perform(post("/api/v1/thesis/groups/{id}/topic", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -545,6 +550,8 @@ class ThesisTopicPersistenceTest {
         // 3. Lecturer rejects with blank reason -> 400 VALIDATION_ERROR
         ensureStudent("student-review-2b", "user-student-2b", "student2b@campuscore.edu");
         addMember(groupId, "student-review-2b").andExpect(status().isOk());
+        ensureStudent("student-review-2c", "user-student-2c", "student2c@campuscore.edu");
+        addMember(groupId, "student-review-2c").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/reject", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"reason\":\"   \"}")
@@ -653,6 +660,8 @@ class ThesisTopicPersistenceTest {
         // 6. Lecturer approves Group 4
         ensureStudent("student-review-4b", "user-student-4b", "student4b@campuscore.edu");
         addMember(group4Id, "student-review-4b").andExpect(status().isOk());
+        ensureStudent("student-review-4c", "user-student-4c", "student4c@campuscore.edu");
+        addMember(group4Id, "student-review-4c").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", group4Id)
                         .with(lecturerJwt("lecturer-reviewer-3")))
                 .andExpect(status().isOk())
@@ -720,6 +729,8 @@ class ThesisTopicPersistenceTest {
         // 5. Co-supervisor can review and approve group
         ensureStudent("student-review-5b", "user-student-5b", "student5b@campuscore.edu");
         addMember(groupId, "student-review-5b").andExpect(status().isOk());
+        ensureStudent("student-review-5c", "user-student-5c", "student5c@campuscore.edu");
+        addMember(groupId, "student-review-5c").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
                         .with(lecturerJwt("lecturer-co")))
                 .andExpect(status().isOk())
@@ -750,7 +761,20 @@ class ThesisTopicPersistenceTest {
                 Integer.class, topicId);
         assertEquals(0, count);
 
-        // Admin publishes topic
+        // A curated topic cannot be published without a real active supervisor.
+        mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
+                        .with(adminJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("TOPIC_SUPERVISOR_REQUIRED"));
+
+        ensureLecturer("admin-topic-supervisor");
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"admin-topic-supervisor\"]}")
+                        .with(adminJwt()))
+                .andExpect(status().isOk());
+
+        // Admin publishes only after the supervisor invariant is satisfied.
         mvc.perform(post("/api/v1/thesis/topics/{id}/publish", topicId)
                         .with(adminJwt()))
                 .andExpect(status().isOk());
@@ -776,6 +800,8 @@ class ThesisTopicPersistenceTest {
         // Admin can still approve group
         ensureStudent("student-review-6b", "user-student-6b", "student6b@campuscore.edu");
         addMember(groupId, "student-review-6b").andExpect(status().isOk());
+        ensureStudent("student-review-6c", "user-student-6c", "student6c@campuscore.edu");
+        addMember(groupId, "student-review-6c").andExpect(status().isOk());
         mvc.perform(post("/api/v1/thesis/groups/{id}/approve", groupId)
                         .with(adminJwt()))
                 .andExpect(status().isOk())
@@ -803,9 +829,12 @@ class ThesisTopicPersistenceTest {
                                 {
                                   "name": "Regression Round",
                                   "thesisType": "TLCN",
+                                  "lecturerSubmitStart": "2026-08-01T00:00:00Z",
+                                  "lecturerSubmitEnd": "2026-08-31T00:00:00Z",
                                   "registrationStart": "2026-09-01T00:00:00Z",
                                   "registrationEnd": "2026-12-31T00:00:00Z",
-                                  "gvpbDeadline": "2027-03-01T00:00:00Z"
+                                  "gvpbDeadline": "2027-03-01T00:00:00Z",
+                                  "reportDate": "2027-03-10T00:00:00Z"
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -828,7 +857,15 @@ class ThesisTopicPersistenceTest {
     /** A round in its lecturer proposal phase with a live submission window. */
     private UUID insertProposalRound(String name) {
         UUID roundId = UUID.randomUUID();
-        insertRound(roundId, name, Instant.now(), "PROPOSAL_OPEN");
+        Instant now = Instant.now();
+        insertRound(roundId, name, now.minusSeconds(3_600), "PROPOSAL_OPEN");
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round "
+                        + "SET lecturer_submit_start = ?, lecturer_submit_end = ?, "
+                        + "registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(3_600)), Timestamp.from(now.plusSeconds(3_600)),
+                Timestamp.from(now.plusSeconds(3_600)), Timestamp.from(now.plusSeconds(31L * 24 * 60 * 60)),
+                roundId);
         return roundId;
     }
 
@@ -843,6 +880,14 @@ class ThesisTopicPersistenceTest {
     private void driveRoundFromProposalToRegistration(UUID roundId) throws Exception {
         mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-proposals", roundId).with(adminJwt()))
                 .andExpect(status().isOk());
+        Instant now = Instant.now();
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round "
+                        + "SET lecturer_submit_end = ?, lecturer_submit_start = ?, "
+                        + "registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(1)), Timestamp.from(now.minusSeconds(3_601)),
+                Timestamp.from(now.minusSeconds(1)), Timestamp.from(now.plusSeconds(31L * 24 * 60 * 60)),
+                roundId);
         mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
                 .andExpect(status().isOk());
     }
@@ -854,6 +899,8 @@ class ThesisTopicPersistenceTest {
                 ? Instant.now().minusSeconds(3_600)
                 : start;
         Instant end = effectiveStart.plusSeconds(31L * 24 * 60 * 60);
+        Instant lecturerStart = effectiveStart.minusSeconds(7_200);
+        Instant lecturerEnd = effectiveStart.minusSeconds(3_600);
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
@@ -862,8 +909,8 @@ class ThesisTopicPersistenceTest {
                 roundId,
                 name,
                 "KLTN",
-                Timestamp.from(effectiveStart),
-                Timestamp.from(end),
+                Timestamp.from(lecturerStart),
+                Timestamp.from(lecturerEnd),
                 Timestamp.from(effectiveStart),
                 Timestamp.from(end),
                 status);
@@ -896,8 +943,8 @@ class ThesisTopicPersistenceTest {
                 expiredRound,
                 "Expired window",
                 "KLTN",
-                Timestamp.from(Instant.now().minusSeconds(2 * 86_400)),
-                Timestamp.from(Instant.now().minusSeconds(86_400)),
+                Timestamp.from(Instant.now().minusSeconds(4 * 86_400)),
+                Timestamp.from(Instant.now().minusSeconds(3 * 86_400)),
                 Timestamp.from(Instant.now().minusSeconds(2 * 86_400)),
                 Timestamp.from(Instant.now().minusSeconds(86_400)),
                 "REGISTRATION_OPEN");
@@ -964,6 +1011,7 @@ class ThesisTopicPersistenceTest {
     }
 
     private org.springframework.test.web.servlet.request.RequestPostProcessor lecturerJwt(String userId) {
+        ensureLecturer(userId);
         // Production lecturer tokens carry the lecturerId claim (AuthTokenService),
         // and createTopic rejects a LECTURER creator without it (LEC-P2-2) instead
         // of silently mis-keying the supervisor row with the User id.
@@ -971,6 +1019,21 @@ class ThesisTopicPersistenceTest {
                         .claim("roles", List.of("LECTURER"))
                         .claim("lecturerId", userId))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private void ensureLecturer(String lecturerId) {
+        String userId = "test-lecturer-user-" + lecturerId;
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"User\" WHERE \"id\" = ?", Integer.class, userId) == 0) {
+            jdbc.update(
+                    "INSERT INTO campuscore_auth.\"User\" (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\", \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\") "
+                            + "VALUES (?, ?, 'test-password', 'Test', 'Lecturer', 'ACTIVE', FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                    userId, lecturerId + "@campuscore.edu");
+        }
+        if (jdbc.queryForObject("SELECT COUNT(*) FROM campuscore_auth.\"Lecturer\" WHERE \"id\" = ?", Integer.class, lecturerId) == 0) {
+            jdbc.update(
+                    "INSERT INTO campuscore_auth.\"Lecturer\" (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\") VALUES (?, ?, 'department-demo', ?, TRUE)",
+                    lecturerId, userId, "EMP-" + lecturerId);
+        }
     }
 
     private org.springframework.test.web.servlet.ResultActions addMember(UUID groupId, String studentId) throws Exception {

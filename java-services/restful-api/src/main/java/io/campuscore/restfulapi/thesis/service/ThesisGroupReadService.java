@@ -32,7 +32,7 @@ public class ThesisGroupReadService {
             String studentId,
             String lecturerId) {
         rounds.requireExisting(roundId);
-        if (roles.contains("ADMIN")) {
+        if (isFacultyAdmin(roles)) {
             return groups.findByRoundId(roundId);
         }
         if (roles.contains("LECTURER")) {
@@ -51,7 +51,7 @@ public class ThesisGroupReadService {
             String studentId,
             String lecturerId) {
         GroupResponse group;
-        if (roles.contains("ADMIN")) {
+        if (isFacultyAdmin(roles)) {
             group = groups.findById(id);
         } else if (roles.contains("LECTURER")) {
             group = supervisedGroup(id, requireLecturerId(lecturerId));
@@ -106,5 +106,9 @@ public class ThesisGroupReadService {
                     "An active student profile is required");
         }
         return studentId;
+    }
+
+    private static boolean isFacultyAdmin(List<String> roles) {
+        return roles.contains("ADMIN") || roles.contains("TRUONG_KHOA");
     }
 }

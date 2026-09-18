@@ -60,6 +60,7 @@ public class ThesisCouncilService {
     public CouncilResponse addMember(UUID councilId, String lecturerId, String memberRole, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
         lockCouncil(councilId);
+        requireRosterMutable(councilId);
         requireText(lecturerId, "lecturerId");
         String role = normalizeRole(memberRole);
         if (!lecturerExists(lecturerId)) {
@@ -107,10 +108,15 @@ public class ThesisCouncilService {
         Integer assignedTopics = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_topic WHERE council_id = :councilId",
                 params().addValue("councilId", councilId));
+        requireRosterMutable(councilId);
         if (assignedTopics != null && assignedTopics > 0) {
             if (hasCouncilRole(councilId, lecturerId, "CHAIR")) {
                 throw conflict("COUNCIL_CHAIR_REQUIRED",
                         "The chair cannot leave a council that has assigned topics; reassign the topics first");
+            }
+            if (hasCouncilRole(councilId, lecturerId, "SECRETARY")) {
+                throw conflict("COUNCIL_SECRETARY_REQUIRED",
+                        "The secretary cannot leave a council that has assigned topics; reassign the topics first");
             }
             Integer size = count(
                     "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = :councilId",
@@ -133,6 +139,9 @@ public class ThesisCouncilService {
         if (topicId == null) {
             throw invalid("topicId is required");
         }
+        // Match ThesisSupervisorService.setSupervisors: assignment and
+        // supervisor replacement must serialize on the same topic row.
+        lockTopic(topicId);
         Integer size = count(
                 "SELECT COUNT(*) FROM thesis.thesis_council_member WHERE council_id = :councilId",
                 params().addValue("councilId", councilId));
@@ -424,6 +433,16 @@ public class ThesisCouncilService {
         return count != null && count > 0;
     }
 
+    private void requireRosterMutable(UUID councilId) {
+        Integer submittedScores = count(
+                "SELECT COUNT(*) FROM thesis.thesis_topic_score WHERE council_id = :councilId",
+                params().addValue("councilId", councilId));
+        if (submittedScores != null && submittedScores > 0) {
+            throw conflict("COUNCIL_STATE_CONFLICT",
+                    "Council membership cannot change after scoring has started");
+        }
+    }
+
     private void requireGovernanceRole(Jwt actor, String message) {
         List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
         boolean allowed = roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA"));
@@ -435,6 +454,11 @@ public class ThesisCouncilService {
     private Map<String, Object> lockCouncil(UUID councilId) {
         return one("SELECT id, round_id, name, status, created_by FROM thesis.thesis_council WHERE id = :id FOR UPDATE",
                 params().addValue("id", councilId), "COUNCIL_NOT_FOUND", "Defense council not found");
+    }
+
+    private void lockTopic(UUID topicId) {
+        one("SELECT id FROM thesis.thesis_topic WHERE id = :topicId FOR UPDATE",
+                params().addValue("topicId", topicId), "TOPIC_NOT_FOUND", "Thesis topic not found");
     }
 
     private UUID councilRound(UUID councilId) {

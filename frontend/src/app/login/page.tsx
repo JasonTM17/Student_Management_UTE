@@ -155,7 +155,11 @@ export default function LoginPage() {
         return;
       }
 
-      router.push(href(postLoginRoute(portal)));
+      if (portal === 'admin' && user.roles?.includes('TRUONG_KHOA') && !user.roles?.includes('ADMIN')) {
+        router.push(href('/admin/thesis'));
+      } else {
+        router.push(href(postLoginRoute(portal)));
+      }
     } catch (error: unknown) {
       const message = getLoginErrorMessage(error);
       setFormError(message);

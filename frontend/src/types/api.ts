@@ -23,7 +23,7 @@ export interface User {
   status: string;
   // True while the account still carries the office-issued temporary credential.
   mustChangePassword?: boolean;
-  role?: 'ADMIN' | 'SUPER_ADMIN' | 'LECTURER' | 'STUDENT';
+  role?: 'ADMIN' | 'SUPER_ADMIN' | 'TRUONG_KHOA' | 'LECTURER' | 'STUDENT';
   roles?: string[];
   createdAt: string;
   // Linked identities from JWT
