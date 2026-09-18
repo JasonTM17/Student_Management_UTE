@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
   Archive,
@@ -174,7 +174,17 @@ export default function ThesisPage() {
   const [proposeDepartmentId, setProposeDepartmentId] = useState('department-demo');
   const [proposeMaxGroups, setProposeMaxGroups] = useState(2);
   const [proposePublishImmediately, setProposePublishImmediately] = useState(true);
+  const [proposeRoundId, setProposeRoundId] = useState('');
   const [proposeError, setProposeError] = useState('');
+
+  // Edit topic modal state
+  const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+  const [editingTopicId, setEditingTopicId] = useState('');
+  const [editTitle, setEditTitle] = useState('');
+  const [editDescription, setEditDescription] = useState('');
+  const [editDepartmentId, setEditDepartmentId] = useState('department-demo');
+  const [editMaxGroups, setEditMaxGroups] = useState(2);
+  const [editError, setEditError] = useState('');
 
   // Reject group modal state
   const [isRejectModalOpen, setIsRejectModalOpen] = useState(false);
@@ -409,10 +419,13 @@ export default function ThesisPage() {
     };
   }, [isSupervisorOrAdmin, messages.thesis.loadFailed, selectedRoundId]);
 
+  const hasAutoSelectedRoundRef = useRef(false);
+
   useEffect(() => {
-    if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId) return;
+    if (!isSupervisorOrAdmin || !lecturerWorkload || explicitRoundId || hasAutoSelectedRoundRef.current) return;
     const withGroups = lecturerWorkload.topics.filter((topic) => topic.groupCount > 0);
     if (withGroups.length === 0) return;
+    hasAutoSelectedRoundRef.current = true;
     if (withGroups.some((topic) => topic.roundId === selectedRoundId)) return;
     const target = [...withGroups].sort((a, b) => b.groupCount - a.groupCount)[0].roundId;
     if (target && rounds.some((round) => round.id === target)) {
@@ -624,7 +637,7 @@ export default function ThesisPage() {
   }, [reportGroupId, reportApprovalStatus]);
 
   useEffect(() => {
-    if (!selectedRoundId || selectedRound?.status !== 'RESULTS_PUBLISHED') {
+    if (!isStudent || !selectedRoundId || selectedRound?.status !== 'RESULTS_PUBLISHED') {
       setRoundResults([]);
       setResultsState('hidden');
       return;
@@ -653,7 +666,7 @@ export default function ThesisPage() {
     return () => {
       cancelled = true;
     };
-  }, [selectedRound?.status, selectedRoundId]);
+  }, [isStudent, selectedRound?.status, selectedRoundId]);
 
   const myTopics = useMemo(
     () =>
@@ -1025,8 +1038,15 @@ export default function ThesisPage() {
       await thesisApi.approveGroup(groupId);
       await refreshGroups();
       setActionSuccess(messages.thesis.approveSuccess);
-    } catch {
-      setActionError(messages.thesis.actionFailed);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'GROUP_TOO_SMALL') {
+        setActionError(messages.thesis.groupTooSmall);
+      } else if (code === 'GROUP_APPROVAL_STATE_CONFLICT') {
+        setActionError(messages.thesis.groupStateConflict);
+      } else {
+        setActionError(messages.thesis.actionFailed);
+      }
     } finally {
       setIsActionPending(false);
     }
@@ -1162,7 +1182,8 @@ export default function ThesisPage() {
 
   const handleProposeTopic = async (event: React.FormEvent) => {
     event.preventDefault();
-    if (!selectedRoundId) return;
+    const targetRoundId = proposeRoundId || selectedRoundId;
+    if (!targetRoundId) return;
     const title = proposeTitle.trim();
     const description = proposeDescription.trim();
     const departmentId = proposeDepartmentId.trim();
@@ -1175,7 +1196,7 @@ export default function ThesisPage() {
     setActionSuccess('');
     try {
       const created = await thesisApi.createTopic({
-        roundId: selectedRoundId,
+        roundId: targetRoundId,
         departmentId,
         title,
         description,
@@ -1194,7 +1215,11 @@ export default function ThesisPage() {
           // The topic itself was created; supervisor assignment can be retried.
         }
       }
-      await refreshTopics(selectedRoundId);
+      if (selectedRoundId !== targetRoundId) {
+        setSelectedRoundId(targetRoundId);
+      } else {
+        await refreshTopics(targetRoundId);
+      }
       setIsProposeModalOpen(false);
       setProposeTitle('');
       setProposeDescription('');
@@ -1208,8 +1233,67 @@ export default function ThesisPage() {
           ? messages.thesis.publishedSuccess
           : messages.thesis.proposeSuccess,
       );
-    } catch {
-      setProposeError(messages.thesis.actionFailed);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'ROUND_NOT_ACCEPTING_PROPOSALS') {
+        setProposeError(messages.thesis.roundNotAcceptingProposals);
+      } else if (code === 'LECTURER_WINDOW_NOT_OPEN') {
+        setProposeError(messages.thesis.lecturerWindowNotOpen);
+      } else if (code === 'LECTURER_WINDOW_CLOSED') {
+        setProposeError(messages.thesis.lecturerWindowClosed);
+      } else {
+        setProposeError(messages.thesis.actionFailed);
+      }
+    } finally {
+      setIsActionPending(false);
+    }
+  };
+
+  const openEditModal = (topic: ThesisTopic) => {
+    setEditingTopicId(topic.id);
+    setEditTitle(topic.title);
+    setEditDescription(topic.description);
+    setEditDepartmentId(topic.departmentId || departments[0]?.id || 'department-demo');
+    setEditMaxGroups(topic.maxGroups || 2);
+    setEditError('');
+    setIsEditModalOpen(true);
+  };
+
+  const handleEditTopic = async (event: React.FormEvent) => {
+    event.preventDefault();
+    if (!editingTopicId) return;
+    const title = editTitle.trim();
+    const description = editDescription.trim();
+    const departmentId = editDepartmentId.trim();
+    if (!title || !description || !departmentId) {
+      setEditError(messages.thesis.allFieldsRequired);
+      return;
+    }
+    setIsActionPending(true);
+    setEditError('');
+    setActionSuccess('');
+    try {
+      await thesisApi.updateTopic(editingTopicId, {
+        title,
+        description,
+        departmentId,
+        maxGroups: Math.min(20, Math.max(1, Number(editMaxGroups) || 1)),
+      });
+      await refreshTopics(selectedRoundId);
+      setIsEditModalOpen(false);
+      setViewingTopic(null);
+      setActionSuccess(messages.thesis.editTopicSuccess);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'ROUND_NOT_ACCEPTING_PROPOSALS') {
+        setEditError(messages.thesis.roundNotAcceptingProposals);
+      } else if (code === 'LECTURER_WINDOW_NOT_OPEN') {
+        setEditError(messages.thesis.lecturerWindowNotOpen);
+      } else if (code === 'LECTURER_WINDOW_CLOSED') {
+        setEditError(messages.thesis.lecturerWindowClosed);
+      } else {
+        setEditError(messages.thesis.actionFailed);
+      }
     } finally {
       setIsActionPending(false);
     }
@@ -1223,8 +1307,19 @@ export default function ThesisPage() {
       await thesisApi.publishTopic(topicId);
       await refreshTopics(selectedRoundId);
       setActionSuccess(messages.thesis.publishedSuccess);
-    } catch {
-      setActionError(messages.thesis.actionFailed);
+    } catch (caught) {
+      const code = getThesisErrorCode(caught);
+      if (code === 'TOPIC_STATE_CONFLICT') {
+        setActionError(messages.thesis.topicStateConflict);
+      } else if (code === 'ROUND_NOT_ACCEPTING_PROPOSALS') {
+        setActionError(messages.thesis.roundNotAcceptingProposals);
+      } else if (code === 'LECTURER_WINDOW_NOT_OPEN') {
+        setActionError(messages.thesis.lecturerWindowNotOpen);
+      } else if (code === 'LECTURER_WINDOW_CLOSED') {
+        setActionError(messages.thesis.lecturerWindowClosed);
+      } else {
+        setActionError(messages.thesis.actionFailed);
+      }
     } finally {
       setIsActionPending(false);
     }
@@ -2222,7 +2317,18 @@ export default function ThesisPage() {
             {isSupervisorOrAdmin && selectedRound ? (
               <Button
                 type="button"
-                onClick={() => setIsProposeModalOpen(true)}
+                onClick={() => {
+                  if (user?.lecturerId && !proposeSupervisorId) {
+                    setProposeSupervisorId(user.lecturerId);
+                  }
+                  const currentIsProposalOpen = selectedRound?.status === 'PROPOSAL_OPEN';
+                  const openProposalRound = rounds.find((r) => r.status === 'PROPOSAL_OPEN');
+                  const targetRound = currentIsProposalOpen
+                    ? selectedRoundId
+                    : (openProposalRound?.id || selectedRoundId);
+                  setProposeRoundId(targetRound);
+                  setIsProposeModalOpen(true);
+                }}
                 disabled={isActionPending}
                 className="h-11"
               >
@@ -2725,6 +2831,42 @@ export default function ThesisPage() {
           <p className="text-sm text-muted-foreground">
             {messages.thesis.proposeTopicDescription}
           </p>
+          {rounds.length > 1 ? (
+            <div>
+              <Select
+                label={messages.thesis.selectRound}
+                value={proposeRoundId || selectedRoundId}
+                onChange={(e) => setProposeRoundId(e.target.value)}
+                disabled={isActionPending}
+                options={rounds.map((round) => ({
+                  value: round.id,
+                  label: `${round.name} (${round.status})`,
+                }))}
+              />
+            </div>
+          ) : null}
+          {(() => {
+            const currentProposeRound =
+              rounds.find((r) => r.id === (proposeRoundId || selectedRoundId)) || selectedRound;
+            const isProposalOpen = currentProposeRound?.status === 'PROPOSAL_OPEN';
+            if (isProposalOpen) {
+              return (
+                <div className="rounded-md border border-emerald-500/30 bg-emerald-500/10 p-3 text-sm text-emerald-700 dark:text-emerald-300">
+                  <div className="font-semibold">{messages.thesis.proposeRoundOpenNotice}</div>
+                  {currentProposeRound?.lecturerSubmitStart && currentProposeRound?.lecturerSubmitEnd ? (
+                    <div className="mt-1 text-xs opacity-90">
+                      {messages.thesis.registrationWindow}: {currentProposeRound.lecturerSubmitStart.slice(0, 10)} → {currentProposeRound.lecturerSubmitEnd.slice(0, 10)}
+                    </div>
+                  ) : null}
+                </div>
+              );
+            }
+            return (
+              <div className="rounded-md border border-amber-500/30 bg-amber-500/10 p-3 text-sm text-amber-700 dark:text-amber-300">
+                {messages.thesis.roundNotAcceptingProposals} ({currentProposeRound?.name}: {currentProposeRound?.status})
+              </div>
+            );
+          })()}
           {proposeError ? (
             <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
               {proposeError}
@@ -2849,7 +2991,15 @@ export default function ThesisPage() {
             >
               {messages.common.actions.cancel}
             </Button>
-            <Button type="submit" disabled={isActionPending}>
+            <Button
+              type="submit"
+              disabled={
+                isActionPending ||
+                (!isAdmin &&
+                  (rounds.find((r) => r.id === (proposeRoundId || selectedRoundId)) || selectedRound)?.status !==
+                    'PROPOSAL_OPEN')
+              }
+            >
               {isActionPending ? messages.common.states.loading : messages.thesis.proposeTopic}
             </Button>
           </div>
@@ -3164,23 +3314,137 @@ export default function ThesisPage() {
                 {isSupervisorOrAdmin &&
                   (isAdmin || viewingTopic.createdBy === user?.id || (user?.lecturerId && viewingTopic.createdBy === user.lecturerId)) &&
                   viewingTopic.status === 'DRAFT' ? (
-                  <Button
-                    type="button"
-                    size="sm"
-                    onClick={() => {
-                      void handlePublishTopic(viewingTopic.id);
-                      setViewingTopic(null);
-                    }}
-                    disabled={isActionPending}
-                  >
-                    {messages.thesis.publish}
-                  </Button>
+                  <>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      size="sm"
+                      onClick={() => openEditModal(viewingTopic)}
+                      disabled={isActionPending}
+                    >
+                      {messages.thesis.editTopic}
+                    </Button>
+                    <Button
+                      type="button"
+                      size="sm"
+                      onClick={() => {
+                        void handlePublishTopic(viewingTopic.id);
+                        setViewingTopic(null);
+                      }}
+                      disabled={isActionPending}
+                    >
+                      {messages.thesis.publish}
+                    </Button>
+                  </>
                 ) : null}
               </div>
             </div>
           </div>
         </Modal>
       ) : null}
+
+      {/* Edit Topic Modal */}
+      <Modal
+        isOpen={isEditModalOpen}
+        onClose={() => {
+          if (!isActionPending) setIsEditModalOpen(false);
+        }}
+        title={messages.thesis.editTopicTitle}
+      >
+        <form onSubmit={(e) => void handleEditTopic(e)} className="space-y-4">
+          <p className="text-sm text-muted-foreground">
+            {messages.thesis.editTopicDescription}
+          </p>
+          {editError ? (
+            <div className="rounded-md border border-destructive/30 bg-destructive/5 p-3 text-sm text-destructive">
+              {editError}
+            </div>
+          ) : null}
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              {messages.thesis.topicTitleLabel}
+            </label>
+            <Input
+              value={editTitle}
+              onChange={(e) => setEditTitle(e.target.value)}
+              placeholder={messages.thesis.topicTitleLabel}
+              required
+              disabled={isActionPending}
+            />
+          </div>
+          <div className="grid gap-4 sm:grid-cols-2">
+            <div>
+              {departments.length > 0 ? (
+                <Select
+                  label={messages.thesis.topicDepartmentLabel}
+                  value={editDepartmentId}
+                  onChange={(e) => setEditDepartmentId(e.target.value)}
+                  required
+                  disabled={isActionPending}
+                  options={departments.map((dept) => ({
+                    value: dept.id,
+                    label: `${dept.code} - ${getLocalizedName(locale, dept, dept.name)}`,
+                  }))}
+                />
+              ) : (
+                <div>
+                  <label className="mb-1 block text-sm font-medium text-foreground">
+                    {messages.thesis.topicDepartmentLabel}
+                  </label>
+                  <Input
+                    value={editDepartmentId}
+                    onChange={(e) => setEditDepartmentId(e.target.value)}
+                    placeholder="department-demo"
+                    required
+                    disabled={isActionPending}
+                  />
+                </div>
+              )}
+            </div>
+            <div>
+              <label className="mb-1 block text-sm font-medium text-foreground">
+                {messages.thesis.topicMaxGroupsLabel} (1-20)
+              </label>
+              <Input
+                type="number"
+                min={1}
+                max={20}
+                value={editMaxGroups}
+                onChange={(e) => setEditMaxGroups(Number(e.target.value) || 1)}
+                required
+                disabled={isActionPending}
+              />
+            </div>
+          </div>
+          <div>
+            <label className="mb-1 block text-sm font-medium text-foreground">
+              {messages.thesis.topicDescriptionLabel}
+            </label>
+            <RichTextEditor
+              value={editDescription}
+              onChange={setEditDescription}
+              placeholder={messages.thesis.topicDescriptionLabel}
+              minHeight="140px"
+              disabled={isActionPending}
+              locale={locale}
+              showTemplates={true}
+            />
+          </div>
+          <div className="flex justify-end gap-2 pt-2">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={() => setIsEditModalOpen(false)}
+              disabled={isActionPending}
+            >
+              {messages.common.actions.cancel}
+            </Button>
+            <Button type="submit" disabled={isActionPending}>
+              {isActionPending ? messages.common.states.loading : messages.thesis.editTopic}
+            </Button>
+          </div>
+        </form>
+      </Modal>
     </div>
   );
 }

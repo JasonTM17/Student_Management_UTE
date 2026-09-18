@@ -546,6 +546,7 @@ export function extractAnnouncementExcerpt(
 ): string {
   if (!content) return '';
   const clean = content
+    .replace(/<figure[^>]*>[\s\S]*?<\/figure>/gi, '') // drop figures and figcaptions from sapo excerpt
     .replace(/<[^>]+>/g, ' ')
     .replace(/!\[[^\]]*\]\([^)]+\)/g, '') // remove images
     .replace(/\[([^\]]+)\]\([^)]+\)/g, '$1') // unwrap links
@@ -554,6 +555,12 @@ export function extractAnnouncementExcerpt(
     .trim();
   if (clean.length <= maxLength) return clean;
   return clean.slice(0, maxLength).trim() + '...';
+}
+
+export interface CoverImageDetails {
+  url: string;
+  alt: string;
+  caption?: string;
 }
 
 /**
@@ -572,4 +579,64 @@ export function extractCoverImage(content: string | null | undefined): string | 
     return htmlMatch[1];
   }
   return null;
+}
+
+/**
+ * Extracts detailed cover image metadata including alt text and optional figcaption caption.
+ */
+export function extractCoverImageDetails(content: string | null | undefined): CoverImageDetails | null {
+  if (!content) return null;
+
+  // 1. Check for <figure> with <img> and <figcaption>
+  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
+  const figMatch = content.match(figureRegex);
+  if (figMatch && figMatch[1]) {
+    const rawCaption = figMatch[3] ? figMatch[3].replace(/<[^>]+>/g, '').trim() : undefined;
+    return {
+      url: figMatch[1],
+      alt: figMatch[2] || '',
+      caption: rawCaption || undefined,
+    };
+  }
+
+  // 2. Check for bare <img ...>
+  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/i);
+  if (htmlMatch && htmlMatch[1]) {
+    return {
+      url: htmlMatch[1],
+      alt: htmlMatch[2] || '',
+    };
+  }
+
+  // 3. Check for Markdown image ![alt](url)
+  const mdMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/i);
+  if (mdMatch && mdMatch[2]) {
+    return {
+      url: mdMatch[2],
+      alt: mdMatch[1] || '',
+    };
+  }
+
+  return null;
+}
+
+/**
+ * Strips the leading cover image or figure from the body content
+ * so it is not duplicated right below the reader's 16:9 Hero Banner.
+ */
+export function stripFirstCoverImage(content: string | null | undefined): string {
+  if (!content) return '';
+  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'][^"']+["'][^>]*>[\s\S]*?<\/figure>/i;
+  if (figureRegex.test(content)) {
+    return content.replace(figureRegex, '').trim();
+  }
+  const imgRegex = /<img[^>]+src=["'][^"']+["'][^>]*\/?>/i;
+  if (imgRegex.test(content)) {
+    return content.replace(imgRegex, '').trim();
+  }
+  const mdRegex = /!\[[^\]]*\]\([^)]+\)/;
+  if (mdRegex.test(content)) {
+    return content.replace(mdRegex, '').trim();
+  }
+  return content;
 }

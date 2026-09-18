@@ -1377,6 +1377,13 @@ export const en = {
     publish: 'Publish',
     proposeSuccess: 'Topic proposed successfully.',
     publishedSuccess: 'Topic published successfully.',
+    roundNotAcceptingProposals: 'The selected round is not currently accepting topic proposals.',
+    lecturerWindowNotOpen: 'The lecturer topic-submission window has not opened yet for this round.',
+    lecturerWindowClosed: 'The lecturer topic-submission window is closed for this round.',
+    editTopic: 'Edit topic',
+    editTopicTitle: 'Edit draft thesis topic',
+    editTopicDescription: 'Update the topic title, department, description, and group capacity.',
+    editTopicSuccess: 'Topic updated successfully.',
     supervisedGroupsTitle: 'Supervised groups & approvals',
     supervisedGroupsDescription: 'Review groups registered for your topics.',
     noSupervisedGroups: 'No student groups have registered for your topics yet.',
@@ -1391,6 +1398,14 @@ export const en = {
       'Please provide a clear reason to help students understand what needs revision.',
     approveSuccess: 'Group approved successfully.',
     rejectSuccess: 'Group rejected.',
+    groupTooSmall:
+      'A thesis group must have at least 2 members before it can be approved (per HCMUTE academic regulations).',
+    groupStateConflict:
+      'Only pending groups with an assigned topic can be approved.',
+    topicStateConflict:
+      'Topic is already published or cannot be modified from its current state.',
+    proposeRoundOpenNotice:
+      'This round is actively accepting topic proposals from department lecturers.',
     myProposedTopics: 'My proposed topics',
     myProposedTopicsDescription: 'Topics proposed by you in this round.',
     noProposedTopics: 'You have not proposed any topics in this round yet.',
@@ -3140,6 +3155,13 @@ export const vi: I18nMessages = {
     publish: 'Công bố',
     proposeSuccess: 'Đã đề xuất đề tài thành công.',
     publishedSuccess: 'Đã công bố đề tài thành công.',
+    roundNotAcceptingProposals: 'Đợt đăng ký này hiện không tiếp nhận đề xuất đề tài mới.',
+    lecturerWindowNotOpen: 'Thời gian nộp đề xuất đề tài của đợt này chưa bắt đầu.',
+    lecturerWindowClosed: 'Thời hạn nộp đề xuất đề tài cho đợt này đã kết thúc.',
+    editTopic: 'Chỉnh sửa đề tài',
+    editTopicTitle: 'Chỉnh sửa đề tài nháp',
+    editTopicDescription: 'Cập nhật tên đề tài, bộ môn, mô tả và số nhóm tối đa.',
+    editTopicSuccess: 'Đã cập nhật đề tài thành công.',
     supervisedGroupsTitle: 'Nhóm hướng dẫn & xét duyệt',
     supervisedGroupsDescription: 'Xét duyệt nhóm đăng ký đề tài của bạn.',
     noSupervisedGroups: 'Chưa có nhóm sinh viên nào đăng ký đề tài của bạn.',
@@ -3154,6 +3176,14 @@ export const vi: I18nMessages = {
       'Vui lòng cung cấp lý do cụ thể để sinh viên chỉnh sửa đề xuất.',
     approveSuccess: 'Đã duyệt nhóm đề tài.',
     rejectSuccess: 'Đã từ chối nhóm đề tài.',
+    groupTooSmall:
+      'Nhóm khóa luận cần có tối thiểu 2 thành viên trước khi được xét duyệt (theo Quy định đào tạo HCM-UTE).',
+    groupStateConflict:
+      'Chỉ nhóm đang chờ xét duyệt (PENDING) và đã đăng ký đề tài mới có thể được duyệt.',
+    topicStateConflict:
+      'Đề tài đã được công bố hoặc không thể thay đổi từ trạng thái hiện tại.',
+    proposeRoundOpenNotice:
+      'Đợt này đang trong thời gian tiếp nhận đề xuất đề tài từ giảng viên bộ môn.',
     myProposedTopics: 'Đề tài tôi đã đề xuất',
     myProposedTopicsDescription: 'Các đề tài do bạn đề xuất trong đợt đăng ký này.',
     noProposedTopics: 'Bạn chưa đề xuất đề tài nào trong đợt này.',

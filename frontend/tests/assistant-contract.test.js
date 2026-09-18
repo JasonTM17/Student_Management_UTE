@@ -1343,3 +1343,71 @@ test('assistant markdown links reject unsafe schemes (javascript:, data:)', () =
   assert.match(componentSource, /elements\.push\(label\)/);
   assert.doesNotMatch(componentSource, /elements\.push\(\s*createAnchor\(/);
 });
+
+test('assistant resolves past thesis repository and campus portal services', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const studentUser = { id: 's-1', roles: ['STUDENT'], studentId: 'SP-1', firstName: 'Son', lastName: 'Nguyen' };
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
+    if (name === '@/lib/api') {
+      return {
+        authApi: { me: async () => studentUser },
+        enrollmentsApi: { getMyEnrollments: async () => [] },
+        announcementsApi: { getMy: async () => ({ data: [] }) },
+        sectionsApi: { getMySchedule: async () => [] },
+        curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
+      };
+    }
+    if (name === '@/lib/thesis-api') {
+      return {
+        thesisApi: {
+          listRounds: async () => [
+            { id: 'r-past', name: 'KLTN 2025-2026', status: 'RESULTS_PUBLISHED', thesisType: 'KHOA_LUAN_TOT_NGHIEP' },
+          ],
+          listTopics: async () => [
+            { id: 't-1', title: 'Hệ thống AI Camera phát hiện khói lửa', finalScore: 9.2, departmentId: 'FIT-AI', description: 'Mô hình phát hiện sớm' },
+          ],
+          listGroups: async () => [],
+          myWorkload: async () => ({ topics: [], councils: [] }),
+        },
+      };
+    }
+    return {};
+  });
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
+
+  // 1. Past Thesis Repository
+  const pastTheses = await resolveStudentAssistantQuery('Cho tôi xem các đề tài khóa trước để tham khảo', 'vi');
+  assert.ok(pastTheses, 'Past thesis question must resolve locally');
+  assert.match(pastTheses.answer, /Kho tài liệu đề tài khóa luận tốt nghiệp/);
+  assert.match(pastTheses.answer, /AI Camera/);
+  assert.match(pastTheses.answer, /RISC-V/);
+  assert.match(pastTheses.answer, /Blockchain/);
+  assert.match(pastTheses.answer, /\/dashboard\/thesis\?tab=repository/);
+  assert.equal(pastTheses.citation.slug, 'past-thesis-repository');
+  assert.equal(pastTheses.citation.domain, 'THESIS');
+
+  // 2. Certificates Self-Service
+  const certs = await resolveStudentAssistantQuery('Làm sao xin giấy tạm hoãn nghĩa vụ quân sự?', 'vi');
+  assert.ok(certs, 'Certificates question must resolve locally');
+  assert.match(certs.answer, /Nghị định 13\/2016\/NĐ-CP/);
+  assert.match(certs.answer, /Quyết định 157\/2007\/QĐ-TTg/);
+  assert.match(certs.answer, /\/dashboard\/certificates/);
+  assert.equal(certs.citation.domain, 'POLICY');
+
+  // 3. Credit Limit 30 credits application
+  const creditApp = await resolveStudentAssistantQuery('Cách làm đơn nâng hạn mức lên 30 tín chỉ', 'vi');
+  assert.ok(creditApp, 'Credit limit app question must resolve locally');
+  assert.match(creditApp.answer, /28 tín chỉ/);
+  assert.match(creditApp.answer, /30 tín chỉ/);
+  assert.match(creditApp.answer, /\/dashboard\/register/);
+
+  // 4. Grade Appeals
+  const regrade = await resolveStudentAssistantQuery('Thủ tục phúc khảo bài thi kết thúc học phần', 'vi');
+  assert.ok(regrade, 'Regrade appeal question must resolve locally');
+  assert.match(regrade.answer, /7 ngày làm việc/);
+  assert.match(regrade.answer, /\/dashboard\/grades/);
+});

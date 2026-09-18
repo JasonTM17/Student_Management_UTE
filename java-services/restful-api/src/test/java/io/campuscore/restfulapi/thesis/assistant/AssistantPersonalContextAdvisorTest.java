@@ -19,10 +19,12 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Semester
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
+import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
 import java.time.Instant;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.UUID;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
@@ -55,6 +57,51 @@ class AssistantPersonalContextAdvisorTest {
         assertFalse(advisor.handles("lớp học phần SE401 còn chỗ không"));
         assertFalse(advisor.handles("quy chế đào tạo nói gì về điểm A?"));
         assertFalse(advisor.handles(null));
+    }
+
+    @Test
+    void detectsThesisWorkloadIntentsInVietnameseAndEnglish() {
+        assertTrue(advisor.handles("Tôi có đề tài đồ án nào đang hướng dẫn?"));
+        assertTrue(advisor.handles("đề tài khóa luận của tôi"));
+        assertTrue(advisor.handles("tôi đang hướng dẫn đề tài nào"));
+        assertTrue(advisor.handles("What thesis topics do I supervise?"));
+        assertTrue(advisor.handles("my thesis topics"));
+
+        // General thesis policy questions must NOT be intercepted as personal workload
+        assertFalse(advisor.handles("Điều kiện làm khóa luận tốt nghiệp là gì?"));
+        assertFalse(advisor.handles("Quy định điểm GPA để làm KLTN?"));
+        assertFalse(advisor.handles("Các đề tài khóa trước về Trí tuệ nhân tạo là gì?"));
+        assertFalse(advisor.handles("Cho tôi xem các đề tài khóa trước để tham khảo"));
+        assertFalse(advisor.handles("Đề tài khóa trước đạt điểm xuất sắc của khoa CNTT"));
+        assertFalse(advisor.handles("Kho lưu trữ đề tài khóa luận của trường"));
+    }
+
+    @Test
+    void answersLecturerThesisWorkloadInVietnamese() {
+        ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
+        AssistantPersonalContextAdvisor thesisAdvisor =
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null);
+
+        var topic = new ThesisLecturerWorkloadService.SupervisedTopic(
+                UUID.randomUUID(), "Hệ thống AI gợi ý học tập", "PUBLISHED",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN",
+                null, 2, 1);
+        var council = new ThesisLecturerWorkloadService.CouncilAssignment(
+                UUID.randomUUID(), "Hội đồng 01 - KTPM", "CHAIR",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN",
+                null, null, 5);
+        when(workloadService.workload("lecturer-profile")).thenReturn(
+                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topic), List.of(council), List.of()));
+
+        ChatResponse response = thesisAdvisor.answer(chatRequest("vi", "Tôi có đề tài đồ án nào đang hướng dẫn?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Hệ thống AI gợi ý học tập"));
+        assertTrue(answer.contains("Đợt 1 KLTN 2026"));
+        assertTrue(answer.contains("Hội đồng 01 - KTPM"));
+        assertTrue(answer.contains("CHAIR"));
     }
 
     @Test
