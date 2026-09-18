@@ -36,6 +36,7 @@ export interface ThesisRound {
   proposalPublishAt?: string | null;
   gvpbDeadline?: string | null;
   reportDate?: string | null;
+  defenseDate?: string | null;
   status: ThesisRoundStatus;
 }
 
@@ -79,6 +80,78 @@ export interface ThesisGroupReport {
   fileName?: string | null;
   fileType?: string | null;
   fileSize?: number | null;
+}
+
+export interface ThesisRepositorySupervisor {
+  displayName: string;
+  supervisorOrder: number;
+}
+
+export interface ThesisRepositoryMember {
+  displayName: string;
+  studentNumber?: string | null;
+  isExternal: boolean;
+  isLeader: boolean;
+}
+
+/** Server-owned archive projection; internal identifiers and contact fields are intentionally absent. */
+export interface ThesisRepositoryReport {
+  reportId: string;
+  title?: string | null;
+  url?: string | null;
+  note?: string | null;
+  submittedAt: string;
+  updatedAt: string;
+  fileName?: string | null;
+  fileType?: string | null;
+  fileSize?: number | null;
+  topicTitle: string;
+  topicDescription?: string | null;
+  departmentName: string;
+  groupStatus: string;
+  approvalStatus: string;
+  submittedByDisplayName?: string | null;
+  submittedByStudentNumber?: string | null;
+  supervisors: ThesisRepositorySupervisor[];
+  members: ThesisRepositoryMember[];
+}
+
+export type ThesisProgressMilestone =
+  | 'ROUND_SELECTED'
+  | 'GROUP_CREATED'
+  | 'TOPIC_ASSIGNED'
+  | 'GROUP_APPROVED'
+  | 'REPORT_SUBMITTED'
+  | 'COUNCIL_ASSIGNED'
+  | 'SCORE_FINALIZED'
+  | 'RESULTS_PUBLISHED';
+
+export interface ThesisProgressResponse {
+  roundId: string;
+  roundStatus: string;
+  participationState: 'PARTICIPATING' | 'NOT_PARTICIPATING';
+  currentMilestone: ThesisProgressMilestone;
+  completedMilestones: ThesisProgressMilestone[];
+  attentionState:
+    | 'NONE'
+    | 'NOT_PARTICIPATING'
+    | 'GROUP_REJECTED'
+    | 'GROUP_CANCELLED'
+    | 'GROUP_INVALID_MEMBER_COUNT'
+    | 'PROGRESS_INCONSISTENT'
+    | 'RESULT_NOT_AVAILABLE';
+  groupId?: string | null;
+  groupStatus?: string | null;
+  approvalStatus?: string | null;
+  memberCount: number;
+  topicId?: string | null;
+  topicTitle?: string | null;
+  reportId?: string | null;
+  reportSubmittedAt?: string | null;
+  councilId?: string | null;
+  finalScore?: number | null;
+  finalScoreFinalizedAt?: string | null;
+  userReportedGroupStatus?: string | null;
 }
 
 export interface ThesisCouncilScore {
@@ -366,6 +439,7 @@ export const thesisApi = {
     proposalPublishAt?: string;
     gvpbDeadline?: string;
     reportDate?: string;
+    defenseDate?: string;
   }): Promise<ThesisRound> => {
     const response = await api.post<ThesisRound>('/thesis/rounds', data);
     return response.data;
@@ -550,6 +624,38 @@ export const thesisApi = {
     URL.revokeObjectURL(url);
   },
 
+  downloadRepositoryReportFile: async (
+    reportId: string,
+    report: { fileName?: string | null },
+  ): Promise<void> => {
+    const response = await api.get<Blob>(
+      '/thesis/reports/' + reportId + '/file',
+      { responseType: 'blob' },
+    );
+    const header = response.headers?.['content-disposition'] as string | undefined;
+    let name = report.fileName || 'thesis-report';
+    if (header) {
+      const star = header.match(/filename\*=UTF-8''([^;]+)/i);
+      const plain = header.match(/filename="?([^";]+)"?/i);
+      const encoded = star?.[1] ?? plain?.[1];
+      if (encoded) {
+        try {
+          name = decodeURIComponent(encoded);
+        } catch {
+          name = encoded;
+        }
+      }
+    }
+    const url = URL.createObjectURL(response.data);
+    const anchor = document.createElement('a');
+    anchor.href = url;
+    anchor.download = name;
+    document.body.appendChild(anchor);
+    anchor.click();
+    anchor.remove();
+    URL.revokeObjectURL(url);
+  },
+
   getReport: async (groupId: string): Promise<ThesisGroupReport> => {
     const response = await api.get<ThesisGroupReport>(
       '/thesis/groups/' + groupId + '/report',
@@ -577,6 +683,20 @@ export const thesisApi = {
       '/thesis/rounds/' + roundId + '/reports',
     );
     return response.data || [];
+  },
+
+  listRoundRepository: async (roundId: string): Promise<ThesisRepositoryReport[]> => {
+    const response = await api.get<ThesisRepositoryReport[]>(
+      '/thesis/rounds/' + roundId + '/repository',
+    );
+    return response.data || [];
+  },
+
+  getMyProgress: async (roundId: string): Promise<ThesisProgressResponse> => {
+    const response = await api.get<ThesisProgressResponse>('/thesis/me/progress', {
+      params: { roundId },
+    });
+    return response.data;
   },
 
   createCouncil: async (

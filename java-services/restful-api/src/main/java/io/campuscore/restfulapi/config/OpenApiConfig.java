@@ -40,9 +40,9 @@ public class OpenApiConfig {
                                 - **Đăng ký Học phần (Registration)**: Kiểm tra xung đột lịch học, sĩ số lớp, hạn mức chuẩn 28 tín chỉ/học kỳ; chỉ đơn được Phòng Đào tạo phê duyệt mới mở tối đa 30 tín chỉ cho đúng sinh viên.
                                 - **Điểm Rèn Luyện (Conduct - ĐRL)**: 5 tiêu chí rèn luyện chính thức theo Quyết định số 24/2020/QĐ-BGDĐT.
                                 - **Khóa luận Tốt nghiệp & Đồ án (Thesis Lifecycle)**:
-                                  - Đợt đăng ký (NCKH, TLCN, KLTN).
+                                  - Đợt đăng ký (MON_HOC, NCKH, TLCN, KLTN).
                                   - Đề tài theo Bộ môn & Giảng viên hướng dẫn (1-2 GVHD).
-                                  - Nhóm sinh viên (tối đa 3 SV, 1 nhóm trưởng).
+                                  - Nhóm sinh viên (3–4 SV, đúng 1 nhóm trưởng).
                                   - Nộp báo cáo luận văn (Chỉ nhóm trưởng nộp trước hạn GVPB).
                                   - Hội đồng chấm bảo vệ 3-5 thành viên (Chủ tịch, Thư ký, Phản biện, Ủy viên).
                                   - Quy tắc loại trừ GVHD không được chấm điểm (`SUPERVISOR_CANNOT_GRADE`).

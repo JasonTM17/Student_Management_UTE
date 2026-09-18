@@ -26,7 +26,7 @@ export function portalMatchesUser(
   const roles = userRoles(user);
 
   if (portal === 'admin') {
-    return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN');
+    return roles.includes('ADMIN') || roles.includes('SUPER_ADMIN') || roles.includes('TRUONG_KHOA');
   }
 
   if (portal === 'lecturer') {
@@ -54,7 +54,7 @@ export function portalFromUser(user: Pick<User, 'role' | 'roles'> | null | undef
   }
 
   const roles = userRoles(user);
-  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN')) {
+  if (roles.includes('SUPER_ADMIN') || roles.includes('ADMIN') || roles.includes('TRUONG_KHOA')) {
     return 'admin';
   }
 

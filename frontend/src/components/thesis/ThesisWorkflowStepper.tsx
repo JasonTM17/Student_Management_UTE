@@ -76,8 +76,8 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
                 ? round.gvpbDeadline
                   ? fill(copy.reportDeadline, { date: formatDateTime(round.gvpbDeadline) })
                   : copy.fallbackBeforeDefence
-                : round.reportDate
-                  ? fill(copy.reportDate, { date: formatDateTime(round.reportDate) })
+                : (round.defenseDate || round.reportDate)
+                  ? fill(copy.reportDate, { date: formatDateTime(round.defenseDate || round.reportDate || '') })
                   : copy.fallbackPerAssignment;
 
       // Stage 4 is the only stage whose regulation note becomes date-specific.

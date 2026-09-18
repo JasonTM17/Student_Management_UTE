@@ -129,7 +129,7 @@ Tài khoản demo: `lecturer@campuscore.edu` | Mật khẩu: `password123`
 > ngay trong bảng xem trước, sau đó bấm *Điền vào bảng điểm* → *Lưu nháp* → *Xuất bản* như nhập tay.
 >
 > **Quản lý nhóm khóa luận:** giảng viên hướng dẫn thêm/xoá thành viên trong nhóm đang đăng ký
-> (tối đa 3 thành viên, giữ nguyên nhóm trưởng) ngay trong khu vực *Hướng dẫn* của cổng khóa luận.
+> (3–4 thành viên, giữ nguyên đúng một nhóm trưởng) ngay trong khu vực *Hướng dẫn* của cổng khóa luận.
 
 ---
 

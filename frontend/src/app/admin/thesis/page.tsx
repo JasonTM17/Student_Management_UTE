@@ -51,6 +51,7 @@ export default function AdminThesisPage() {
     user,
     isAdmin,
     isLecturer,
+    isFacultyHead,
     isLoading: isAuthLoading,
     isLoggingOut,
     isSuperAdmin,
@@ -76,6 +77,7 @@ export default function AdminThesisPage() {
   const [formProposal, setFormProposal] = useState('');
   const [formGvpb, setFormGvpb] = useState('');
   const [formReportDate, setFormReportDate] = useState('');
+  const [formDefenseDate, setFormDefenseDate] = useState('');
 
   // Council management state
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
@@ -90,7 +92,8 @@ export default function AdminThesisPage() {
   const [targetCouncilIdForTopic, setTargetCouncilIdForTopic] = useState('');
   const [selectedTopicIdToAssign, setSelectedTopicIdToAssign] = useState('');
 
-  const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
+  const thesisAdminAccess = Boolean(isAdmin || isSuperAdmin || isFacultyHead);
+  const canAccess = Boolean(user && thesisAdminAccess);
 
   const loadData = useCallback(async () => {
     setIsLoading(true);
@@ -241,8 +244,12 @@ export default function AdminThesisPage() {
         proposalPublishAt: formProposal ? new Date(formProposal).toISOString() : undefined,
         gvpbDeadline: formGvpb ? new Date(formGvpb).toISOString() : undefined,
         reportDate:
-          formType === 'KLTN' && formReportDate
+          (formType === 'TLCN' || formType === 'KLTN') && formReportDate
             ? new Date(formReportDate).toISOString()
+            : undefined,
+        defenseDate:
+          formType === 'KLTN' && formDefenseDate
+            ? new Date(formDefenseDate).toISOString()
             : undefined,
       });
       setSuccess(messages.thesis.admin.created);
@@ -255,6 +262,7 @@ export default function AdminThesisPage() {
       setFormProposal('');
       setFormGvpb('');
       setFormReportDate('');
+      setFormDefenseDate('');
       await loadData();
     } catch {
       setError(messages.thesis.actionFailed);
@@ -752,10 +760,16 @@ export default function AdminThesisPage() {
               <Input type="datetime-local" value={formGvpb} onChange={(e) => setFormGvpb(e.target.value)} />
             </label>
           ) : null}
-          {formType === 'KLTN' ? (
+          {formType === 'TLCN' || formType === 'KLTN' ? (
             <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
               {messages.thesis.admin.reportDate}
               <Input type="datetime-local" value={formReportDate} onChange={(e) => setFormReportDate(e.target.value)} />
+            </label>
+          ) : null}
+          {formType === 'KLTN' ? (
+            <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
+              {messages.thesis.admin.defenseDate}
+              <Input type="datetime-local" value={formDefenseDate} onChange={(e) => setFormDefenseDate(e.target.value)} />
             </label>
           ) : null}
           <div className="flex justify-end gap-2 pt-2">

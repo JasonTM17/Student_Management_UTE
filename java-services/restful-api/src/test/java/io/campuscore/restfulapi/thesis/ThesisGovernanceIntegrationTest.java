@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
@@ -64,10 +65,9 @@ class ThesisGovernanceIntegrationTest {
         jdbc.update("DELETE FROM thesis.thesis_topic_supervisor");
         jdbc.update("DELETE FROM thesis.thesis_topic");
         jdbc.update("DELETE FROM thesis.thesis_registration_round");
-        jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'gov-member-%'");
-        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'gov-user-%'");
-        jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'gov-lecturer-%'");
-        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'gov-lecturer-user-%'");
+        jdbc.update("DELETE FROM campuscore_auth.\"Lecturer\" WHERE \"id\" LIKE 'gov-%'");
+        jdbc.update("DELETE FROM campuscore_auth.\"Student\" WHERE \"id\" LIKE 'gov-%'");
+        jdbc.update("DELETE FROM campuscore_auth.\"User\" WHERE \"id\" LIKE 'gov-%'");
     }
 
     // ---------- R1/R2: round types, windows, phase order ----------
@@ -128,6 +128,7 @@ class ThesisGovernanceIntegrationTest {
 
     @Test
     void lecturerProposalWindowGatesTopicCreationAndPublishing() throws Exception {
+        ensureLecturer("gov-lecturer-1");
         // A closed lecturer window rejects topic submission (failed before the fix).
         UUID closedRound = insertRound("Gov Round Closed Window", "PROPOSAL_OPEN",
                 Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
@@ -204,6 +205,18 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"supervisorIds\":[\"gov-lecturer-2\"]}")
                         .with(studentJwt(UUID.randomUUID().toString())))
                 .andExpect(status().isForbidden());
+
+        UUID councilId = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_council (id, round_id, name, status, created_by) VALUES (?, ?, ?, 'ACTIVE', ?)",
+                councilId, roundId, "Supervisor Freeze Council", "test-admin");
+        jdbc.update("INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), councilId, topicId, "test-admin");
+        mvc.perform(put("/api/v1/thesis/topics/{id}/supervisors", topicId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"supervisorIds\":[\"gov-lecturer-2\"]}")
+                        .with(lecturerJwt("gov-lecturer-1")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("SUPERVISOR_STATE_CONFLICT"));
     }
 
     // ---------- Feedback items 5 and 11: the topic supervisor manages membership ----------
@@ -215,46 +228,76 @@ class ThesisGovernanceIntegrationTest {
         ensureLecturer("gov-supervisor-1");
         ensureLecturer("gov-outsider-1");
         ensureStudent("gov-member-1", "gov-user-1", "gov-member-1@campuscore.edu");
+        ensureStudent("gov-member-2", "gov-user-2", "gov-member-2@campuscore.edu");
         ensureStudent("gov-member-3", "gov-user-3", "gov-member-3@campuscore.edu");
+        ensureStudent("gov-member-4", "gov-user-4", "gov-member-4@campuscore.edu");
         UUID topicId = insertPublishedTopic(roundId);
-        // The report asks for roster completion on an approved group, so the
-        // fixture is deliberately APPROVED: only the supervisor path may touch it.
         UUID groupId = insertGroup(roundId, "gov-member-1", topicId, "APPROVED");
+        insertMember(groupId, roundId, "gov-member-1", 1);
+        insertMember(groupId, roundId, "gov-member-2", 2);
+        insertMember(groupId, roundId, "gov-member-3", 3);
         jdbc.update(
                 "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
                         + "VALUES (?, ?, 'gov-supervisor-1', 1)",
                 UUID.randomUUID(), topicId);
 
-        // The supervisor adds the missing member to the approved group. The
-        // fixture inserts no member rows, so the roster holds exactly the new
-        // member afterwards.
+        // The supervisor may complete a valid 3-member approved roster to four.
         mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"studentId\":\"gov-member-3\"}")
+                        .content("{\"studentId\":\"gov-member-4\"}")
                         .with(lecturerJwt("gov-supervisor-1")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.members.length()").value(1))
-                .andExpect(jsonPath("$.members[0].studentId").value("gov-member-3"));
+                .andExpect(jsonPath("$.members.length()").value(4));
 
         // A lecturer who does not supervise this topic is still locked out.
         mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"studentId\":\"gov-member-2\"}")
+                        .content("{\"studentId\":\"gov-member-5\"}")
                         .with(lecturerJwt("gov-outsider-1")))
                 .andExpect(status().isForbidden());
 
-        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gov-member-3")
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gov-member-4")
                         .with(lecturerJwt("gov-supervisor-1")))
                 .andExpect(status().isOk())
-                .andExpect(jsonPath("$.members.length()").value(0));
+                .andExpect(jsonPath("$.members.length()").value(3));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?", Integer.class, groupId))
+                .isEqualTo(3);
 
         // The leader's own path still works through the same endpoint.
         mvc.perform(post("/api/v1/thesis/groups/{id}/members", groupId)
                         .contentType(MediaType.APPLICATION_JSON)
-                        .content("{\"studentId\":\"gov-member-3\"}")
+                        .content("{\"studentId\":\"gov-member-4\"}")
                         .with(studentJwt("gov-member-1")))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("GROUP_STATE_CONFLICT"));
+    }
+
+    @Test
+    void approvedGroupCannotShrinkBelowThreeMembers() throws Exception {
+        UUID roundId = insertRound("Gov Approved Roster Shrink", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        ensureLecturer("gov-shrink-supervisor");
+        ensureStudent("gov-shrink-leader", "gov-shrink-leader-user", "gov-shrink-leader@campuscore.edu");
+        ensureStudent("gov-shrink-member-2", "gov-shrink-member-2-user", "gov-shrink-member-2@campuscore.edu");
+        ensureStudent("gov-shrink-member-3", "gov-shrink-member-3-user", "gov-shrink-member-3@campuscore.edu");
+        UUID topicId = insertPublishedTopic(roundId);
+        UUID groupId = insertGroup(roundId, "gov-shrink-leader", topicId, "APPROVED");
+        insertMember(groupId, roundId, "gov-shrink-leader", 1);
+        insertMember(groupId, roundId, "gov-shrink-member-2", 2);
+        insertMember(groupId, roundId, "gov-shrink-member-3", 3);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_topic_supervisor (id, topic_id, lecturer_id, supervisor_order) "
+                        + "VALUES (?, ?, 'gov-shrink-supervisor', 1)",
+                UUID.randomUUID(), topicId);
+
+        mvc.perform(delete("/api/v1/thesis/groups/{id}/members/{studentId}", groupId, "gov-shrink-member-3")
+                        .with(lecturerJwt("gov-shrink-supervisor")))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("GROUP_TOO_SMALL"));
+        assertThat(jdbc.queryForObject(
+                "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = ?", Integer.class, groupId))
+                .isEqualTo(3);
     }
 
     // ---------- R4: single active group per student ----------
@@ -355,6 +398,10 @@ class ThesisGovernanceIntegrationTest {
         ensureStudent("gov-leader-report", "gov-user-report", "gov-leader@campuscore.edu");
         ensureStudent("gov-peer-report", "gov-user-peer", "gov-peer@campuscore.edu");
         insertMember(groupId, roundId, "gov-peer-report", 2);
+        ensureStudent("gov-member-report-3", "gov-user-member-report-3", "gov-member-report-3@campuscore.edu");
+        ensureStudent("gov-member-report-4", "gov-user-member-report-4", "gov-member-report-4@campuscore.edu");
+        insertMember(groupId, roundId, "gov-member-report-3", 3);
+        insertMember(groupId, roundId, "gov-member-report-4", 4);
 
         // A non-leader member cannot submit (R5).
         mvc.perform(post("/api/v1/thesis/groups/{id}/report", groupId)
@@ -386,6 +433,12 @@ class ThesisGovernanceIntegrationTest {
         UUID frozenTopic = insertPublishedTopic(frozenRound);
         UUID frozenGroup = insertGroup(frozenRound, "gov-leader-frozen", frozenTopic, "APPROVED");
         insertMember(frozenGroup, frozenRound, "gov-leader-frozen", 1);
+        ensureStudent("gov-frozen-member-2", "gov-frozen-user-2", "gov-frozen-member-2@campuscore.edu");
+        ensureStudent("gov-frozen-member-3", "gov-frozen-user-3", "gov-frozen-member-3@campuscore.edu");
+        ensureStudent("gov-frozen-member-4", "gov-frozen-user-4", "gov-frozen-member-4@campuscore.edu");
+        insertMember(frozenGroup, frozenRound, "gov-frozen-member-2", 2);
+        insertMember(frozenGroup, frozenRound, "gov-frozen-member-3", 3);
+        insertMember(frozenGroup, frozenRound, "gov-frozen-member-4", 4);
 
         mvc.perform(post("/api/v1/thesis/groups/{id}/report", frozenGroup)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -493,6 +546,11 @@ class ThesisGovernanceIntegrationTest {
                         .with(truongKhoaJwt()))
                 .andExpect(status().isOk());
 
+        mvc.perform(delete("/api/v1/thesis/councils/{id}/members/{lecturerId}", councilId, "gov-score-secretary")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUNCIL_SECRETARY_REQUIRED"));
+
         // Brief R8: the supervisor cannot grade their own topic.
         mvc.perform(post("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
                         .contentType(MediaType.APPLICATION_JSON)
@@ -533,6 +591,11 @@ class ThesisGovernanceIntegrationTest {
                         .content("{\"score\":7}")
                         .with(lecturerJwt("gov-score-chair")))
                 .andExpect(status().isOk());
+
+        mvc.perform(delete("/api/v1/thesis/councils/{id}/members/{lecturerId}", councilId, "gov-score-chair")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isConflict())
+                .andExpect(jsonPath("$.code").value("COUNCIL_STATE_CONFLICT"));
 
         // Raw committee scores stay staff/council-only; students use /me/results after publication.
         mvc.perform(get("/api/v1/thesis/councils/{councilId}/topics/{topicId}/scores", councilId, topicId)
@@ -597,6 +660,12 @@ class ThesisGovernanceIntegrationTest {
         UUID groupId = insertGroup(roundId, "gov-result-leader", topicId, "APPROVED");
         ensureStudent("gov-result-leader", "gov-user-result", "gov-result-leader@campuscore.edu");
         insertMember(groupId, roundId, "gov-result-leader", 1);
+        ensureStudent("gov-result-member-2", "gov-user-result-2", "gov-result-member-2@campuscore.edu");
+        ensureStudent("gov-result-member-3", "gov-user-result-3", "gov-result-member-3@campuscore.edu");
+        ensureStudent("gov-result-member-4", "gov-user-result-4", "gov-result-member-4@campuscore.edu");
+        insertMember(groupId, roundId, "gov-result-member-2", 2);
+        insertMember(groupId, roundId, "gov-result-member-3", 3);
+        insertMember(groupId, roundId, "gov-result-member-4", 4);
         jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.5, result_status = 'GRADED' WHERE id = ?", topicId);
 
         // Nothing graded -> publication refused.
@@ -608,7 +677,12 @@ class ThesisGovernanceIntegrationTest {
 
         // One graded topic is not enough while another approved group waits.
         UUID pendingTopicId = insertPublishedTopic(roundId);
-        insertGroup(roundId, "gov-result-pending", pendingTopicId, "APPROVED");
+        UUID pendingGroup = insertGroup(roundId, "gov-result-pending", pendingTopicId, "APPROVED");
+        ensureStudent("gov-result-pending-2", "gov-user-result-pending-2", "gov-result-pending-2@campuscore.edu");
+        ensureStudent("gov-result-pending-3", "gov-user-result-pending-3", "gov-result-pending-3@campuscore.edu");
+        insertMember(pendingGroup, roundId, "gov-result-pending", 1);
+        insertMember(pendingGroup, roundId, "gov-result-pending-2", 2);
+        insertMember(pendingGroup, roundId, "gov-result-pending-3", 3);
         mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-results", roundId).with(truongKhoaJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("SCORES_INCOMPLETE"));
@@ -643,6 +717,126 @@ class ThesisGovernanceIntegrationTest {
                 .andExpect(jsonPath("$.code").value("RESULTS_NOT_PUBLISHED"));
     }
 
+    @Test
+    void personalProgressReportsNonParticipationInsteadOfInferringCompletion() throws Exception {
+        ensureStudent("gov-progress-outsider", "gov-progress-outsider-user", "gov-progress-outsider@campuscore.edu");
+        UUID roundId = insertRound("Gov Progress Historical Round", "PROPOSALS_PUBLISHED",
+                Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
+
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt("gov-progress-outsider")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participationState").value("NOT_PARTICIPATING"))
+                .andExpect(jsonPath("$.currentMilestone").value("ROUND_SELECTED"))
+                .andExpect(jsonPath("$.completedMilestones.length()").value(0))
+                .andExpect(jsonPath("$.attentionState").value("NOT_PARTICIPATING"));
+    }
+
+    @Test
+    void facultyHeadCanReadThesisGroupsAcrossTheRound() throws Exception {
+        UUID roundId = insertRound("Gov Faculty Head Group Read", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+    }
+
+    @Test
+    void personalProgressRequiresPublishedPersonalResult() throws Exception {
+        ensureStudent("gov-progress-leader", "gov-progress-leader-user", "gov-progress-leader@campuscore.edu");
+        ensureStudent("gov-progress-member", "gov-progress-member-user", "gov-progress-member@campuscore.edu");
+        ensureStudent("gov-progress-member-3", "gov-progress-member-3-user", "gov-progress-member-3@campuscore.edu");
+        ensureStudent("gov-progress-member-4", "gov-progress-member-4-user", "gov-progress-member-4@campuscore.edu");
+        UUID pendingRound = insertRound("Gov Progress Published Without Result", "RESULTS_PUBLISHED",
+                Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
+        UUID pendingTopic = insertPublishedTopic(pendingRound);
+        UUID pendingGroup = insertGroup(pendingRound, "gov-progress-leader", pendingTopic, "APPROVED");
+        insertMember(pendingGroup, pendingRound, "gov-progress-leader", 1);
+        insertMember(pendingGroup, pendingRound, "gov-progress-member", 2);
+        insertMember(pendingGroup, pendingRound, "gov-progress-member-3", 3);
+        insertMember(pendingGroup, pendingRound, "gov-progress-member-4", 4);
+        UUID pendingCouncil = UUID.randomUUID();
+        jdbc.update("INSERT INTO thesis.thesis_council (id, round_id, name, status, created_by) VALUES (?, ?, ?, 'ACTIVE', ?)",
+                pendingCouncil, pendingRound, "Gov Progress Council", "test-admin");
+        jdbc.update("INSERT INTO thesis.thesis_council_topic (id, council_id, topic_id, assigned_by) VALUES (?, ?, ?, ?)",
+                UUID.randomUUID(), pendingCouncil, pendingTopic, "test-admin");
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url) "
+                        + "VALUES (?, ?, ?, ?, 'Gov progress report', 'https://example.test/gov-progress-report.pdf')",
+                UUID.randomUUID(), pendingGroup, pendingRound, "gov-progress-leader");
+
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", pendingRound.toString())
+                        .with(studentJwt("gov-progress-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participationState").value("PARTICIPATING"))
+                .andExpect(jsonPath("$.currentMilestone").value("COUNCIL_ASSIGNED"))
+                .andExpect(jsonPath("$.attentionState").value("RESULT_NOT_AVAILABLE"));
+
+        jdbc.update("UPDATE thesis.thesis_topic SET final_score = 8.25, result_status = 'GRADED' WHERE id = ?",
+                pendingTopic);
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", pendingRound.toString())
+                        .with(studentJwt("gov-progress-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentMilestone").value("RESULTS_PUBLISHED"))
+                .andExpect(jsonPath("$.completedMilestones", org.hamcrest.Matchers.hasItem("RESULTS_PUBLISHED")))
+                .andExpect(jsonPath("$.finalScore").value(8.25))
+                .andExpect(jsonPath("$.attentionState").value("NONE"));
+    }
+
+    @Test
+    void personalProgressWarnsWhenParticipatingGroupHasIncompleteRoster() throws Exception {
+        ensureStudent("gov-progress-incomplete-leader", "gov-progress-incomplete-leader-user",
+                "gov-progress-incomplete-leader@campuscore.edu");
+        UUID roundId = insertRound("Gov Progress Incomplete Roster", "REGISTRATION_OPEN",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        UUID groupId = insertGroup(roundId, "gov-progress-incomplete-leader", topicId, "PENDING");
+        insertMember(groupId, roundId, "gov-progress-incomplete-leader", 1);
+
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt("gov-progress-incomplete-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.participationState").value("PARTICIPATING"))
+                .andExpect(jsonPath("$.memberCount").value(1))
+                .andExpect(jsonPath("$.attentionState").value("GROUP_INVALID_MEMBER_COUNT"));
+    }
+
+    @Test
+    void personalProgressStopsAtMissingApprovalWhenLaterReportEvidenceExists() throws Exception {
+        ensureStudent("gov-progress-inconsistent-leader", "gov-progress-inconsistent-leader-user",
+                "gov-progress-inconsistent-leader@campuscore.edu");
+        ensureStudent("gov-progress-inconsistent-member", "gov-progress-inconsistent-member-user",
+                "gov-progress-inconsistent-member@campuscore.edu");
+        ensureStudent("gov-progress-inconsistent-member-3", "gov-progress-inconsistent-member-3-user",
+                "gov-progress-inconsistent-member-3@campuscore.edu");
+        UUID roundId = insertRound("Gov Progress Inconsistent Evidence", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(7_200), Instant.now().minusSeconds(3_600));
+        UUID topicId = insertPublishedTopic(roundId);
+        UUID groupId = insertGroup(roundId, "gov-progress-inconsistent-leader", topicId, "PENDING");
+        insertMember(groupId, roundId, "gov-progress-inconsistent-leader", 1);
+        insertMember(groupId, roundId, "gov-progress-inconsistent-member", 2);
+        insertMember(groupId, roundId, "gov-progress-inconsistent-member-3", 3);
+        jdbc.update(
+                "INSERT INTO thesis.thesis_group_report (id, group_id, round_id, submitted_by, title, url) "
+                        + "VALUES (?, ?, ?, ?, 'Retained report', 'https://example.test/retained-report.pdf')",
+                UUID.randomUUID(), groupId, roundId, "gov-progress-inconsistent-leader");
+
+        mvc.perform(get("/api/v1/thesis/me/progress")
+                        .queryParam("roundId", roundId.toString())
+                        .with(studentJwt("gov-progress-inconsistent-leader")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.currentMilestone").value("TOPIC_ASSIGNED"))
+                .andExpect(jsonPath("$.completedMilestones", org.hamcrest.Matchers.hasItem("TOPIC_ASSIGNED")))
+                .andExpect(jsonPath("$.completedMilestones", org.hamcrest.Matchers.not(
+                        org.hamcrest.Matchers.hasItem("REPORT_SUBMITTED"))))
+                .andExpect(jsonPath("$.attentionState").value("PROGRESS_INCONSISTENT"));
+    }
+
     // ---------- fixtures ----------
 
     private String validRoundBody(String type, String name) {
@@ -652,7 +846,8 @@ class ThesisGovernanceIntegrationTest {
                 "\"registrationStart\":\"2027-01-15T00:00:00Z\"," +
                 "\"registrationEnd\":\"2027-02-15T00:00:00Z\"," +
                 "\"gvpbDeadline\":\"2027-03-01T00:00:00Z\"," +
-                "\"reportDate\":\"2027-03-10T00:00:00Z\"}";
+                "\"reportDate\":\"2027-03-10T00:00:00Z\"," +
+                "\"defenseDate\":\"2027-03-20T00:00:00Z\"}";
     }
 
     private String topicBody(UUID roundId, String title) {
@@ -662,14 +857,29 @@ class ThesisGovernanceIntegrationTest {
 
     private UUID insertRound(String name, String status, Instant windowStart, Instant windowEnd) {
         UUID roundId = UUID.randomUUID();
+        Instant lecturerStart;
+        Instant lecturerEnd;
+        Instant registrationStart;
+        Instant registrationEnd;
+        if ("PROPOSAL_OPEN".equals(status)) {
+            lecturerStart = windowStart;
+            lecturerEnd = windowEnd;
+            registrationStart = windowEnd;
+            registrationEnd = windowEnd.plusSeconds(31L * 24 * 60 * 60);
+        } else {
+            registrationStart = windowStart;
+            registrationEnd = windowEnd;
+            lecturerStart = windowStart.minusSeconds(7_200);
+            lecturerEnd = windowStart.minusSeconds(3_600);
+        }
         jdbc.update(
                 "INSERT INTO thesis.thesis_registration_round "
                         + "(id, name, thesis_type, lecturer_submit_start, lecturer_submit_end, "
                         + "registration_start, registration_end, status) "
                         + "VALUES (?, ?, ?, ?, ?, ?, ?, ?)",
                 roundId, name, "KLTN",
-                Timestamp.from(windowStart), Timestamp.from(windowEnd),
-                Timestamp.from(windowStart), Timestamp.from(windowEnd),
+                Timestamp.from(lecturerStart), Timestamp.from(lecturerEnd),
+                Timestamp.from(registrationStart), Timestamp.from(registrationEnd),
                 status);
         return roundId;
     }

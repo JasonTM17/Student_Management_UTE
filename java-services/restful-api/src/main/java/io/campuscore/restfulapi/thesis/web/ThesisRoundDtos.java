@@ -21,6 +21,7 @@ public final class ThesisRoundDtos {
             Instant gvpbDeadline,
             Instant proposalPublishAt,
             Instant reportDate,
+            Instant defenseDate,
             RoundStatus status) {
 
         public static RoundResponse from(ThesisRegistrationRound round) {
@@ -29,7 +30,7 @@ public final class ThesisRoundDtos {
                     round.getLecturerSubmitStart(), round.getLecturerSubmitEnd(),
                     round.getRegistrationStart(), round.getRegistrationEnd(),
                     round.getGvpbDeadline(), round.getProposalPublishAt(),
-                    round.getReportDate(), round.getStatus());
+                    round.getReportDate(), round.getDefenseDate(), round.getStatus());
         }
     }
 }
