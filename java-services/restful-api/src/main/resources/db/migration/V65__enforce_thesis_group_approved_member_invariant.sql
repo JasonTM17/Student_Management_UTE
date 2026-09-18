@@ -25,7 +25,7 @@ BEGIN
 
     IF terminal_invalid_count > 0 THEN
         RAISE EXCEPTION
-            'V63 stopped: % approved terminal-round groups have an invalid member count',
+            'V65 stopped: % approved terminal-round groups have an invalid member count',
             terminal_invalid_count;
     END IF;
 
@@ -65,7 +65,7 @@ BEGIN
 
     IF structural_invalid_count > 0 THEN
         RAISE EXCEPTION
-            'V63 stopped: % thesis groups violate leader, round, or member-order invariants',
+            'V65 stopped: % thesis groups violate leader, round, or member-order invariants',
             structural_invalid_count;
     END IF;
 END $$;

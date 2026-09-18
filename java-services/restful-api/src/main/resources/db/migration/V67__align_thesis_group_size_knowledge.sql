@@ -92,8 +92,8 @@ INSERT INTO assistant.knowledge_release
     (id, corpus_version, corpus_hash, row_count, source, status, manifest, created_by,
      activated_at, previous_release_id)
 SELECT '00000000-0000-0000-0000-000000000065'::uuid,
-       'thesis-group-size-v65', corpus_hash, row_count, 'MANUAL', 'PUBLISHED',
-       jsonb_build_object('schemaVersion', 1, 'corpusVersion', 'thesis-group-size-v65',
+       'thesis-group-size-v67', corpus_hash, row_count, 'MANUAL', 'PUBLISHED',
+       jsonb_build_object('schemaVersion', 1, 'corpusVersion', 'thesis-group-size-v67',
                           'rowCount', row_count, 'sha256', corpus_hash, 'documents', documents),
        'system-migration', CURRENT_TIMESTAMP,
        (SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton = TRUE)

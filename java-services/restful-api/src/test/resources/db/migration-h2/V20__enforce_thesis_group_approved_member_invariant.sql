@@ -1,4 +1,4 @@
--- H2 twin of PostgreSQL V63. H2 cannot express a PostgreSQL deferred
+-- H2 twin of PostgreSQL V65. H2 cannot express a PostgreSQL deferred
 -- constraint trigger, so service-level row locking tests cover the timing
 -- invariant while these indexes/checks cover the portable row shape.
 ALTER TABLE thesis.thesis_group_member

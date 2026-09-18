@@ -1,4 +1,4 @@
--- H2 twin of PostgreSQL V64. H2 enforces the same row-level schedule oracle;
+-- H2 twin of PostgreSQL V66. H2 enforces the same row-level schedule oracle;
 -- service tests cover conditional presence and phase-specific requirements.
 -- The production profile creates the academic catalogue in V3. The compact
 -- H2 fixture omits that catalogue, but topic mutations still resolve active
