@@ -55,8 +55,10 @@ export default function ThesisTopicDetailPage() {
     }
   };
 
+  const { topics, selectedRoundId, setSelectedRoundId } = workspace;
+
   useEffect(() => {
-    if (!topicId || workspace.topics.some((item) => item.id === topicId)) {
+    if (!topicId || topics.some((item) => item.id === topicId)) {
       return;
     }
     let cancelled = false;
@@ -66,8 +68,8 @@ export default function ThesisTopicDetailPage() {
       .then((t) => {
         if (!cancelled) {
           setDirectTopic(t);
-          if (t?.roundId && t.roundId !== workspace.selectedRoundId) {
-            workspace.setSelectedRoundId(t.roundId);
+          if (t?.roundId && t.roundId !== selectedRoundId) {
+            setSelectedRoundId(t.roundId);
           }
         }
       })
@@ -80,16 +82,16 @@ export default function ThesisTopicDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [topicId, workspace.topics, workspace.selectedRoundId, workspace.setSelectedRoundId]);
+  }, [topicId, topics, selectedRoundId, setSelectedRoundId]);
 
   useEffect(() => {
-    const matched = workspace.topics.find((item) => item.id === topicId);
-    if (matched?.roundId && matched.roundId !== workspace.selectedRoundId) {
-      workspace.setSelectedRoundId(matched.roundId);
+    const matched = topics.find((item) => item.id === topicId);
+    if (matched?.roundId && matched.roundId !== selectedRoundId) {
+      setSelectedRoundId(matched.roundId);
     }
-  }, [topicId, workspace.topics, workspace.selectedRoundId, workspace.setSelectedRoundId]);
+  }, [topicId, topics, selectedRoundId, setSelectedRoundId]);
 
-  const topic = workspace.topics.find((item) => item.id === topicId) ?? directTopic;
+  const topic = topics.find((item) => item.id === topicId) ?? directTopic;
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
