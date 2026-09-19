@@ -599,7 +599,7 @@ INSERT INTO engagement."Announcement" (
     'Lễ Tôn vinh Giảng viên Xuất sắc & Nhà Khoa học Tiêu biểu HCM-UTE Năm học 2025-2026',
     'le-ton-vinh-giang-vien-xuat-sac-nha-khoa-hoc-tieu-bieu',
     'Vinh danh các thầy cô giáo có thành tích vượt trội trong giảng dạy, nghiên cứu khoa học và công bố quốc tế uy tín.',
-    '<p>Hội đồng Thi đua - Khen thưởng Trường Đại học Sư phạm Kỹ thuật TP.HCM trang trọng tổ chức Lễ Tôn vinh Giảng viên Xuất sắc và Nhà Khoa học Tiêu biểu năm học tại Hội trường Trung tâm.</p>
+    '<p>Hội đồng Thi đua - Khen thưởng Trường Đại học Công nghệ Kỹ thuật TP.HCM trang trọng tổ chức Lễ Tôn vinh Giảng viên Xuất sắc và Nhà Khoa học Tiêu biểu năm học tại Hội trường Trung tâm.</p>
 <figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
   <img src="/images/news/faculty-excellence-awards.jpg" alt="Hiệu trưởng trao cúp vinh danh cho Giảng viên xuất sắc HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
   <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
@@ -623,66 +623,76 @@ INSERT INTO engagement."Announcement" (
     "coverImageUrl" = EXCLUDED."coverImageUrl",
     "readingTimeMinutes" = EXCLUDED."readingTimeMinutes";
 
--- Update existing 6 articles with metadata and category linkage
+-- Update existing articles with metadata, category linkage, and strictly unique slugs
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-research-tech',
     "coverImageUrl" = '/images/news/bigdata-ai-lab.jpg',
     "summary" = 'Khánh thành cụm máy chủ điện toán hiệu năng cao GPU NVIDIA A100 và hệ thống lưu trữ Ceph 500TB phục vụ nghiên cứu Big Data và AI.',
     "readingTimeMinutes" = 4,
-    "slug" = 'khanh-thanh-cum-may-chu-hpc-bigdata-ai-lab',
     "viewCount" = 3450,
     "uniqueReaderCount" = 2890
 WHERE "id" IN ('announcement-ute-bigdata-ai-center', 'announcement-v32-smart-campus');
+UPDATE engagement."Announcement" SET "slug" = 'khanh-thanh-cum-may-chu-hpc-bigdata-ai-lab' WHERE "id" = 'announcement-ute-bigdata-ai-center';
+UPDATE engagement."Announcement" SET "slug" = 'khanh-thanh-cum-may-chu-hpc-smart-campus-v32' WHERE "id" = 'announcement-v32-smart-campus';
 
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-career-opps',
     "coverImageUrl" = '/images/news/tech-career-expo.jpg',
     "summary" = 'Hơn 60 tập đoàn công nghệ tuyển dụng 1.200 vị trí kỹ sư phần mềm, AI, Cloud DevOps tại Ngày hội việc làm UTE Tech Career Expo 2026.',
     "readingTimeMinutes" = 3,
-    "slug" = 'ngay-hoi-viec-lam-ute-tech-career-expo-2026',
     "viewCount" = 4120,
     "uniqueReaderCount" = 3560
 WHERE "id" IN ('announcement-ute-career-fair-tech-2026', 'announcement-v32-job-fair', 'announcement-ute-fpt-ojt-career-day');
+UPDATE engagement."Announcement" SET "slug" = 'ngay-hoi-viec-lam-ute-tech-career-expo-2026' WHERE "id" = 'announcement-ute-career-fair-tech-2026';
+UPDATE engagement."Announcement" SET "slug" = 'ngay-hoi-viec-lam-ute-job-fair-v32' WHERE "id" = 'announcement-v32-job-fair';
+UPDATE engagement."Announcement" SET "slug" = 'ngay-hoi-fpt-ojt-career-day-2026' WHERE "id" = 'announcement-ute-fpt-ojt-career-day';
 
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-awards-honors',
     "coverImageUrl" = '/images/news/scholarship-ceremony.jpg',
     "summary" = 'Thông báo kết quả đối soát GPA và điểm rèn luyện xét cấp Học bổng Khuyến khích học tập kỳ 1 năm học 2026-2027.',
     "readingTimeMinutes" = 3,
-    "slug" = 'ket-qua-xet-cap-hoc-bong-khuyen-khich-hoc-tap',
     "viewCount" = 5230,
     "uniqueReaderCount" = 4680
 WHERE "id" IN ('announcement-ute-scholarship-dr-criteria', 'announcement-ute-samsung-scholarship-2026', 'announcement-ute-intel-stem-women-2026', 'announcement-v26-scholarship');
+UPDATE engagement."Announcement" SET "slug" = 'ket-qua-xet-cap-hoc-bong-khuyen-khich-hoc-tap' WHERE "id" = 'announcement-ute-scholarship-dr-criteria';
+UPDATE engagement."Announcement" SET "slug" = 'hoc-bong-tai-nang-samsung-innovation-campus-2026' WHERE "id" = 'announcement-ute-samsung-scholarship-2026';
+UPDATE engagement."Announcement" SET "slug" = 'hoc-bong-intel-stem-women-leadership-2026' WHERE "id" = 'announcement-ute-intel-stem-women-2026';
+UPDATE engagement."Announcement" SET "slug" = 'ket-qua-xet-cap-hoc-bong-khuyen-khich-v26' WHERE "id" = 'announcement-v26-scholarship';
 
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-academic-affairs',
     "coverImageUrl" = '/images/news/course-registration.jpg',
     "summary" = 'Kế hoạch đăng ký học phần trực tuyến, phân luồng theo khóa và quy định trần hạn mức 28 tín chỉ trên cổng CampusUTE.',
     "readingTimeMinutes" = 4,
-    "slug" = 'ke-hoach-dang-ky-hoc-phan-truc-tuyen-hoc-ky',
     "viewCount" = 6840,
     "uniqueReaderCount" = 5920
 WHERE "id" IN ('announcement-ute-course-reg-official', 'announcement-registration-window');
+UPDATE engagement."Announcement" SET "slug" = 'ke-hoach-dang-ky-hoc-phan-truc-tuyen-hoc-ky' WHERE "id" = 'announcement-ute-course-reg-official';
+UPDATE engagement."Announcement" SET "slug" = 'thong-bao-mo-cong-dang-ky-hoc-phan-truc-tuyen' WHERE "id" = 'announcement-registration-window';
 
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-academic-affairs',
     "coverImageUrl" = '/images/news/thesis-defense.jpg',
     "summary" = 'Khoa Công nghệ Thông tin tổ chức bảo vệ Khóa luận tốt nghiệp đợt 2 cho 120 nhóm sinh viên trước 18 hội đồng chuyên môn.',
     "readingTimeMinutes" = 4,
-    "slug" = 'le-bao-ve-khoa-luan-tot-nghiep-kltn-khoa-cntt',
     "viewCount" = 2950,
     "uniqueReaderCount" = 2410
 WHERE "id" IN ('announcement-ute-thesis-registration-fall', 'announcement-v26-thesis-round');
+UPDATE engagement."Announcement" SET "slug" = 'le-bao-ve-khoa-luan-tot-nghiep-kltn-khoa-cntt' WHERE "id" = 'announcement-ute-thesis-registration-fall';
+UPDATE engagement."Announcement" SET "slug" = 'le-bao-ve-khoa-luan-tot-nghiep-kltn-v26' WHERE "id" = 'announcement-v26-thesis-round';
 
 UPDATE engagement."Announcement"
 SET "categoryId" = 'cat-research-tech',
     "coverImageUrl" = '/images/news/scientific-research.jpg',
     "summary" = 'Lễ tổng kết và trao giải Nghiên cứu Khoa học Sinh viên UTE 2026: 5 Giải Nhất, 10 Giải Nhì và nhiều dự án đăng ký sáng chế.',
     "readingTimeMinutes" = 3,
-    "slug" = 'le-trao-giai-nghien-cuu-khoa-hoc-sinh-vien-nckh',
     "viewCount" = 2670,
     "uniqueReaderCount" = 2190
 WHERE "id" IN ('announcement-ute-student-scientific-research-awards', 'announcement-v32-ute-research', 'announcement-ute-innovation-awards-2026');
+UPDATE engagement."Announcement" SET "slug" = 'le-trao-giai-nghien-cuu-khoa-hoc-sinh-vien-nckh' WHERE "id" = 'announcement-ute-student-scientific-research-awards';
+UPDATE engagement."Announcement" SET "slug" = 'le-trao-giai-nghien-cuu-khoa-hoc-v32' WHERE "id" = 'announcement-v32-ute-research';
+UPDATE engagement."Announcement" SET "slug" = 'giai-thuong-doi-moi-sang-tao-innovation-awards-2026' WHERE "id" = 'announcement-ute-innovation-awards-2026';
 
 -- 9. Seed Tag Maps for Articles
 INSERT INTO engagement."AnnouncementTagMap" ("announcementId", "tagId") VALUES
