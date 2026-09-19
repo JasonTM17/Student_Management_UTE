@@ -21,8 +21,10 @@ import org.springframework.web.bind.annotation.RequestHeader;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** Private RAG-side authority boundary.  Never expose this route through Caddy. */
+@Tag(name = "Internal Service Mesh (Supabase Authority)", description = "Private service-to-service endpoints for internal Supabase RAG authority sync")
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "supabase")

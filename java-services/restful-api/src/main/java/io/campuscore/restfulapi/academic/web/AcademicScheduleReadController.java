@@ -14,7 +14,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** Academic schedule query routes. */
+@Tag(name = "Academic Schedules", description = "Tra cứu thời khóa biểu học tập, phòng học và lịch giảng dạy")
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/schedules")
@@ -26,17 +33,26 @@ public class AcademicScheduleReadController {
         this.academic = academic;
     }
 
+    @Operation(summary = "Danh sách lịch học / thời khóa biểu", description = "Truy vấn danh sách các tiết học, phòng học, thứ trong tuần và thời gian học")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy danh sách thời khóa biểu thành công")
+    })
     @GetMapping
     public ScheduleListResponse getSchedules(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findSchedules(page, limit);
     }
 
+    @Operation(summary = "Chi tiết một mục thời khóa biểu", description = "Lấy thông tin chi tiết một buổi học theo mã định danh")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tìm thấy lịch học")
+    })
     @GetMapping("{id}")
-    public ScheduleResponse getSchedule(@PathVariable String id) {
+    public ScheduleResponse getSchedule(
+            @Parameter(description = "Mã định danh lịch học (UUID)", required = true) @PathVariable String id) {
         return academic.findSchedule(id);
     }
 

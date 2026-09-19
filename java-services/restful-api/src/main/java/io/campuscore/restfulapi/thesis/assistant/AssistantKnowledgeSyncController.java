@@ -8,7 +8,13 @@ import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** Administrative boundary for Supabase -> PostgreSQL release promotion. */
+@Tag(name = "AI Assistant Knowledge Sync (Admin)", description = "Đồng bộ hóa dữ liệu tri thức giữa Supabase và PostgreSQL")
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "sql", matchIfMissing = true)
@@ -20,12 +26,20 @@ public class AssistantKnowledgeSyncController {
         this.sync = sync;
     }
 
+    @Operation(summary = "Thực hiện đồng bộ tri thức ngay lập tức (Sync Now)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Đồng bộ thành công")
+    })
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public SupabaseKnowledgeSyncService.SyncResult sync() {
         return sync.syncNow();
     }
 
+    @Operation(summary = "Kiểm tra trạng thái đồng bộ tri thức")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy trạng thái thành công")
+    })
     @GetMapping("/sync-status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public SupabaseKnowledgeSyncService.SyncResult status() {

@@ -23,11 +23,17 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.server.ResponseStatusException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Controller providing UTE Student Conduct / Training Points ("Điểm rèn luyện" - DRL).
  * Follows the 5-criteria Ministry of Education & Training (MOET) framework.
  */
+@Tag(name = "Student Conduct & Training Points", description = "Điểm rèn luyện sinh viên theo 5 điều khung quy chế Bộ GD&ĐT và Quy chế công tác sinh viên HCM-UTE")
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/conduct")
@@ -39,6 +45,11 @@ public class AcademicConductController {
         this.jdbc = jdbc;
     }
 
+    @Operation(summary = "Xem tổng kết điểm rèn luyện cá nhân của sinh viên", description = "Truy vấn điểm rèn luyện tích lũy, xếp loại và lịch sử qua các học kỳ của sinh viên đang đăng nhập")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy tổng kết điểm rèn luyện thành công"),
+        @ApiResponse(responseCode = "403", description = "Chỉ sinh viên mới có quyền truy cập")
+    })
     @GetMapping("my")
     @PreAuthorize("hasRole('STUDENT')")
     public StudentConductSummaryDto getMyConductSummary(@AuthenticationPrincipal Jwt jwt) {
@@ -55,10 +66,17 @@ public class AcademicConductController {
      * lecturer can look at their own class, not so it can serve as a directory of
      * the student body.
      */
+    @Operation(summary = "Xem điểm rèn luyện của sinh viên (Admin / Giảng viên phụ trách)", description = "Quản trị viên hoặc Giảng viên giảng dạy xem chi tiết điểm rèn luyện của sinh viên theo mã SV")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy thông tin điểm rèn luyện thành công"),
+        @ApiResponse(responseCode = "403", description = "Không có thẩm quyền xem sinh viên ngoài danh sách lớp phụ trách"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy hồ sơ sinh viên")
+    })
     @GetMapping("student/{studentId}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
     public StudentConductSummaryDto getStudentConductSummary(
-            @PathVariable String studentId, @AuthenticationPrincipal Jwt actor) {
+            @Parameter(description = "Mã định danh hoặc Mã số sinh viên (MSSV)", required = true) @PathVariable String studentId,
+            @AuthenticationPrincipal Jwt actor) {
         requireConductReadAccess(studentId, actor);
         return buildStudentConductSummary(studentId);
     }
@@ -92,11 +110,16 @@ public class AcademicConductController {
         }
     }
 
+    @Operation(summary = "Xem chi tiết điểm rèn luyện học kỳ của cá nhân", description = "Truy xuất chi tiết điểm 5 tiêu chí thành phần và danh sách hoạt động phong trào sinh viên đã tham gia trong học kỳ")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy điểm học kỳ thành công"),
+        @ApiResponse(responseCode = "404", description = "Không có dữ liệu điểm rèn luyện trong học kỳ")
+    })
     @GetMapping("my/semester/{semesterId}")
     @PreAuthorize("hasRole('STUDENT')")
     public ConductSemesterScoreDto getMySemesterScore(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String semesterId) {
+            @Parameter(description = "Mã định danh học kỳ (UUID)", required = true) @PathVariable String semesterId) {
         String studentProfileId = resolveStudentProfileId(jwt);
         return loadSemesterScore(studentProfileId, semesterId);
     }

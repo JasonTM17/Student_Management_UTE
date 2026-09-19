@@ -20,6 +20,7 @@ import org.springframework.transaction.annotation.Transactional;
 @Profile("persistence")
 public class AdminCatalogMutationService {
 
+    private static final String FACULTY = "\"academic\".\"Faculty\"";
     private static final String DEPARTMENT = "\"academic\".\"Department\"";
     private static final String ACADEMIC_YEAR = "\"academic\".\"AcademicYear\"";
     private static final String SEMESTER = "\"academic\".\"Semester\"";
@@ -43,7 +44,13 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createDepartment(Map<String, Object> input) {
         String id = id(input);
         required(input, "name");
-        String facultyId = text(input, "facultyId", "faculty-demo");
+        String facultyId = text(input, "facultyId", null);
+        if (facultyId == null || facultyId.isBlank()) {
+            List<String> ids = jdbc.getJdbcTemplate().query(
+                    "SELECT \"id\" FROM " + FACULTY + " LIMIT 1",
+                    (rs, rowNum) -> rs.getString("id"));
+            facultyId = ids.isEmpty() ? "faculty-demo" : ids.get(0);
+        }
         jdbc.update(
                 "INSERT INTO " + DEPARTMENT
                         + " (\"id\", \"name\", \"nameEn\", \"nameVi\", \"code\", \"description\", \"descriptionEn\", \"descriptionVi\", \"facultyId\")"
@@ -78,13 +85,20 @@ public class AdminCatalogMutationService {
         required(input, "name");
         int credits = number(input, "credits", 3);
         requireCreditsInRange(credits);
+        String departmentId = text(input, "departmentId", null);
+        if (departmentId == null || departmentId.isBlank()) {
+            List<String> ids = jdbc.getJdbcTemplate().query(
+                    "SELECT \"id\" FROM " + DEPARTMENT + " LIMIT 1",
+                    (rs, rowNum) -> rs.getString("id"));
+            departmentId = ids.isEmpty() ? "department-demo" : ids.get(0);
+        }
         jdbc.update(
                 "INSERT INTO " + COURSE
                         + " (\"id\", \"code\", \"name\", \"nameEn\", \"nameVi\", \"description\", \"descriptionEn\", \"descriptionVi\", \"credits\", \"departmentId\")"
                         + " VALUES (:id, :code, :name, :nameEn, :nameVi, :description, :descriptionEn, :descriptionVi, :credits, :departmentId)",
                 params(input, id)
                         .addValue("credits", credits)
-                        .addValue("departmentId", text(input, "departmentId", "department-demo")));
+                        .addValue("departmentId", departmentId));
         return get(COURSE, id);
     }
 
@@ -105,7 +119,13 @@ public class AdminCatalogMutationService {
     public Map<String, Object> createSemester(Map<String, Object> input) {
         String id = id(input);
         required(input, "name");
-        String academicYearId = text(input, "academicYearId", "academic-year-demo");
+        String academicYearId = text(input, "academicYearId", null);
+        if (academicYearId == null || academicYearId.isBlank()) {
+            List<String> ids = jdbc.getJdbcTemplate().query(
+                    "SELECT \"id\" FROM " + ACADEMIC_YEAR + " ORDER BY \"isCurrent\" DESC, \"year\" DESC LIMIT 1",
+                    (rs, rowNum) -> rs.getString("id"));
+            academicYearId = ids.isEmpty() ? "academic-year-demo" : ids.get(0);
+        }
         validateSemesterDates(null, academicYearId,
                 input.get("startDate"), input.get("endDate"),
                 input.get("registrationStart"), input.get("registrationEnd"));

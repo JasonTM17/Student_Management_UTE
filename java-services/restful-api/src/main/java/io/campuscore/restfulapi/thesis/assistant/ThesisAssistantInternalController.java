@@ -28,7 +28,9 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
+@Tag(name = "Internal Service Mesh (RAG)", description = "Private service-to-service endpoints for internal microservice communication")
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.rag", name = "service-mode", havingValue = "true")

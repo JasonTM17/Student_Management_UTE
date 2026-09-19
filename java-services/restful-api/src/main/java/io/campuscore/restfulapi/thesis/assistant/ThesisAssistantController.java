@@ -28,10 +28,16 @@ import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.ResponseStatus;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.servlet.mvc.method.annotation.SseEmitter;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 
 /** Owner-scoped JSON/SSE assistant contract for web and mobile clients. */
+@Tag(name = "AI Academic Assistant (RAG)", description = "Trợ lý AI học vụ HCM-UTE: hỏi đáp quy chế đào tạo, tư vấn đề tài khóa luận qua giao thức JSON / Server-Sent Events (SSE)")
 @RestController
 @Profile("persistence")
 @RequestMapping({"/api/v1/assistant", "/api/v1/thesis/assistant"})
@@ -61,6 +67,12 @@ public class ThesisAssistantController {
         this.personalContext = personalContext;
     }
 
+    @Operation(summary = "Gửi câu hỏi tới Trợ lý AI (JSON Block Mode)", description = "Hỏi đáp quy chế đào tạo, thời khóa biểu, tiến độ và đề tài khóa luận với mô hình AI RAG")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nhận phản hồi từ trợ lý AI"),
+        @ApiResponse(responseCode = "400", description = "Tin nhắn không hợp lệ"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực danh tính")
+    })
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
@@ -106,6 +118,10 @@ public class ThesisAssistantController {
                 return thread;
             });
 
+    @Operation(summary = "Hỏi đáp tương tác thời gian thực (SSE Stream)", description = "Truyền luồng phản hồi từ trợ lý AI qua Server-Sent Events (SSE) kèm heartbeat giữ kết nối và bảo vệ prompt injection")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Mở luồng SSE thành công", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE))
+    })
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
@@ -160,9 +176,15 @@ public class ThesisAssistantController {
         return emitter;
     }
 
+    @Operation(summary = "Hủy yêu cầu trả lời đang xử lý", description = "Hủy lượt phản hồi của model dựa trên clientRequestId của lượt gọi")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Hủy thành công")
+    })
     @PostMapping("/requests/{clientRequestId}/cancel")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
-    public CancelResponse cancel(@PathVariable UUID clientRequestId, @AuthenticationPrincipal Jwt actor) {
+    public CancelResponse cancel(
+            @Parameter(description = "Mã định danh yêu cầu của client (UUID)", required = true) @PathVariable UUID clientRequestId,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
         if (remoteRag()) {
             return ragGateway.cancel(clientRequestId, owner);
@@ -180,9 +202,15 @@ public class ThesisAssistantController {
         return new CancelResponse(clientRequestId, result.status());
     }
 
+    @Operation(summary = "Gửi đánh giá câu trả lời của AI", description = "Người dùng xếp hạng hữu ích (like/dislike) và gửi lý do góp ý")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Gửi đánh giá thành công")
+    })
     @PutMapping("/messages/{messageId}/feedback")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
-    public FeedbackResponse feedback(@PathVariable UUID messageId, @Valid @RequestBody FeedbackRequest request,
+    public FeedbackResponse feedback(
+            @Parameter(description = "Mã định danh tin nhắn AI (UUID)", required = true) @PathVariable UUID messageId,
+            @Valid @RequestBody FeedbackRequest request,
             @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
         if (remoteRag()) {
@@ -192,10 +220,16 @@ public class ThesisAssistantController {
         return new FeedbackResponse(messageId, request.rating(), request.reason(), false);
     }
 
+    @Operation(summary = "Xóa đánh giá câu trả lời của AI", description = "Hủy xếp hạng đã gửi cho tin nhắn")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Xóa đánh giá thành công")
+    })
     @DeleteMapping("/messages/{messageId}/feedback")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteFeedback(@PathVariable UUID messageId, @AuthenticationPrincipal Jwt actor) {
+    public void deleteFeedback(
+            @Parameter(description = "Mã định danh tin nhắn (UUID)", required = true) @PathVariable UUID messageId,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
         if (remoteRag()) {
             ragGateway.deleteFeedback(messageId, owner);
@@ -204,11 +238,17 @@ public class ThesisAssistantController {
         assistant.deleteFeedback(messageId, owner);
     }
 
+    @Operation(summary = "Danh sách phiên hội thoại của người dùng", description = "Truy vấn danh sách các cuộc trò chuyện trước đây kèm con trỏ phân trang")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy danh sách phiên hội thoại thành công")
+    })
     @GetMapping("/conversations")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public List<ThesisAssistantRepository.Conversation> conversations(
-            @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) String cursor, HttpServletResponse response) {
+            @AuthenticationPrincipal Jwt actor,
+            @Parameter(description = "Giới hạn số bản ghi") @RequestParam(required = false) Integer limit,
+            @Parameter(description = "Con trỏ phân trang cursor") @RequestParam(required = false) String cursor,
+            HttpServletResponse response) {
         String owner = subject(actor);
         if (remoteRag()) {
             RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Conversation>> page =
@@ -221,6 +261,10 @@ public class ThesisAssistantController {
         return page.data();
     }
 
+    @Operation(summary = "Tạo mới phiên hội thoại", description = "Khởi tạo phiên hội thoại mới với ngôn ngữ chỉ định (vi/en)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tạo phiên thành công")
+    })
     @PostMapping("/conversations")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     public ConversationCreated createConversation(@RequestBody(required = false) CreateConversationRequest request,
@@ -237,11 +281,18 @@ public class ThesisAssistantController {
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
+    @Operation(summary = "Lấy lịch sử tin nhắn trong phiên hội thoại", description = "Truy xuất danh sách tin nhắn hỏi và đáp theo thứ tự thời gian")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy lịch sử tin nhắn thành công")
+    })
     @GetMapping("/conversations/{id}/messages")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
-    public List<ThesisAssistantRepository.Message> messages(@PathVariable UUID id,
-            @AuthenticationPrincipal Jwt actor, @RequestParam(required = false) Integer limit,
-            @RequestParam(required = false) String cursor, HttpServletResponse response) {
+    public List<ThesisAssistantRepository.Message> messages(
+            @Parameter(description = "Mã định danh phiên hội thoại (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor,
+            @Parameter(description = "Giới hạn số tin nhắn") @RequestParam(required = false) Integer limit,
+            @Parameter(description = "Con trỏ phân trang cursor") @RequestParam(required = false) String cursor,
+            HttpServletResponse response) {
         String owner = subject(actor);
         if (remoteRag()) {
             RagAssistantGateway.RemotePage<List<ThesisAssistantRepository.Message>> page =
@@ -254,10 +305,16 @@ public class ThesisAssistantController {
         return page.data();
     }
 
+    @Operation(summary = "Xóa phiên hội thoại", description = "Xóa vĩnh viễn cuộc trò chuyện và toàn bộ lịch sử tin nhắn tương ứng")
+    @ApiResponses({
+        @ApiResponse(responseCode = "204", description = "Xóa phiên thành công")
+    })
     @DeleteMapping("/conversations/{id}")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
-    public void deleteConversation(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public void deleteConversation(
+            @Parameter(description = "Mã định danh phiên hội thoại (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = subject(actor);
         if (remoteRag()) {
             ragGateway.deleteConversation(id, owner);
