@@ -26,6 +26,7 @@ import {
   formatAnnouncementPublisher,
   formatRelativeTime,
   resolveAnnouncementDomain,
+  resolveArticleCover,
 } from '@/lib/announcement-presentation';
 
 interface AnnouncementFeedCardProps {
@@ -50,11 +51,12 @@ export function AnnouncementFeedCard({
 
   const domain = resolveAnnouncementDomain(announcement, locale);
   const readingTime = calculateReadingTime(announcement.content);
-  const coverImage = extractCoverImage(announcement.content);
+  const coverImage = resolveArticleCover(announcement);
   const sapo = extractAnnouncementExcerpt(
     announcement.content,
     variant === 'featured' ? 240 : 130,
   );
+
   const publisher = formatAnnouncementPublisher(announcement.publishedBy, locale);
   const relativeTime = formatRelativeTime(
     announcement.publishAt || announcement.createdAt,

@@ -26,6 +26,7 @@ import {
   formatAnnouncementPublisher,
   formatRelativeTime,
   resolveAnnouncementDomain,
+  resolveArticleCover,
   stripFirstCoverImage,
 } from '@/lib/announcement-presentation';
 import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
@@ -52,8 +53,9 @@ export function EditorialArticleMagazine({
   const domain = resolveAnnouncementDomain(announcement, locale);
   const readingTime = calculateReadingTime(announcement.content);
   const coverDetails = extractCoverImageDetails(announcement.content);
-  const coverImage = coverDetails?.url || extractCoverImage(announcement.content);
+  const coverImage = coverDetails?.url || extractCoverImage(announcement.content) || resolveArticleCover(announcement);
   const bodyContent = coverImage ? stripFirstCoverImage(announcement.content) : announcement.content;
+
   const sapo = extractAnnouncementExcerpt(announcement.content, 220);
   const publisher = formatAnnouncementPublisher(announcement.publishedBy, locale);
   const relativeTime = formatRelativeTime(announcement.publishAt || announcement.createdAt, locale);

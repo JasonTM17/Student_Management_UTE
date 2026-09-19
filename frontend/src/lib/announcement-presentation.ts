@@ -339,52 +339,163 @@ export function formatAnnouncementPublisher(
   return trimmed;
 }
 
+export type ArticleCategoryCode =
+  | 'RESEARCH_TECH'
+  | 'AWARDS_HONORS'
+  | 'STUDENT_LIFE'
+  | 'CULTURE_ARTS'
+  | 'ACADEMIC_AFFAIRS'
+  | 'CAREER_OPPORTUNITIES';
+
+export interface ArticleCategoryMeta {
+  code: ArticleCategoryCode;
+  nameVi: string;
+  nameEn: string;
+  colorTone: 'cyan' | 'emerald' | 'amber' | 'rose' | 'indigo' | 'purple';
+  iconType: 'flask' | 'award' | 'users' | 'sparkles' | 'book' | 'briefcase';
+  accentGradient: string;
+}
+
+export const INSTITUTIONAL_ARTICLE_CATEGORIES: Record<ArticleCategoryCode, ArticleCategoryMeta> = {
+  RESEARCH_TECH: {
+    code: 'RESEARCH_TECH',
+    nameVi: 'Nghiên cứu & Công nghệ',
+    nameEn: 'Research & Technology',
+    colorTone: 'cyan',
+    iconType: 'flask',
+    accentGradient: 'from-cyan-600 via-teal-600 to-blue-700',
+  },
+  AWARDS_HONORS: {
+    code: 'AWARDS_HONORS',
+    nameVi: 'Học bổng & Khen thưởng',
+    nameEn: 'Scholarships & Honors',
+    colorTone: 'emerald',
+    iconType: 'award',
+    accentGradient: 'from-emerald-600 via-teal-600 to-green-700',
+  },
+  STUDENT_LIFE: {
+    code: 'STUDENT_LIFE',
+    nameVi: 'Đời sống Sinh viên',
+    nameEn: 'Student Life & Youth',
+    colorTone: 'amber',
+    iconType: 'users',
+    accentGradient: 'from-amber-600 via-orange-600 to-red-600',
+  },
+  CULTURE_ARTS: {
+    code: 'CULTURE_ARTS',
+    nameVi: 'Văn hóa & Nghệ thuật',
+    nameEn: 'Culture & Arts',
+    colorTone: 'rose',
+    iconType: 'sparkles',
+    accentGradient: 'from-rose-600 via-pink-600 to-purple-700',
+  },
+  ACADEMIC_AFFAIRS: {
+    code: 'ACADEMIC_AFFAIRS',
+    nameVi: 'Đào tạo & Học vụ',
+    nameEn: 'Academic Affairs',
+    colorTone: 'indigo',
+    iconType: 'book',
+    accentGradient: 'from-indigo-600 via-blue-600 to-slate-800',
+  },
+  CAREER_OPPORTUNITIES: {
+    code: 'CAREER_OPPORTUNITIES',
+    nameVi: 'Cơ hội Việc làm',
+    nameEn: 'Career & Industry',
+    colorTone: 'purple',
+    iconType: 'briefcase',
+    accentGradient: 'from-purple-600 via-violet-600 to-indigo-700',
+  },
+};
+
 export type AnnouncementDomainType = 'OFFICIAL_DISPATCH' | 'EDITORIAL_ARTICLE';
 
 export interface DomainResolution {
   domain: AnnouncementDomainType;
+  categoryCode: ArticleCategoryCode;
   categoryLabel: string;
   categoryTone: 'primary' | 'info' | 'success' | 'warning' | 'danger';
-  iconType: 'document' | 'newspaper' | 'award' | 'flask' | 'calendar' | 'briefcase';
+  iconType: 'document' | 'newspaper' | 'award' | 'flask' | 'calendar' | 'briefcase' | 'users' | 'sparkles' | 'book';
   accentGradient: string;
 }
 
 /**
- * Intelligently classifies an announcement into:
- * - OFFICIAL_DISPATCH: Formal institutional decree (NĐ 30/2020) for academic affairs, regulations, exams
- * - EDITORIAL_ARTICLE: Engaging academic magazine/news for tech talks, research, competitions, scholarships, jobs
+ * Intelligently classifies an announcement into institutional categories and domains
  */
 export function resolveAnnouncementDomain(
-  announcement: Pick<AnnouncementRecord, 'title' | 'content' | 'publishedBy'> & { documentType?: string },
+  announcement: Pick<AnnouncementRecord, 'title' | 'content' | 'publishedBy'> & { documentType?: string; categoryId?: string | null },
   locale: Locale = 'vi',
 ): DomainResolution {
   const isVi = locale === 'vi';
-
-  // 1. Explicit flag if present
-  if (announcement.documentType === 'EDITORIAL') {
-    return {
-      domain: 'EDITORIAL_ARTICLE',
-      categoryLabel: isVi ? 'Tin tức & Học thuật' : 'Academic News',
-      categoryTone: 'primary',
-      iconType: 'newspaper',
-      accentGradient: 'from-blue-600 to-indigo-700',
-    };
-  }
-  if (announcement.documentType === 'OFFICIAL') {
-    return {
-      domain: 'OFFICIAL_DISPATCH',
-      categoryLabel: isVi ? 'Công văn e-Office' : 'Official Dispatch',
-      categoryTone: 'danger',
-      iconType: 'document',
-      accentGradient: 'from-red-600 to-rose-700',
-    };
-  }
-
   const title = (announcement.title || '').toLowerCase();
   const publisher = (announcement.publishedBy || '').toLowerCase();
   const content = (announcement.content || '').toLowerCase();
 
-  // Strict administrative indicators
+  // 1. Check categoryId explicit mapping if present
+  if (announcement.categoryId) {
+    const cat = announcement.categoryId.toLowerCase();
+    if (cat.includes('research') || cat.includes('tech')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'RESEARCH_TECH',
+        categoryLabel: isVi ? 'Nghiên cứu & Công nghệ' : 'Research & Tech',
+        categoryTone: 'info',
+        iconType: 'flask',
+        accentGradient: 'from-cyan-600 via-blue-600 to-indigo-700',
+      };
+    }
+    if (cat.includes('award') || cat.includes('honor')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'AWARDS_HONORS',
+        categoryLabel: isVi ? 'Học bổng & Khen thưởng' : 'Scholarships & Honors',
+        categoryTone: 'success',
+        iconType: 'award',
+        accentGradient: 'from-emerald-600 via-teal-600 to-green-700',
+      };
+    }
+    if (cat.includes('student') || cat.includes('life')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'STUDENT_LIFE',
+        categoryLabel: isVi ? 'Đời sống Sinh viên' : 'Student Life',
+        categoryTone: 'warning',
+        iconType: 'users',
+        accentGradient: 'from-amber-600 via-orange-600 to-red-600',
+      };
+    }
+    if (cat.includes('culture') || cat.includes('art')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'CULTURE_ARTS',
+        categoryLabel: isVi ? 'Văn hóa & Nghệ thuật' : 'Culture & Arts',
+        categoryTone: 'primary',
+        iconType: 'sparkles',
+        accentGradient: 'from-rose-600 via-pink-600 to-purple-700',
+      };
+    }
+    if (cat.includes('career') || cat.includes('job')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'CAREER_OPPORTUNITIES',
+        categoryLabel: isVi ? 'Cơ hội Việc làm' : 'Career & Industry',
+        categoryTone: 'primary',
+        iconType: 'briefcase',
+        accentGradient: 'from-purple-600 via-violet-600 to-indigo-700',
+      };
+    }
+    if (cat.includes('academic') || cat.includes('affair')) {
+      return {
+        domain: 'EDITORIAL_ARTICLE',
+        categoryCode: 'ACADEMIC_AFFAIRS',
+        categoryLabel: isVi ? 'Đào tạo & Học vụ' : 'Academic Affairs',
+        categoryTone: 'primary',
+        iconType: 'book',
+        accentGradient: 'from-indigo-600 via-blue-700 to-slate-800',
+      };
+    }
+  }
+
+  // 2. Strict administrative indicators
   const isStrictAdmin =
     title.startsWith('quyết định') ||
     title.includes('kế hoạch mở cổng đăng ký') ||
@@ -396,6 +507,7 @@ export function resolveAnnouncementDomain(
   if (isStrictAdmin) {
     return {
       domain: 'OFFICIAL_DISPATCH',
+      categoryCode: 'ACADEMIC_AFFAIRS',
       categoryLabel: isVi ? 'Công văn Đào tạo & Khảo thí' : 'Academic Dispatch',
       categoryTone: 'danger',
       iconType: 'document',
@@ -403,10 +515,44 @@ export function resolveAnnouncementDomain(
     };
   }
 
-  // Editorial domains
-  if (title.includes('học bổng') || content.includes('học bổng khuyến khích')) {
+  // 3. Culture & Arts
+  if (title.includes('20/11') || title.includes('nhà giáo') || title.includes('nghệ thuật') || title.includes('nhạc hội') || title.includes('hoa sen')) {
     return {
       domain: 'EDITORIAL_ARTICLE',
+      categoryCode: 'CULTURE_ARTS',
+      categoryLabel: isVi ? 'Văn hóa & Nghệ thuật' : 'Culture & Arts',
+      categoryTone: 'primary',
+      iconType: 'sparkles',
+      accentGradient: 'from-rose-600 via-pink-600 to-purple-700',
+    };
+  }
+
+  // 4. Student Life & Community
+  if (
+    title.includes('mùa hè xanh') ||
+    title.includes('tình nguyện') ||
+    title.includes('bóng đá') ||
+    title.includes('champions cup') ||
+    title.includes('hiến máu') ||
+    title.includes('giọt hồng') ||
+    title.includes('ký túc xá') ||
+    title.includes('ktx')
+  ) {
+    return {
+      domain: 'EDITORIAL_ARTICLE',
+      categoryCode: 'STUDENT_LIFE',
+      categoryLabel: isVi ? 'Đời sống Sinh viên' : 'Student Life',
+      categoryTone: 'warning',
+      iconType: 'users',
+      accentGradient: 'from-amber-600 via-orange-600 to-red-600',
+    };
+  }
+
+  // 5. Awards & Honors
+  if (title.includes('học bổng') || content.includes('học bổng khuyến khích') || title.includes('tôn vinh') || title.includes('giảng viên xuất sắc') || title.includes('tiêu biểu')) {
+    return {
+      domain: 'EDITORIAL_ARTICLE',
+      categoryCode: 'AWARDS_HONORS',
       categoryLabel: isVi ? 'Học bổng & Khen thưởng' : 'Scholarships & Honors',
       categoryTone: 'success',
       iconType: 'award',
@@ -414,7 +560,16 @@ export function resolveAnnouncementDomain(
     };
   }
 
+  // 6. Research & Tech
   if (
+    title.includes('bán dẫn') ||
+    title.includes('vi mạch') ||
+    title.includes('cleanroom') ||
+    title.includes('robotics') ||
+    title.includes('tự động hóa') ||
+    title.includes('iot') ||
+    title.includes('ieee') ||
+    title.includes('hackathon') ||
     title.includes('khởi động') ||
     title.includes('nghiên cứu') ||
     title.includes('big data') ||
@@ -424,6 +579,7 @@ export function resolveAnnouncementDomain(
   ) {
     return {
       domain: 'EDITORIAL_ARTICLE',
+      categoryCode: 'RESEARCH_TECH',
       categoryLabel: isVi ? 'Nghiên cứu & Công nghệ' : 'Research & Tech',
       categoryTone: 'info',
       iconType: 'flask',
@@ -431,6 +587,7 @@ export function resolveAnnouncementDomain(
     };
   }
 
+  // 7. Career
   if (
     title.includes('ngày hội') ||
     title.includes('tuyển dụng') ||
@@ -440,6 +597,7 @@ export function resolveAnnouncementDomain(
   ) {
     return {
       domain: 'EDITORIAL_ARTICLE',
+      categoryCode: 'CAREER_OPPORTUNITIES',
       categoryLabel: isVi ? 'Sự kiện & Hướng nghiệp' : 'Career & Events',
       categoryTone: 'warning',
       iconType: 'briefcase',
@@ -447,30 +605,116 @@ export function resolveAnnouncementDomain(
     };
   }
 
+  // 8. Academic Affairs / Library / Graduation
   if (
-    title.includes('hội thảo') ||
-    title.includes('seminar') ||
-    title.includes('hackathon') ||
-    title.includes('cuộc thi')
+    title.includes('thư viện') ||
+    title.includes('tốt nghiệp') ||
+    title.includes('trao bằng') ||
+    title.includes('khóa luận') ||
+    title.includes('kltn') ||
+    title.includes('học phần')
   ) {
     return {
       domain: 'EDITORIAL_ARTICLE',
-      categoryLabel: isVi ? 'Hội thảo & Sự kiện' : 'Seminars & Events',
+      categoryCode: 'ACADEMIC_AFFAIRS',
+      categoryLabel: isVi ? 'Đào tạo & Học vụ' : 'Academic Affairs',
       categoryTone: 'primary',
-      iconType: 'newspaper',
-      accentGradient: 'from-violet-600 to-purple-700',
+      iconType: 'book',
+      accentGradient: 'from-indigo-600 to-blue-700',
     };
   }
 
   // Default to official dispatch
   return {
     domain: 'OFFICIAL_DISPATCH',
+    categoryCode: 'ACADEMIC_AFFAIRS',
     categoryLabel: isVi ? 'Văn bản Hành chính' : 'Official Notice',
     categoryTone: 'danger',
     iconType: 'document',
     accentGradient: 'from-blue-700 to-slate-800',
   };
 }
+
+/**
+ * Resolves the primary 16:9 editorial cover image for an announcement:
+ * 1. Checks explicit coverImageUrl
+ * 2. Checks extracted image in content
+ * 3. Intelligently falls back to our 18 authentic editorial photography assets
+ */
+export function resolveArticleCover(
+  announcement: Pick<AnnouncementRecord, 'title' | 'content'> & { coverImageUrl?: string | null },
+): string {
+  if (announcement.coverImageUrl && typeof announcement.coverImageUrl === 'string' && announcement.coverImageUrl.trim()) {
+    return announcement.coverImageUrl.trim();
+  }
+
+  const extracted = extractCoverImage(announcement.content);
+  if (extracted) {
+    return extracted;
+  }
+
+  const title = (announcement.title || '').toLowerCase();
+  const content = (announcement.content || '').toLowerCase();
+
+  // Keyword-to-photo matching
+  if (title.includes('bán dẫn') || title.includes('vi mạch') || title.includes('cleanroom') || title.includes('semiconductor')) {
+    return '/images/news/semiconductor-cleanroom.jpg';
+  }
+  if (title.includes('robotics') || title.includes('robot') || title.includes('tự động hóa') || title.includes('iot')) {
+    return '/images/news/robotics-iot-lab.jpg';
+  }
+  if (title.includes('mùa hè xanh') || title.includes('tình nguyện') || title.includes('nông thôn')) {
+    return '/images/news/green-summer-volunteer.jpg';
+  }
+  if (title.includes('bóng đá') || title.includes('champions cup') || title.includes('thể thao')) {
+    return '/images/news/campus-sports-cup.jpg';
+  }
+  if (title.includes('20/11') || title.includes('nhà giáo') || title.includes('tri ân') || title.includes('nghệ thuật') || title.includes('nhạc hội')) {
+    return '/images/news/cultural-arts-gala.jpg';
+  }
+  if (title.includes('ieee') || title.includes('stem') || title.includes('hội nghị quốc tế') || title.includes('keynote')) {
+    return '/images/news/stem-conference-keynote.jpg';
+  }
+  if (title.includes('hackathon') || title.includes('đổi mới sáng tạo') || title.includes('48 giờ') || title.includes('48h')) {
+    return '/images/news/ai-hackathon-arena.jpg';
+  }
+  if (title.includes('thư viện') || title.includes('learning commons') || title.includes('học liệu')) {
+    return '/images/news/campus-digital-library.jpg';
+  }
+  if (title.includes('tốt nghiệp') || title.includes('trao bằng') || title.includes('tân khoa') || title.includes('commencement')) {
+    return '/images/news/commencement-graduation.jpg';
+  }
+  if (title.includes('hiến máu') || title.includes('giọt hồng') || title.includes('chữ thập đỏ') || title.includes('nhân đạo')) {
+    return '/images/news/blood-donation-day.jpg';
+  }
+  if (title.includes('ktx') || title.includes('ký túc xá') || title.includes('nội trú') || title.includes('dormitory')) {
+    return '/images/news/student-dormitory-campus.jpg';
+  }
+  if (title.includes('tôn vinh') || title.includes('giảng viên xuất sắc') || title.includes('nhà khoa học tiêu biểu') || title.includes('excellence')) {
+    return '/images/news/faculty-excellence-awards.jpg';
+  }
+  if (title.includes('big data') || title.includes('a100') || title.includes('hpc') || (title.includes('ai') && content.includes('gpu'))) {
+    return '/images/news/bigdata-ai-lab.jpg';
+  }
+  if (title.includes('việc làm') || title.includes('tuyển dụng') || title.includes('career') || title.includes('job fair')) {
+    return '/images/news/tech-career-expo.jpg';
+  }
+  if (title.includes('học bổng') || content.includes('học bổng khuyến khích') || title.includes('khen thưởng')) {
+    return '/images/news/scholarship-ceremony.jpg';
+  }
+  if (title.includes('đăng ký học phần') || title.includes('tín chỉ') || title.includes('thời khóa biểu')) {
+    return '/images/news/course-registration.jpg';
+  }
+  if (title.includes('khóa luận') || title.includes('kltn') || title.includes('bảo vệ')) {
+    return '/images/news/thesis-defense.jpg';
+  }
+  if (title.includes('nghiên cứu khoa học') || title.includes('nckh') || title.includes('sáng tạo trẻ')) {
+    return '/images/news/scientific-research.jpg';
+  }
+
+  return '/images/news/bigdata-ai-lab.jpg';
+}
+
 
 /**
  * Calculates estimated reading time in minutes and total word count.
