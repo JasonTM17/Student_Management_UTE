@@ -102,7 +102,8 @@ class AnnouncementReadPersistenceTest {
                     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "version" INTEGER NOT NULL DEFAULT 0,
                     "archivedAt" TIMESTAMP WITH TIME ZONE,
-                    "archivedBy" VARCHAR(120)
+                    "archivedBy" VARCHAR(120),
+                    "displayOrder" INTEGER
                 )
                 """);
     }

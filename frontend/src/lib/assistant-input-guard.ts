@@ -2,13 +2,14 @@
  * Client-side mirror of the server AssistantInputGuard
  * (java-services/.../thesis/assistant/AssistantInputGuard.java).
  *
- * The chatbot routes many personal-data questions through the local student
- * resolver before any server turn is created. Without this mirror, a message
- * that matches a resolver intent regex (for example the Vietnamese word
- * "hướng dẫn" inside "bỏ qua tất cả hướng dẫn...") reached a canned answer
- * while the server guard would have refused it. Keeping a copy of the same
- * deterministic checks on the client guarantees the guard applies to every
- * turn, whichever engine answers it.
+ * The local student resolver still answers trivial smalltalk (greetings,
+ * capabilities, thanks, goodbyes) client-side without creating a server turn,
+ * and smalltalk phrasings can carry injection or sensitive content (for
+ * example the Vietnamese word "hướng dẫn" inside "bỏ qua tất cả hướng
+ * dẫn..."). Personal-data questions now stream to the backend, which re-runs
+ * the server guard, but a locally answered turn would bypass it entirely.
+ * Keeping a copy of the same deterministic checks on the client guarantees
+ * the guard applies to every turn, whichever engine answers it.
  *
  * When the server patterns change, update both sides in the same commit.
  */

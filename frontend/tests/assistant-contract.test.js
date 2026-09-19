@@ -6,10 +6,6 @@ const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 
-const assistantEnrollmentStatusModule = {
-  ACTIVE_ENROLLMENT_STATUSES: ['ENROLLED', 'PENDING', 'CONFIRMED'],
-};
-
 function load(relativePath) {
   const source = fs.readFileSync(path.join(root, relativePath), 'utf8');
   const output = ts.transpileModule(source, {
@@ -187,118 +183,79 @@ test('assistant local quota override remains opt-in while production defaults st
   assert.match(configSource, /quota-enforced: \$\{ASSISTANT_QUOTA_ENFORCED:true\}/);
 });
 
-test('personalized student assistant query detection and unaccented day matching', () => {
+test('student assistant smalltalk detection and personal-data delegation', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   assert.match(source, /export function isStudentAssistantQuery/);
-  assert.match(source, /export function detectRequestedDay/);
-  assert.match(source, /GRADES_REGEX/);
-  assert.match(source, /TUITION_REGEX/);
-  assert.match(source, /THESIS_REGEX/);
-  assert.match(source, /CURRICULUM_REGEX/);
-  assert.match(source, /PROFILE_REGEX/);
-  assert.match(source, /TEACHING_REGEX/);
+  assert.match(source, /export async function resolveStudentAssistantQuery/);
+  // Trivial smalltalk regexes stay client-side.
+  assert.match(source, /GREETING_REGEX/);
+  assert.match(source, /CAPABILITIES_REGEX/);
+  assert.match(source, /THANK_YOU_REGEX/);
+  assert.match(source, /GOODBYE_REGEX/);
+  // Personal-data intents moved to the backend: the client resolver no longer
+  // owns schedule, materials, grades, conduct, tuition, announcement, thesis,
+  // curriculum, registration, teaching, or profile branches, and it no longer
+  // fetches portal APIs to compose answers.
+  assert.doesNotMatch(source, /GRADES_REGEX|SCHEDULE_REGEX|CONDUCT_REGEX|TUITION_REGEX|THESIS_REGEX|CURRICULUM_REGEX|PROFILE_REGEX|TEACHING_REGEX|ANNOUNCEMENT_REGEX|MATERIALS_REGEX|REGISTRATION_REGEX|PAST_THESIS_REGEX/);
+  assert.doesNotMatch(source, /enrollmentsApi|gradesApi|conductApi|announcementsApi|registrationApi|sectionsApi|curriculumApi|thesisApi/);
 
-  // Extract functions for runtime assertion
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const moduleRecord = { exports: {} };
   // Mock external API modules imported by assistant-student-resolver
-  const fakeRequire = (moduleName) => {
-    return {};
-  };
+  const fakeRequire = () => ({});
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, fakeRequire);
-  const { isStudentAssistantQuery, detectRequestedDay } = moduleRecord.exports;
+  const { isStudentAssistantQuery, resolveStudentAssistantQuery } = moduleRecord.exports;
 
-  // 1. Day detection (accented and unaccented)
-  assert.equal(detectRequestedDay('Lịch thứ 2 của tôi là khi nào'), 2);
-  assert.equal(detectRequestedDay('lich thu 2 cua toi la khi nao'), 2);
-  assert.equal(detectRequestedDay('t2 co tiet khong'), 2);
-  assert.equal(detectRequestedDay('monday classes'), 2);
-
-  assert.equal(detectRequestedDay('thứ 3 học phòng nào'), 3);
-  assert.equal(detectRequestedDay('thu 3 hoc o dau'), 3);
-  assert.equal(detectRequestedDay('t3 co mon gi'), 3);
-
-  assert.equal(detectRequestedDay('thứ 4 có học không'), 4);
-  assert.equal(detectRequestedDay('thu tu co lop khong'), 4);
-  assert.equal(detectRequestedDay('thu 4 co tiet khong'), 4);
-
-  assert.equal(detectRequestedDay('thứ 5 học gì'), 5);
-  assert.equal(detectRequestedDay('thu nam hoc gi'), 5);
-
-  assert.equal(detectRequestedDay('thứ 6 có môn gì'), 6);
-  assert.equal(detectRequestedDay('thu 6 co mon gi'), 6);
-
-  assert.equal(detectRequestedDay('thứ 7 học mấy giờ'), 7);
-  assert.equal(detectRequestedDay('thu bay hoc may gio'), 7);
-
-  assert.equal(detectRequestedDay('chủ nhật có học không'), 1);
-  assert.equal(detectRequestedDay('chu nhat co lop khong'), 1);
-  assert.equal(detectRequestedDay('cn co lich khong'), 1);
-
-  // 2. Query detection coverage
-  assert.equal(isStudentAssistantQuery('lịch thứ 2 của tôi là khi nào'), true);
-  assert.equal(isStudentAssistantQuery('lich thu 2 cua toi'), true);
-  assert.equal(isStudentAssistantQuery('điểm của tôi thế nào'), true);
-  assert.equal(isStudentAssistantQuery('diem gpa cua toi'), true);
-  assert.equal(isStudentAssistantQuery('bảng điểm học kỳ'), true);
-  assert.equal(isStudentAssistantQuery('học phí của tôi còn nợ không'), true);
-  assert.equal(isStudentAssistantQuery('hoc phi ky nay bao nhieu'), true);
-  assert.equal(isStudentAssistantQuery('đồ án tốt nghiệp của tôi'), true);
-  assert.equal(isStudentAssistantQuery('do an tot nghiep'), true);
-  assert.equal(isStudentAssistantQuery('thông tin sinh viên của tôi'), true);
-  assert.equal(isStudentAssistantQuery('mssv cua toi la gi'), true);
-  assert.equal(isStudentAssistantQuery('chương trình đào tạo của tôi'), true);
-  assert.equal(isStudentAssistantQuery('lớp tôi đang dạy'), true);
-  assert.equal(isStudentAssistantQuery('lop toi dang day'), true);
-  assert.equal(isStudentAssistantQuery('Hạn nộp điểm GVPB là khi nào?'), true);
+  // 1. Smalltalk detection still works (accented + unaccented, vi + en).
+  for (const greeting of ['xin chào', 'hello', 'chào bạn', 'chao ban', 'chào buổi sáng', 'good morning']) {
+    assert.equal(isStudentAssistantQuery(greeting), true, greeting);
+  }
+  assert.equal(isStudentAssistantQuery('bạn là ai'), true);
+  assert.equal(isStudentAssistantQuery('bạn có thể làm được gì'), true);
+  assert.equal(isStudentAssistantQuery('what can you do'), true);
+  assert.equal(isStudentAssistantQuery('cảm ơn'), true);
+  assert.equal(isStudentAssistantQuery('tạm biệt'), true);
   assert.equal(isStudentAssistantQuery('What is the deadline for my assignment?'), false);
-  // A bare "classes" must not turn a public enrollment question into a
-  // personal schedule lookup; schedule wording stays contextual.
-  assert.equal(isStudentAssistantQuery('What classes do I have?'), true);
   assert.equal(isStudentAssistantQuery('When can I enroll in classes?'), false);
+
+  // 2. Personal-data intents are NOT answered locally: the gate returns false
+  // and the resolver returns null, so useAssistantStream forwards the message
+  // to /assistant/chat (backend personal-context advisor / RAG). Regression:
+  // every entry below used to produce a client-side answer card.
+  const personalDataQuestions = [
+    'lịch thứ 2 của tôi là khi nào',
+    'lich thu 2 cua toi',
+    'hôm nay tôi có lịch học không',
+    'Do I have classes today?',
+    'điểm của tôi thế nào',
+    'diem gpa cua toi',
+    'bảng điểm học kỳ',
+    'ĐRL của tôi bao nhiêu điểm',
+    'học phí của tôi còn nợ không',
+    'hoc phi ky nay bao nhieu',
+    'đồ án tốt nghiệp của tôi',
+    'do an tot nghiep cua toi',
+    'thông báo mới nhất cho tôi',
+    'thông tin sinh viên của tôi',
+    'mssv cua toi la gi',
+    'chương trình đào tạo của tôi',
+    'lớp tôi đang dạy',
+    'lop toi dang day',
+  ];
+  for (const question of personalDataQuestions) {
+    assert.equal(isStudentAssistantQuery(question), false, `gate must not claim personal-data question: ${question}`);
+    assert.equal(await resolveStudentAssistantQuery(question, 'vi'), null, `client composed an answer for: ${question}`);
+  }
 });
 
-test('student assistant resolves schedules and materials from portal APIs', async () => {
+test('personal schedule and materials questions stream to the backend instead of local cards (regression)', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const calls = { enrollments: 0, announcements: 0 };
-  const currentEnrollments = [
-    {
-      id: 'enrollment-se101',
-      sectionId: 'section-se101-01',
-      status: 'CONFIRMED',
-      section: {
-        sectionNumber: '01',
-        course: {
-          code: 'SE101',
-          name: 'Software Engineering',
-          nameVi: 'Kỹ thuật phần mềm',
-        },
-        schedules: [
-          {
-            dayOfWeek: 2,
-            startTime: '07:00',
-            endTime: '09:30',
-            classroom: { roomNumber: 'A101' },
-          },
-        ],
-      },
-    },
-    {
-      id: 'dropped-course',
-      sectionId: 'section-old',
-      status: 'DROPPED',
-      section: {
-        sectionNumber: '99',
-        course: { code: 'OLD101', name: 'Old course' },
-        schedules: [{ dayOfWeek: 2, startTime: '13:00', endTime: '15:00' }],
-      },
-    },
-  ];
   const fakeRequire = (moduleName) => {
     if (moduleName === '@/lib/api') {
       return {
@@ -306,45 +263,21 @@ test('student assistant resolves schedules and materials from portal APIs', asyn
         enrollmentsApi: {
           getMyEnrollments: async () => {
             calls.enrollments += 1;
-            return currentEnrollments;
+            return [];
           },
         },
         announcementsApi: {
           getMy: async () => {
             calls.announcements += 1;
-            return {
-              data: [
-                {
-                  id: 'notice-slide-week-2',
-                  title: 'Slide tuần 2',
-                  content: '<p>Tải slide và bài giảng trong thông báo lớp.</p>',
-                  priority: 'NORMAL',
-                  createdAt: '2026-09-09T00:00:00Z',
-                  isGlobal: false,
-                  sectionId: 'section-se101-01',
-                  courseCode: 'SE101',
-                },
-                {
-                  id: 'notice-unrelated',
-                  title: 'Sinh hoạt lớp',
-                  content: 'Không phải tài liệu môn học.',
-                  priority: 'NORMAL',
-                  createdAt: '2026-09-09T00:00:00Z',
-                  sectionId: 'section-other',
-                  courseCode: 'OTHER',
-                },
-              ],
-            };
+            return { data: [] };
           },
         },
         sectionsApi: { getMySchedule: async () => [] },
         curriculumApi: {},
         gradesApi: {},
         registrationApi: {},
+        conductApi: {},
       };
-    }
-    if (moduleName === '@/lib/enrollment-status') {
-      return assistantEnrollmentStatusModule;
     }
     return {};
   };
@@ -352,21 +285,17 @@ test('student assistant resolves schedules and materials from portal APIs', asyn
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, fakeRequire);
   const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
+  // Regression: schedule and materials questions used to be answered from
+  // client-side enrollmentsApi/announcementsApi fetches. They must now return
+  // null so useAssistantStream forwards the turn to the backend
+  // personal-context advisor.
   const schedule = await resolveStudentAssistantQuery('lịch thứ 2 của tôi ở phòng nào', 'vi');
-  assert.match(schedule.answer, /SE101 - Kỹ thuật phần mềm/);
-  assert.match(schedule.answer, /07:00 - 09:30/);
-  assert.match(schedule.answer, /A101/);
-  assert.doesNotMatch(schedule.answer, /OLD101/);
-
+  assert.equal(schedule, null, 'schedule question must not resolve locally');
   const materials = await resolveStudentAssistantQuery('Tài liệu môn học và slide ở đâu?', 'vi');
-  assert.match(materials.answer, /SE101 - Kỹ thuật phần mềm/);
-  assert.match(materials.answer, /Slide tuần 2 \(SE101\)/);
-  assert.match(materials.answer, /Tải slide và bài giảng/);
-  assert.doesNotMatch(materials.answer, /<p>/);
-  assert.equal(materials.citation.source, 'academic-records');
-  assert.equal(materials.citation.slug, 'materials-from-enrollments-announcements');
-  assert.ok(calls.enrollments >= 2);
-  assert.equal(calls.announcements, 1);
+  assert.equal(materials, null, 'materials question must not resolve locally');
+  // The client must not touch portal APIs while deciding either.
+  assert.equal(calls.enrollments, 0);
+  assert.equal(calls.announcements, 0);
 });
 
 test('regulation questions are never answered by the client (R1)', async () => {
@@ -376,7 +305,7 @@ test('regulation questions are never answered by the client (R1)', async () => {
   }).outputText;
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, () => ({}));
-  const { isRegulationLookup, resolveStudentAssistantQuery } = moduleRecord.exports;
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
   // Wording that used to be swallowed by the client capability menu
   // ("hướng dẫn", "giúp tôi") or by the announcements branch ("thông báo").
@@ -409,10 +338,13 @@ test('regulation questions are never answered by the client (R1)', async () => {
     'Hạn chót đăng ký học phần là khi nào?',
   ];
   for (const question of regulationQuestions) {
-    assert.equal(isRegulationLookup(question), true, `expected a regulation lookup: ${question}`);
+    const resolution = await resolveStudentAssistantQuery(question, 'vi');
+    assert.equal(resolution, null, `client composed a regulation answer for: ${question}`);
   }
 
-  // First-person record questions must stay on the client.
+  // First-person record questions also stream to the backend now: the
+  // personal-context advisor owns them, not a client-side card. Regression:
+  // these used to be answered from locally fetched API records.
   for (const question of [
     'điểm của tôi thế nào',
     'lịch thứ 2 của tôi là khi nào',
@@ -420,22 +352,8 @@ test('regulation questions are never answered by the client (R1)', async () => {
     'What is my course registration deadline?',
     'Toi dang ky hoc phan khi nao?',
   ]) {
-    assert.equal(isRegulationLookup(question), false, `expected a personal answer: ${question}`);
-  }
-
-  for (const question of [
-    'What is the enrollment deadline for courses?',
-    'When can I enroll in classes?',
-    'Khi nào đăng ký học phần?',
-    'Khi nao dang ky hoc phan?',
-  ]) {
-    assert.equal(isRegulationLookup(question), true, `expected a regulation lookup: ${question}`);
-  }
-
-  // The resolver must delegate before it touches any API module.
-  for (const question of regulationQuestions) {
     const resolution = await resolveStudentAssistantQuery(question, 'vi');
-    assert.equal(resolution, null, `client composed a regulation answer for: ${question}`);
+    assert.equal(resolution, null, `client composed a personal answer for: ${question}`);
   }
 });
 
@@ -446,10 +364,11 @@ test('public admission-score questions never open the private transcript (C-P0-1
   }).outputText;
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, () => ({}));
-  const { isRegulationLookup, isPolicyQuestion, resolveStudentAssistantQuery } = moduleRecord.exports;
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
   // Bare "điểm" used to match GRADES_REGEX and answer a public question with
-  // the asker's GPA. Admission/selection scores are regulation content.
+  // the asker's GPA. Admission/selection scores are regulation content and now
+  // stream to the server knowledge base like every other personal-data intent.
   const publicScoreQuestions = [
     'Điểm chuẩn ngành Khoa học máy tính 2026 là bao nhiêu?',
     'diem chuan nganh cntt 2026',
@@ -458,18 +377,17 @@ test('public admission-score questions never open the private transcript (C-P0-1
     'điểm chuẩn của trường năm ngoái',
   ];
   for (const question of publicScoreQuestions) {
-    assert.equal(isPolicyQuestion(question), true, `expected a policy question: ${question}`);
-    assert.equal(isRegulationLookup(question), true, `expected a regulation lookup: ${question}`);
     const resolution = await resolveStudentAssistantQuery(question, 'vi');
     assert.equal(resolution, null, `client composed a transcript answer for: ${question}`);
   }
 
-  // Record questions still open the personal card: the score word carries a
-  // personal/record noun.
+  // Record questions also stream to the backend now: the transcript card lives
+  // server-side behind the personal-context advisor. Regression: these used to
+  // be answered from locally fetched grades records.
   const personalQuestions = ['xem điểm của tôi', 'điểm số môn học của tôi là bao nhiêu', 'cho tôi xem bảng điểm'];
   for (const question of personalQuestions) {
     const resolution = await resolveStudentAssistantQuery(question, 'vi');
-    assert.notEqual(resolution, null, `personal grades question lost its card: ${question}`);
+    assert.equal(resolution, null, `client composed a transcript answer for: ${question}`);
   }
 });
 
@@ -591,40 +509,54 @@ test('client assistant guard mirrors the server input guard', () => {
   assert.equal(inspectAssistantInput('khong biet cach nop hoc phi').allowed, true);
 });
 
-test('student resolver defers regulation questions to the knowledge base', () => {
+test('policy and personal-record questions alike defer to the server', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, () => ({}));
-  const { isPolicyQuestion } = moduleRecord.exports;
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
-  // Pure rule questions must NOT be answered by the personal resolver.
-  assert.equal(isPolicyQuestion('Một nhóm đồ án được tối đa bao nhiêu thành viên?'), true);
-  assert.equal(isPolicyQuestion('Hội đồng bảo vệ có bao nhiêu thành viên?'), true);
-  assert.equal(isPolicyQuestion('Điểm cuối cùng của đề tài tính thế nào?'), true);
-  assert.equal(isPolicyQuestion('Giảng viên hướng dẫn tối đa mấy người?'), true);
-  assert.equal(isPolicyQuestion('Học phần tiên quyết khác học phần học trước như thế nào?'), true);
-  assert.equal(isPolicyQuestion('So sánh môn tiên quyết và môn song hành?'), true);
-  assert.equal(isPolicyQuestion('Bị điểm F môn bắt buộc thì xử lý thế nào?'), true);
-  assert.equal(isPolicyQuestion('Hạn nộp học phí học kỳ này khi nào?'), true);
-  assert.equal(isPolicyQuestion('Quy định cảnh báo học vụ các mức?'), true);
-  assert.equal(isPolicyQuestion('Tiêu chuẩn xét học bổng khuyến khích?'), true);
-  assert.equal(isPolicyQuestion('Chuẩn đầu ra tốt nghiệp cần chứng chỉ gì?'), true);
+  // Pure rule questions must NOT be answered by the client resolver.
+  const policyQuestions = [
+    'Một nhóm đồ án được tối đa bao nhiêu thành viên?',
+    'Hội đồng bảo vệ có bao nhiêu thành viên?',
+    'Điểm cuối cùng của đề tài tính thế nào?',
+    'Giảng viên hướng dẫn tối đa mấy người?',
+    'Học phần tiên quyết khác học phần học trước như thế nào?',
+    'So sánh môn tiên quyết và môn song hành?',
+    'Bị điểm F môn bắt buộc thì xử lý thế nào?',
+    'Hạn nộp học phí học kỳ này khi nào?',
+    'Quy định cảnh báo học vụ các mức?',
+    'Tiêu chuẩn xét học bổng khuyến khích?',
+    'Chuẩn đầu ra tốt nghiệp cần chứng chỉ gì?',
+    // Regulation questions containing personal pronouns ("của tôi", "em",
+    // "mình") are still server questions, not client cards.
+    'điểm F của em có phải học lại không?',
+    'học phí của tôi nộp qua đâu theo quy chế?',
+    'chuẩn đầu ra tốt nghiệp của mình gồm những gì?',
+    'em muốn hỏi điều kiện xét học bổng khuyến khích?',
+    'thưa thầy học phần tiên quyết của em là gì?',
+  ];
+  for (const question of policyQuestions) {
+    const resolution = await resolveStudentAssistantQuery(question, 'vi');
+    assert.equal(resolution, null, `client composed a policy answer for: ${question}`);
+  }
 
-  // Personal records questions still resolve locally.
-  assert.equal(isPolicyQuestion('đồ án tốt nghiệp của tôi'), false);
-  assert.equal(isPolicyQuestion('Tôi được đăng ký tối đa bao nhiêu tín chỉ?'), false);
-  assert.equal(isPolicyQuestion('điểm của tôi học kỳ này'), false);
-  assert.equal(isPolicyQuestion('lịch học hôm nay'), false);
-
-  // Regulation questions containing personal pronouns ("của tôi", "em", "mình") are still recognized as policy questions
-  assert.equal(isPolicyQuestion('điểm F của em có phải học lại không?'), true);
-  assert.equal(isPolicyQuestion('học phí của tôi nộp qua đâu theo quy chế?'), true);
-  assert.equal(isPolicyQuestion('chuẩn đầu ra tốt nghiệp của mình gồm những gì?'), true);
-  assert.equal(isPolicyQuestion('em muốn hỏi điều kiện xét học bổng khuyến khích?'), true);
-  assert.equal(isPolicyQuestion('thưa thầy học phần tiên quyết của em là gì?'), true);
+  // Personal-record questions stream to the backend as well. Regression:
+  // "đồ án tốt nghiệp của tôi" and "điểm của tôi học kỳ này" used to produce
+  // client-side thesis/grades cards, and "lịch học hôm nay" a local timetable.
+  const personalQuestions = [
+    'đồ án tốt nghiệp của tôi',
+    'Tôi được đăng ký tối đa bao nhiêu tín chỉ?',
+    'điểm của tôi học kỳ này',
+    'lịch học hôm nay',
+  ];
+  for (const question of personalQuestions) {
+    const resolution = await resolveStudentAssistantQuery(question, 'vi');
+    assert.equal(resolution, null, `client composed a personal answer for: ${question}`);
+  }
 });
 
 test('regulation questions fall through the resolver to the server', async () => {
@@ -719,44 +651,22 @@ test('regulation questions fall through the resolver to the server', async () =>
     null,
   );
 
-  // Genuine schedule questions still resolve locally when data is present.
-  const enrollments = [
-    {
-      id: 'e1',
-      status: 'CONFIRMED',
-      section: {
-        sectionNumber: '01',
-        course: { code: 'SE101', name: 'SE', nameVi: 'Kỹ thuật phần mềm' },
-        schedules: [{ dayOfWeek: 2, startTime: '07:00', endTime: '09:30', classroom: { roomNumber: 'A101' } }],
-      },
-    },
-  ];
-  const scheduleModule = { exports: {} };
-  Function('module', 'exports', 'require', output)(
-    scheduleModule,
-    scheduleModule.exports,
-    (name) => (name === '@/lib/api'
-      ? {
-          authApi: { me: async () => ({ id: 's1', roles: ['STUDENT'] }) },
-          enrollmentsApi: { getMyEnrollments: async () => enrollments },
-          announcementsApi: { getMy: async () => ({ data: [] }) },
-          sectionsApi: { getMySchedule: async () => [] },
-          curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
-        }
-      : name === '@/lib/enrollment-status'
-        ? assistantEnrollmentStatusModule
-        : {}),
+  // Genuine schedule questions stream to the backend as well: the personal
+  // timetable card is rendered server-side by the personal-context advisor.
+  // Regression: this question used to resolve locally from enrollmentsApi.
+  assert.equal(
+    await resolveStudentAssistantQuery('lịch học của tôi tuần này có những môn nào?', 'vi'),
+    null,
+    'personal schedule question must not resolve locally',
   );
-  const schedule = await scheduleModule.exports.resolveStudentAssistantQuery('lịch học của tôi tuần này có những môn nào?', 'vi');
-  assert.ok(schedule, 'personal schedule question must still resolve locally');
-  assert.match(schedule.answer, /SE101/);
 });
 
-test('student schedule resolver does not claim an empty timetable when enrollment data is unavailable', async () => {
+test('unaccented schedule question delegates to the backend without touching portal APIs', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
+  const calls = { enrollments: 0, sections: 0 };
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(
     moduleRecord,
@@ -766,38 +676,58 @@ test('student schedule resolver does not claim an empty timetable when enrollmen
           authApi: { me: async () => ({ id: 's1', roles: ['STUDENT'] }) },
           enrollmentsApi: {
             getMyEnrollments: async () => {
+              calls.enrollments += 1;
               throw new Error('academic enrollment service unavailable');
             },
           },
           announcementsApi: { getMy: async () => ({ data: [] }) },
-          sectionsApi: { getMySchedule: async () => [] },
+          sectionsApi: {
+            getMySchedule: async () => {
+              calls.sections += 1;
+              return [];
+            },
+          },
           curriculumApi: {}, gradesApi: {}, registrationApi: {}, conductApi: {},
         }
-      : name === '@/lib/enrollment-status'
-        ? assistantEnrollmentStatusModule
-        : {}),
+      : {}),
   );
 
+  // Regression: the old client resolver fetched enrollments here and either
+  // rendered a local timetable or refused an empty one; both paths are gone
+  // and the backend personal-context advisor owns the answer.
   const resolution = await moduleRecord.exports.resolveStudentAssistantQuery(
     'Cho toi xem lich hoc',
     'vi',
   );
   assert.equal(resolution, null);
+  assert.equal(calls.enrollments, 0);
+  assert.equal(calls.sections, 0);
 });
 
-test('resolver personalizes thesis status dates and enums', () => {
+test('thesis status questions delegate to the backend personal-context advisor', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
-  // Raw enum values and ISO timestamps must no longer be interpolated directly.
-  assert.doesNotMatch(source, /Trạng thái đợt:\*\* \$\{activeRound\.status\}/);
-  assert.doesNotMatch(source, /Ngày báo cáo dự kiến:\*\* \$\{activeRound\.reportDate\}/);
-  assert.match(source, /localizedStatus\(\s*THESIS_ROUND_STATUS_LABELS/);
-  assert.match(source, /formatAssistantDate\(activeRound\.reportDate, locale\)/);
-  assert.match(source, /formatAssistantDateTime\(eligibility\.windowStart, locale\)/);
-  // Defense council and final score come from published results.
-  assert.match(source, /thesisApi\.myResults\(activeRound\.id\)/);
+  // The client no longer renders round/group status enums, dates, or published
+  // results; that personal thesis card moved server-side with the
+  // personal-context advisor.
+  assert.doesNotMatch(source, /activeRound\.status/);
+  assert.doesNotMatch(source, /thesisApi\.myResults/);
+  assert.doesNotMatch(source, /localizedStatus\(/);
+
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, () => ({}));
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
+
+  // Regression: these used to resolve into a client-side thesis status card
+  // with formatted dates and enum labels.
+  assert.equal(await resolveStudentAssistantQuery('đồ án tốt nghiệp của tôi', 'vi'), null);
+  assert.equal(await resolveStudentAssistantQuery('Hạn chót đăng ký khóa luận tốt nghiệp là khi nào?', 'vi'), null);
+  assert.equal(await resolveStudentAssistantQuery('Bảo vệ đồ án của tôi khi nào?', 'vi'), null);
 });
 
-test('student thesis answers expose the registration deadline from the round API', async () => {
+test('thesis registration deadline question no longer resolves locally', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
@@ -808,12 +738,11 @@ test('student thesis answers expose the registration deadline from the round API
     thesisType: 'KLTN',
     registrationStart: '2026-10-16T00:00:00Z',
     registrationEnd: '2026-11-15T00:00:00Z',
-    lecturerSubmitStart: '2026-09-01T00:00:00Z',
-    lecturerSubmitEnd: '2026-10-01T00:00:00Z',
     gvpbDeadline: '2026-12-01T00:00:00Z',
     reportDate: '2026-12-15T00:00:00Z',
     status: 'REGISTRATION_OPEN',
   };
+  const calls = { rounds: 0, groups: 0 };
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
     if (name === '@/lib/api') {
@@ -822,8 +751,14 @@ test('student thesis answers expose the registration deadline from the round API
     if (name === '@/lib/thesis-api') {
       return {
         thesisApi: {
-          listRounds: async () => [round],
-          listGroups: async () => [],
+          listRounds: async () => {
+            calls.rounds += 1;
+            return [round];
+          },
+          listGroups: async () => {
+            calls.groups += 1;
+            return [];
+          },
         },
       };
     }
@@ -836,9 +771,10 @@ test('student thesis answers expose the registration deadline from the round API
     'vi',
   );
 
-  assert.ok(resolution);
-  assert.match(resolution.answer, /Hạn chót đăng ký[^\n]*15\/11\/2026/);
-  assert.doesNotMatch(resolution.answer, /Hạn chót đăng ký[^\n]*Chưa được cập nhật/);
+  // Regression: this used to answer from listRounds/listGroups client-side.
+  assert.equal(resolution, null);
+  assert.equal(calls.rounds, 0);
+  assert.equal(calls.groups, 0);
 });
 
 test('assistant internal route linkification matches after punctuation and spaces', () => {
@@ -910,9 +846,11 @@ test('assistant UI strings are localized and reason labels cover personal contex
 
   const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
   assert.match(hookSource, /inspectAssistantInput/);
-  assert.match(hookSource, /const localReasonCode = resolution\.reasonCode/);
-  assert.match(hookSource, /reasonCode: localReasonCode/);
-  assert.match(hookSource, /if \(resolution\.citation\)/);
+  // Smalltalk is the only locally answered intent; it carries no citation and
+  // never claims the server's personal-context badge.
+  assert.match(hookSource, /reasonCode: 'LOCAL_ASSIST'/);
+  assert.doesNotMatch(hookSource, /resolution\.citation/);
+  assert.doesNotMatch(hookSource, /resolution\.reasonCode/);
 });
 
 test('assistant output guard hides technical commands from rendered and copied answers', () => {
@@ -1030,17 +968,17 @@ test('streaming markdown trims only unclosed trailing constructs', () => {
   assert.equal(sanitizeStreamingMarkdown('bình thường 123'), 'bình thường 123');
 });
 
-test('lecturer assistant reports supervised topics, pending approvals, and councils', async () => {
+test('lecturer workload questions stream to the backend instead of local composition', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
-  const lecturerUser = { id: 'u-9', roles: ['LECTURER'], lecturerId: 'L-9', firstName: 'Van', lastName: 'An' };
+  const calls = { workload: 0 };
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
     if (name === '@/lib/api') {
       return {
-        authApi: { me: async () => lecturerUser },
+        authApi: { me: async () => ({ id: 'u-9', roles: ['LECTURER'], lecturerId: 'L-9' }) },
         enrollmentsApi: { getMyEnrollments: async () => [] },
         announcementsApi: { getMy: async () => ({ data: [] }) },
         sectionsApi: { getMySchedule: async () => [] },
@@ -1050,53 +988,22 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
     if (name === '@/lib/thesis-api') {
       return {
         thesisApi: {
-          myWorkload: async () => ({
-            topics: [
-              {
-                topicId: 't1',
-                title: 'Nền tảng quản lý phòng lab',
-                topicStatus: 'PUBLISHED',
-                roundId: 'r1',
-                roundName: 'Đồ án tốt nghiệp 2026-2027',
-                roundStatus: 'REGISTRATION_OPEN',
-                groupCount: 1,
-                pendingGroupCount: 1,
-              },
-            ],
-            councils: [
-              {
-                councilId: 'c1',
-                name: 'Hội đồng 01',
-                memberRole: 'CHAIR',
-                roundId: 'r1',
-                roundName: 'Đồ án tốt nghiệp 2026-2027',
-                roundStatus: 'REGISTRATION_OPEN',
-                reportDate: '2026-12-15T00:00:00Z',
-                gvpbDeadline: '2026-12-10T00:00:00Z',
-                topicCount: 2,
-              },
-            ],
-            gradingTasks: [
-              {
-                topicId: 't1',
-                title: 'Nền tảng quản lý phòng lab',
-                councilId: 'c1',
-                councilName: 'Hội đồng 01',
-                roundName: 'Đồ án tốt nghiệp 2026-2027',
-                roundStatus: 'REGISTRATION_OPEN',
-                myScoreRows: 0,
-              },
-              {
-                topicId: 't3',
-                title: 'Hệ thống chấm điểm tự động',
-                councilId: 'c1',
-                councilName: 'Hội đồng 01',
-                roundName: 'Đồ án tốt nghiệp 2026-2027',
-                roundStatus: 'REGISTRATION_OPEN',
-                myScoreRows: 4,
-              },
-            ],
-          }),
+          myWorkload: async () => {
+            calls.workload += 1;
+            return {
+              topics: [
+                {
+                  topicId: 't1',
+                  title: 'Nền tảng quản lý phòng lab',
+                  roundName: 'Đồ án tốt nghiệp 2026-2027',
+                  groupCount: 1,
+                  pendingGroupCount: 1,
+                },
+              ],
+              councils: [],
+              gradingTasks: [],
+            };
+          },
         },
       };
     }
@@ -1104,24 +1011,15 @@ test('lecturer assistant reports supervised topics, pending approvals, and counc
   });
   const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
+  // Regression: "nhóm đồ án nào đang chờ tôi duyệt?" used to be answered from
+  // a client-side thesisApi.myWorkload() fetch. The server owns it now, so the
+  // resolver returns null without touching the workload endpoint.
   const workload = await resolveStudentAssistantQuery(
     'nhóm đồ án nào đang chờ tôi duyệt?',
     'vi',
   );
-  assert.ok(workload, 'lecturer workload question must resolve locally');
-  assert.match(workload.answer, /Nền tảng quản lý phòng lab/);
-  assert.match(workload.answer, /1 chờ duyệt/);
-  assert.match(workload.answer, /Hội đồng 01/);
-  assert.match(workload.answer, /Chủ tịch hội đồng/);
-  assert.match(workload.answer, /2 đề tài được phân công/);
-  assert.match(workload.answer, /hạn nộp điểm: 10\/12\/2026/);
-  assert.match(workload.answer, /ngày bảo vệ: 15\/12\/2026/);
-  // Grading workload per council topic with live score status.
-  assert.match(workload.answer, /Đề tài hội đồng phân công cho bạn \(2\)/);
-  assert.match(workload.answer, /Chưa nhập điểm/);
-  assert.match(workload.answer, /Đã nhập điểm/);
-  assert.match(workload.answer, /Còn 1 đề tài chưa nhập điểm/);
-  assert.equal(workload.citation.domain, 'THESIS');
+  assert.equal(workload, null, 'lecturer workload question must not resolve locally');
+  assert.equal(calls.workload, 0);
 
   // Regulation questions from a lecturer still go to the knowledge base.
   const policy = await resolveStudentAssistantQuery(
@@ -1348,17 +1246,16 @@ test('assistant markdown links reject unsafe schemes (javascript:, data:)', () =
   assert.doesNotMatch(componentSource, /elements\.push\(\s*createAnchor\(/);
 });
 
-test('assistant resolves past thesis repository and campus portal services', async () => {
+test('static portal guides and past-thesis content delegate to the backend knowledge base', async () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
   const output = ts.transpileModule(source, {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
-  const studentUser = { id: 's-1', roles: ['STUDENT'], studentId: 'SP-1', firstName: 'Son', lastName: 'Nguyen' };
   const moduleRecord = { exports: {} };
   Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
     if (name === '@/lib/api') {
       return {
-        authApi: { me: async () => studentUser },
+        authApi: { me: async () => ({ id: 's-1', roles: ['STUDENT'] }) },
         enrollmentsApi: { getMyEnrollments: async () => [] },
         announcementsApi: { getMy: async () => ({ data: [] }) },
         sectionsApi: { getMySchedule: async () => [] },
@@ -1371,11 +1268,7 @@ test('assistant resolves past thesis repository and campus portal services', asy
           listRounds: async () => [
             { id: 'r-past', name: 'KLTN 2025-2026', status: 'RESULTS_PUBLISHED', thesisType: 'KHOA_LUAN_TOT_NGHIEP' },
           ],
-          listTopics: async () => [
-            { id: 't-1', title: 'Hệ thống AI Camera phát hiện khói lửa', finalScore: 9.2, departmentId: 'FIT-AI', description: 'Mô hình phát hiện sớm' },
-          ],
           listGroups: async () => [],
-          myWorkload: async () => ({ topics: [], councils: [] }),
         },
       };
     }
@@ -1383,35 +1276,72 @@ test('assistant resolves past thesis repository and campus portal services', asy
   });
   const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
-  // 1. Past Thesis Repository
-  const pastTheses = await resolveStudentAssistantQuery('Cho tôi xem các đề tài khóa trước để tham khảo', 'vi');
-  assert.ok(pastTheses, 'Past thesis question must resolve locally');
-  assert.match(pastTheses.answer, /Kho tài liệu đề tài khóa luận tốt nghiệp/);
-  assert.match(pastTheses.answer, /AI Camera/);
-  assert.match(pastTheses.answer, /RISC-V/);
-  assert.match(pastTheses.answer, /Blockchain/);
-  assert.match(pastTheses.answer, /\/dashboard\/thesis\?tab=repository/);
-  assert.equal(pastTheses.citation.slug, 'past-thesis-repository');
-  assert.equal(pastTheses.citation.domain, 'THESIS');
+  // Regression: past-thesis archive, certificates, credit-limit applications,
+  // and grade appeals used to resolve into long client-side static guides.
+  // They are knowledge content, so they stream to the server RAG pipeline.
+  for (const question of [
+    'Cho tôi xem các đề tài khóa trước để tham khảo',
+    'Làm sao xin giấy tạm hoãn nghĩa vụ quân sự?',
+    'Cách làm đơn nâng hạn mức lên 30 tín chỉ',
+    'Thủ tục phúc khảo bài thi kết thúc học phần',
+  ]) {
+    const resolution = await resolveStudentAssistantQuery(question, 'vi');
+    assert.equal(resolution, null, `client composed a static guide for: ${question}`);
+  }
+});
 
-  // 2. Certificates Self-Service
-  const certs = await resolveStudentAssistantQuery('Làm sao xin giấy tạm hoãn nghĩa vụ quân sự?', 'vi');
-  assert.ok(certs, 'Certificates question must resolve locally');
-  assert.match(certs.answer, /Nghị định 13\/2016\/NĐ-CP/);
-  assert.match(certs.answer, /Quyết định 157\/2007\/QĐ-TTg/);
-  assert.match(certs.answer, /\/dashboard\/certificates/);
-  assert.equal(certs.citation.domain, 'POLICY');
+test('smalltalk intents still resolve locally with static copy and no citations', async () => {
+  const source = fs.readFileSync(path.join(root, 'src/lib/assistant-student-resolver.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, (name) => {
+    if (name === '@/lib/api') {
+      return {
+        authApi: { me: async () => ({ id: 's-1', roles: ['STUDENT'], firstName: 'Minh', lastName: 'Nguyen' }) },
+      };
+    }
+    return {};
+  });
+  const { resolveStudentAssistantQuery } = moduleRecord.exports;
 
-  // 3. Credit Limit 30 credits application
-  const creditApp = await resolveStudentAssistantQuery('Cách làm đơn nâng hạn mức lên 30 tín chỉ', 'vi');
-  assert.ok(creditApp, 'Credit limit app question must resolve locally');
-  assert.match(creditApp.answer, /28 tín chỉ/);
-  assert.match(creditApp.answer, /30 tín chỉ/);
-  assert.match(creditApp.answer, /\/dashboard\/register/);
+  // Greeting stays client-side and keeps locale + display-name personalization.
+  const greeting = await resolveStudentAssistantQuery('xin chào', 'vi');
+  assert.ok(greeting, 'greeting must resolve locally');
+  assert.match(greeting.answer, /Trợ lý học vụ CampusUTE/);
+  assert.match(greeting.answer, /Nguyen Minh/);
 
-  // 4. Grade Appeals
-  const regrade = await resolveStudentAssistantQuery('Thủ tục phúc khảo bài thi kết thúc học phần', 'vi');
-  assert.ok(regrade, 'Regrade appeal question must resolve locally');
-  assert.match(regrade.answer, /7 ngày làm việc/);
-  assert.match(regrade.answer, /\/dashboard\/grades/);
+  const helloEn = await resolveStudentAssistantQuery('hello', 'en');
+  assert.ok(helloEn, 'greeting must resolve locally in English');
+  assert.match(helloEn.answer, /CampusUTE academic assistant/);
+
+  // Capabilities / who-are-you menu stays client-side.
+  const capabilities = await resolveStudentAssistantQuery('bạn có thể làm được gì', 'vi');
+  assert.ok(capabilities, 'capabilities question must resolve locally');
+  assert.match(capabilities.answer, /Trợ lý học vụ CampusUTE/);
+
+  // Thanks and goodbye stay client-side.
+  const thanks = await resolveStudentAssistantQuery('cảm ơn bạn nhé', 'vi');
+  assert.ok(thanks, 'thanks must resolve locally');
+  assert.match(thanks.answer, /Không có gì/);
+  const goodbye = await resolveStudentAssistantQuery('tạm biệt nhé', 'vi');
+  assert.ok(goodbye, 'goodbye must resolve locally');
+  assert.match(goodbye.answer, /Hẹn gặp lại/);
+
+  // Smalltalk answers are static copy: no citation and no personal-context
+  // claim on the asker's records.
+  assert.equal(greeting.citation, undefined);
+  assert.equal(capabilities.citation, undefined);
+  assert.equal(thanks.reasonCode, undefined);
+});
+
+test('hook still simulates the SSE sequence for locally answered smalltalk', () => {
+  const hookSource = fs.readFileSync(path.join(root, 'src/components/assistant/useAssistantStream.ts'), 'utf8');
+  assert.match(hookSource, /isStudentAssistantQuery\(message\)/);
+  assert.match(hookSource, /resolveStudentAssistantQuery\(message, locale\)/);
+  assert.match(hookSource, /type: 'meta'/);
+  assert.match(hookSource, /type: 'delta'/);
+  assert.match(hookSource, /messageId: `local-resolved-\$\{Date\.now\(\)\}`/);
+  assert.match(hookSource, /reasonCode: 'LOCAL_ASSIST'/);
 });

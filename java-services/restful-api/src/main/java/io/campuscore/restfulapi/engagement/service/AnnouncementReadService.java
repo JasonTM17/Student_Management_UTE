@@ -6,6 +6,8 @@ import io.campuscore.restfulapi.engagement.repository.AnnouncementReadRepository
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementListResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PageMeta;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementListResponse;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementResponse;
 import java.time.Instant;
 import java.util.List;
 import java.util.Set;
@@ -78,6 +80,24 @@ public class AnnouncementReadService {
         List<AnnouncementResponse> data =
                 announcements.findForUser(visibility, offset(page, limit), limit);
         return response(data, total, page, limit);
+    }
+
+    /**
+     * Anonymous public campus news feed: only PUBLISHED + global announcements
+     * inside their publish window, ordered by admin display order (rows without
+     * one last) then newest first.
+     */
+    @Transactional(readOnly = true)
+    public PublicAnnouncementListResponse findPublic(int page, int limit) {
+        requirePage(page, limit);
+        Instant now = Instant.now();
+        long total = announcements.countPublic(now);
+        List<PublicAnnouncementResponse> data =
+                announcements.findPublic(offset(page, limit), limit, now);
+        long totalPages = total == 0 ? 0 : ((total - 1) / limit) + 1;
+        return new PublicAnnouncementListResponse(
+                data,
+                new PageMeta(total, page, limit, (int) totalPages));
     }
 
     private static AnnouncementListResponse response(

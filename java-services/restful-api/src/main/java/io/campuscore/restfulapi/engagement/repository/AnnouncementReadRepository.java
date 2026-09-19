@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.engagement.repository;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.CourseSummary;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.LecturerSummary;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SectionSummary;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.SemesterSummary;
 import java.sql.Array;
@@ -34,6 +35,23 @@ public class AnnouncementReadRepository {
             "lecturerId", "lecturerDisplayName", "createdAt", "updatedAt",
             "version", "archivedAt", "archivedBy"
             """;
+    /** Safe columns for the anonymous public feed — no audience-scoping arrays. */
+    private static final String PUBLIC_SELECT_COLUMNS = """
+            "id", "title", "content", "summary", "coverImageUrl", "priority",
+            "categoryId", "slug", "publishAt", "expiresAt", "createdAt",
+            "updatedAt", "publishedBy", "lecturerDisplayName", "semesterId",
+            "semesterName", "sectionId", "sectionNumber", "courseCode",
+            "courseName", "lecturerId"
+            """;
+    /**
+     * Display ordering shared by the admin list and the public feed: an
+     * administrator-assigned display order wins (ascending, rows without one
+     * last), then newest first. The CASE keeps NULLS LAST semantics portable
+     * across PostgreSQL and H2.
+     */
+    static final String DISPLAY_ORDER_CLAUSE =
+            " ORDER BY CASE WHEN \"displayOrder\" IS NULL THEN 1 ELSE 0 END,"
+                    + " \"displayOrder\", COALESCE(\"publishAt\", \"createdAt\") DESC";
     private static final RowMapper<AnnouncementResponse> ROW_MAPPER =
             AnnouncementReadRepository::mapRow;
 
@@ -51,7 +69,7 @@ public class AnnouncementReadRepository {
         where.parameters().addValue("offset", offset).addValue("limit", limit);
         return jdbc.query(
                 "SELECT " + SELECT_COLUMNS + " FROM " + TABLE + where.sql()
-                        + " ORDER BY \"createdAt\" DESC LIMIT :limit OFFSET :offset",
+                        + DISPLAY_ORDER_CLAUSE + " LIMIT :limit OFFSET :offset",
                 where.parameters(),
                 ROW_MAPPER);
     }
@@ -85,6 +103,93 @@ public class AnnouncementReadRepository {
                 where.parameters(),
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
+    }
+
+    /**
+     * Anonymous public feed: only announcements that are editorially PUBLISHED,
+     * globally visible (isGlobal — no role/year/section scoping), inside their
+     * publish window and not archived.
+     */
+    public List<PublicAnnouncementResponse> findPublic(long offset, int limit, Instant now) {
+        MapSqlParameterSource parameters = publicWhere(now);
+        parameters.addValue("offset", offset).addValue("limit", limit);
+        return jdbc.query(
+                "SELECT " + PUBLIC_SELECT_COLUMNS + " FROM " + TABLE + where(publicConditions(now))
+                        + DISPLAY_ORDER_CLAUSE + " LIMIT :limit OFFSET :offset",
+                parameters,
+                PUBLIC_ROW_MAPPER);
+    }
+
+    public long countPublic(Instant now) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM " + TABLE + where(publicConditions(now)),
+                publicWhere(now),
+                Long.class);
+        return Objects.requireNonNullElse(count, 0L);
+    }
+
+    private static List<String> publicConditions(Instant now) {
+        return List.of(
+                "\"status\" = 'PUBLISHED'",
+                "\"isGlobal\" = TRUE",
+                "(\"publishAt\" IS NULL OR \"publishAt\" <= :now)",
+                "(\"expiresAt\" IS NULL OR \"expiresAt\" > :now)",
+                "\"archivedAt\" IS NULL");
+    }
+
+    private static MapSqlParameterSource publicWhere(Instant now) {
+        return new MapSqlParameterSource().addValue(
+                "now",
+                OffsetDateTime.ofInstant(now, ZoneOffset.UTC),
+                Types.TIMESTAMP_WITH_TIMEZONE);
+    }
+
+    private static final RowMapper<PublicAnnouncementResponse> PUBLIC_ROW_MAPPER =
+            AnnouncementReadRepository::mapPublicRow;
+
+    private static PublicAnnouncementResponse mapPublicRow(ResultSet resultSet, int ignored)
+            throws SQLException {
+        String semesterName = resultSet.getString("semesterName");
+        String sectionId = resultSet.getString("sectionId");
+        String sectionNumber = resultSet.getString("sectionNumber");
+        String courseCode = resultSet.getString("courseCode");
+        String courseName = resultSet.getString("courseName");
+        String lecturerId = resultSet.getString("lecturerId");
+        String lecturerDisplayName = resultSet.getString("lecturerDisplayName");
+
+        SemesterSummary semester = present(semesterName) ? new SemesterSummary(semesterName) : null;
+        CourseSummary course = present(courseCode) || present(courseName)
+                ? new CourseSummary(courseCode, courseName)
+                : null;
+        SectionSummary section = present(sectionId)
+                        || present(sectionNumber)
+                        || present(courseCode)
+                        || present(courseName)
+                ? new SectionSummary(sectionNumber, course)
+                : null;
+        LecturerSummary lecturer = present(lecturerId)
+                ? new LecturerSummary(lecturerId, lecturerDisplayName)
+                : null;
+
+        return new PublicAnnouncementResponse(
+                resultSet.getString("id"),
+                resultSet.getString("title"),
+                resultSet.getString("content"),
+                resultSet.getString("summary"),
+                resultSet.getString("coverImageUrl"),
+                resultSet.getString("priority"),
+                resultSet.getString("categoryId"),
+                resultSet.getString("slug"),
+                instant(resultSet, "publishAt"),
+                instant(resultSet, "expiresAt"),
+                instant(resultSet, "createdAt"),
+                instant(resultSet, "updatedAt"),
+                resultSet.getString("publishedBy"),
+                lecturerDisplayName,
+                semesterName,
+                semester,
+                section,
+                lecturer);
     }
 
     private static SqlWhere adminWhere(AnnouncementFilter filter) {

@@ -22,7 +22,6 @@ import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.stereotype.Repository;
-
 /** PostgreSQL write adapter for announcements owned by the Java API. */
 @Repository
 @Profile("persistence")
@@ -118,6 +117,24 @@ public class AnnouncementWriteRepository {
 
     public int archive(TransitionCommand command) {
         return transition(command, true);
+    }
+
+    /**
+     * Administrator-assigned homepage display order. Deliberately does NOT
+     * bump the content version: the version guards optimistic content edits
+     * through PUT, while re-ordering is a presentation-only mutation.
+     */
+    public int updateDisplayOrder(String id, int displayOrder, Instant updatedAt) {
+        return jdbc.update(
+                "UPDATE " + TABLE + " SET \"displayOrder\" = :displayOrder,"
+                        + " \"updatedAt\" = :updatedAt WHERE \"id\" = :id",
+                new MapSqlParameterSource()
+                        .addValue("displayOrder", displayOrder, Types.INTEGER)
+                        .addValue(
+                                "updatedAt",
+                                OffsetDateTime.ofInstant(updatedAt, ZoneOffset.UTC),
+                                Types.TIMESTAMP_WITH_TIMEZONE)
+                        .addValue("id", id, Types.VARCHAR));
     }
 
     public int restore(TransitionCommand command) {
