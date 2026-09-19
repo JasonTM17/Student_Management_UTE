@@ -6,6 +6,10 @@ import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerSch
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionGradesResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.SectionResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -24,6 +28,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/sections")
+@Tag(name = "Academic Sections & Grading", description = "Quản lý và tra cứu lớp học phần, thời khóa biểu giảng dạy và bảng điểm sinh viên theo lớp")
 public class AcademicSectionReadController {
 
     private final AcademicSectionReadService academic;
@@ -34,12 +39,14 @@ public class AcademicSectionReadController {
 
     @GetMapping
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Danh sách lớp học phần", description = "Tra cứu danh sách các lớp học phần mở trong học kỳ, lọc theo học kỳ, khoa hoặc học phần.")
+    @ApiResponse(responseCode = "200", description = "Danh sách lớp học phần phân trang")
     public SectionListResponse getSections(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "100") int limit,
-            @RequestParam(required = false) String semesterId,
-            @RequestParam(required = false) String departmentId,
-            @RequestParam(required = false) String courseId,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "100") int limit,
+            @Parameter(description = "Mã học kỳ (Semester ID)") @RequestParam(required = false) String semesterId,
+            @Parameter(description = "Mã Bộ môn (Department ID)") @RequestParam(required = false) String departmentId,
+            @Parameter(description = "Mã học phần (Course ID)") @RequestParam(required = false) String courseId,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit", "semesterId", "departmentId", "courseId"));
         return academic.findSections(page, limit, semesterId, departmentId, courseId);
@@ -47,9 +54,11 @@ public class AcademicSectionReadController {
 
     @GetMapping("my/schedule")
     @PreAuthorize("hasRole('LECTURER')")
+    @Operation(summary = "Thời khóa biểu giảng dạy của giảng viên", description = "Truy xuất lịch dạy theo tuần và phòng học của giảng viên đang đăng nhập.")
+    @ApiResponse(responseCode = "200", description = "Danh sách lịch giảng dạy")
     public List<LecturerScheduleResponse> getMySchedule(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam(required = false) String semesterId,
+            @Parameter(description = "Mã học kỳ (tùy chọn)") @RequestParam(required = false) String semesterId,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("semesterId"));
         return academic.findLecturerSchedule(jwt.getClaimAsString("lecturerId"), semesterId);
@@ -57,9 +66,11 @@ public class AcademicSectionReadController {
 
     @GetMapping("my/grading")
     @PreAuthorize("hasRole('LECTURER')")
+    @Operation(summary = "Danh sách lớp cần nhập điểm của giảng viên", description = "Lấy danh sách các lớp học phần được phân công giảng dạy kèm tiến độ nhập điểm QT và CK.")
+    @ApiResponse(responseCode = "200", description = "Danh sách lớp phân công nhập điểm")
     public List<LecturerGradingSectionResponse> getMyGradingSections(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam(required = false) String semesterId,
+            @Parameter(description = "Mã học kỳ (tùy chọn)") @RequestParam(required = false) String semesterId,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("semesterId"));
         return academic.findLecturerGradingSections(jwt.getClaimAsString("lecturerId"), semesterId);
@@ -67,15 +78,19 @@ public class AcademicSectionReadController {
 
     @GetMapping("{id}")
     @PreAuthorize("isAuthenticated()")
-    public SectionResponse getSection(@PathVariable String id) {
+    @Operation(summary = "Chi tiết lớp học phần", description = "Xem thông tin chi tiết về sĩ số, phòng học, lịch học và giảng viên phụ trách lớp học phần.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết lớp học phần")
+    public SectionResponse getSection(@Parameter(description = "Mã lớp học phần (Section ID)") @PathVariable String id) {
         return academic.findSection(id);
     }
 
     @GetMapping("{id}/grades")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN', 'LECTURER')")
+    @Operation(summary = "Bảng điểm lớp học phần", description = "Tra cứu bảng điểm chi tiết (điểm Quá trình 50% + Cuối kỳ 50%) của tất cả sinh viên trong lớp.")
+    @ApiResponse(responseCode = "200", description = "Bảng điểm chi tiết của lớp học phần")
     public SectionGradesResponse getSectionGrades(
             @AuthenticationPrincipal Jwt jwt,
-            @PathVariable String id) {
+            @Parameter(description = "Mã lớp học phần (Section ID)") @PathVariable String id) {
         return academic.findSectionGrades(
                 id,
                 jwt.getClaimAsStringList("roles"),

@@ -22,7 +22,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** Brief R6–R9: council management, component scoring, and student results. */
+@Tag(name = "Thesis Defense Councils & Grading", description = "Quản lý hội đồng bảo vệ khóa luận, cơ cấu thành viên hội đồng, phân công đề tài phản biện và nhập điểm thành phần")
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/thesis")
@@ -34,6 +41,7 @@ public class ThesisCouncilController {
         this.councils = councils;
     }
 
+    @Operation(summary = "Tạo hội đồng đánh giá khóa luận", description = "Khởi tạo hội đồng đánh giá/chấm điểm khóa luận cho một đợt cụ thể")
     @PostMapping("/councils")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
     public CouncilResponse createCouncil(@RequestBody Map<String, Object> request, @AuthenticationPrincipal Jwt actor) {
@@ -42,15 +50,17 @@ public class ThesisCouncilController {
         return councils.createCouncil(parseUuid(roundIdRaw, "roundId"), name, actor);
     }
 
+    @Operation(summary = "Danh sách hội đồng theo đợt khóa luận", description = "Truy xuất danh sách tất cả các hội đồng bảo vệ trong một đợt khóa luận")
     @GetMapping("/councils")
     @PreAuthorize("isAuthenticated()")
-    public List<CouncilResponse> listCouncils(@RequestParam UUID roundId) {
+    public List<CouncilResponse> listCouncils(@Parameter(description = "Mã UUID của đợt", required = true) @RequestParam UUID roundId) {
         return councils.listByRound(roundId);
     }
 
+    @Operation(summary = "Xem chi tiết một hội đồng", description = "Truy xuất thông tin chi tiết một hội đồng: danh sách giảng viên thành viên và đề tài được phân công")
     @GetMapping("/councils/{id}")
     @PreAuthorize("isAuthenticated()")
-    public CouncilResponse getCouncil(@PathVariable UUID id) {
+    public CouncilResponse getCouncil(@Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id) {
         return councils.getCouncil(id);
     }
 

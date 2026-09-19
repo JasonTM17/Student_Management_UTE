@@ -173,7 +173,7 @@ export default function ThesisPage() {
   const [isProposeModalOpen, setIsProposeModalOpen] = useState(false);
   const [proposeTitle, setProposeTitle] = useState('');
   const [proposeDescription, setProposeDescription] = useState('');
-  const [proposeDepartmentId, setProposeDepartmentId] = useState('department-demo');
+  const [proposeDepartmentId, setProposeDepartmentId] = useState('');
   const [proposeMaxGroups, setProposeMaxGroups] = useState(2);
   const [proposePublishImmediately, setProposePublishImmediately] = useState(true);
   const [proposeRoundId, setProposeRoundId] = useState('');
@@ -184,7 +184,7 @@ export default function ThesisPage() {
   const [editingTopicId, setEditingTopicId] = useState('');
   const [editTitle, setEditTitle] = useState('');
   const [editDescription, setEditDescription] = useState('');
-  const [editDepartmentId, setEditDepartmentId] = useState('department-demo');
+  const [editDepartmentId, setEditDepartmentId] = useState('');
   const [editMaxGroups, setEditMaxGroups] = useState(2);
   const [editError, setEditError] = useState('');
 
@@ -450,7 +450,7 @@ export default function ThesisPage() {
             : [];
         if (!cancelled && list.length > 0) {
           setDepartments(list as Department[]);
-          setProposeDepartmentId((current) => (current === 'department-demo' ? list[0].id : current));
+          setProposeDepartmentId((current) => current || list[0].id);
         }
       } catch {
         // preserve fallback
@@ -1209,7 +1209,7 @@ export default function ThesisPage() {
       setIsProposeModalOpen(false);
       setProposeTitle('');
       setProposeDescription('');
-      setProposeDepartmentId(departments[0]?.id || 'department-demo');
+      setProposeDepartmentId(departments[0]?.id || '');
       setProposeMaxGroups(2);
       setProposePublishImmediately(true);
       setProposeSupervisorId('');
@@ -1239,7 +1239,7 @@ export default function ThesisPage() {
     setEditingTopicId(topic.id);
     setEditTitle(topic.title);
     setEditDescription(topic.description);
-    setEditDepartmentId(topic.departmentId || departments[0]?.id || 'department-demo');
+    setEditDepartmentId(topic.departmentId || departments[0]?.id || '');
     setEditMaxGroups(topic.maxGroups || 2);
     setEditError('');
     setIsEditModalOpen(true);
@@ -2880,7 +2880,7 @@ export default function ThesisPage() {
                   <Input
                     value={proposeDepartmentId}
                     onChange={(e) => setProposeDepartmentId(e.target.value)}
-                    placeholder="department-demo"
+                    placeholder={departments[0]?.id || 'FIT'}
                     required
                     disabled={isActionPending}
                   />
@@ -3368,7 +3368,7 @@ export default function ThesisPage() {
                   <Input
                     value={editDepartmentId}
                     onChange={(e) => setEditDepartmentId(e.target.value)}
-                    placeholder="department-demo"
+                    placeholder={departments[0]?.id || 'FIT'}
                     required
                     disabled={isActionPending}
                   />

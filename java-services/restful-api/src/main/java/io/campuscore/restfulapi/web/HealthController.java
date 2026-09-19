@@ -1,5 +1,9 @@
 package io.campuscore.restfulapi.web;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
@@ -17,6 +21,7 @@ import org.springframework.web.server.ResponseStatusException;
 
 @RestController
 @RequestMapping("/api/v1/health")
+@Tag(name = "Health & Probes", description = "Kiểm tra trạng thái sẵn sàng (Readiness) và khả năng hoạt động (Liveness) của dịch vụ")
 public class HealthController {
 
     private final String readinessKey;
@@ -30,6 +35,8 @@ public class HealthController {
     }
 
     @GetMapping("/liveness")
+    @Operation(summary = "Kiểm tra Liveness Probe", description = "Xác nhận container RESTful API đang chạy bình thường.")
+    @ApiResponse(responseCode = "200", description = "Dịch vụ đang hoạt động bình thường")
     public Map<String, Object> liveness() {
         return Map.of(
                 "status", "ok",
@@ -38,7 +45,10 @@ public class HealthController {
     }
 
     @GetMapping("/readiness")
+    @Operation(summary = "Kiểm tra Readiness Probe", description = "Kiểm tra kết nối tới cơ sở dữ liệu PostgreSQL trước khi tiếp nhận lưu lượng truy cập.")
+    @ApiResponse(responseCode = "200", description = "Cơ sở dữ liệu sẵn sàng")
     public Map<String, Object> readiness(
+            @Parameter(description = "Mã khóa bảo vệ probe kiểm tra trạng thái sẵn sàng")
             @RequestHeader(value = "X-Health-Key", required = false) String suppliedKey) {
         if (readinessKey.isBlank()
                 || suppliedKey == null

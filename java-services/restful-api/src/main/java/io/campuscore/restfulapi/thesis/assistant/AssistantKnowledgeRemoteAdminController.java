@@ -22,11 +22,18 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Production REST edge for knowledge governance.  Supabase credentials stay
  * inside the private RAG service; this controller forwards authenticated admin
  * operations over the internal token boundary.
  */
+@Tag(name = "AI Assistant Knowledge Remote Gateway (Admin)", description = "Cổng kết nối quản trị kho tri thức RAG từ xa ủy quyền qua Supabase RAG microservice")
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "remote")
@@ -38,19 +45,35 @@ public class AssistantKnowledgeRemoteAdminController {
         this.authority = authority;
     }
 
+    @Operation(summary = "Danh sách tài liệu tri thức RAG từ xa", description = "Truy vấn danh sách tài liệu tri thức từ gateway từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn thành công")
+    })
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public List<KnowledgeDocumentView> list(@RequestParam(required = false) String domain,
-            @RequestParam(required = false) String state, @AuthenticationPrincipal Jwt actor) {
+    public List<KnowledgeDocumentView> list(
+            @Parameter(description = "Lĩnh vực tri thức") @RequestParam(required = false) String domain,
+            @Parameter(description = "Trạng thái phê duyệt") @RequestParam(required = false) String state,
+            @AuthenticationPrincipal Jwt actor) {
         return authority.list(subject(actor), domain, state);
     }
 
+    @Operation(summary = "Xem chi tiết tài liệu tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tìm thấy tài liệu")
+    })
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public KnowledgeDocumentView get(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public KnowledgeDocumentView get(
+            @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         return authority.get(id, subject(actor));
     }
 
+    @Operation(summary = "Tạo mới tài liệu tri thức từ xa (DRAFT)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tạo thành công")
+    })
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public KnowledgeRevision create(@RequestBody KnowledgeRequest request, @AuthenticationPrincipal Jwt actor) {
@@ -58,38 +81,70 @@ public class AssistantKnowledgeRemoteAdminController {
         return authority.create(request, subject(actor));
     }
 
+    @Operation(summary = "Cập nhật tài liệu tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
+    })
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public KnowledgeRevision update(@PathVariable UUID id, @RequestBody KnowledgeRequest request,
+    public KnowledgeRevision update(
+            @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
+            @RequestBody KnowledgeRequest request,
             @AuthenticationPrincipal Jwt actor) {
         ThesisAssistantKnowledgeAdminController.validate(request);
         return authority.update(id, request, subject(actor));
     }
 
+    @Operation(summary = "Nộp bản nháp tài liệu tri thức từ xa để duyệt")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nộp thành công")
+    })
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public KnowledgeRevision submit(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public KnowledgeRevision submit(
+            @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         return authority.submit(id, subject(actor));
     }
 
+    @Operation(summary = "Phê duyệt và xuất bản tài liệu tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Xuất bản thành công")
+    })
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public KnowledgeRevision publish(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public KnowledgeRevision publish(
+            @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         return authority.publish(id, subject(actor));
     }
 
+    @Operation(summary = "Lưu trữ tài liệu tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lưu trữ thành công")
+    })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public void archive(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public void archive(
+            @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         authority.archive(id, subject(actor));
     }
 
+    @Operation(summary = "Đồng bộ hóa kho tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Kích hoạt đồng bộ thành công")
+    })
     @PostMapping("/sync")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public SupabaseKnowledgeSyncService.SyncResult sync(@AuthenticationPrincipal Jwt actor) {
         return authority.sync(subject(actor));
     }
 
+    @Operation(summary = "Kiểm tra trạng thái đồng bộ hóa kho tri thức từ xa")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy trạng thái thành công")
+    })
     @GetMapping("/sync-status")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public SupabaseKnowledgeSyncService.SyncResult status(@AuthenticationPrincipal Jwt actor) {

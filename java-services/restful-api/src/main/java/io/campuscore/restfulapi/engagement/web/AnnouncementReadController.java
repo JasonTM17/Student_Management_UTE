@@ -18,8 +18,14 @@ import org.springframework.web.bind.annotation.GetMapping;
 import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 
 /** Role-aware announcement query routes for the course portal. */
+@Tag(name = "Announcements & Campus News", description = "Truy vấn thông báo học vụ, bản tin trường HCM-UTE, quản lý vòng đời bài viết (soạn thảo, cập nhật, lưu trữ, lịch sử chỉnh sửa)")
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/announcements")
@@ -31,11 +37,17 @@ public class AnnouncementReadController {
         this.announcements = announcements;
     }
 
+    @Operation(summary = "Lấy danh sách thông báo dành riêng cho người dùng", description = "Truy vấn thông báo phân quyền theo vai trò (Sinh viên, Giảng viên, Quản trị viên) và đối tượng lớp/học kỳ")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn danh sách thông báo thành công"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực danh tính JWT"),
+        @ApiResponse(responseCode = "403", description = "Thiếu thông tin phân quyền hợp lệ")
+    })
     @GetMapping("my")
     public AnnouncementListResponse getMyAnnouncements(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số trang phân trang (bắt đầu từ 1)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng thông báo trên một trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         List<String> roles = requireIdentity(jwt);
@@ -52,15 +64,20 @@ public class AnnouncementReadController {
                 limit);
     }
 
+    @Operation(summary = "Quản trị tra cứu toàn bộ thông báo (Admin/SuperAdmin)", description = "Truy vấn danh sách tất cả thông báo hệ thống với các bộ lọc học kỳ, lớp học phần, mức độ ưu tiên và trạng thái")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lấy danh sách thông báo thành công"),
+        @ApiResponse(responseCode = "403", description = "Chỉ Quản trị viên mới có quyền truy cập")
+    })
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public AnnouncementListResponse getAllAnnouncements(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) String semesterId,
-            @RequestParam(required = false) String sectionId,
-            @RequestParam(required = false) String priority,
-            @RequestParam(defaultValue = "ACTIVE") String status,
+            @Parameter(description = "Số trang phân trang (bắt đầu từ 1)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng thông báo trên một trang") @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Mã định danh học kỳ (UUID)") @RequestParam(required = false) String semesterId,
+            @Parameter(description = "Mã định danh lớp học phần (UUID)") @RequestParam(required = false) String sectionId,
+            @Parameter(description = "Mức độ ưu tiên (LOW, NORMAL, HIGH, URGENT)") @RequestParam(required = false) String priority,
+            @Parameter(description = "Trạng thái thông báo (ACTIVE, ARCHIVED)") @RequestParam(defaultValue = "ACTIVE") String status,
             @RequestParam MultiValueMap<String, String> queryParameters,
             @AuthenticationPrincipal Jwt jwt) {
         requireAllowedQuery(

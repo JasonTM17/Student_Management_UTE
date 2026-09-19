@@ -1,5 +1,8 @@
 package io.campuscore.restfulapi.web;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Collection;
 import java.util.List;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
@@ -11,9 +14,12 @@ import org.springframework.web.bind.annotation.RestController;
 /** Verifies that the future modules can consume the frozen identity claims. */
 @RestController
 @RequestMapping("/api/v1/me")
+@Tag(name = "Identity Claims", description = "Kiểm tra và truy xuất thông tin xác thực định danh (claims) đóng băng từ JWT")
 public class IdentityController {
 
     @GetMapping
+    @Operation(summary = "Định danh tài khoản hiện tại", description = "Trả về danh sách vai trò, quyền hạn và mã số sinh viên/giảng viên được giải mã từ JWT token.")
+    @ApiResponse(responseCode = "200", description = "Định danh tài khoản thành công")
     public IdentityResponse currentUser(@AuthenticationPrincipal Jwt jwt) {
         return new IdentityResponse(
                 jwt.getSubject(),

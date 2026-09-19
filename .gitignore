@@ -99,3 +99,4 @@ database/backups/
 frontend/.mimosa/
 scratch/
 .workbuddy-ai/
+.zcodeignore

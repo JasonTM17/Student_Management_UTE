@@ -40,11 +40,18 @@ import org.springframework.web.bind.annotation.RequestPart;
 import org.springframework.web.bind.annotation.RestController;
 import org.springframework.web.multipart.MultipartFile;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /**
  * Brief-governed thesis mutations. Round lifecycle ownership sits with the
  * faculty head (TRUONG_KHOA) with ADMIN as staff fallback; the legacy
  * SUPER_ADMIN grant is intentionally not accepted in this package.
  */
+@Tag(name = "Thesis Lifecycle Mutations", description = "Quy trình chuyển đổi trạng thái đợt khóa luận, đề xuất đề tài, phân công GVHD, quản lý nhóm và nộp báo cáo")
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1/thesis")
@@ -63,6 +70,7 @@ public class ThesisMutationController {
         this.reports = reports;
     }
 
+    @Operation(summary = "Khởi tạo đợt khóa luận mới", description = "Tạo một đợt đăng ký khóa luận/tiểu luận mới ở trạng thái DRAFT")
     @PostMapping("/rounds")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
     public RoundResponse createRound(@RequestBody RoundCreateRequest request) {
@@ -70,36 +78,41 @@ public class ThesisMutationController {
     }
 
     /** Brief phase one: the faculty head opens the lecturer topic-submission window. */
+    @Operation(summary = "Mở cổng đề xuất đề tài cho giảng viên", description = "Chuyển trạng thái đợt từ DRAFT sang PROPOSAL_OPEN để giảng viên nộp đề tài")
     @PostMapping("/rounds/{id}/open-proposals")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
-    public RoundResponse openProposals(@PathVariable UUID id) {
+    public RoundResponse openProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN);
     }
 
     /** Brief phase one closure: publish the topic catalog to student groups. */
+    @Operation(summary = "Công bố danh mục đề tài cho sinh viên", description = "Chuyển đợt sang PROPOSALS_PUBLISHED để sinh viên tìm hiểu danh mục đề tài đã duyệt")
     @PostMapping("/rounds/{id}/publish-proposals")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
-    public RoundResponse publishProposals(@PathVariable UUID id) {
+    public RoundResponse publishProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED);
     }
 
     /** Brief phase two: student groups may register inside the student window. */
+    @Operation(summary = "Mở cổng đăng ký đề tài cho nhóm sinh viên", description = "Chuyển đợt sang REGISTRATION_OPEN để các nhóm sinh viên nộp nguyện vọng đề tài")
     @PostMapping("/rounds/{id}/open-registration")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
-    public RoundResponse openRegistration(@PathVariable UUID id) {
+    public RoundResponse openRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
     }
 
+    @Operation(summary = "Đóng cổng đăng ký đề tài", description = "Chuyển đợt sang REGISTRATION_CLOSED sau khi hết hạn đăng ký")
     @PostMapping("/rounds/{id}/close-registration")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
-    public RoundResponse closeRegistration(@PathVariable UUID id) {
+    public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
     }
 
     /** Brief R9: publish graded results to the students of the round. */
+    @Operation(summary = "Công bố điểm và kết quả bảo vệ khóa luận", description = "Chuyển đợt sang RESULTS_PUBLISHED để sinh viên xem điểm đánh giá chính thức")
     @PostMapping("/rounds/{id}/publish-results")
     @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
-    public RoundResponse publishResults(@PathVariable UUID id) {
+    public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.publishResults(id);
     }
 

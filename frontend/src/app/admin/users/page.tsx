@@ -18,7 +18,8 @@ import {
   Users,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
-import { departmentsApi, usersApi } from '@/lib/api';
+import { curriculaApi, departmentsApi, usersApi } from '@/lib/api';
+import { Curriculum } from '@/types/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import {
   AdminDialogFooter,
@@ -104,6 +105,7 @@ export default function AdminUsersPage() {
 
   const [users, setUsers] = useState<UserRecord[]>([]);
   const [departments, setDepartments] = useState<{ id: string; name: string; code?: string }[]>([]);
+  const [curricula, setCurricula] = useState<Curriculum[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
@@ -129,7 +131,7 @@ export default function AdminUsersPage() {
     // Student-specific fields
     studentId: '',
     year: '1',
-    curriculumId: 'curriculum-demo',
+    curriculumId: '',
     // Lecturer-specific fields
     employeeId: '',
     departmentId: '',
@@ -206,12 +208,24 @@ export default function AdminUsersPage() {
     }
   }, []);
 
+  const fetchCurricula = useCallback(async () => {
+    try {
+      const res = await curriculaApi.getAll({ limit: 100 });
+      if (res.data) {
+        setCurricula(res.data);
+      }
+    } catch {
+      // Curricula fallback
+    }
+  }, []);
+
   useEffect(() => {
     if (canAccess) {
       void fetchUsers();
       void fetchDepartments();
+      void fetchCurricula();
     }
-  }, [canAccess, fetchUsers, fetchDepartments]);
+  }, [canAccess, fetchUsers, fetchDepartments, fetchCurricula]);
 
   const filteredUsers = useMemo(() => {
     if (roleFilter === 'ALL') return users;
@@ -415,7 +429,7 @@ export default function AdminUsersPage() {
       role,
       studentId: '',
       year: '1',
-      curriculumId: 'curriculum-demo',
+      curriculumId: curricula[0]?.id || '',
       employeeId: '',
       departmentId: departments[0]?.id || '',
       academicTitle: 'TS.',
@@ -447,7 +461,7 @@ export default function AdminUsersPage() {
       role: primaryRole(userRecord.roles),
       studentId: '',
       year: '1',
-      curriculumId: 'curriculum-demo',
+      curriculumId: curricula[0]?.id || '',
       employeeId: '',
       departmentId: departments[0]?.id || '',
       academicTitle: 'TS.',
@@ -585,7 +599,7 @@ export default function AdminUsersPage() {
         if (formData.role === 'STUDENT') {
           payload.studentId = formData.studentId.trim();
           payload.year = formData.year;
-          payload.curriculumId = formData.curriculumId;
+          payload.curriculumId = formData.curriculumId || curricula[0]?.id || '';
         } else if (formData.role === 'LECTURER') {
           payload.employeeId = formData.employeeId.trim();
           payload.departmentId = formData.departmentId;
@@ -1187,12 +1201,19 @@ export default function AdminUsersPage() {
 
                     <AdminFormField label="Khung chương trình *">
                       <select
-                        value={formData.curriculumId}
+                        value={formData.curriculumId || (curricula[0]?.id ?? '')}
                         onChange={(e) => setFormData((c) => ({ ...c, curriculumId: e.target.value }))}
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <option value="curriculum-demo">Kỹ sư Chuẩn (140 TC)</option>
-                        <option value="curriculum-clc">Chất lượng cao (150 TC)</option>
+                        {curricula.length > 0 ? (
+                          curricula.map((c) => (
+                            <option key={c.id} value={c.id}>
+                              {c.nameVi || c.name} {c.totalCredits ? `(${c.totalCredits} TC)` : ''}
+                            </option>
+                          ))
+                        ) : (
+                          <option value="">{locale === 'vi' ? '-- Đang tải CTĐT --' : '-- Loading Curricula --'}</option>
+                        )}
                       </select>
                     </AdminFormField>
                   </div>

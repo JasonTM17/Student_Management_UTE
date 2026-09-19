@@ -16,6 +16,10 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyListRespons
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.FacultyResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -34,6 +38,7 @@ import org.springframework.web.bind.annotation.RestController;
 @RestController
 @Profile("persistence")
 @RequestMapping("/api/v1")
+@Tag(name = "Academic Catalog", description = "Tra cứu danh mục học vụ: Khoa, Bộ môn, Học kỳ, Năm học, Học phần, Khung chương trình đào tạo và Phòng học")
 public class AcademicReadController {
 
     private final AcademicReadService academic;
@@ -43,24 +48,30 @@ public class AcademicReadController {
     }
 
     @GetMapping("semesters")
+    @Operation(summary = "Danh sách học kỳ", description = "Truy xuất danh sách các học kỳ trong năm học kèm trạng thái học vụ và đăng ký.")
+    @ApiResponse(responseCode = "200", description = "Danh sách học kỳ phân trang")
     public SemesterListResponse getSemesters(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findSemesters(page, limit);
     }
 
     @GetMapping("semesters/{id}")
-    public SemesterResponse getSemester(@PathVariable String id) {
+    @Operation(summary = "Chi tiết học kỳ", description = "Lấy thông tin chi tiết của một học kỳ theo mã định danh ID.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết học kỳ")
+    public SemesterResponse getSemester(@Parameter(description = "Mã học kỳ (Semester ID)") @PathVariable String id) {
         return academic.findSemester(id);
     }
 
     @GetMapping("faculties")
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Danh sách Khoa đào tạo", description = "Tra cứu danh mục các Khoa / Viện đào tạo trực thuộc Trường ĐH Sư phạm Kỹ thuật TP.HCM.")
+    @ApiResponse(responseCode = "200", description = "Danh sách Khoa đào tạo")
     public FacultyListResponse getFaculties(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findFaculties(page, limit);
@@ -68,15 +79,19 @@ public class AcademicReadController {
 
     @GetMapping("faculties/{id}")
     @PreAuthorize("isAuthenticated()")
-    public FacultyResponse getFaculty(@PathVariable String id) {
+    @Operation(summary = "Chi tiết Khoa đào tạo", description = "Lấy thông tin chi tiết của Khoa đào tạo theo ID.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết Khoa đào tạo")
+    public FacultyResponse getFaculty(@Parameter(description = "Mã Khoa (Faculty ID)") @PathVariable String id) {
         return academic.findFaculty(id);
     }
 
     @GetMapping("departments")
     @PreAuthorize("isAuthenticated()")
+    @Operation(summary = "Danh sách Bộ môn chuyên ngành", description = "Tra cứu danh mục các Bộ môn trực thuộc các Khoa đào tạo.")
+    @ApiResponse(responseCode = "200", description = "Danh sách Bộ môn chuyên ngành")
     public DepartmentListResponse getDepartments(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findDepartments(page, limit);
@@ -84,69 +99,89 @@ public class AcademicReadController {
 
     @GetMapping("departments/{id}")
     @PreAuthorize("isAuthenticated()")
-    public DepartmentResponse getDepartment(@PathVariable String id) {
+    @Operation(summary = "Chi tiết Bộ môn chuyên ngành", description = "Lấy thông tin chi tiết của Bộ môn kèm danh sách giảng viên trực thuộc.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết Bộ môn")
+    public DepartmentResponse getDepartment(@Parameter(description = "Mã Bộ môn (Department ID)") @PathVariable String id) {
         return academic.findDepartment(id);
     }
 
     @GetMapping("academic-years")
+    @Operation(summary = "Danh sách năm học", description = "Tra cứu danh mục các niên khóa / năm học của nhà trường.")
+    @ApiResponse(responseCode = "200", description = "Danh sách năm học")
     public AcademicYearListResponse getAcademicYears(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findAcademicYears(page, limit);
     }
 
     @GetMapping("academic-years/{id}")
-    public AcademicYearResponse getAcademicYear(@PathVariable String id) {
+    @Operation(summary = "Chi tiết năm học", description = "Lấy thông tin chi tiết một năm học kèm các học kỳ trực thuộc.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết năm học")
+    public AcademicYearResponse getAcademicYear(@Parameter(description = "Mã năm học (Academic Year ID)") @PathVariable String id) {
         return academic.findAcademicYear(id);
     }
 
     @GetMapping("courses")
+    @Operation(summary = "Danh mục học phần / môn học", description = "Tra cứu danh sách các học phần trong chương trình đào tạo kèm số tín chỉ và bộ môn phụ trách.")
+    @ApiResponse(responseCode = "200", description = "Danh mục học phần phân trang")
     public CourseListResponse getCourses(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findCourses(page, limit);
     }
 
     @GetMapping("courses/{id}")
-    public CourseResponse getCourse(@PathVariable String id) {
+    @Operation(summary = "Chi tiết học phần", description = "Lấy thông tin mô tả chi tiết của học phần theo ID.")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết học phần")
+    public CourseResponse getCourse(@Parameter(description = "Mã học phần (Course ID)") @PathVariable String id) {
         return academic.findCourse(id);
     }
 
     @GetMapping("curricula")
+    @Operation(summary = "Danh sách khung chương trình đào tạo (CTĐT)", description = "Tra cứu các khung CTĐT chuẩn, CLC kèm tổng số tín chỉ yêu cầu tốt nghiệp.")
+    @ApiResponse(responseCode = "200", description = "Danh sách khung CTĐT")
     public CurriculumListResponse getCurricula(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findCurricula(page, limit);
     }
 
     @GetMapping("curricula/{id}")
-    public CurriculumResponse getCurriculum(@PathVariable String id) {
+    @Operation(summary = "Chi tiết khung chương trình đào tạo", description = "Lấy cấu trúc chi tiết các học phần theo từng năm học và học kỳ trong CTĐT.")
+    @ApiResponse(responseCode = "200", description = "Chi tiết khung CTĐT")
+    public CurriculumResponse getCurriculum(@Parameter(description = "Mã CTĐT (Curriculum ID)") @PathVariable String id) {
         return academic.findCurriculum(id);
     }
 
     @GetMapping("me/curriculum")
     @PreAuthorize("hasRole('STUDENT')")
+    @Operation(summary = "Khung CTĐT của sinh viên hiện tại", description = "Tra cứu chương trình đào tạo chính thức áp dụng cho khóa và chuyên ngành của sinh viên đang đăng nhập.")
+    @ApiResponse(responseCode = "200", description = "Khung CTĐT của sinh viên")
     public MyCurriculumResponse getMyCurriculum(@AuthenticationPrincipal Jwt jwt) {
         return academic.findMyCurriculum(jwt.getClaimAsString("studentId"));
     }
 
     @GetMapping("classrooms")
+    @Operation(summary = "Danh sách phòng học và giảng đường", description = "Tra cứu hệ thống phòng lý thuyết, thực hành, xưởng tại các cơ sở đào tạo.")
+    @ApiResponse(responseCode = "200", description = "Danh sách phòng học")
     public ClassroomListResponse getClassrooms(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Số thứ tự trang") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
             @RequestParam MultiValueMap<String, String> queryParameters) {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         return academic.findClassrooms(page, limit);
     }
 
     @GetMapping("classrooms/{id}")
-    public ClassroomResponse getClassroom(@PathVariable String id) {
+    @Operation(summary = "Chi tiết phòng học", description = "Lấy thông tin sức chứa, tòa nhà và loại phòng học (LECTURE, LAB).")
+    @ApiResponse(responseCode = "200", description = "Thông tin chi tiết phòng học")
+    public ClassroomResponse getClassroom(@Parameter(description = "Mã phòng học (Classroom ID)") @PathVariable String id) {
         return academic.findClassroom(id);
     }
 

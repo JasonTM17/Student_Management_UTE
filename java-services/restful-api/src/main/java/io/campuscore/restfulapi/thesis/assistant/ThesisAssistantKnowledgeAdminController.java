@@ -25,7 +25,14 @@ import org.springframework.web.bind.annotation.RequestMapping;
 import org.springframework.web.bind.annotation.RequestParam;
 import org.springframework.web.bind.annotation.RestController;
 
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
+
 /** Admin-only CRUD and Draft -> review -> publish workflow for public campus knowledge. */
+@Tag(name = "AI Assistant Knowledge Base (Admin)", description = "Quản trị tài liệu tri thức RAG: quy chế, hướng dẫn học vụ, quy trình kiểm duyệt hai bước (Draft -> Review -> Publish)")
 @RestController
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "sql", matchIfMissing = true)
@@ -37,10 +44,15 @@ public class ThesisAssistantKnowledgeAdminController {
         this.jdbc = jdbc;
     }
 
+    @Operation(summary = "Danh sách tài liệu tri thức RAG", description = "Truy vấn danh sách tài liệu tri thức học vụ theo lĩnh vực (domain) và trạng thái (DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn thành công")
+    })
     @GetMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public List<KnowledgeDocumentView> list(@RequestParam(required = false) String domain,
-            @RequestParam(required = false) String state) {
+    public List<KnowledgeDocumentView> list(
+            @Parameter(description = "Lĩnh vực tri thức (THESIS, ACADEMIC, ENROLLMENT, CONDUCT, TUITION)") @RequestParam(required = false) String domain,
+            @Parameter(description = "Trạng thái phê duyệt (DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED)") @RequestParam(required = false) String state) {
         String suffix = "";
         MapSqlParameterSource params = p();
         if (state != null && !state.isBlank()) {
@@ -58,14 +70,24 @@ public class ThesisAssistantKnowledgeAdminController {
         return jdbc.query(latestRevisionSql(suffix) + " ORDER BY d.slug ASC", params, this::mapView);
     }
 
+    @Operation(summary = "Xem chi tiết tài liệu tri thức", description = "Lấy nội dung tài liệu và phiên bản mới nhất theo ID")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tìm thấy tài liệu"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy tài liệu")
+    })
     @GetMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public KnowledgeDocumentView get(@PathVariable UUID id) {
+    public KnowledgeDocumentView get(
+            @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id) {
         List<KnowledgeDocumentView> rows = jdbc.query(latestRevisionSql(" AND d.id=:id"), p().addValue("id", id), this::mapView);
         if (rows.isEmpty()) throw notFound(id);
         return rows.get(0);
     }
 
+    @Operation(summary = "Tạo mới tài liệu tri thức (Bản nháp DRAFT)", description = "Tạo một tài liệu tri thức mới kèm phiên bản 1 trạng thái DRAFT")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Tạo tài liệu thành công")
+    })
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Transactional
@@ -84,10 +106,16 @@ public class ThesisAssistantKnowledgeAdminController {
         return new KnowledgeRevision(document, revision, 1, "DRAFT");
     }
 
+    @Operation(summary = "Cập nhật bản nháp tài liệu tri thức", description = "Chỉnh sửa nội dung tài liệu bản nháp của người tạo hoặc sinh phiên bản mới")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Cập nhật thành công")
+    })
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Transactional
-    public KnowledgeRevision update(@PathVariable UUID id, @RequestBody KnowledgeRequest request,
+    public KnowledgeRevision update(
+            @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
+            @RequestBody KnowledgeRequest request,
             @AuthenticationPrincipal Jwt actor) {
         validate(request);
         String owner = requireActor(actor);
@@ -113,10 +141,17 @@ public class ThesisAssistantKnowledgeAdminController {
         return new KnowledgeRevision(id, revision, version, "DRAFT");
     }
 
+    @Operation(summary = "Nộp bản nháp để chờ xét duyệt (Submit for Review)", description = "Chuyển trạng thái phiên bản từ DRAFT sang PENDING_REVIEW để người khác duyệt")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Nộp duyệt thành công"),
+        @ApiResponse(responseCode = "409", description = "Xung đột trạng thái phiên bản")
+    })
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Transactional
-    public KnowledgeRevision submit(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public KnowledgeRevision submit(
+            @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = requireActor(actor);
         lockDocument(id);
         List<RevisionRow> drafts = jdbc.query(
@@ -131,10 +166,17 @@ public class ThesisAssistantKnowledgeAdminController {
         return new KnowledgeRevision(id, draft.id(), draft.version(), "PENDING_REVIEW");
     }
 
+    @Operation(summary = "Phê duyệt và xuất bản tài liệu tri thức (Publish - 2-man rule)", description = "Yêu cầu một Admin khác với người tạo kiểm duyệt và chính thức xuất bản tri thức cho AI sử dụng")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Xuất bản thành công"),
+        @ApiResponse(responseCode = "409", description = "Người tạo không thể tự duyệt phiên bản của chính mình")
+    })
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Transactional
-    public KnowledgeRevision publish(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public KnowledgeRevision publish(
+            @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = requireActor(actor);
         lockDocument(id);
         List<RevisionRow> pending = jdbc.query(
@@ -165,10 +207,17 @@ public class ThesisAssistantKnowledgeAdminController {
         return new KnowledgeRevision(id, selected.id(), selected.version(), "PUBLISHED");
     }
 
+    @Operation(summary = "Lưu trữ tài liệu tri thức (Archive/Delete)", description = "Đưa tài liệu tri thức vào trạng thái lưu trữ ngưng hoạt động")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Lưu trữ thành công"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy tài liệu")
+    })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Transactional
-    public void delete(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
+    public void delete(
+            @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
         String owner = requireActor(actor);
         lockDocument(id);
         List<RevisionRow> revisions = jdbc.query("SELECT id,version,created_by FROM assistant.knowledge_document_revision WHERE document_id=:id ORDER BY version DESC LIMIT 1",

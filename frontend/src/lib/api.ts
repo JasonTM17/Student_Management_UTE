@@ -18,6 +18,7 @@ import {
   TranscriptResponse,
   AcademicYear,
   Classroom,
+  Curriculum,
   Lecturer,
   GradingSection,
   LecturerSection,
@@ -942,6 +943,23 @@ export const academicYearsApi = {
     const response = await api.delete<{ message: string }>(
       `/academic-years/${id}`,
     );
+    return response.data;
+  },
+};
+
+// Admin Curricula API
+export const curriculaApi = {
+  getAll: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<Curriculum[]>> => {
+    const response = await api.get<ApiResponse<Curriculum[]>>('/curricula', {
+      params,
+    });
+    return response.data;
+  },
+  getById: async (id: string): Promise<Curriculum> => {
+    const response = await api.get<Curriculum>(`/curricula/${id}`);
     return response.data;
   },
 };

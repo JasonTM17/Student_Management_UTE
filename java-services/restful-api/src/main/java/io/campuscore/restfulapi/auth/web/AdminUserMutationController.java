@@ -1,6 +1,11 @@
 package io.campuscore.restfulapi.auth.web;
 
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.Parameter;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
@@ -19,6 +24,7 @@ import org.springframework.web.bind.annotation.RestController;
 @Profile("persistence")
 @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
 @RequestMapping("/api/v1/users")
+@Tag(name = "User Management (Admin)", description = "Quản trị danh sách người dùng, cấp phát tài khoản học vụ, đặt lại mật khẩu và phân quyền hệ thống")
 public class AdminUserMutationController {
 
     private final AdminUserMutationService users;
@@ -28,15 +34,22 @@ public class AdminUserMutationController {
     }
 
     @GetMapping
+    @Operation(summary = "Danh sách người dùng", description = "Truy xuất danh sách người dùng theo phân trang, lọc theo trạng thái và tìm kiếm họ tên hoặc email.")
+    @ApiResponse(responseCode = "200", description = "Danh sách người dùng và siêu dữ liệu phân trang")
     public Map<String, Object> list(
-            @RequestParam(defaultValue = "1") int page,
-            @RequestParam(defaultValue = "20") int limit,
-            @RequestParam(required = false) String status,
-            @RequestParam(required = false) String search) {
+            @Parameter(description = "Số thứ tự trang (bắt đầu từ 1)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng bản ghi trên một trang") @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Bộ lọc trạng thái (ACTIVE, INACTIVE, LOCKED)") @RequestParam(required = false) String status,
+            @Parameter(description = "Từ khóa tìm kiếm theo tên hoặc email") @RequestParam(required = false) String search) {
         return users.list(page, limit, status, search);
     }
 
     @PostMapping
+    @Operation(summary = "Tạo tài khoản người dùng mới", description = "Phòng Đào tạo / Quản trị viên cấp tài khoản học vụ cho Sinh viên hoặc Giảng viên, hệ thống cấp phát mật khẩu tạm thời.")
+    @ApiResponses({
+            @ApiResponse(responseCode = "200", description = "Tạo tài khoản thành công, trả về thông tin người dùng và mật khẩu tạm thời"),
+            @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc email đã tồn tại")
+    })
     public Map<String, Object> create(
             @RequestBody Map<String, Object> input,
             Authentication authentication) {
@@ -44,16 +57,20 @@ public class AdminUserMutationController {
     }
 
     @PostMapping("/{id}/password-reset")
+    @Operation(summary = "Đặt lại mật khẩu người dùng", description = "Phòng Đào tạo / Quản trị viên cấp lại mật khẩu tạm thời ngẫu nhiên an toàn cho tài khoản người dùng.")
+    @ApiResponse(responseCode = "200", description = "Phát hành mật khẩu mới thành công, yêu cầu đổi mật khẩu khi đăng nhập lần đầu")
     public Map<String, Object> resetPassword(
-            @PathVariable String id,
+            @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
             Authentication authentication) {
         String currentUserId = authentication != null ? authentication.getName() : null;
         return users.resetPassword(id, isSuperAdmin(authentication), currentUserId);
     }
 
     @PutMapping("/{id}")
+    @Operation(summary = "Cập nhật tài khoản người dùng", description = "Chỉnh sửa thông tin hồ sơ họ tên, quyền hạn vai trò hoặc trạng thái tài khoản.")
+    @ApiResponse(responseCode = "200", description = "Cập nhật thông tin người dùng thành công")
     public Map<String, Object> update(
-            @PathVariable String id,
+            @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
             @RequestBody Map<String, Object> input,
             Authentication authentication) {
         String currentUserId = authentication != null ? authentication.getName() : null;
@@ -61,8 +78,10 @@ public class AdminUserMutationController {
     }
 
     @DeleteMapping("/{id}")
+    @Operation(summary = "Xóa tài khoản người dùng", description = "Xóa người dùng khỏi hệ thống đào tạo kèm kiểm tra bảo vệ tài khoản siêu quản trị viên.")
+    @ApiResponse(responseCode = "200", description = "Xóa tài khoản thành công")
     public Map<String, String> delete(
-            @PathVariable String id,
+            @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
             Authentication authentication) {
         String currentUserId = authentication != null ? authentication.getName() : null;
         users.delete(id, isSuperAdmin(authentication), currentUserId);
