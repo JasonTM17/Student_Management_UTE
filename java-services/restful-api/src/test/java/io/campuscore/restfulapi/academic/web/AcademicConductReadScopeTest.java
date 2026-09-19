@@ -9,6 +9,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import java.util.List;
+import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
@@ -39,7 +40,7 @@ class AcademicConductReadScopeTest {
     @BeforeEach
     void setUp() {
         jdbc = mock(NamedParameterJdbcTemplate.class);
-        controller = new AcademicConductController(jdbc);
+        controller = new AcademicConductController(new AcademicConductService(jdbc));
     }
 
     private void targetIsTaughtBy(int enrollmentMatches) {
