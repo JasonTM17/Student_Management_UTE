@@ -30,8 +30,8 @@ const routes: Record<Persona, string[]> = {
     '/dashboard/editor',
     '/dashboard/thesis',
     '/dashboard/thesis/topics',
-    '/dashboard/thesis/topics/22222222-2222-2222-2222-222222222201',
-    '/dashboard/thesis/22222222-2222-2222-2222-222222222101',
+    '/dashboard/thesis/topics/d7e2b345-0c8f-423e-9412-2c3d4e5f6a71',
+    '/dashboard/thesis/c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     '/dashboard/thesis/progress',
   ],
   lecturer: [

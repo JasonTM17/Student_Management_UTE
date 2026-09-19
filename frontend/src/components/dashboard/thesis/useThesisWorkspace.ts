@@ -39,12 +39,13 @@ export function useThesisWorkspace(
     try {
       const nextRounds = await thesisApi.listRounds();
       const sortedRounds = [...nextRounds].sort((a, b) => {
-        // Prioritize canonical registration round holding the full topic catalog
-        if (a.id === '22222222-2222-2222-2222-222222222101') return -1;
-        if (b.id === '22222222-2222-2222-2222-222222222101') return 1;
+        // Academic rule priority: OPEN registration > KLTN thesis type > newest start date
         const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
         const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
         if (isOpenA !== isOpenB) return isOpenA - isOpenB;
+        const isKltnA = a.thesisType === 'KLTN' ? 0 : 1;
+        const isKltnB = b.thesisType === 'KLTN' ? 0 : 1;
+        if (isKltnA !== isKltnB) return isKltnA - isKltnB;
         return (b.registrationStart || '').localeCompare(a.registrationStart || '');
       });
       setRounds(sortedRounds);
@@ -55,11 +56,10 @@ export function useThesisWorkspace(
         if (current && sortedRounds.some((round) => round.id === current)) {
           return current;
         }
-        const preferred = sortedRounds.find(
-          (r) => r.id === '22222222-2222-2222-2222-222222222101' && r.status === 'REGISTRATION_OPEN',
-        ) || sortedRounds.find(
-          (r) => r.status === 'REGISTRATION_OPEN',
-        ) || sortedRounds[0];
+        const preferred =
+          sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
+          sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
+          sortedRounds[0];
         return preferred?.id || '';
       });
     } catch {
