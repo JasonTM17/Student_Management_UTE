@@ -1,0 +1,144 @@
+-- Migration 20260919202000_populate_article_attachments.sql
+-- Bổ sung 12 tài liệu học vụ, quyết định và cẩm nang đính kèm chính thức cho các bài viết tiêu biểu
+
+INSERT INTO engagement."ArticleAttachment" (
+    "id", "announcementId", "fileName", "fileUrl", "fileSizeBytes", "mimeType", "checksumSha256", "downloadCount", "isPublic"
+) VALUES
+(
+    'att-rector-academic-plan',
+    'announcement-rector-new-academic-year-decision',
+    'Quyet_dinh_Ban_hanh_Ke_hoach_Nam_hoc_2026_2027.pdf',
+    '/documents/announcements/Quyet_dinh_Ke_hoach_Nam_hoc_2026_2027.pdf',
+    2154800,
+    'application/pdf',
+    'a1b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0',
+    1240,
+    TRUE
+),
+(
+    'att-digital-library-guide',
+    'announcement-digital-library-hub',
+    'Huong_dan_Su_dung_Thuc_dia_Thu_vien_So_24_7.pdf',
+    '/documents/announcements/Huong_dan_Thu_vien_So_24_7.pdf',
+    1684500,
+    'application/pdf',
+    'b2c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef012',
+    895,
+    TRUE
+),
+(
+    'att-dormitory-handbook',
+    'announcement-student-dormitory-campus',
+    'Noi_quy_va_So_tay_Kytucxa_Sinhvien_2026.pdf',
+    '/documents/announcements/So_tay_KTX_Sinh_vien_2026.pdf',
+    2894100,
+    'application/pdf',
+    'c3d4e5f67890123456789abcdef0123456789abcdef0123456789abcdef0123',
+    720,
+    TRUE
+),
+(
+    'att-faculty-honors-list',
+    'announcement-faculty-excellence-awards',
+    'Danh_sach_Tuyen_duong_Giang_vien_Xuat_sac_2025_2026.pdf',
+    '/documents/announcements/Danh_sach_Giang_vien_Xuat_sac_2026.pdf',
+    1432600,
+    'application/pdf',
+    'd4e5f67890123456789abcdef0123456789abcdef0123456789abcdef01234',
+    640,
+    TRUE
+),
+(
+    'att-blood-donation-guidelines',
+    'announcement-blood-donation-day',
+    'Huong_dan_Y_te_va_Dang_ky_Hien_mau_Giot_hong_2026.pdf',
+    '/documents/announcements/Huong_dan_Hien_mau_Giot_hong_2026.pdf',
+    980700,
+    'application/pdf',
+    'e5f67890123456789abcdef0123456789abcdef0123456789abcdef012345',
+    530,
+    TRUE
+),
+(
+    'att-cultural-gala-plan',
+    'announcement-cultural-arts-gala',
+    'Ke_hoach_To_chuc_Hoi_dien_Van_nghe_Truyen_thong_2026.pdf',
+    '/documents/announcements/Ke_hoach_Hoi_dien_Van_nghe_2026.pdf',
+    1845300,
+    'application/pdf',
+    'f67890123456789abcdef0123456789abcdef0123456789abcdef0123456',
+    410,
+    TRUE
+),
+(
+    'att-bigdata-gpu-bylaws',
+    'announcement-ute-bigdata-ai-center',
+    'Quy_che_Khai_thac_Cum_may_chu_GPU_AI_Lab.pdf',
+    '/documents/announcements/Quy_che_Khai_thac_GPU_AI_Lab.pdf',
+    2340100,
+    'application/pdf',
+    '0123456789abcdef0123456789abcdef0123456789abcdef0123456789abcdef',
+    980,
+    TRUE
+),
+(
+    'att-career-expo-handbook',
+    'announcement-ute-career-fair-tech-2026',
+    'Cam_nang_Doanh_nghiep_Tech_Career_Expo_2026.pdf',
+    '/documents/announcements/Cam_nang_Tech_Career_Expo_2026.pdf',
+    3420500,
+    'application/pdf',
+    '11223344556677889900aabbccddeeff11223344556677889900aabbccddeeff',
+    1560,
+    TRUE
+),
+(
+    'att-scholarship-criteria-doc',
+    'announcement-ute-scholarship-dr-criteria',
+    'Quy_dinh_Xet_cap_Hoc_bong_Khuyen_khich_va_Doanh_nghiep.pdf',
+    '/documents/announcements/Quy_dinh_Hoc_bong_Khuyen_khich_2026.pdf',
+    1920400,
+    'application/pdf',
+    '22334455667788990011aabbccddeeff22334455667788990011aabbccddeeff',
+    2150,
+    TRUE
+),
+(
+    'att-course-reg-handbook',
+    'announcement-ute-course-reg-official',
+    'So_tay_Huong_dan_Dang_ky_Hoc_phan_CampusUTE.pdf',
+    '/documents/announcements/So_tay_Dang_ky_Hoc_phan_CampusUTE.pdf',
+    2750300,
+    'application/pdf',
+    '33445566778899001122aabbccddeeff33445566778899001122aabbccddeeff',
+    3420,
+    TRUE
+),
+(
+    'att-thesis-guidelines-doc',
+    'announcement-ute-thesis-registration-fall',
+    'Quy_dinh_va_Bieu_mau_Bao_ve_Khoa_luan_Tot_nghiep.pdf',
+    '/documents/announcements/Quy_dinh_Bieu_mau_KLTN_2026.pdf',
+    2480600,
+    'application/pdf',
+    '44556677889900112233aabbccddeeff44556677889900112233aabbccddeeff',
+    1890,
+    TRUE
+),
+(
+    'att-student-research-rules',
+    'announcement-ute-student-scientific-research-awards',
+    'The_le_Giai_thuong_Nghien_cuu_Khoa_hoc_Sinh_vien_2026.pdf',
+    '/documents/announcements/The_le_Giai_thuong_NCKH_2026.pdf',
+    1760800,
+    'application/pdf',
+    '55667788990011223344aabbccddeeff55667788990011223344aabbccddeeff',
+    1120,
+    TRUE
+)
+ON CONFLICT ("id") DO UPDATE SET
+    "fileName" = EXCLUDED."fileName",
+    "fileUrl" = EXCLUDED."fileUrl",
+    "fileSizeBytes" = EXCLUDED."fileSizeBytes",
+    "checksumSha256" = EXCLUDED."checksumSha256",
+    "downloadCount" = EXCLUDED."downloadCount";
