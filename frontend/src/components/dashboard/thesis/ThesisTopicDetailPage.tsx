@@ -64,7 +64,12 @@ export default function ThesisTopicDetailPage() {
     thesisApi
       .getTopic(topicId)
       .then((t) => {
-        if (!cancelled) setDirectTopic(t);
+        if (!cancelled) {
+          setDirectTopic(t);
+          if (t?.roundId && t.roundId !== workspace.selectedRoundId) {
+            workspace.setSelectedRoundId(t.roundId);
+          }
+        }
       })
       .catch(() => {
         if (!cancelled) setDirectTopic(null);
@@ -75,7 +80,14 @@ export default function ThesisTopicDetailPage() {
     return () => {
       cancelled = true;
     };
-  }, [topicId, workspace.topics]);
+  }, [topicId, workspace.topics, workspace.selectedRoundId, workspace.setSelectedRoundId]);
+
+  useEffect(() => {
+    const matched = workspace.topics.find((item) => item.id === topicId);
+    if (matched?.roundId && matched.roundId !== workspace.selectedRoundId) {
+      workspace.setSelectedRoundId(matched.roundId);
+    }
+  }, [topicId, workspace.topics, workspace.selectedRoundId, workspace.setSelectedRoundId]);
 
   const topic = workspace.topics.find((item) => item.id === topicId) ?? directTopic;
 

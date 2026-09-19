@@ -360,11 +360,12 @@ export default function ThesisPage() {
         const nextRounds = await thesisApi.listRounds();
         if (cancelled) return;
         const sortedRounds = [...nextRounds].sort((a, b) => {
-          if (a.id === '22222222-2222-2222-2222-222222222101') return -1;
-          if (b.id === '22222222-2222-2222-2222-222222222101') return 1;
           const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
           const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
           if (isOpenA !== isOpenB) return isOpenA - isOpenB;
+          const isKltnA = a.thesisType === 'KLTN' ? 0 : 1;
+          const isKltnB = b.thesisType === 'KLTN' ? 0 : 1;
+          if (isKltnA !== isKltnB) return isKltnA - isKltnB;
           return (b.registrationStart || '').localeCompare(a.registrationStart || '');
         });
         setRounds(sortedRounds);
@@ -373,11 +374,10 @@ export default function ThesisPage() {
             return explicitRoundId;
           }
           if (current) return current;
-          const preferred = sortedRounds.find(
-            (r) => r.id === '22222222-2222-2222-2222-222222222101' && r.status === 'REGISTRATION_OPEN',
-          ) || sortedRounds.find(
-            (r) => r.status === 'REGISTRATION_OPEN',
-          ) || sortedRounds[0];
+          const preferred =
+            sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
+            sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
+            sortedRounds[0];
           return preferred?.id || '';
         });
       } catch {
@@ -3263,7 +3263,7 @@ export default function ThesisPage() {
 
             <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border/60 pt-3">
               <LocalizedLink
-                href={`/dashboard/thesis/topics/${viewingTopic.id}?roundId=${selectedRoundId}`}
+                href={`/dashboard/thesis/topics/${viewingTopic.id}`}
                 className="inline-flex items-center gap-1 text-xs font-semibold text-primary hover:underline"
               >
                 <ExternalLink className="h-3.5 w-3.5" />

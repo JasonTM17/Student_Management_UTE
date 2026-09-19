@@ -92,4 +92,35 @@ class AnnouncementGovernanceMigrationTest {
         }
         assertThat(foundV68).isTrue();
     }
+
+    @Test
+    void v69StandardizesMockThesisUuids() throws Exception {
+        Path script = Path.of("src/main/resources/db/migration/V69__standardize_mock_thesis_uuids.sql");
+        String sql = Files.readString(script);
+
+        assertThat(script).exists();
+        assertThat(sql)
+                .contains("c8f1a234-9b7e-412d-8301-1b2c3d4e5f60")
+                .contains("d7e2b345-0c8f-423e-9412-2c3d4e5f6a71")
+                .contains("22222222-2222-2222-2222-222222222101")
+                .contains("22222222-2222-2222-2222-222222222201")
+                .contains("thesis.thesis_registration_round")
+                .contains("thesis.thesis_topic")
+                .contains("thesis.thesis_group")
+                .contains("thesis.thesis_group_member");
+
+        org.flywaydb.core.Flyway flyway = org.flywaydb.core.Flyway.configure()
+                .dataSource("jdbc:h2:mem:probe69;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE", "sa", "")
+                .locations("classpath:db/migration")
+                .load();
+        boolean foundV69 = false;
+        for (org.flywaydb.core.api.MigrationInfo info : flyway.info().all()) {
+            if ("69".equals(info.getVersion().getVersion())) {
+                assertThat(info.getChecksum()).isEqualTo(-1664827406);
+                foundV69 = true;
+                break;
+            }
+        }
+        assertThat(foundV69).isTrue();
+    }
 }

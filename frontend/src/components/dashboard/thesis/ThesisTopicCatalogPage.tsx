@@ -264,7 +264,7 @@ export default function ThesisTopicCatalogPage() {
             {matchingTopics.map((topic) => (
               <LocalizedLink
                 key={topic.id}
-                href={`/dashboard/thesis/topics/${topic.id}?roundId=${workspace.selectedRoundId}`}
+                href={`/dashboard/thesis/topics/${topic.id}`}
                 className={cn(
                   'group flex min-h-[210px] flex-col rounded-lg border border-border/70 bg-card p-5',
                   'transition-colors hover:border-primary/50 hover:bg-primary/[0.025]',
