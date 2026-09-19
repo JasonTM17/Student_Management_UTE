@@ -18,7 +18,458 @@ WHERE "id" IN (
     '145f17d9-0f5a-43c7-b143-4cb2c33bdb43'
 );
 
--- 2. Chuẩn hóa toàn bộ thông báo cũ với chuyên mục, slug và ảnh bìa chất lượng cao
+-- 2. Đảm bảo toàn bộ 16 thông báo học vụ cốt lõi tồn tại trước khi chuẩn hóa chuyên mục và tạo quan hệ media/tài liệu
+INSERT INTO engagement."Announcement" (
+    id, title, content, priority, "targetRoles", "targetYears", "isGlobal",
+    "publishAt", "publishedBy", "semesterId", "semesterName", "createdAt", "updatedAt", version
+) VALUES
+(
+    'announcement-ute-bigdata-ai-center',
+    'Khởi động Phòng Nghiên cứu Dữ liệu lớn (Big Data) & Trí tuệ Nhân tạo Khoa CNTT HCM-UTE',
+    '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM trân trọng thông báo chính thức khánh thành và đưa vào vận hành cụm máy chủ điện toán hiệu năng cao (HPC Cluster) phục vụ nghiên cứu Dữ liệu lớn (Big Data) và Trí tuệ nhân tạo (AI Lab) tại cơ sở chính.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/bigdata-ai-lab.jpg" alt="Phòng Nghiên cứu Big Data & AI Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Cụm máy chủ điện toán GPU NVIDIA A100 và hạ tầng lưu trữ phân tán 500TB tại Phòng Nghiên cứu Big Data & AI Khoa CNTT HCM-UTE
+  </figcaption>
+</figure>
+<p>Dự án là bước tiến chiến lược trong đề án chuyển đổi số giáo dục đại học và nâng cao năng lực nghiên cứu ứng dụng thực tiễn của Nhà trường:</p>
+<ul>
+  <li><strong>Hạ tầng kỹ thuật:</strong> Cụm máy chủ 8x NVIDIA A100 GPU Tensor Core (80GB VRAM), hệ thống lưu trữ phân tán Ceph 500TB NVMe và mạng kết nối InfiniBand tốc độ cao 200Gbps.</li>
+  <li><strong>Nền tảng phần mềm:</strong> Triển khai môi trường ảo hóa Kubernetes, hỗ trợ xử lý luồng Kafka, Apache Spark, PyTorch Distributed và cụm huấn luyện mô hình ngôn ngữ lớn (LLM).</li>
+  <li><strong>Đối tượng khai thác:</strong> Toàn thể giảng viên, nghiên cứu sinh, học viên cao học, nhóm sinh viên nghiên cứu khoa học (Lab AI & Data Science) và đề tài Khóa luận tốt nghiệp chuyên sâu.</li>
+  <li><strong>Quy trình đăng ký tài nguyên:</strong> Giảng viên và nhóm nghiên cứu nộp đề cương tại Văn phòng Bộ môn Kỹ thuật Dữ liệu (Phòng A1-402) trước ngày 30/09/2026.</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER', 'ADMIN']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-08 08:00:00+07',
+    'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-08 08:00:00+07',
+    '2026-09-08 08:00:00+07',
+    1
+),
+(
+    'announcement-ute-course-reg-official',
+    'Kế hoạch tổ chức đăng ký học phần chính thức Học kỳ 1 năm học 2026-2027',
+    '<p>Phòng Đào tạo thông báo kế hoạch tổ chức đăng ký học phần chính thức cho Học kỳ 1 năm học 2026-2027 trên hệ thống quản lý học tập tích hợp CampusUTE.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/course-registration.jpg" alt="Cổng đăng ký học phần trực tuyến CampusUTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Sinh viên tra cứu thời khóa biểu và thực hiện đăng ký học phần trực tuyến trên cổng CampusUTE
+  </figcaption>
+</figure>
+<p>Để đảm bảo công tác tổ chức đào tạo diễn ra thuận lợi, sinh viên cần nắm vững các mốc thời gian và quy định học vụ sau:</p>
+<ul>
+  <li><strong>Hạn mức tín chỉ:</strong> Sinh viên được đăng ký tối đa <strong>28 tín chỉ</strong> trong học kỳ chính; chỉ trường hợp có đơn xin vượt hạn mức được Ban Chủ nhiệm Khoa và Phòng Đào tạo duyệt mới được nâng lên trần 30 tín chỉ.</li>
+  <li><strong>Khung thời gian mở cổng đăng ký:</strong>
+    <ul>
+      <li>Khóa 2023 (Năm 4): Từ 08:00 ngày 25/08/2026 đến 17:00 ngày 27/08/2026.</li>
+      <li>Khóa 2024 (Năm 3): Từ 08:00 ngày 28/08/2026 đến 17:00 ngày 30/08/2026.</li>
+      <li>Khóa 2025 (Năm 2): Từ 08:00 ngày 31/08/2026 đến 17:00 ngày 02/09/2026.</li>
+      <li>Đăng ký bổ sung toàn trường &amp; Đổi lớp: Từ 08:00 ngày 05/09/2026 đến 17:00 ngày 15/09/2026.</li>
+    </ul>
+  </li>
+  <li><strong>Lưu ý học vụ quan trọng:</strong> Hệ thống tự động kiểm tra điều kiện tiên quyết và trùng thời khóa biểu. Sinh viên cần rà soát kỹ tiến độ học tập trên trang cá nhân trước khi ấn nút xác nhận lưu đăng ký.</li>
+</ul>',
+    'URGENT',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-08-25 08:00:00+07',
+    'Phòng Đào Tạo UTE',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-08-25 08:00:00+07',
+    '2026-08-25 08:00:00+07',
+    1
+),
+(
+    'announcement-ute-thesis-registration-fall',
+    'Thông báo mở đợt đăng ký Khóa luận tốt nghiệp (KLTN) & Tiểu luận chuyên ngành Khoa CNTT',
+    '<p>Khoa Công nghệ Thông tin - Trường Đại học Sư phạm Kỹ thuật TP.HCM long trọng tổ chức Lễ bảo vệ Khóa luận tốt nghiệp (KLTN) đợt 2 cho sinh viên các chuyên ngành Kỹ thuật phần mềm, Hệ thống thông tin, An toàn thông tin và Trí tuệ nhân tạo.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/thesis-defense.jpg" alt="Lễ bảo vệ Khóa luận tốt nghiệp Khoa CNTT HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Sinh viên Khoa Công nghệ Thông tin tự tin báo cáo đề tài khóa luận trước Hội đồng chấm thi học thuật HCM-UTE
+  </figcaption>
+</figure>
+<p>Đợt bảo vệ ghi nhận sự trưởng thành vượt bậc về hàm lượng khoa học, tính ứng dụng thực tiễn và khả năng làm chủ công nghệ của sinh viên:</p>
+<ul>
+  <li><strong>Điều kiện đăng ký KLTN:</strong> Sinh viên tích lũy tối thiểu 110 tín chỉ, điểm trung bình tích lũy CPA &ge; 2.00, không bị cảnh báo học vụ mức 2.</li>
+  <li><strong>Hình thức thực hiện:</strong> Mỗi nhóm từ 1 đến tối đa 3 sinh viên; Nhóm trưởng trực tiếp khởi tạo đề tài và mời thành viên cùng Giảng viên hướng dẫn (GVHD) trên Cổng thông tin.</li>
+  <li><strong>Mốc thời gian quan trọng:</strong>
+    <ul>
+      <li>Nộp phiếu giao đề tài có chữ ký duyệt của GVHD: Hạn chót 17:00 ngày 25/09/2026.</li>
+      <li>Báo cáo tiến độ giữa kỳ (Mid-term evaluation): Từ ngày 10/11/2026 đến 15/11/2026.</li>
+      <li>Nộp bản thảo toàn văn và báo cáo kiểm tra trùng lặp đạo văn (&le; 20%): Ngày 15/12/2026.</li>
+      <li>Hội đồng bảo vệ chính thức: Dự kiến từ ngày 05/01/2027 đến 10/01/2027.</li>
+    </ul>
+  </li>
+  <li><strong>Kho lưu trữ số hóa:</strong> Toàn bộ báo cáo toàn văn, slide thuyết trình và mã nguồn đề tài được tích hợp lưu trữ tại Phân hệ Kho Luận án & Đồ án tốt nghiệp trên nền tảng CampusUTE.</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-01 07:30:00+07',
+    'Văn Phòng Khoa CNTT & Phòng Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-01 07:30:00+07',
+    '2026-09-01 07:30:00+07',
+    1
+),
+(
+    'announcement-ute-scholarship-dr-criteria',
+    'Thông báo xét cấp Học bổng Khuyến khích học tập & Tiêu chuẩn Điểm rèn luyện (ĐRL) đợt 1',
+    '<p>Hội đồng xét duyệt Học bổng Nhà trường trân trọng thông báo kết quả đối soát điểm trung bình chung học tập (GPA) kết hợp điểm rèn luyện (ĐRL) xét cấp Học bổng Khuyến khích học tập.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/scholarship-ceremony.jpg" alt="Lễ trao học bổng khuyến khích học tập HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Lễ trao Học bổng Khuyến khích học tập và Học bổng Doanh nghiệp vinh danh các sinh viên xuất sắc HCM-UTE
+  </figcaption>
+</figure>
+<p>Chính sách học bổng nhằm động viên tinh thần nỗ lực vươn lên trong học tập và rèn luyện của sinh viên toàn trường theo các tiêu chuẩn học vụ hiện hành:</p>
+<ul>
+  <li><strong>Học bổng Xuất sắc (Loại A):</strong> GPA &ge; 3.60 và Điểm rèn luyện &ge; 90 điểm (Xếp loại Xuất sắc), hoàn thành tối thiểu 15 tín chỉ trong học kỳ xét. Mức cấp: 120% học phí học kỳ.</li>
+  <li><strong>Học bổng Giỏi (Loại B):</strong> GPA &ge; 3.20 và Điểm rèn luyện &ge; 80 điểm (Xếp loại Tốt trở lên). Mức cấp: 100% học phí học kỳ.</li>
+  <li><strong>Học bổng Khá (Loại C):</strong> GPA &ge; 2.50 và Điểm rèn luyện &ge; 70 điểm (Xếp loại Khá trở lên). Mức cấp: 50% học phí học kỳ.</li>
+  <li><strong>Quy trình đối soát:</strong> Sinh viên kiểm tra điểm rèn luyện tại phân hệ Quản lý ĐRL trên Cổng thông tin. Mọi khiếu nại về minh chứng điểm hoạt động gửi về Văn phòng Đoàn - Hội trường trước 17:00 ngày 20/09/2026.</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-05 09:00:00+07',
+    'Phòng Công Tác Sinh Viên & Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-05 09:00:00+07',
+    '2026-09-05 09:00:00+07',
+    1
+),
+(
+    'announcement-ute-exam-regulations-schedule',
+    'Quy chế thi kết thúc học phần, phân ca phòng thi và thủ tục nộp đơn phúc khảo trực tuyến',
+    '<p>Phòng Khảo thí và Đảm bảo Chất lượng Đào tạo thông báo hướng dẫn tham gia các kỳ thi học phần:</p>
+<ul>
+  <li><strong>Thẻ dự thi và nhận diện:</strong> Sinh viên bắt buộc xuất trình Thẻ sinh viên có tích hợp chip hoặc Căn cước công dân gắn chip khi vào phòng thi. Trường hợp mất thẻ phải xin giấy xác nhận tại Phòng CTSV trước giờ thi 30 phút.</li>
+  <li><strong>Quy định phòng thi:</strong> Tuyệt đối không mang điện thoại di động, đồng hồ thông minh hoặc thiết bị thu phát sóng vào bàn thi. Vi phạm sẽ bị lập biên bản đình chỉ thi và nhận điểm 0 (F).</li>
+  <li><strong>Thủ tục phúc khảo bài thi:</strong> Thời gian nộp đơn phúc khảo trực tuyến là 07 ngày làm việc kể từ thời điểm giảng viên công bố điểm tổng kết trên hệ thống. Kết quả phúc khảo được Hội đồng chấm lại và công bố trong vòng 10 ngày làm việc.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-07 14:00:00+07',
+    'Phòng Khảo Thí & Đảm Bảo Chất Lượng',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-07 14:00:00+07',
+    '2026-09-07 14:00:00+07',
+    1
+),
+(
+    'announcement-ute-career-fair-tech-2026',
+    'Ngày hội việc làm và Kết nối doanh nghiệp công nghệ thông tin UTE Tech Career Expo 2026',
+    '<p>Nhà trường phối hợp cùng hơn 60 tập đoàn công nghệ đa quốc gia và doanh nghiệp công nghệ thông tin hàng đầu tổ chức Ngày hội Việc làm và Kết nối Doanh nghiệp UTE Tech Career Expo 2026 tại khuôn viên sảnh A & B.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/tech-career-expo.jpg" alt="Ngày hội việc làm UTE Tech Career Expo" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Không khí sôi nổi tại UTE Tech Career Expo 2026 với hơn 60 tập đoàn công nghệ và 1.200 vị trí tuyển dụng kỹ sư
+  </figcaption>
+</figure>
+<p>Sự kiện mang đến hàng nghìn cơ hội nghề nghiệp chất lượng cao và định hướng phát triển sự nghiệp vững chắc cho sinh viên các khối ngành kỹ thuật công nghệ:</p>
+<ul>
+  <li><strong>Thời gian:</strong> 07:30 - 16:30 thứ Sáu ngày 23/10/2026.</li>
+  <li><strong>Địa điểm:</strong> Quảng trường trung tâm Khu A và Hội trường Trịnh Công Sơn, Trường ĐH Công nghệ Kỹ thuật TP.HCM.</li>
+  <li><strong>Doanh nghiệp tham gia:</strong> FPT Software, Viettel, VNPT, VNG, KMS Technology, Bosch Global Software, Renesas, Shopee, NAB Innovation Centre Vietnam...</li>
+  <li><strong>Cơ hội dành cho sinh viên:</strong>
+    <ul>
+      <li>Hơn 1.200 vị trí tuyển dụng thực tập sinh (Internship) và kỹ sư chính thức (Fresher/Junior Software Engineer, Data Engineer, AI Engineer).</li>
+      <li>Phỏng vấn tuyển dụng trực tiếp tại gian hàng (On-site Fast-track Interview).</li>
+      <li>Tư vấn sửa CV chuyên nghiệp và định hướng lộ trình nghề nghiệp cùng các chuyên gia Headhunter.</li>
+    </ul>
+  </li>
+  <li><strong>Quyền lợi:</strong> Sinh viên tham dự được cộng 05 điểm rèn luyện vào Mục 3 (Hoạt động hỗ trợ kỹ năng và hội nhập nghề nghiệp).</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-09 10:00:00+07',
+    'Trung Tâm Hướng Nghiệp & Quan Hệ Doanh Nghiệp',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-09 10:00:00+07',
+    '2026-09-09 10:00:00+07',
+    1
+),
+(
+    'announcement-ute-english-it-exit-benchmark',
+    'Kế hoạch kiểm tra Chuẩn đầu ra Ngoại ngữ (TOEIC/IELTS) và Tin học chuẩn Quốc tế MOS đợt 1',
+    '<p>Trung tâm Ngoại ngữ - Tin học UTE thông báo lịch kiểm tra và xét công nhận chuẩn đầu ra đợt tháng 10/2026:</p>
+<ul>
+  <li><strong>Chuẩn Ngoại ngữ tốt nghiệp:</strong>
+    <ul>
+      <li>Bậc Đại học hệ chuẩn: TOEIC 500+ / IELTS 5.0+ / VSTEP B1.</li>
+      <li>Bậc Đại học hệ chất lượng cao / Tiên tiến: TOEIC 600+ / IELTS 5.5+ / VSTEP B2.</li>
+    </ul>
+  </li>
+  <li><strong>Chuẩn Tin học:</strong> Chứng chỉ MOS (Word, Excel) đạt từ 700/1000 điểm hoặc chứng chỉ Ứng dụng CNTT nâng cao.</li>
+  <li><strong>Thời hạn nộp chứng chỉ quốc tế để miễn thi:</strong> Đến hết 17:00 ngày 15/10/2026 qua cổng nộp hồ sơ trực tuyến.</li>
+  <li><strong>Lịch thi tập trung:</strong> Ngày 24 và 25/10/2026 tại Tòa nhà Trung tâm Dạy học số.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['STUDENT']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-06 08:30:00+07',
+    'Trung Tâm Ngoại Ngữ & Tin Học UTE',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-06 08:30:00+07',
+    '2026-09-06 08:30:00+07',
+    1
+),
+(
+    'announcement-ute-tuition-payment-notice',
+    'Thông báo thu học phí Học kỳ 1 năm học 2026-2027 và các kênh thanh toán trực tuyến',
+    '<p>Phòng Kế hoạch - Tài chính thông báo thời hạn và phương thức nộp học phí học kỳ 1 năm học 2026-2027:</p>
+<ul>
+  <li><strong>Thời gian nộp:</strong> Từ ngày 01/09/2026 đến hết 17:00 ngày 10/10/2026. Sau thời hạn trên, sinh viên chưa hoàn thành nghĩa vụ học phí sẽ bị khóa quyền thi kết thúc học phần.</li>
+  <li><strong>Phương thức thanh toán trực tuyến:</strong>
+    <ul>
+      <li>Cổng thanh toán VietQR (mã QR động có gắn sẵn mã sinh viên và số tiền học phí chính xác).</li>
+      <li>Chuyển khoản định danh qua Ngân hàng số Agribank, Vietcombank, BIDV theo mã định danh sinh viên: <code>HCMUTE + [Mã SV]</code>.</li>
+      <li>Thanh toán trực tiếp tại Cổng Cán sự lớp hoặc Văn phòng Phòng Kế hoạch - Tài chính (Phòng A1-102).</li>
+    </ul>
+  </li>
+  <li><strong>Chính sách gia hạn học phí:</strong> Sinh viên có hoàn cảnh khó khăn làm đơn xin gia hạn nộp học phí theo mẫu số 04-ĐT và nộp tại Phòng CTSV trước ngày 25/09/2026.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['STUDENT']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-01 10:00:00+07',
+    'Phòng Kế Hoạch - Tài Chính',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-01 10:00:00+07',
+    '2026-09-01 10:00:00+07',
+    1
+),
+(
+    'announcement-ute-academic-warning-counseling',
+    'Thông báo rà soát kết quả học tập, cảnh báo học vụ và chương trình tư vấn học vụ cá nhân',
+    '<p>Phòng Đào tạo phối hợp cùng Tổ Cố vấn học tập các Khoa thông báo kế hoạch hỗ trợ sinh viên có nguy cơ học vụ:</p>
+<ul>
+  <li><strong>Cảnh báo học vụ mức 1:</strong> Điểm trung bình học kỳ GPA &lt; 1.00 (học kỳ đầu) hoặc GPA &lt; 1.20 (các học kỳ tiếp theo).</li>
+  <li><strong>Cảnh báo học vụ mức 2:</strong> Bị cảnh báo mức 1 trong hai học kỳ liên tiếp hoặc tổng số tín chỉ nợ đọng vượt quá 24 tín chỉ.</li>
+  <li><strong>Chương trình tư vấn học tập:</strong> Các sinh viên thuộc diện cảnh báo học vụ được phân công Cố vấn học tập riêng để xây dựng lộ trình cải thiện điểm số, giới hạn khối lượng đăng ký từ 10 - 14 tín chỉ/học kỳ.</li>
+  <li><strong>Lịch hẹn tư vấn:</strong> Các buổi tư vấn trực tiếp diễn ra từ ngày 15/09/2026 đến 25/09/2026 tại Văn phòng Cố vấn học tập Tòa nhà Trung tâm.</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-04 15:00:00+07',
+    'Phòng Đào Tạo & Ban Cố Vấn Học Tập',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-04 15:00:00+07',
+    '2026-09-04 15:00:00+07',
+    1
+),
+(
+    'announcement-ute-student-scientific-research-awards',
+    'Phát động Giải thưởng Nghiên cứu Khoa học Sinh viên và Khởi nghiệp Đổi mới Sáng tạo 2026-2027',
+    '<p>Trường Đại học Sư phạm Kỹ thuật TP.HCM phối hợp cùng Khoa Công nghệ Thông tin thông báo phát động phong trào Sinh viên Nghiên cứu Khoa học (NCKH) & Đổi mới Sáng tạo Công nghệ năm học 2026-2027.</p>
+<figure class="my-5 overflow-hidden rounded-xl border border-border/70 bg-secondary/15 p-2">
+  <img src="/images/news/scientific-research.jpg" alt="Lễ vinh danh Giải thưởng Nghiên cứu Khoa học Sinh viên HCM-UTE" class="w-full h-auto rounded-lg object-cover" />
+  <figcaption class="pt-2 text-center text-xs font-medium text-muted-foreground italic">
+    Đại diện Ban Giám hiệu Nhà trường trao bằng khen và cúp lưu niệm cho các nhóm sinh viên đạt giải thưởng Nghiên cứu Khoa học 2026
+  </figcaption>
+</figure>
+<p>Phong trào nghiên cứu khoa học sinh viên năm nay tiếp tục khẳng định vị thế tiên phong của HCM-UTE trong sáng tạo kỹ thuật và giải quyết các bài toán thực tiễn của xã hội:</p>
+<ul>
+  <li><strong>Lĩnh vực ưu tiên tài trợ kinh phí:</strong>
+    <ul>
+      <li>Khoa học Dữ liệu lớn (Big Data Analytics), Trí tuệ Nhân tạo và Thị giác máy tính.</li>
+      <li>Internet vạn vật (IoT), Hệ thống nhúng và Tự động hóa sản xuất thông minh.</li>
+      <li>Năng lượng tái tạo, Công nghệ xanh và Vật liệu tiên tiến.</li>
+      <li>Giải pháp chuyển đổi số trong quản lý giáo dục và đô thị thông minh.</li>
+    </ul>
+  </li>
+  <li><strong>Kinh phí hỗ trợ:</strong> Mỗi đề tài được phê duyệt nhận hỗ trợ từ 10.000.000 VNĐ đến 30.000.000 VNĐ từ Quỹ Phát triển Khoa học Công nghệ HCMUTE.</li>
+  <li><strong>Hạn nộp thuyết minh đề tài:</strong> Trước 17:00 ngày 15/10/2026 qua Cổng quản lý NCKH trực tuyến.</li>
+  <li><strong>Quyền lợi:</strong> Tác giả đề tài đạt giải Nhất, Nhì cấp Trường được quy đổi điểm Khóa luận tốt nghiệp (điểm 10) và cộng 15 điểm rèn luyện.</li>
+</ul>',
+    'HIGH',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-03 09:00:00+07',
+    'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-03 09:00:00+07',
+    '2026-09-03 09:00:00+07',
+    1
+),
+(
+    'announcement-ute-digital-transcript-signature',
+    'Triển khai Cổng Dịch vụ công Một cửa điện tử và Cấp bản sao trích lục Bảng điểm có Chữ ký số',
+    '<p>Nhằm đẩy mạnh chuyển đổi số học vụ và tạo điều kiện thuận lợi cho sinh viên tra cứu và xin cấp giấy tờ học vụ:</p>
+<ul>
+  <li><strong>Dịch vụ trực tuyến mới:</strong>
+    <ul>
+      <li>Cấp Giấy chứng nhận sinh viên trực tuyến có mã QR xác thực tức thời.</li>
+      <li>Cấp Bảng điểm học tập điện tử có Chữ ký số của Hiệu trưởng / Trưởng phòng Đào tạo (có giá trị pháp lý tương đương bản giấy đóng dấu đỏ).</li>
+      <li>Đăng ký cấp lại Thẻ sinh viên, Đơn tạm hoãn nghĩa vụ quân sự và Đơn xin nghỉ học tạm thời.</li>
+    </ul>
+  </li>
+  <li><strong>Thời gian xử lý:</strong> Tối đa 02 ngày làm việc kể từ thời điểm gửi yêu cầu thành công trên hệ thống. Bản điện tử PDF ký số được tự động gửi về Email sinh viên.</li>
+  <li><strong>Cổng truy cập dịch vụ:</strong> Mục "Dịch vụ một cửa" trên Cổng thông tin đào tạo HCMUTE.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['STUDENT', 'LECTURER', 'ADMIN']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-02 11:00:00+07',
+    'Phòng Đào Tạo & Trung Tâm CNTT',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-02 11:00:00+07',
+    '2026-09-02 11:00:00+07',
+    1
+),
+(
+    'announcement-ute-ojt-internship-semester1',
+    'Kế hoạch tổ chức Thực tập Doanh nghiệp (OJT) & Thực tập tốt nghiệp Học kỳ 1 năm học 2026-2027',
+    '<p>Văn phòng các Khoa phối hợp cùng Trung tâm Hướng nghiệp &amp; Quan hệ Doanh nghiệp hướng dẫn quy trình thực tập:</p>
+<ul>
+  <li><strong>Đối tượng:</strong> Sinh viên năm thứ 3 và năm thứ 4 đã hoàn thành tối thiểu 90 tín chỉ chuyên ngành.</li>
+  <li><strong>Thời lượng thực tập:</strong> Tối thiểu 10 tuần làm việc toàn thời gian (Full-time) tại doanh nghiệp đối tác đã được Nhà trường thẩm định.</li>
+  <li><strong>Quy trình thực hiện:</strong>
+    <ul>
+      <li>Bước 1: Nộp Giấy tiếp nhận thực tập của Doanh nghiệp trên Cổng thông tin trước ngày 25/09/2026.</li>
+      <li>Bước 2: Giảng viên phụ trách OJT duyệt kế hoạch làm việc và giao nhiệm vụ chuyên môn.</li>
+      <li>Bước 3: Viết nhật ký thực tập hàng tuần và nộp Báo cáo tổng kết có xác nhận, chấm điểm của Người hướng dẫn tại doanh nghiệp trước ngày 20/12/2026.</li>
+    </ul>
+  </li>
+</ul>',
+    'NORMAL',
+    ARRAY['STUDENT', 'LECTURER']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-09-01 14:00:00+07',
+    'Văn Phòng Khoa & TT Quan Hệ Doanh Nghiệp',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-01 14:00:00+07',
+    '2026-09-01 14:00:00+07',
+    1
+),
+(
+    'announcement-ute-system-upgrade-maintenance',
+    'Lịch bảo trì, nâng cấp hạ tầng Cụm máy chủ Cổng Đào tạo UTE định kỳ tháng 09/2026',
+    '<p>Trung tâm Công nghệ Thông tin thông báo kế hoạch bảo trì kỹ thuật hệ thống nhằm nâng cao băng thông và độ ổn định:</p>
+<ul>
+  <li><strong>Thời gian tạm dừng dịch vụ:</strong> Từ 23:00 thứ Bảy ngày 12/09/2026 đến 04:00 sáng Chủ Nhật ngày 13/09/2026.</li>
+  <li><strong>Nội dung nâng cấp:</strong> Cập nhật bản vá bảo mật cơ sở dữ liệu PostgreSQL, nâng cấp cấu hình cân bằng tải (HAProxy Load Balancer) và mở rộng cụm nhớ đệm Redis phục vụ đợt đăng ký môn học cao điểm.</li>
+  <li><strong>Phạm vi ảnh hưởng:</strong> Cổng đăng ký học phần, Cổng xem điểm và Hệ thống nộp bài trực tuyến sẽ tạm thời gián đoạn truy cập trong khoảng thời gian trên.</li>
+</ul>
+<p>Kính đề nghị Quý Thầy/Cô và các bạn sinh viên lưu ý kế hoạch để chủ động trong công tác và học tập.</p>',
+    'LOW',
+    ARRAY['STUDENT', 'LECTURER', 'ADMIN']::text[],
+    ARRAY[]::integer[],
+    TRUE,
+    '2026-08-30 16:00:00+07',
+    'Trung Tâm Công Nghệ Thông Tin',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-08-30 16:00:00+07',
+    '2026-08-30 16:00:00+07',
+    1
+),
+(
+    'announcement-ute-lecturer-exam-proctoring',
+    'Kế hoạch phân công Cán bộ coi thi và thời hạn nộp Đề thi trích lục Học kỳ 1 năm học 2026-2027',
+    '<p>Phòng Khảo thí & Đảm bảo Chất lượng thông báo đến Quý Thầy/Cô kế hoạch công tác khảo thí Học kỳ 1:</p>
+<ul>
+  <li><strong>Thời hạn nộp Đề thi trích lục:</strong> Quý Thầy/Cô phụ trách học phần hoàn tất nộp 02 đề thi trích lục (kèm đáp án, biểu điểm và ma trận đề thi theo chuẩn đầu ra CLO) trước 17:00 ngày 20/11/2026 tại Văn phòng Phòng Khảo thí (Phòng A1-201).</li>
+  <li><strong>Lịch phân công Cán bộ coi thi:</strong> Danh sách phân ca coi thi chính thức cho từng giảng viên đã được cập nhật chi tiết trên Cổng thông tin Giảng viên và gửi về Văn phòng các Khoa/Bộ môn.</li>
+  <li><strong>Quy định phòng thi:</strong> Giảng viên có mặt tại Phòng Hội đồng thi trước giờ phát đề 20 phút để nhận túi bài thi, danh sách thí sinh và thẻ cán bộ coi thi.</li>
+</ul>',
+    'HIGH',
+    ARRAY['LECTURER']::text[],
+    ARRAY[]::integer[],
+    FALSE,
+    '2026-09-08 09:00:00+07',
+    'Phòng Khảo Thí & Đảm Bảo Chất Lượng',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-08 09:00:00+07',
+    '2026-09-08 09:00:00+07',
+    1
+),
+(
+    'announcement-ute-lecturer-syllabus-review',
+    'Hướng dẫn rà soát và cập nhật Đề cương chi tiết học phần (Course Syllabus) theo chuẩn ABET',
+    '<p>Ban Chủ nhiệm Khoa Công nghệ Thông tin phối hợp cùng Phòng Đào tạo đề nghị Quý Thầy/Cô phụ trách học phần thực hiện công tác rà soát chuyên môn:</p>
+<ul>
+  <li><strong>Chuẩn hóa mục tiêu học phần:</strong> Đối sánh và ánh xạ ma trận chuẩn đầu ra học phần (CLO) tương thích với Chuẩn đầu ra chương trình đào tạo (PLO) theo tiêu chuẩn kiểm định quốc tế ABET.</li>
+  <li><strong>Cập nhật học liệu điện tử:</strong> Bổ sung danh mục giáo trình tham khảo xuất bản từ năm 2022 trở lại đây và tích hợp đường dẫn bài giảng số lên hệ thống Canvas/LMS của Trường.</li>
+  <li><strong>Thời hạn hoàn thành:</strong> Nộp bản mềm Đề cương chi tiết đã có ý kiến phê duyệt của Trưởng Bộ môn qua Cổng học vụ trước ngày 25/09/2026.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['LECTURER']::text[],
+    ARRAY[]::integer[],
+    FALSE,
+    '2026-09-07 14:00:00+07',
+    'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-07 14:00:00+07',
+    '2026-09-07 14:00:00+07',
+    1
+),
+(
+    'announcement-ute-lecturer-research-norm',
+    'Kế hoạch nghiệm thu đề tài NCKH cấp Trường và đăng ký định mức giờ chuẩn Giảng viên năm học 2026-2027',
+    '<p>Khoa Công nghệ Thông tin phối hợp cùng Phòng Đào tạo thông báo đến Quý Thầy/Cô cán bộ giảng dạy:</p>
+<ul>
+  <li><strong>Kê khai định mức giờ giảng & NCKH:</strong> Quý Thầy/Cô hoàn thành bản kê khai kế hoạch giảng dạy, hướng dẫn đồ án và nghiên cứu khoa học năm học 2026-2027 trên Cổng quản trị viên chức trước ngày 30/10/2026.</li>
+  <li><strong>Chính sách khen thưởng bài báo khoa học:</strong> Nhà trường tiếp tục áp dụng chính sách khen thưởng đột xuất cho các công trình công bố trên các tạp chí quốc tế uy tín thuộc danh mục Web of Science (Q1, Q2) và Scopus.</li>
+  <li><strong>Hỗ trợ kinh phí nghiên cứu:</strong> Đăng ký chủ trì đề tài NCKH cấp Trường trọng điểm ưu tiên các hướng: Trí tuệ nhân tạo (AI), Dữ liệu lớn (Big Data), Thiết kế vi mạch bán dẫn và Chuyển đổi số giáo dục.</li>
+</ul>',
+    'NORMAL',
+    ARRAY['LECTURER']::text[],
+    ARRAY[]::integer[],
+    FALSE,
+    '2026-09-06 10:30:00+07',
+    'Khoa Công nghệ Thông tin & Phòng Đào Tạo',
+    'semester-demo',
+    'Học kỳ 1 năm học 2026-2027',
+    '2026-09-06 10:30:00+07',
+    '2026-09-06 10:30:00+07',
+    1
+)
+ON CONFLICT (id) DO UPDATE SET
+    title = EXCLUDED.title,
+    content = EXCLUDED.content,
+    priority = EXCLUDED.priority,
+    "targetRoles" = EXCLUDED."targetRoles",
+    "isGlobal" = EXCLUDED."isGlobal",
+    "publishedBy" = EXCLUDED."publishedBy",
+    "updatedAt" = EXCLUDED."updatedAt";
+
+-- 3. Chuẩn hóa toàn bộ thông báo cũ với chuyên mục, slug và ảnh bìa chất lượng cao
 UPDATE engagement."Announcement" SET "categoryId" = 'cat-academic-affairs', "coverImageUrl" = '/images/news/course-registration.jpg', "summary" = 'Kế hoạch năm học 2026-2027 và định hướng chiến lược đào tạo của Trường Đại học Công nghệ Kỹ thuật TP.HCM.', "slug" = 'quyet-dinh-hieu-truong-ke-hoach-nam-hoc-2026-2027', "readingTimeMinutes" = 4, "viewCount" = 4250, "uniqueReaderCount" = 3680 WHERE "id" = 'announcement-rector-new-academic-year-decision';
 UPDATE engagement."Announcement" SET "categoryId" = 'cat-academic-affairs', "coverImageUrl" = '/images/news/course-registration.jpg', "summary" = 'Quy định khung thời gian điều chỉnh và rút bớt học phần trong học kỳ chính.', "slug" = 'thoi-gian-dieu-chinh-dang-ky-hoc-phan', "readingTimeMinutes" = 3, "viewCount" = 2840, "uniqueReaderCount" = 2410 WHERE "id" = 'announcement-add-drop-window';
 UPDATE engagement."Announcement" SET "categoryId" = 'cat-academic-affairs', "coverImageUrl" = '/images/news/campus-digital-library.jpg', "summary" = 'Danh mục học phần chính thức Học kỳ 1 đã được cập nhật đầy đủ mã lớp và giảng viên giảng dạy.', "slug" = 'danh-muc-hoc-phan-hoc-ky-1-cap-nhat', "readingTimeMinutes" = 3, "viewCount" = 2310, "uniqueReaderCount" = 1980 WHERE "id" = 'announcement-catalog-enriched';
