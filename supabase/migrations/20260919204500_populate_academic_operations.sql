@@ -184,7 +184,7 @@ INSERT INTO campuscore_audit."AdminAudit" (
     'Ban Quản lý Luận văn Khoa CNTT',
     'CONFIGURE_THESIS_DEFENSE',
     'ThesisRound',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'Thiết lập hội đồng đánh giá và lịch bảo vệ Khóa luận tốt nghiệp đợt 2 cho 12 nhóm nghiên cứu',
     '{"councilsFormed": 0, "status": "IN_PROGRESS"}',
     '{"councilsFormed": 8, "status": "DEFENSE_SCHEDULED", "topicsAssigned": 16}',
