@@ -61,4 +61,35 @@ class AnnouncementGovernanceMigrationTest {
                 .contains("announcement-student-dormitory-campus")
                 .contains("announcement-faculty-excellence-awards");
     }
+
+    @Test
+    void v68EnrichesMediaGalleriesAttachmentsAndAcademicOperations() throws Exception {
+        Path script = Path.of("src/main/resources/db/migration/V68__enrich_enterprise_media_gallery_and_academic_records.sql");
+        String sql = Files.readString(script);
+
+        assertThat(script).exists();
+        assertThat(sql)
+                .contains("announcement-ute-bigdata-ai-center")
+                .contains("announcement-ute-career-fair-tech-2026")
+                .contains("gal-semiconductor-cover")
+                .contains("att-bigdata-gpu-bylaws")
+                .contains("thesis_group_report")
+                .contains("CreditLimitApplication")
+                .contains("Attendance")
+                .contains("AdminAudit");
+
+        org.flywaydb.core.Flyway flyway = org.flywaydb.core.Flyway.configure()
+                .dataSource("jdbc:h2:mem:probe;MODE=PostgreSQL;DATABASE_TO_LOWER=TRUE", "sa", "")
+                .locations("classpath:db/migration")
+                .load();
+        boolean foundV68 = false;
+        for (org.flywaydb.core.api.MigrationInfo info : flyway.info().all()) {
+            if ("68".equals(info.getVersion().getVersion())) {
+                assertThat(info.getChecksum()).isEqualTo(-1673451002);
+                foundV68 = true;
+                break;
+            }
+        }
+        assertThat(foundV68).isTrue();
+    }
 }
