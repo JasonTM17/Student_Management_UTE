@@ -1064,10 +1064,10 @@ export default function AdminUsersPage() {
                   value={formData.email}
                   placeholder={
                     formData.role === 'STUDENT'
-                      ? 'sv.nguyenvana@campuscore.demo'
+                      ? 'sv.nguyenvana@student.ute.edu.vn'
                       : formData.role === 'LECTURER'
-                        ? 'gv.tranvanb@campuscore.demo'
-                        : 'admin.hoangdung@campuscore.demo'
+                        ? 'gv.tranvanb@ute.edu.vn'
+                        : 'admin.hoangdung@ute.edu.vn'
                   }
                   onChange={(e) => setFormData((current) => ({ ...current, email: e.target.value }))}
                   disabled={Boolean(editingUser)}
@@ -1246,7 +1246,7 @@ export default function AdminUsersPage() {
                     <Input
                       type="text"
                       value={formData.employeeId}
-                      placeholder="ví dụ: GV2026001 hoặc LEC-DEMO-001"
+                      placeholder="ví dụ: GV2026001 hoặc GV2026002"
                       onChange={(e) => setFormData((c) => ({ ...c, employeeId: e.target.value }))}
                       required
                     />
