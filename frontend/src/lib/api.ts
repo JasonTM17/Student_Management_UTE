@@ -102,7 +102,35 @@ export type AnnouncementRecord = {
     course?: { code?: string; name?: string; nameEn?: string; nameVi?: string };
   } | null;
   lecturer?: { id?: string; displayName?: string } | null;
+  categoryId?: string | null;
+  status?: string;
+  coverImageUrl?: string | null;
+  summary?: string | null;
+  readingTimeMinutes?: number;
+  viewCount?: number;
+  uniqueReaderCount?: number;
+  slug?: string | null;
+  featuredOrder?: number | null;
+  tags?: Array<{ id: string; slug: string; nameVi: string; nameEn: string }>;
+  attachments?: Array<{
+    id: string;
+    fileName: string;
+    fileUrl: string;
+    fileSizeBytes: number;
+    mimeType: string;
+    checksumSha256?: string;
+    downloadCount?: number;
+  }>;
+  gallery?: Array<{
+    id: string;
+    mediaUrl: string;
+    captionVi: string;
+    captionEn?: string;
+    altText: string;
+    isCover?: boolean;
+  }>;
 };
+
 
 export type CreditLimitApplication = {
   id: string;
