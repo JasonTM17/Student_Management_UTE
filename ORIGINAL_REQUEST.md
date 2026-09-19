@@ -37,3 +37,42 @@ Bổ sung đầy đủ các văn bản quy chế học vụ thiết yếu vào s
 ### LLM Synthesis & DeepSeek Trigger
 - [ ] Câu hỏi phức tạp, so sánh hoặc suy luận đa bước được route thành công sang mô hình deepseek-v4-flash, trả về phân tích sâu sắc có căn cứ trích dẫn rõ ràng thay vì câu từ chối "Ngữ cảnh không đề cập".
 - [ ] Không có query nào bị nuốt bởi regex cứng ở frontend client (CampusCore Student Assistant).
+
+## 2026-09-19T15:35:52Z
+
+Khắc phục triệt để 3 điểm dữ liệu mẫu và mock còn tồn tại trên giao diện CampusUTE:
+1. Xây dựng Backend API thống kê cho Admin Analytics và đồng bộ biểu đồ `AdminAnalyticsCharts.tsx` với dữ liệu thực tế từ database.
+2. Xóa bỏ 18 bài tin tức giả lập tĩnh trong `HomeNewsSection.tsx`, nạp 100% tin tức và bài viết thông báo thực tế từ API `/api/v1/announcements`.
+3. Tái cấu trúc cơ chế Trợ lý AI học vụ (`assistant-student-resolver.ts`), chuyển tiếp toàn bộ câu hỏi quy chế học vụ lên Backend RAG AI Service (`/api/v1/thesis/assistant/stream` và `/chat`) thay vì trả lời bằng mẫu văn bản cứng phía client.
+
+Working directory: d:/Student_Management
+Integrity mode: demo
+
+## Requirements
+
+### R1. Backend Analytics API & Dynamic Admin Charts
+- Thiết kế endpoint RESTful API tại backend Spring Boot: `GET /api/v1/admin/analytics/distribution` (hoặc tương đương) trả về số liệu tổng hợp thực tế theo Khoa (sinh viên, học phần, lớp học phần) và xu hướng học kỳ từ cơ sở dữ liệu PostgreSQL.
+- Cập nhật `AdminAnalyticsCharts.tsx` để tiêu thụ dữ liệu thực tế từ API này, loại bỏ các mảng dữ liệu mẫu `DEPARTMENTS` và `SEMESTER_TRENDS` bị fix cứng; hiển thị trạng thái loading và empty state thanh lịch khi dữ liệu đang nạp.
+
+### R2. Real Homepage Announcements & Elimination of Static Stories
+- Xóa bỏ mảng `HOMEPAGE_FALLBACK_NEWS` gồm 18 bài tin giả lập trong `HomeNewsSection.tsx`.
+- Đồng bộ trực tiếp với endpoint `/api/v1/announcements` để hiển thị các thông báo, sự kiện và tin tức học thuật thực tế được phát hành từ cơ sở dữ liệu.
+- Giữ nguyên thiết kế Bento Grid và typography trang trọng, hỗ trợ phân loại theo danh mục thực tế và phân trang mượt mà.
+
+### R3. Chatbot Backend-First RAG Delegation
+- Tái cấu trúc bộ giải quyết câu hỏi trong `assistant-student-resolver.ts`: Ưu tiên tuyệt đối việc ủy quyền và gửi câu hỏi của sinh viên lên Backend RAG AI Service (`/api/v1/thesis/assistant/stream` và `/chat`).
+- Loại bỏ các câu trả lời tĩnh mẫu cứng (hardcoded responses) cho các quy chế đào tạo, học phí, điểm số; đảm bảo mọi câu trả lời được sinh ra từ tri thức học thuật thực tế của hệ thống RAG backend kèm trích dẫn (citations) chính xác.
+
+## Acceptance Criteria
+
+### Data & Code Integrity
+- [x] Mảng 18 tin giả lập `HOMEPAGE_FALLBACK_NEWS` đã được xóa bỏ hoàn toàn khỏi `HomeNewsSection.tsx`; giao diện trang chủ nạp dữ liệu động từ API `/api/v1/announcements`.
+- [x] Các mảng dữ liệu tĩnh `DEPARTMENTS` và `SEMESTER_TRENDS` trong `AdminAnalyticsCharts.tsx` đã được thay thế bằng dữ liệu gọi từ API backend.
+- [x] Chatbot không còn sử dụng câu trả lời văn bản mẫu cứng phía client cho các câu hỏi nghiệp vụ đào tạo, mà gọi trực tiếp đến Backend RAG Service.
+- [x] Endpoint backend mới được bổ sung đầy đủ Swagger OpenAPI 3.0 annotations (`@Tag`, `@Operation`, `@ApiResponse`).
+
+### Automated Verification
+- [x] Backend: `mvn test` vượt qua 100% (tất cả các unit và integration test cases xanh).
+- [x] Frontend: `npm run lint` đạt 0 warnings, 0 errors (`--max-warnings=0`).
+- [x] Frontend: `npm run typecheck` đạt 0 TypeScript errors.
+- [x] Frontend: `npm test` vượt qua 100% tất cả các test suites.

@@ -81,4 +81,41 @@ public final class AnnouncementReadDtos {
             List<AnnouncementHistoryResponse> data,
             PageMeta meta) {
     }
+
+    /**
+     * Safe subset of an announcement for the anonymous public news feed.
+     * Field names mirror the frontend {@code AnnouncementRecord} contract so the
+     * homepage can bind the same record type. Audience-scoping metadata
+     * (targetRoles/targetYears/isGlobal) is intentionally absent: a public feed
+     * item is global by definition and never carries internal audience filters.
+     */
+    public record PublicAnnouncementResponse(
+            String id,
+            String title,
+            String content,
+            String summary,
+            String coverImageUrl,
+            String priority,
+            String categoryId,
+            String slug,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant publishAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant expiresAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant createdAt,
+            @JsonFormat(shape = JsonFormat.Shape.STRING, pattern = "yyyy-MM-dd'T'HH:mm:ss.SSSX", timezone = "UTC")
+            Instant updatedAt,
+            String publishedBy,
+            String lecturerDisplayName,
+            String semesterName,
+            SemesterSummary semester,
+            SectionSummary section,
+            LecturerSummary lecturer) {
+    }
+
+    public record PublicAnnouncementListResponse(
+            List<PublicAnnouncementResponse> data,
+            PageMeta meta) {
+    }
 }

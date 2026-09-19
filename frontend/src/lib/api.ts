@@ -1017,6 +1017,61 @@ export const announcementsApi = {
     );
     return response.data;
   },
+  getPublic: async (params?: {
+    page?: number;
+    limit?: number;
+  }): Promise<ApiResponse<AnnouncementRecord[]>> => {
+    const response = await api.get<ApiResponse<AnnouncementRecord[]>>(
+      '/announcements/public',
+      { params },
+    );
+    return response.data;
+  },
+};
+
+export interface DepartmentStat {
+  code: string;
+  name: string;
+  students: number;
+  courses: number;
+  sections: number;
+}
+
+export interface SemesterTrend {
+  semester: string;
+  count: number;
+  completionRate: number;
+  activeStudents: number;
+}
+
+export interface FacultyRank {
+  rank: string;
+  count: number;
+}
+
+export interface GradeDistributionEntry {
+  grade: string;
+  count: number;
+}
+
+export interface AdminAnalyticsOverview {
+  departments: DepartmentStat[];
+  semesterTrends: SemesterTrend[];
+  facultyRanks: FacultyRank[];
+  gradeDistribution: GradeDistributionEntry[];
+  totals: {
+    students: number;
+    lecturers: number;
+    courses: number;
+    enrollments: number;
+  };
+}
+
+export const campusDistributionApi = {
+  getOverview: async (): Promise<AdminAnalyticsOverview> => {
+    const response = await api.get<AdminAnalyticsOverview>('/academic/distribution-overview/overview');
+    return response.data;
+  },
 };
 
 // Notifications API

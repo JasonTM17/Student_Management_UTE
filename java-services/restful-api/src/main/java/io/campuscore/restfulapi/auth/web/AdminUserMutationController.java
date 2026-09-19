@@ -1,11 +1,14 @@
 package io.campuscore.restfulapi.auth.web;
 
 import io.campuscore.restfulapi.auth.service.AdminUserMutationService;
+import io.campuscore.restfulapi.auth.web.AdminUserRequestDtos.AdminUserCreateRequest;
+import io.campuscore.restfulapi.auth.web.AdminUserRequestDtos.AdminUserUpdateRequest;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
 import io.swagger.v3.oas.annotations.responses.ApiResponses;
 import io.swagger.v3.oas.annotations.tags.Tag;
+import jakarta.validation.Valid;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.security.core.Authentication;
@@ -51,9 +54,9 @@ public class AdminUserMutationController {
             @ApiResponse(responseCode = "400", description = "Dữ liệu đầu vào không hợp lệ hoặc email đã tồn tại")
     })
     public Map<String, Object> create(
-            @RequestBody Map<String, Object> input,
+            @Valid @RequestBody AdminUserCreateRequest request,
             Authentication authentication) {
-        return users.create(input, isSuperAdmin(authentication), actorId(authentication));
+        return users.create(request.toInput(), isSuperAdmin(authentication), actorId(authentication));
     }
 
     @PostMapping("/{id}/password-reset")
@@ -71,10 +74,10 @@ public class AdminUserMutationController {
     @ApiResponse(responseCode = "200", description = "Cập nhật thông tin người dùng thành công")
     public Map<String, Object> update(
             @Parameter(description = "Mã định danh người dùng (User ID)") @PathVariable String id,
-            @RequestBody Map<String, Object> input,
+            @Valid @RequestBody AdminUserUpdateRequest request,
             Authentication authentication) {
         String currentUserId = authentication != null ? authentication.getName() : null;
-        return users.update(id, input, isSuperAdmin(authentication), currentUserId);
+        return users.update(id, request.toInput(), isSuperAdmin(authentication), currentUserId);
     }
 
     @DeleteMapping("/{id}")

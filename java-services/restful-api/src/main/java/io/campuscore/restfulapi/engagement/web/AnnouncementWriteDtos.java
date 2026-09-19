@@ -118,6 +118,17 @@ public final class AnnouncementWriteDtos {
     public record DeleteAnnouncementResponse(String message) {
     }
 
+    /**
+     * Body of PATCH /{id}/order — an administrator-assigned homepage display
+     * order. Zero or positive; clearing an order is not part of the JSON
+     * contract so the field stays a plain required integer.
+     */
+    public record UpdateDisplayOrderRequest(
+            @NotNull(message = "displayOrder is required")
+            @jakarta.validation.constraints.Min(value = 0, message = "displayOrder must be zero or positive")
+            Integer displayOrder) {
+    }
+
     private static ObjectNode objectBody(JsonNode body) {
         if (body == null || body.isNull()) {
             throw new IllegalArgumentException("request body is required");

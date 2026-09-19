@@ -8,6 +8,8 @@ import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.CreateAnnou
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.DeleteAnnouncementResponse;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.LifecycleRequest;
 import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateAnnouncementRequest;
+import io.campuscore.restfulapi.engagement.web.AnnouncementWriteDtos.UpdateDisplayOrderRequest;
+import jakarta.validation.Valid;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -18,6 +20,7 @@ import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.util.MultiValueMap;
 import org.springframework.web.bind.annotation.DeleteMapping;
 import org.springframework.web.bind.annotation.GetMapping;
+import org.springframework.web.bind.annotation.PatchMapping;
 import org.springframework.web.bind.annotation.PathVariable;
 import org.springframework.web.bind.annotation.PostMapping;
 import org.springframework.web.bind.annotation.PutMapping;
@@ -92,6 +95,25 @@ public class AnnouncementWriteController {
         requireAllowedQuery(queryParameters, Set.of("page", "limit"));
         subject(jwt);
         return announcements.history(id, page, limit);
+    }
+
+    @Operation(summary = "Đặt thứ tự hiển thị của thông báo", description = "Quản trị viên gán thứ tự hiển thị cho trang chủ; số nhỏ hơn hiển thị trước, thông báo không có thứ tự nằm cuối danh sách")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Cập nhật thứ tự hiển thị thành công"),
+        @ApiResponse(responseCode = "400", description = "displayOrder không hợp lệ"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy thông báo")
+    })
+    @PatchMapping("{id}/order")
+    @org.springframework.security.access.prepost.PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
+    public AnnouncementResponse updateDisplayOrder(
+            @Parameter(description = "Mã định danh thông báo (UUID)", required = true) @PathVariable String id,
+            @AuthenticationPrincipal Jwt jwt,
+            @Valid @RequestBody UpdateDisplayOrderRequest request) {
+        return announcements.setDisplayOrder(
+                subject(jwt),
+                actorLabel(jwt),
+                id,
+                request.displayOrder());
     }
 
     @Operation(summary = "Lưu trữ (Archive) thông báo", description = "Đưa thông báo vào trạng thái lưu trữ bảo mật")

@@ -268,17 +268,10 @@ export function useAssistantStream({
           try {
             const resolution = await resolveStudentAssistantQuery(message, locale);
             if (resolution && isCurrentRequest() && !controller.signal.aborted) {
-              // Only a personal-record card may claim grounding in the asker's
-              // own data. Greetings, the capability menu and other locally
-              // composed replies carry no citation, so they must not reuse the
-              // server's "answered from approved guidance" badge.
-              const localReasonCode = resolution.reasonCode ?? (
-                resolution.citation?.source === 'academic-records' ||
-                resolution.citation?.source === 'academic-conduct' ||
-                resolution.citation?.source === 'academic-announcements'
-                  ? 'PERSONAL_CONTEXT'
-                  : 'LOCAL_ASSIST'
-              );
+              // Only trivial smalltalk resolves locally now (greeting,
+              // capabilities, thanks, goodbye). It is static copy with no
+              // citation and no claim on the asker's records, so it never
+              // reuses the server's personal-context badge.
               applyStreamEvent({
                 type: 'meta',
                 conversationId: requestedConversationId,
@@ -288,16 +281,10 @@ export function useAssistantStream({
                 type: 'delta',
                 text: resolution.answer,
               });
-              if (resolution.citation) {
-                applyStreamEvent({
-                  type: 'citation',
-                  citation: resolution.citation,
-                });
-              }
               applyStreamEvent({
                 type: 'done',
                 messageId: `local-resolved-${Date.now()}`,
-                reasonCode: localReasonCode,
+                reasonCode: 'LOCAL_ASSIST',
                 degraded: false,
               });
               terminalReconciled = true;
@@ -305,7 +292,7 @@ export function useAssistantStream({
               return;
             }
           } catch {
-            // Fallback to thesisApi.streamChat if student resolution encounters error
+            // Fallback to thesisApi.streamChat if local resolution encounters error
           }
         }
 

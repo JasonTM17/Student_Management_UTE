@@ -262,12 +262,46 @@ public class AnnouncementWriteService {
         return new DeleteAnnouncementResponse("Announcement deleted successfully");
     }
 
+    /**
+     * Sets the homepage display order of an announcement. Presentation-only:
+     * the content version is left untouched, so concurrent content edits do
+     * not conflict with a re-order.
+     */
+    @Transactional
+    public AnnouncementResponse setDisplayOrder(
+            String actorId,
+            String actorLabel,
+            String announcementId,
+            int displayOrder) {
+        String actor = requireText(actorId, "actor");
+        String label = requireActorLabel(actorLabel, "actorLabel");
+        String id = requireText(announcementId, "announcement id");
+        if (displayOrder < 0) {
+            throw new IllegalArgumentException("displayOrder must be zero or positive");
+        }
+        AnnouncementResponse before = requireAnnouncementForUpdate(id);
+        Instant now = Instant.now(clock);
+        int changed = announcements.updateDisplayOrder(id, displayOrder, now);
+        if (changed != 1) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Announcement not found");
+        }
+        AnnouncementResponse after = requireAnnouncement(id);
+        appendAudit(
+                "UPDATED",
+                actor,
+                label,
+                "Display order set to " + displayOrder,
+                before,
+                after,
+                now);
+        return after;
+    }
+
     @Transactional(readOnly = true)
     public AnnouncementHistoryListResponse history(
             String announcementId,
             int page,
-            int limit) {
-        String id = requireText(announcementId, "announcement id");
+            int limit) {        String id = requireText(announcementId, "announcement id");
         requirePage(page, limit);
         requireAnnouncement(id);
         long total = audits.countByAnnouncementId(id);

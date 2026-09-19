@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.engagement.web;
 
 import io.campuscore.restfulapi.engagement.service.AnnouncementReadService;
 import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.AnnouncementListResponse;
+import io.campuscore.restfulapi.engagement.web.AnnouncementReadDtos.PublicAnnouncementListResponse;
 import java.math.BigInteger;
 import java.util.Collection;
 import java.util.List;
@@ -35,6 +36,24 @@ public class AnnouncementReadController {
 
     public AnnouncementReadController(AnnouncementReadService announcements) {
         this.announcements = announcements;
+    }
+
+    /**
+     * Anonymous campus news feed for the public homepage. Returns only
+     * PUBLISHED, globally visible, unexpired announcements — no identity is
+     * required and no audience-scoping metadata is exposed.
+     */
+    @Operation(summary = "Bản tin công khai cho khách truy cập (không cần đăng nhập)", description = "Danh sách thông báo đã xuất bản, công khai toàn trường và còn trong thời hạn hiển thị, dùng cho trang chủ")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy vấn bản tin công khai thành công")
+    })
+    @GetMapping("public")
+    public PublicAnnouncementListResponse getPublicAnnouncements(
+            @Parameter(description = "Số trang phân trang (bắt đầu từ 1)") @RequestParam(defaultValue = "1") int page,
+            @Parameter(description = "Số lượng thông báo trên một trang") @RequestParam(defaultValue = "9") int limit,
+            @RequestParam MultiValueMap<String, String> queryParameters) {
+        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
+        return announcements.findPublic(page, limit);
     }
 
     @Operation(summary = "Lấy danh sách thông báo dành riêng cho người dùng", description = "Truy vấn thông báo phân quyền theo vai trò (Sinh viên, Giảng viên, Quản trị viên) và đối tượng lớp/học kỳ")

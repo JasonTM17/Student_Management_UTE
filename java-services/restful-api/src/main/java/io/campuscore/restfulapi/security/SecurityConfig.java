@@ -119,6 +119,9 @@ public class SecurityConfig {
                                 "/api/v1/auth/refresh",
                                 "/api/v1/contract",
                                 "/api/v1/health/**",
+                                // Anonymous public campus news feed for the
+                                // homepage; read-only and safe-subset only.
+                                "/api/v1/announcements/public",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
                                 // Mail endpoints used to be reachable without a
