@@ -20,7 +20,7 @@ BEGIN
         WHERE g.approval_status = 'APPROVED'
           AND r.status IN ('RESULTS_PUBLISHED', 'CLOSED', 'CANCELLED')
         GROUP BY g.id
-        HAVING COUNT(gm.id) NOT BETWEEN 3 AND 4
+        HAVING COUNT(gm.id) NOT BETWEEN 1 AND 4
     ) invalid_terminal_groups;
 
     IF terminal_invalid_count > 0 THEN
