@@ -8,7 +8,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666011',
     '55555555-5555-5555-5555-555544444011',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-002',
     'Báo cáo Toàn văn Khóa luận Tốt nghiệp - Hệ thống giám sát giao thông đô thị thời gian thực ứng dụng AI Camera và Edge Computing',
     'https://theses.campusute.io.vn/2026/traffic-ai-camera.pdf',
@@ -26,7 +26,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666012',
     '55555555-5555-5555-5555-555544444012',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-004',
     'Báo cáo Luận văn Tốt nghiệp - Nền tảng phân tích cảm xúc khách hàng đa kênh với Big Data và Mô hình ngôn ngữ lớn LLM',
     'https://theses.campusute.io.vn/2026/sentiment-bigdata-llm.pdf',
@@ -44,7 +44,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666013',
     '55555555-5555-5555-5555-555544444013',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-006',
     'Báo cáo Đồ án Tốt nghiệp Kỹ sư - Thiết kế và chế tạo Robot tự hành AGV vận chuyển hàng trong kho thông minh với định vị SLAM',
     'https://theses.campusute.io.vn/2026/robot-agv-slam.pdf',
@@ -62,7 +62,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666014',
     '55555555-5555-5555-5555-555544444014',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-008',
     'Báo cáo Khóa luận Kỹ sư - Hệ thống quản lý và tối ưu hóa lưới điện mặt trời áp mái phân tán ứng dụng IoT & AI',
     'https://theses.campusute.io.vn/2026/solar-microgrid-iot.pdf',
@@ -80,7 +80,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666016',
     '55555555-5555-5555-5555-555544444016',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-002',
     'Báo cáo Đồ án Kỹ sư Công nghệ Ô tô - Nghiên cứu tối ưu hóa hệ thống quản lý năng lượng pin (BMS) trên xe điện thông minh',
     'https://theses.campusute.io.vn/2026/ev-battery-bms.pdf',
@@ -98,7 +98,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666017',
     '55555555-5555-5555-5555-555544444017',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-003',
     'Báo cáo Khóa luận Kỹ sư Xây dựng - Ứng dụng mô hình BIM 5D và tiêu chuẩn công trình xanh LEED trong quản lý vòng đời dự án',
     'https://theses.campusute.io.vn/2026/bim-5d-leed.pdf',
@@ -116,7 +116,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666026',
     '55555555-5555-5555-5555-555544444026',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-004',
     'Báo cáo Khóa luận Thạc sĩ / Kỹ sư Tài năng - Hệ thống Multi-Agent AI tự trị điều phối vận hành nhà kho logistics thông minh',
     'https://theses.campusute.io.vn/2026/multi-agent-logistics.pdf',
@@ -134,7 +134,7 @@ INSERT INTO thesis.thesis_group_report (
 (
     '66666666-6666-6666-6666-666666666027',
     '55555555-5555-5555-5555-555544444027',
-    '22222222-2222-2222-2222-222222222101',
+    'c8f1a234-9b7e-412d-8301-1b2c3d4e5f60',
     'student-profile-005',
     'Báo cáo Khóa luận Tốt nghiệp - Nền tảng phát hiện gian lận giao dịch tài chính thời gian thực với Graph Neural Networks (GNN)',
     'https://theses.campusute.io.vn/2026/fraud-detection-gnn.pdf',
