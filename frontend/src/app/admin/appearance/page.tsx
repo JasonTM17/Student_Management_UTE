@@ -159,7 +159,7 @@ export default function AdminAppearancePage() {
           <span
             className={cn(
               'inline-flex min-h-11 items-center rounded-md border px-3',
-              isSaving ? 'border-border' : 'border-[var(--portal-yellow)] text-foreground',
+              isSaving ? 'border-border' : 'border-[var(--portal-chrome-accent)] text-foreground',
             )}
           >
             {isSaving ? copy.saving : copy.saved}
@@ -315,7 +315,7 @@ export default function AdminAppearancePage() {
                     className={cn(
                       'min-h-11 rounded-md border px-3 py-3 text-left text-sm font-semibold',
                       draft.accent === accent
-                        ? 'border-[var(--portal-yellow)] bg-secondary'
+                        ? 'border-[var(--portal-chrome-accent)] bg-secondary'
                         : 'border-border/80 hover:border-foreground/30',
                     )}
                     aria-pressed={draft.accent === accent}
@@ -406,8 +406,8 @@ export default function AdminAppearancePage() {
             <h2 className="text-sm font-semibold uppercase tracking-wide text-muted-foreground">
               {copy.preview}
             </h2>
-            <div className="rounded-lg border-l-4 border-[var(--portal-yellow)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)]">
-              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-yellow)]">
+            <div className="rounded-lg border-l-4 border-[var(--portal-chrome-accent)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)]">
+              <p className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-chrome-accent)]">
                 {preview.eyebrow || fallbackHero.eyebrow}
               </p>
               <p className="mt-4 text-2xl font-semibold leading-8">

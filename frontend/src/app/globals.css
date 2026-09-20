@@ -54,6 +54,14 @@
        harmonizing perfectly with institutional deep navy (#003F87). */
     --portal-yellow: oklch(0.92 0.035 240);
     --portal-yellow-ink: oklch(0.24 0.08 255);
+    /* The chrome accent is this colour used as a FOREGROUND or hairline ON the
+       navy portal chrome (section eyebrows, rule accents, status dots). It must
+       not follow `--portal-yellow`, which is a FILL token: that pair inverts in
+       dark mode (dark fill, light ink) so a chip stays legible, and reusing it
+       as text paints dark navy onto the dark navy sidebar. This token keeps the
+       light value in every theme, because the chrome it sits on is navy in
+       every theme. */
+    --portal-chrome-accent: oklch(0.92 0.035 240);
     /* Institutional brand gold: fixed, NOT accent-reactive. Identity marks
        (HCMUTE badge, role and demo chips, the specialized-assistant mark) keep
        a warm honey gold on the navy chrome even when the site accent is a cool
@@ -78,11 +86,13 @@
   html[data-accent='river-blue'] {
     --portal-yellow: oklch(0.92 0.035 240);
     --portal-yellow-ink: oklch(0.24 0.08 255);
+    --portal-chrome-accent: oklch(0.92 0.035 240);
   }
 
   html[data-accent='campus-gold'] {
     --portal-yellow: oklch(0.94 0.025 240);
     --portal-yellow-ink: oklch(0.24 0.08 255);
+    --portal-chrome-accent: oklch(0.94 0.025 240);
   }
 
   .dark {
@@ -138,6 +148,9 @@
     --portal-yellow-ink: oklch(0.96 0.015 248);
     --portal-brand-gold: oklch(0.82 0.115 82);
     --portal-brand-gold-ink: oklch(0.2 0.04 80);
+    /* Held at the light value: the navy chrome does not get lighter in dark
+       mode, so the accent drawn on it must not get darker. */
+    --portal-chrome-accent: oklch(0.92 0.035 240);
     --portal-ribbon: oklch(0.3 0.1 251);
     --portal-canvas: oklch(0.18 0.018 248);
     --portal-surface: oklch(0.225 0.018 248);
@@ -149,11 +162,13 @@
   html.dark[data-accent='river-blue'] {
     --portal-yellow: oklch(0.32 0.06 252);
     --portal-yellow-ink: oklch(0.96 0.015 248);
+    --portal-chrome-accent: oklch(0.92 0.035 240);
   }
 
   html.dark[data-accent='campus-gold'] {
     --portal-yellow: oklch(0.35 0.05 252);
     --portal-yellow-ink: oklch(0.96 0.015 248);
+    --portal-chrome-accent: oklch(0.94 0.025 240);
   }
 }
 
@@ -340,7 +355,9 @@
   }
 
   .portal-menu-label.portal-menu-label-accent {
-    color: var(--portal-yellow);
+    /* Chrome accent, not the `--portal-yellow` fill: that token inverts in dark
+       mode so the label would paint dark navy onto the dark navy sidebar. */
+    color: var(--portal-chrome-accent);
   }
 
   .portal-page-ribbon {

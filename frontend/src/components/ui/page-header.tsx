@@ -13,11 +13,15 @@ export function SectionEyebrow({
   return (
     <div
       className={cn(
-        'portal-menu-label inline-flex items-center gap-1.5 rounded-sm bg-primary/10 px-2.5 py-0.5 text-xs font-bold tracking-wider text-primary border border-primary/20',
+        // Symmetric padding around the label alone. A leading dot was tried and
+        // removed: inside a chip that hugs its content there is no way to give
+        // the dot clearance from the text AND keep the label on the frame
+        // centre, so the dot either pushed the label off-centre or collided
+        // with it. The border already carries the accent.
+        'portal-menu-label inline-flex items-center justify-center rounded-sm bg-primary/10 px-3.5 py-0.5 text-xs font-bold text-primary border border-primary/20',
         className,
       )}
     >
-      <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-yellow)]" aria-hidden="true" />
       <span>{children}</span>
     </div>
   );

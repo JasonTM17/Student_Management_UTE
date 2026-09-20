@@ -90,6 +90,9 @@ module.exports = {
           rule: "var(--portal-rule)",
           ribbon: "var(--portal-ribbon)",
           scrim: "var(--portal-scrim)",
+          // Foreground/hairline accent drawn ON the navy chrome. Theme-stable,
+          // unlike `portal.yellow` which is a fill that inverts between themes.
+          "chrome-accent": "var(--portal-chrome-accent)",
           yellow: {
             DEFAULT: "var(--portal-yellow)",
             ink: "var(--portal-yellow-ink)",

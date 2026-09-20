@@ -127,7 +127,7 @@ export default function HomePage() {
 
       <main id="main-content" tabIndex={-1}>
         <section className="mx-auto grid max-w-[1280px] items-stretch gap-10 px-4 py-10 sm:px-6 lg:grid-cols-[1.15fr_0.85fr] lg:px-12 lg:py-14">
-          <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-yellow)] pl-6">
+          <div className="flex flex-col justify-center space-y-6 border-l-4 border-[var(--portal-chrome-accent)] pl-6">
             <div className="flex items-center gap-3.5">
               <div className="relative h-14 w-11 shrink-0">
                 <Image
@@ -227,7 +227,7 @@ export default function HomePage() {
               {messages.home.processSteps.map((step, index) => (
                 <li
                   key={step}
-                  className="flex items-center gap-4 border-l-4 border-[var(--portal-yellow)] pl-4 lg:flex-1 lg:border-l-0 lg:pl-0"
+                  className="flex items-center gap-4 border-l-4 border-[var(--portal-chrome-accent)] pl-4 lg:flex-1 lg:border-l-0 lg:pl-0"
                 >
                   <span
                     className="hidden h-4 w-1 shrink-0 bg-[var(--portal-yellow)] lg:block"

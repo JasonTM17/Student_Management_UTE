@@ -1201,7 +1201,7 @@ export default function AcademicEditorPage() {
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
                   {isVi ? 'Xem trước giao diện Banner Trang chủ:' : 'Homepage Live Preview:'}
                 </div>
-                <div className="border-l-4 border-[var(--portal-yellow)] pl-5 py-2 space-y-2">
+                <div className="border-l-4 border-[var(--portal-chrome-accent)] pl-5 py-2 space-y-2">
                   <SectionEyebrow>{heroEyebrow}</SectionEyebrow>
                   <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
                     {heroTitle}
