@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.thesis.service;
 
+import io.campuscore.restfulapi.thesis.domain.RoundStatus;
 import io.campuscore.restfulapi.web.DomainException;
 import java.time.Instant;
 import java.util.LinkedHashMap;
@@ -48,11 +49,7 @@ public class ThesisReportService {
         if (!trimmedUrl.startsWith("http://") && !trimmedUrl.startsWith("https://")) {
             throw invalid("url must be an http(s) link to the report document");
         }
-        Instant gvpbDeadline = group.gvpbDeadline();
-        if (gvpbDeadline != null && !Instant.now().isBefore(gvpbDeadline)) {
-            throw conflict("REPORT_DEADLINE_PASSED",
-                    "The GVPB grading deadline for this round has passed; reports are frozen");
-        }
+        requireReportWritable(group);
         requireApproved(groupId);
         StoredObjectRef previous = existingStoredObject(groupId);
         jdbc.update("DELETE FROM thesis.thesis_group_report WHERE group_id = :groupId",
@@ -77,11 +74,7 @@ public class ThesisReportService {
         GroupContext group = loadGroup(groupId);
         requireWriteAccess(group, actor);
         ReportFilePolicy.ValidatedFile validated = ReportFilePolicy.validate(file);
-        Instant gvpbDeadline = group.gvpbDeadline();
-        if (gvpbDeadline != null && !Instant.now().isBefore(gvpbDeadline)) {
-            throw conflict("REPORT_DEADLINE_PASSED",
-                    "The GVPB grading deadline for this round has passed; reports are frozen");
-        }
+        requireReportWritable(group);
         requireApproved(groupId);
         StoredObjectRef previous = existingStoredObject(groupId);
         String storageKey = "thesis-reports/" + groupId + "/" + UUID.randomUUID() + "." + validated.extension();
@@ -372,7 +365,7 @@ public class ThesisReportService {
     private GroupContext loadGroup(UUID groupId) {
         Map<String, Object> group = one(
                 "SELECT g.id, g.round_id, g.leader_student_id, g.topic_id, g.status, g.approval_status, "
-                        + "t.department_id AS topic_department_id, r.gvpb_deadline "
+                        + "t.department_id AS topic_department_id, r.gvpb_deadline, r.status AS round_status "
                         + "FROM thesis.thesis_group g JOIN thesis.thesis_registration_round r ON r.id = g.round_id "
                         + "LEFT JOIN thesis.thesis_topic t ON t.id = g.topic_id "
                         + "WHERE g.id = :groupId",
@@ -383,6 +376,7 @@ public class ThesisReportService {
                 (String) group.get("leader_student_id"),
                 (UUID) group.get("topic_id"),
                 group.get("gvpb_deadline") == null ? null : instantOf(group.get("gvpb_deadline")),
+                roundStatusOf(group.get("round_status")),
                 (String) group.get("status"),
                 (String) group.get("approval_status"),
                 (String) group.get("topic_department_id"));
@@ -437,7 +431,8 @@ public class ThesisReportService {
     }
 
     private record GroupContext(UUID id, UUID roundId, String leaderStudentId, UUID topicId, Instant gvpbDeadline,
-                                String status, String approvalStatus, String topicDepartmentId) { }
+                                RoundStatus roundStatus, String status, String approvalStatus,
+                                String topicDepartmentId) { }
 
     private record StoredObjectRef(String provider, String bucket, String key) { }
 
@@ -542,6 +537,46 @@ public class ThesisReportService {
         }
     }
 
+    /**
+     * The report deliverable is writable only inside the round's report window,
+     * and that window is resolved per round type so it is reachable for every
+     * kind of round:
+     *
+     * <ul>
+     *   <li>TLCN/KLTN author a GVPB grading deadline ({@link
+     *       io.campuscore.restfulapi.thesis.domain.RoundType#requiresGvpbDeadline()}).
+     *       Reports freeze the moment that date passes, because the grading
+     *       committee reads the artifact from then on.</li>
+     *   <li>MON_HOC/NCKH deliberately author no grading, council or defense
+     *       date, so their freeze source is the round's own lifecycle: the
+     *       report is writable once registration has closed and frozen as soon
+     *       as the round leaves REGISTRATION_CLOSED, i.e. when the results are
+     *       published. The last date those rounds carry is registration_end,
+     *       which is the date the deliverable window <em>opens</em>; keying the
+     *       freeze to it would make their reports unwritable, which is worse
+     *       than leaving them unfrozen.</li>
+     *   <li>A round that carries no grading deadline at all degrades safely: a
+     *       missing date never freezes a writable report, and the lifecycle
+     *       window still bounds it.</li>
+     * </ul>
+     *
+     * <p>Sequencing for every round type: a report is written after the group
+     * is approved (see {@link #requireApproved(UUID)}) and after registration
+     * closes, and never after the round's results are official.
+     */
+    private void requireReportWritable(GroupContext group) {
+        Instant gradingDeadline = group.gvpbDeadline();
+        if (gradingDeadline != null && !Instant.now().isBefore(gradingDeadline)) {
+            throw conflict("REPORT_DEADLINE_PASSED",
+                    "The GVPB grading deadline for this round has passed; reports are frozen");
+        }
+        if (group.roundStatus() != RoundStatus.REGISTRATION_CLOSED) {
+            throw conflict("REPORT_WINDOW_CLOSED",
+                    "Reports can be submitted or replaced only after the round's registration closes and before "
+                            + "its results are published (this round is " + group.roundStatus() + ")");
+        }
+    }
+
     private void requireApproved(UUID groupId) {
         Integer approved = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM thesis.thesis_group WHERE id = :groupId AND approval_status = 'APPROVED'",
@@ -633,6 +668,16 @@ public class ThesisReportService {
         if (value instanceof java.sql.Timestamp timestamp) return timestamp.toInstant();
         if (value instanceof java.time.OffsetDateTime offsetDateTime) return offsetDateTime.toInstant();
         return null;
+    }
+
+    /** {@code thesis_registration_round.status} is a constrained column; unknown values stay unreadable rather than open. */
+    private static RoundStatus roundStatusOf(Object value) {
+        if (value == null) return null;
+        try {
+            return RoundStatus.valueOf(value.toString().trim());
+        } catch (IllegalArgumentException unknown) {
+            return null;
+        }
     }
 
     private static String blankToNull(String value, int maxLength) {

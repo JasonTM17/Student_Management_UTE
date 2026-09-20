@@ -469,7 +469,11 @@ export function AssistantPanel() {
             <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm dark:from-[#0b3a70] dark:via-[#004eab] dark:to-[#005fcf]">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
-                  <AssistantMascot className="h-5 w-5" active={isSending} variant="detailed" />
+                  <AssistantMascot
+                    className="h-5 w-5"
+                    state={isSending ? 'thinking' : 'idle'}
+                    variant="detailed"
+                  />
                   <span
                     className="absolute -bottom-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white bg-white/75"
                     aria-hidden="true"

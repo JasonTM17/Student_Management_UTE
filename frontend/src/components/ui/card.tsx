@@ -11,7 +11,9 @@ const cardVariants = cva(
         muted: 'bg-secondary/35 border-border/70',
         elevated: 'bg-card border-border/70 surface-shadow',
         contrast:
-          'bg-[hsl(var(--surface-alt))] border-white/10 text-card-foreground',
+          // `--surface-alt` flips with the theme, so the hairline must flip with
+          // it: a fixed `border-white/10` is an invisible border in light mode.
+          'bg-[hsl(var(--surface-alt))] border-black/5 dark:border-white/10 text-card-foreground',
       },
     },
     defaultVariants: {

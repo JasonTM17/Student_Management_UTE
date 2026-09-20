@@ -58,7 +58,6 @@ import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import { departmentsApi, lecturersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import type { Department, Lecturer } from '@/types/api';
-import { FALLBACK_THESIS_ADVISORS } from '@/lib/thesis-advisors-data';
 import {
   thesisApi,
   type ThesisLecturerWorkload,
@@ -226,8 +225,12 @@ export default function ThesisPage() {
     'hidden' | 'loading' | 'ready' | 'notPublished'
   >('hidden');
 
-  // Supervisor directory used by the propose-topic modal
+  // Supervisor directory used by the propose-topic modal. A failed or empty
+  // fetch stays failed or empty — the directory is never padded with invented
+  // faculty, and `lecturersError` keeps an outage distinguishable from a
+  // genuinely unpopulated directory.
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [lecturersError, setLecturersError] = useState('');
   const [proposeSupervisorId, setProposeSupervisorId] = useState('');
   const [proposeSecondSupervisorId, setProposeSecondSupervisorId] = useState('');
 
@@ -469,29 +472,25 @@ export default function ThesisPage() {
     };
   }, [isSupervisorOrAdmin]);
 
-  useEffect(() => {
-    let cancelled = false;
-    const loadLecturers = async () => {
-      try {
-        const response = await lecturersApi.getAll({ limit: 100 });
-        const list = Array.isArray(response?.data) && response.data.length > 0 ? response.data : FALLBACK_THESIS_ADVISORS;
-        if (!cancelled && list.length > 0) {
-          setLecturers(list);
-        }
-      } catch {
-        if (!cancelled) {
-          setLecturers(FALLBACK_THESIS_ADVISORS);
-        }
-      }
-    };
+  const loadLecturers = useCallback(async () => {
+    setLecturersError('');
+    try {
+      const response = await lecturersApi.getAll({ limit: 100 });
+      const list = Array.isArray(response?.data) ? response.data : [];
+      setLecturers(list);
+    } catch {
+      // Never substitute a fabricated directory: the modal says the directory
+      // failed to load so the reader is not shown invented supervisors.
+      setLecturers([]);
+      setLecturersError(messages.thesis.loadFailed);
+    }
+  }, [messages.thesis.loadFailed]);
 
+  useEffect(() => {
     if (isSupervisorOrAdmin || isProposeModalOpen) {
       void loadLecturers();
     }
-    return () => {
-      cancelled = true;
-    };
-  }, [isSupervisorOrAdmin, isProposeModalOpen]);
+  }, [isSupervisorOrAdmin, isProposeModalOpen, loadLecturers]);
 
   const refreshTopics = useCallback(
     async (roundId: string) => {
@@ -2929,7 +2928,15 @@ export default function ThesisPage() {
               />
             </div>
           </div>
-          {lecturers.length > 0 ? (
+          {lecturersError ? (
+            // An outage must not read as "no supervisors exist": the reader
+            // gets the real failure and a retry.
+            <ErrorState
+              title={locale === 'vi' ? 'Không thể tải danh sách giảng viên' : 'Supervisor directory unavailable'}
+              description={lecturersError}
+              onRetry={() => void loadLecturers()}
+            />
+          ) : lecturers.length > 0 ? (
             <div className="grid gap-4 sm:grid-cols-2">
               <Select
                 label={messages.thesis.supervisorPrimaryLabel}
@@ -2958,7 +2965,16 @@ export default function ThesisPage() {
                 ]}
               />
             </div>
-          ) : null}
+          ) : (
+            <EmptyState
+              title={locale === 'vi' ? 'Chưa có giảng viên hướng dẫn' : 'No supervisors listed yet'}
+              description={
+                locale === 'vi'
+                  ? 'Nhà trường chưa công bố giảng viên nào trong danh sách hướng dẫn. Vui lòng liên hệ Khoa để được hỗ trợ.'
+                  : 'The faculty directory lists no supervisors yet. Contact your department office for assistance.'
+              }
+            />
+          )}
           <div>
             <label className="mb-1 block text-sm font-medium text-foreground">
               {messages.thesis.topicDescriptionLabel}
