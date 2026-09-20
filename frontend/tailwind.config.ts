@@ -5,6 +5,10 @@ module.exports = {
     "./src/pages/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/components/**/*.{js,ts,jsx,tsx,mdx}",
     "./src/app/**/*.{js,ts,jsx,tsx,mdx}",
+    // Feature views (src/features/**) render dashboard surfaces, so their
+    // classes must be scanned; without this line Tailwind purges every utility
+    // that is not also spelled out in src/app or src/components.
+    "./src/features/**/*.{js,ts,jsx,tsx,mdx}",
   ],
   theme: {
     container: {

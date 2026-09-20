@@ -41,6 +41,8 @@ interface StudentGroupCardProps {
   onRemoveMember: (studentId: string) => void | Promise<void>;
   /** The report panel stays with the page: it owns submission state and rights. */
   reportSection?: React.ReactNode;
+  /** Submission-status timeline, rendered under the report panel. */
+  submissionStatusSection?: React.ReactNode;
 }
 
 export default function StudentGroupCard({
@@ -58,6 +60,7 @@ export default function StudentGroupCard({
   onAddMember,
   onRemoveMember,
   reportSection,
+  submissionStatusSection,
 }: StudentGroupCardProps) {
   const pageCopy = messages.thesisWorkflow.page;
 
@@ -235,6 +238,8 @@ export default function StudentGroupCard({
             </div>
 
             {reportSection}
+
+            {submissionStatusSection}
           </div>
         )}
       </CardContent>

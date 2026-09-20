@@ -263,6 +263,31 @@ export const thesisWorkflowEn = {
       '**Article R5:** the right to submit or update the thesis report belongs to the **group leader** ({leader}). Members can view the submitted acceptance documents.',
     reportLinkHint:
       'Accepts Google Drive links (Anyone with the link), OneDrive, a GitHub repository or a direct PDF file.',
+    /** Stitch report-submission board: the dropzone format/size helper line. */
+    uploadFormatsHint: 'Accepted formats: PDF, DOC, DOCX • up to 20 MB per file.',
+    chooseFileFromDevice: 'Choose a file from your computer',
+    fileReadyChip: 'Ready',
+    removeFileLabel: 'Remove the selected file',
+    /** Side panel "submission status" timeline, rendered under the report panel. */
+    submissionStatus: {
+      title: 'Submission status',
+      deadlineChip: 'Deadline: {days} days left',
+      overdueChip: 'Past the deadline',
+      notOpenChip: 'Not open yet',
+      deadlineDateLabel: 'Submission deadline:',
+      firstSubmissionLabel: 'First submission',
+      latestUpdateLabel: 'Latest update (v{version})',
+      submittedChip: 'Submitted',
+      updatedChip: 'Updated',
+      feedbackLabel: 'Supervisor feedback',
+      awaitingChip: 'Awaiting',
+      feedbackPendingNote:
+        'No supervising-lecturer feedback has been recorded yet. The report is reviewed once the submission window closes.',
+      noSubmissionTitle: 'No report submitted yet',
+      noSubmissionDescription:
+        'The group leader submits the thesis report once the topic is approved (Article R5).',
+      documentLabel: 'Attached document',
+    },
     assignedTopicsCount: '{count} assigned topics',
     thesisDocumentLabel: 'Thesis document:',
     tabTopicsAndSupervisors: '1. Topics & supervising groups (supervisors)',
@@ -563,6 +588,31 @@ export const thesisWorkflowVi: Widen<typeof thesisWorkflowEn> = {
       '**Quy chế Điều R5:** Quyền nộp hoặc cập nhật báo cáo luận văn thuộc về **Nhóm trưởng** ({leader}). Các thành viên xem tài liệu nghiệm thu đã nộp.',
     reportLinkHint:
       'Chấp nhận liên kết Google Drive (chế độ Anyone with the link), OneDrive, GitHub repo hoặc file PDF trực tiếp.',
+    /** Stitch "Nộp Báo Cáo Tổng Kết": dòng mô tả định dạng/dung lượng trong dropzone. */
+    uploadFormatsHint: 'Định dạng chấp nhận: PDF, DOC, DOCX • tối đa 20 MB mỗi tệp.',
+    chooseFileFromDevice: 'Chọn tệp từ máy tính',
+    fileReadyChip: 'Đã sẵn sàng',
+    removeFileLabel: 'Bỏ tệp đã chọn',
+    /** Bảng "Trạng thái nộp" — timeline dọc bên dưới khung nộp báo cáo. */
+    submissionStatus: {
+      title: 'Trạng thái nộp',
+      deadlineChip: 'Hạn chót: còn {days} ngày',
+      overdueChip: 'Đã quá hạn',
+      notOpenChip: 'Chưa mở',
+      deadlineDateLabel: 'Hạn nộp:',
+      firstSubmissionLabel: 'Nộp lần đầu',
+      latestUpdateLabel: 'Cập nhật lần cuối (v{version})',
+      submittedChip: 'Đã nộp',
+      updatedChip: 'Đã cập nhật',
+      feedbackLabel: 'Phản hồi từ GVHD',
+      awaitingChip: 'Đang chờ',
+      feedbackPendingNote:
+        'Chưa có phản hồi từ giảng viên hướng dẫn. Báo cáo sẽ được GVHD nhận xét sau khi kết thúc hạn nộp.',
+      noSubmissionTitle: 'Chưa nộp báo cáo',
+      noSubmissionDescription:
+        'Nhóm trưởng nộp báo cáo luận văn sau khi đề tài được phê duyệt (Điều R5).',
+      documentLabel: 'Tài liệu đính kèm',
+    },
     assignedTopicsCount: '{count} đề tài phân công',
     thesisDocumentLabel: 'Tài liệu luận văn:',
     tabTopicsAndSupervisors: '1. Đề tài & nhóm hướng dẫn (GVHD)',
