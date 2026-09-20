@@ -59,12 +59,14 @@ type AuthRequestConfig = AxiosRequestConfig & {
   skipAuthRedirect?: boolean;
   _retry?: boolean;
   _retryNoCache?: boolean;
+  _coldStartRetry?: boolean;
 };
 type AuthInternalRequestConfig = InternalAxiosRequestConfig & {
   skipAuthRefresh?: boolean;
   skipAuthRedirect?: boolean;
   _retry?: boolean;
   _retryNoCache?: boolean;
+  _coldStartRetry?: boolean;
 };
 export type AnnouncementPriority = 'LOW' | 'NORMAL' | 'HIGH' | 'URGENT';
 export type AnnouncementAudienceRole =
@@ -336,6 +338,22 @@ api.interceptors.response.use(
     const originalConfig = error.config as AuthRequestConfig | undefined;
     const unauthorized = error.response?.status === 401;
     const notModified = error.response?.status === 304;
+
+    // Render's free tier sleeps and answers the first probe with a gateway
+    // error or nothing at all. One bounded retry after a short backoff wakes
+    // it without surfacing a spurious failure to idempotent reads.
+    const backendWarming =
+      !error.response || [502, 503, 504].includes(error.response.status ?? 0);
+    if (
+      backendWarming &&
+      originalConfig &&
+      isSafeRequest(originalConfig) &&
+      !originalConfig._coldStartRetry
+    ) {
+      originalConfig._coldStartRetry = true;
+      await new Promise((resolve) => setTimeout(resolve, 3000));
+      return api(originalConfig);
+    }
 
     if (notModified && originalConfig && isSafeRequest(originalConfig) && !originalConfig._retryNoCache) {
       originalConfig._retryNoCache = true;

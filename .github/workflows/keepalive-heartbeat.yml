@@ -2,36 +2,41 @@ name: Supabase & Render Keep-Alive Heartbeat
 
 on:
   schedule:
-    # Runs every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC)
+    # Runs every 6 hours (at 00:00, 06:00, 12:00, 18:00 UTC). A 10-minute cadence
+    # would keep Render warm but burns ~2160 GH Actions minutes/month, beyond the
+    # free budget; the cold-boot gap is covered by the frontend retry UX instead.
     - cron: '0 */6 * * *'
   workflow_dispatch:
+
+permissions:
+  contents: read
 
 jobs:
   heartbeat:
     name: Mutual Keep-Alive & Health Ping
     runs-on: ubuntu-latest
     steps:
+      - uses: actions/checkout@v4
       - name: Wake & Ping Render Backend
         run: |
           echo "Pinging Render Backend (campuscore-backend)..."
-          # Render free tier might take ~45s to cold boot if sleeping
-          curl -sSf -m 60 https://campuscore-backend-p4em.onrender.com/actuator/health || echo "Render ping retry 1"
-          sleep 5
-          curl -sSf -m 30 https://campuscore-backend-p4em.onrender.com/api/v1/health/liveness || echo "Render liveness ping finished"
-
+          bash scripts/keepalive-ping.sh "Render actuator" https://campuscore-backend-p4em.onrender.com/actuator/health
+          bash scripts/keepalive-ping.sh "Render liveness" https://campuscore-backend-p4em.onrender.com/api/v1/health/liveness
       - name: Ping Supabase Gateway & Database
         env:
           SUPABASE_KEY: ${{ secrets.SUPABASE_SERVICE_ROLE_KEY }}
         run: |
           echo "Pinging Supabase REST Gateway (kbptwmwitojjjwvwckom)..."
+          # The gateway answers 401 when reachable without credentials, which is a
+          # healthy probe result; only connection failure/5xx should fail the job.
+          export OK_CODES="200 204 401"
           if [ -n "$SUPABASE_KEY" ]; then
-            curl -sSf -m 30 -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY" \
-              https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/ -o /dev/null || echo "Supabase auth ping completed"
+            bash scripts/keepalive-ping.sh "Supabase REST" https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/ \
+              -H "apikey: $SUPABASE_KEY" -H "Authorization: Bearer $SUPABASE_KEY"
           else
-            curl -sSf -m 30 https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/ -o /dev/null || echo "Supabase gateway ping completed"
+            bash scripts/keepalive-ping.sh "Supabase REST" https://kbptwmwitojjjwvwckom.supabase.co/rest/v1/
           fi
-
       - name: Ping Frontend Production (Vercel)
         run: |
           echo "Pinging Vercel Frontend (campusute.io.vn)..."
-          curl -sSf -m 30 https://campusute.io.vn -o /dev/null || echo "Vercel ping completed"
+          bash scripts/keepalive-ping.sh "Vercel frontend" https://campusute.io.vn

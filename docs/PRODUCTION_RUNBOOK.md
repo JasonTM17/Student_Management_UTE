@@ -51,3 +51,22 @@ Supabase service-role and DeepSeek keys are server-only runtime files. The
 browser receives neither key, raw provider error, model identifier nor private
 campus records. If the provider is unavailable, the assistant must return a
 cited lexical answer with a degraded product status.
+
+## Render cold-start mitigation
+
+The GitHub Actions heartbeat (`keepalive-heartbeat.yml`) probes Render, Supabase
+and Vercel every 6 hours with three bounded retries; a target that stays
+unreachable after all attempts fails the workflow visibly instead of logging a
+fake success. Render's free tier still sleeps between runs, so two extra layers
+cover the gap:
+
+1. The frontend axios layer retries idempotent GETs once (3s backoff) when the
+   gateway answers 502/503/504, which absorbs single cold-start requests.
+2. `supabase/migrations/20260920210000_render_keepalive_warm_ping.sql` schedules
+   a 10-minute in-database ping via `pg_cron` + `pg_net`. It is a no-op unless
+   both extensions are enabled (Dashboard -> Database -> Extensions), then
+   re-apply the migration to register the job. Verify with
+   `SELECT jobname, schedule FROM cron.job;`.
+
+A paid Render instance removes the cold start entirely; that is a cost decision
+tracked outside this runbook.

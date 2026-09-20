@@ -162,6 +162,19 @@ function resolveSemesterFallback(
   return null;
 }
 
+const warnedNameFallbacks = new Set<string>();
+
+function noteNameFallbackUse(key: string, locale: Locale) {
+  // The dictionary rows should carry their own nameVi/nameEn; reaching this
+  // map means the backend directory is missing them. Surface it in dev only.
+  if (process.env.NODE_ENV !== 'production' && !warnedNameFallbacks.has(key)) {
+    warnedNameFallbacks.add(key);
+    console.warn(
+      `[academic-content] localized name fallback used for "${key}" (${locale}) — directory row lacks nameVi/nameEn`,
+    );
+  }
+}
+
 function resolveLocalizedNameFallback(
   locale: Locale,
   entity?: LocalizedTextRecord | null,
@@ -172,11 +185,13 @@ function resolveLocalizedNameFallback(
 
   const byCode = entity.code ? LOCALIZED_NAME_FALLBACKS[entity.code] : null;
   if (byCode) {
+    noteNameFallbackUse(entity.code as string, locale);
     return byCode[locale];
   }
 
   const byName = entity.name ? LOCALIZED_NAME_FALLBACKS[entity.name] : null;
   if (byName) {
+    noteNameFallbackUse(entity.name as string, locale);
     return byName[locale];
   }
 
