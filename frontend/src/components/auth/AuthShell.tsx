@@ -77,7 +77,7 @@ export function AuthShell({
                 titleClassName="text-[var(--portal-sidebar-text)]"
                 subtitleClassName="text-[var(--portal-sidebar-muted)]"
               />
-              <div className="space-y-4 border-l-4 border-[var(--portal-yellow)] pl-6">
+              <div className="space-y-4 border-l-4 border-[var(--portal-chrome-accent)] pl-6">
                 <SectionEyebrow className="portal-menu-label-accent">{eyebrow}</SectionEyebrow>
                 <h1 className="max-w-lg text-4xl font-semibold leading-[1.18] text-[var(--portal-sidebar-text)] xl:text-[2.75rem]">
                   {title}
@@ -93,7 +93,7 @@ export function AuthShell({
                       key={feature.label}
                       className="grid grid-cols-[5.5rem_1fr] items-baseline gap-4 py-4"
                     >
-                      <span className="text-sm font-semibold tabular-nums text-[var(--portal-yellow)]">
+                      <span className="text-sm font-semibold tabular-nums text-[var(--portal-chrome-accent)]">
                         {feature.label}
                       </span>
                       <p className="text-sm leading-6 text-[var(--portal-sidebar-muted)]">
@@ -120,7 +120,7 @@ export function AuthShell({
                           {feature.description}
                         </p>
                       </div>
-                      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-yellow)]">
+                      <span className="text-xs font-semibold uppercase tracking-wide text-[var(--portal-chrome-accent)]">
                         {messages.login.portals.admin.opsMark}
                       </span>
                     </div>
@@ -133,7 +133,7 @@ export function AuthShell({
                       key={feature.label}
                       className="grid grid-cols-[2rem_1fr] gap-4 py-4"
                     >
-                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-[var(--portal-yellow)]">
+                      <div className="flex h-8 w-8 items-center justify-center rounded-lg border border-white/15 text-[var(--portal-chrome-accent)]">
                         <span className="text-xs font-semibold">
                           {String(index + 1).padStart(2, '0')}
                         </span>
