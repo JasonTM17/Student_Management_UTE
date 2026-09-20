@@ -372,7 +372,7 @@ export default function AdminThesisPage() {
         </div>
       ) : null}
       {success ? (
-        <div className="mb-6 flex items-center gap-3 rounded-lg border border-status-success/30 bg-status-success/12 px-4 py-3 text-sm text-status-success-foreground">
+        <div className="mb-6 flex items-center gap-3 rounded-lg border border-status-success/30 bg-status-success/15 px-4 py-3 text-sm text-status-success-foreground">
           <Check className="h-4 w-4" />
           {success}
         </div>

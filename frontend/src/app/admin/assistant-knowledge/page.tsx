@@ -239,7 +239,7 @@ export default function AdminAssistantKnowledgePage() {
       actions={<Button type="button" onClick={openCreate}><Plus className="mr-2 h-4 w-4" aria-hidden="true" />{vi ? 'Tạo nội dung' : 'Add guidance'}</Button>}
     >
       {error ? <div role="alert" className="mb-5 border border-destructive/35 bg-destructive/5 px-4 py-3 text-sm text-destructive">{error} <button type="button" className="ml-2 font-semibold underline" onClick={() => void load()}>{vi ? 'Thử lại' : 'Retry'}</button></div> : null}
-      {notice ? <div role="status" className="mb-5 flex items-center gap-2 border border-status-success/30 bg-status-success/12 px-4 py-3 text-sm text-status-success-foreground"><Check className="h-4 w-4" aria-hidden="true" />{notice}</div> : null}
+      {notice ? <div role="status" className="mb-5 flex items-center gap-2 border border-status-success/30 bg-status-success/15 px-4 py-3 text-sm text-status-success-foreground"><Check className="h-4 w-4" aria-hidden="true" />{notice}</div> : null}
 
       <div className="space-y-6">
         <div className="grid gap-3 sm:grid-cols-3">
