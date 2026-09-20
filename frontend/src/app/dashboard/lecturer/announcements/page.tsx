@@ -64,6 +64,11 @@ export default function LecturerAnnouncementsPage() {
   const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // Feed pagination: the backend caps a page, so notices past page 1 stay
+  // reachable through an explicit load-more instead of being cut off silently.
+  const [page, setPage] = useState(1);
+  const [totalPages, setTotalPages] = useState(1);
+  const [isLoadingMore, setIsLoadingMore] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<LecturerNoticeCategory>('ALL');
   const [searchQuery, setSearchQuery] = useState('');
   const [readingNotice, setReadingNotice] = useState<AnnouncementRecord | null>(null);
@@ -95,6 +100,8 @@ export default function LecturerAnnouncementsPage() {
           filterLecturerOnly: '👨‍🏫 Nghiệp vụ Giảng viên',
           filterExamGrades: 'Khảo thí & Sổ điểm',
           filterResearch: 'NCKH & Đề cương',
+          loadMore: 'Tải thêm thông báo',
+          loadingMore: 'Đang tải thêm…',
         }
       : {
           eyebrow: 'Lecturer area',
@@ -120,19 +127,36 @@ export default function LecturerAnnouncementsPage() {
           filterLecturerOnly: '👨‍🏫 Faculty dedicated',
           filterExamGrades: 'Exams & Gradebook',
           filterResearch: 'Research & Syllabus',
+          loadMore: 'Load more notices',
+          loadingMore: 'Loading more…',
         };
 
-  const fetchFeed = useCallback(async () => {
-    setIsLoading(true);
-    setError('');
+  const fetchFeed = useCallback(async (nextPage = 1) => {
+    if (nextPage === 1) {
+      setIsLoading(true);
+      setError('');
+    } else {
+      setIsLoadingMore(true);
+    }
 
     try {
-      const response = await announcementsApi.getMy({ page: 1, limit: 50 });
-      setItems(response.data ?? []);
+      const response = await announcementsApi.getMy({ page: nextPage, limit: 50 });
+      const data = response.data ?? [];
+      // Page 1 replaces the feed; later pages append so the reader keeps what
+      // is already on screen.
+      setItems((current) => (nextPage === 1 ? data : [...current, ...data]));
+      setTotalPages(Math.max(response.meta?.totalPages ?? 1, 1));
+      setPage(nextPage);
     } catch {
-      setError(copy.loadFailed);
+      if (nextPage === 1) {
+        setError(copy.loadFailed);
+      }
     } finally {
-      setIsLoading(false);
+      if (nextPage === 1) {
+        setIsLoading(false);
+      } else {
+        setIsLoadingMore(false);
+      }
     }
   }, [copy.loadFailed]);
 
@@ -378,6 +402,24 @@ export default function LecturerAnnouncementsPage() {
           </CardContent>
         </Card>
       )}
+
+      {/* Load more: notices past the first page stay reachable. */}
+      {!error && !isLoading && page < totalPages ? (
+        <div className="flex justify-center">
+          <Button
+            type="button"
+            variant="outline"
+            onClick={() => void fetchFeed(page + 1)}
+            disabled={isLoadingMore}
+          >
+            <RefreshCw
+              className={`mr-2 h-4 w-4 motion-reduce:animate-none ${isLoadingMore ? 'animate-spin' : ''}`}
+              aria-hidden="true"
+            />
+            {isLoadingMore ? copy.loadingMore : copy.loadMore}
+          </Button>
+        </div>
+      ) : null}
 
       {/* Official Stationery Reader Modal */}
       <AnnouncementReaderModal

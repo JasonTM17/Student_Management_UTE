@@ -350,7 +350,11 @@ export default function AdminAppearancePage() {
                   itemClassName="transition-colors hover:bg-muted/30"
                   renderItem={(post, index) => (
                     <div className="flex items-center gap-2 py-3">
-                      <DragHandle className="shrink-0 cursor-grab" title="Kéo thả để sắp xếp vị trí" />
+                      <DragHandle
+                        className="shrink-0 cursor-grab"
+                        label={copy.dragToReorder}
+                        title={copy.dragToReorder}
+                      />
                       <span className="w-8 text-sm font-semibold tabular-nums text-muted-foreground">
                         {String(index + 1).padStart(2, '0')}
                       </span>

@@ -682,7 +682,7 @@ export default function AdminThesisPage() {
                                               </span>
                                               {top?.finalScore != null && (
                                                 <span className="shrink-0 rounded bg-status-success/20 px-1.5 py-0.5 text-[10px] font-semibold text-status-success-foreground">
-                                                  {top.finalScore} điểm
+                                                  {messages.thesis.councils.finalScorePoints.replace('{score}', String(top.finalScore))}
                                                 </span>
                                               )}
                                             </div>
@@ -844,7 +844,7 @@ export default function AdminThesisPage() {
             return (
               <>
                 <div className="rounded-lg border border-border/60 bg-muted/30 p-3 text-xs flex items-center justify-between">
-                  <span className="text-muted-foreground">Ghế tiếp theo (Bắt buộc):</span>
+                  <span className="text-muted-foreground">{messages.thesis.councils.nextSeatRequired}</span>
                   <span className="font-semibold text-primary">{nextRoleLabel}</span>
                 </div>
                 <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
