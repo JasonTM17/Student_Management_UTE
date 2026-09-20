@@ -705,8 +705,17 @@ export function resolveArticleCover(
   if (title.includes('đăng ký học phần') || title.includes('tín chỉ') || title.includes('thời khóa biểu')) {
     return '/images/news/course-registration.jpg';
   }
-  if (title.includes('khóa luận') || title.includes('kltn') || title.includes('bảo vệ')) {
-    return '/images/news/thesis-defense.jpg';
+  if (title.includes('khóa luận') || title.includes('kltn') || title.includes('bảo vệ') || title.includes('thesis')) {
+    return '/images/banners/thesis_defense_hall.jpg';
+  }
+  if (title.includes('robotics') || title.includes('robot') || title.includes('tự động hóa') || title.includes('iot') || title.includes('khoa cntt')) {
+    return '/images/banners/department_research_lab.jpg';
+  }
+  if (title.includes('thông báo học vụ') || title.includes('công văn') || title.includes('quy chế')) {
+    return '/images/banners/academic_notice_banner.jpg';
+  }
+  if (title.includes('hcmute') || title.includes('toàn trường') || title.includes('khuôn viên') || title.includes('học kỳ')) {
+    return '/images/banners/campus_academic_banner.jpg';
   }
   if (title.includes('nghiên cứu khoa học') || title.includes('nckh') || title.includes('sáng tạo trẻ')) {
     return '/images/news/scientific-research.jpg';

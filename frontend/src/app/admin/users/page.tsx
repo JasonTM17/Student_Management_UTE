@@ -841,7 +841,7 @@ export default function AdminUsersPage() {
                       </h3>
                       <p className="text-xs text-muted-foreground">{record.email}</p>
                     </div>
-                    <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                    <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
                       {statusLabel(record.status)}
                     </span>
                   </div>
@@ -885,7 +885,7 @@ export default function AdminUsersPage() {
                           {record.email}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex rounded-full px-2.5 py-0.5 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-0.5 text-xs font-medium ${statusToneClass(userStatusTone(record.status))}`}>
                             {statusLabel(record.status)}
                           </span>
                         </td>
@@ -1109,7 +1109,7 @@ export default function AdminUsersPage() {
               <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 text-xs">
                 <div className="flex items-center justify-between">
                   <span className="text-muted-foreground">Trạng thái tài khoản ban đầu:</span>
-                  <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
+                  <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="h-3 w-3" />
                     Đang hoạt động (ACTIVE)
                   </span>
@@ -1153,7 +1153,7 @@ export default function AdminUsersPage() {
                 </div>
 
                 <span className={cn(
-                  'rounded-full px-2.5 py-0.5 text-xs font-semibold',
+                  'rounded-md px-2.5 py-0.5 text-xs font-semibold',
                   formData.role === 'STUDENT'
                     ? 'bg-blue-500/10 text-blue-600 dark:text-blue-400'
                     : formData.role === 'LECTURER'

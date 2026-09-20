@@ -120,7 +120,7 @@ export function GradeDetailModal({ isOpen, onClose, record }: GradeDetailModalPr
             <span className="font-mono text-xs font-bold uppercase text-primary">
               {record.courseCode}
             </span>
-            <span className="rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
+            <span className="rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
               {record.sectionCode}
             </span>
             <span className="text-xs text-muted-foreground">

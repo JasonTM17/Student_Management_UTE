@@ -156,7 +156,7 @@ export default function ThesisProgressPage() {
             {workspace.rounds.map((round) => <option key={round.id} value={round.id}>{round.name}</option>)}
           </select>
         </label>
-        <div className="rounded-full bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
+        <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
           {messages.thesis.progressCurrentStage}: {messages.thesis.progressSteps[Math.max(progressIndex, 0)]}
         </div>
       </div>

@@ -97,7 +97,7 @@ export function HomeIdentityBoard() {
       <div className="mt-6 border-t border-white/15 pt-4">
         <LocalizedLink
           href={activePortal.href}
-          className="group flex w-full items-center justify-between rounded-lg bg-[var(--portal-yellow)] px-4 py-2.5 text-sm font-bold text-[var(--portal-yellow-ink)] transition-all hover:bg-amber-400 shadow-sm"
+          className="group flex w-full items-center justify-between rounded-lg bg-white px-4 py-2.5 text-sm font-bold text-[#003f87] transition-all hover:bg-white/95 shadow-sm"
         >
           <span>{activePortal.label}</span>
           <ArrowRight className="h-4 w-4 transition-transform group-hover:translate-x-1" />

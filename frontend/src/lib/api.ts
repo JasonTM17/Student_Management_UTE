@@ -112,6 +112,7 @@ export type AnnouncementRecord = {
   uniqueReaderCount?: number;
   slug?: string | null;
   featuredOrder?: number | null;
+  displayOrder?: number | null;
   tags?: Array<{ id: string; slug: string; nameVi: string; nameEn: string }>;
   attachments?: Array<{
     id: string;
@@ -1024,6 +1025,16 @@ export const announcementsApi = {
     const response = await api.get<ApiResponse<AnnouncementRecord[]>>(
       '/announcements/public',
       { params },
+    );
+    return response.data;
+  },
+  updateDisplayOrder: async (
+    id: string,
+    displayOrder: number,
+  ): Promise<AnnouncementRecord> => {
+    const response = await api.patch<AnnouncementRecord>(
+      `/announcements/${id}/order`,
+      { displayOrder },
     );
     return response.data;
   },

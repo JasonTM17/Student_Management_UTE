@@ -45,6 +45,7 @@ import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-bloc
 import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
+import { TinyMceEditor } from '@/components/ui/tinymce-editor';
 import { SortableList, DragHandle } from '@/components/ui/sortable-list';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
@@ -226,6 +227,7 @@ export default function AdminAnnouncementsPage() {
   const editorSnapshot = useRef('');
   const [reorderList, setReorderList] = useState<AnnouncementRecord[]>([]);
   const [isSavingOrder, setIsSavingOrder] = useState(false);
+  const [editorEngine, setEditorEngine] = useState<'tinymce' | 'markdown'>('tinymce');
 
   const handleSaveReorder = async () => {
     setIsSavingOrder(true);
@@ -240,6 +242,16 @@ export default function AdminAnnouncementsPage() {
       };
       await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
+
+      // Persist to backend database via Spring Boot REST API
+      await Promise.all(
+        reorderList.map((item, index) =>
+          announcementsApi.updateDisplayOrder(item.id, index).catch((err) => {
+            console.warn(`Failed to update display order for announcement ${item.id}`, err);
+          }),
+        ),
+      );
+
       toast.success(vi ? 'Đã cập nhật thứ tự hiển thị thông báo thành công!' : 'Announcement order updated!');
       setModal(null);
       void fetchAnnouncements();
@@ -882,9 +894,9 @@ export default function AdminAnnouncementsPage() {
                     <div className="flex flex-col gap-5 xl:flex-row xl:items-start xl:justify-between">
                       <div className="min-w-0 flex-1 space-y-3">
                         <div className="flex flex-wrap items-center gap-2">
-                          <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${tone}`}>{announcementPriorityLabel(item.priority, locale)}</span>
-                          {item.archivedAt ? <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{copy.archived}</span> : null}
-                          {updated ? <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{copy.updated}</span> : null}
+                          <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${tone}`}>{announcementPriorityLabel(item.priority, locale)}</span>
+                          {item.archivedAt ? <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{copy.archived}</span> : null}
+                          {updated ? <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{copy.updated}</span> : null}
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
@@ -940,14 +952,66 @@ export default function AdminAnnouncementsPage() {
                   <AdminFormField label={`${vi ? 'Tiêu đề' : 'Title'} · ${copy.required}`}>
                     <Input autoFocus value={draft.title} maxLength={240} required onChange={(event) => setDraft((current) => ({ ...current, title: event.target.value }))} />
                   </AdminFormField>
-                  <AdminFormField label={`${vi ? 'Nội dung' : 'Content'} · ${copy.required}`} description={vi ? 'Nội dung cập nhật ngay trên bảng tin; hỗ trợ định dạng Markdown, bảng biểu, liên kết và hộp ghi chú callout.' : 'Changes appear in the feed immediately; supports Markdown, tables, links and alert callouts.'}>
-                    <RichTextEditor
-                      value={draft.content}
-                      onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
-                      locale={locale}
-                      minHeight="220px"
-                      placeholder={vi ? 'Soạn thảo nội dung thông báo... (Hỗ trợ tiêu đề, in đậm, bảng biểu, ghi chú khẩn)' : 'Compose announcement body... (Supports headings, bold, tables, alert callouts)'}
-                    />
+                  <AdminFormField label={`${vi ? 'Nội dung' : 'Content'} · ${copy.required}`} description={vi ? 'Nội dung cập nhật ngay trên bảng tin; hỗ trợ trình soạn thảo TinyMCE WYSIWYG chuyên sâu hoặc Markdown bảng biểu, liên kết và hộp ghi chú callout.' : 'Changes appear in the feed immediately; supports TinyMCE visual editor or Markdown with tables and callouts.'}>
+                    <div className="mb-2 flex items-center justify-between border-b border-border/60 pb-2">
+                      <div className="inline-flex rounded-lg border border-border/80 bg-muted/40 p-0.5 text-xs">
+                        <button
+                          type="button"
+                          onClick={() => setEditorEngine('tinymce')}
+                          className={cn(
+                            'rounded-md px-3 py-1 font-semibold transition-all',
+                            editorEngine === 'tinymce'
+                              ? 'bg-primary text-primary-foreground shadow-xs'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {vi ? '✨ Trực quan TinyMCE' : '✨ TinyMCE Visual'}
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditorEngine('markdown')}
+                          className={cn(
+                            'rounded-md px-3 py-1 font-semibold transition-all',
+                            editorEngine === 'markdown'
+                              ? 'bg-primary text-primary-foreground shadow-xs'
+                              : 'text-muted-foreground hover:text-foreground',
+                          )}
+                        >
+                          {vi ? '📝 Markdown & Khối' : '📝 Markdown & Blocks'}
+                        </button>
+                      </div>
+                      <span className="text-[11px] text-muted-foreground">
+                        {editorEngine === 'tinymce'
+                          ? (vi ? 'Chuẩn xuất bản học thuật HCMUTE' : 'HCMUTE Academic Publishing')
+                          : (vi ? 'Hỗ trợ phím tắt và mẫu nhanh' : 'Keyboard shortcuts & templates')}
+                      </span>
+                    </div>
+
+                    {editorEngine === 'tinymce' ? (
+                      <div className="space-y-1">
+                        <TinyMceEditor
+                          value={draft.content}
+                          onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
+                          locale={locale}
+                          height={360}
+                          placeholder={
+                            vi
+                              ? 'Soạn thảo nội dung thông báo chuẩn học thuật HCMUTE (hỗ trợ bảng biểu, định dạng, danh sách)...'
+                              : 'Compose academic announcement body...'
+                          }
+                        />
+                      </div>
+                    ) : null}
+
+                    <div className={editorEngine === 'markdown' ? 'block' : 'hidden'}>
+                      <RichTextEditor
+                        value={draft.content}
+                        onChange={(newContent) => setDraft((current) => ({ ...current, content: newContent }))}
+                        locale={locale}
+                        minHeight="220px"
+                        placeholder={vi ? 'Soạn thảo nội dung thông báo... (Hỗ trợ tiêu đề, in đậm, bảng biểu, ghi chú khẩn)' : 'Compose announcement body... (Supports headings, bold, tables, alert callouts)'}
+                      />
+                    </div>
                   </AdminFormField>
                 </AdminFormSection>
 
@@ -1046,7 +1110,7 @@ export default function AdminAnnouncementsPage() {
                   <CardContent className="space-y-4 pt-5">
                     <div className={`rounded-md border p-4 ${previewVisible ? 'border-primary/30 bg-background' : 'border-border/70 bg-secondary/30'}`} aria-live="polite">
                       <div className="flex flex-wrap items-center gap-2">
-                        <span className={`rounded-full px-2.5 py-1 text-xs font-semibold ${statusToneClass(announcementPriorityTone(draft.priority))}`}>{announcementPriorityLabel(draft.priority, locale)}</span>
+                        <span className={`rounded-md px-2.5 py-1 text-xs font-semibold ${statusToneClass(announcementPriorityTone(draft.priority))}`}>{announcementPriorityLabel(draft.priority, locale)}</span>
                         <span className="text-xs font-medium text-muted-foreground">{previewVisible ? copy.visible : copy.notVisible}</span>
                       </div>
                       <div className="mt-3">
@@ -1113,7 +1177,7 @@ export default function AdminAnnouncementsPage() {
                           <p className="font-semibold text-foreground">{announcementHistoryActionLabel(entry.action, locale)}</p>
                           <p className="mt-1 text-xs text-muted-foreground">{copy.actor}: {entry.actorLabel?.trim() || actorDescription(locale)} · {copy.version} {entry.version} · {formatDateTime(entry.createdAt)}</p>
                         </div>
-                        <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{announcementHistoryReason(entry.reason, entry.action, locale)}</span>
+                        <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-muted-foreground">{announcementHistoryReason(entry.reason, entry.action, locale)}</span>
                       </div>
                       <div className="mt-4 space-y-2">
                         <p className="text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground">{copy.changedFields}</p>

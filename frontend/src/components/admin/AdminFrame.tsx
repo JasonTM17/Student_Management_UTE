@@ -276,7 +276,7 @@ export function AdminFrame({
                 {user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}
               </div>
               <div className="mt-2">
-                <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                <span className="inline-flex items-center rounded-md bg-[var(--portal-yellow)]/10 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30 shadow-xs">
                   {locale === 'vi' ? 'Hệ thống Quản trị Đại học' : 'University Administration System'}
                 </span>
               </div>

@@ -691,7 +691,7 @@ export default function AdminSectionsPage() {
                             {courseLabel}
                           </h3>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
+                        <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
                           {messages.common.statuses[section.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                         </span>
                       </div>
@@ -879,7 +879,7 @@ export default function AdminSectionsPage() {
                           )}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(sectionStatusTone(section.status))}`}>
                             {messages.common.statuses[section.status as keyof typeof messages.common.statuses] ?? messages.common.statuses.UNKNOWN}
                           </span>
                         </td>

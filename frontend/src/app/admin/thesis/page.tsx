@@ -547,7 +547,7 @@ export default function AdminThesisPage() {
                                     </div>
                                     <span
                                       className={cn(
-                                        'inline-flex items-center rounded-full px-2.5 py-0.5 text-xs font-medium',
+                                        'inline-flex items-center rounded-md px-2.5 py-0.5 text-xs font-medium',
                                         isComplete
                                           ? 'bg-status-success/15 text-status-success-foreground border border-status-success/30'
                                           : 'bg-status-warning/15 text-status-warning-foreground border border-status-warning/30'

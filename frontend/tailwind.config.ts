@@ -76,6 +76,12 @@ module.exports = {
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
+        // The large end of the default scale is capped to an enterprise range:
+        // 12/16/24px radii read as consumer chat bubbles on dense data surfaces.
+        // Cards and modals land at 8-10px, accents at 12px maximum.
+        xl: "0.5rem",
+        "2xl": "0.625rem",
+        "3xl": "0.75rem",
       },
       keyframes: {
         "accordion-down": {

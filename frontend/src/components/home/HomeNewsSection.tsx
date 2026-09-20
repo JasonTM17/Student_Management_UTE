@@ -187,7 +187,7 @@ export function HomeNewsSection() {
                   setIsExpanded(false);
                 }}
                 className={cn(
-                  'inline-flex items-center gap-2 rounded-full px-4 py-2 text-xs font-semibold transition-all shadow-2xs cursor-pointer border',
+                  'inline-flex items-center gap-2 rounded-md px-4 py-2 text-xs font-semibold transition-all shadow-2xs cursor-pointer border',
                   isActive
                     ? 'bg-primary text-primary-foreground border-primary shadow-sm ring-2 ring-primary/20'
                     : 'bg-card text-muted-foreground border-border/80 hover:bg-accent hover:text-foreground',
@@ -197,7 +197,7 @@ export function HomeNewsSection() {
                 <span>{isVi ? tab.labelVi : tab.labelEn}</span>
                 <span
                   className={cn(
-                    'rounded-full px-1.5 py-0.2 text-[10px] font-bold',
+                    'rounded-md px-1.5 py-0.2 text-[10px] font-bold',
                     isActive ? 'bg-primary-foreground/20 text-primary-foreground' : 'bg-muted text-muted-foreground',
                   )}
                 >
@@ -348,7 +348,7 @@ export function HomeNewsSection() {
               <div className="flex justify-center pt-2">
                 <button
                   onClick={() => setIsExpanded(!isExpanded)}
-                  className="inline-flex items-center gap-2 rounded-full border border-border/80 bg-card px-6 py-2.5 text-xs font-bold text-foreground shadow-xs hover:bg-accent transition-colors cursor-pointer"
+                  className="inline-flex items-center gap-2 rounded-md border border-border/80 bg-card px-6 py-2.5 text-xs font-bold text-foreground shadow-xs hover:bg-accent transition-colors cursor-pointer"
                 >
                   {isExpanded ? (
                     <>

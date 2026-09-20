@@ -141,6 +141,40 @@ export default function ThesisTopicCatalogPage() {
         }
       />
 
+      {/* Executive Thesis Catalog Hero Banner */}
+      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12">
+          <div className="flex flex-col justify-center p-6 lg:col-span-8 space-y-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
+                {messages.thesis.navigation.catalog}
+              </span>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                HCMUTE Academic Engineering & Technology
+              </span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {messages.thesis.catalogTitle}
+            </h2>
+            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+              {messages.thesis.catalogDescription}
+            </p>
+          </div>
+          <div className="relative h-48 lg:h-full lg:col-span-4 overflow-hidden border-t lg:border-t-0 lg:border-l border-border/60 min-h-[160px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/banners/faculty_engineering_hall.jpg"
+              alt="HCMUTE Faculty of Engineering Hall"
+              className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent lg:hidden" />
+            <div className="absolute bottom-2 left-3 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
+              {locale === 'vi' ? 'Khoa Kỹ thuật HCMUTE' : 'HCMUTE Faculty of Engineering'}
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
         <label className="flex min-w-[15rem] flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
           {messages.thesis.selectRound}
@@ -233,7 +267,7 @@ export default function ThesisTopicCatalogPage() {
                   key={pill}
                   type="button"
                   onClick={() => handleSelectPill(pill)}
-                  className="rounded-full border border-border/80 bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-muted/80"
+                  className="rounded-md border border-border/80 bg-card px-3 py-1 text-xs font-medium text-foreground transition hover:border-primary/50 hover:bg-muted/80"
                 >
                   {pill}
                 </button>
@@ -272,7 +306,7 @@ export default function ThesisTopicCatalogPage() {
                 )}
               >
                 <div className="flex items-start justify-between gap-3">
-                  <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
+                  <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-semibold text-muted-foreground">
                     {topic.maxGroups} {messages.thesis.groups.toLowerCase()}
                   </span>
                   <ArrowUpRight className="h-4 w-4 text-muted-foreground transition-transform group-hover:-translate-y-0.5 group-hover:translate-x-0.5" />

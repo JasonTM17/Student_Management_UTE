@@ -141,6 +141,40 @@ export default function ThesisTopicDetailPage() {
         }
       />
 
+      {/* Executive Thesis Defense Hall Banner */}
+      <div className="overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs">
+        <div className="grid grid-cols-1 lg:grid-cols-12">
+          <div className="flex flex-col justify-center p-6 lg:col-span-8 space-y-2.5">
+            <div className="flex flex-wrap items-center gap-2">
+              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
+                {messages.thesis.topicDetailTitle}
+              </span>
+              <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                HCMUTE Academic Defense Council
+              </span>
+            </div>
+            <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+              {topic.title}
+            </h2>
+            <p className="text-xs leading-relaxed text-muted-foreground sm:text-sm">
+              {messages.thesis.topicDetailDescription}
+            </p>
+          </div>
+          <div className="relative h-48 lg:h-full lg:col-span-4 overflow-hidden border-t lg:border-t-0 lg:border-l border-border/60 min-h-[160px]">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/banners/thesis_defense_hall.jpg"
+              alt="HCMUTE Thesis Defense Hall & Faculty Committee"
+              className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent lg:hidden" />
+            <div className="absolute bottom-2 left-3 rounded-md bg-background/85 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
+              Hội đồng Đánh giá Khóa luận HCMUTE
+            </div>
+          </div>
+        </div>
+      </div>
+
       <div className="grid gap-6 lg:grid-cols-[minmax(0,1fr)_20rem]">
         <Card variant="muted">
           <CardHeader>

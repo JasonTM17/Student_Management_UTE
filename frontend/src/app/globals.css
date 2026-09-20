@@ -50,8 +50,16 @@
     --portal-sidebar-hover: oklch(0.37 0.09 252);
     --portal-sidebar-text: oklch(0.97 0.01 248);
     --portal-sidebar-muted: oklch(0.82 0.025 248);
-    --portal-yellow: oklch(0.83 0.17 89);
-    --portal-yellow-ink: oklch(0.26 0.055 82);
+    /* Academic Ice-Blue / Diamond Navy: prestigious university emblem palette
+       harmonizing perfectly with institutional deep navy (#003F87). */
+    --portal-yellow: oklch(0.92 0.035 240);
+    --portal-yellow-ink: oklch(0.24 0.08 255);
+    /* Institutional brand gold: fixed, NOT accent-reactive. Identity marks
+       (HCMUTE badge, role and demo chips, the specialized-assistant mark) keep
+       a warm honey gold on the navy chrome even when the site accent is a cool
+       tone — otherwise they sink into the sidebar and lose the brand. */
+    --portal-brand-gold: oklch(0.8 0.115 82);
+    --portal-brand-gold-ink: oklch(0.24 0.05 82);
     --portal-ribbon: oklch(0.995 0.002 248);
     --portal-canvas: oklch(0.984 0.009 264);
     --portal-surface: oklch(0.995 0.002 248);
@@ -66,41 +74,47 @@
     --focus-width: 0.1875rem;
   }
 
-  html[data-accent='campus-gold'] {
-    --portal-yellow: oklch(0.81 0.15 78);
-    --portal-yellow-ink: oklch(0.28 0.06 78);
+  html[data-accent='ute-yellow'],
+  html[data-accent='river-blue'] {
+    --portal-yellow: oklch(0.92 0.035 240);
+    --portal-yellow-ink: oklch(0.24 0.08 255);
   }
 
-  html[data-accent='river-blue'] {
-    --portal-yellow: oklch(0.78 0.12 230);
-    --portal-yellow-ink: oklch(0.24 0.07 240);
+  html[data-accent='campus-gold'] {
+    --portal-yellow: oklch(0.94 0.025 240);
+    --portal-yellow-ink: oklch(0.24 0.08 255);
   }
 
   .dark {
     --background: 220 18% 9%;
     --foreground: 210 18% 94%;
-    --card: 220 14% 12%;
+    /* Elevation ramp retuned for real surface depth: the card sat at a 1.07:1
+       separation from the canvas (visually flat) and the muted text at 11.4:1
+       competed with primary copy. Cards now step +2% lightness per tier so
+       elevation reads without relying on borders, and muted copy lands in the
+       7-9:1 band that keeps a three-level text hierarchy. */
+    --card: 220 15% 14%;
     --card-foreground: 210 18% 94%;
-    --popover: 220 14% 12%;
+    --popover: 220 15% 15%;
     --popover-foreground: 210 18% 94%;
     --primary: 205 44% 72%;
     --primary-foreground: 220 20% 9%;
-    --secondary: 220 11% 16%;
+    --secondary: 220 12% 18%;
     --secondary-foreground: 210 18% 94%;
-    --muted: 220 10% 14%;
-    --muted-foreground: 214 14% 84%;
-    --accent: 220 11% 16%;
+    --muted: 220 11% 16%;
+    --muted-foreground: 214 12% 70%;
+    --accent: 220 12% 18%;
     --accent-foreground: 210 18% 94%;
     --destructive: 0 74% 63%;
     --destructive-foreground: 210 18% 94%;
-    --border: 220 9% 24%;
-    --input: 220 9% 24%;
+    --border: 220 9% 22%;
+    --input: 220 9% 22%;
     /* Focus rings must clear 3:1 on both dark surfaces and the light portal
        canvas that stays white in dark mode (WCAG 2.4.7 / 1.4.11). */
     --ring: 205 65% 42%;
     --canvas-subtle: 220 18% 10%;
-    --surface-raised: 220 13% 14%;
-    --surface-alt: 220 12% 17%;
+    --surface-raised: 220 13% 16%;
+    --surface-alt: 220 12% 19%;
     --ink-soft: 214 9% 79%;
     --accent-warm: 24 78% 64%;
     --accent-cool: 205 44% 72%;
@@ -120,8 +134,10 @@
     --portal-sidebar-hover: oklch(0.33 0.09 252);
     --portal-sidebar-text: oklch(0.96 0.012 248);
     --portal-sidebar-muted: oklch(0.78 0.035 248);
-    --portal-yellow: oklch(0.86 0.16 88);
-    --portal-yellow-ink: oklch(0.22 0.045 82);
+    --portal-yellow: oklch(0.32 0.06 252);
+    --portal-yellow-ink: oklch(0.96 0.015 248);
+    --portal-brand-gold: oklch(0.82 0.115 82);
+    --portal-brand-gold-ink: oklch(0.2 0.04 80);
     --portal-ribbon: oklch(0.3 0.1 251);
     --portal-canvas: oklch(0.18 0.018 248);
     --portal-surface: oklch(0.225 0.018 248);
@@ -129,14 +145,15 @@
     --portal-scrim: oklch(0.1 0.02 252 / 0.7);
   }
 
-  html.dark[data-accent='campus-gold'] {
-    --portal-yellow: oklch(0.84 0.14 78);
-    --portal-yellow-ink: oklch(0.24 0.05 78);
+  html.dark[data-accent='ute-yellow'],
+  html.dark[data-accent='river-blue'] {
+    --portal-yellow: oklch(0.32 0.06 252);
+    --portal-yellow-ink: oklch(0.96 0.015 248);
   }
 
-  html.dark[data-accent='river-blue'] {
-    --portal-yellow: oklch(0.8 0.1 230);
-    --portal-yellow-ink: oklch(0.22 0.06 240);
+  html.dark[data-accent='campus-gold'] {
+    --portal-yellow: oklch(0.35 0.05 252);
+    --portal-yellow-ink: oklch(0.96 0.015 248);
   }
 }
 

@@ -369,7 +369,7 @@ export default function AdminAcademicYearsPage() {
                         <h3 className="font-semibold text-foreground">{record.year}</h3>
                         <p className="mt-1 text-sm text-muted-foreground">{copy.headers.year}</p>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(record.isActive || record.isCurrent ? 'success' : 'neutral')}`}>
+                      <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(record.isActive || record.isCurrent ? 'success' : 'neutral')}`}>
                         {record.isActive || record.isCurrent ? copy.active : copy.inactive}
                       </span>
                     </div>
@@ -435,7 +435,7 @@ export default function AdminAcademicYearsPage() {
                           {formatDate(record.endDate)}
                         </td>
                         <td className="px-2 py-4">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(record.isActive || record.isCurrent ? 'success' : 'neutral')}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(record.isActive || record.isCurrent ? 'success' : 'neutral')}`}>
                             {record.isActive || record.isCurrent ? copy.active : copy.inactive}
                           </span>
                         </td>

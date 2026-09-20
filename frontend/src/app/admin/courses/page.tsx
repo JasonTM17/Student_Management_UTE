@@ -502,7 +502,7 @@ export default function AdminCoursesPage() {
                             </p>
                           ) : null}
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(course.isActive ? 'success' : 'neutral')}`}>
+                        <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(course.isActive ? 'success' : 'neutral')}`}>
                           {course.isActive ? copy.active : copy.inactive}
                         </span>
                       </div>
@@ -595,7 +595,7 @@ export default function AdminCoursesPage() {
                           {departmentLabel}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(course.isActive ? 'success' : 'neutral')}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(course.isActive ? 'success' : 'neutral')}`}>
                             {course.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>

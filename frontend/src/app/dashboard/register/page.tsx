@@ -509,11 +509,11 @@ export default function RegisterPage() {
                             <span className="text-xs text-muted-foreground">
                               {formatNumber(group.credits)} {copy.creditsUnit}
                             </span>
-                            <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                            <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                               {copy.groupSectionCount.replace('{count}', formatNumber(group.sections.length))}
                             </span>
                             <span
-                                className={`rounded-full px-2 py-0.5 text-[11px] font-medium ${
+                                className={`rounded-md px-2 py-0.5 text-[11px] font-medium ${
                                   openSeats > 0
                                     ? 'bg-status-success/12 text-status-success-foreground'
                                     : 'bg-secondary text-muted-foreground'
@@ -546,12 +546,12 @@ export default function RegisterPage() {
                             {copy.columns.section} {section.sectionNumber}
                           </p>
                           {section.alreadyEnrolled ? (
-                            <span className="rounded-full border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
+                            <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                               {copy.registered}
                             </span>
                           ) : null}
                           {section.scheduleConflict ? (
-                            <span className="rounded-full border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
+                            <span className="rounded-md border border-destructive/30 bg-destructive/10 px-2 py-0.5 text-xs font-medium text-destructive">
                               {copy.conflictBadge}
                             </span>
                           ) : null}
@@ -613,7 +613,7 @@ export default function RegisterPage() {
         <Card className="min-w-0 lg:col-span-3">
           <CardHeader className="flex flex-row items-center justify-between gap-2 space-y-0 pb-3">
             <CardTitle>{copy.enrolledRail}</CardTitle>
-            <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+            <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
               {formatNumber(totalRegisteredCredits)} / {formatNumber(creditLimit)} {copy.creditsUnit}
             </span>
           </CardHeader>

@@ -288,6 +288,51 @@ export default function StudentAnnouncementsPage() {
         }
       />
 
+      {/* Institutional Campus Announcement Banner */}
+      <div className="relative overflow-hidden rounded-2xl border border-border/80 bg-gradient-to-r from-primary/15 via-background to-secondary/20 p-6 shadow-xs">
+        <div className="grid grid-cols-1 gap-6 md:grid-cols-12 items-center">
+          <div className="md:col-span-8 space-y-2.5">
+            <div className="inline-flex items-center gap-2 rounded-full border border-primary/30 bg-primary/10 px-3 py-1 text-xs font-bold text-primary">
+              <Megaphone className="h-3.5 w-3.5" />
+              <span>{locale === 'vi' ? 'TRUNG TÂM THÔNG BÁO CHÍNH THỨC HCMUTE' : 'HCMUTE OFFICIAL NOTIFICATION CENTER'}</span>
+            </div>
+            <h2 className="text-xl font-bold text-foreground sm:text-2xl">
+              {locale === 'vi'
+                ? 'Thông Báo Học Vụ, Kế Hoạch Đào Tạo & Khóa Luận'
+                : 'Academic Affairs, Course Registration & Thesis Bulletin'}
+            </h2>
+            <p className="text-xs leading-relaxed text-muted-foreground max-w-xl sm:text-sm">
+              {locale === 'vi'
+                ? 'Tất cả văn bản chỉ đạo, lịch đăng ký học phần, quyết định giao đề tài và hướng dẫn quy chế đào tạo được xác thực trực tiếp từ Phòng Đào tạo và các Khoa chuyên môn.'
+                : 'Official academic dispatches, semester schedules, thesis milestone approvals, and institutional regulations published directly by Academic Affairs and Academic Departments.'}
+            </p>
+            <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-muted-foreground">
+              <span className="flex items-center gap-1 font-semibold text-foreground">
+                <Calendar className="h-3.5 w-3.5 text-primary" />
+                {locale === 'vi' ? 'Học kỳ 1 • 2026-2027' : 'Term 1 • 2026-2027'}
+              </span>
+              <span>•</span>
+              <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">
+                <span className="h-2 w-2 rounded-full bg-emerald-500 animate-pulse" />
+                {locale === 'vi' ? 'Kênh trực tuyến mở' : 'Active Channel'}
+              </span>
+            </div>
+          </div>
+          <div className="relative hidden md:block md:col-span-4 h-36 overflow-hidden rounded-xl border border-border/60 shadow-xs">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
+            <img
+              src="/images/banners/campus_academic_banner.jpg"
+              alt="HCMUTE Campus Banner"
+              className="h-full w-full object-cover object-center"
+            />
+            <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+            <div className="absolute bottom-2 left-3 rounded-md bg-background/80 px-2 py-0.5 text-[10px] font-bold text-foreground backdrop-blur-xs">
+              HCMUTE Campus Portal
+            </div>
+          </div>
+        </div>
+      </div>
+
       {/* Control Bar: Search & Category Tabs */}
       <div className="flex flex-col gap-3 lg:flex-row lg:items-center lg:justify-between">
         <div className="flex flex-wrap gap-1.5">

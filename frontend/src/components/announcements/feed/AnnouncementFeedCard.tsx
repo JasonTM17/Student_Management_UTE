@@ -142,7 +142,7 @@ export function AnnouncementFeedCard({
                 />
               </div>
               <div className="relative z-10 flex items-center gap-2">
-                <span className="rounded-full bg-white/20 px-3 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
+                <span className="rounded-md bg-white/20 px-3 py-1 text-xs font-bold uppercase tracking-wider backdrop-blur-md">
                   {domain.categoryLabel}
                 </span>
               </div>
@@ -276,7 +276,7 @@ export function AnnouncementFeedCard({
               />
             </div>
             <div className="relative z-10 flex items-center justify-between">
-              <span className="rounded-full bg-white/20 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider backdrop-blur-md">
+              <span className="rounded-md bg-white/20 px-2.5 py-0.5 text-[10.5px] font-bold uppercase tracking-wider backdrop-blur-md">
                 {domain.categoryLabel}
               </span>
               {isUrgent && (

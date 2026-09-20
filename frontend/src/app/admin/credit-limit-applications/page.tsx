@@ -215,7 +215,7 @@ export default function AdminCreditLimitApplicationsPage() {
                         <p className="font-semibold text-foreground">{application.studentName || application.studentCode}</p>
                         <p className="mt-1 text-sm text-muted-foreground">{application.studentCode} · {application.studentEmail}</p>
                       </div>
-                      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(applicationTone(application.status))}`}>
+                      <span className={`inline-flex shrink-0 items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(applicationTone(application.status))}`}>
                         <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                         {statusLabel(application.status)}
                       </span>
@@ -276,7 +276,7 @@ export default function AdminCreditLimitApplicationsPage() {
                         <td className="px-4 py-4 font-semibold text-foreground">{application.standardLimit} → {application.requestedLimit}</td>
                         <td className="max-w-[320px] px-4 py-4 leading-6 text-muted-foreground">{application.reason}</td>
                         <td className="px-4 py-4">
-                          <span className={`inline-flex items-center gap-1.5 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(applicationTone(application.status))}`}>
+                          <span className={`inline-flex items-center gap-1.5 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(applicationTone(application.status))}`}>
                             <Icon className="h-3.5 w-3.5" aria-hidden="true" />
                             {statusLabel(application.status)}
                           </span>

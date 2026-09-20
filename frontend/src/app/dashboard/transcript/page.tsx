@@ -346,7 +346,7 @@ export default function TranscriptPage() {
       return (
         <span className="inline-flex flex-wrap items-center justify-end gap-1.5">
           <span
-            className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusToneClass('success')}`}
+            className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${statusToneClass('success')}`}
           >
             {copy.statusCompleted}
           </span>
@@ -364,7 +364,7 @@ export default function TranscriptPage() {
     if (course.status === 'IN_PROGRESS') {
       return (
         <span
-          className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-semibold ${statusToneClass('info')}`}
+          className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-semibold ${statusToneClass('info')}`}
         >
           {copy.statusInProgress}
         </span>
@@ -372,7 +372,7 @@ export default function TranscriptPage() {
     }
     return (
       <span
-        className={`inline-flex items-center rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass('neutral')}`}
+        className={`inline-flex items-center rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass('neutral')}`}
       >
         {copy.statusNotStarted}
       </span>
@@ -705,7 +705,7 @@ export default function TranscriptPage() {
                             </p>
                           </div>
                           <span
-                            className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
+                            className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
                           >
                             {record.letterGrade || '-'}
                           </span>
@@ -817,7 +817,7 @@ export default function TranscriptPage() {
                             <td className="px-4 py-3.5 text-center">
                               {record.letterGrade ? (
                                 <span
-                                  className={`inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(
+                                  className={`inline-flex min-w-[2.75rem] items-center justify-center rounded-md px-2.5 py-1 text-xs font-semibold ${getGradeTone(
                                     record.letterGrade,
                                   )}`}
                                 >
@@ -833,12 +833,12 @@ export default function TranscriptPage() {
                                 : '-'}
                             </td>
                             <td className="px-4 py-3.5 text-center">
-                              <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                              <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                 {statusLabel(record.enrollmentStatus)}
                               </span>
                             </td>
                             <td className="px-4 py-3.5 text-right">
-                              <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                              <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                 {statusLabel(record.gradeStatus)}
                               </span>
                             </td>
@@ -932,7 +932,7 @@ export default function TranscriptPage() {
                               {formatNumber(course.credits)} {copy.programHeaders.credits}
                             </span>
                             {course.isMandatory ? (
-                              <span className="rounded-full bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">
+                              <span className="rounded-md bg-secondary px-2 py-0.5 text-[11px] font-medium text-foreground">
                                 {copy.mandatory}
                               </span>
                             ) : null}
@@ -970,7 +970,7 @@ export default function TranscriptPage() {
                               </td>
                               <td className="px-2 py-3 text-center">
                                 {course.isMandatory ? (
-                                  <span className="inline-flex rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                                  <span className="inline-flex rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                     {copy.mandatory}
                                   </span>
                                 ) : (

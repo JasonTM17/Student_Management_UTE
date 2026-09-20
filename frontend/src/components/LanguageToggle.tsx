@@ -41,7 +41,9 @@ export function LanguageToggle({
   return (
     <div
       className={cn(
-        'inline-flex items-center rounded-full border border-border/70 bg-card/80 p-1 shadow-sm',
+        // Container and its active chip share the same 6px radius family; a pill
+        // container with a rounded-rect chip left the chip corners poking out.
+        'inline-flex items-center gap-0.5 rounded-md border border-border/70 bg-card/80 p-0.5 shadow-sm',
         inverse && 'border-white/20 bg-white/10 shadow-none',
         className,
       )}
@@ -64,16 +66,18 @@ export function LanguageToggle({
             type="button"
             onClick={() => handleSwitch(item)}
             className={cn(
-              'min-h-11 rounded-full px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              'min-h-11 rounded-[4px] px-3 py-1.5 text-xs font-semibold uppercase tracking-[0.08em] transition-[background-color,color,transform] duration-150 motion-safe:active:translate-y-px focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
               inverse &&
                 'min-h-9 px-2.5 focus-visible:ring-[var(--portal-yellow)] focus-visible:ring-offset-[var(--portal-sidebar)]',
               isActive
                 ? inverse
-                  ? 'bg-[var(--portal-yellow)] text-[var(--portal-yellow-ink)]'
-                  : 'bg-primary text-primary-foreground'
+                  ? 'bg-white text-slate-950 font-bold shadow-xs'
+                  : // Dark mode keeps a LIGHT active chip: the previous
+                    // dark-on-dark pairing made the selected locale unreadable.
+                    'bg-white text-primary font-bold shadow-xs dark:bg-primary dark:text-primary-foreground'
                 : inverse
-                  ? 'text-[var(--portal-sidebar-text)] hover:text-white'
-                  : 'text-muted-foreground hover:text-foreground',
+                  ? 'text-white/80 hover:text-white hover:bg-white/10'
+                  : 'text-muted-foreground hover:text-foreground hover:bg-muted/50',
             )}
             aria-pressed={isActive}
             aria-label={label}

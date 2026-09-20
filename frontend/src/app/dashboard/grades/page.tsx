@@ -375,7 +375,7 @@ export default function GradesPage() {
                             </div>
                             <span className="flex shrink-0 items-center gap-2">
                               <span
-                                className={`rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
+                                className={`rounded-md px-2.5 py-1 text-xs font-semibold ${getGradeTone(record.letterGrade)}`}
                               >
                                 {record.letterGrade || '-'}
                               </span>
@@ -513,7 +513,7 @@ export default function GradesPage() {
                             <td className="px-2 py-4 text-center">
                               {record.letterGrade ? (
                                 <span
-                                  className={`inline-flex min-w-[2.75rem] items-center justify-center rounded-full px-2.5 py-1 text-xs font-semibold ${getGradeTone(
+                                  className={`inline-flex min-w-[2.75rem] items-center justify-center rounded-md px-2.5 py-1 text-xs font-semibold ${getGradeTone(
                                     record.letterGrade,
                                   )}`}
                                 >
@@ -525,7 +525,7 @@ export default function GradesPage() {
                             </td>
                             <td className="px-2 py-4 text-right">
                               <div className="inline-flex items-center justify-end gap-1.5">
-                                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                                <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                   {statusLabel(record.gradeStatus)}
                                 </span>
                               </div>

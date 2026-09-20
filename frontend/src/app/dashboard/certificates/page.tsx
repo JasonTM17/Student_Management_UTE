@@ -204,7 +204,7 @@ export default function CertificatesPage() {
       <div className="print:hidden mb-8 border-b border-border pb-6">
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
           <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-full text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
+            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
               <TriangleAlert className="h-3.5 w-3.5" />
               <span>{certCopy.serviceBadge}</span>
             </div>

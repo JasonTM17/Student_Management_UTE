@@ -114,7 +114,7 @@ export function DocumentAttachmentsList({
         <h4 className="text-xs font-bold uppercase tracking-wider text-foreground">
           {isVi ? 'Tệp đính kèm chính thức' : 'Official Attached Documents'}
         </h4>
-        <span className="ml-auto rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+        <span className="ml-auto rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
           {allAttachments.length} {isVi ? 'tệp' : 'files'}
         </span>
       </div>

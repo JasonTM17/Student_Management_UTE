@@ -232,7 +232,7 @@ export default function NotificationsCenterPage() {
                 {label}
                 <span
                   className={cn(
-                    'rounded-full px-2 py-0.5 text-xs',
+                    'rounded-md px-2 py-0.5 text-xs',
                     selected ? 'bg-white/20' : 'bg-secondary text-foreground',
                   )}
                 >
@@ -322,7 +322,7 @@ export default function NotificationsCenterPage() {
                             {title}
                           </h2>
                           {!item.isRead ? (
-                            <span className="rounded-full bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase text-primary">
+                            <span className="rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold uppercase text-primary">
                               {copy.unread}
                             </span>
                           ) : null}

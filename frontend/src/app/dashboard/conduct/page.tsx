@@ -492,7 +492,7 @@ export default function StudentConductPage() {
                 <Award className="h-4 w-4 text-primary" />
                 {copy.currentSemester}
               </span>
-              <span className={`inline-flex items-center gap-1 rounded-full border px-2.5 py-0.5 text-xs font-bold ${getRankBadgeClass(activeSemesterScore?.classification)}`}>
+              <span className={`inline-flex items-center gap-1 rounded-md border px-2.5 py-0.5 text-xs font-bold ${getRankBadgeClass(activeSemesterScore?.classification)}`}>
                 <CheckCircle2 className="h-3 w-3" />
                 {rankLabel(activeSemesterScore?.classification, activeSemesterScore?.classificationVi)}
               </span>
@@ -528,7 +528,7 @@ export default function StudentConductPage() {
                 <TrendingUp className="h-4 w-4 text-primary" />
                 {copy.cumulativeTitle}
               </span>
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                 {summary?.history.length ?? 0} {copy.semesters}
               </span>
             </div>
@@ -583,7 +583,7 @@ export default function StudentConductPage() {
                 <Sparkles className="h-4 w-4 text-status-warning-foreground" />
                 {copy.activitiesTitle}
               </span>
-              <span className="rounded-full bg-status-warning/12 px-2.5 py-0.5 text-xs font-bold text-status-warning-foreground">
+              <span className="rounded-md bg-status-warning/12 px-2.5 py-0.5 text-xs font-bold text-status-warning-foreground">
                 +{(activeSemesterScore?.activities || []).reduce((sum, a) => sum + (a.points || 0), 0).toFixed(1)} {copy.bonusPoints}
               </span>
             </div>
@@ -728,7 +728,7 @@ export default function StudentConductPage() {
                       <h4 className="break-words text-sm font-semibold text-foreground">{details.title}</h4>
                       <p className="mt-1 text-xs text-muted-foreground">{details.category}</p>
                     </div>
-                    <span className="shrink-0 rounded-full bg-status-success/12 px-2 py-0.5 text-xs font-bold text-status-success-foreground">
+                    <span className="shrink-0 rounded-md bg-status-success/12 px-2 py-0.5 text-xs font-bold text-status-success-foreground">
                       +{formatNumber(act.points)}
                     </span>
                   </div>
@@ -797,7 +797,7 @@ export default function StudentConductPage() {
                         +{formatNumber(act.points)} {copy.scoreUnit}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 rounded-full px-2 py-0.5 text-[11px] font-semibold ${semesterStatus.approved ? 'bg-status-success/12 text-status-success-foreground' : 'bg-status-neutral/12 text-status-neutral-foreground'}`}>
+                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${semesterStatus.approved ? 'bg-status-success/12 text-status-success-foreground' : 'bg-status-neutral/12 text-status-neutral-foreground'}`}>
                           {semesterStatus.approved ? (
                             <CheckCircle2 className="h-3 w-3" />
                           ) : (
@@ -856,7 +856,7 @@ export default function StudentConductPage() {
                       </p>
                       <p className="mt-1 text-xs text-muted-foreground">{copy.historySemester}</p>
                     </div>
-                    <span className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
+                    <span className={`shrink-0 rounded-md border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
                       {rankLabel(item.classification, item.classificationVi)}
                     </span>
                   </div>
@@ -920,7 +920,7 @@ export default function StudentConductPage() {
                           {formatNumber(item.totalScore)}
                         </td>
                         <td className="px-4 py-3 text-center">
-                          <span className={`inline-flex rounded-full border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
+                          <span className={`inline-flex rounded-md border px-2 py-0.5 text-xs font-bold ${getRankBadgeClass(item.classification)}`}>
                             {rankLabel(item.classification, item.classificationVi)}
                           </span>
                         </td>

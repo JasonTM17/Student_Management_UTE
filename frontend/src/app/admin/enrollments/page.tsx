@@ -700,7 +700,7 @@ export default function AdminEnrollmentsPage() {
                           </p>
                         </button>
                         <span
-                          className={`shrink-0 whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
+                          className={`shrink-0 whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                         >
                           {enrollmentStatusLabel}
                         </span>
@@ -819,7 +819,7 @@ export default function AdminEnrollmentsPage() {
                               <p className="text-xs text-muted-foreground">
                                 {enrollment.student?.user?.email || copy.noEmail}
                               </p>
-                              <p className="inline-flex rounded-full bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground">
+                              <p className="inline-flex rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground">
                                 {getStudentCodeLabel(enrollment)}
                               </p>
                             </button>
@@ -847,7 +847,7 @@ export default function AdminEnrollmentsPage() {
                           </td>
                           <td className="px-2 py-4">
                             <span
-                              className={`inline-flex whitespace-nowrap rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
+                              className={`inline-flex whitespace-nowrap rounded-md px-2.5 py-1 text-xs font-medium ${statusColors[enrollment.status] || metricToneClass('neutral')}`}
                             >
                               {statusLabel(enrollment.status)}
                             </span>
@@ -912,7 +912,7 @@ export default function AdminEnrollmentsPage() {
                   </p>
                 </div>
                 <span
-                  className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || metricToneClass('neutral')}`}
+                  className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusColors[selectedEnrollment.status] || metricToneClass('neutral')}`}
                 >
                   {statusLabel(selectedEnrollment.status)}
                 </span>
