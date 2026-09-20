@@ -109,7 +109,11 @@ test('npm test includes smoke, portal, and Phase 6 source regressions', () => {
   assert.match(packageJson.scripts.test, /portal-shell\.test\.js/);
   assert.match(packageJson.scripts.test, /phase-six-repair\.test\.js/);
   assert.match(packageJson.scripts.test, /docker-browser-api-origin\.test\.js/);
-  assert.doesNotMatch(packageJson.scripts.test, /viewport/);
+  // The viewport shell check used to be banned from this gate because it needed
+  // a live browser + dev server. It is now skip-aware (skips, never fails, when
+  // either is absent) and the CI portal-viewport job runs it for real, so the
+  // gate must keep carrying it.
+  assert.match(packageJson.scripts.test, /portal-shell\.viewport\.test\.js/);
 });
 
 test('the authenticated portal assistant is a complete bottom-right RAG surface', () => {

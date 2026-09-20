@@ -1,5 +1,6 @@
 const test = require('node:test');
 const assert = require('node:assert/strict');
+const http = require('node:http');
 const { chromium } = require('@playwright/test');
 
 const baseURL = process.env.PORTAL_BASE_URL ?? 'http://127.0.0.1:4317';
@@ -8,6 +9,35 @@ const viewports = [
   { name: 'tablet', width: 768, height: 1024 },
   { name: 'mobile', width: 390, height: 844 },
 ];
+
+function serverReachable(timeoutMs = 2000) {
+  return new Promise((resolve) => {
+    const req = http.get(baseURL, (res) => {
+      res.resume();
+      resolve(true);
+    });
+    req.setTimeout(timeoutMs, () => {
+      req.destroy();
+      resolve(false);
+    });
+    req.on('error', () => resolve(false));
+  });
+}
+
+// These are live-browser checks: they skip only when the portal dev server or
+// a Chromium channel is absent, never when the shell itself is broken.
+async function openShellBrowserOrSkip(t) {
+  if (!(await serverReachable())) {
+    t.skip(`portal dev server is not reachable at ${baseURL}; start it with PORTAL_BASE_URL or npm run dev`);
+    return null;
+  }
+  try {
+    return await launchBrowser();
+  } catch {
+    t.skip('no chromium/chrome/msedge channel is installed for Playwright');
+    return null;
+  }
+}
 
 function apiResponse(data = []) {
   return {
@@ -129,8 +159,9 @@ async function verifySidebar(page, sidebarId, openButtonName, viewport) {
   assert.equal(await openButton.evaluate((element) => element === document.activeElement), true);
 }
 
-test('student and lecturer portal shell holds at 1440, 768, and 390', async () => {
-  const browser = await launchBrowser();
+test('student and lecturer portal shell holds at 1440, 768, and 390', async (t) => {
+  const browser = await openShellBrowserOrSkip(t);
+  if (!browser) return;
   try {
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport });
@@ -154,8 +185,9 @@ test('student and lecturer portal shell holds at 1440, 768, and 390', async () =
   }
 });
 
-test('admin portal shell holds at 1440, 768, and 390', async () => {
-  const browser = await launchBrowser();
+test('admin portal shell holds at 1440, 768, and 390', async (t) => {
+  const browser = await openShellBrowserOrSkip(t);
+  if (!browser) return;
   try {
     for (const viewport of viewports) {
       const context = await browser.newContext({ viewport });
