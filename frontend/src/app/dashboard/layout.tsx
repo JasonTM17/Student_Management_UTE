@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -29,6 +30,7 @@ import {
   Megaphone,
   Menu,
   Palette,
+  RefreshCw,
   School,
   ScrollText,
   Settings,
@@ -239,6 +241,9 @@ export default function DashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  // A failed load must never read as "nothing unread": this flag keeps an
+  // outage distinguishable from an honestly empty inbox.
+  const [notificationsError, setNotificationsError] = useState(false);
   const [avatarPhoto, setAvatarPhoto] = useState(user?.avatar ?? '');
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -606,39 +611,31 @@ export default function DashboardLayout({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
+  const reloadNotifications = useCallback(async () => {
     if (!user) {
       return;
     }
 
-    let cancelled = false;
-
-    const loadNotifications = async () => {
-      setNotificationsLoading(true);
-      try {
-        const response = await notificationsApi.getMy({
-          limit: 5,
-          isRead: false,
-        });
-        if (!cancelled) {
-          setNotifications(response.data);
-        }
-      } catch {
-        if (!cancelled) {
-          setNotifications([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setNotificationsLoading(false);
-        }
-      }
-    };
-
-    void loadNotifications();
-    return () => {
-      cancelled = true;
-    };
+    setNotificationsLoading(true);
+    setNotificationsError(false);
+    try {
+      const response = await notificationsApi.getMy({
+        limit: 5,
+        isRead: false,
+      });
+      setNotifications(response.data);
+    } catch {
+      // Surface the failure instead of rendering the bell as "no unread".
+      setNotifications([]);
+      setNotificationsError(true);
+    } finally {
+      setNotificationsLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    void reloadNotifications();
+  }, [reloadNotifications]);
 
   const currentPage = useMemo(() => {
     if (pageMetadata[pathname]) {
@@ -1069,6 +1066,24 @@ export default function DashboardLayout({
                       {notificationsLoading ? (
                         <div className="py-6 text-sm text-muted-foreground">
                           {messages.dashboardShell.notifications.loading}
+                        </div>
+                      ) : notificationsError ? (
+                        // An outage is not an empty inbox: say so and let the
+                        // reader retry the load.
+                        <div className="py-4" role="alert">
+                          <p className="text-sm leading-6 text-destructive">
+                            {messages.dashboardShell.notifications.loadFailed}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => void reloadNotifications()}
+                          >
+                            <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                            {messages.common.actions.retry}
+                          </Button>
                         </div>
                       ) : notifications.length === 0 ? (
                         <div className="py-6 text-sm leading-6 text-muted-foreground">

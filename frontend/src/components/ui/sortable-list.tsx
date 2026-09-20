@@ -152,13 +152,23 @@ export function SortableList<T>({
   );
 }
 
-export function DragHandle({ className, ...props }: React.HTMLAttributes<HTMLDivElement>) {
+interface DragHandleProps extends React.HTMLAttributes<HTMLDivElement> {
+  /**
+   * Localized accessible name. Callers on a locale-aware page must pass this;
+   * the fallback default stays bilingual-neutral Vietnamese for callers that
+   * have no i18n access. A caller-provided aria-label (spread below) still
+   * wins over this default.
+   */
+  label?: string;
+}
+
+export function DragHandle({ className, label, ...props }: DragHandleProps) {
   return (
     <div
       role="button"
       tabIndex={0}
       // Pointer and keyboard are both supported, so the label names both.
-      aria-label="Kéo hoặc dùng phím mũi tên để sắp xếp lại"
+      aria-label={label ?? 'Kéo hoặc dùng phím mũi tên để sắp xếp lại'}
       className={cn(
         'drag-handle flex h-7 w-7 cursor-grab active:cursor-grabbing items-center justify-center rounded text-muted-foreground transition-colors hover:bg-muted hover:text-foreground',
         className

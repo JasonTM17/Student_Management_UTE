@@ -223,6 +223,9 @@ export default function ThesisPage() {
   // Thesis Repository State (Faculty archive of submitted theses)
   const [repositoryReports, setRepositoryReports] = useState<ThesisRepositoryReport[]>([]);
   const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
+  // A failed archive load must never read as "no reports yet": this flag keeps
+  // an outage distinguishable from a genuinely empty repository.
+  const [repositoryError, setRepositoryError] = useState('');
   const [repositorySearch, setRepositorySearch] = useState('');
 
   // Supervisors for current student group's topic
@@ -515,11 +518,13 @@ export default function ThesisPage() {
             thesisApi.listRoundRepository(selectedRoundId).then((rList) => {
               if (!cancelled) {
                 setRepositoryReports(rList);
+                setRepositoryError('');
                 setIsRepositoryLoading(false);
               }
             }).catch(() => {
               if (!cancelled) {
                 setRepositoryReports([]);
+                setRepositoryError(messages.thesis.loadFailed);
                 setIsRepositoryLoading(false);
               }
             }),
@@ -539,6 +544,22 @@ export default function ThesisPage() {
       cancelled = true;
     };
   }, [isSupervisorOrAdmin, loadCouncilDetails, messages.thesis.loadFailed, refreshTopics, selectedRoundId]);
+
+  // Retry path for a failed repository load: the reader gets the real failure
+  // with a way back, instead of an archive that silently reads as empty.
+  const reloadRepository = useCallback(async () => {
+    if (!selectedRoundId || !isSupervisorOrAdmin) return;
+    setIsRepositoryLoading(true);
+    setRepositoryError('');
+    try {
+      setRepositoryReports(await thesisApi.listRoundRepository(selectedRoundId));
+    } catch {
+      setRepositoryReports([]);
+      setRepositoryError(messages.thesis.loadFailed);
+    } finally {
+      setIsRepositoryLoading(false);
+    }
+  }, [isSupervisorOrAdmin, messages.thesis.loadFailed, selectedRoundId]);
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
   const roundGroups = useMemo(() => {
@@ -776,7 +797,14 @@ export default function ThesisPage() {
     };
   }, [currentGroup?.topicId]);
 
+  // Once the reader picks a tab by hand, background refreshes and round
+  // changes must not snap them back to an auto-selected tab.
+  const userChoseTabRef = useRef(false);
+
   useEffect(() => {
+    if (userChoseTabRef.current) {
+      return;
+    }
     const tabParam = searchParams.get('tab');
     if (tabParam === 'repository') {
       setLecturerTab('repository');
@@ -795,7 +823,7 @@ export default function ThesisPage() {
     } else if (supervisedGroups.length > 0) {
       setLecturerTab('supervision');
     }
-  }, [searchParams, selectedRoundId, supervisedGroups.length, visibleCouncils.length]);
+  }, [searchParams, supervisedGroups.length, visibleCouncils.length]);
 
   useEffect(() => {
     const topicId = searchParams.get('topicId');
@@ -1824,7 +1852,10 @@ export default function ThesisPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('supervision')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('supervision');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'supervision'
@@ -1847,7 +1878,10 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('defense')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('defense');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'defense'
@@ -1870,7 +1904,10 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('repository')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('repository');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'repository'
@@ -1948,6 +1985,8 @@ export default function ThesisPage() {
                   filteredReports={filteredRepositoryReports}
                   roundName={selectedRound?.name}
                   isLoading={isRepositoryLoading}
+                  loadError={repositoryError}
+                  onRetry={() => void reloadRepository()}
                   search={repositorySearch}
                   onSearchChange={setRepositorySearch}
                   onDownloadReport={handleDownloadRepositoryReport}

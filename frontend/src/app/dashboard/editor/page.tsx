@@ -893,16 +893,37 @@ export default function AcademicEditorPage() {
     const targetId = params.get('editId') || params.get('id');
     if (!targetId) return;
 
+    let cancelled = false;
     announcementsApi
       .getAll({ page: 1, limit: 50 })
       .then((res) => {
+        if (cancelled) return;
         const found = (res.data || []).find((a) => a.id === targetId);
         if (found) {
           handleLoadAnnouncement(found);
+        } else {
+          // The editor would otherwise show its blank seed document; the
+          // author must know the requested draft was not loaded.
+          toast.error(
+            isVi
+              ? `Không tìm thấy thông báo cần sửa (mã ${targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`
+              : `The notice to edit (id ${targetId}) was not found. The editor is showing a new blank draft.`,
+          );
         }
       })
-      .catch(() => {});
-  }, [handleLoadAnnouncement]);
+      .catch(() => {
+        if (!cancelled) {
+          toast.error(
+            isVi
+              ? 'Không thể tải thông báo cần sửa. Trình soạn thảo đang hiển thị bản nháp mới.'
+              : 'The notice to edit could not be loaded. The editor is showing a new blank draft.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [handleLoadAnnouncement, isVi]);
 
   // Preview current draft in Official Administrative modal
   const handlePreviewCurrentDraft = () => {
@@ -1547,6 +1568,7 @@ export default function AcademicEditorPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         <DragHandle
                           className="cursor-grab hover:text-primary active:cursor-grabbing"
+                          label={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
                           title={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
                         />
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
@@ -1799,6 +1821,7 @@ export default function AcademicEditorPage() {
                           <td className="py-3 px-3 text-center">
                             <DragHandle
                               className="mx-auto cursor-grab hover:text-primary active:cursor-grabbing"
+                              label={isVi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Drag to reorder notice'}
                               title={isVi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Drag to reorder notice'}
                             />
                           </td>

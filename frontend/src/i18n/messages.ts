@@ -891,6 +891,7 @@ export const en = {
       moveUp: 'Move up',
       moveDown: 'Move down',
       openAnnouncements: 'Open notices',
+      dragToReorder: 'Drag to reorder',
     },
   },
     dashboardShell: {
@@ -1510,6 +1511,8 @@ export const en = {
       councilSeatOrderHint: 'Required seat order: 1st Chair, 2nd Secretary, then 3-5 Members.',
       councilCompleteBadge: 'Ready (3-5 members)',
       councilIncompleteBadge: 'Needs members ({count}/3-5)',
+      nextSeatRequired: 'Next seat (required):',
+      finalScorePoints: '{score} points',
     },
     grading: {
       title: 'Defense council grading',
@@ -2691,6 +2694,7 @@ export const vi: I18nMessages = {
       moveUp: 'Đưa lên',
       moveDown: 'Đưa xuống',
       openAnnouncements: 'Mở thông báo',
+      dragToReorder: 'Kéo thả để sắp xếp vị trí',
     },
   },
   dashboardShell: {
@@ -3310,6 +3314,8 @@ export const vi: I18nMessages = {
       councilSeatOrderHint: 'Thứ tự ghế bắt buộc: 1 Chủ tịch, 2 Thư ký, sau đó là Ủy viên (tối thiểu 3, tối đa 5).',
       councilCompleteBadge: 'Đủ điều kiện (3-5 thành viên)',
       councilIncompleteBadge: 'Chưa đủ ghế ({count}/3-5)',
+      nextSeatRequired: 'Ghế tiếp theo (Bắt buộc):',
+      finalScorePoints: '{score} điểm',
     },
     grading: {
       title: 'Chấm điểm bảo vệ hội đồng',

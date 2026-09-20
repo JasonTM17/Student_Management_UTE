@@ -325,6 +325,62 @@ export default function AdminUsersPage() {
             `Chỉnh sửa người dùng ${lastName} ${firstName}`,
           deleteUserLabel: (firstName: string, lastName: string) =>
             `Xóa người dùng ${lastName} ${firstName}`,
+          filterByRole: 'Lọc theo phân loại:',
+          filterAll: (count: number) => `Tất cả (${count})`,
+          editRecord: 'Sửa',
+          createAudienceLabel: 'Phân loại đối tượng tạo mới:',
+          createAudienceHint:
+            'Chọn loại tài khoản để hệ thống tải hồ sơ học vụ chuyên biệt tương ứng',
+          rolesShort: {
+            ADMIN: 'Quản trị',
+          },
+          accountSectionTitle: '1. Thông Tin Tài Khoản & Đăng Nhập',
+          accountSectionHint: 'Định danh đăng nhập và bảo mật tài khoản',
+          lastNamePlaceholder: 'Nguyễn Văn',
+          firstNamePlaceholder: 'An',
+          initialStatusLabel: 'Trạng thái tài khoản ban đầu:',
+          initialStatusActive: 'Đang hoạt động (ACTIVE)',
+          assignmentSectionTitle: '2. Hồ Sơ Phân Công Học Vụ',
+          assignmentHints: {
+            STUDENT: 'Thông tin hồ sơ đào tạo sinh viên chính quy',
+            LECTURER: 'Thông tin học hàm và bộ môn giảng dạy',
+            ADMIN: 'Phân quyền quản trị hệ thống',
+          },
+          studentIdLabel: 'Mã số sinh viên (MSSV) *',
+          studentIdDescription: 'Mã định danh sinh viên dùng tra cứu điểm, ĐRL và ĐKHP',
+          studentIdPlaceholder: 'ví dụ: 24110054',
+          cohortLabel: 'Khóa đào tạo *',
+          yearOptions: {
+            '1': 'Năm 1 (Khóa K2026)',
+            '2': 'Năm 2 (Khóa K2025)',
+            '3': 'Năm 3 (Khóa K2024)',
+            '4': 'Năm 4 (Khóa K2023)',
+          },
+          curriculumLabel: 'Khung chương trình *',
+          facultyLabel: 'Khoa / Viện đào tạo *',
+          selectFacultyPlaceholder: '-- Chọn Khoa / Viện đào tạo --',
+          employeeIdLabel: 'Mã số Giảng viên (MSGV) *',
+          employeeIdDescription: 'Mã định danh cán bộ giảng dạy và chấm thi luận văn',
+          employeeIdPlaceholder: 'ví dụ: GV2026001 hoặc GV2026002',
+          academicTitleLabel: 'Học hàm / Học vị *',
+          academicTitleOptions: {
+            'PGS.TS.': 'PGS.TS. (Phó Giáo sư - Tiến sĩ)',
+            'GS.TS.': 'GS.TS. (Giáo sư - Tiến sĩ)',
+            'TS.': 'TS. (Tiến sĩ)',
+            'ThS.': 'ThS. (Thạc sĩ)',
+            'KS.': 'KS. / Kỹ sư chính',
+          },
+          departmentLabel: 'Khoa / Bộ môn công tác *',
+          selectDepartmentPlaceholder: '-- Chọn Khoa / Bộ môn --',
+          specializationLabel: 'Lĩnh vực chuyên môn / Hướng nghiên cứu',
+          specializationDescription:
+            'Ví dụ: Trí tuệ nhân tạo, Hệ thống nhúng, Kỹ thuật phần mềm',
+          specializationPlaceholder: 'ví dụ: Kỹ thuật phần mềm & AI',
+          adminPermissionsTitle: 'Phân quyền Quản Trị Hệ Thống',
+          adminPermissionsDescription:
+            'Tài khoản có toàn quyền truy cập phân hệ Quản trị viện, quản lý danh mục người dùng, giảng viên, môn học, lớp học phần, bảng tin thông báo và cấu hình trường học.',
+          createStudentAction: '+ Tạo Tài Khoản Sinh Viên',
+          createLecturerAction: '+ Tạo Tài Khoản Giảng Viên',
         }
       : {
           loading: 'Loading user management',
@@ -407,6 +463,64 @@ export default function AdminUsersPage() {
             `Edit user ${lastName} ${firstName}`,
           deleteUserLabel: (firstName: string, lastName: string) =>
             `Delete user ${lastName} ${firstName}`,
+          filterByRole: 'Filter by role:',
+          filterAll: (count: number) => `All (${count})`,
+          editRecord: 'Edit',
+          createAudienceLabel: 'Account type to create:',
+          createAudienceHint:
+            'Choose the account type so the system loads the matching academic profile',
+          rolesShort: {
+            ADMIN: 'Admin',
+          },
+          accountSectionTitle: '1. Account & Sign-in Details',
+          accountSectionHint: 'Sign-in identity and account security',
+          lastNamePlaceholder: 'e.g. Nguyen Van',
+          firstNamePlaceholder: 'e.g. An',
+          initialStatusLabel: 'Initial account status:',
+          initialStatusActive: 'Active (ACTIVE)',
+          assignmentSectionTitle: '2. Academic Assignment Profile',
+          assignmentHints: {
+            STUDENT: 'Academic profile details for the enrolled student',
+            LECTURER: 'Academic title and teaching department details',
+            ADMIN: 'System administration permissions',
+          },
+          studentIdLabel: 'Student ID (MSSV) *',
+          studentIdDescription:
+            'The identifier used to look up grades, conduct, and course registration',
+          studentIdPlaceholder: 'e.g. 24110054',
+          cohortLabel: 'Cohort *',
+          yearOptions: {
+            '1': 'Year 1 (Cohort K2026)',
+            '2': 'Year 2 (Cohort K2025)',
+            '3': 'Year 3 (Cohort K2024)',
+            '4': 'Year 4 (Cohort K2023)',
+          },
+          curriculumLabel: 'Curriculum *',
+          facultyLabel: 'Faculty / Training Institute *',
+          selectFacultyPlaceholder: '-- Select Faculty / Institute --',
+          employeeIdLabel: 'Employee ID (MSGV) *',
+          employeeIdDescription:
+            'The identifier for teaching staff and thesis examiners',
+          employeeIdPlaceholder: 'e.g. GV2026001 or GV2026002',
+          academicTitleLabel: 'Academic title / Degree *',
+          academicTitleOptions: {
+            'PGS.TS.': 'PGS.TS. (Associate Professor - PhD)',
+            'GS.TS.': 'GS.TS. (Professor - PhD)',
+            'TS.': 'TS. (PhD)',
+            'ThS.': 'ThS. (Master)',
+            'KS.': 'KS. / Senior Engineer',
+          },
+          departmentLabel: 'Faculty / Department *',
+          selectDepartmentPlaceholder: '-- Select Faculty / Department --',
+          specializationLabel: 'Specialization / Research area',
+          specializationDescription:
+            'e.g. Artificial Intelligence, Embedded Systems, Software Engineering',
+          specializationPlaceholder: 'e.g. Software Engineering & AI',
+          adminPermissionsTitle: 'System Administration Permissions',
+          adminPermissionsDescription:
+            'This account has full access to the administration modules, managing users, lecturers, courses, sections, notices, and school configuration.',
+          createStudentAction: '+ Create Student Account',
+          createLecturerAction: '+ Create Lecturer Account',
         };
 
   const statusLabel = (status: string | null | undefined) =>
@@ -710,7 +824,7 @@ export default function AdminUsersPage() {
             {/* Filter Tabs by Role */}
             <div className="flex flex-wrap items-center gap-2 border-b border-border/70 pb-3">
               <span className="text-xs font-semibold text-muted-foreground mr-1">
-                Lọc theo phân loại:
+                {copy.filterByRole}
               </span>
               <button
                 type="button"
@@ -722,7 +836,7 @@ export default function AdminUsersPage() {
                     : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
                 )}
               >
-                Tất cả ({users.length})
+                {copy.filterAll(users.length)}
               </button>
               <button
                 type="button"
@@ -735,7 +849,7 @@ export default function AdminUsersPage() {
                 )}
               >
                 <GraduationCap className="h-3.5 w-3.5" />
-                Sinh viên
+                {copy.roles.STUDENT}
               </button>
               <button
                 type="button"
@@ -748,7 +862,7 @@ export default function AdminUsersPage() {
                 )}
               >
                 <School className="h-3.5 w-3.5" />
-                Giảng viên
+                {copy.roles.LECTURER}
               </button>
               <button
                 type="button"
@@ -761,7 +875,7 @@ export default function AdminUsersPage() {
                 )}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
-                Quản trị viên
+                {copy.roles.ADMIN}
               </button>
             </div>
 
@@ -852,7 +966,7 @@ export default function AdminUsersPage() {
                   <AdminRowActions>
                     <Button size="sm" variant="outline" onClick={() => openEdit(record)}>
                       <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                      Sửa
+                      {copy.editRecord}
                     </Button>
                   </AdminRowActions>
                 </article>
@@ -893,17 +1007,17 @@ export default function AdminUsersPage() {
                           {primary === 'STUDENT' ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-blue-500/10 px-2 py-0.5 text-xs font-medium text-blue-600 dark:text-blue-400">
                               <GraduationCap className="h-3 w-3" />
-                              Sinh viên
+                              {copy.roles.STUDENT}
                             </span>
                           ) : primary === 'LECTURER' ? (
                             <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
                               <School className="h-3 w-3" />
-                              Giảng viên
+                              {copy.roles.LECTURER}
                             </span>
                           ) : (
                             <span className="inline-flex items-center gap-1 rounded-md bg-purple-500/10 px-2 py-0.5 text-xs font-medium text-purple-600 dark:text-purple-400">
                               <ShieldCheck className="h-3 w-3" />
-                              Quản trị viên
+                              {copy.roles.ADMIN}
                             </span>
                           )}
                         </td>
@@ -984,9 +1098,9 @@ export default function AdminUsersPage() {
             <div className="rounded-xl border border-border/80 bg-secondary/20 p-3">
               <div className="flex items-center justify-between">
                 <div>
-                  <span className="text-xs font-semibold text-foreground">Phân loại đối tượng tạo mới:</span>
+                  <span className="text-xs font-semibold text-foreground">{copy.createAudienceLabel}</span>
                   <p className="text-xs text-muted-foreground">
-                    Chọn loại tài khoản để hệ thống tải hồ sơ học vụ chuyên biệt tương ứng
+                    {copy.createAudienceHint}
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background p-1">
@@ -1003,7 +1117,7 @@ export default function AdminUsersPage() {
                     )}
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
-                    Sinh viên
+                    {copy.roles.STUDENT}
                   </button>
                   <button
                     type="button"
@@ -1018,7 +1132,7 @@ export default function AdminUsersPage() {
                     )}
                   >
                     <School className="h-3.5 w-3.5" />
-                    Giảng viên
+                    {copy.roles.LECTURER}
                   </button>
                   <button
                     type="button"
@@ -1033,7 +1147,7 @@ export default function AdminUsersPage() {
                     )}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
-                    Quản trị
+                    {copy.rolesShort.ADMIN}
                   </button>
                 </div>
               </div>
@@ -1050,10 +1164,10 @@ export default function AdminUsersPage() {
                 </div>
                 <div>
                   <h4 className="text-sm font-semibold text-foreground">
-                    1. Thông Tin Tài Khoản & Đăng Nhập
+                    {copy.accountSectionTitle}
                   </h4>
                   <p className="text-xs text-muted-foreground">
-                    Định danh đăng nhập và bảo mật tài khoản
+                    {copy.accountSectionHint}
                   </p>
                 </div>
               </div>
@@ -1090,7 +1204,7 @@ export default function AdminUsersPage() {
                   <Input
                     type="text"
                     value={formData.lastName}
-                    placeholder="Nguyễn Văn"
+                    placeholder={copy.lastNamePlaceholder}
                     onChange={(e) => setFormData((current) => ({ ...current, lastName: e.target.value }))}
                     required
                   />
@@ -1099,7 +1213,7 @@ export default function AdminUsersPage() {
                   <Input
                     type="text"
                     value={formData.firstName}
-                    placeholder="An"
+                    placeholder={copy.firstNamePlaceholder}
                     onChange={(e) => setFormData((current) => ({ ...current, firstName: e.target.value }))}
                     required
                   />
@@ -1108,10 +1222,10 @@ export default function AdminUsersPage() {
 
               <div className="rounded-lg border border-border/60 bg-secondary/15 p-3 text-xs">
                 <div className="flex items-center justify-between">
-                  <span className="text-muted-foreground">Trạng thái tài khoản ban đầu:</span>
+                  <span className="text-muted-foreground">{copy.initialStatusLabel}</span>
                   <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 font-semibold text-emerald-600 dark:text-emerald-400">
                     <CheckCircle2 className="h-3 w-3" />
-                    Đang hoạt động (ACTIVE)
+                    {copy.initialStatusActive}
                   </span>
                 </div>
               </div>
@@ -1140,14 +1254,14 @@ export default function AdminUsersPage() {
                   </div>
                   <div>
                     <h4 className="text-sm font-semibold text-foreground">
-                      2. Hồ Sơ Phân Công Học Vụ
+                      {copy.assignmentSectionTitle}
                     </h4>
                     <p className="text-xs text-muted-foreground">
                       {formData.role === 'STUDENT'
-                        ? 'Thông tin hồ sơ đào tạo sinh viên chính quy'
+                        ? copy.assignmentHints.STUDENT
                         : formData.role === 'LECTURER'
-                          ? 'Thông tin học hàm và bộ môn giảng dạy'
-                          : 'Phân quyền quản trị hệ thống'}
+                          ? copy.assignmentHints.LECTURER
+                          : copy.assignmentHints.ADMIN}
                     </p>
                   </div>
                 </div>
@@ -1161,10 +1275,10 @@ export default function AdminUsersPage() {
                       : 'bg-purple-500/10 text-purple-600 dark:text-purple-400',
                 )}>
                   {formData.role === 'STUDENT'
-                    ? 'Sinh viên'
+                    ? copy.roles.STUDENT
                     : formData.role === 'LECTURER'
-                      ? 'Giảng viên'
-                      : 'Quản trị viên'}
+                      ? copy.roles.LECTURER
+                      : copy.roles.ADMIN}
                 </span>
               </div>
 
@@ -1172,34 +1286,34 @@ export default function AdminUsersPage() {
               {formData.role === 'STUDENT' && (
                 <div className="space-y-3.5">
                   <AdminFormField
-                    label="Mã số sinh viên (MSSV) *"
-                    description="Mã định danh sinh viên dùng tra cứu điểm, ĐRL và ĐKHP"
+                    label={copy.studentIdLabel}
+                    description={copy.studentIdDescription}
                     error={fieldErrors.studentId}
                   >
                     <Input
                       type="text"
                       value={formData.studentId}
-                      placeholder="ví dụ: 24110054"
+                      placeholder={copy.studentIdPlaceholder}
                       onChange={(e) => setFormData((c) => ({ ...c, studentId: e.target.value }))}
                       required
                     />
                   </AdminFormField>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <AdminFormField label="Khóa đào tạo *">
+                    <AdminFormField label={copy.cohortLabel}>
                       <select
                         value={formData.year}
                         onChange={(e) => setFormData((c) => ({ ...c, year: e.target.value }))}
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <option value="1">Năm 1 (Khóa K2026)</option>
-                        <option value="2">Năm 2 (Khóa K2025)</option>
-                        <option value="3">Năm 3 (Khóa K2024)</option>
-                        <option value="4">Năm 4 (Khóa K2023)</option>
+                        <option value="1">{copy.yearOptions['1']}</option>
+                        <option value="2">{copy.yearOptions['2']}</option>
+                        <option value="3">{copy.yearOptions['3']}</option>
+                        <option value="4">{copy.yearOptions['4']}</option>
                       </select>
                     </AdminFormField>
 
-                    <AdminFormField label="Khung chương trình *">
+                    <AdminFormField label={copy.curriculumLabel}>
                       <select
                         value={formData.curriculumId || (curricula[0]?.id ?? '')}
                         onChange={(e) => setFormData((c) => ({ ...c, curriculumId: e.target.value }))}
@@ -1218,13 +1332,13 @@ export default function AdminUsersPage() {
                     </AdminFormField>
                   </div>
 
-                  <AdminFormField label="Khoa / Viện đào tạo *">
+                  <AdminFormField label={copy.facultyLabel}>
                     <select
                       value={formData.departmentId}
                       onChange={(e) => setFormData((c) => ({ ...c, departmentId: e.target.value }))}
                       className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                     >
-                      <option value="">-- Chọn Khoa / Viện đào tạo --</option>
+                      <option value="">{copy.selectFacultyPlaceholder}</option>
                       {departments.map((d) => (
                         <option key={d.id} value={d.id}>
                           {d.name} {d.code ? `(${d.code})` : ''}
@@ -1239,41 +1353,41 @@ export default function AdminUsersPage() {
               {formData.role === 'LECTURER' && (
                 <div className="space-y-3.5">
                   <AdminFormField
-                    label="Mã số Giảng viên (MSGV) *"
-                    description="Mã định danh cán bộ giảng dạy và chấm thi luận văn"
+                    label={copy.employeeIdLabel}
+                    description={copy.employeeIdDescription}
                     error={fieldErrors.employeeId}
                   >
                     <Input
                       type="text"
                       value={formData.employeeId}
-                      placeholder="ví dụ: GV2026001 hoặc GV2026002"
+                      placeholder={copy.employeeIdPlaceholder}
                       onChange={(e) => setFormData((c) => ({ ...c, employeeId: e.target.value }))}
                       required
                     />
                   </AdminFormField>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <AdminFormField label="Học hàm / Học vị *">
+                    <AdminFormField label={copy.academicTitleLabel}>
                       <select
                         value={formData.academicTitle}
                         onChange={(e) => setFormData((c) => ({ ...c, academicTitle: e.target.value }))}
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <option value="PGS.TS.">PGS.TS. (Phó Giáo sư - Tiến sĩ)</option>
-                        <option value="GS.TS.">GS.TS. (Giáo sư - Tiến sĩ)</option>
-                        <option value="TS.">TS. (Tiến sĩ)</option>
-                        <option value="ThS.">ThS. (Thạc sĩ)</option>
-                        <option value="KS.">KS. / Kỹ sư chính</option>
+                        <option value="PGS.TS.">{copy.academicTitleOptions['PGS.TS.']}</option>
+                        <option value="GS.TS.">{copy.academicTitleOptions['GS.TS.']}</option>
+                        <option value="TS.">{copy.academicTitleOptions['TS.']}</option>
+                        <option value="ThS.">{copy.academicTitleOptions['ThS.']}</option>
+                        <option value="KS.">{copy.academicTitleOptions['KS.']}</option>
                       </select>
                     </AdminFormField>
 
-                    <AdminFormField label="Khoa / Bộ môn công tác *">
+                    <AdminFormField label={copy.departmentLabel}>
                       <select
                         value={formData.departmentId}
                         onChange={(e) => setFormData((c) => ({ ...c, departmentId: e.target.value }))}
                         className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
                       >
-                        <option value="">-- Chọn Khoa / Bộ môn --</option>
+                        <option value="">{copy.selectDepartmentPlaceholder}</option>
                         {departments.map((d) => (
                           <option key={d.id} value={d.id}>
                             {d.name} {d.code ? `(${d.code})` : ''}
@@ -1284,13 +1398,13 @@ export default function AdminUsersPage() {
                   </div>
 
                   <AdminFormField
-                    label="Lĩnh vực chuyên môn / Hướng nghiên cứu"
-                    description="Ví dụ: Trí tuệ nhân tạo, Hệ thống nhúng, Kỹ thuật phần mềm"
+                    label={copy.specializationLabel}
+                    description={copy.specializationDescription}
                   >
                     <Input
                       type="text"
                       value={formData.specialization}
-                      placeholder="ví dụ: Kỹ thuật phần mềm & AI"
+                      placeholder={copy.specializationPlaceholder}
                       onChange={(e) => setFormData((c) => ({ ...c, specialization: e.target.value }))}
                     />
                   </AdminFormField>
@@ -1303,10 +1417,10 @@ export default function AdminUsersPage() {
                   <div className="rounded-xl border border-purple-500/20 bg-purple-500/5 p-4 space-y-2">
                     <div className="flex items-center gap-2 text-purple-700 dark:text-purple-400">
                       <ShieldCheck className="h-5 w-5" />
-                      <span className="text-sm font-semibold">Phân quyền Quản Trị Hệ Thống</span>
+                      <span className="text-sm font-semibold">{copy.adminPermissionsTitle}</span>
                     </div>
                     <p className="text-xs text-muted-foreground leading-5">
-                      Tài khoản có toàn quyền truy cập phân hệ Quản trị viện, quản lý danh mục người dùng, giảng viên, môn học, lớp học phần, bảng tin thông báo và cấu hình trường học.
+                      {copy.adminPermissionsDescription}
                     </p>
                   </div>
 
@@ -1352,9 +1466,9 @@ export default function AdminUsersPage() {
                 : editingUser
                   ? copy.editAction
                   : formData.role === 'STUDENT'
-                    ? '+ Tạo Tài Khoản Sinh Viên'
+                    ? copy.createStudentAction
                     : formData.role === 'LECTURER'
-                      ? '+ Tạo Tài Khoản Giảng Viên'
+                      ? copy.createLecturerAction
                       : copy.createUser}
             </Button>
           </AdminDialogFooter>
