@@ -58,6 +58,37 @@ jobs:
         working-directory: frontend
         run: npm run build
 
+  portal-viewport:
+    name: Portal viewport shell
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install web dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Chromium for Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Start portal dev server
+        working-directory: frontend
+        run: |
+          nohup npm run dev -- --port 4317 > /tmp/portal-dev.log 2>&1 &
+          for i in $(seq 1 60); do
+            if curl -sf -o /dev/null http://127.0.0.1:4317; then exit 0; fi
+            sleep 2
+          done
+          echo 'portal dev server did not answer within 120s:'
+          cat /tmp/portal-dev.log
+          exit 1
+      - name: Test portal shell at 1440, 768, and 390
+        working-directory: frontend
+        run: node --test tests/portal-shell.viewport.test.js
+
   mobile:
     name: Expo mobile
     runs-on: ubuntu-latest

@@ -128,7 +128,7 @@ const TINYMCE_TEMPLATES = [
         <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
           <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM</h4>
           <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 20px; font-weight: 700;">THÔNG BÁO HỌC VỤ CHÍNH THỨC</h2>
-          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Số: 2026/TB-ĐHCNKT | Học kỳ I - Năm học 2026-2027</p>
+          <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Số: {{số văn bản}} | {{Học kỳ - Năm học}}</p>
         </div>
 
         <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
@@ -147,16 +147,16 @@ const TINYMCE_TEMPLATES = [
           </thead>
           <tbody>
             <tr>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">Đăng ký tín chỉ đợt 1</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 15/09/2026</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">23:59 - 18/09/2026</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên năm 3, 4</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{Hạng mục kế hoạch 1}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{giờ - ngày bắt đầu}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{giờ - ngày kết thúc}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{đối tượng áp dụng}}</td>
             </tr>
             <tr>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">Đăng ký tín chỉ đợt 2</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 19/09/2026</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">17:00 - 22/09/2026</td>
-              <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên năm 1, 2 và bổ sung</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{Hạng mục kế hoạch 2}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{giờ - ngày bắt đầu}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{giờ - ngày kết thúc}}</td>
+              <td style="border: 1px solid #cbd5e1; padding: 10px;">{{đối tượng áp dụng}}</td>
             </tr>
           </tbody>
         </table>
@@ -176,13 +176,13 @@ const TINYMCE_TEMPLATES = [
       <div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
         <h2 style="color: #0f172a; border-bottom: 2px solid #0284c7; padding-bottom: 8px;">ĐỀ CƯƠNG ĐỀ TÀI KHÓA LUẬN TỐT NGHIỆP</h2>
 
-        <p><strong>1. Tên đề tài (Tiếng Việt):</strong> Hệ thống quản lý học tập và đăng ký tín chỉ thời gian thực CampusCore</p>
-        <p><strong>2. Tên đề tài (Tiếng Anh):</strong> Real-time CampusCore Academic Management System</p>
-        <p><strong>3. Giảng viên hướng dẫn:</strong> TS. Nguyễn Văn A</p>
+        <p><strong>1. Tên đề tài (Tiếng Việt):</strong> {{tên đề tài tiếng Việt}}</p>
+        <p><strong>2. Tên đề tài (Tiếng Anh):</strong> {{tên đề tài tiếng Anh}}</p>
+        <p><strong>3. Giảng viên hướng dẫn:</strong> {{học hàm/học vị, họ tên GVHD}}</p>
         <p><strong>4. Nhóm sinh viên thực hiện:</strong></p>
         <ul>
-          <li>Nguyễn Tiến Sơn (Trưởng nhóm - MSSV: 20110001)</li>
-          <li>Thành viên phối hợp (MSSV: 20110002)</li>
+          <li>{{họ tên trưởng nhóm}} (Trưởng nhóm - MSSV: {{MSSV}})</li>
+          <li>{{họ tên thành viên}} (MSSV: {{MSSV}})</li>
         </ul>
 
         <h3 style="color: #0369a1; margin-top: 20px;">I. Tính cấp thiết của đề tài</h3>
@@ -190,9 +190,9 @@ const TINYMCE_TEMPLATES = [
 
         <h3 style="color: #0369a1; margin-top: 20px;">II. Mục tiêu nghiên cứu</h3>
         <ol>
-          <li>Xây dựng kiến trúc xử lý đăng ký tải cao chống nghẽn 4 lớp (Rate limit, Redis counter, Atomic slot lock, PostgreSQL optimistic lock).</li>
-          <li>Tích hợp trợ lý học vụ AI hỗ trợ sinh viên tra cứu thời khóa biểu và quy chế đào tạo trực tiếp.</li>
-          <li>Đảm bảo tuân thủ tiêu chuẩn Web Accessibility WCAG 2.1 AA và giao diện song ngữ mượt mà.</li>
+          <li>{{Mục tiêu tổng quát: sản phẩm/kết quả chính của đề tài}}</li>
+          <li>{{Mục tiêu cụ thể 1 đo lường được}}</li>
+          <li>{{Mục tiêu cụ thể 2 đo lường được}}</li>
         </ol>
 
         <h3 style="color: #0369a1; margin-top: 20px;">III. Kế hoạch triển khai (Gantt)</h3>
@@ -252,7 +252,7 @@ const TINYMCE_TEMPLATES = [
           <div style="text-align: right;">
             <p style="margin: 0; font-weight: 700; text-transform: uppercase;">HIỆU TRƯỞNG</p>
             <div style="height: 50px;"></div>
-            <p style="margin: 0; font-weight: 700; color: #0d509d;">PGS. TS. Lê Hiếu Giang</p>
+            <p style="margin: 0; font-weight: 700; color: #0d509d;">{{Học hàm, Học vị, Họ tên}}</p>
           </div>
         </div>
       </div>
