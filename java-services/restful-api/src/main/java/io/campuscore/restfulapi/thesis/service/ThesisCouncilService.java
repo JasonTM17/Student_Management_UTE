@@ -34,12 +34,28 @@ public class ThesisCouncilService {
 
     private final NamedParameterJdbcTemplate jdbc;
 
+    /**
+     * Creates the service over the shared named-parameter JDBC template.
+     *
+     * @param jdbc template used for the council, scoring, and result queries
+     */
     public ThesisCouncilService(NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
     }
 
     // ---------- councils ----------
 
+    /**
+     * Opens an empty defense council for a round; only a faculty head or an admin may do it.
+     *
+     * @param roundId round the council grades
+     * @param name display name of the council
+     * @param actor caller JWT used for the governance-role check and the {@code created_by} audit column
+     * @return the newly created council with its empty member and topic rosters
+     * @throws DomainException with code VALIDATION_ERROR when the round id or name is missing, or
+     *         FORBIDDEN with code COUNCIL_ADMIN_REQUIRED for an unauthorised caller; the round
+     *         itself is enforced by the {@code round_id} foreign key
+     */
     @Transactional
     public CouncilResponse createCouncil(UUID roundId, String name, Jwt actor) {
         if (roundId == null) {
@@ -56,6 +72,18 @@ public class ThesisCouncilService {
         return getCouncil(id);
     }
 
+    /**
+     * Adds one lecturer to a council, filling the privileged seats in order.
+     *
+     * @param councilId council being staffed
+     * @param lecturerId id of the active lecturer to add
+     * @param memberRole requested seat: {@code CHAIR}, {@code SECRETARY}, or {@code MEMBER}
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the council with the new member listed
+     * @throws DomainException with code COUNCIL_MEMBER_EXISTS for a duplicate lecturer,
+     *         COUNCIL_SIZE_INVALID past five members, COUNCIL_INCOMPLETE when the requested seat
+     *         is not the next one to fill, or VALIDATION_ERROR for an unknown lecturer
+     */
     @Transactional
     public CouncilResponse addMember(UUID councilId, String lecturerId, String memberRole, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
@@ -100,6 +128,17 @@ public class ThesisCouncilService {
         return getCouncil(councilId);
     }
 
+    /**
+     * Removes a lecturer from a council while protecting the seats a graded council needs.
+     *
+     * @param councilId council being staffed
+     * @param lecturerId lecturer to remove
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the council roster after the removal
+     * @throws DomainException with code COUNCIL_CHAIR_REQUIRED or COUNCIL_SECRETARY_REQUIRED when
+     *         the council already holds topics, COUNCIL_SIZE_INVALID when the roster would drop
+     *         below three members, or COUNCIL_MEMBER_NOT_FOUND when the lecturer is not a member
+     */
     @Transactional
     public CouncilResponse removeMember(UUID councilId, String lecturerId, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can manage council members");
@@ -132,6 +171,17 @@ public class ThesisCouncilService {
         return getCouncil(councilId);
     }
 
+    /**
+     * Assigns one thesis topic to a fully staffed council for defense.
+     *
+     * @param councilId council that will grade the topic
+     * @param topicId topic being defended, which must belong to the council's round
+     * @param actor caller JWT; a faculty head or admin is required
+     * @return the council including the newly assigned topic
+     * @throws DomainException with code COUNCIL_INCOMPLETE when the roster is not three to five
+     *         members with a chair and a secretary, TOPIC_ROUND_MISMATCH, TOPIC_ALREADY_ASSIGNED,
+     *         SUPERVISOR_CANNOT_CHAIR_COUNCIL, or SCORE_ALREADY_FINALIZED for a graded topic
+     */
     @Transactional
     public CouncilResponse assignTopic(UUID councilId, UUID topicId, Jwt actor) {
         requireGovernanceRole(actor, "Only a faculty head or admin can assign topics to a council");
@@ -182,6 +232,12 @@ public class ThesisCouncilService {
         return getCouncil(councilId);
     }
 
+    /**
+     * Lists every council of one registration round with its members and assigned topics.
+     *
+     * @param roundId round whose councils are listed, oldest first
+     * @return the councils of the round, each fully hydrated through {@link #getCouncil(UUID)}
+     */
     @Transactional(readOnly = true)
     public List<CouncilResponse> listByRound(UUID roundId) {
         List<UUID> ids = jdbc.queryForList(
@@ -190,6 +246,13 @@ public class ThesisCouncilService {
         return ids.stream().map(this::getCouncil).toList();
     }
 
+    /**
+     * Reads one council: header, members ordered chair then secretary then members, and topics.
+     *
+     * @param councilId council to read
+     * @return the fully hydrated council response
+     * @throws DomainException with code COUNCIL_NOT_FOUND when no council has that id
+     */
     @Transactional(readOnly = true)
     public CouncilResponse getCouncil(UUID councilId) {
         Map<String, Object> council = one(
@@ -214,6 +277,20 @@ public class ThesisCouncilService {
 
     // ---------- scoring ----------
 
+    /**
+     * Records one council member's defense score, overwriting that member's earlier value.
+     *
+     * @param councilId council grading the topic
+     * @param topicId topic being graded
+     * @param component requested scoring component; the frozen model stores the single
+     *        {@code DEFENSE} component so every member's grade carries equal weight
+     * @param score score between 0 and 10 inclusive
+     * @param actor caller JWT, which must belong to a non-supervising council member
+     * @return the stored score with the grader and resolved component
+     * @throws DomainException with code TOPIC_NOT_ASSIGNED when the council does not grade the
+     *         topic, FORBIDDEN with code COUNCIL_MEMBER_REQUIRED for a non-member, or
+     *         VALIDATION_ERROR for an out-of-range score or a supervisor of the topic
+     */
     @Transactional
     public ScoreResponse submitScore(UUID councilId, UUID topicId, String component, BigDecimal score, Jwt actor) {
         String lecturerId = requireCouncilLecturer(councilId, actor);
@@ -251,6 +328,16 @@ public class ThesisCouncilService {
         return new ScoreResponse(topicId, lecturerId, resolvedComponent, score);
     }
 
+    /**
+     * Lists the submitted defense scores of one topic, newest submission last.
+     *
+     * @param councilId council that grades the topic
+     * @param topicId topic whose scores are read
+     * @param actor caller JWT; must be a member of the council or a governance role
+     * @return every submitted score for the frozen defense component
+     * @throws DomainException with code COUNCIL_SCORE_ACCESS_REQUIRED for an unauthorised reader,
+     *         or TOPIC_NOT_ASSIGNED when the council does not grade the topic
+     */
     @Transactional(readOnly = true)
     public List<ScoreResponse> listScores(UUID councilId, UUID topicId, Jwt actor) {
         requireScoreReadAccess(councilId, actor);
@@ -267,6 +354,19 @@ public class ThesisCouncilService {
                         rs.getString("component"), rs.getBigDecimal("score")));
     }
 
+    /**
+     * Freezes a topic's defense result as the equal-weighted average of the eligible member
+     * scores. The update is guarded by {@code final_score IS NULL}, so a concurrent finalize
+     * loses instead of double-writing.
+     *
+     * @param councilId council that graded the topic
+     * @param topicId topic being closed out
+     * @param actor caller JWT; must be the council chair
+     * @return the finalized result with the average, the chair, and the finalization instant
+     * @throws DomainException with code COUNCIL_ROLE_REQUIRED for a non-chair, SCORES_INCOMPLETE
+     *         while an eligible member has not graded, SCORES_REQUIRED with no usable score, or
+     *         SCORE_ALREADY_FINALIZED when another chair froze the result first
+     */
     @Transactional
     public TopicResult finalizeScores(UUID councilId, UUID topicId, Jwt actor) {
         requireCouncilRole(councilId, actor, "CHAIR", "Only the council chair can finalize the topic score");
@@ -312,6 +412,17 @@ public class ThesisCouncilService {
 
     // ---------- student results ----------
 
+    /**
+     * Reads the published defense result of one student's approved groups in a round.
+     *
+     * @param roundId round whose results are read; it must be in the {@code RESULTS_PUBLISHED} status
+     * @param studentId id of the student whose memberships are selected
+     * @return one row per approved group the student belongs to, with title, final score,
+     *         council name, and group leader
+     * @throws DomainException with code VALIDATION_ERROR when the round id is missing,
+     *         RESULTS_NOT_PUBLISHED before the round publishes, or ROUND_NOT_FOUND for an
+     *         unknown round
+     */
     @Transactional(readOnly = true)
     public List<StudentResultRow> studentResults(UUID roundId, String studentId) {
         if (roundId == null) {
