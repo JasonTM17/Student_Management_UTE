@@ -481,7 +481,7 @@ export default function DashboardPage() {
                           {badgeText ? (
                             <span
                               className={cn(
-                                'shrink-0 rounded-full px-2 py-0.5 text-[11px] font-semibold',
+                                'shrink-0 rounded-md px-2 py-0.5 text-[11px] font-semibold',
                                 meeting.daysUntil === 0
                                   ? 'bg-primary/15 text-primary'
                                   : 'bg-secondary text-muted-foreground',
@@ -492,7 +492,7 @@ export default function DashboardPage() {
                           ) : null}
                         </div>
                         <div className="mt-1 flex flex-wrap items-center gap-2 text-xs text-muted-foreground">
-                          <span className={cn('rounded-full border px-2 py-0.5 text-[10px] font-semibold', shift.tone)}>
+                          <span className={cn('rounded-md border px-2 py-0.5 text-[10px] font-semibold', shift.tone)}>
                             {shift.label}
                           </span>
                           <span className="inline-flex items-center gap-1 tabular-nums">
@@ -539,7 +539,7 @@ export default function DashboardPage() {
               </div>
               {pendingCourses.length > 0 ? (
                 <div className="pt-0.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-full border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
                     {copy.pendingBadge(formatNumber(pendingCourses.length))}
                   </span>
                 </div>
@@ -551,7 +551,7 @@ export default function DashboardPage() {
             title={
               <span className="flex items-center gap-2.5">
                 <span>{messages.studentDashboard.panels.currentCourses.title}</span>
-                <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
+                <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-xs font-semibold text-primary">
                   {activeCourses.length} {copy.coursesUnit}
                 </span>
               </span>
@@ -606,7 +606,7 @@ export default function DashboardPage() {
                         {enrollment.section?.course?.code} - {localizedCourseName}
                       </div>
                       <span
-                        className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
+                        className="shrink-0 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground"
                         aria-label={enrollmentStatusLabel(enrollment.status)}
                       >
                         {enrollmentStatusLabel(enrollment.status)}

@@ -9,20 +9,94 @@ import {
   FileEdit,
   Globe,
   GraduationCap,
+  ImageIcon,
   Loader2,
   Save,
   School,
   Sparkles,
   Wand2,
+  X,
 } from 'lucide-react';
 import type { AnnouncementMutation, AnnouncementRecord } from '@/lib/api';
+import {
+  announcementLengthViolationMessage,
+  findAnnouncementLengthViolation,
+} from '@/lib/announcement-limits';
 import { Modal } from '@/components/ui/modal';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
+import { TinyMceEditor } from '@/components/ui/tinymce-editor';
 import { cn } from '@/lib/utils';
+
+export const EDIT_BANNER_PRESETS = [
+  {
+    id: 'campus',
+    url: '/images/banners/campus_academic_banner.jpg',
+    titleVi: 'Khuôn viên học thuật HCMUTE',
+    titleEn: 'HCMUTE Campus Academic',
+    tagVi: 'Khuôn viên',
+    tagEn: 'Campus',
+  },
+  {
+    id: 'notice',
+    url: '/images/banners/academic_notice_banner.jpg',
+    titleVi: 'Bản tin thông báo học vụ',
+    titleEn: 'Academic Notice Bulletin',
+    tagVi: 'Học vụ',
+    tagEn: 'Notice',
+  },
+  {
+    id: 'thesis',
+    url: '/images/banners/thesis_defense_hall.jpg',
+    titleVi: 'Hội đồng bảo vệ khóa luận',
+    titleEn: 'Thesis Defense Committee',
+    tagVi: 'Khóa luận',
+    tagEn: 'Thesis',
+  },
+  {
+    id: 'council',
+    url: '/images/banners/thesis_evaluation_council.jpg',
+    titleVi: 'Hội đồng đánh giá đề tài',
+    titleEn: 'Thesis Evaluation Council',
+    tagVi: 'Hội đồng',
+    tagEn: 'Council',
+  },
+  {
+    id: 'faculty',
+    url: '/images/banners/faculty_engineering_hall.jpg',
+    titleVi: 'Tòa nhà Khoa Kỹ thuật HCMUTE',
+    titleEn: 'Faculty of Engineering Hall',
+    tagVi: 'Khoa Viện',
+    tagEn: 'Faculty',
+  },
+  {
+    id: 'library',
+    url: '/images/banners/smart_campus_library.jpg',
+    titleVi: 'Thư viện số & Không gian học tập',
+    titleEn: 'Smart Digital Library & Commons',
+    tagVi: 'Thư viện',
+    tagEn: 'Library',
+  },
+  {
+    id: 'convocation',
+    url: '/images/banners/academic_convocation_ceremony.jpg',
+    titleVi: 'Lễ tốt nghiệp & Vinh danh học thuật',
+    titleEn: 'Grand Convocation Ceremony',
+    tagVi: 'Tốt nghiệp',
+    tagEn: 'Graduation',
+  },
+  {
+    id: 'lab',
+    url: '/images/banners/department_research_lab.jpg',
+    titleVi: 'Phòng Lab nghiên cứu Khoa CNTT',
+    titleEn: 'IT Smart Systems Lab',
+    tagVi: 'Nghiên cứu',
+    tagEn: 'Research',
+  },
+];
 
 interface AnnouncementEditModalProps {
   announcement: AnnouncementRecord | null;
@@ -47,9 +121,56 @@ export function AnnouncementEditModal({
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('NORMAL');
   const [targetRole, setTargetRole] = useState<'ALL' | 'STUDENT' | 'LECTURER'>('ALL');
   const [publishedBy, setPublishedBy] = useState('');
-  const [isPreviewMode, setIsPreviewMode] = useState(false);
+  const [editorMode, setEditorMode] = useState<'visual' | 'code' | 'preview'>('visual');
   const [isSaving, setIsSaving] = useState(false);
   const [validationError, setValidationError] = useState('');
+
+  // Active cover image detection from content
+  const activeCoverUrl =
+    EDIT_BANNER_PRESETS.find((b) => content.includes(b.url))?.url ||
+    content.match(/src=["'](\/images\/(?:banners|news)\/[^"']+)["']/i)?.[1] ||
+    null;
+
+  const handleApplyBanner = (bannerUrl: string, bannerTitle: string) => {
+    const figureMarkup = `<figure class="my-3 text-center">\n  <img src="${bannerUrl}" alt="${bannerTitle}" class="w-full rounded-lg object-cover max-h-72 shadow-xs" />\n  <figcaption class="mt-1.5 text-xs text-muted-foreground italic">${bannerTitle}</figcaption>\n</figure>\n\n`;
+
+    if (activeCoverUrl) {
+      const figureRegex = new RegExp(
+        `<figure[^>]*>[\\s\\S]*?(?:${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}|\\/images\\/(?:banners|news)\\/[^"']+)[\\s\\S]*?<\\/figure>\\s*`,
+        'i'
+      );
+      if (figureRegex.test(content)) {
+        setContent((prev) => prev.replace(figureRegex, figureMarkup));
+        return;
+      }
+      const imgRegex = new RegExp(
+        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
+        'i'
+      );
+      if (imgRegex.test(content)) {
+        setContent((prev) => prev.replace(imgRegex, figureMarkup));
+        return;
+      }
+    }
+    setContent((prev) => figureMarkup + prev);
+  };
+
+  const handleRemoveBanner = () => {
+    if (!activeCoverUrl) return;
+    const figureRegex = new RegExp(
+      `<figure[^>]*>[\\s\\S]*?${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?<\\/figure>\\s*`,
+      'gi'
+    );
+    if (figureRegex.test(content)) {
+      setContent((prev) => prev.replace(figureRegex, '').trim());
+    } else {
+      const imgRegex = new RegExp(
+        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
+        'gi'
+      );
+      setContent((prev) => prev.replace(imgRegex, '').trim());
+    }
+  };
 
   useEffect(() => {
     if (!announcement) return;
@@ -72,7 +193,7 @@ export function AnnouncementEditModal({
       setTargetRole('LECTURER');
     }
 
-    setIsPreviewMode(false);
+    setEditorMode('visual');
     setValidationError('');
   }, [announcement]);
 
@@ -86,6 +207,14 @@ export function AnnouncementEditModal({
     }
     if (!content.trim()) {
       setValidationError(isVi ? 'Vui lòng nhập nội dung văn bản' : 'Please enter document content');
+      return;
+    }
+
+    const overflow = findAnnouncementLengthViolation(content);
+    if (overflow) {
+      setValidationError(
+        announcementLengthViolationMessage(overflow, isVi ? 'vi' : 'en'),
+      );
       return;
     }
 
@@ -199,46 +328,126 @@ export function AnnouncementEditModal({
           </div>
         </div>
 
-        {/* Content Area with Preview Toggle */}
+        {/* Editorial Cover Image Preset Tray */}
+        <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/15 p-3">
+          <div className="flex items-center justify-between">
+            <label className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+              <ImageIcon className="h-3.5 w-3.5 text-primary" />
+              {isVi ? 'Ảnh bìa học thuật (Bộ sưu tập HCMUTE):' : 'Editorial Cover Image (HCMUTE Collection):'}
+            </label>
+            {activeCoverUrl ? (
+              <button
+                type="button"
+                onClick={handleRemoveBanner}
+                className="text-[11px] font-medium text-destructive hover:underline flex items-center gap-1 cursor-pointer"
+              >
+                <X className="h-3 w-3" />
+                {isVi ? 'Gỡ ảnh bìa' : 'Remove Cover'}
+              </button>
+            ) : null}
+          </div>
+          <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+            {EDIT_BANNER_PRESETS.map((banner) => {
+              const isSelected = activeCoverUrl === banner.url;
+              const bannerTitle = isVi ? banner.titleVi : banner.titleEn;
+              const bannerTag = isVi ? banner.tagVi : banner.tagEn;
+              return (
+                <button
+                  key={banner.id}
+                  type="button"
+                  onClick={() => handleApplyBanner(banner.url, bannerTitle)}
+                  className={cn(
+                    'group relative flex flex-col overflow-hidden rounded-lg border text-left transition-all duration-150',
+                    isSelected
+                      ? 'border-primary ring-2 ring-primary/40 shadow-xs'
+                      : 'border-border/70 bg-card hover:border-primary/50'
+                  )}
+                >
+                  <div className="relative h-16 w-full overflow-hidden bg-muted">
+                    {/* eslint-disable-next-line @next/next/no-img-element */}
+                    <img
+                      src={banner.url}
+                      alt={bannerTitle}
+                      className="h-full w-full object-cover object-center transition duration-300 group-hover:scale-105"
+                    />
+                    {isSelected ? (
+                      <div className="absolute right-1.5 top-1.5 rounded-full bg-primary p-0.5 text-primary-foreground shadow-xs">
+                        <Check className="h-3 w-3" />
+                      </div>
+                    ) : null}
+                  </div>
+                  <div className="p-1.5 bg-card">
+                    <p className="text-[11px] font-semibold text-foreground truncate">{bannerTitle}</p>
+                    <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        </div>
+
+        {/* Content Area with 3-Mode Toggle: Visual (TinyMCE) vs Code vs Preview */}
         <div className="space-y-1.5">
           <div className="flex items-center justify-between">
             <label className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
               {isVi ? 'Nội dung công văn / văn bản' : 'Document Content'} <span className="text-destructive">*</span>
             </label>
-            <div className="flex items-center gap-1">
+            <div className="flex items-center gap-1 rounded-md border border-border/80 bg-background p-0.5 text-xs">
               <button
                 type="button"
-                onClick={() => setIsPreviewMode(false)}
+                onClick={() => setEditorMode('visual')}
                 className={cn(
-                  'rounded px-2 py-0.5 text-[11px] font-medium transition',
-                  !isPreviewMode
+                  'flex items-center gap-1 rounded px-2 py-1 font-medium transition',
+                  editorMode === 'visual'
                     ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                {isVi ? 'Soạn thảo' : 'Editor'}
+                <Sparkles className="h-3.5 w-3.5" />
+                {isVi ? 'Trực quan (TinyMCE)' : 'Visual'}
               </button>
               <button
                 type="button"
-                onClick={() => setIsPreviewMode(true)}
+                onClick={() => setEditorMode('code')}
                 className={cn(
-                  'rounded px-2 py-0.5 text-[11px] font-medium transition',
-                  isPreviewMode
+                  'flex items-center gap-1 rounded px-2 py-1 font-medium transition',
+                  editorMode === 'code'
                     ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
                     : 'text-muted-foreground hover:text-foreground'
                 )}
               >
-                <span className="inline-flex items-center gap-1">
-                  <Eye className="h-3 w-3" />
-                  {isVi ? 'Xem định dạng' : 'Preview'}
-                </span>
+                <FileEdit className="h-3.5 w-3.5" />
+                {isVi ? 'Mã nguồn' : 'Code'}
+              </button>
+              <button
+                type="button"
+                onClick={() => setEditorMode('preview')}
+                className={cn(
+                  'flex items-center gap-1 rounded px-2 py-1 font-medium transition',
+                  editorMode === 'preview'
+                    ? 'bg-primary text-primary-foreground font-semibold shadow-xs'
+                    : 'text-muted-foreground hover:text-foreground'
+                )}
+              >
+                <Eye className="h-3.5 w-3.5" />
+                {isVi ? 'Xem trước' : 'Preview'}
               </button>
             </div>
           </div>
 
-          {isPreviewMode ? (
+          {editorMode === 'preview' ? (
             <div className="max-h-[360px] min-h-[220px] overflow-y-auto rounded-md border border-border bg-card p-4 text-xs">
               <RichContentRenderer content={content} />
+            </div>
+          ) : editorMode === 'visual' ? (
+            <div className="overflow-hidden rounded-md border border-border">
+              <TinyMceEditor
+                value={content}
+                onChange={setContent}
+                locale={locale}
+                height={280}
+                placeholder={isVi ? 'Soạn thảo nội dung văn bản chuẩn học thuật...' : 'Compose document content...'}
+              />
             </div>
           ) : (
             <Textarea

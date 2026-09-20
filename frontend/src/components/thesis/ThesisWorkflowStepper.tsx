@@ -112,7 +112,7 @@ export function ThesisWorkflowStepper({ round, formatDateTime }: ThesisWorkflowS
       <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between border-b border-border/60 pb-4">
         <div>
           <div className="flex items-center gap-2">
-            <span className="inline-flex items-center gap-1.5 rounded-full bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary border border-primary/20">
+            <span className="inline-flex items-center gap-1.5 rounded-md bg-primary/10 px-3 py-1 text-xs font-bold uppercase tracking-wider text-primary border border-primary/20">
               <Sparkles className="h-3.5 w-3.5" />
               {copy.badge}
             </span>

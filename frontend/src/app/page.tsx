@@ -196,7 +196,7 @@ export default function HomePage() {
                     {lane.rows.map((row) => (
                       <li
                         key={row}
-                        className="rounded-full bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground"
+                        className="rounded-md bg-secondary/40 px-3 py-1 text-xs font-medium text-foreground"
                       >
                         {row}
                       </li>

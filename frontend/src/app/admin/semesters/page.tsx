@@ -499,7 +499,7 @@ export default function AdminSemestersPage() {
                             {getSemesterTypeLabel(semester.type)} · {semester.academicYear?.year || copy.unassigned}
                           </p>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
+                        <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
                           {semesterStatusLabel(semester.status)}
                         </span>
                       </div>
@@ -588,7 +588,7 @@ export default function AdminSemestersPage() {
                           {formatDate(semester.endDate)}
                         </td>
                         <td className="px-2 py-4">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(semesterStatusTone(semester.status))}`}>
                             {semesterStatusLabel(semester.status)}
                           </span>
                         </td>

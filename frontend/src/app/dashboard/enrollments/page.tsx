@@ -487,7 +487,7 @@ export default function EnrollmentsPage() {
                 <Layers className="h-4 w-4" />
                 {copy.tabCurriculum}
                 {curriculumCourses.length > 0 && (
-                  <span className="ml-1 rounded-full bg-primary-foreground/20 px-2 py-0.5 text-xs">
+                  <span className="ml-1 rounded-md bg-primary-foreground/20 px-2 py-0.5 text-xs">
                     {curriculumCourses.length}
                   </span>
                 )}
@@ -503,7 +503,7 @@ export default function EnrollmentsPage() {
               >
                 <BookOpen className="h-4 w-4" />
                 {copy.tabEnrollments}
-                <span className="ml-1 rounded-full bg-muted px-2 py-0.5 text-xs text-foreground">
+                <span className="ml-1 rounded-md bg-muted px-2 py-0.5 text-xs text-foreground">
                   {enrollments.length}
                 </span>
               </button>
@@ -524,7 +524,7 @@ export default function EnrollmentsPage() {
                     type="button"
                     aria-pressed={statusFilter === btn.key}
                     onClick={() => setStatusFilter(btn.key)}
-                    className={`rounded-full px-3 py-1 font-medium transition ${
+                    className={`rounded-md px-3 py-1 font-medium transition ${
                       statusFilter === btn.key
                         ? 'bg-foreground text-background font-semibold'
                         : 'border border-border/80 bg-card text-muted-foreground hover:text-foreground'
@@ -649,7 +649,7 @@ export default function EnrollmentsPage() {
 
                                   <div className="flex shrink-0 items-center gap-2">
                                     {isCompleted ? (
-                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusToneClass('success')}`}>
+                                      <span className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusToneClass('success')}`}>
                                         <CheckCircle2 className="h-3.5 w-3.5" />
                                         {copy.filterCompleted}
                                         {course.finalGrade !== null && course.finalGrade !== undefined ? (
@@ -659,12 +659,12 @@ export default function EnrollmentsPage() {
                                         ) : null}
                                       </span>
                                     ) : isInProgress ? (
-                                      <span className={`inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-semibold ${statusToneClass('info')}`}>
+                                      <span className={`inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-semibold ${statusToneClass('info')}`}>
                                         <Clock className="h-3.5 w-3.5" />
                                         {copy.filterInProgress}
                                       </span>
                                     ) : (
-                                      <span className={`inline-flex items-center rounded-full px-3 py-1 text-xs font-medium ${statusToneClass('neutral')}`}>
+                                      <span className={`inline-flex items-center rounded-md px-3 py-1 text-xs font-medium ${statusToneClass('neutral')}`}>
                                         {copy.filterNotStarted}
                                       </span>
                                     )}
@@ -719,12 +719,12 @@ export default function EnrollmentsPage() {
                                 <h2 className="min-w-0 break-words text-base font-semibold text-foreground sm:text-lg">
                                   {courseCode} - {courseName}
                                 </h2>
-                                <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                                <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                                   {copy.sectionPrefix}{' '}
                                   {enrollment.section?.sectionNumber || copy.unknownSection}
                                 </span>
                                 <span
-                                  className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                                  className={`rounded-md px-2.5 py-1 text-xs font-medium ${
                                     statusTone[enrollment.status] ??
                                       'bg-secondary text-foreground'
                                   }`}
@@ -762,7 +762,7 @@ export default function EnrollmentsPage() {
                                     {enrollment.section.schedules.map((schedule, index) => (
                                       <span
                                         key={`${enrollment.id}-desktop-${index}`}
-                                        className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
+                                        className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1 text-xs text-foreground"
                                       >
                                         <Clock className="h-3.5 w-3.5" />
                                         {getDayName(schedule.dayOfWeek, locale)}{' '}
@@ -808,7 +808,7 @@ export default function EnrollmentsPage() {
                                       {enrollment.section.schedules.map((schedule, index) => (
                                         <span
                                           key={`${enrollment.id}-mobile-${index}`}
-                                          className="inline-flex items-center gap-2 rounded-full bg-secondary px-3 py-1 text-xs text-foreground"
+                                          className="inline-flex items-center gap-2 rounded-md bg-secondary px-3 py-1 text-xs text-foreground"
                                         >
                                           <Clock className="h-3.5 w-3.5" />
                                           {getDayName(schedule.dayOfWeek, locale)}{' '}

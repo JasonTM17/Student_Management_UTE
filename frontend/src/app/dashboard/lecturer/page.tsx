@@ -236,7 +236,7 @@ export default function LecturerDashboardPage() {
                             </div>
                           </div>
                           <div className="mt-1">
-                            <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                            <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                               {section.canPublish ? messages.lecturerDashboard.queueStatusReady : messages.lecturerDashboard.queueStatusProgress}
                             </span>
                           </div>

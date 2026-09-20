@@ -39,7 +39,7 @@ export function StatusBadge({ status, variant = 'default', className }: StatusBa
     messages.common.statuses.UNKNOWN;
 
   return (
-    <span className={cn('inline-flex rounded-full px-2.5 py-1 text-xs font-semibold', statusClass(status, variant), className)}>
+    <span className={cn('inline-flex rounded-md px-2.5 py-1 text-xs font-semibold', statusClass(status, variant), className)}>
       {label}
     </span>
   );

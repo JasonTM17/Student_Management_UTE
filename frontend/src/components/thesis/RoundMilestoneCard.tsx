@@ -69,7 +69,7 @@ export function RoundMilestoneCard({
             <div className="flex flex-wrap items-center gap-2.5">
               <span
                 className={cn(
-                  'inline-flex items-center gap-1.5 rounded-full px-3 py-1 text-xs font-bold uppercase tracking-wider border',
+                  'inline-flex items-center gap-1.5 rounded-md px-3 py-1 text-xs font-bold uppercase tracking-wider border',
                   currentType.badgeClass,
                 )}
               >

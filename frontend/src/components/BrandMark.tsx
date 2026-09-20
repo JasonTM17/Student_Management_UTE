@@ -47,7 +47,7 @@ export function BrandMark({
   compact = false,
 }: BrandMarkProps) {
   const content = (
-    <div className={cn('flex items-center gap-3', className)}>
+    <div className={cn('flex min-w-0 items-center gap-2.5', className)}>
       <CampusUteEmblem
         size={compact ? 36 : 44}
         className={cn('border border-white/10 ring-1 ring-black/5', markClassName)}
@@ -55,13 +55,17 @@ export function BrandMark({
       <div className="min-w-0">
         <div
           className={cn(
-            'flex items-center gap-1.5 text-lg font-bold tracking-tight text-foreground',
+            'flex min-w-0 items-center gap-1.5 text-lg font-bold tracking-tight text-foreground',
             compact && 'text-base',
             titleClassName,
           )}
         >
-          <span translate="no">{title}</span>
-          <span className="rounded bg-[var(--portal-yellow,#F59E0B)] px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wider text-[var(--portal-yellow-ink)]">
+          {/* The product name truncates so the fixed-width badge can never slide
+              under the sidebar collapse control. */}
+          <span translate="no" className="truncate">
+            {title}
+          </span>
+          <span className="shrink-0 rounded-[4px] bg-[var(--portal-yellow)] px-1 py-0.5 text-[10px] font-extrabold uppercase tracking-wide text-[var(--portal-yellow-ink)] shadow-xs ring-1 ring-black/5">
             HCMUTE
           </span>
         </div>

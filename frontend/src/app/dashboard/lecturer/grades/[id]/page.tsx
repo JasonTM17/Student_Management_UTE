@@ -597,7 +597,7 @@ export default function SectionGradingPage() {
                           {enrollment.email ?? copy.unavailableEmail}
                         </p>
                       </div>
-                      <span className="shrink-0 rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                      <span className="shrink-0 rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                         {isPublished
                           ? copy.publishedStatus
                           : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}
@@ -714,7 +714,7 @@ export default function SectionGradingPage() {
                           {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
                         </td>
                         <td className="px-3 py-3.5 text-right">
-                          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {isPublished
                               ? copy.publishedStatus
                               : statusLabel(enrollment.gradeStatus ?? 'DRAFT')}

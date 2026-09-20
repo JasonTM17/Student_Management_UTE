@@ -181,7 +181,7 @@ export default function LecturerGradesPage() {
                               section.courseName,
                             )}
                           </h2>
-                          <span className="rounded-full bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
+                          <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {messages.lecturerGrades.labels.sectionPrefix} {section.sectionNumber}
                           </span>
                         </div>
@@ -214,7 +214,7 @@ export default function LecturerGradesPage() {
 
                     <div className="flex shrink-0 flex-col items-start gap-3 xl:min-w-[200px] xl:items-end">
                       <span
-                        className={`rounded-full px-2.5 py-1 text-xs font-medium ${
+                        className={`rounded-md px-2.5 py-1 text-xs font-medium ${
                           section.canPublish
                             ? metricToneClass('success')
                             : section.gradeStatus === 'PARTIAL'

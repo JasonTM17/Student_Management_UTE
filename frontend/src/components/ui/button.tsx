@@ -18,7 +18,7 @@ const buttonVariants = cva(
           'bg-secondary text-secondary-foreground hover:bg-secondary/85',
         ghost: 'text-foreground hover:bg-secondary/75',
         link: 'text-primary underline-offset-4 hover:underline',
-        warm: 'bg-[hsl(var(--accent-warm))] text-[var(--portal-yellow-ink)] hover:bg-[hsl(var(--accent-warm))/0.9]',
+        warm: 'bg-white text-[#003f87] border border-white/20 shadow-xs hover:bg-white/90 font-bold dark:bg-white dark:text-slate-900',
         registration:
           'bg-[var(--registration-gold)] text-[var(--registration-gold-ink)] hover:bg-[var(--registration-gold)]/90',
       },

@@ -406,7 +406,7 @@ export default function AdminClassroomsPage() {
                         </p>
                         <h3 className="mt-1 font-semibold text-foreground">{room.roomNumber}</h3>
                       </div>
-                      <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
+                      <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
                         {room.isActive ? copy.active : copy.inactive}
                       </span>
                     </div>
@@ -476,7 +476,7 @@ export default function AdminClassroomsPage() {
                           {room.type}
                         </td>
                         <td className="px-2 py-4">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(room.isActive ? 'success' : 'neutral')}`}>
                             {room.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>

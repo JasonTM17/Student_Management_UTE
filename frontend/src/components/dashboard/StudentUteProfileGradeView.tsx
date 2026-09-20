@@ -516,7 +516,7 @@ export function StudentUteProfileGradeView({
                     </text>
                   </svg>
                 ) : (
-                  <div className="w-[160px] h-[160px] flex items-center justify-center rounded-full border border-dashed border-border text-xs text-muted-foreground px-4">
+                  <div className="w-[160px] h-[160px] flex items-center justify-center rounded-md border border-dashed border-border text-xs text-muted-foreground px-4">
                     {card.notAvailable}
                   </div>
                 )}

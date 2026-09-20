@@ -346,6 +346,56 @@ export default function AdminDepartmentsPage() {
       }
     >
       <div className="space-y-6">
+        {/* Executive Department Overview & Campus Lab Banner */}
+        <div className="relative overflow-hidden rounded-xl border border-border/80 bg-gradient-to-br from-primary/10 via-background to-secondary/20 shadow-xs">
+          <div className="grid grid-cols-1 lg:grid-cols-12 items-center">
+            <div className="p-6 lg:col-span-8 space-y-3">
+              <div className="inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/10 px-3 py-1 text-xs font-semibold text-primary">
+                <Building2 className="h-3.5 w-3.5" />
+                <span>{locale === 'vi' ? 'CƠ CẤU TỔ CHỨC & KHOA ĐÀO TẠO HCMUTE' : 'HCMUTE ACADEMIC FACULTIES & DEPARTMENTS'}</span>
+              </div>
+              <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
+                {locale === 'vi'
+                  ? 'Quản trị Cơ cấu Khoa & Viện Đào tạo Trọng điểm'
+                  : 'Faculty & Department Administration'}
+              </h2>
+              <p className="text-sm leading-relaxed text-muted-foreground max-w-2xl">
+                {locale === 'vi'
+                  ? 'Phân cấp tổ chức học thuật, quản lý các khoa chuyên ngành, phòng thí nghiệm nghiên cứu công nghệ cao và bộ môn trực thuộc phục vụ đào tạo tín chỉ, phân bổ giảng viên và quản lý đồ án tốt nghiệp.'
+                  : 'Manage university faculties, specialized research laboratories, and academic departments supporting curriculum delivery and thesis mentorship.'}
+              </p>
+              <div className="flex flex-wrap items-center gap-4 pt-2 text-xs font-medium text-muted-foreground">
+                <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-3 py-1.5 shadow-2xs">
+                  <span className="font-bold text-foreground text-sm">{departments.length}</span>
+                  <span>{locale === 'vi' ? 'Khoa & Đơn vị trực thuộc' : 'Academic Units'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-3 py-1.5 shadow-2xs">
+                  <span className="font-bold text-emerald-600 dark:text-emerald-400 text-sm">
+                    {departments.filter((d) => d.isActive).length}
+                  </span>
+                  <span>{locale === 'vi' ? 'Đang hoạt động' : 'Active'}</span>
+                </div>
+                <div className="flex items-center gap-1.5 rounded-lg border border-border/70 bg-card/80 px-3 py-1.5 shadow-2xs">
+                  <span className="font-bold text-primary text-sm">100%</span>
+                  <span>{locale === 'vi' ? 'Chuẩn hóa tín chỉ' : 'Curriculum Aligned'}</span>
+                </div>
+              </div>
+            </div>
+            <div className="relative h-48 lg:h-full lg:col-span-4 overflow-hidden border-t lg:border-t-0 lg:border-l border-border/60 min-h-[160px]">
+              {/* eslint-disable-next-line @next/next/no-img-element */}
+              <img
+                src="/images/banners/department_research_lab.jpg"
+                alt="HCMUTE IT Department Research Lab"
+                className="h-full w-full object-cover object-center transition duration-500 hover:scale-105"
+              />
+              <div className="absolute inset-0 bg-gradient-to-t from-black/40 via-transparent to-transparent lg:hidden" />
+              <div className="absolute bottom-2 left-3 rounded-md bg-background/80 px-2 py-0.5 text-[11px] font-semibold text-foreground backdrop-blur-xs">
+                Smart Systems & Robotics Lab
+              </div>
+            </div>
+          </div>
+        </div>
+
         <AdminToolbarCard>
             <form
               onSubmit={handleSearch}
@@ -424,7 +474,7 @@ export default function AdminDepartmentsPage() {
                           </p>
                           <h3 className="mt-1 font-semibold text-foreground">{departmentLabel}</h3>
                         </div>
-                        <span className={`shrink-0 rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(department.isActive ? 'success' : 'neutral')}`}>
+                        <span className={`shrink-0 rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(department.isActive ? 'success' : 'neutral')}`}>
                           {department.isActive ? copy.active : copy.inactive}
                         </span>
                       </div>
@@ -501,7 +551,7 @@ export default function AdminDepartmentsPage() {
                           {departmentDescription}
                         </td>
                         <td className="px-4 py-3.5">
-                          <span className={`inline-flex rounded-full px-2.5 py-1 text-xs font-medium ${statusToneClass(department.isActive ? 'success' : 'neutral')}`}>
+                          <span className={`inline-flex rounded-md px-2.5 py-1 text-xs font-medium ${statusToneClass(department.isActive ? 'success' : 'neutral')}`}>
                             {department.isActive ? copy.active : copy.inactive}
                           </span>
                         </td>

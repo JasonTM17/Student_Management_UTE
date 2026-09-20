@@ -85,7 +85,7 @@ export function ThesisRegulationGuide() {
           </div>
           <div>
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-full bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
+              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
                 {copy.badge}
               </span>
               <span className="text-xs text-muted-foreground font-medium">
@@ -110,7 +110,33 @@ export function ThesisRegulationGuide() {
 
       {/* Expandable Accordion Body */}
       {isOpen && (
-        <div className="border-t border-border/60 bg-muted/10 p-5 sm:p-6">
+        <div className="border-t border-border/60 bg-muted/10 p-5 sm:p-6 space-y-5">
+          {/* Hall & Council Visual Banner Strip */}
+          <div className="overflow-hidden rounded-xl border border-border/70 bg-card shadow-2xs">
+            <div className="grid grid-cols-1 sm:grid-cols-12 items-center">
+              <div className="p-4 sm:col-span-8 space-y-1.5">
+                <span className="text-[11px] font-bold uppercase tracking-wider text-primary">
+                  HCMUTE Academic Council Guidelines
+                </span>
+                <p className="text-xs text-muted-foreground leading-relaxed">
+                  Quy chuẩn quy trình thực hiện và đánh giá khóa luận tốt nghiệp theo chuẩn chất lượng đào tạo đại học chính quy HCMUTE.
+                </p>
+              </div>
+              <div className="relative h-28 sm:h-full sm:col-span-4 min-h-[90px] overflow-hidden border-t sm:border-t-0 sm:border-l border-border/60">
+                {/* eslint-disable-next-line @next/next/no-img-element */}
+                <img
+                  src="/images/banners/thesis_defense_hall.jpg"
+                  alt="HCMUTE Thesis Defense Hall"
+                  className="h-full w-full object-cover object-center"
+                />
+                <div className="absolute inset-0 bg-gradient-to-t from-black/50 via-transparent to-transparent" />
+                <div className="absolute bottom-1.5 left-2 rounded-md bg-background/85 px-1.5 py-0.5 text-[9px] font-bold text-foreground backdrop-blur-xs">
+                  Hội đồng Đánh giá Khóa luận
+                </div>
+              </div>
+            </div>
+          </div>
+
           <div className="grid grid-cols-1 gap-6 lg:grid-cols-[280px_1fr]">
             {/* Rule Selector List */}
             <div className="space-y-1.5">
@@ -153,7 +179,7 @@ export function ThesisRegulationGuide() {
                     {currentRule.title}
                   </h4>
                 </div>
-                <span className="rounded-full bg-muted px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
+                <span className="rounded-md bg-muted px-2.5 py-0.5 text-[11px] font-semibold text-muted-foreground">
                   {currentRule.badge}
                 </span>
               </div>

@@ -109,7 +109,7 @@ export function TableOfContents({
       <div className="flex items-center gap-2 border-b border-border/60 pb-2.5 text-xs font-bold uppercase tracking-wider text-foreground">
         <List className="h-4 w-4 text-primary" />
         <span>{isVi ? 'Mục lục bài viết' : 'Table of Contents'}</span>
-        <span className="ml-auto rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
+        <span className="ml-auto rounded-md bg-primary/10 px-2 py-0.5 text-[10px] font-semibold text-primary">
           {headings.length} {isVi ? 'phần' : 'sections'}
         </span>
       </div>

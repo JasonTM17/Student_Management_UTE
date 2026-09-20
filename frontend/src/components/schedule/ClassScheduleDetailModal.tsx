@@ -123,7 +123,7 @@ export function ClassScheduleDetailModal({
                 {locale === 'vi' ? 'Lớp HP' : 'Section'} {data.sectionNumber}
               </span>
               {data.status ? (
-                <span className="rounded-full bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
+                <span className="rounded-md bg-emerald-500/15 px-2 py-0.5 text-[11px] font-medium text-emerald-700 dark:text-emerald-300">
                   {data.status}
                 </span>
               ) : null}
