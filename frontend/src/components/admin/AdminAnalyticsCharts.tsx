@@ -159,7 +159,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             <span
               title={copy.illustrativeNotice}
               className={cn(
-                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-xs font-medium',
+                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium',
                 isLive
                   ? 'bg-status-success/15 text-status-success-foreground'
                   : 'bg-status-warning/15 text-status-warning-foreground',

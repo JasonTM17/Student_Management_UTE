@@ -4,6 +4,7 @@ import { useState } from 'react';
 import { Loader2, Trash2, UserPlus } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { campusCodeMessage } from '@/lib/campus-error';
 import { cn } from '@/lib/utils';
@@ -24,6 +25,7 @@ interface SupervisedGroupMembersProps {
  */
 export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: SupervisedGroupMembersProps) {
   const { messages, formatNumber } = useI18n();
+  const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
   const [query, setQuery] = useState('');
   const [results, setResults] = useState<ThesisStudentResult[]>([]);
@@ -95,10 +97,18 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
     });
   };
 
-  const remove = (studentId: string) => {
-    // Same confirmation gate as the sibling screen (dashboard/thesis/page.tsx):
-    // a DELETE that removes a member must never fire on a single click.
-    if (!window.confirm(messages.thesis.removeMemberConfirm)) return;
+  const remove = async (studentId: string) => {
+    // Same destructive-action gate as the sibling screen (dashboard/thesis/page.tsx),
+    // via the app-standard dialog: a DELETE that removes a member must never fire
+    // on a single click.
+    const shouldRemove = await confirm({
+      title: messages.thesis.removeMemberTitle,
+      message: messages.thesis.removeMemberConfirm,
+      confirmText: messages.thesis.removeMember,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!shouldRemove) return;
     void run(() => thesisApi.removeMember(group.id, studentId));
   };
 
@@ -149,7 +159,7 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
                     size="sm"
                     variant="ghost"
                     className="h-7 w-7 p-0 text-destructive hover:bg-destructive/10"
-                    onClick={() => remove(member.studentId)}
+                    onClick={() => void remove(member.studentId)}
                     disabled={isPending}
                     aria-label={`${messages.thesis.removeMember}: ${member.displayName || member.studentId}`}
                   >
@@ -263,6 +273,8 @@ export function SupervisedGroupMembers({ group, roundOpen = true, onChanged }: S
           {error ? <p className="text-xs text-destructive">{error}</p> : null}
         </div>
       ) : null}
+
+      {confirmationDialog}
     </div>
   );
 }

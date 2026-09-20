@@ -66,8 +66,8 @@ curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
 | --- | --- | --- | --- |
 | **Sinh viên (Chính)** | `student@campuscore.edu` | `password123` | Đầy đủ lịch học kỳ hiện tại, điểm số, đăng ký học phần, hỏi Trợ lý AI |
 | **Giảng viên** | `lecturer@campuscore.edu` | `password123` | Quản lý danh sách lớp dạy, vào điểm học phần, hướng dẫn luận văn |
-| **Quản trị viên 1** | `admin@campuscore.edu` | `admin123` | Điều hành toàn trường, mở lớp học phần, tạo bản thảo tri thức RAG |
-| **Quản trị viên 2** | `admin002@campuscore.demo` | `admin123` | Dùng để thực hiện nguyên tắc Four-Eyes duyệt bản nháp tri thức của Admin 1 |
+| **Quản trị viên 1** | `admin@campuscore.edu` | `password123` | Điều hành toàn trường, mở lớp học phần, tạo bản thảo tri thức RAG |
+| **Quản trị viên 2** | `admin002@campuscore.demo` | `password123` | Dùng để thực hiện nguyên tắc Four-Eyes duyệt bản nháp tri thức của Admin 1 |
 
 *Danh bạ giảng viên phụ `lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo` cũng được seed sẵn để lịch dạy và hội đồng phản ánh quy mô trường thực tế.*
 
@@ -106,7 +106,7 @@ curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
 ### Bước 6: Giảng viên Vào Điểm & Quản trị Duyệt Tri thức 2 Người (60 giây)
 - Đăng xuất và đăng nhập vai trò Giảng viên: `lecturer@campuscore.edu` / `password123`.
   - Mở `/vi/dashboard/lecturer/grades` -> Chọn lớp -> Mở bảng điểm sinh viên và trình diễn việc nhập/sửa điểm trực tiếp.
-- Đăng nhập vai trò Quản trị viên: `admin@campuscore.edu` / `admin123`.
+- Đăng nhập vai trò Quản trị viên: `admin@campuscore.edu` / `password123`.
   - Mở `/vi/admin/assistant-knowledge` -> Chỉ ra quy trình bản thảo tri thức RAG (`DRAFT` -> `PENDING_REVIEW` -> `PUBLISHED`).
   - Thuyết minh: Admin tạo bài không thể tự duyệt bài của mình; chỉ có Admin thứ hai (`admin002@campuscore.demo`) mới có quyền phê duyệt, kích hoạt Privacy Gate và đẩy vào snapshot đang chạy.
 
@@ -223,7 +223,7 @@ công trừ khi đang làm một repair có bằng chứng riêng.
 | **Không truy cập được Web ở 3100** | Cổng bị chiếm dụng hoặc compose chưa lên | Chạy `docker compose port web 3000` để lấy cổng thực tế; chạy `docker compose restart web` |
 | **API trả về lỗi kết nối Database** | PostgreSQL chưa hoàn tất khởi động | Kiểm tra `docker compose logs postgres`; kiểm tra port `5435` |
 | **Trợ lý AI trả lời chậm** | Đang bật `DEEPSEEK_ENABLED=true` nhưng không có internet | Tắt `DEEPSEEK_ENABLED=false` trong `.env` để chuyển sang chế độ Lexical RAG cục bộ (< 50ms, không cần mạng) |
-| **Quên tài khoản đăng nhập** | Nhập sai mật khẩu | Sử dụng các tài khoản mặc định `student@campuscore.edu` / `password123` hoặc `admin@campuscore.edu` / `admin123` |
+| **Quên tài khoản đăng nhập** | Nhập sai mật khẩu | Sử dụng các tài khoản mặc định `student@campuscore.edu` / `password123` hoặc `admin@campuscore.edu` / `password123` |
 
 ---
 

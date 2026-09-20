@@ -24,6 +24,7 @@ import {
   assessAnnouncementContentLength,
 } from '@/lib/announcement-limits';
 import { cn } from '@/lib/utils';
+import { toast } from 'sonner';
 
 // Loading shell rendered while the editor chunk resolves. Locale is picked from
 // <html lang> because the dynamic wrapper has no access to the component props.
@@ -396,7 +397,7 @@ export function TinyMceEditor({
             <Sparkles className="h-4 w-4" />
             <span>{isVi ? 'Trình soạn thảo văn bản hành chính' : 'Official Document Editor'}</span>
           </div>
-          <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
+          <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-semibold text-primary">
             {isVi ? 'Lưu trữ nội bộ an toàn' : 'Secure Internal Storage'}
           </span>
         </div>
@@ -710,7 +711,9 @@ export function TinyMceEditor({
                     if (file.size > MAX_INLINE_IMAGE_BYTES) {
                       // Fail before reading so the author gets the same quota
                       // message as the paste path instead of a silent drop.
-                      alert(
+                      // Non-blocking toast (app standard) instead of native alert,
+                      // which freezes the editor window.
+                      toast.error(
                         isVi
                           ? `Ảnh quá lớn (tối đa ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB để vừa hạn mức ký tự của máy chủ). Hãy nén ảnh trước khi chèn.`
                           : `Image too large (max ${Math.floor(MAX_INLINE_IMAGE_BYTES / 1024)} KB to fit the server character budget). Compress it before inserting.`,
