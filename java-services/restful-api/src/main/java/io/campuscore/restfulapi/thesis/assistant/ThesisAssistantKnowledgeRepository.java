@@ -37,6 +37,16 @@ public class ThesisAssistantKnowledgeRepository {
     }
 
     public List<KnowledgeDocument> search(String locale, List<String> terms, int limit) {
+        return search(locale, terms, limit, null);
+    }
+
+    /**
+     * Lexical retrieval over the active published release. A non-blank scope
+     * NARROWS the corpus — it can never widen access beyond the existing
+     * active+PUBLIC gates. {@code specialized} restricts results to documents
+     * published in the SPECIALIZED domain (the curated professional corpus).
+     */
+    public List<KnowledgeDocument> search(String locale, List<String> terms, int limit, String scope) {
         // The service budget is 16 terms and puts folded-phrase aliases first;
         // an 8-term cap here silently dropped exactly those aliases, so
         // unaccented Vietnamese queries degraded to NO_MATCH.
@@ -48,6 +58,7 @@ public class ThesisAssistantKnowledgeRepository {
         if (usableTerms.isEmpty()) {
             return List.of();
         }
+        boolean specializedScope = "specialized".equalsIgnoreCase(scope);
 
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("locale", locale)
@@ -70,6 +81,7 @@ public class ThesisAssistantKnowledgeRepository {
                 + "JOIN assistant.knowledge_release rel ON rel.id = s.active_release_id AND rel.status = 'PUBLISHED' "
                 + "JOIN assistant.knowledge_runtime_document p ON p.release_id = rel.id "
                 + "WHERE s.singleton = TRUE AND p.active = TRUE AND p.visibility = 'PUBLIC' "
+                + (specializedScope ? "AND p.domain = 'SPECIALIZED' " : "")
                 + "AND p.locale IN (:locale, 'both') "
                 + "AND (" + String.join(" OR ", predicates) + ") "
                 + "ORDER BY CASE WHEN p.locale = :locale THEN 0 ELSE 1 END, "
@@ -80,6 +92,11 @@ public class ThesisAssistantKnowledgeRepository {
         } catch (org.springframework.jdbc.BadSqlGrammarException missingProjection) {
             // Focused pre-V16 fixtures can still exercise lexical retrieval.
             if (!allowLegacyFallback) throw missingProjection;
+            // The legacy projection has no domain column, so a specialized
+            // scope cannot be honored there; an empty result is the honest answer.
+            if (specializedScope) {
+                return List.of();
+            }
             String legacyScoreExpression = scoreExpression.replace("p.", "r.");
             String legacySql = "SELECT CAST(d.id AS VARCHAR) AS id, d.slug, r.locale, r.title, r.content, r.source, 'THESIS' AS domain, r.id AS revision_id, r.version AS revision_version, "
                     + "NULL AS release_id, NULL AS corpus_version, NULL AS corpus_hash "

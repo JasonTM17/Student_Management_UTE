@@ -8,6 +8,33 @@ active authoring project must be verified before any import/export; a Supabase
 project containing a different application's tables is not evidence that the
 CampusCore assistant corpus is present.
 
+## Specialized corpus (Trợ lý chuyên sâu)
+
+`supabase/seed/assistant-specialized-knowledge.json` is the bilingual
+professional-domain corpus (software engineering expert Q&A: OOP/SOLID, SQL,
+testing, Git, REST, architecture, React, DevOps, security, RAG, clean code,
+careers). The Supabase authoring table has no `domain` column by design; when
+the corpus is published into the local runtime through
+`V71__specialized_domain_knowledge.sql`, every row is assigned
+`domain = 'SPECIALIZED'`, which the assistant's specialized scope
+(`ChatRequest.scope = 'specialized'`) narrows retrieval to.
+
+Validate the corpus locally (no network, no keys):
+
+```powershell
+node scripts/supabase/assistant-knowledge.mjs validate `
+  --file .\supabase\seed\assistant-specialized-knowledge.json --expected-count 24
+```
+
+The JSON corpus is the single source of truth. After editing it, regenerate
+the Flyway seed (the generator reads the JSON and emits
+`V71__specialized_domain_knowledge.sql`; it never touches the process
+environment):
+
+```powershell
+node scripts/generate-specialized-knowledge.mjs
+```
+
 ## Schema and access
 
 Apply `supabase/migrations/20260823073842_assistant_knowledge_authoring.sql`

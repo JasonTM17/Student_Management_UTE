@@ -29,6 +29,12 @@ import { inspectAssistantInput, isSensitiveGuardReason } from '@/lib/assistant-i
 
 export interface UseAssistantStreamOptions {
   locale: Locale;
+  /**
+   * Retrieval scope. Undefined/'academic' keeps the default curated corpus;
+   * 'specialized' narrows retrieval to the professional SPECIALIZED domain.
+   * The scope can only narrow the corpus, never widen access.
+   */
+  scope?: 'academic' | 'specialized';
   assistantMessages: {
     cancelled: string;
     unavailable: string;
@@ -68,6 +74,7 @@ function apiErrorCode(error: unknown): string | undefined {
 
 export function useAssistantStream({
   locale,
+  scope,
   assistantMessages,
   onReconcileHistory,
   onNewExchange,
@@ -299,6 +306,7 @@ export function useAssistantStream({
         await thesisApi.streamChat(message, locale, {
           conversationId: requestedConversationId,
           clientRequestId,
+          scope,
           signal: controller.signal,
           onEvent: (streamEvent) => {
             if (!isCurrentRequest()) return;
@@ -361,6 +369,7 @@ export function useAssistantStream({
               locale,
               requestedConversationId,
               clientRequestId,
+              scope,
             );
             break;
           } catch (error) {
@@ -460,6 +469,7 @@ export function useAssistantStream({
       input,
       isSending,
       locale,
+      scope,
       onNewExchange,
       onReconcileHistory,
       state.conversationId,
@@ -489,6 +499,7 @@ export function useAssistantStream({
             locale,
             activeConversationIdRef.current,
             requestId,
+            scope,
           );
           casResolvedRef.current = true;
           dispatch({
@@ -506,7 +517,7 @@ export function useAssistantStream({
         abortRef.current?.abort();
       }
     }
-  }, [lastPrompt, locale, onReconcileHistory]);
+  }, [lastPrompt, locale, scope, onReconcileHistory]);
 
   const abortStream = useCallback(() => {
     requestGenerationRef.current += 1;

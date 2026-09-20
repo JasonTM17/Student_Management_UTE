@@ -1206,9 +1206,6 @@ export const en = {
       currentPassword: 'Current password',
       newPassword: 'New password',
       confirmNewPassword: 'Confirm new password',
-      managedHint: 'Email is managed through your campus account owner.',
-      nameManagedHint:
-        'Your official name is managed by the Academic Office. Students and lecturers cannot rename themselves.',
       phonePlaceholder: '+84...',
       addressPlaceholder: 'Street, city, region',
       currentPasswordPlaceholder: 'Enter your current password',
@@ -1346,6 +1343,7 @@ export const en = {
     memberAdded: 'Group member added successfully.',
     memberRemoved: 'Group member removed successfully.',
     removeMember: 'Remove',
+    removeMemberTitle: 'Remove group member',
     removeMemberConfirm: 'Are you sure you want to remove this member from the group?',
     leaderBadge: 'Leader',
     manageMembers: 'Manage members',
@@ -1418,6 +1416,7 @@ export const en = {
     navigation: {
       catalog: 'Topic catalog',
       progress: 'Thesis progress',
+      advisors: 'Thesis advisors',
     },
     catalogTitle: 'Published topic catalog',
     catalogDescription: 'Scan published topics, then open details before choosing.',
@@ -1602,6 +1601,17 @@ export const en = {
   assistant: {
     label: 'Campus helpdesk',
     title: 'CampusUTE assistant',
+    specializedLabel: 'Specialized AI Assistant',
+    specializedTitle: 'Specialized Assistant',
+    specializedTagline: 'Expert Q&A: programming, databases, architecture, testing, careers.',
+    specializedSuggestions: [
+      'How do SOLID principles and design patterns apply?',
+      'Database normalization and SQL query tuning',
+      'Effective unit testing and TDD',
+      'Software engineering career roadmap',
+    ],
+    specializedEmpty:
+      'Ask professional questions about programming, databases, software architecture, testing, DevOps, security and software-engineering careers.',
     description: 'Ask about registration, schedules, announcements, the academic catalog, policies, or your thesis journey.',
     open: 'Open CampusUTE assistant',
     close: 'Close CampusUTE assistant',
@@ -2996,9 +3006,6 @@ export const vi: I18nMessages = {
       currentPassword: 'Mật khẩu hiện tại',
       newPassword: 'Mật khẩu mới',
       confirmNewPassword: 'Xác nhận mật khẩu mới',
-      managedHint: 'Email do nhà trường quản lý.',
-      nameManagedHint:
-        'Họ tên do Phòng Đào tạo quản lý. Sinh viên và giảng viên không thể tự sửa tên; liên hệ Phòng Đào tạo nếu cần đính chính.',
       phonePlaceholder: '+84...',
       addressPlaceholder: 'Số nhà, thành phố, khu vực',
       currentPasswordPlaceholder: 'Nhập mật khẩu hiện tại',
@@ -3136,6 +3143,7 @@ export const vi: I18nMessages = {
     memberAdded: 'Đã thêm thành viên vào nhóm thành công.',
     memberRemoved: 'Đã xóa thành viên khỏi nhóm.',
     removeMember: 'Xóa',
+    removeMemberTitle: 'Xóa thành viên khỏi nhóm',
     removeMemberConfirm: 'Bạn có chắc chắn muốn xóa thành viên này khỏi nhóm?',
     leaderBadge: 'Nhóm trưởng',
     manageMembers: 'Quản lý thành viên',
@@ -3208,6 +3216,7 @@ export const vi: I18nMessages = {
     navigation: {
       catalog: 'Danh mục đề tài',
       progress: 'Tiến độ luận văn',
+      advisors: 'Giảng viên hướng dẫn',
     },
     catalogTitle: 'Danh mục đề tài đã công bố',
     catalogDescription: 'Xem đề tài đã công bố, rồi mở chi tiết trước khi chọn.',
@@ -3392,6 +3401,17 @@ export const vi: I18nMessages = {
   assistant: {
     label: 'Trợ lý học vụ CampusUTE',
     title: 'Trợ lý CampusUTE',
+    specializedLabel: 'Trợ lý AI chuyên sâu',
+    specializedTitle: 'Trợ lý chuyên sâu',
+    specializedTagline: 'Hỏi đáp chuyên môn: lập trình, CSDL, kiến trúc, kiểm thử, nghề nghiệp.',
+    specializedSuggestions: [
+      'SOLID và design pattern ứng dụng thế nào?',
+      'Chuẩn hóa CSDL và tối ưu truy vấn SQL',
+      'Viết unit test và TDD hiệu quả',
+      'Lộ trình nghề nghiệp kỹ thuật phần mềm',
+    ],
+    specializedEmpty:
+      'Đặt câu hỏi chuyên môn về lập trình, cơ sở dữ liệu, kiến trúc phần mềm, kiểm thử, DevOps, an toàn thông tin và lộ trình nghề nghiệp.',
     description: 'Hỏi về đăng ký học phần, lịch học, thông báo, học liệu, chính sách hoặc hành trình luận văn.',
     open: 'Mở trợ lý CampusUTE',
     close: 'Đóng trợ lý CampusUTE',

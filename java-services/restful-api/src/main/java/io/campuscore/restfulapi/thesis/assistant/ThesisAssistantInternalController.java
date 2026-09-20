@@ -51,7 +51,8 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner(owner), request.clientRequestId());
+        return assistant.answer(request.message(), request.locale(), request.conversationId(),
+                owner(owner), request.clientRequestId(), request.scope());
     }
 
     @Deprecated
@@ -78,7 +79,7 @@ public class ThesisAssistantInternalController {
                             terminal.set(true);
                         }
                         send(emitter, event);
-                    });
+                    }, request.scope());
             if (terminal.compareAndSet(false, true)) {
                 sendError(emitter, "ASSISTANT_STREAM_INCOMPLETE", true);
             }

@@ -277,12 +277,12 @@ export function AssistantMessages({
                   {!isUser && message.reasonCode && (
                     <div className="mt-2 flex items-center gap-1.5 border-t border-border/60 pt-1.5 text-[11px] font-medium text-muted-foreground">
                       {message.reasonCode === 'ANSWERED' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-emerald-600 dark:text-emerald-400">
                           <Sparkles className="h-3 w-3" />
                           {messages.assistant.answered}
                         </span>
                       ) : message.reasonCode === 'RAG_GROUNDED' ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-2 py-0.5 text-primary">
+                        <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-primary">
                           <ShieldCheck className="h-3 w-3" />
                           {messages.assistant.answered}
                         </span>
@@ -443,7 +443,7 @@ export function AssistantMessages({
                           key={reason}
                           type="button"
                           onClick={() => onFeedback(message.id, 'DOWN', reason)}
-                          className="min-h-11 rounded-full border border-border/80 bg-background px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
+                          className="min-h-11 rounded-md border border-border/80 bg-background px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
                         >
                           {messages.assistant.feedbackReasons[reason]}
                         </button>
@@ -475,7 +475,7 @@ export function AssistantMessages({
                       key={suggestion}
                       type="button"
                       onClick={() => onFollowUp(suggestion)}
-                      className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                      className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                     >
                       {suggestion}
                     </button>

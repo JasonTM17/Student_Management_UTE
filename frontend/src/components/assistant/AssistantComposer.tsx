@@ -4,6 +4,7 @@ import type { FormEvent, KeyboardEvent, RefObject } from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
+import { AssistantMascot } from './AssistantMascot';
 
 interface AssistantComposerProps {
   input: string;
@@ -87,7 +88,14 @@ export function AssistantComposer({
         )}
       </div>
       <div className="mt-1.5 flex items-center justify-between text-[11px] text-muted-foreground px-1">
-        <span id="assistant-composer-hint">{messages.assistant.composerHint}</span>
+        <span className="flex items-center gap-1.5">
+          {/* The cute mascot lives right under the input box: it greets without
+              crowding the empty state above, and gently pulses while thinking. */}
+          <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+            <AssistantMascot className="h-3.5 w-3.5" active={isSending} />
+          </span>
+          <span id="assistant-composer-hint">{messages.assistant.composerHint}</span>
+        </span>
         <span id="assistant-composer-count">{input.length}/2000</span>
       </div>
     </form>

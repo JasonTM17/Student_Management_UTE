@@ -12,7 +12,6 @@ import {
   Bell,
   BookMarked,
   BookOpen,
-  Bot,
   BrainCircuit,
   Building2,
   Calendar,
@@ -46,6 +45,7 @@ import { ThemeToggle } from '@/components/ThemeToggle';
 import { BrandMark } from '@/components/BrandMark';
 import { ForcedPasswordRotationGate } from '@/components/auth/ForcedPasswordRotationGate';
 import { AssistantPanel } from '@/components/assistant/AssistantPanel';
+import { AssistantMascot } from '@/components/assistant/AssistantMascot';
 import { useDocumentTitle } from '@/lib/use-document-title';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
@@ -737,7 +737,7 @@ export default function DashboardLayout({
         <div
           className={cn(
             'flex min-h-[4.25rem] items-center border-b border-white/10 py-3',
-            sidebarCollapsed ? 'flex-col justify-center px-2' : 'justify-between px-5',
+            sidebarCollapsed ? 'flex-col justify-center px-2' : 'justify-between gap-2 pl-3 pr-1',
           )}
         >
           <BrandMark
@@ -756,31 +756,27 @@ export default function DashboardLayout({
             )}
           />
           {!sidebarCollapsed ? (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="hidden text-[var(--portal-sidebar-muted)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:inline-flex"
+              className="hidden h-8 w-8 shrink-0 items-center justify-center rounded-md text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] lg:inline-flex"
               onClick={() => setSidebarCollapsed(true)}
               aria-label={messages.dashboardShell.controls.collapseSidebar}
               title={messages.dashboardShell.controls.collapseSidebar}
               aria-expanded={true}
             >
               <ChevronLeft className="h-4 w-4" aria-hidden="true" />
-            </Button>
+            </button>
           ) : (
-            <Button
+            <button
               type="button"
-              variant="ghost"
-              size="icon"
-              className="mt-1.5 hidden h-7 w-7 rounded-md text-[var(--portal-sidebar-muted)] hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] lg:inline-flex"
+              className="mt-1.5 hidden h-7 w-7 shrink-0 items-center justify-center rounded-md text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)] lg:inline-flex"
               onClick={() => setSidebarCollapsed(false)}
               aria-label={messages.dashboardShell.controls.expandSidebar}
               title={messages.dashboardShell.controls.expandSidebar}
               aria-expanded={false}
             >
               <ChevronRight className="h-3.5 w-3.5" aria-hidden="true" />
-            </Button>
+            </button>
           )}
           <Button
             ref={sidebarCloseRef}
@@ -839,12 +835,15 @@ export default function DashboardLayout({
                     {user.email}
                   </div>
                   <div className="mt-2 flex flex-wrap items-center gap-1.5">
-                    <span className="inline-flex items-center rounded-none bg-white/[0.12] px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
+                    {/* Institutional brand gold (accent-independent): the role chip
+                        and demo marker keep the warm gold identity on the navy
+                        chrome even when the site accent is a cool tone. */}
+                    <span className="inline-flex items-center rounded-md border border-[var(--portal-brand-gold)]/40 bg-[var(--portal-brand-gold)]/15 px-2.5 py-0.5 text-[11px] font-semibold uppercase tracking-wider text-[var(--portal-sidebar-text)] shadow-xs">
                       {roleLabel}
                     </span>
                     {isDemoUser(user) && (
-                      <span className="inline-flex items-center gap-1 rounded bg-amber-500/20 px-2 py-0.5 text-[10px] font-medium text-amber-300 border border-amber-500/30">
-                        <span className="h-1.5 w-1.5 rounded-full bg-amber-400 animate-pulse" />
+                      <span className="inline-flex items-center gap-1 rounded-md border border-[var(--portal-brand-gold)]/35 bg-[var(--portal-brand-gold)]/12 px-2 py-0.5 text-[10px] font-medium text-[var(--portal-sidebar-text)]">
+                        <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)] shadow-xs" />
                         {locale === 'vi' ? 'TK Demo trải nghiệm' : 'Demo account'}
                       </span>
                     )}
@@ -908,27 +907,27 @@ export default function DashboardLayout({
           ))}
         </nav>
           <div className={cn('pt-2 border-t border-white/10 mt-2', sidebarCollapsed ? 'px-1' : 'px-2')}>
+            {/* The academic assistant stays reachable from the page header pill;
+                the sidebar keeps only the specialized launcher so the menu does
+                not carry two entries for the same panel. */}
             <button
               onClick={() => {
                 if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('open-campus-assistant'));
+                  window.dispatchEvent(
+                    new CustomEvent('open-campus-assistant', { detail: { mode: 'specialized' } }),
+                  );
                 }
               }}
               className={cn(
                 'group flex min-h-11 w-full items-center gap-3 rounded-md px-3 py-2 text-sm font-medium text-[var(--portal-sidebar-muted)] transition-colors duration-150 hover:bg-white/10 hover:text-[var(--portal-sidebar-text)] focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-[var(--portal-yellow)]',
                 sidebarCollapsed && 'justify-center px-0',
               )}
-              aria-label={messages.assistant.title}
-              title={sidebarCollapsed ? messages.assistant.title : undefined}
+              aria-label={messages.assistant.specializedLabel}
+              title={sidebarCollapsed ? messages.assistant.specializedLabel : undefined}
             >
-              <Bot className="h-5 w-5 shrink-0 text-[var(--portal-yellow)]" aria-hidden="true" />
+              <AssistantMascot className="h-5 w-5 shrink-0 text-[var(--portal-brand-gold)] transition-transform duration-200 group-hover:scale-110" />
               {!sidebarCollapsed ? (
-                <div className="flex flex-1 items-center justify-between">
-                  <span>{messages.assistant.label}</span>
-                  <span className="rounded bg-[var(--portal-yellow)]/20 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-[var(--portal-yellow)] border border-[var(--portal-yellow)]/30">
-                    AI
-                  </span>
-                </div>
+                <span>{messages.assistant.specializedLabel}</span>
               ) : null}
             </button>
           </div>
@@ -1007,27 +1006,13 @@ export default function DashboardLayout({
             </div>
 
             <div className="flex items-center gap-2">
-              <Button
-                type="button"
-                variant="outline"
-                size="sm"
-                className="hidden sm:inline-flex items-center gap-1.5 rounded-full border-primary/40 bg-primary/5 px-3 py-1.5 text-xs font-semibold text-primary transition-all duration-150 hover:border-primary hover:bg-primary/10 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring shadow-xs"
-                onClick={() => {
-                  if (typeof window !== 'undefined') {
-                    window.dispatchEvent(new CustomEvent('open-campus-assistant'));
-                  }
-                }}
-                aria-label={messages.assistant.title}
-                title={messages.assistant.title}
-              >
-                <Bot className="h-4 w-4" aria-hidden="true" />
-                <span>{messages.assistant.label}</span>
-              </Button>
+              {/* One small assistant launcher in the right corner (all breakpoints):
+                  the old labelled pill and its mobile twin were redundant. */}
               <Button
                 type="button"
                 variant="ghost"
                 size="icon"
-                className="sm:hidden text-primary hover:bg-secondary/60"
+                className="min-h-11 min-w-11 text-primary hover:bg-secondary/60"
                 onClick={() => {
                   if (typeof window !== 'undefined') {
                     window.dispatchEvent(new CustomEvent('open-campus-assistant'));
@@ -1036,7 +1021,7 @@ export default function DashboardLayout({
                 aria-label={messages.assistant.title}
                 title={messages.assistant.title}
               >
-                <Bot className="h-5 w-5" aria-hidden="true" />
+                <AssistantMascot className="h-5 w-5" />
               </Button>
               <div className="hidden sm:flex items-center">
                 <LanguageToggle />
@@ -1171,8 +1156,12 @@ export default function DashboardLayout({
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
                       <span>{user.email}</span>
                       {isDemoUser(user) && (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
-                          ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
+                        <span className="inline-flex items-center gap-1 text-[10px] font-medium text-muted-foreground">
+                          <span
+                            className="h-1.5 w-1.5 rounded-full bg-[var(--portal-brand-gold)]"
+                            aria-hidden="true"
+                          />
+                          {locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'}
                         </span>
                       )}
                     </div>
@@ -1205,11 +1194,11 @@ export default function DashboardLayout({
                           {user.email}
                         </p>
                         <div className="mt-1.5 flex flex-wrap items-center gap-1.5">
-                          <div className="inline-flex rounded-full bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
+                          <div className="inline-flex rounded-md bg-secondary px-2.5 py-0.5 text-xs font-medium text-foreground">
                             {user.roles?.[0] || 'USER'}
                           </div>
                           {isDemoUser(user) && (
-                            <div className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
+                            <div className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 border border-amber-500/30 px-2.5 py-0.5 text-[11px] font-medium text-amber-700 dark:text-amber-300">
                               <span className="h-1.5 w-1.5 rounded-full bg-amber-500" />
                               {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
                             </div>
@@ -1303,7 +1292,7 @@ export default function DashboardLayout({
                       {messages.dashboardShell.controls.bottomNav.menu}
                     </span>
                     {unreadCount > 0 ? (
-                      <span className="absolute right-1 top-1 min-w-4 rounded-full bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground">
+                      <span className="absolute right-1 top-1 min-w-4 rounded-md bg-primary px-1 text-center text-[10px] font-semibold leading-4 text-primary-foreground">
                         {unreadCount > 99 ? '99+' : unreadCount}
                       </span>
                     ) : null}
@@ -1350,7 +1339,7 @@ export default function DashboardLayout({
               title={messages.assistant.open}
               className="flex min-h-11 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
             >
-              <Bot className="h-5 w-5" aria-hidden="true" />
+              <AssistantMascot className="h-5 w-5" />
               <span className="max-w-full text-center leading-4">
                 {messages.assistant.slotLabel}
               </span>

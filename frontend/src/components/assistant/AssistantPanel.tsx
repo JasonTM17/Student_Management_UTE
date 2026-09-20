@@ -10,7 +10,6 @@ import {
 } from 'react';
 import {
   ArrowDown,
-  Bot,
   History,
   LoaderCircle,
   RotateCcw,
@@ -25,6 +24,7 @@ import {
   TRANSIENT_TERMINAL_CODES,
   fromHistoryMessage,
 } from './assistant-reducer';
+import { AssistantMascot } from './AssistantMascot';
 import { AssistantMessages } from './AssistantMessages';
 import {
   AssistantHistoryPanel,
@@ -44,6 +44,10 @@ export function AssistantPanel() {
   const { locale, messages } = useI18n();
   const { confirm, confirmationDialog } = useConfirmationDialog();
   const [open, setOpen] = useState(false);
+  // Assistant retrieval scope. The academic launcher opens the default corpus;
+  // the specialized launcher (Trợ lý chuyên sâu) narrows retrieval to the
+  // professional SPECIALIZED domain. Scope can only narrow, never widen.
+  const [mode, setMode] = useState<'academic' | 'specialized'>('academic');
   const [showHistory, setShowHistory] = useState(false);
   const [history, setHistory] = useState<AssistantConversation[]>([]);
   const [historyStatus, setHistoryStatus] =
@@ -93,6 +97,7 @@ export function AssistantPanel() {
     resetConversation,
   } = useAssistantStream({
     locale,
+    scope: mode === 'specialized' ? 'specialized' : undefined,
     assistantMessages: messages.assistant,
     onReconcileHistory: reconcileHistory,
     onNewExchange: handleNewExchange,
@@ -102,6 +107,9 @@ export function AssistantPanel() {
   // repeating the empty-state suggestions after every reply.
   const followUps = useMemo(() => {
     if (isSending) return undefined;
+    // Specialized mode always suggests specialized follow-ups: the corpus
+    // scope is narrower, so academic-domain chips would mislead.
+    if (mode === 'specialized') return messages.assistant.specializedSuggestions;
     const lastGrounded = [...state.messages]
       .reverse()
       .find(
@@ -115,7 +123,7 @@ export function AssistantPanel() {
       readonly string[]
     >;
     return (domain && byDomain[domain]) || messages.assistant.suggestions;
-  }, [state.messages, isSending, messages]);
+  }, [state.messages, isSending, messages, mode]);
 
   const latestSettledAssistant = [...state.messages]
     .reverse()
@@ -144,8 +152,11 @@ export function AssistantPanel() {
   ]);
 
   useEffect(() => {
-    const handleOpen = () => {
+    const handleOpen = (event: Event) => {
       triggerRef.current = document.activeElement as HTMLElement | null;
+      const requestedMode = (event as CustomEvent<{ mode?: 'academic' | 'specialized' }>)
+        .detail?.mode;
+      setMode(requestedMode === 'specialized' ? 'specialized' : 'academic');
       setOpen(true);
     };
     window.addEventListener('open-campus-assistant', handleOpen);
@@ -178,6 +189,27 @@ export function AssistantPanel() {
     requestAnimationFrame(() => inputRef.current?.focus());
     return () => document.removeEventListener('keydown', handleEscape);
   }, [open, showHistory]);
+
+  // Clicking anywhere outside the panel dismisses it, the way any floating
+  // chat window behaves. Clicks inside a portal-rendered dialog (the confirm
+  // modal) must not count as "outside".
+  useEffect(() => {
+    if (!open) return undefined;
+    const handlePointerDown = (event: PointerEvent) => {
+      const target = event.target;
+      if (!(target instanceof Node)) return;
+      if (assistantDialogRef.current?.contains(target)) return;
+      if (
+        target instanceof Element &&
+        target.closest('[role="dialog"], [role="alertdialog"]')
+      ) {
+        return;
+      }
+      setOpen(false);
+    };
+    document.addEventListener('pointerdown', handlePointerDown);
+    return () => document.removeEventListener('pointerdown', handlePointerDown);
+  }, [open]);
 
   useEffect(() => {
     if (!open || !isMobile) return undefined;
@@ -437,7 +469,7 @@ export function AssistantPanel() {
             <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm dark:from-[#0b3a70] dark:via-[#004eab] dark:to-[#005fcf]">
               <div className="flex min-w-0 items-center gap-2.5">
                 <div className="relative flex h-8 w-8 shrink-0 items-center justify-center rounded-xl bg-white/15 text-white shadow-inner backdrop-blur">
-                  <Bot className="h-4 w-4" aria-hidden="true" />
+                  <AssistantMascot className="h-5 w-5" active={isSending} variant="detailed" />
                   <span
                     className="absolute -bottom-0.5 -right-0.5 inline-flex h-2.5 w-2.5 rounded-full border border-white bg-white/75"
                     aria-hidden="true"
@@ -446,15 +478,21 @@ export function AssistantPanel() {
                 <div className="min-w-0">
                   <h2
                     id="assistant-panel-title"
-                    className="flex items-center gap-1.5 font-semibold text-white text-sm"
+                    className="flex min-w-0 items-center gap-1.5 text-sm font-semibold text-white"
                   >
-                    <span>{messages.assistant.title}</span>
+                    <span className="truncate">
+                      {mode === 'specialized'
+                        ? messages.assistant.specializedTitle
+                        : messages.assistant.title}
+                    </span>
                   </h2>
                   <p
                     id="assistant-panel-description"
                     className="truncate text-[11px] text-white/85"
                   >
-                    {messages.assistant.description}
+                    {mode === 'specialized'
+                      ? messages.assistant.specializedTagline
+                      : messages.assistant.description}
                   </p>
                 </div>
               </div>
@@ -556,24 +594,26 @@ export function AssistantPanel() {
               ) : null}
               {state.messages.length === 0 ? (
                 <div className="flex min-h-44 flex-col items-center justify-center gap-3 text-center p-3">
-                  <div className="flex h-11 w-11 items-center justify-center rounded-2xl border border-primary/20 bg-primary/10 text-primary shadow-xs">
-                    <Bot className="h-5 w-5" aria-hidden="true" />
-                  </div>
                   <div className="space-y-1">
                     <p className="text-sm font-semibold text-foreground">
                       {messages.assistant.greeting}
                     </p>
                     <p className="max-w-xs text-xs text-muted-foreground leading-relaxed">
-                      {messages.assistant.empty}
+                      {mode === 'specialized'
+                        ? messages.assistant.specializedEmpty
+                        : messages.assistant.empty}
                     </p>
                   </div>
                   <div className="mt-1 flex flex-wrap justify-center gap-1.5 max-w-xs">
-                    {messages.assistant.suggestions.map((suggestion) => (
+                    {(mode === 'specialized'
+                      ? messages.assistant.specializedSuggestions
+                      : messages.assistant.suggestions
+                    ).map((suggestion) => (
                       <button
                         key={suggestion}
                         type="button"
                         onClick={() => void sendMessage(undefined, suggestion)}
-                        className="min-h-11 rounded-full border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
+                        className="min-h-11 rounded-md border border-primary/20 bg-primary/5 px-3 py-2 text-[11px] font-medium text-primary transition-colors hover:border-primary/40 hover:bg-primary/10"
                       >
                         {suggestion}
                       </button>
@@ -637,7 +677,7 @@ export function AssistantPanel() {
                 <button
                   type="button"
                   onClick={scrollToBottom}
-                  className="absolute bottom-3 right-4 z-20 flex min-h-11 items-center gap-1 rounded-full border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
+                  className="absolute bottom-3 right-4 z-20 flex min-h-11 items-center gap-1 rounded-md border border-primary/20 bg-primary px-3 py-2 text-xs font-medium text-primary-foreground shadow-md transition-transform hover:scale-105 active:scale-95 motion-reduce:transform-none motion-reduce:transition-none"
                   aria-label={messages.assistant.scrollToLatest}
                 >
                   <ArrowDown className="h-3 w-3" aria-hidden="true" />
@@ -656,7 +696,27 @@ export function AssistantPanel() {
               onStop={() => void stopGeneration()}
             />
           </section>
-        ) : null}
+        ) : (
+          /* Floating chat launcher: one round mascot button in the bottom-right
+             corner whenever the panel is closed. */
+          <button
+            type="button"
+            onClick={() => {
+              triggerRef.current = document.activeElement as HTMLElement | null;
+              setMode('academic');
+              setOpen(true);
+            }}
+            aria-label={messages.assistant.open}
+            title={messages.assistant.open}
+            className="group relative flex h-14 w-14 items-center justify-center rounded-full bg-gradient-to-br from-primary via-[#004eab] to-[#005fcf] text-white shadow-[0_12px_28px_rgba(0,35,90,0.35)] ring-1 ring-black/5 transition-transform duration-150 hover:scale-105 active:scale-95 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 motion-reduce:transform-none motion-reduce:transition-none"
+          >
+            <AssistantMascot className="h-7 w-7 transition-transform duration-200 group-hover:scale-110" variant="detailed" />
+            <span
+              className="absolute -right-0.5 -top-0.5 inline-flex h-3.5 w-3.5 rounded-full bg-[var(--portal-yellow)] ring-2 ring-card shadow-xs"
+              aria-hidden="true"
+            />
+          </button>
+        )}
       </div>
       {confirmationDialog}
     </>

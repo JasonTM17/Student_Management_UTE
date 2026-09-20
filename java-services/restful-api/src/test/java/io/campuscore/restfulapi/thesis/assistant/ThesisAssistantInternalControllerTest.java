@@ -46,12 +46,28 @@ class ThesisAssistantInternalControllerTest {
         UUID requestId = UUID.randomUUID();
         ChatRequest request = new ChatRequest("Xin chào", "vi", requestId, null);
         ChatResponse expected = new ChatResponse("ok", "curated-lexical-rag", false, "ANSWERED", "vi", List.of());
-        when(service.answer("Xin chào", "vi", null, "owner-a", requestId)).thenReturn(expected);
+        when(service.answer("Xin chào", "vi", null, "owner-a", requestId, (String) null)).thenReturn(expected);
 
         ChatResponse response = controller.chat(request, "internal-token", "owner-a");
 
         assertEquals(expected, response);
-        verify(service).answer("Xin chào", "vi", null, "owner-a", requestId);
+        verify(service).answer("Xin chào", "vi", null, "owner-a", requestId, (String) null);
+    }
+
+    @Test
+    void forwardsTheSpecializedScopeToTheAssistantService() {
+        ThesisAssistantService service = Mockito.mock(ThesisAssistantService.class);
+        ThesisAssistantInternalController controller = controller(service);
+        UUID requestId = UUID.randomUUID();
+        ChatRequest request = new ChatRequest("SOLID là gì?", "vi", requestId, null, "specialized");
+        ChatResponse expected = new ChatResponse("ok", "curated-lexical-rag", false, "ANSWERED", "vi", List.of());
+        when(service.answer("SOLID là gì?", "vi", null, "owner-a", requestId, "specialized"))
+                .thenReturn(expected);
+
+        ChatResponse response = controller.chat(request, "internal-token", "owner-a");
+
+        assertEquals(expected, response);
+        verify(service).answer("SOLID là gì?", "vi", null, "owner-a", requestId, "specialized");
     }
 
     private ThesisAssistantInternalController controller(ThesisAssistantService service) {
