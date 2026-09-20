@@ -541,13 +541,35 @@ public class ThesisAssistantService {
 
     public ChatResponse answer(String message, String locale, String conversationId, String ownerId,
             UUID clientRequestId, Consumer<StreamEvent> streamSink) {
+        return answer(message, locale, conversationId, ownerId, clientRequestId, streamSink, null);
+    }
+
+    /** Scoped JSON entry point without a stream sink. */
+    public ChatResponse answer(String message, String locale, String conversationId, String ownerId,
+            UUID clientRequestId, String scope) {
+        return answer(message, locale, conversationId, ownerId, clientRequestId, ignored -> { }, scope);
+    }
+
+    /**
+     * Full entry point with an optional retrieval scope. {@code scope} only
+     * narrows the curated corpus (see ThesisAssistantKnowledgeRepository#search);
+     * null keeps the default academic behaviour.
+     */
+    public ChatResponse answer(String message, String locale, String conversationId, String ownerId,
+            UUID clientRequestId, Consumer<StreamEvent> streamSink, String scope) {
         if (turns == null || properties == null) return legacyAnswer(message, locale, conversationId, ownerId);
-        return execute(message, locale, conversationId, ownerId, clientRequestId, streamSink == null ? ignored -> { } : streamSink);
+        return execute(message, locale, conversationId, ownerId, clientRequestId,
+                streamSink == null ? ignored -> { } : streamSink, scope);
     }
 
     public ChatResponse stream(String message, String locale, String conversationId, String ownerId,
             UUID clientRequestId, Consumer<StreamEvent> sink) {
         return answer(message, locale, conversationId, ownerId, clientRequestId, sink);
+    }
+
+    public ChatResponse stream(String message, String locale, String conversationId, String ownerId,
+            UUID clientRequestId, Consumer<StreamEvent> sink, String scope) {
+        return answer(message, locale, conversationId, ownerId, clientRequestId, sink, scope);
     }
 
     public ThesisAssistantTurnRepository.CancelResult cancel(UUID clientRequestId, String ownerId) {
@@ -608,6 +630,11 @@ public class ThesisAssistantService {
 
     private ChatResponse execute(String message, String locale, String conversationId, String ownerId,
             UUID clientRequestId, Consumer<StreamEvent> sink) {
+        return execute(message, locale, conversationId, ownerId, clientRequestId, sink, null);
+    }
+
+    private ChatResponse execute(String message, String locale, String conversationId, String ownerId,
+            UUID clientRequestId, Consumer<StreamEvent> sink, String scope) {
         if (clientRequestId == null) throw problem(400, "CLIENT_REQUEST_ID_REQUIRED", "clientRequestId is required");
         if (ownerId == null || ownerId.isBlank()) throw problem(401, "UNAUTHENTICATED", "Authentication is required");
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(message);
@@ -628,7 +655,7 @@ public class ThesisAssistantService {
                     List.of(), requestId, clientRequestId, null, false, "REJECTED", null, null);
         }
         UUID requestedConversation = parseConversation(conversationId);
-        LexicalResult lexical = retrieve(normalized, normalizedLocale);
+        LexicalResult lexical = retrieve(normalized, normalizedLocale, scope);
         if (lexical.error()) {
             emit(sink, new StreamError("KNOWLEDGE_UNAVAILABLE", true));
             return new ChatResponse(lexical.answer(), MODEL, true, "KNOWLEDGE_UNAVAILABLE", normalizedLocale,
@@ -875,7 +902,16 @@ public class ThesisAssistantService {
     }
 
     private LexicalResult retrieve(String message, String locale) {
-        if (!hasPublicScopeSignal(message)) {
+        return retrieve(message, locale, null);
+    }
+
+    private LexicalResult retrieve(String message, String locale, String scope) {
+        boolean specializedScope = "specialized".equalsIgnoreCase(scope);
+        // The academic signal gate keeps off-topic questions out of the broad
+        // campus corpus. The specialized corpus is a narrow, curated
+        // professional set, so there the retrieval result itself is the filter:
+        // a question that matches nothing yields the honest NO_MATCH answer.
+        if (!specializedScope && !hasPublicScopeSignal(message)) {
             return noMatchResult(locale);
         }
         List<String> terms = retrievalTerms(message);
@@ -887,13 +923,24 @@ public class ThesisAssistantService {
         int topK = topK();
         int retrievalLimit = isCreditLimitQuery(message) ? topK * 2 : topK;
         try {
-            addDocuments(documents, seen, knowledge.search(locale, terms, retrievalLimit));
+            // Unscoped retrieval keeps the historical three-argument call so the
+            // published contract (and its tests) stays byte-identical; only the
+            // specialized scope opts into the domain-filtered overload.
+            addDocuments(documents, seen, specializedScope
+                    ? knowledge.search(locale, terms, retrievalLimit, scope)
+                    : knowledge.search(locale, terms, retrievalLimit));
             String alternateLocale = DEFAULT_LOCALE.equals(locale) ? "en" : DEFAULT_LOCALE;
-            if (documents.size() < topK) addDocuments(documents, seen, knowledge.search(alternateLocale, terms, topK - documents.size()));
+            if (documents.size() < topK) {
+                addDocuments(documents, seen, specializedScope
+                        ? knowledge.search(alternateLocale, terms, topK - documents.size(), scope)
+                        : knowledge.search(alternateLocale, terms, topK - documents.size()));
+            }
         } catch (DataAccessException exception) {
             return new LexicalResult(unavailableMessage(locale), List.of(), List.of(), "", true, true);
         }
-        if (catalog != null && documents.size() < topK) {
+        // The academic catalog adapter is campus-scoped; specialized retrieval
+        // must never dilute a professional answer with course-catalog rows.
+        if (!specializedScope && catalog != null && documents.size() < topK) {
             try {
                 for (ThesisAssistantCatalogRepository.CatalogDocument row : catalog.search(locale, terms, topK - documents.size())) {
                     String sourceId = row.entityType() + ":" + row.entityId();

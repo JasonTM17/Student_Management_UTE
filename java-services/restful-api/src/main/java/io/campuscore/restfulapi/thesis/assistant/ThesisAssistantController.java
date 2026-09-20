@@ -98,7 +98,8 @@ public class ThesisAssistantController {
         if (remoteRag()) {
             return ragGateway.chat(request, owner);
         }
-        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner, request.clientRequestId());
+        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
+                request.clientRequestId(), request.scope());
     }
 
     /** Deprecated compatibility alias; clients should use /chat. */
@@ -160,7 +161,7 @@ public class ThesisAssistantController {
                 ragGateway.stream(request, owner, sink);
             } else {
                 assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                        request.clientRequestId(), sink);
+                        request.clientRequestId(), sink, request.scope());
             }
             emitter.complete();
         } catch (DomainException exception) {

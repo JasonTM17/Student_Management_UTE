@@ -1,12 +1,16 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
+import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
+import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
@@ -31,10 +35,12 @@ import org.springframework.stereotype.Service;
 import org.springframework.util.StringUtils;
 
 /**
- * Answers personal timetable questions (lịch học / thời khóa biểu / schedule)
- * and thesis supervision / registration queries from the asker's real enrollments,
- * teaching assignments, and thesis workloads. The public RAG snapshot intentionally
- * never sees personal rows, so this advisor provides accurate, grounded answers.
+ * Answers personal timetable questions (lịch học / thời khóa biểu / schedule),
+ * personal grades and conduct (ĐRL) questions, and thesis supervision /
+ * registration queries from the asker's real enrollments, grade rows, conduct
+ * evaluations, teaching assignments, and thesis workloads. The public RAG
+ * snapshot intentionally never sees personal rows, so this advisor provides
+ * accurate, grounded answers.
  *
  * Intercepted answers are not charged against the daily RAG quota and are not
  * persisted as conversation turns; the controller falls back to the RAG path
@@ -86,6 +92,35 @@ public class AssistantPersonalContextAdvisor {
             "điều\\s*kiện|dieu\\s*kien|quy\\s*định|quy\\s*dinh|quy\\s*chế|quy\\s*che|thủ\\s*tục|thu\\s*tuc|tiêu\\s*chí|tieu\\s*chi|hướng\\s*dẫn\\s*(?:chung|đăng\\s*ký)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
+    /** Personal conduct (ĐRL) questions; checked before the broader grades intent. */
+    private static final Pattern CONDUCT_INTENT = Pattern.compile(
+            "điểm\\s*rèn\\s*luyện|diem\\s*ren\\s*luyen|\\bđrl\\b|\\bdrl\\b"
+                    + "|xếp\\s*loại\\s*rèn\\s*luyện|xep\\s*loai\\s*ren\\s*luyen"
+                    + "|conduct(?:\\s+(?:score|points?|rating|record))?|training\\s+points?",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** Personal academic-grades questions (bảng điểm, GPA, kết quả học tập). */
+    private static final Pattern GRADES_INTENT = Pattern.compile(
+            "bảng\\s*điểm|bang\\s*diem|học\\s*bạ|hoc\\s*ba"
+                    + "|kết\\s*quả\\s*học\\s*tập|ket\\s*qua\\s*hoc\\s*tap"
+                    + "|xếp\\s*loại\\s*học\\s*lực|xep\\s*loai\\s*hoc\\s*luc"
+                    + "|\\bgpa\\b|\\bgpa\\s*của|\\bgpa\\s*cua"
+                    + "|(?:điểm|diem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)?"
+                    + "|(?:my\\s+)?(?:grades?|scores?|marks?|transcript)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    private static boolean isConductIntent(String message) {
+        return StringUtils.hasText(message) && CONDUCT_INTENT.matcher(message).find();
+    }
+
+    /** Grades intent requires a first-person marker so policy questions stay on the knowledge path. */
+    private static boolean isGradesIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (isConductIntent(message)) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && GRADES_INTENT.matcher(message).find();
+    }
+
     private static boolean isThesisPersonalIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
         if (THESIS_ARCHIVE_INTENT.matcher(message).find() || THESIS_POLICY_OR_GENERAL_INTENT.matcher(message).find()) {
@@ -104,12 +139,13 @@ public class AssistantPersonalContextAdvisor {
     private final AcademicEnrollmentReadService enrollments;
     private final AcademicSectionReadService sections;
     private final ThesisLecturerWorkloadService lecturerWorkload;
+    private final AcademicConductService conductService;
     private final NamedParameterJdbcTemplate jdbc;
 
     public AssistantPersonalContextAdvisor(
             AcademicEnrollmentReadService enrollments,
             AcademicSectionReadService sections) {
-        this(enrollments, sections, null, null);
+        this(enrollments, sections, null, null, null);
     }
 
     @Autowired
@@ -117,16 +153,21 @@ public class AssistantPersonalContextAdvisor {
             AcademicEnrollmentReadService enrollments,
             AcademicSectionReadService sections,
             @Autowired(required = false) ThesisLecturerWorkloadService lecturerWorkload,
-            @Autowired(required = false) NamedParameterJdbcTemplate jdbc) {
+            @Autowired(required = false) NamedParameterJdbcTemplate jdbc,
+            @Autowired(required = false) AcademicConductService conductService) {
         this.enrollments = enrollments;
         this.sections = sections;
         this.lecturerWorkload = lecturerWorkload;
         this.jdbc = jdbc;
+        this.conductService = conductService;
     }
 
-    /** True when the question is clearly about personal schedule or thesis status. */
+    /** True when the question is clearly about personal schedule, grades, conduct, or thesis status. */
     public boolean handles(String message) {
-        return message != null && (SCHEDULE_INTENT.matcher(message).find() || isThesisPersonalIntent(message));
+        return message != null && (SCHEDULE_INTENT.matcher(message).find()
+                || isThesisPersonalIntent(message)
+                || isConductIntent(message)
+                || isGradesIntent(message));
     }
 
     /**
@@ -195,8 +236,21 @@ public class AssistantPersonalContextAdvisor {
             }
             return null;
         }
-        Integer requestedDay = detectRequestedDay(message);
         String studentId = claim(actor, "studentId");
+        if (isConductIntent(message)) {
+            // Conduct summaries are student-owned; staff questions fall through to RAG policy answers.
+            if (StringUtils.hasText(studentId) && conductService != null) {
+                return conductAnswer(studentId, locale);
+            }
+            return null;
+        }
+        if (isGradesIntent(message)) {
+            if (StringUtils.hasText(studentId)) {
+                return gradesAnswer(studentId, locale);
+            }
+            return null;
+        }
+        Integer requestedDay = detectRequestedDay(message);
         if (StringUtils.hasText(studentId)) {
             return studentAnswer(studentId, locale, requestedDay);
         }
@@ -205,6 +259,107 @@ public class AssistantPersonalContextAdvisor {
             return lecturerAnswer(lecturerId, locale, requestedDay);
         }
         return null;
+    }
+
+    /** Personal grades answer grounded in the asker's real grade rows and transcript. */
+    private String gradesAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<GradeSummary> grades = enrollments.findStudentGrades(studentId, null);
+        if (grades == null || grades.isEmpty()) {
+            return vi
+                    ? "Bạn chưa có điểm học phần nào được ghi nhận. Điểm sẽ xuất hiện ở đây sau khi giảng viên nhập và cổng công bố."
+                    : "You have no recorded course grades yet. Grades appear here once lecturers submit them and the portal publishes them.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Kết quả học tập của bạn:\n" : "Your academic results:\n");
+
+        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
+        if (transcript != null && transcript.summary() != null) {
+            answer.append("\n")
+                    .append(vi ? "Tích lũy: GPA " : "Cumulative: GPA ")
+                    .append(transcript.summary().cumulativeGpa())
+                    .append(vi ? " | " : " | ")
+                    .append(transcript.summary().totalCreditsEarned())
+                    .append(vi ? " tín chỉ đạt" : " credits earned")
+                    .append(vi ? " / " : " / ")
+                    .append(transcript.summary().totalCreditsAttempted())
+                    .append(vi ? " thực học\n" : " attempted\n");
+        }
+
+        int rendered = 0;
+        int skipped = 0;
+        for (GradeSummary grade : grades) {
+            if (rendered >= 10) {
+                skipped += 1;
+                continue;
+            }
+            String course = courseName(grade.courseCode(), courseText(grade, vi), null);
+            answer.append("\n• ").append(StringUtils.hasText(course) ? course : (vi ? "Học phần" : "Course"));
+            answer.append(vi ? ": " : ": ");
+            String letter = grade.letterGrade();
+            if (StringUtils.hasText(letter)) {
+                answer.append(vi ? "điểm " : "grade ").append(grade.finalGrade()).append(" (").append(letter).append(")");
+            } else {
+                answer.append(vi ? "chưa công bố" : "not published yet");
+            }
+            answer.append("\n");
+            rendered += 1;
+        }
+        if (skipped > 0) {
+            answer.append("\n").append(vi
+                    ? "… và " + skipped + " học phần khác. Xem đầy đủ ở trang Bảng điểm."
+                    : "… and " + skipped + " more courses. See the Grades page for the full list.");
+        } else {
+            answer.append(vi
+                    ? "\nBạn có thể xem chi tiết từng cột điểm ở trang Bảng điểm."
+                    : "\nYou can review each score component on the Grades page.");
+        }
+        return answer.toString();
+    }
+
+    private static String courseText(GradeSummary grade, boolean vi) {
+        String localized = vi ? grade.courseNameVi() : grade.courseNameEn();
+        return StringUtils.hasText(localized) ? localized : grade.courseName();
+    }
+
+    /** Personal conduct (ĐRL) answer from the student's real semester evaluations. */
+    private String conductAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        StudentConductSummaryDto summary;
+        try {
+            summary = conductService.studentSummary(studentId);
+        } catch (org.springframework.web.server.ResponseStatusException exception) {
+            return vi
+                    ? "Bạn chưa có bản đánh giá điểm rèn luyện nào. Điểm rèn luyện được cập nhật sau mỗi học kỳ bởi cố vấn học tập."
+                    : "You have no conduct evaluation on record yet. Conduct points are updated after each semester by your academic advisor.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Điểm rèn luyện của bạn:\n" : "Your conduct record:\n");
+        if (summary.history() == null || summary.history().isEmpty()) {
+            answer.append("\n").append(vi
+                    ? "Chưa có đánh giá rèn luyện trong các học kỳ gần đây."
+                    : "No conduct evaluation was recorded in recent semesters.");
+            return answer.toString();
+        }
+        answer.append("\n").append(vi ? "Tổng kết: " : "Cumulative: ")
+                .append(summary.cumulativeAverageScore())
+                .append(" — ")
+                .append(summary.cumulativeClassificationVi())
+                .append("\n");
+        var current = summary.currentSemester();
+        if (current != null) {
+            answer.append("\n").append(vi ? "Học kỳ gần nhất (" : "Most recent semester (")
+                    .append(current.semesterName())
+                    .append(vi ? "): " : "): ")
+                    .append(current.totalScore())
+                    .append(" — ")
+                    .append(vi ? current.classificationVi() : current.classification())
+                    .append("\n");
+        }
+        answer.append(vi
+                ? "\nXem chi tiết 5 tiêu chí và hoạt động phong trào ở trang Điểm rèn luyện."
+                : "\nSee the five criteria and activity list on the Conduct page.");
+        return answer.toString();
     }
 
     private String lecturerThesisAnswer(String lecturerId, String locale) {
@@ -534,8 +689,8 @@ public class AssistantPersonalContextAdvisor {
 
     private static String fallbackMessage(String locale) {
         return "vi".equals(locale)
-                ? "Mình chưa xem được lịch học cá nhân của bạn lúc này. Bạn thử lại sau hoặc mở trang Thời khóa biểu nhé."
-                : "I could not read your personal schedule right now. Please try again later or open the Schedule page.";
+                ? "Mình chưa xem được dữ liệu cá nhân của bạn lúc này. Bạn thử lại sau, hoặc mở trang Thời khóa biểu / Bảng điểm để xem trực tiếp nhé."
+                : "I could not read your personal records right now. Please try again later, or check the Schedule / Grades pages directly.";
     }
 
     private static String normalizedLocale(ChatRequest request) {

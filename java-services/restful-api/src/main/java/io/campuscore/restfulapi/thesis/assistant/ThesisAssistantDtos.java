@@ -21,13 +21,24 @@ public final class ThesisAssistantDtos {
             String locale,
             @NotNull(message = "clientRequestId is required")
             UUID clientRequestId,
-            String conversationId) {
+            String conversationId,
+            @Pattern(regexp = "^(academic|specialized)$", message = "scope must be academic or specialized")
+            String scope) {
         public ChatRequest(String message, String locale) {
-            this(message, locale, UUID.randomUUID(), null);
+            this(message, locale, UUID.randomUUID(), null, null);
         }
 
         public ChatRequest(String message, String locale, String conversationId) {
-            this(message, locale, UUID.randomUUID(), conversationId);
+            this(message, locale, UUID.randomUUID(), conversationId, null);
+        }
+
+        public ChatRequest(String message, String locale, UUID clientRequestId, String conversationId) {
+            this(message, locale, clientRequestId, conversationId, null);
+        }
+
+        /** Null or blank scope means the default academic corpus. */
+        public boolean isSpecializedScope() {
+            return "specialized".equalsIgnoreCase(scope);
         }
     }
 

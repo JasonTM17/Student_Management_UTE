@@ -8,8 +8,10 @@ import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
+import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
@@ -81,7 +83,7 @@ class AssistantPersonalContextAdvisorTest {
     void answersLecturerThesisWorkloadInVietnamese() {
         ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
         AssistantPersonalContextAdvisor thesisAdvisor =
-                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null);
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
 
         var topic = new ThesisLecturerWorkloadService.SupervisedTopic(
                 UUID.randomUUID(), "Hệ thống AI gợi ý học tập", "PUBLISHED",
@@ -189,7 +191,99 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(response.degraded());
         assertEquals("PERSONAL_CONTEXT_UNAVAILABLE", response.reasonCode());
         assertTrue(response.citations().isEmpty());
-        assertTrue(response.answer().contains("chưa xem được lịch học cá nhân"), response.answer());
+        assertTrue(response.answer().contains("chưa xem được dữ liệu cá nhân"), response.answer());
+    }
+
+    @Test
+    void detectsGradesAndConductIntentsInVietnameseAndEnglish() {
+        assertTrue(advisor.handles("điểm của tôi thế nào?"));
+        assertTrue(advisor.handles("cho xem bảng điểm của tôi"));
+        assertTrue(advisor.handles("GPA của tôi bao nhiêu?"));
+        assertTrue(advisor.handles("kết quả học tập của tôi"));
+        assertTrue(advisor.handles("what are my grades?"));
+        assertTrue(advisor.handles("show my gpa"));
+        assertTrue(advisor.handles("điểm rèn luyện của tôi mấy điểm?"));
+        assertTrue(advisor.handles("DRL của tôi"));
+
+        // Policy and non-personal questions stay on the knowledge path.
+        assertFalse(advisor.handles("quy chế đào tạo nói gì về điểm A?"));
+        assertFalse(advisor.handles("Quy định điểm GPA để làm KLTN?"));
+        assertFalse(advisor.handles("Học phí kỳ này bao nhiêu?"));
+        assertFalse(advisor.handles("điểm chuẩn ngành CNTT năm ngoái"));
+    }
+
+    @Test
+    void answersStudentGradesFromRealRows() {
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
+                new AcademicEnrollmentReadDtos.GradeSummary(
+                        "g1", "SE401", "Lập trình Java nâng cao", "Advanced Java",
+                        "Lập trình Java nâng cao", 3, "SE401-01", "ThS. Demo",
+                        "sem-2026a", "Semester A", "Học kỳ A", "sem-2026a",
+                        new java.math.BigDecimal("8.5"), new java.math.BigDecimal("9.0"),
+                        new java.math.BigDecimal("8.7"), "A", "PUBLISHED", "COMPLETED"),
+                new AcademicEnrollmentReadDtos.GradeSummary(
+                        "g2", "SE403", "Cấu trúc dữ liệu và giải thuật", "Data Structures",
+                        "Cấu trúc dữ liệu và giải thuật", 3, "SE403-01", "TS. Demo",
+                        "sem-2026a", "Semester A", "Học kỳ A", "sem-2026a",
+                        new java.math.BigDecimal("7.0"), new java.math.BigDecimal("6.5"),
+                        new java.math.BigDecimal("6.7"), null, "PENDING", "ENROLLED")));
+        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(
+                new AcademicEnrollmentReadDtos.TranscriptResponse(
+                        new AcademicEnrollmentReadDtos.TranscriptSummary(
+                                new java.math.BigDecimal("3.21"), 74, 86),
+                        List.of()));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "điểm của tôi thế nào?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Kết quả học tập của bạn"), answer);
+        assertTrue(answer.contains("GPA 3.21"), answer);
+        assertTrue(answer.contains("74 tín chỉ đạt"), answer);
+        assertTrue(answer.contains("SE401"), answer);
+        assertTrue(answer.contains("8.7 (A)"), answer);
+        assertTrue(answer.contains("chưa công bố"), answer);
+    }
+
+    @Test
+    void answersNoGradesMessageWhenTheStudentHasNone() {
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of());
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "bảng điểm của tôi"), jwtStudent());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("chưa có điểm học phần nào"), response.answer());
+    }
+
+    @Test
+    void answersStudentConductFromRealRows() {
+        AcademicConductService conductService = mock(AcademicConductService.class);
+        AssistantPersonalContextAdvisor conductAdvisor =
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, null, null, conductService);
+        var semesterScore = new io.campuscore.restfulapi.academic.web.AcademicConductDtos.ConductSemesterScoreDto(
+                "cs1", "sem-2026a", "Học kỳ A",
+                new java.math.BigDecimal("20"), new java.math.BigDecimal("25"),
+                new java.math.BigDecimal("8"), new java.math.BigDecimal("22"),
+                new java.math.BigDecimal("10"), new java.math.BigDecimal("85"),
+                "Tốt", "Tốt", "FINALIZED", null,
+                List.of(), List.of());
+        when(conductService.studentSummary("student-profile")).thenReturn(
+                new io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto(
+                        "student-profile", "SV001", "Nguyễn Văn A",
+                        new java.math.BigDecimal("85.0"), "Tốt",
+                        semesterScore,
+                        List.of(semesterScore)));
+
+        ChatResponse response = conductAdvisor.answer(
+                chatRequest("vi", "điểm rèn luyện của tôi mấy điểm?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Điểm rèn luyện của bạn"), answer);
+        assertTrue(answer.contains("85.0 — Tốt"), answer);
+        assertTrue(answer.contains("Học kỳ A"), answer);
     }
 
     @Test

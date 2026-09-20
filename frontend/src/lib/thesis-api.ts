@@ -868,12 +868,14 @@ export const thesisApi = {
     locale: 'en' | 'vi',
     conversationId?: string,
     clientRequestId = createAssistantRequestId(),
+    scope?: 'academic' | 'specialized',
   ): Promise<AssistantReply> => {
     const response = await api.post<AssistantReply>('/assistant/chat', {
       message,
       locale,
       clientRequestId,
       ...(conversationId ? { conversationId } : {}),
+      ...(scope ? { scope } : {}),
     });
     return response.data;
   },
@@ -884,6 +886,7 @@ export const thesisApi = {
     options: {
       conversationId?: string;
       clientRequestId?: string;
+      scope?: 'academic' | 'specialized';
       signal?: AbortSignal;
       onEvent: (event: AssistantStreamEvent) => void;
     },
@@ -899,6 +902,7 @@ export const thesisApi = {
       ...(options.conversationId
         ? { conversationId: options.conversationId }
         : {}),
+      ...(options.scope ? { scope: options.scope } : {}),
     };
     const fetchStream = () => {
       // Refresh may rotate the CSRF cookie; read it immediately before each
