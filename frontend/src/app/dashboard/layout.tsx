@@ -192,7 +192,10 @@ interface NotificationItem {
   createdAt: string;
 }
 
-function resolveNotificationTarget(notification: { title?: string; content?: string }): string {
+function resolveNotificationTarget(
+  notification: { title?: string; content?: string },
+  isLecturer: boolean,
+): string {
   const text = `${notification.title || ''} ${notification.content || ''}`.toLowerCase();
   if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
     return '/dashboard/thesis';
@@ -201,16 +204,20 @@ function resolveNotificationTarget(notification: { title?: string; content?: str
     return '/dashboard/conduct';
   }
   if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
-    return '/dashboard/register';
+    // The registration and conduct pages are student-only; a lecturer clicking
+    // this notification used to be bounced off the portal entirely.
+    return isLecturer ? '/dashboard/lecturer' : '/dashboard/register';
   }
   if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
-    return '/dashboard/transcript';
+    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
   }
   if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
-    return '/dashboard/schedule';
+    return isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
   }
   if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
-    return '/dashboard/announcements';
+    // A lecturer's announcement home is the lecturer feed; the shared feed is
+    // student/admin only and the shell would bounce a lecturer out of it.
+    return isLecturer ? '/dashboard/lecturer/announcements' : '/dashboard/announcements';
   }
   return '/dashboard/notifications';
 }
@@ -1070,7 +1077,7 @@ export default function DashboardLayout({
                       ) : (
                         <div className="space-y-2">
                           {notifications.map((notification) => {
-                            const targetUrl = resolveNotificationTarget(notification);
+                            const targetUrl = resolveNotificationTarget(notification, isLecturer);
                             return (
                               <button
                                 key={notification.id}

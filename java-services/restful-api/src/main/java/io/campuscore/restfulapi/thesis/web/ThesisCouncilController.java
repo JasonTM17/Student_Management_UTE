@@ -47,7 +47,7 @@ public class ThesisCouncilController {
 
     @Operation(summary = "Tạo hội đồng đánh giá khóa luận", description = "Khởi tạo hội đồng đánh giá/chấm điểm khóa luận cho một đợt cụ thể")
     @PostMapping("/councils")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public CouncilResponse createCouncil(
             @Valid @RequestBody CreateCouncilRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -69,7 +69,7 @@ public class ThesisCouncilController {
     }
 
     @PostMapping("/councils/{id}/members")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public CouncilResponse addMember(
             @PathVariable UUID id,
             @Valid @RequestBody AddCouncilMemberRequest request,
@@ -78,7 +78,7 @@ public class ThesisCouncilController {
     }
 
     @DeleteMapping("/councils/{id}/members/{lecturerId}")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public CouncilResponse removeMember(
             @PathVariable UUID id,
             @PathVariable String lecturerId,
@@ -87,7 +87,7 @@ public class ThesisCouncilController {
     }
 
     @PostMapping("/councils/{id}/topics")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public CouncilResponse assignTopic(
             @PathVariable UUID id,
             @Valid @RequestBody AssignTopicRequest request,
@@ -96,7 +96,7 @@ public class ThesisCouncilController {
     }
 
     @PostMapping("/councils/{councilId}/topics/{topicId}/scores")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public ScoreResponse submitScore(
             @PathVariable UUID councilId,
             @PathVariable UUID topicId,
@@ -106,7 +106,7 @@ public class ThesisCouncilController {
     }
 
     @GetMapping("/councils/{councilId}/topics/{topicId}/scores")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public List<ScoreResponse> listScores(
             @PathVariable UUID councilId,
             @PathVariable UUID topicId,
@@ -115,7 +115,7 @@ public class ThesisCouncilController {
     }
 
     @PostMapping("/councils/{councilId}/topics/{topicId}/finalize")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public TopicResult finalizeScores(
             @PathVariable UUID councilId,
             @PathVariable UUID topicId,
@@ -125,7 +125,7 @@ public class ThesisCouncilController {
 
     /** Brief R9: students read their own graded result after publication. */
     @GetMapping("/me/results")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public List<StudentResultRow> studentResults(
             @RequestParam UUID roundId,
             @AuthenticationPrincipal Jwt actor) {
