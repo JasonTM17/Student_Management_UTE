@@ -375,6 +375,20 @@ class ThesisTopicPersistenceTest {
         mvc.perform(post("/api/v1/thesis/rounds/{id}/publish-proposals", roundId).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("PROPOSALS_PUBLISHED"));
+        // Opening registration now validates the authored window, so the fixture
+        // makes the scheduled registration window live before opening the gate
+        // (the same relative-window idiom driveRoundFromProposalToRegistration
+        // already uses). open-proposals clamped lecturer_submit_start to "now",
+        // so the lecturer window is re-based too and the ordering oracle holds.
+        // The phase-order assertions are unchanged.
+        Instant now = Instant.now();
+        jdbc.update(
+                "UPDATE thesis.thesis_registration_round "
+                        + "SET lecturer_submit_start = ?, lecturer_submit_end = ?, "
+                        + "registration_start = ?, registration_end = ? WHERE id = ?",
+                Timestamp.from(now.minusSeconds(7_200)), Timestamp.from(now.minusSeconds(3_600)),
+                Timestamp.from(now.minusSeconds(1)),
+                Timestamp.from(now.plusSeconds(31L * 24 * 60 * 60)), roundId);
         mvc.perform(post("/api/v1/thesis/rounds/{id}/open-registration", roundId).with(adminJwt()))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.status").value("REGISTRATION_OPEN"));

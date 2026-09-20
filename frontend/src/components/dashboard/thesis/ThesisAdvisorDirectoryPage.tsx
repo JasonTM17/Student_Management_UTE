@@ -1,70 +1,240 @@
 'use client';
 
-import { useMemo, useState, useEffect } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
+import type { KeyboardEvent as ReactKeyboardEvent, ReactNode } from 'react';
 import { useSearchParams } from 'next/navigation';
 import {
-  Card,
-  Input,
-  Select,
-  Tag,
-  Button,
-  Avatar,
-  Badge,
-  Progress,
-  Modal,
-  Table,
-  Segmented,
-  Tooltip,
-  Empty,
-  Spin,
-  Alert,
-} from 'antd';
-import type { ColumnsType } from 'antd/es/table';
-import {
-  SearchOutlined,
-  AppstoreOutlined,
-  BarsOutlined,
-  UserOutlined,
-  MailOutlined,
-  PhoneOutlined,
-  HomeOutlined,
-  BookOutlined,
-  TeamOutlined,
-  CheckCircleOutlined,
-  ArrowRightOutlined,
-  PlusOutlined,
-  InfoCircleOutlined,
-} from '@ant-design/icons';
+  ArrowLeft,
+  BookOpen,
+  Building2,
+  ChevronLeft,
+  ChevronRight,
+  GraduationCap,
+  LayoutGrid,
+  List,
+  Mail,
+  MapPin,
+  Plus,
+  Search,
+  Users,
+} from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { LinkButton } from '@/components/ui/link-button';
+import { Button } from '@/components/ui/button';
+import { Card } from '@/components/ui/card';
+import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
+import { Modal } from '@/components/ui/modal';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
+import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { useAuth, useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
-import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { LoadingState } from '@/components/ui/state-block';
 import { lecturersApi, departmentsApi } from '@/lib/api';
 import { thesisApi, type ThesisRound, type ThesisTopic } from '@/lib/thesis-api';
 import type { Lecturer, Department } from '@/types/api';
-import { FALLBACK_THESIS_ADVISORS } from '@/lib/thesis-advisors-data';
+import { cn } from '@/lib/utils';
 
-const { Search } = Input;
+/** Cards rendered before the reader asks for more. */
+const GRID_PAGE_SIZE = 12;
+/** Supervision ceiling the directory assumes when a topic projection is absent. */
+const DEFAULT_MAX_TOPICS = 5;
 
-// Specialized academic domain mappings for HCMUTE professors
-const ADVISOR_SPECIALIZATIONS: Record<string, string[]> = {
-  default: ['Kỹ thuật phần mềm', 'Hệ thống thông tin', 'Phân tích dữ liệu'],
-  cntt: ['Trí tuệ nhân tạo (AI)', 'Thị giác máy tính', 'Học sâu (Deep Learning)', 'Xử lý ngôn ngữ tự nhiên'],
-  khmt: ['Khoa học dữ liệu', 'Thuật toán nâng cao', 'Tính toán hiệu năng cao', 'Machine Learning'],
-  ktpm: ['Kiến trúc Microservices', 'DevOps & CI/CD', 'Phát triển Web/Mobile', 'Kiểm thử phần mềm tự động'],
-  mmt: ['An toàn thông tin', 'Mạng máy tính & Điện toán đám mây', 'IoT & Hệ thống nhúng', 'Blockchain'],
-};
+interface AdvisorWorkload {
+  topicCount: number;
+  maxTopics: number;
+}
 
 function getAdvisorFullName(lec: Lecturer): string {
   const parts = [lec.user?.lastName, lec.user?.firstName].filter(Boolean);
   if (parts.length > 0) {
     return parts.join(' ').trim();
   }
-  return lec.employeeId || 'Giảng viên';
+  // The record's own identifier, never a guessed name.
+  return lec.employeeId || '—';
 }
+
+function getInitials(name: string): string {
+  const letters = name
+    .split(/\s+/)
+    .filter(Boolean)
+    .map((part) => part.charAt(0).toUpperCase());
+  if (letters.length === 0) return '—';
+  return `${letters[0]}${letters[letters.length - 1]}`;
+}
+
+function workloadFor(map: Map<string, AdvisorWorkload>, lecturerId: string): AdvisorWorkload {
+  return map.get(lecturerId) || { topicCount: 0, maxTopics: DEFAULT_MAX_TOPICS };
+}
+
+// ---------------------------------------------------------------------------
+// Local presentation primitives (single design language, no vendor UI kit)
+// ---------------------------------------------------------------------------
+
+function StatusPill({ tone, children }: { tone: StatusTone; children: ReactNode }) {
+  return (
+    <span className={cn('inline-flex items-center rounded-md px-2 py-0.5 text-[11px] font-semibold', statusToneClass(tone))}>
+      {children}
+    </span>
+  );
+}
+
+function AdvisorAvatar({ lecturer, size = 'md' }: { lecturer: Lecturer; size?: 'sm' | 'md' | 'lg' }) {
+  const src = lecturer.user?.avatar || '';
+  const name = getAdvisorFullName(lecturer);
+  const sizeClass =
+    size === 'lg' ? 'h-14 w-14 text-lg' : size === 'sm' ? 'h-9 w-9 text-xs' : 'h-11 w-11 text-sm';
+
+  return (
+    <span
+      className={cn(
+        'flex shrink-0 items-center justify-center overflow-hidden rounded-full border border-border bg-primary font-bold text-primary-foreground',
+        sizeClass,
+      )}
+    >
+      {src ? (
+        // eslint-disable-next-line @next/next/no-img-element
+        <img src={src} alt="" className="h-full w-full object-cover" />
+      ) : (
+        <span aria-hidden="true">{getInitials(name)}</span>
+      )}
+    </span>
+  );
+}
+
+function QuotaBar({ topicCount, maxTopics }: AdvisorWorkload) {
+  const isAvailable = topicCount < maxTopics;
+  const percent = maxTopics > 0 ? Math.min(100, Math.round((topicCount / maxTopics) * 100)) : 0;
+
+  return (
+    <div
+      role="progressbar"
+      aria-valuenow={percent}
+      aria-valuemin={0}
+      aria-valuemax={100}
+      className="h-1.5 w-full overflow-hidden rounded-full bg-secondary"
+    >
+      <div
+        className={cn('h-full rounded-full transition-[width]', isAvailable ? 'bg-primary' : 'bg-status-neutral')}
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
+}
+
+interface SegmentedOption<T extends string> {
+  value: T;
+  label: string;
+  icon?: ReactNode;
+}
+
+interface SegmentedProps<T extends string> {
+  value: T;
+  onChange: (value: T) => void;
+  options: SegmentedOption<T>[];
+  ariaLabel: string;
+}
+
+function Segmented<T extends string>({ value, onChange, options, ariaLabel }: SegmentedProps<T>) {
+  const handleKeyDown = (event: ReactKeyboardEvent<HTMLButtonElement>, index: number) => {
+    if (event.key !== 'ArrowLeft' && event.key !== 'ArrowRight') return;
+    event.preventDefault();
+    const offset = event.key === 'ArrowRight' ? 1 : -1;
+    const nextIndex = (index + offset + options.length) % options.length;
+    onChange(options[nextIndex].value);
+  };
+
+  return (
+    <div
+      role="radiogroup"
+      aria-label={ariaLabel}
+      className="inline-flex items-center gap-1 rounded-lg border border-border bg-secondary/40 p-1"
+    >
+      {options.map((option, index) => {
+        const selected = option.value === value;
+        return (
+          <button
+            key={option.value}
+            type="button"
+            role="radio"
+            aria-checked={selected}
+            tabIndex={selected ? 0 : -1}
+            onClick={() => onChange(option.value)}
+            onKeyDown={(event) => handleKeyDown(event, index)}
+            className={cn(
+              'inline-flex h-9 items-center gap-1.5 rounded-md px-3 text-xs font-semibold transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+              selected
+                ? 'bg-primary text-primary-foreground'
+                : 'text-muted-foreground hover:bg-background hover:text-foreground',
+            )}
+          >
+            {option.icon ? <span aria-hidden="true">{option.icon}</span> : null}
+            <span>{option.label}</span>
+          </button>
+        );
+      })}
+    </div>
+  );
+}
+
+interface TableColumn<T> {
+  key: string;
+  title: string;
+  align?: 'left' | 'right';
+  render: (row: T) => ReactNode;
+}
+
+interface DataTableProps<T> {
+  columns: TableColumn<T>[];
+  rows: T[];
+  rowKey: (row: T) => string;
+  caption: string;
+}
+
+function DataTable<T>({ columns, rows, rowKey, caption }: DataTableProps<T>) {
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+        <caption className="sr-only">{caption}</caption>
+        <thead>
+          <tr className="border-b border-border bg-secondary/40">
+            {columns.map((column) => (
+              <th
+                key={column.key}
+                scope="col"
+                className={cn(
+                  'px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground',
+                  column.align === 'right' && 'text-right',
+                )}
+              >
+                {column.title}
+              </th>
+            ))}
+          </tr>
+        </thead>
+        <tbody>
+          {rows.map((row) => (
+            <tr key={rowKey(row)} className="border-b border-border/70 last:border-b-0 hover:bg-secondary/30">
+              {columns.map((column) => (
+                <td
+                  key={column.key}
+                  className={cn('px-4 py-3 align-middle', column.align === 'right' && 'text-right')}
+                >
+                  {column.render(row)}
+                </td>
+              ))}
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+}
+
+// ---------------------------------------------------------------------------
+// Page
+// ---------------------------------------------------------------------------
 
 export default function ThesisAdvisorDirectoryPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
@@ -74,10 +244,12 @@ export default function ThesisAdvisorDirectoryPage() {
 
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
-  const [rounds, setRounds] = useState<ThesisRound[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
-  const [loading, setLoading] = useState(true);
+  // 'failed' is an outage; 'ready' with an empty list is a genuinely
+  // unpopulated directory. The two never render the same message.
+  const [loadState, setLoadState] = useState<'loading' | 'ready' | 'failed'>('loading');
   const [error, setError] = useState('');
+  const [reloadToken, setReloadToken] = useState(0);
 
   // Filtering states
   const [searchQuery, setSearchQuery] = useState('');
@@ -85,60 +257,81 @@ export default function ThesisAdvisorDirectoryPage() {
   const [quotaFilter, setQuotaFilter] = useState<'all' | 'available' | 'full'>('all');
   const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
 
+  // Pagination states
+  const [tablePage, setTablePage] = useState(1);
+  const [tablePageSize, setTablePageSize] = useState(10);
+  const [gridVisibleCount, setGridVisibleCount] = useState(GRID_PAGE_SIZE);
+
   // Modal detail state
   const [selectedAdvisor, setSelectedAdvisor] = useState<Lecturer | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
 
-  // Load data
+  const loadFailedMessage = messages.thesis.loadFailed;
+
   useEffect(() => {
     let active = true;
+
     async function loadData() {
-      setLoading(true);
+      setLoadState('loading');
       setError('');
-      try {
-        const [lecRes, deptRes, roundsList] = await Promise.all([
-          lecturersApi.getAll({ limit: 100 }).catch(() => ({ data: [] })),
-          departmentsApi.getAll({ limit: 50 }).catch(() => ({ data: [] })),
-          thesisApi.listRounds().catch(() => []),
-        ]);
 
-        if (active) {
-          const lecList = Array.isArray(lecRes?.data) && lecRes.data.length > 0 ? lecRes.data : FALLBACK_THESIS_ADVISORS;
-          setLecturers(lecList);
-          setDepartments(deptRes.data || []);
-          setRounds(roundsList);
+      const [lecResult, deptRes, roundsList] = await Promise.all([
+        // The directory is the one required input. Its failure is reported
+        // below; it is never silently replaced with invented faculty.
+        lecturersApi
+          .getAll({ limit: 100 })
+          .then((res) => ({
+            ok: true as const,
+            data: Array.isArray(res?.data) ? res.data : [],
+          }))
+          .catch(() => ({ ok: false as const, data: [] as Lecturer[] })),
+        // Departments, rounds and topics only enrich the directory; losing
+        // them degrades the enrichment, it does not invent a person.
+        departmentsApi.getAll({ limit: 50 }).catch(() => ({ data: [] as Department[] })),
+        thesisApi.listRounds().catch(() => [] as ThesisRound[]),
+      ]);
 
-          // Find active or first round to count active supervision
-          const targetRound = roundsList.find((r) => r.id === preselectedRoundId) || roundsList[0];
-          if (targetRound) {
-            const topicList = await thesisApi.listTopics(targetRound.id, 'PUBLISHED').catch(() => []);
-            if (active) setTopics(topicList);
-          }
-        }
-      } catch {
-        if (active) setError(locale === 'vi' ? 'Không thể tải danh sách giảng viên.' : 'Failed to load lecturers.');
-      } finally {
-        if (active) setLoading(false);
+      if (!active) return;
+
+      setDepartments(Array.isArray(deptRes?.data) ? deptRes.data : []);
+
+      if (!lecResult.ok) {
+        setLecturers([]);
+        setError(loadFailedMessage);
+        setLoadState('failed');
+        return;
+      }
+
+      setLecturers(lecResult.data);
+      setLoadState('ready');
+
+      const targetRound =
+        roundsList.find((r) => r.id === preselectedRoundId) || roundsList[0];
+      if (targetRound) {
+        const topicList = await thesisApi
+          .listTopics(targetRound.id, 'PUBLISHED')
+          .catch(() => [] as ThesisTopic[]);
+        if (active) setTopics(topicList);
       }
     }
 
-    loadData();
+    void loadData();
     return () => {
       active = false;
     };
-  }, [locale, preselectedRoundId]);
+  }, [locale, preselectedRoundId, reloadToken, loadFailedMessage]);
 
   // Advisor workload calculation (how many published topics each lecturer supervises)
   const advisorWorkloadMap = useMemo(() => {
-    const map = new Map<string, { topicCount: number; maxTopics: number }>();
+    const map = new Map<string, AdvisorWorkload>();
     topics.forEach((topic) => {
       // ThesisTopic payloads do not carry supervisors yet; the optional
       // projection keeps the workload map honest (empty when absent).
       (topic as ThesisTopic & { supervisors?: Array<{ lecturerId: string }> })
         .supervisors?.forEach((sup) => {
-        const current = map.get(sup.lecturerId) || { topicCount: 0, maxTopics: 5 };
-        map.set(sup.lecturerId, { ...current, topicCount: current.topicCount + 1 });
-      });
+          const current = map.get(sup.lecturerId) || { topicCount: 0, maxTopics: DEFAULT_MAX_TOPICS };
+          map.set(sup.lecturerId, { ...current, topicCount: current.topicCount + 1 });
+        });
     });
     return map;
   }, [topics]);
@@ -158,7 +351,7 @@ export default function ThesisAdvisorDirectoryPage() {
       const matchDept = selectedDepartmentId === 'all' || lec.departmentId === selectedDepartmentId;
 
       // 3. Quota filter
-      const workload = advisorWorkloadMap.get(lec.id) || { topicCount: 0, maxTopics: 5 };
+      const workload = workloadFor(advisorWorkloadMap, lec.id);
       const isAvailable = workload.topicCount < workload.maxTopics;
       const matchQuota =
         quotaFilter === 'all' ||
@@ -173,7 +366,7 @@ export default function ThesisAdvisorDirectoryPage() {
   const stats = useMemo(() => {
     const total = lecturers.length;
     const available = lecturers.filter((l) => {
-      const w = advisorWorkloadMap.get(l.id) || { topicCount: 0, maxTopics: 5 };
+      const w = workloadFor(advisorWorkloadMap, l.id);
       return w.topicCount < w.maxTopics;
     }).length;
     return {
@@ -184,8 +377,49 @@ export default function ThesisAdvisorDirectoryPage() {
     };
   }, [lecturers, departments, topics, advisorWorkloadMap]);
 
+  // A narrowing filter re-pages the result set from the top.
+  useEffect(() => {
+    setTablePage(1);
+    setGridVisibleCount(GRID_PAGE_SIZE);
+  }, [searchQuery, selectedDepartmentId, quotaFilter]);
+
   const userRoles = user?.roles || (user?.role ? [user.role] : []);
   const isStudent = userRoles.includes('STUDENT');
+
+  const retryLoad = useCallback(() => {
+    setReloadToken((token) => token + 1);
+  }, []);
+
+  const isVi = locale === 'vi';
+  const st = messages.common.states;
+
+  const departmentName = (departmentId?: string) => {
+    if (!departmentId) return '—';
+    const dept = departments.find((d) => d.id === departmentId);
+    if (!dept) return departmentId;
+    return (isVi ? dept.nameVi || dept.name : dept.nameEn || dept.name) || departmentId;
+  };
+
+  const pageCount = Math.max(1, Math.ceil(filteredLecturers.length / tablePageSize));
+  const currentTablePage = Math.min(tablePage, pageCount);
+  const pagedLecturers = filteredLecturers.slice(
+    (currentTablePage - 1) * tablePageSize,
+    currentTablePage * tablePageSize,
+  );
+  const visibleLecturers = filteredLecturers.slice(0, gridVisibleCount);
+  const filtersActive =
+    searchQuery.trim() !== '' || selectedDepartmentId !== 'all' || quotaFilter !== 'all';
+
+  const resetFilters = () => {
+    setSearchQuery('');
+    setSelectedDepartmentId('all');
+    setQuotaFilter('all');
+  };
+
+  const openAdvisor = (lecturer: Lecturer) => {
+    setSelectedAdvisor(lecturer);
+    setIsModalOpen(true);
+  };
 
   if (authLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -195,35 +429,25 @@ export default function ThesisAdvisorDirectoryPage() {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
-  const isVi = locale === 'vi';
-
-  // Ant Design Table Columns Definition
-  const columns: ColumnsType<Lecturer> = [
+  const tableColumns: TableColumn<Lecturer>[] = [
     {
-      title: isVi ? 'Giảng viên hướng dẫn' : 'Lecturer & Advisor',
       key: 'name',
-      render: (_, record) => {
+      title: isVi ? 'Giảng viên hướng dẫn' : 'Lecturer & Advisor',
+      render: (record) => {
         const titlePrefix = record.title ? `${record.title} ` : '';
         const name = getAdvisorFullName(record);
         return (
           <div className="flex items-center gap-3">
-            <Avatar
-              size={42}
-              icon={<UserOutlined />}
-              src={record.user?.avatar}
-              className="bg-[#003f87] text-white shrink-0 font-bold"
-            >
-              {name.charAt(0).toUpperCase()}
-            </Avatar>
+            <AdvisorAvatar lecturer={record} />
             <div className="min-w-0">
-              <div className="font-bold text-sm text-foreground hover:text-primary transition-colors">
+              <div className="text-sm font-bold text-foreground">
                 {titlePrefix}{name}
               </div>
-              <div className="text-xs text-muted-foreground flex items-center gap-1 font-mono">
-                <span>{record.employeeId}</span>
+              <div className="flex items-center gap-1 font-mono text-xs text-muted-foreground">
+                <span>{record.employeeId || '—'}</span>
                 {record.user?.email ? (
                   <>
-                    <span>•</span>
+                    <span aria-hidden="true">•</span>
                     <span className="truncate">{record.user.email}</span>
                   </>
                 ) : null}
@@ -234,72 +458,53 @@ export default function ThesisAdvisorDirectoryPage() {
       },
     },
     {
-      title: isVi ? 'Khoa / Bộ môn' : 'Department',
-      dataIndex: 'departmentId',
       key: 'department',
-      render: (deptId) => {
-        const dept = departments.find((d) => d.id === deptId);
-        const deptName = isVi ? (dept?.nameVi || dept?.name) : (dept?.nameEn || dept?.name);
-        return <Tag color="blue" className="font-medium text-xs py-0.5 px-2">{deptName || deptId || '—'}</Tag>;
-      },
+      title: isVi ? 'Khoa / Bộ môn' : 'Department',
+      render: (record) => (
+        <StatusPill tone="info">{departmentName(record.departmentId)}</StatusPill>
+      ),
     },
     {
-      title: isVi ? 'Chuyên môn & Hướng nghiên cứu' : 'Research Specialization',
       key: 'specialization',
-      render: (_, record) => {
-        const spec = record.specialization || (isVi ? 'Công nghệ phần mềm & Hệ thống' : 'Software & Systems');
-        return (
-          <div className="text-xs text-slate-700 dark:text-slate-300 max-w-xs truncate" title={spec}>
-            {spec}
-          </div>
-        );
-      },
+      title: isVi ? 'Chuyên môn & Hướng nghiên cứu' : 'Research Specialization',
+      render: (record) => (
+        <div className="max-w-xs truncate text-xs text-foreground" title={record.specialization || undefined}>
+          {record.specialization || '—'}
+        </div>
+      ),
     },
     {
-      title: isVi ? 'Tải hướng dẫn' : 'Supervision Quota',
       key: 'workload',
-      render: (_, record) => {
-        const workload = advisorWorkloadMap.get(record.id) || { topicCount: 0, maxTopics: 5 };
-        const percent = Math.min(100, Math.round((workload.topicCount / workload.maxTopics) * 100));
+      title: isVi ? 'Tải hướng dẫn' : 'Supervision Quota',
+      render: (record) => {
+        const workload = workloadFor(advisorWorkloadMap, record.id);
         const isAvailable = workload.topicCount < workload.maxTopics;
         return (
           <div className="w-36 space-y-1">
             <div className="flex justify-between text-xs font-semibold">
               <span>{workload.topicCount}/{workload.maxTopics} {isVi ? 'đề tài' : 'topics'}</span>
-              <span className={isAvailable ? 'text-emerald-600' : 'text-slate-400'}>
+              <span className={isAvailable ? 'text-status-success-foreground' : 'text-muted-foreground'}>
                 {isAvailable ? (isVi ? 'Còn nhận' : 'Available') : (isVi ? 'Đủ' : 'Full')}
               </span>
             </div>
-            <Progress
-              percent={percent}
-              size="small"
-              status={isAvailable ? 'active' : 'normal'}
-              strokeColor={isAvailable ? '#003f87' : '#94a3b8'}
-              showInfo={false}
-            />
+            <QuotaBar {...workload} />
           </div>
         );
       },
     },
     {
-      title: isVi ? 'Thao tác' : 'Actions',
       key: 'action',
+      title: isVi ? 'Thao tác' : 'Actions',
       align: 'right',
-      render: (_, record) => (
+      render: (record) => (
         <div className="flex items-center justify-end gap-2">
-          <Button
-            size="small"
-            onClick={() => {
-              setSelectedAdvisor(record);
-              setIsModalOpen(true);
-            }}
-          >
+          <Button type="button" variant="outline" size="sm" className="h-9 px-3 text-xs" onClick={() => openAdvisor(record)}>
             {isVi ? 'Chi tiết' : 'Details'}
           </Button>
           <LinkButton
             href={`/dashboard/thesis?advisorId=${record.id}&action=propose`}
             size="sm"
-            className="h-7 px-2.5 text-xs font-semibold bg-[#003f87] text-white hover:bg-[#002a5d]"
+            className="h-9 px-3 text-xs"
           >
             {isVi ? 'Chọn GV' : 'Select'}
           </LinkButton>
@@ -309,14 +514,14 @@ export default function ThesisAdvisorDirectoryPage() {
   ];
 
   return (
-    <div className="space-y-6 max-w-[1280px] mx-auto pb-12">
+    <div className="mx-auto max-w-[1280px] space-y-6 pb-12">
       {/* Top Header & Breadcrumb Navigation */}
       <PageHeader
         eyebrow={
           <SectionEyebrow>
-            <LocalizedLink href="/dashboard/thesis" className="hover:underline flex items-center gap-1">
+            <LocalizedLink href="/dashboard/thesis" className="flex items-center gap-1 hover:underline">
               <span>{messages.thesis.title}</span>
-              <span>/</span>
+              <span aria-hidden="true">/</span>
               <span>{isVi ? 'Giảng viên hướng dẫn' : 'Advisors'}</span>
             </LocalizedLink>
           </SectionEyebrow>
@@ -331,16 +536,12 @@ export default function ThesisAdvisorDirectoryPage() {
         actions={
           <div className="flex items-center gap-3">
             <LinkButton href="/dashboard/thesis" variant="outline" size="sm" className="gap-1.5">
-              <ArrowRightOutlined rotate={180} />
+              <ArrowLeft className="h-4 w-4" aria-hidden="true" />
               <span>{isVi ? 'Quay lại Khóa luận' : 'Back to Thesis'}</span>
             </LinkButton>
             {isStudent ? (
-              <LinkButton
-                href="/dashboard/thesis?action=propose"
-                size="sm"
-                className="bg-[#003f87] text-white hover:bg-[#002a5d] gap-1.5"
-              >
-                <PlusOutlined />
+              <LinkButton href="/dashboard/thesis?action=propose" size="sm" className="gap-1.5">
+                <Plus className="h-4 w-4" aria-hidden="true" />
                 <span>{isVi ? 'Đề xuất đề tài mới' : 'Propose Topic'}</span>
               </LinkButton>
             ) : null}
@@ -348,18 +549,16 @@ export default function ThesisAdvisorDirectoryPage() {
         }
       />
 
-      {error ? <Alert message={error} type="error" showIcon closable /> : null}
-
       {/* Executive Faculty & Defense Council Banner */}
       <div className="overflow-hidden rounded-2xl border border-border/80 bg-card text-card-foreground shadow-xs">
         <div className="grid grid-cols-1 lg:grid-cols-12">
-          <div className="flex flex-col justify-center p-6 lg:col-span-8 space-y-2.5">
+          <div className="flex flex-col justify-center space-y-2.5 p-6 lg:col-span-8">
             <div className="flex flex-wrap items-center gap-2">
-              <span className="rounded-md bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary border border-primary/20">
+              <span className="rounded-md border border-primary/20 bg-primary/10 px-2.5 py-0.5 text-[11px] font-bold uppercase tracking-wider text-primary">
                 {isVi ? 'Hội đồng Khoa học & Đào tạo' : 'Academic Council & Faculty'}
               </span>
               <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground">
-                HCMUTE Thesis Committee 2024-2025
+                HCMUTE Thesis Committee
               </span>
             </div>
             <h2 className="text-xl font-bold tracking-tight text-foreground sm:text-2xl">
@@ -371,7 +570,7 @@ export default function ThesisAdvisorDirectoryPage() {
                 : 'Browse faculty profiles, academic degrees, research specializations, thesis student capacity, and direct contact details.'}
             </p>
           </div>
-          <div className="relative h-48 lg:h-full lg:col-span-4 overflow-hidden border-t lg:border-t-0 lg:border-l border-border/60 min-h-[160px]">
+          <div className="relative h-48 min-h-[160px] overflow-hidden border-t border-border/60 lg:col-span-4 lg:h-full lg:border-l lg:border-t-0">
             {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src="/images/banners/thesis_evaluation_council.jpg"
@@ -386,328 +585,425 @@ export default function ThesisAdvisorDirectoryPage() {
         </div>
       </div>
 
-      {/* Overview Stat Ribbon - Stitch Style */}
-      <div className="grid grid-cols-2 sm:grid-cols-4 gap-4">
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isVi ? 'Tổng số Giảng viên' : 'Total Faculty'}
-          </p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{lecturers.length}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isVi ? 'Khoa & Bộ môn' : 'Departments'}
-          </p>
-          <p className="mt-1 text-2xl font-bold text-primary">{departments.length}</p>
-        </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isVi ? 'Đang mở nhận hướng dẫn' : 'Accepting Students'}
-          </p>
-          <p className="mt-1 text-2xl font-bold text-emerald-600">
-            {
-              lecturers.filter((l) => {
-                const w = advisorWorkloadMap.get(l.id) || { topicCount: 0, maxTopics: 5 };
-                return w.topicCount < w.maxTopics;
-              }).length
-            }
-          </p>
-        </div>
-        <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900">
-          <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-            {isVi ? 'Đề tài đang triển khai' : 'Active Theses'}
-          </p>
-          <p className="mt-1 text-2xl font-bold text-foreground">{topics.length}</p>
-        </div>
-      </div>
-
-      {/* Ant Design Filter Bar (Stitch Screen 538cba8b58674dfc93d356072df75498) */}
-      <div className="rounded-xl border border-slate-200/80 bg-white p-4 shadow-2xs dark:border-slate-800 dark:bg-slate-900 flex flex-col md:flex-row items-center justify-between gap-3">
-        <div className="flex flex-wrap items-center gap-3 w-full md:w-auto flex-1">
-          <div className="w-full sm:w-72">
-            <Search
-              placeholder={isVi ? 'Tìm tên, mã GV, email, hướng nghiên cứu...' : 'Search by name, email, keyword...'}
-              allowClear
-              value={searchQuery}
-              onChange={(e) => setSearchQuery(e.target.value)}
-              prefix={<SearchOutlined className="text-slate-400" />}
-            />
-          </div>
-
-          <div className="w-full sm:w-60">
-            <Select
-              className="w-full"
-              value={selectedDepartmentId}
-              onChange={setSelectedDepartmentId}
-              options={[
-                { value: 'all', label: isVi ? 'Tất cả Khoa / Bộ môn' : 'All Departments' },
-                ...departments.map((d) => ({
-                  value: d.id,
-                  label: isVi ? (d.nameVi || d.name) : (d.nameEn || d.name),
-                })),
-              ]}
-            />
-          </div>
-
-          <div className="w-full sm:w-48">
-            <Select
-              className="w-full"
-              value={quotaFilter}
-              onChange={setQuotaFilter}
-              options={[
-                { value: 'all', label: isVi ? 'Tất cả chỉ tiêu' : 'All Quotas' },
-                { value: 'available', label: isVi ? 'Còn nhận hướng dẫn' : 'Available' },
-                { value: 'full', label: isVi ? 'Đã đủ chỉ tiêu' : 'Quota full' },
-              ]}
-            />
-          </div>
-        </div>
-
-        <div className="flex items-center gap-2 shrink-0 self-end md:self-auto">
-          <Segmented
-            value={viewMode}
-            onChange={(val) => setViewMode(val as 'grid' | 'table')}
-            options={[
-              { value: 'grid', icon: <AppstoreOutlined />, label: isVi ? 'Lưới thẻ' : 'Cards' },
-              { value: 'table', icon: <BarsOutlined />, label: isVi ? 'Bảng' : 'Table' },
-            ]}
-          />
-        </div>
-      </div>
-
-      {/* Main Content: Grid vs Table */}
-      {loading ? (
-        <div className="py-20 flex flex-col items-center justify-center gap-3">
-          <Spin size="large" />
-          <p className="text-sm text-muted-foreground">{isVi ? 'Đang tải danh sách giảng viên...' : 'Loading advisors...'}</p>
-        </div>
-      ) : filteredLecturers.length === 0 ? (
-        <Empty
-          description={
-            <span className="text-muted-foreground">
-              {isVi ? 'Không tìm thấy giảng viên nào phù hợp bộ lọc.' : 'No advisors matched your filters.'}
-            </span>
-          }
-          className="my-16"
+      {loadState === 'loading' ? (
+        <LoadingState label={messages.thesis.loading} />
+      ) : loadState === 'failed' ? (
+        // An outage is an outage: the directory is not rendered at all, so a
+        // failure can never be mistaken for "no advisors exist".
+        <ErrorState
+          title={isVi ? 'Không thể tải danh bạ giảng viên' : 'Advisor directory unavailable'}
+          description={`${error} ${isVi ? 'Danh bạ bên dưới chưa được tải nên không hiển thị.' : 'Nothing below is rendered, because the directory did not load.'}`}
+          onRetry={retryLoad}
         />
-      ) : viewMode === 'grid' ? (
-        /* High-fidelity Card Grid matching Stitch Screen 538cba8b58674dfc93d356072df75498 */
-        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-5">
-          {filteredLecturers.map((lec) => {
-            const workload = advisorWorkloadMap.get(lec.id) || { topicCount: 0, maxTopics: 5 };
-            const isAvailable = workload.topicCount < workload.maxTopics;
-            const titlePrefix = lec.title ? `${lec.title} ` : '';
-            const fullName = getAdvisorFullName(lec);
-            const dept = departments.find((d) => d.id === lec.departmentId);
-            const deptName = isVi ? (dept?.nameVi || dept?.name) : (dept?.nameEn || dept?.name);
+      ) : (
+        <>
+          {/* Overview Stat Ribbon - Stitch Style */}
+          <div className="grid grid-cols-2 gap-4 sm:grid-cols-4">
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {isVi ? 'Tổng số Giảng viên' : 'Total Faculty'}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{stats.total}</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {isVi ? 'Khoa & Bộ môn' : 'Departments'}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-primary">{stats.departmentsCount}</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {isVi ? 'Đang mở nhận hướng dẫn' : 'Accepting Students'}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-status-success-foreground">{stats.available}</p>
+            </div>
+            <div className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+              <p className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {isVi ? 'Đề tài đang triển khai' : 'Active Theses'}
+              </p>
+              <p className="mt-1 text-2xl font-bold text-foreground">{stats.activeTopicsCount}</p>
+            </div>
+          </div>
 
-            // Tags based on dept or specialization
-            const tags =
-              ADVISOR_SPECIALIZATIONS[dept?.code?.toLowerCase() || ''] ||
-              (lec.specialization ? [lec.specialization] : ADVISOR_SPECIALIZATIONS.default);
+          {/* Filter Bar */}
+          <div className="flex flex-col items-center justify-between gap-3 rounded-xl border border-border/80 bg-card p-4 shadow-2xs md:flex-row">
+            <div className="flex w-full flex-1 flex-wrap items-center gap-3 md:w-auto">
+              <div className="w-full sm:w-72">
+                <Input
+                  type="search"
+                  aria-label={isVi ? 'Tìm giảng viên hướng dẫn' : 'Search advisors'}
+                  placeholder={isVi ? 'Tìm tên, mã GV, email, hướng nghiên cứu...' : 'Search by name, email, keyword...'}
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value)}
+                  icon={<Search className="h-4 w-4" aria-hidden="true" />}
+                  endAction={
+                    searchQuery ? (
+                      <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        className="h-8 px-2 text-xs"
+                        onClick={() => setSearchQuery('')}
+                      >
+                        {isVi ? 'Xóa' : 'Clear'}
+                      </Button>
+                    ) : undefined
+                  }
+                />
+              </div>
 
-            return (
-              <Card
-                key={lec.id}
-                hoverable
-                className="flex flex-col justify-between border-slate-200/90 shadow-2xs transition-all duration-200 hover:border-[#003f87] hover:shadow-md dark:border-slate-800 dark:bg-slate-900 rounded-xl overflow-hidden group"
-                bodyStyle={{ padding: '1.25rem', height: '100%', display: 'flex', flexDirection: 'column' }}
-              >
-                <div>
-                  {/* Top row: Avatar + Name + Department Tag */}
-                  <div className="flex items-start gap-3.5">
-                    <Avatar
-                      size={54}
-                      icon={<UserOutlined />}
-                      src={lec.user?.avatar}
-                      className="bg-[#003f87] text-white shrink-0 font-bold border-2 border-slate-100 dark:border-slate-800"
+              <div className="w-full sm:w-60">
+                <Select
+                  aria-label={isVi ? 'Lọc theo khoa' : 'Filter by department'}
+                  value={selectedDepartmentId}
+                  onChange={(e) => setSelectedDepartmentId(e.target.value)}
+                  options={[
+                    { value: 'all', label: isVi ? 'Tất cả Khoa / Bộ môn' : 'All Departments' },
+                    ...departments.map((d) => ({
+                      value: d.id,
+                      label: (isVi ? d.nameVi || d.name : d.nameEn || d.name) || d.name,
+                    })),
+                  ]}
+                />
+              </div>
+
+              <div className="w-full sm:w-48">
+                <Select
+                  aria-label={isVi ? 'Lọc theo chỉ tiêu' : 'Filter by quota'}
+                  value={quotaFilter}
+                  onChange={(e) => setQuotaFilter(e.target.value as 'all' | 'available' | 'full')}
+                  options={[
+                    { value: 'all', label: isVi ? 'Tất cả chỉ tiêu' : 'All Quotas' },
+                    { value: 'available', label: isVi ? 'Còn nhận hướng dẫn' : 'Available' },
+                    { value: 'full', label: isVi ? 'Đã đủ chỉ tiêu' : 'Quota full' },
+                  ]}
+                />
+              </div>
+            </div>
+
+            <div className="flex shrink-0 items-center gap-2 self-end md:self-auto">
+              <Segmented
+                ariaLabel={isVi ? 'Chế độ hiển thị' : 'Display mode'}
+                value={viewMode}
+                onChange={setViewMode}
+                options={[
+                  { value: 'grid', icon: <LayoutGrid className="h-4 w-4" />, label: isVi ? 'Lưới thẻ' : 'Cards' },
+                  { value: 'table', icon: <List className="h-4 w-4" />, label: isVi ? 'Bảng' : 'Table' },
+                ]}
+              />
+            </div>
+          </div>
+
+          {lecturers.length === 0 ? (
+            <EmptyState
+              icon={GraduationCap}
+              title={isVi ? 'Chưa có giảng viên trong danh bạ' : 'No advisors in the directory yet'}
+              description={
+                isVi
+                  ? 'Nhà trường chưa công bố giảng viên hướng dẫn nào. Vui lòng liên hệ Khoa để được hỗ trợ.'
+                  : 'The faculty directory publishes no advisors yet. Contact your department office for assistance.'
+              }
+            />
+          ) : filteredLecturers.length === 0 ? (
+            <EmptyState
+              icon={Search}
+              title={isVi ? 'Không tìm thấy giảng viên nào phù hợp bộ lọc' : 'No advisors matched your filters'}
+              description={
+                isVi
+                  ? 'Thử đổi từ khóa tìm kiếm hoặc bỏ bộ lọc khoa/chỉ tiêu.'
+                  : 'Try a different keyword, or clear the department and quota filters.'
+              }
+              action={
+                filtersActive ? (
+                  <Button type="button" variant="outline" onClick={resetFilters}>
+                    {isVi ? 'Bỏ tất cả bộ lọc' : 'Clear all filters'}
+                  </Button>
+                ) : undefined
+              }
+            />
+          ) : viewMode === 'grid' ? (
+            /* High-fidelity Card Grid */
+            <div className="space-y-5">
+              <div className="grid grid-cols-1 gap-5 md:grid-cols-2 lg:grid-cols-3">
+                {visibleLecturers.map((lec) => {
+                  const workload = workloadFor(advisorWorkloadMap, lec.id);
+                  const isAvailable = workload.topicCount < workload.maxTopics;
+                  const titlePrefix = lec.title ? `${lec.title} ` : '';
+                  const fullName = getAdvisorFullName(lec);
+
+                  return (
+                    <Card
+                      key={lec.id}
+                      className="flex flex-col justify-between rounded-xl border-border/90 shadow-2xs transition-all duration-200 hover:border-primary hover:shadow-md"
                     >
-                      {fullName.charAt(0).toUpperCase()}
-                    </Avatar>
-                    <div className="flex-1 min-w-0">
-                      <div className="flex items-center justify-between gap-1">
-                        <h3 className="text-base font-bold text-foreground group-hover:text-primary transition-colors truncate">
-                          {titlePrefix}{fullName}
-                        </h3>
-                      </div>
-                      <p className="text-xs text-secondary font-medium mt-0.5 truncate">
-                        {deptName || (isVi ? 'Khoa Công nghệ Thông tin' : 'Faculty of IT')}
-                      </p>
-                      <div className="mt-1.5 flex items-center gap-1.5 font-mono text-[11px] text-muted-foreground">
-                        <Badge status={isAvailable ? 'success' : 'default'} />
-                        <span>{isAvailable ? (isVi ? 'Nhận hướng dẫn' : 'Available') : (isVi ? 'Đã đủ chỉ tiêu' : 'Full quota')}</span>
-                      </div>
-                    </div>
-                  </div>
+                      <div className="flex h-full flex-col p-5">
+                        <div>
+                          {/* Top row: Avatar + Name + Department */}
+                          <div className="flex items-start gap-3.5">
+                            <AdvisorAvatar lecturer={lec} size="lg" />
+                            <div className="min-w-0 flex-1">
+                              <h3 className="truncate text-base font-bold text-foreground">
+                                {titlePrefix}{fullName}
+                              </h3>
+                              <p className="mt-0.5 flex items-center gap-1.5 truncate text-xs font-medium text-muted-foreground">
+                                <Building2 className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                                <span className="truncate">{departmentName(lec.departmentId)}</span>
+                              </p>
+                              <div className="mt-1.5">
+                                <StatusPill tone={isAvailable ? 'success' : 'neutral'}>
+                                  {isAvailable
+                                    ? (isVi ? 'Nhận hướng dẫn' : 'Available')
+                                    : (isVi ? 'Đã đủ chỉ tiêu' : 'Full quota')}
+                                </StatusPill>
+                              </div>
+                            </div>
+                          </div>
 
-                  {/* Contact Info */}
-                  <div className="mt-4 pt-3 border-t border-slate-100 dark:border-slate-800 space-y-1.5 text-xs text-muted-foreground">
-                    <div className="flex items-center gap-2 truncate">
-                      <MailOutlined className="text-slate-400 shrink-0" />
-                      <span className="truncate">{lec.user?.email || `${lec.employeeId}@hcmute.edu.vn`}</span>
-                    </div>
-                    {lec.office ? (
-                      <div className="flex items-center gap-2 truncate">
-                        <HomeOutlined className="text-slate-400 shrink-0" />
-                        <span className="truncate">{lec.office}</span>
+                          {/* Contact Info */}
+                          <div className="mt-4 space-y-1.5 border-t border-border/70 pt-3 text-xs text-muted-foreground">
+                            <div className="flex items-center gap-2 truncate">
+                              <Mail className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{lec.user?.email || '—'}</span>
+                            </div>
+                            <div className="flex items-center gap-2 truncate">
+                              <MapPin className="h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                              <span className="truncate">{lec.office || '—'}</span>
+                            </div>
+                          </div>
+
+                          {/* Research Specialization */}
+                          <div className="mt-3 flex flex-wrap gap-1.5">
+                            {lec.specialization ? (
+                              <StatusPill tone="neutral">{lec.specialization}</StatusPill>
+                            ) : (
+                              <span className="text-[11px] text-muted-foreground">—</span>
+                            )}
+                          </div>
+
+                          {/* Supervision Quota & Metrics */}
+                          <div className="mt-4 rounded-lg border border-border/70 bg-secondary/40 p-2.5">
+                            <div className="mb-1.5 flex items-center justify-between text-xs">
+                              <span className="flex items-center gap-1 text-muted-foreground">
+                                <BookOpen className="h-3.5 w-3.5 text-primary" aria-hidden="true" />
+                                <span>{isVi ? 'Tải hướng dẫn:' : 'Advising:'}</span>
+                              </span>
+                              <span className="font-bold text-foreground">
+                                {workload.topicCount} / {workload.maxTopics} {isVi ? 'đề tài' : 'theses'}
+                              </span>
+                            </div>
+                            <QuotaBar {...workload} />
+                          </div>
+                        </div>
+
+                        {/* Card Actions */}
+                        <div className="mt-5 flex gap-2 border-t border-border/70 pt-3">
+                          <Button
+                            type="button"
+                            variant="outline"
+                            className="h-9 flex-1 rounded-lg text-xs font-semibold"
+                            onClick={() => openAdvisor(lec)}
+                          >
+                            {isVi ? 'Xem chi tiết' : 'View Bio'}
+                          </Button>
+                          <LinkButton
+                            href={`/dashboard/thesis?advisorId=${lec.id}&action=propose`}
+                            className="h-9 flex-1 justify-center rounded-lg text-xs font-semibold"
+                          >
+                            {isVi ? 'Chọn hướng dẫn' : 'Select'}
+                          </LinkButton>
+                        </div>
                       </div>
-                    ) : null}
-                  </div>
+                    </Card>
+                  );
+                })}
+              </div>
 
-                  {/* Research Specialization Tags */}
-                  <div className="mt-3 flex flex-wrap gap-1.5">
-                    {tags.slice(0, 3).map((tag) => (
-                      <Tag key={tag} className="m-0 text-[11px] font-medium border-slate-200 bg-slate-50 text-slate-700 dark:bg-slate-800 dark:border-slate-700 dark:text-slate-300">
-                        {tag}
-                      </Tag>
-                    ))}
-                  </div>
+              {filteredLecturers.length > visibleLecturers.length ? (
+                <div className="flex justify-center">
+                  <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => setGridVisibleCount((count) => count + GRID_PAGE_SIZE)}
+                  >
+                    {isVi
+                      ? `Tải thêm giảng viên (${visibleLecturers.length}/${filteredLecturers.length})`
+                      : `Load more advisors (${visibleLecturers.length}/${filteredLecturers.length})`}
+                  </Button>
+                </div>
+              ) : null}
+            </div>
+          ) : (
+            /* High-density data table */
+            <div className="overflow-hidden rounded-xl border border-border/80 bg-card shadow-2xs">
+              <DataTable
+                columns={tableColumns}
+                rows={pagedLecturers}
+                rowKey={(row) => row.id}
+                caption={isVi ? 'Danh sách giảng viên hướng dẫn' : 'Faculty thesis advisor directory'}
+              />
 
-                  {/* Supervision Quota & Metrics */}
-                  <div className="mt-4 rounded-lg bg-slate-50 dark:bg-slate-800/60 p-2.5 border border-slate-100 dark:border-slate-800">
-                    <div className="flex items-center justify-between text-xs mb-1.5">
-                      <span className="text-muted-foreground flex items-center gap-1">
-                        <BookOutlined className="text-[#003f87]" />
-                        <span>{isVi ? 'Tải hướng dẫn:' : 'Advising:'}</span>
-                      </span>
-                      <span className="font-bold text-foreground">
-                        {workload.topicCount} / {workload.maxTopics} {isVi ? 'đề tài' : 'theses'}
-                      </span>
-                    </div>
-                    <Progress
-                      percent={Math.min(100, Math.round((workload.topicCount / workload.maxTopics) * 100))}
-                      size="small"
-                      status={isAvailable ? 'active' : 'normal'}
-                      strokeColor={isAvailable ? '#003f87' : '#94a3b8'}
-                      showInfo={false}
+              <div className="flex flex-col items-center justify-between gap-3 border-t border-border/70 px-4 py-3 sm:flex-row">
+                <p className="text-xs text-muted-foreground">
+                  {st.showingResults}{' '}
+                  {(currentTablePage - 1) * tablePageSize + 1}
+                  {' – '}
+                  {(currentTablePage - 1) * tablePageSize + pagedLecturers.length} {st.of}{' '}
+                  {filteredLecturers.length} {st.results}
+                </p>
+
+                <div className="flex items-center gap-2">
+                  <div className="w-36">
+                    <Select
+                      aria-label={isVi ? 'Số dòng mỗi trang' : 'Rows per page'}
+                      value={String(tablePageSize)}
+                      onChange={(e) => {
+                        setTablePageSize(Number(e.target.value) || 10);
+                        setTablePage(1);
+                      }}
+                      options={[
+                        { value: '10', label: st.perPage10 },
+                        { value: '25', label: st.perPage25 },
+                        { value: '50', label: st.perPage50 },
+                      ]}
                     />
                   </div>
-                </div>
-
-                {/* Card Actions (Stitch Screen 538cba8b58674dfc93d356072df75498 line 350) */}
-                <div className="mt-5 pt-3 border-t border-slate-100 dark:border-slate-800 flex gap-2">
                   <Button
-                    className="flex-1 rounded-lg text-xs font-semibold"
-                    onClick={() => {
-                      setSelectedAdvisor(lec);
-                      setIsModalOpen(true);
-                    }}
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    aria-label={st.goToPreviousPage}
+                    disabled={currentTablePage <= 1}
+                    onClick={() => setTablePage((page) => Math.max(1, page - 1))}
                   >
-                    {isVi ? 'Xem chi tiết' : 'View Bio'}
+                    <ChevronLeft className="h-4 w-4" aria-hidden="true" />
                   </Button>
-                  <LinkButton
-                    href={`/dashboard/thesis?advisorId=${lec.id}&action=propose`}
-                    className="flex-1 w-full text-xs font-semibold bg-[#003f87] hover:bg-[#002a5d] text-white justify-center h-8"
+                  <span className="text-xs font-semibold text-foreground">
+                    {st.page} {currentTablePage} / {pageCount}
+                  </span>
+                  <Button
+                    type="button"
+                    variant="outline"
+                    size="icon"
+                    className="h-9 w-9"
+                    aria-label={st.goToNextPage}
+                    disabled={currentTablePage >= pageCount}
+                    onClick={() => setTablePage((page) => Math.min(pageCount, page + 1))}
                   >
-                    {isVi ? 'Chọn hướng dẫn' : 'Select'}
-                  </LinkButton>
-                </div>
-              </Card>
-            );
-          })}
-        </div>
-      ) : (
-        /* Ant Design High-density Data Table */
-        <div className="rounded-xl border border-slate-200/80 bg-white shadow-2xs overflow-hidden dark:border-slate-800 dark:bg-slate-900">
-          <Table<Lecturer>
-            columns={columns}
-            dataSource={filteredLecturers}
-            rowKey="id"
-            pagination={{ pageSize: 12, showSizeChanger: true }}
-            scroll={{ x: 900 }}
-            className="ant-table-custom"
-          />
-        </div>
-      )}
-
-      {/* Advisor Detail Modal (Antd Modal) */}
-      <Modal
-        title={
-          selectedAdvisor ? (
-            <div className="flex items-center gap-3">
-              <Avatar
-                size={42}
-                icon={<UserOutlined />}
-                src={selectedAdvisor.user?.avatar}
-                className="bg-[#003f87] text-white shrink-0 font-bold"
-              >
-                {getAdvisorFullName(selectedAdvisor).charAt(0).toUpperCase()}
-              </Avatar>
-              <div>
-                <div className="text-base font-bold text-foreground">
-                  {selectedAdvisor.title ? `${selectedAdvisor.title} ` : ''}
-                  {getAdvisorFullName(selectedAdvisor)}
-                </div>
-                <div className="text-xs text-muted-foreground font-normal font-mono">
-                  {selectedAdvisor.employeeId} • {isVi ? 'Giảng viên cơ hữu HCMUTE' : 'HCMUTE Faculty Member'}
+                    <ChevronRight className="h-4 w-4" aria-hidden="true" />
+                  </Button>
                 </div>
               </div>
             </div>
-          ) : null
+          )}
+        </>
+      )}
+
+      {/* Advisor Detail Modal */}
+      <Modal
+        isOpen={isModalOpen}
+        onClose={() => setIsModalOpen(false)}
+        title={
+          selectedAdvisor
+            ? `${selectedAdvisor.title ? `${selectedAdvisor.title} ` : ''}${getAdvisorFullName(selectedAdvisor)}`
+            : undefined
         }
-        open={isModalOpen}
-        onCancel={() => setIsModalOpen(false)}
-        footer={[
-          <Button key="close" onClick={() => setIsModalOpen(false)}>
-            {isVi ? 'Đóng' : 'Close'}
-          </Button>,
-          selectedAdvisor ? (
-            <LinkButton
-              key="select"
-              href={`/dashboard/thesis?advisorId=${selectedAdvisor.id}&action=propose`}
-              className="bg-[#003f87] text-white hover:bg-[#002a5d]"
-              onClick={() => setIsModalOpen(false)}
-            >
-              {isVi ? 'Đề xuất đề tài cùng Giảng viên này' : 'Propose Topic with Advisor'}
-            </LinkButton>
-          ) : null,
-        ]}
-        width={680}
+        className="max-w-2xl"
       >
         {selectedAdvisor ? (
           <div className="space-y-4 py-2">
-            <div className="grid grid-cols-2 gap-3 text-xs bg-slate-50 dark:bg-slate-800/60 p-3 rounded-lg border border-slate-100 dark:border-slate-800">
+            <div className="flex items-center gap-3">
+              <AdvisorAvatar lecturer={selectedAdvisor} size="lg" />
+              <div className="min-w-0">
+                <div className="font-mono text-xs text-muted-foreground">
+                  {selectedAdvisor.employeeId || '—'} • {isVi ? 'Giảng viên cơ hữu HCMUTE' : 'HCMUTE Faculty Member'}
+                </div>
+                <div className="mt-0.5 flex items-center gap-1.5 text-xs text-muted-foreground">
+                  <Users className="h-3.5 w-3.5" aria-hidden="true" />
+                  <span>{departmentName(selectedAdvisor.departmentId)}</span>
+                </div>
+              </div>
+            </div>
+
+            <div className="grid grid-cols-2 gap-3 rounded-lg border border-border/70 bg-secondary/40 p-3 text-xs">
               <div>
-                <span className="text-muted-foreground block">{isVi ? 'Khoa / Bộ môn:' : 'Department:'}</span>
-                <span className="font-semibold text-foreground">
-                  {departments.find((d) => d.id === selectedAdvisor.departmentId)?.name || 'Khoa Công nghệ Thông tin'}
-                </span>
+                <span className="block text-muted-foreground">{isVi ? 'Khoa / Bộ môn:' : 'Department:'}</span>
+                <span className="font-semibold text-foreground">{departmentName(selectedAdvisor.departmentId)}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block">{isVi ? 'Email học thuật:' : 'Email:'}</span>
+                <span className="block text-muted-foreground">{isVi ? 'Email học thuật:' : 'Email:'}</span>
                 <span className="font-semibold text-foreground">{selectedAdvisor.user?.email || '—'}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block">{isVi ? 'Phòng làm việc:' : 'Office:'}</span>
-                <span className="font-semibold text-foreground">{selectedAdvisor.office || 'Tòa nhà Trung tâm - HCMUTE'}</span>
+                <span className="block text-muted-foreground">{isVi ? 'Phòng làm việc:' : 'Office:'}</span>
+                <span className="font-semibold text-foreground">{selectedAdvisor.office || '—'}</span>
               </div>
               <div>
-                <span className="text-muted-foreground block">{isVi ? 'Điện thoại cơ quan:' : 'Phone:'}</span>
-                <span className="font-semibold text-foreground">{selectedAdvisor.phone || '028 3896 8641'}</span>
+                <span className="block text-muted-foreground">{isVi ? 'Điện thoại cơ quan:' : 'Phone:'}</span>
+                <span className="font-semibold text-foreground">{selectedAdvisor.phone || '—'}</span>
               </div>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+              <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {isVi ? 'Định hướng nghiên cứu & Chuyên môn' : 'Research Interests & Fields'}
               </h4>
-              <p className="text-sm text-foreground leading-relaxed">
-                {selectedAdvisor.specialization ||
-                  (isVi
-                    ? 'Chuyên sâu về kiến trúc phần mềm phân tán, ứng dụng trí tuệ nhân tạo, xử lý dữ liệu lớn và các giải pháp chuyển đổi số cho doanh nghiệp giáo dục.'
-                    : 'Specialized in distributed software architectures, applied AI, big data systems, and digital transformation for higher education.')}
+              <p className="text-sm leading-relaxed text-foreground">
+                {selectedAdvisor.specialization || '—'}
               </p>
             </div>
 
             <div>
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-1.5">
+              <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
+                {isVi ? 'Tải hướng dẫn hiện tại' : 'Current supervision load'}
+              </h4>
+              <div className="space-y-2 rounded-lg border border-border/70 bg-secondary/40 p-3">
+                <div className="flex items-center justify-between text-xs font-semibold">
+                  <span className="text-muted-foreground">
+                    {isVi ? 'Số đề tài đang hướng dẫn' : 'Supervised topics'}
+                  </span>
+                  <span className="text-foreground">
+                    {workloadFor(advisorWorkloadMap, selectedAdvisor.id).topicCount} /{' '}
+                    {workloadFor(advisorWorkloadMap, selectedAdvisor.id).maxTopics}
+                  </span>
+                </div>
+                <QuotaBar {...workloadFor(advisorWorkloadMap, selectedAdvisor.id)} />
+              </div>
+            </div>
+
+            <div>
+              <h4 className="mb-1.5 text-xs font-bold uppercase tracking-wider text-muted-foreground">
                 {isVi ? 'Quy định hướng dẫn & Đăng ký' : 'Supervision Guidelines'}
               </h4>
-              <ul className="text-xs text-slate-600 dark:text-slate-300 space-y-1 list-disc pl-4">
-                <li>{isVi ? 'Sinh viên cần chuẩn bị trước đề cương sơ bộ trước khi gặp giảng viên.' : 'Students should prepare an initial outline before scheduling an appointment.'}</li>
-                <li>{isVi ? 'Nhóm thực hiện tối đa 2-3 sinh viên theo quy chế đào tạo hiện hành.' : 'Each team consists of 2-3 students according to academic regulations.'}</li>
-                <li>{isVi ? 'Báo cáo tiến độ định kỳ vào thứ 3 và thứ 5 hàng tuần.' : 'Weekly milestone report submitted every Tuesday and Thursday.'}</li>
+              <ul className="list-disc space-y-1 pl-4 text-xs text-muted-foreground">
+                <li>
+                  {isVi
+                    ? 'Mỗi đề tài có 1–2 giảng viên hướng dẫn (hướng dẫn chính và đồng hướng dẫn).'
+                    : 'Each topic has 1–2 supervising lecturers (primary and co-supervisor).'}
+                </li>
+                <li>
+                  {isVi
+                    ? 'Mỗi nhóm đăng ký đúng một đề tài; giảng viên hướng dẫn phê duyệt hoặc từ chối kèm lý do.'
+                    : 'Each group registers exactly one topic; the supervisor approves or rejects it with a reason.'}
+                </li>
+                <li>
+                  {isVi
+                    ? 'Sinh viên nên chuẩn bị đề cương sơ bộ trước khi liên hệ giảng viên.'
+                    : 'Students should prepare an initial outline before contacting a supervisor.'}
+                </li>
               </ul>
+            </div>
+
+            <div className="flex justify-end gap-2 border-t border-border/70 pt-4">
+              <Button type="button" variant="outline" onClick={() => setIsModalOpen(false)}>
+                {isVi ? 'Đóng' : 'Close'}
+              </Button>
+              <LinkButton
+                href={`/dashboard/thesis?advisorId=${selectedAdvisor.id}&action=propose`}
+                onClick={() => setIsModalOpen(false)}
+              >
+                {isVi ? 'Đề xuất đề tài cùng Giảng viên này' : 'Propose Topic with Advisor'}
+              </LinkButton>
             </div>
           </div>
         ) : null}

@@ -71,6 +71,34 @@ module.exports = {
             foreground: "hsl(var(--status-neutral-foreground))",
           },
         },
+        // The portal chrome tokens are authored as complete `oklch()` colours,
+        // not HSL triplets, so they are referenced directly rather than wrapped
+        // in `hsl()`. Exposing them as first-class utilities removes the need for
+        // `bg-[var(--portal-surface)]` arbitrary values, where a mistyped token
+        // name fails silently as a transparent background instead of failing the
+        // build. Purely additive: existing arbitrary-value call sites keep working.
+        portal: {
+          sidebar: {
+            DEFAULT: "var(--portal-sidebar)",
+            strong: "var(--portal-sidebar-strong)",
+            hover: "var(--portal-sidebar-hover)",
+            text: "var(--portal-sidebar-text)",
+            muted: "var(--portal-sidebar-muted)",
+          },
+          canvas: "var(--portal-canvas)",
+          surface: "var(--portal-surface)",
+          rule: "var(--portal-rule)",
+          ribbon: "var(--portal-ribbon)",
+          scrim: "var(--portal-scrim)",
+          yellow: {
+            DEFAULT: "var(--portal-yellow)",
+            ink: "var(--portal-yellow-ink)",
+          },
+          "brand-gold": {
+            DEFAULT: "var(--portal-brand-gold)",
+            ink: "var(--portal-brand-gold-ink)",
+          },
+        },
       },
       borderRadius: {
         lg: "var(--radius)",

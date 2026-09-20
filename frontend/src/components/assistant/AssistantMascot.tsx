@@ -1,145 +1,120 @@
 import { cn } from '@/lib/utils';
 
-export interface AssistantMascotProps {
-  className?: string;
-  /** Adds a gentle "thinking" pulse/glow while the assistant is replying. */
-  active?: boolean;
-  /**
-   * - 'icon': crisp vector using currentColor for seamless UI integration (sidebar, buttons, inputs).
-   * - 'detailed': full collegiate vector with rich institutional navy, amber gold, and glowing cyan optics.
-   */
-  variant?: 'icon' | 'detailed';
-}
+/**
+ * Visual treatment of the mark.
+ *
+ * - `icon`    — pure `currentColor` outline. For inline glyphs inside text and
+ *               for small controls, where the mark must inherit the surrounding
+ *               text colour and never introduce its own palette.
+ * - `detailed`— `currentColor` at two opacity tiers plus a single antique-gold
+ *               accent. Adapts to whatever surface it sits on, so the same mark
+ *               is legible on the deep-navy portal chrome and on a light card.
+ * - `brand`   — the fixed brand lockup (institutional navy body, warm off-white
+ *               facing, gold accent). Only for light or neutral surfaces; use
+ *               `detailed` on any dark or tinted surface.
+ */
+export type AssistantMascotVariant = 'icon' | 'detailed' | 'brand';
 
 /**
- * CampusUTE Academic AI Scholar Mascot & Icon.
+ * Expression of the mark. Differences are intentionally small and are drawn to
+ * stay readable from about 20px upward; below that the silhouettes still differ
+ * but the expression details are not resolvable.
  *
- * Designed with Google Stitch MCP for CampusCore / CampusUTE.
- * Blends academic authority (graduation mortarboard cap with golden tassel)
- * with intelligent AI robotics (sleek cyber visor, smart optics, and audio sensors).
+ * - `idle`      — resting scholar.
+ * - `listening` — the assistant is receiving input.
+ * - `thinking`  — a request is in flight awaiting a reply.
+ * - `answering` — a reply is streaming.
+ */
+export type AssistantMascotState = 'idle' | 'listening' | 'thinking' | 'answering';
+
+export interface AssistantMascotProps {
+  className?: string;
+  /** Convenience flag: maps to `state="thinking"` for backwards compatibility. */
+  active?: boolean;
+  variant?: AssistantMascotVariant;
+  state?: AssistantMascotState;
+}
+
+const BRAND_NAVY = '#003F87';
+const BRAND_GOLD = '#C5B358';
+const BRAND_FACE = '#FBF8F1';
+
+/**
+ * CampusUTE academic-scholar mascot: an owl in a mortarboard, seated on an open
+ * book.
  *
- * Fully scalable from 14px micro-tokens up to large hero displays.
+ * The owl is drawn as flat geometry with no gradients and no raster shading, so
+ * it reproduces exactly as hand-authored SVG and stays crisp from a 14px inline
+ * glyph up to a hero lockup. It deliberately carries an academic motif (cap,
+ * tassel, faculty facial discs, open book) rather than a cybernetic one, because
+ * the assistant is an academic-advising office rather than a technology product.
+ *
+ * The `detailed` and `icon` variants draw entirely in `currentColor`, which is
+ * what makes the mark legible on every surface the portal uses: on the navy
+ * assistant header it inherits the light text colour, on a light card it
+ * inherits the dark text colour. Only the tassel and the beak take the gold
+ * accent, which is the single accent the brand permits.
  */
 export function AssistantMascot({
   className,
   active = false,
   variant = 'icon',
+  state,
 }: AssistantMascotProps) {
-  if (variant === 'detailed') {
-    return (
-      <svg
-        viewBox="0 0 24 24"
-        fill="none"
-        xmlns="http://www.w3.org/2000/svg"
-        aria-hidden="true"
-        className={cn(
-          'shrink-0',
-          active && 'motion-safe:animate-pulse motion-reduce:animate-none',
-          className,
-        )}
-      >
-        <defs>
-          <linearGradient id="mascotGold" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#70E4FF" />
-            <stop offset="50%" stopColor="#38BDF8" />
-            <stop offset="100%" stopColor="#0284C7" />
-          </linearGradient>
-          <linearGradient id="mascotNavy" x1="0%" y1="0%" x2="0%" y2="100%">
-            <stop offset="0%" stopColor="#0F2B5C" />
-            <stop offset="100%" stopColor="#0B192C" />
-          </linearGradient>
-          <linearGradient id="mascotOptic" x1="0%" y1="0%" x2="100%" y2="100%">
-            <stop offset="0%" stopColor="#70E4FF" />
-            <stop offset="100%" stopColor="#0284C7" />
-          </linearGradient>
-        </defs>
+  const resolvedState: AssistantMascotState = state ?? (active ? 'thinking' : 'idle');
+  const isBrand = variant === 'brand';
+  const isIcon = variant === 'icon';
 
-        {/* Cap skull rim underneath */}
-        <path
-          d="M6.8 7.4 C6.8 7.4 8.6 9.8 12 9.8 C15.4 9.8 17.2 7.4 17.2 7.4"
-          fill="#0F2B5C"
-          stroke="#1E3A8A"
-          strokeWidth="0.8"
-        />
+  // Body strokes: `icon` needs weight to survive 14px; `detailed` is drawn at
+  // sizes where a finer line reads better.
+  const bodyStroke = isIcon ? 1.35 : 1.15;
+  const detailStroke = isIcon ? 1.1 : 0.95;
 
-        {/* Head Shell */}
-        <rect
-          x="4.8"
-          y="9.2"
-          width="14.4"
-          height="11.4"
-          rx="4"
-          fill="#FFFFFF"
-          stroke="#CBD5E1"
-          strokeWidth="1"
-        />
+  // Body plane and facing fill. `icon` stays purely monochrome so it can sit
+  // inside a run of text; `detailed` separates the planes with opacity tiers.
+  //
+  // The facing must be DARKER than the head, not equal to it: both draw in
+  // `currentColor`, so an equal-tier pair collapses the owl's face into one
+  // solid mass at small sizes. The head stays a light tint and the facial discs
+  // take the heavier tint, which is what makes the owl read as an owl.
+  const bodyFill = isBrand ? BRAND_NAVY : 'currentColor';
+  const bodyFillOpacity = isBrand ? 1 : 0.12;
+  const facingFill = isBrand ? BRAND_FACE : 'currentColor';
+  const facingFillOpacity = isBrand ? 1 : 0.34;
+  const accent = BRAND_GOLD;
 
-        {/* Ear Sensors */}
-        <path
-          d="M4.8 13.2H3.8a0.8 0.8 0 0 0 0 1.6h1"
-          stroke="url(#mascotGold)"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-        />
-        <path
-          d="M19.2 13.2h1a0.8 0.8 0 0 1 0 1.6h-1"
-          stroke="url(#mascotGold)"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-        />
+  // Outer silhouette stroke. In `brand` mode the body fill is a fixed navy, which
+  // would vanish on a navy surface, so the silhouette keyline follows
+  // `currentColor`: dark on a light surface (matching the fill), light on a dark
+  // one (holding the edge). The brand lockup is still intended for light or
+  // neutral surfaces — `detailed` is the correct choice on dark or tinted
+  // chrome — but a misuse can no longer render an invisible mark.
+  const silhouetteStroke = 'currentColor';
+  const interiorStroke = isBrand ? BRAND_NAVY : 'currentColor';
 
-        {/* Cyber Visor */}
-        <rect
-          x="6.8"
-          y="11"
-          width="10.4"
-          height="6"
-          rx="2.2"
-          fill="url(#mascotNavy)"
-        />
+  // Pupils shift to carry the expression without redrawing the silhouette.
+  const pupilShift =
+    resolvedState === 'thinking'
+      ? { dx: 0.34, dy: -0.34 }
+      : resolvedState === 'listening'
+        ? { dx: 0, dy: 0.24 }
+        : { dx: 0, dy: 0 };
 
-        {/* Glowing Smart Optics */}
-        <circle cx="9.8" cy="14" r="1.3" fill="url(#mascotOptic)" />
-        <circle cx="9.8" cy="14" r="0.5" fill="#FFFFFF" />
-        <circle cx="14.2" cy="14" r="1.3" fill="url(#mascotOptic)" />
-        <circle cx="14.2" cy="14" r="0.5" fill="#FFFFFF" />
+  const eyeRadius = resolvedState === 'listening' ? 1.26 : 1.1;
+  const glint = (cx: number, cy: number, key: string) => (
+    <circle
+      key={key}
+      cx={cx + pupilShift.dx - 0.38}
+      cy={cy + pupilShift.dy - 0.38}
+      r={0.4}
+      fill={BRAND_FACE}
+      opacity={isIcon ? 0 : 0.9}
+    />
+  );
 
-        {/* Micro Smile / Waveform */}
-        <path
-          d="M10.8 15.8 Q12 16.5 13.2 15.8"
-          stroke="url(#mascotGold)"
-          strokeWidth="0.9"
-          strokeLinecap="round"
-          fill="none"
-        />
+  const leftEye = { cx: 9.1, cy: 13.9 };
+  const rightEye = { cx: 14.9, cy: 13.9 };
 
-        {/* Academic Mortarboard Diamond Cap */}
-        <polygon
-          points="12,2.2 21.6,5.8 12,9.4 2.4,5.8"
-          fill="#0B192C"
-          stroke="url(#mascotGold)"
-          strokeWidth="1.2"
-          strokeLinejoin="round"
-        />
-
-        {/* Cap Button */}
-        <circle cx="12" cy="5.8" r="0.9" fill="url(#mascotGold)" />
-
-        {/* Golden Tassel ribbon */}
-        <path
-          d="M12 5.8 Q8.5 7.2 7 9.6 Q6.2 11.2 6.2 12.8"
-          stroke="url(#mascotGold)"
-          strokeWidth="1.2"
-          strokeLinecap="round"
-          fill="none"
-        />
-        {/* Tassel Fringe */}
-        <polygon points="6.2,12.8 5.2,14.6 7.2,14.6" fill="url(#mascotGold)" />
-      </svg>
-    );
-  }
-
-  // Standard lightweight vector (variant === 'icon')
   return (
     <svg
       viewBox="0 0 24 24"
@@ -148,93 +123,135 @@ export function AssistantMascot({
       aria-hidden="true"
       className={cn(
         'shrink-0',
-        active && 'motion-safe:animate-pulse motion-reduce:animate-none',
+        resolvedState === 'thinking' && 'motion-safe:animate-pulse motion-reduce:animate-none',
         className,
       )}
     >
-      {/* Mortarboard Skull Rim */}
+      {/* Mortarboard board */}
       <path
-        d="M6.8 7.4 C6.8 7.4 8.6 9.8 12 9.8 C15.4 9.8 17.2 7.4 17.2 7.4"
-        stroke="currentColor"
-        strokeWidth="1.2"
-        strokeLinecap="round"
-        fill="none"
-      />
-
-      {/* Head Shell */}
-      <rect
-        x="4.8"
-        y="9.2"
-        width="14.4"
-        height="11.4"
-        rx="4"
-        stroke="currentColor"
-        strokeWidth="1.4"
-      />
-
-      {/* Cyber Visor */}
-      <rect
-        x="6.8"
-        y="11"
-        width="10.4"
-        height="6"
-        rx="2.2"
-        fill="currentColor"
-        fillOpacity="0.16"
-        stroke="currentColor"
-        strokeWidth="1.1"
-      />
-
-      {/* Optics / Eyes */}
-      <circle cx="9.8" cy="14" r="1.25" fill="currentColor" />
-      <circle cx="14.2" cy="14" r="1.25" fill="currentColor" />
-
-      {/* Micro Smile */}
-      <path
-        d="M10.8 15.8 Q12 16.5 13.2 15.8"
-        stroke="currentColor"
-        strokeWidth="1"
-        strokeLinecap="round"
-        fill="none"
-      />
-
-      {/* Ear Sensors */}
-      <path
-        d="M4.8 13.2H3.8a0.8 0.8 0 0 0 0 1.6h1"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinecap="round"
-      />
-      <path
-        d="M19.2 13.2h1a0.8 0.8 0 0 1 0 1.6h-1"
-        stroke="currentColor"
-        strokeWidth="1.1"
-        strokeLinecap="round"
-      />
-
-      {/* Mortarboard Diamond Cap */}
-      <polygon
-        points="12,2.2 21.6,5.8 12,9.4 2.4,5.8"
-        stroke="currentColor"
-        strokeWidth="1.4"
+        d="M12 1.7 L21.7 5.5 L12 9.3 L2.3 5.5 Z"
+        fill={isBrand ? BRAND_NAVY : 'currentColor'}
+        fillOpacity={isBrand ? 1 : 0.16}
+        stroke={silhouetteStroke}
+        strokeWidth={bodyStroke}
         strokeLinejoin="round"
-        fill="currentColor"
-        fillOpacity="0.18"
       />
+      {/* Cap button */}
+      <circle cx="12" cy="5.5" r="0.78" fill={isBrand ? BRAND_FACE : 'currentColor'} />
 
-      {/* Cap Center Button */}
-      <circle cx="12" cy="5.8" r="0.9" fill="currentColor" />
-
-      {/* Tassel Ribbon */}
+      {/* Tassel ribbon — the mark's single gold accent */}
       <path
-        d="M12 5.8 Q8.5 7.2 7 9.6 Q6.2 11.2 6.2 12.8"
-        stroke="currentColor"
-        strokeWidth="1.2"
+        d="M12 5.5 C14.7 5.9 16.7 7.5 17.5 9.7"
+        stroke={accent}
+        strokeWidth={detailStroke}
         strokeLinecap="round"
-        fill="none"
       />
-      {/* Tassel Fringe */}
-      <polygon points="6.2,12.8 5.2,14.6 7.2,14.6" fill="currentColor" />
+      {/* Tassel fringe */}
+      <path d="M17.5 9.5 L19 11.7 L16.1 11.7 Z" fill={accent} />
+
+      {/* Owl head */}
+      <path
+        d="M5.5 12.5 C5.5 10.3 8.4 9.4 12 9.4 C15.6 9.4 18.5 10.3 18.5 12.5 L18.5 15.3 C18.5 18 15.6 19.6 12 19.6 C8.4 19.6 5.5 18 5.5 15.3 Z"
+        fill={bodyFill}
+        fillOpacity={bodyFillOpacity}
+        stroke={silhouetteStroke}
+        strokeWidth={bodyStroke}
+        strokeLinejoin="round"
+      />
+
+      {/* Facial discs — the owl's defining feature */}
+      <circle
+        cx={leftEye.cx}
+        cy={leftEye.cy}
+        r="2.6"
+        fill={facingFill}
+        fillOpacity={facingFillOpacity}
+        stroke={interiorStroke}
+        strokeWidth={detailStroke}
+      />
+      <circle
+        cx={rightEye.cx}
+        cy={rightEye.cy}
+        r="2.6"
+        fill={facingFill}
+        fillOpacity={facingFillOpacity}
+        stroke={interiorStroke}
+        strokeWidth={detailStroke}
+      />
+
+      {/* Attentive eyes */}
+      <circle
+        cx={leftEye.cx + pupilShift.dx}
+        cy={leftEye.cy + pupilShift.dy}
+        r={eyeRadius}
+        fill={isBrand ? BRAND_NAVY : 'currentColor'}
+      />
+      <circle
+        cx={rightEye.cx + pupilShift.dx}
+        cy={rightEye.cy + pupilShift.dy}
+        r={eyeRadius}
+        fill={isBrand ? BRAND_NAVY : 'currentColor'}
+      />
+      {glint(leftEye.cx, leftEye.cy, 'glint-left')}
+      {glint(rightEye.cx, rightEye.cy, 'glint-right')}
+
+      {/* Beak */}
+      <path
+        d="M12 14.2 L13.15 15.8 L12 17.3 L10.85 15.8 Z"
+        fill={accent}
+      />
+
+      {/* Open book the scholar sits on */}
+      <path
+        d="M7.2 19.9 C8.7 19.3 10.4 19.3 12 20.15 C13.6 19.3 15.3 19.3 16.8 19.9 L16.8 21.9 C15.3 21.3 13.6 21.3 12 22.15 C10.4 21.3 8.7 21.3 7.2 21.9 Z"
+        fill={bodyFill}
+        fillOpacity={isBrand ? 1 : 0.2}
+        stroke={silhouetteStroke}
+        strokeWidth={detailStroke}
+        strokeLinejoin="round"
+      />
+
+      {/* Expression accents */}
+      {resolvedState === 'listening' && (
+        <>
+          <path
+            d="M3.4 12.1 A2.5 2.5 0 0 0 3.4 15.7"
+            stroke={accent}
+            strokeWidth={detailStroke}
+            strokeLinecap="round"
+          />
+          <path
+            d="M20.6 12.1 A2.5 2.5 0 0 1 20.6 15.7"
+            stroke={accent}
+            strokeWidth={detailStroke}
+            strokeLinecap="round"
+          />
+        </>
+      )}
+      {resolvedState === 'thinking' && (
+        <>
+          <circle cx="19.3" cy="8.4" r="0.62" fill={accent} />
+          <circle cx="21" cy="6.8" r="0.52" fill={accent} />
+          <circle cx="22.3" cy="5.1" r="0.42" fill={accent} />
+        </>
+      )}
+      {resolvedState === 'answering' && (
+        <>
+          <path
+            d="M17.9 15.1 A3.2 3.2 0 0 1 17.9 19.1"
+            stroke={accent}
+            strokeWidth={detailStroke}
+            strokeLinecap="round"
+          />
+          <path
+            d="M20.1 13.7 A5.2 5.2 0 0 1 20.1 20.5"
+            stroke={accent}
+            strokeWidth={detailStroke}
+            strokeLinecap="round"
+            opacity="0.65"
+          />
+        </>
+      )}
     </svg>
   );
 }

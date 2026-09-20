@@ -1397,7 +1397,7 @@ export const en = {
     approveSuccess: 'Group approved successfully.',
     rejectSuccess: 'Group rejected.',
     groupTooSmall:
-      'A thesis group must have at least 2 members before it can be approved (per HCMUTE academic regulations).',
+      'A thesis group must have 3 to 4 members, with exactly one group leader, before it can be approved (per HCMUTE academic regulations).',
     groupStateConflict:
       'Only pending groups with an assigned topic can be approved.',
     topicStateConflict:
@@ -3197,7 +3197,7 @@ export const vi: I18nMessages = {
     approveSuccess: 'Đã duyệt nhóm đề tài.',
     rejectSuccess: 'Đã từ chối nhóm đề tài.',
     groupTooSmall:
-      'Nhóm khóa luận cần có tối thiểu 2 thành viên trước khi được xét duyệt (theo Quy định đào tạo HCM-UTE).',
+      'Nhóm khóa luận phải có từ 3 đến 4 thành viên, với đúng một nhóm trưởng, trước khi được xét duyệt (theo Quy định đào tạo HCM-UTE).',
     groupStateConflict:
       'Chỉ nhóm đang chờ xét duyệt (PENDING) và đã đăng ký đề tài mới có thể được duyệt.',
     topicStateConflict:

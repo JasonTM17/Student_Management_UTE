@@ -1896,7 +1896,7 @@ export default function AcademicEditorPage() {
           {TEMPLATES.map((tmpl) => (
             <Card key={tmpl.id} className="flex flex-col justify-between hover:border-primary/50 transition-colors">
               <CardHeader>
-                <CardTitle className="text-base font-bold text-slate-800 flex items-center gap-2">
+                <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
                   <BookOpen className="h-4 w-4 text-primary" />
                   {isVi ? tmpl.nameVi : tmpl.nameEn}
                 </CardTitle>

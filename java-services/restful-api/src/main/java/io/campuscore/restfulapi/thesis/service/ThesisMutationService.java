@@ -154,7 +154,48 @@ public class ThesisMutationService {
                             + "WHERE id = :id AND lecturer_submit_start IS NOT NULL AND lecturer_submit_start > CURRENT_TIMESTAMP",
                     params().addValue("id", id));
         }
+        if (next == RoundStatus.REGISTRATION_OPEN) {
+            requireLiveRegistrationWindow(id);
+        }
         return roundReads.get(id);
+    }
+
+    /**
+     * The stored registration window is normative for every registration
+     * mutation ({@link #requireRoundStatus}) and for the student registration
+     * CTA, so the transition into REGISTRATION_OPEN must not be able to create a
+     * round that renders as "registration open" while every group and topic
+     * action answers 409 REGISTRATION_WINDOW_CLOSED.
+     *
+     * <p>An out-of-window transition is rejected rather than accepted: the
+     * PROPOSAL_OPEN clamp above cannot be mirrored here, because
+     * {@code registration_start >= lecturer_submit_end} is part of the authored
+     * two-phase schedule (enforced by thesis_round_schedule_order_valid), so
+     * moving the registration start to "now" would silently rewrite the
+     * published schedule and can violate that oracle. REGISTRATION_OPEN is
+     * therefore only reachable inside the window the faculty authored.
+     */
+    private void requireLiveRegistrationWindow(UUID id) {
+        Map<String, Object> round = one(
+                "SELECT registration_start, registration_end FROM thesis.thesis_registration_round WHERE id = :id",
+                params().addValue("id", id), "ROUND_NOT_FOUND", "Thesis registration round not found");
+        Instant now = Instant.now();
+        Instant start = instantOf(round.get("registration_start"));
+        Instant end = instantOf(round.get("registration_end"));
+        if (start == null || end == null) {
+            throw conflict("REGISTRATION_WINDOW_CLOSED",
+                    "The round has no usable registration window (start: " + start + ", end: " + end
+                            + "); amend the round schedule before opening registration");
+        }
+        if (!now.isBefore(end)) {
+            throw conflict("REGISTRATION_WINDOW_CLOSED",
+                    "The registration window is already closed for this round (window: " + start + " to " + end
+                            + "); amend the round schedule before opening registration");
+        }
+        if (now.isBefore(start)) {
+            throw conflict("REGISTRATION_WINDOW_NOT_OPEN",
+                    "Registration opens on " + start + "; the round cannot be opened before its scheduled window");
+        }
     }
 
     /**
@@ -303,7 +344,8 @@ public class ThesisMutationService {
             requireMutableMembership(group, actor);
         }
         if (count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) >= MAX_GROUP_MEMBERS) {
-            throw conflict("GROUP_FULL", "A thesis group can have at most four members");
+            throw conflict("GROUP_FULL", "A thesis group can have at most " + MAX_GROUP_MEMBERS
+                    + " members (allowed range: " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS + ")");
         }
         String studentId = normalize(request == null ? null : request.studentId());
         if (studentId.isBlank()) {
@@ -357,9 +399,15 @@ public class ThesisMutationService {
         if (group.leaderStudentId().equals(normalized)) {
             throw conflict("LEADER_CANNOT_BE_REMOVED", "The group leader cannot be removed");
         }
-        if (group.approvalStatus() == ApprovalStatus.APPROVED
-                && count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId) <= MIN_GROUP_MEMBERS) {
-            throw conflict("GROUP_TOO_SMALL", "An approved thesis group must retain at least three members");
+        if (group.approvalStatus() == ApprovalStatus.APPROVED) {
+            Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId);
+            if (memberCount != null && memberCount <= MIN_GROUP_MEMBERS) {
+                int remaining = memberCount - 1;
+                throw conflict("GROUP_TOO_SMALL", "An approved thesis group must keep " + MIN_GROUP_MEMBERS + " to "
+                        + MAX_GROUP_MEMBERS + " members; this removal would leave " + remaining + " ("
+                        + (MIN_GROUP_MEMBERS - remaining) + " short of the minimum of " + MIN_GROUP_MEMBERS
+                        + ", add a replacement member first)");
+            }
         }
         if (jdbc.update("DELETE FROM thesis.thesis_group_member WHERE group_id = :groupId AND student_id = :studentId", params().addValue("groupId", groupId).addValue("studentId", normalized)) != 1) {
             throw notFound("MEMBER_NOT_FOUND", "Group member not found");
@@ -434,10 +482,15 @@ public class ThesisMutationService {
         }
         Integer memberCount = count("SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId", groupId);
         if (memberCount == null || memberCount < MIN_GROUP_MEMBERS) {
-            throw conflict("GROUP_TOO_SMALL", "A thesis group needs at least three members before it can be approved");
+            int present = memberCount == null ? 0 : memberCount;
+            throw conflict("GROUP_TOO_SMALL", "A thesis group needs " + MIN_GROUP_MEMBERS + " to " + MAX_GROUP_MEMBERS
+                    + " members before it can be approved; this group has " + present + " ("
+                    + (MIN_GROUP_MEMBERS - present) + " short of the minimum of " + MIN_GROUP_MEMBERS
+                    + ", invite more classmates first)");
         }
         if (memberCount > MAX_GROUP_MEMBERS) {
-            throw conflict("GROUP_TOO_LARGE", "A thesis group can have at most four members");
+            throw conflict("GROUP_TOO_LARGE", "A thesis group can have " + MIN_GROUP_MEMBERS + " to "
+                    + MAX_GROUP_MEMBERS + " members; this group has " + memberCount);
         }
         Integer leaderCount = count(
                 "SELECT COUNT(*) FROM thesis.thesis_group_member WHERE group_id = :groupId AND is_leader = TRUE",
