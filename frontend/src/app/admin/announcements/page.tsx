@@ -7,6 +7,7 @@ import {
   ArrowUpDown,
   Bell,
   CalendarClock,
+  Check,
   History,
   Pencil,
   Plus,
@@ -1030,12 +1031,34 @@ export default function AdminAnnouncementsPage() {
                     <fieldset className="space-y-2">
                       <legend className="text-sm font-medium text-foreground">{copy.targeted}</legend>
                       <div className="grid gap-2 sm:grid-cols-2">
-                        {ANNOUNCEMENT_ROLES.map((role) => (
-                          <label key={role} className="inline-flex min-h-11 items-center gap-3 rounded-md border border-border/70 px-3 text-sm text-foreground hover:bg-secondary/50">
-                            <input type="checkbox" className="h-4 w-4 accent-primary" checked={draft.targetRoles.includes(role)} onChange={(event) => setDraft((current) => ({ ...current, targetRoles: event.target.checked ? [...new Set([...current.targetRoles, role])] : current.targetRoles.filter((value) => value !== role) }))} />
-                            {announcementRoleLabel(role, locale)}
-                          </label>
-                        ))}
+                        {ANNOUNCEMENT_ROLES.map((role) => {
+                          const selected = draft.targetRoles.includes(role);
+                          return (
+                            <button
+                              key={role}
+                              type="button"
+                              aria-pressed={selected}
+                              onClick={() => setDraft((current) => ({ ...current, targetRoles: selected ? current.targetRoles.filter((value) => value !== role) : [...new Set([...current.targetRoles, role])] }))}
+                              className={cn(
+                                'inline-flex min-h-11 items-center gap-2.5 rounded-md border px-3 text-sm transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
+                                selected
+                                  ? 'border-primary/50 bg-primary/10 font-semibold text-foreground'
+                                  : 'border-border/70 text-muted-foreground hover:bg-secondary/50 hover:text-foreground',
+                              )}
+                            >
+                              <span
+                                aria-hidden="true"
+                                className={cn(
+                                  'inline-flex h-4 w-4 shrink-0 items-center justify-center rounded border',
+                                  selected ? 'border-primary bg-primary text-primary-foreground' : 'border-input bg-background',
+                                )}
+                              >
+                                {selected ? <Check className="h-3 w-3" /> : null}
+                              </span>
+                              {announcementRoleLabel(role, locale)}
+                            </button>
+                          );
+                        })}
                       </div>
                     </fieldset>
                   ) : null}
@@ -1129,10 +1152,15 @@ export default function AdminAnnouncementsPage() {
                 </Card>
               </aside>
             </div>
-            <AdminDialogFooter className="border-t border-border/70 pt-4">
-              <Button type="button" variant="outline" onClick={closeModal} disabled={busy}>{copy.cancel}</Button>
-              <Button type="submit" disabled={busy}>{busy ? (vi ? 'Đang lưu…' : 'Saving…') : editorMode === 'edit' ? copy.save : copy.createSave}</Button>
-            </AdminDialogFooter>
+            {/* Sticky action bar: the dialog body owns its own scroll container,
+                so the save/publish row rides at the bottom of it instead of
+                scrolling out of reach behind a long document. */}
+            <div className="sticky bottom-4 z-10 -mx-5 bg-card px-5">
+              <AdminDialogFooter className="border-t border-border/70 pt-4">
+                <Button type="button" variant="outline" onClick={closeModal} disabled={busy}>{copy.cancel}</Button>
+                <Button type="submit" disabled={busy}>{busy ? (vi ? 'Đang lưu…' : 'Saving…') : editorMode === 'edit' ? copy.save : copy.createSave}</Button>
+              </AdminDialogFooter>
+            </div>
           </form>
         </Modal>
       ) : null}
@@ -1251,10 +1279,10 @@ export default function AdminAnnouncementsPage() {
                             className={cn(
                               'rounded px-1.5 py-0.5 font-medium',
                               item.priority === 'URGENT'
-                                ? 'text-red-600 bg-red-500/10'
+                                ? 'text-status-danger-foreground bg-status-danger/10'
                                 : item.priority === 'HIGH'
-                                ? 'text-amber-600 bg-amber-500/10'
-                                : 'text-blue-600 bg-blue-500/10'
+                                ? 'text-status-warning-foreground bg-status-warning/10'
+                                : 'text-status-info-foreground bg-status-info/10'
                             )}
                           >
                             {announcementPriorityLabel(item.priority, locale)}

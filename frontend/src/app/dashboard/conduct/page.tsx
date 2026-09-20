@@ -420,15 +420,15 @@ export default function StudentConductPage() {
     switch (rank?.toUpperCase()) {
       case 'XUAT_SAC':
       case 'XUẤT SẮC':
-        return 'bg-status-success/12 text-status-success-foreground border-status-success/30';
+        return 'bg-status-success/15 text-status-success-foreground border-status-success/30';
       case 'TOT':
       case 'TỐT':
-        return 'bg-status-info/12 text-status-info-foreground border-status-info/30';
+        return 'bg-status-info/15 text-status-info-foreground border-status-info/30';
       case 'KHA':
       case 'KHÁ':
-        return 'bg-status-warning/12 text-status-warning-foreground border-status-warning/30';
+        return 'bg-status-warning/15 text-status-warning-foreground border-status-warning/30';
       default:
-        return 'bg-status-neutral/12 text-status-neutral-foreground border-status-neutral/30';
+        return 'bg-status-neutral/15 text-status-neutral-foreground border-status-neutral/30';
     }
   };
 
@@ -583,7 +583,7 @@ export default function StudentConductPage() {
                 <Sparkles className="h-4 w-4 text-status-warning-foreground" />
                 {copy.activitiesTitle}
               </span>
-              <span className="rounded-md bg-status-warning/12 px-2.5 py-0.5 text-xs font-bold text-status-warning-foreground">
+              <span className="rounded-md bg-status-warning/15 px-2.5 py-0.5 text-xs font-bold text-status-warning-foreground">
                 +{(activeSemesterScore?.activities || []).reduce((sum, a) => sum + (a.points || 0), 0).toFixed(1)} {copy.bonusPoints}
               </span>
             </div>
@@ -728,7 +728,7 @@ export default function StudentConductPage() {
                       <h4 className="break-words text-sm font-semibold text-foreground">{details.title}</h4>
                       <p className="mt-1 text-xs text-muted-foreground">{details.category}</p>
                     </div>
-                    <span className="shrink-0 rounded-md bg-status-success/12 px-2 py-0.5 text-xs font-bold text-status-success-foreground">
+                    <span className="shrink-0 rounded-md bg-status-success/15 px-2 py-0.5 text-xs font-bold text-status-success-foreground">
                       +{formatNumber(act.points)}
                     </span>
                   </div>
@@ -797,7 +797,7 @@ export default function StudentConductPage() {
                         +{formatNumber(act.points)} {copy.scoreUnit}
                       </td>
                       <td className="px-4 py-3 text-center">
-                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${semesterStatus.approved ? 'bg-status-success/12 text-status-success-foreground' : 'bg-status-neutral/12 text-status-neutral-foreground'}`}>
+                        <span className={`inline-flex items-center gap-1 rounded-md px-2 py-0.5 text-[11px] font-semibold ${semesterStatus.approved ? 'bg-status-success/15 text-status-success-foreground' : 'bg-status-neutral/15 text-status-neutral-foreground'}`}>
                           {semesterStatus.approved ? (
                             <CheckCircle2 className="h-3 w-3" />
                           ) : (
@@ -957,27 +957,27 @@ export default function StudentConductPage() {
               <span>{copy.range}</span>
               <span className="text-right">{copy.note}</span>
             </div>
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-success/30 bg-status-success/8 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-success/30 bg-status-success/10 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span className="break-words font-bold text-status-success-foreground">{copy.excellent}</span>
               <span className="font-semibold text-foreground tabular-nums">90-100 {copy.scoreUnit}</span>
               <span className="break-words text-right text-[11px] text-muted-foreground">{copy.scholarshipPriority}</span>
             </div>
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-info/30 bg-status-info/8 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-info/30 bg-status-info/10 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span className="break-words font-bold text-status-info-foreground">{copy.good}</span>
               <span className="font-semibold text-foreground tabular-nums">80-89 {copy.scoreUnit}</span>
               <span className="break-words text-right text-[11px] text-muted-foreground">{copy.scholarshipReady}</span>
             </div>
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-warning/30 bg-status-warning/8 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-warning/30 bg-status-warning/10 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span className="break-words font-bold text-status-warning-foreground">{copy.fair}</span>
               <span className="font-semibold text-foreground tabular-nums">65-79 {copy.scoreUnit}</span>
               <span className="break-words text-right text-[11px] text-muted-foreground">{copy.completed}</span>
             </div>
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-neutral/30 bg-status-neutral/8 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-neutral/30 bg-status-neutral/10 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span className="break-words font-bold text-status-neutral-foreground">{copy.average}</span>
               <span className="font-semibold text-foreground tabular-nums">50-64 {copy.scoreUnit}</span>
               <span className="break-words text-right text-[11px] text-muted-foreground">{copy.meetsRequirement}</span>
             </div>
-            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-danger/30 bg-status-danger/8 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
+            <div className="grid grid-cols-[4.25rem_5.5rem_1fr] items-center gap-2 rounded-md border border-status-danger/30 bg-status-danger/10 px-2.5 py-2 sm:grid-cols-[5rem_7.5rem_1fr]">
               <span className="break-words font-bold text-status-danger-foreground">{copy.weak}</span>
               <span className="font-semibold text-foreground tabular-nums">&lt; 50 {copy.scoreUnit}</span>
               <span className="break-words text-right text-[11px] text-status-danger-foreground">{copy.warning}</span>
@@ -1031,7 +1031,7 @@ export default function StudentConductPage() {
 
             {/* Record Status Badge — bound to the status the API reported, and
                 never asserting a validity no system granted */}
-            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 text-xs font-bold ${semesterStatus.approved ? 'bg-status-success/12 border-status-success/30 text-status-success-foreground' : 'bg-status-neutral/12 border-status-neutral/30 text-status-neutral-foreground'}`}>
+            <div className={`flex flex-col sm:flex-row sm:items-center justify-between gap-2 rounded-lg border p-3 text-xs font-bold ${semesterStatus.approved ? 'bg-status-success/15 border-status-success/30 text-status-success-foreground' : 'bg-status-neutral/15 border-status-neutral/30 text-status-neutral-foreground'}`}>
               <div className="flex items-center gap-2">
                 {semesterStatus.approved ? (
                   <ShieldCheck className="h-4 w-4 shrink-0" />

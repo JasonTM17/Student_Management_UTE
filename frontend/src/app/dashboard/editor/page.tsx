@@ -1320,7 +1320,7 @@ export default function AcademicEditorPage() {
                     onClick={handleCopy}
                     className="gap-1.5"
                   >
-                    {copied ? <Check className="h-4 w-4 text-emerald-600" /> : <Copy className="h-4 w-4" />}
+                    {copied ? <Check className="h-4 w-4 text-status-success-foreground" /> : <Copy className="h-4 w-4" />}
                     {copy.copyContent}
                   </Button>
                   <Button
@@ -1741,7 +1741,7 @@ export default function AcademicEditorPage() {
             {hasUnsavedNoticeOrder && (
               <div className="bg-blue-500/10 border-b border-blue-500/20 px-4 py-2.5 flex items-center justify-between gap-3 text-xs text-blue-700 dark:text-blue-300">
                 <div className="flex items-center gap-2">
-                  <ArrowUpDown className="h-4 w-4 shrink-0 text-blue-600" />
+                  <ArrowUpDown className="h-4 w-4 shrink-0 text-status-info-foreground" />
                   <span>
                     {isVi
                       ? 'Bạn vừa kéo thả sắp xếp lại thứ tự bài viết. Bấm nút "Lưu thứ tự ghim bài viết" để đồng bộ ngay lập tức lên Bảng tin sinh viên & giảng viên.'
