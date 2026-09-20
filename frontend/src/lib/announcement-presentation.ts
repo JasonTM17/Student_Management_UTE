@@ -639,7 +639,9 @@ export function resolveAnnouncementDomain(
  * Resolves the primary 16:9 editorial cover image for an announcement:
  * 1. Checks explicit coverImageUrl
  * 2. Checks extracted image in content
- * 3. Intelligently falls back to our 18 authentic editorial photography assets
+ * 3. Falls back to a neutral brand placeholder. The previous keyword→stock-photo
+ *    mapping is gone: it presented unrelated photography as coverage of real
+ *    campus events, which misleads readers and reviewers.
  */
 export function resolveArticleCover(
   announcement: Pick<AnnouncementRecord, 'title' | 'content'> & { coverImageUrl?: string | null },
@@ -653,76 +655,13 @@ export function resolveArticleCover(
     return extracted;
   }
 
-  const title = (announcement.title || '').toLowerCase();
-  const content = (announcement.content || '').toLowerCase();
-
-  // Keyword-to-photo matching
-  if (title.includes('bán dẫn') || title.includes('vi mạch') || title.includes('cleanroom') || title.includes('semiconductor')) {
-    return '/images/news/semiconductor-cleanroom.jpg';
-  }
-  if (title.includes('robotics') || title.includes('robot') || title.includes('tự động hóa') || title.includes('iot')) {
-    return '/images/news/robotics-iot-lab.jpg';
-  }
-  if (title.includes('mùa hè xanh') || title.includes('tình nguyện') || title.includes('nông thôn')) {
-    return '/images/news/green-summer-volunteer.jpg';
-  }
-  if (title.includes('bóng đá') || title.includes('champions cup') || title.includes('thể thao')) {
-    return '/images/news/campus-sports-cup.jpg';
-  }
-  if (title.includes('20/11') || title.includes('nhà giáo') || title.includes('tri ân') || title.includes('nghệ thuật') || title.includes('nhạc hội')) {
-    return '/images/news/cultural-arts-gala.jpg';
-  }
-  if (title.includes('ieee') || title.includes('stem') || title.includes('hội nghị quốc tế') || title.includes('keynote')) {
-    return '/images/news/stem-conference-keynote.jpg';
-  }
-  if (title.includes('hackathon') || title.includes('đổi mới sáng tạo') || title.includes('48 giờ') || title.includes('48h')) {
-    return '/images/news/ai-hackathon-arena.jpg';
-  }
-  if (title.includes('thư viện') || title.includes('learning commons') || title.includes('học liệu')) {
-    return '/images/news/campus-digital-library.jpg';
-  }
-  if (title.includes('tốt nghiệp') || title.includes('trao bằng') || title.includes('tân khoa') || title.includes('commencement')) {
-    return '/images/news/commencement-graduation.jpg';
-  }
-  if (title.includes('hiến máu') || title.includes('giọt hồng') || title.includes('chữ thập đỏ') || title.includes('nhân đạo')) {
-    return '/images/news/blood-donation-day.jpg';
-  }
-  if (title.includes('ktx') || title.includes('ký túc xá') || title.includes('nội trú') || title.includes('dormitory')) {
-    return '/images/news/student-dormitory-campus.jpg';
-  }
-  if (title.includes('tôn vinh') || title.includes('giảng viên xuất sắc') || title.includes('nhà khoa học tiêu biểu') || title.includes('excellence')) {
-    return '/images/news/faculty-excellence-awards.jpg';
-  }
-  if (title.includes('big data') || title.includes('a100') || title.includes('hpc') || (title.includes('ai') && content.includes('gpu'))) {
-    return '/images/news/bigdata-ai-lab.jpg';
-  }
-  if (title.includes('việc làm') || title.includes('tuyển dụng') || title.includes('career') || title.includes('job fair')) {
-    return '/images/news/tech-career-expo.jpg';
-  }
-  if (title.includes('học bổng') || content.includes('học bổng khuyến khích') || title.includes('khen thưởng')) {
-    return '/images/news/scholarship-ceremony.jpg';
-  }
-  if (title.includes('đăng ký học phần') || title.includes('tín chỉ') || title.includes('thời khóa biểu')) {
-    return '/images/news/course-registration.jpg';
-  }
-  if (title.includes('khóa luận') || title.includes('kltn') || title.includes('bảo vệ') || title.includes('thesis')) {
-    return '/images/banners/thesis_defense_hall.jpg';
-  }
-  if (title.includes('robotics') || title.includes('robot') || title.includes('tự động hóa') || title.includes('iot') || title.includes('khoa cntt')) {
-    return '/images/banners/department_research_lab.jpg';
-  }
-  if (title.includes('thông báo học vụ') || title.includes('công văn') || title.includes('quy chế')) {
-    return '/images/banners/academic_notice_banner.jpg';
-  }
-  if (title.includes('hcmute') || title.includes('toàn trường') || title.includes('khuôn viên') || title.includes('học kỳ')) {
-    return '/images/banners/campus_academic_banner.jpg';
-  }
-  if (title.includes('nghiên cứu khoa học') || title.includes('nckh') || title.includes('sáng tạo trẻ')) {
-    return '/images/news/scientific-research.jpg';
-  }
-
-  return '/images/news/bigdata-ai-lab.jpg';
+  return BRAND_COVER_PLACEHOLDER;
 }
+
+// 16:9 navy-gradient tile with a gold mortarboard mark — decorative by design,
+// never mistaken for a photograph of an actual event.
+export const BRAND_COVER_PLACEHOLDER =
+  "data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 640 360'%3E%3Cdefs%3E%3ClinearGradient id='g' x1='0' y1='0' x2='1' y2='1'%3E%3Cstop offset='0' stop-color='%23003F87'/%3E%3Cstop offset='1' stop-color='%230B192C'/%3E%3C/linearGradient%3E%3C/defs%3E%3Crect width='640' height='360' fill='url(%23g)'/%3E%3Cpath d='M320 140l86 32-86 32-86-32z' fill='%23E5A93C'/%3E%3Cpath d='M386 180v34c0 14-30 26-66 26s-66-12-66-26v-34l66 24z' fill='%23E5A93C' opacity='.85'/%3E%3Ccircle cx='320' cy='172' r='5' fill='%23F6CE7A'/%3E%3C/svg%3E";
 
 
 /**
