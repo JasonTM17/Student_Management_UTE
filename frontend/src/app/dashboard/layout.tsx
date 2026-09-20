@@ -205,12 +205,19 @@ function resolveNotificationTarget(
   if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
     return '/dashboard/conduct';
   }
+  // Grade-entry intent is checked before the registration/class branch: a notice
+  // like "Kỳ nhập điểm giữa kỳ đang mở — lớp học phần của bạn sẵn sàng nhập
+  // điểm" mentions both, and the class wording must not bury it on the portal
+  // home when a specific grading surface exists.
+  if (text.includes('nhập điểm') || text.includes('bảng điểm') || text.includes('transcript')) {
+    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
+  }
   if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
     // The registration and conduct pages are student-only; a lecturer clicking
     // this notification used to be bounced off the portal entirely.
     return isLecturer ? '/dashboard/lecturer' : '/dashboard/register';
   }
-  if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
+  if (text.includes('điểm') || text.includes('grade')) {
     return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
   }
   if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
