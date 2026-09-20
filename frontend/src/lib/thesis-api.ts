@@ -578,7 +578,15 @@ export const thesisApi = {
   /** Feedback item 7: upload the report document itself (.pdf/.doc/.docx, <= 20 MB). */
   submitReportFile: async (
     groupId: string,
-    data: { file: File; title?: string; note?: string },
+    data: {
+      file: File;
+      title?: string;
+      note?: string;
+      /** Receives 0-100 as axios reports upload progress. */
+      onUploadProgress?: (percent: number) => void;
+      /** Lets the caller abandon an in-flight upload from the UI. */
+      signal?: AbortSignal;
+    },
   ): Promise<ThesisGroupReport> => {
     const form = new FormData();
     form.append('file', data.file);
@@ -587,6 +595,19 @@ export const thesisApi = {
     const response = await api.post<ThesisGroupReport>(
       '/thesis/groups/' + groupId + '/report/file',
       form,
+      {
+        // A 20 MB document on a campus connection otherwise looks frozen: the
+        // submission design calls for a live percentage and a cancel control.
+        onUploadProgress: data.onUploadProgress
+          ? (event) => {
+              const total = event.total ?? 0;
+              if (total > 0) {
+                data.onUploadProgress!(Math.min(100, Math.round((event.loaded / total) * 100)));
+              }
+            }
+          : undefined,
+        signal: data.signal,
+      },
     );
     return response.data;
   },
