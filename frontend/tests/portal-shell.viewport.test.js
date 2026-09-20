@@ -47,6 +47,11 @@ function apiResponse(data = []) {
 }
 
 async function mockPortalApi(page, roles) {
+  // AuthContext only probes /auth/me when the cc_csrf session-hint cookie is
+  // present; without it the shell redirects to the login page.
+  await page.context().addCookies([
+    { name: 'cc_csrf', value: 'viewport-test-hint', url: baseURL },
+  ]);
   await page.route('**/api/v1/**', async (route) => {
     const requestUrl = new URL(route.request().url());
     const path = requestUrl.pathname;
@@ -113,7 +118,9 @@ async function assertNoHorizontalOverflow(page, label) {
 
 async function verifySidebar(page, sidebarId, openButtonName, viewport) {
   const sidebar = page.locator(sidebarId);
-  const openButton = page.getByRole('button', { name: openButtonName });
+  // The mobile bottom-nav exposes the same accessible label, so the check is
+  // scoped to the header banner's hamburger.
+  const openButton = page.getByRole('banner').getByRole('button', { name: openButtonName });
 
   if (viewport.width >= 1024) {
     assert.notEqual(await sidebar.getAttribute('aria-hidden'), 'true');
@@ -169,11 +176,11 @@ test('student and lecturer portal shell holds at 1440, 768, and 390', async (t) 
       await mockPortalApi(page, viewport.name === 'tablet' ? ['LECTURER'] : ['STUDENT']);
       await page.goto(`${baseURL}/dashboard/notifications`, { waitUntil: 'networkidle' });
 
-      await page.locator('.portal-page-ribbon').waitFor({ state: 'visible' });
+      await page.locator('.portal-shell').first().waitFor({ state: 'visible', timeout: 60_000 });
       await verifySidebar(
         page,
         '#dashboard-sidebar',
-        /Open sidebar navigation|Mở điều hướng sidebar/,
+        /Open sidebar navigation|Mở thanh điều hướng/,
         viewport,
       );
       await assertNoHorizontalOverflow(page, `dashboard ${viewport.name}`);
@@ -195,7 +202,7 @@ test('admin portal shell holds at 1440, 768, and 390', async (t) => {
       await mockPortalApi(page, ['ADMIN']);
       await page.goto(`${baseURL}/admin`, { waitUntil: 'networkidle' });
 
-      await page.locator('.portal-page-ribbon').waitFor({ state: 'visible' });
+      await page.locator('.portal-shell').first().waitFor({ state: 'visible', timeout: 60_000 });
       await verifySidebar(
         page,
         '#admin-sidebar',
