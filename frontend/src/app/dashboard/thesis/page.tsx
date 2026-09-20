@@ -10,25 +10,15 @@ import {
   Building2,
   CalendarDays,
   Check,
-  CircleDot,
   ExternalLink,
   FileDown,
   FileStack,
   FileText,
   GraduationCap,
   Info,
-  Layers,
   Plus,
-  Scale,
   Search,
-  Shield,
-  ShieldCheck,
-  Sparkles,
-  Trash2,
-  UserPlus,
-  Users,
   UsersRound,
-  X,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { toast } from 'sonner';
@@ -46,15 +36,22 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
-import { metricToneClass, type StatusTone } from '@/components/ui/status';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
-import { StatusBadge } from '@/components/thesis/StatusBadge';
-import { MemberAvatars } from '@/components/thesis/MemberAvatars';
 import { ThesisWorkflowStepper } from '@/components/thesis/ThesisWorkflowStepper';
-import { SupervisedGroupMembers } from '@/components/dashboard/thesis/SupervisedGroupMembers';
 import { ThesisRegulationGuide } from '@/components/thesis/ThesisRegulationGuide';
 import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
+import CouncilDefenseWorkspace from '@/features/thesis/components/CouncilDefenseWorkspace';
+import MetricCard, {
+  fillCopy,
+  formatReportFileSize,
+  renderInlineBold,
+} from '@/features/thesis/components/MetricCard';
+import StudentGroupCard, {
+  type StudentGroupMemberRow,
+} from '@/features/thesis/components/StudentGroupCard';
+import SupervisedGroupList from '@/features/thesis/components/SupervisedGroupList';
+import ThesisRepositoryWorkspace from '@/features/thesis/components/ThesisRepositoryWorkspace';
 import { departmentsApi, lecturersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import type { Department, Lecturer } from '@/types/api';
@@ -82,35 +79,6 @@ interface ThesisApiErrorShape {
 function getThesisErrorCode(error: unknown): string {
   const data = (error as ThesisApiErrorShape | undefined)?.response?.data;
   return data?.code ?? '';
-}
-
-/** Fills `{name}` placeholders in a copy template. */
-function fillCopy(template: string, values: Record<string, string | number>): string {
-  return template.replace(/\{(\w+)\}/g, (match, key: string) =>
-    key in values ? String(values[key]) : match,
-  );
-}
-
-function formatReportFileSize(bytes: number | null | undefined, locale: string): string | null {
-  if (!Number.isFinite(bytes) || !bytes || bytes < 0) return null;
-  const units = ['B', 'KB', 'MB', 'GB'];
-  let value = bytes;
-  let unitIndex = 0;
-  while (value >= 1024 && unitIndex < units.length - 1) {
-    value /= 1024;
-    unitIndex += 1;
-  }
-  const formatted = new Intl.NumberFormat(locale === 'vi' ? 'vi-VN' : 'en-US', {
-    maximumFractionDigits: unitIndex === 0 ? 0 : 1,
-  }).format(value);
-  return `${formatted} ${units[unitIndex]}`;
-}
-
-/** Renders `**bold**` spans inside a copy string as inline emphasis. */
-function renderInlineBold(text: string): React.ReactNode[] {
-  return text
-    .split('**')
-    .map((part, index) => (index % 2 === 1 ? <strong key={index}>{part}</strong> : <span key={index}>{part}</span>));
 }
 
 /** Stable classification keys; the display label comes from the i18n dictionary. */
@@ -1352,421 +1320,250 @@ export default function ThesisPage() {
   }
 
   
-  const renderStudentGroupCard = () => (
-<Card variant="muted" className="h-full">
-              <CardHeader>
-                <CardTitle>{messages.thesis.groupsTitle}</CardTitle>
-                <CardDescription>{messages.thesis.groupsDescription}</CardDescription>
-              </CardHeader>
-              <CardContent>
-                {!currentGroup ? (
-                  <EmptyState
-                    icon={UsersRound}
-                    title={messages.thesis.noGroup}
-                    description={messages.thesis.noGroupDescription}
-                    action={
-                      isStudent && isRegistrationWindowOpen ? (
-                        <Button type="button" onClick={() => void createGroup()} disabled={isActionPending}>
-                          {messages.thesis.createGroup}
-                          <ArrowUpRight className="ml-2 h-4 w-4" />
-                        </Button>
-                      ) : undefined
-                    }
-                    className="min-h-[280px] border-none bg-transparent px-0 py-0"
-                  />
-                ) : (
-                  <div className="space-y-5">
-                    <div className="flex flex-col gap-3 rounded-xl border border-border/70 bg-card p-4 sm:flex-row sm:items-center sm:justify-between">
-                      <div className="min-w-0 space-y-1">
-                        <div className="flex flex-wrap items-center gap-2">
-                          <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                            {messages.thesis.groupsTitle}
-                          </span>
-                          <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-foreground">
-                            {messages.thesis.status[currentGroup.status] ?? messages.common.statuses.UNKNOWN}
-                          </span>
-                          <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
-                          <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] font-semibold text-foreground">
-                            {pageCopy.yourRoleLabel}{' '}
-                        {isGroupLeader ? pageCopy.roleGroupLeaderReport : pageCopy.roleMember}
-                          </span>
-                        </div>
-                        <h4 className="text-sm font-semibold text-foreground truncate">
-                          {currentGroup.topicId ? (
-                            getTopicTitle(currentGroup.topicId)
-                          ) : (
-                            // Selection lives in the catalog now, so the empty
-                            // state is an actionable link rather than a label.
-                            <LocalizedLink
-                              href="/dashboard/thesis/topics"
-                              className="text-primary hover:underline"
-                            >
-                              {messages.thesis.chooseTopic}
-                            </LocalizedLink>
-                          )}
-                        </h4>
-                      </div>
+  // The report panel stays here: it owns the submission form, its state, and
+  // the leader-only rights it renders.
+  const studentReportSection =
+    currentGroup && currentGroup.approvalStatus === 'APPROVED' ? (
+      <div className="rounded-xl border border-border/70 bg-card p-4">
+        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
+          <div className="flex items-center gap-2">
+            <FileText className="h-4 w-4 text-primary" />
+            <span className="text-sm font-semibold text-foreground">
+              {messages.thesis.report.title} {pageCopy.articleR5Suffix}
+            </span>
+          </div>
+          {isGroupLeader ? (
+            <Button
+              type="button"
+              size="sm"
+              variant="outline"
+              onClick={openReportForm}
+              disabled={isActionPending}
+              className="shrink-0"
+            >
+              {groupReport
+                ? messages.thesis.report.update
+                : messages.thesis.report.submit}
+            </Button>
+          ) : null}
+        </div>
 
-                      {canManageMembers && groupMemberList.length < 4 ? (
-                        <Button
-                          type="button"
-                          size="sm"
-                          onClick={() => {
-                            resetStudentSearch();
-                            setIsAddMemberModalOpen(true);
-                          }}
-                          disabled={isActionPending}
-                          className="shrink-0 gap-1.5"
-                        >
-                          <UserPlus className="h-4 w-4" />
-                          {messages.thesis.addMember}
-                        </Button>
-                      ) : null}
-                    </div>
+        {/* Regulatory Notice R5 */}
+        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5 text-xs text-muted-foreground flex items-center gap-2">
+          <Info className="h-4 w-4 shrink-0 text-primary" />
+          <span>
+            {renderInlineBold(fillCopy(pageCopy.reportRightsNotice, { leader: currentLeaderName }))}
+          </span>
+        </div>
 
-                    {/* Supervisor Info (Rule R3) */}
-                    {studentTopicSupervisors.length > 0 && (
-                      <div className="flex flex-wrap items-center gap-2 rounded-lg border border-primary/20 bg-primary/[0.04] px-3 py-2 text-xs">
-                        <span className="font-bold text-foreground">{pageCopy.supervisorLabel}</span>
-                        <span className="font-semibold text-primary">{studentTopicSupervisors.join(' · ')}</span>
-                      </div>
-                    )}
-
-                    {/* Approval Status Guidance (Rule R4) */}
-                    {currentGroup.approvalStatus === 'APPROVED' ? (
-                      <div className="rounded-lg border border-emerald-500/30 bg-emerald-500/10 p-3 text-xs text-emerald-800 dark:text-emerald-300 flex items-start gap-2">
-                        <Check className="h-4 w-4 shrink-0 text-emerald-600 dark:text-emerald-400 mt-0.5" />
-                        <div>
-                          {renderInlineBold(pageCopy.topicApprovedNotice)}
-                        </div>
-                      </div>
-                    ) : currentGroup.approvalStatus === 'PENDING' ? (
-                      <div className="rounded-lg border border-amber-500/30 bg-amber-500/10 p-3 text-xs text-amber-800 dark:text-amber-300 flex items-start gap-2">
-                        <CircleDot className="h-4 w-4 shrink-0 text-amber-600 dark:text-amber-400 mt-0.5" />
-                        <div>
-                          {renderInlineBold(pageCopy.topicPendingNotice)}
-                        </div>
-                      </div>
-                    ) : (
-                      <div className="rounded-lg border border-destructive/30 bg-destructive/10 p-3 text-xs text-destructive flex items-start gap-2">
-                        <Shield className="h-4 w-4 shrink-0 mt-0.5" />
-                        <div>
-                          <strong>{pageCopy.topicRejectedLabel}</strong> {currentGroup.rejectionReason || pageCopy.rejectedTopicFallback}
-                        </div>
-                      </div>
-                    )}
-
-                    {/* Member List Header & Count */}
-                    <div className="space-y-3">
-                      <div className="flex items-center justify-between text-sm">
-                        <span className="font-medium text-foreground">
-                          {messages.thesis.memberCount.replace('{count}', String(groupMemberList.length))}
-                        </span>
-                        <span className="text-xs text-muted-foreground">
-                          {groupMemberList.length >= 4 ? messages.thesis.maxMembersReached : ''}
-                        </span>
-                      </div>
-
-                      {/* Detailed member items */}
-                      <div className="space-y-2">
-                        {groupMemberList.map((member) => {
-                          const memberDisplayName =
-                            member.displayName || member.studentNumber || member.studentId || 'SV';
-                          const memberIdentifier = member.studentNumber || member.studentId;
-
-                          return (
-                          <div
-                            key={member.studentId || member.displayName}
-                            className="flex items-center justify-between gap-3 rounded-xl border border-border/70 bg-card p-3 shadow-2xs transition-colors hover:border-primary/40"
-                          >
-                            <div className="flex min-w-0 items-center gap-3">
-                              <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">
-                                {memberDisplayName.slice(0, 2).toUpperCase()}
-                              </div>
-                              <div className="min-w-0 space-y-0.5">
-                                <div className="flex flex-wrap items-center gap-1.5">
-                                  <span className="text-sm font-semibold text-foreground">
-                                    {memberDisplayName}
-                                  </span>
-                                  {member.isLeader ? (
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
-                                      <Shield className="h-3 w-3" />
-                                      {messages.thesis.leaderBadge}
-                                    </span>
-                                  ) : (
-                                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
-                                      {messages.thesis.memberBadge}
-                                    </span>
-                                  )}
-                                  {member.isExternal ? (
-                                    <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
-                                      <Building2 className="h-3 w-3" />
-                                      {messages.thesis.externalBadge}
-                                    </span>
-                                  ) : null}
-                                </div>
-                                <div className="flex flex-wrap items-center gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                  {memberIdentifier && !member.isExternal ? (
-                                    <span>MSSV: <strong className="font-mono text-foreground/80">{memberIdentifier}</strong></span>
-                                  ) : null}
-                                  {member.contact ? (
-                                    <span>{member.contact}</span>
-                                  ) : null}
-                                </div>
-                              </div>
-                            </div>
-
-                            {/* Remove button for leader during open registration */}
-                            {canManageMembers && !member.isLeader ? (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="ghost"
-                                onClick={() => void handleRemoveMember(member.studentId)}
-                                disabled={isActionPending}
-                                className="h-8 w-8 p-0 text-muted-foreground hover:text-destructive hover:bg-destructive/10 shrink-0"
-                                title={messages.thesis.removeMember}
-                              >
-                                <Trash2 className="h-4 w-4" />
-                              </Button>
-                            ) : null}
-                          </div>
-                          );
-                        })}
-                      </div>
-                    </div>
-
-                    {/* Group report (approved groups only) */}
-                    {currentGroup.approvalStatus === 'APPROVED' ? (
-                      <div className="rounded-xl border border-border/70 bg-card p-4">
-                        <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                          <div className="flex items-center gap-2">
-                            <FileText className="h-4 w-4 text-primary" />
-                            <span className="text-sm font-semibold text-foreground">
-                              {messages.thesis.report.title} {pageCopy.articleR5Suffix}
-                            </span>
-                          </div>
-                          {isGroupLeader ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={openReportForm}
-                              disabled={isActionPending}
-                              className="shrink-0"
-                            >
-                              {groupReport
-                                ? messages.thesis.report.update
-                                : messages.thesis.report.submit}
-                            </Button>
-                          ) : null}
-                        </div>
-
-                        {/* Regulatory Notice R5 */}
-                        <div className="mt-3 rounded-lg border border-primary/20 bg-primary/[0.03] p-2.5 text-xs text-muted-foreground flex items-center gap-2">
-                          <Info className="h-4 w-4 shrink-0 text-primary" />
-                          <span>
-                            {renderInlineBold(fillCopy(pageCopy.reportRightsNotice, { leader: currentLeaderName }))}
-                          </span>
-                        </div>
-
-                        {isReportLoading ? (
-                          <p className="mt-3 text-xs text-muted-foreground">
-                            {messages.common.states.loading}
-                          </p>
-                        ) : groupReport ? (
-                          <div className="mt-3 space-y-1">
-                            {groupReport.title ? (
-                              <p className="text-sm font-medium text-foreground">
-                                {groupReport.title}
-                              </p>
-                            ) : null}
-                            {groupReport.fileName ? (
-                              // Feedback item 7: the attached Word/PDF document.
-                              <div className="flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-3 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="flex min-w-0 items-start gap-2.5">
-                                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                    <FileStack className="h-4 w-4" aria-hidden="true" />
-                                  </span>
-                                  <div className="min-w-0">
-                                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
-                                      {messages.thesis.report.documentAttached}
-                                    </p>
-                                    <p
-                                      className="truncate text-sm font-medium text-foreground"
-                                      title={groupReport.fileName}
-                                    >
-                                      {groupReport.fileName}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                      {[groupReport.fileType, formatReportFileSize(groupReport.fileSize, locale)]
-                                        .filter(Boolean)
-                                        .join(' · ')}
-                                    </p>
-                                  </div>
-                                </div>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="outline"
-                                  onClick={() => void handleDownloadReportFile()}
-                                  className="shrink-0 self-start sm:self-auto"
-                                >
-                                  {messages.thesis.report.downloadFile}
-                                  <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
-                                </Button>
-                              </div>
-                            ) : null}
-                            {groupReport.url ? (
-                              <a
-                                href={groupReport.url}
-                                target="_blank"
-                                rel="noreferrer"
-                                className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
-                              >
-                                {messages.thesis.report.view}
-                                <ExternalLink className="h-3.5 w-3.5" />
-                              </a>
-                            ) : null}
-                            {groupReport.note ? (
-                              <p className="text-xs text-muted-foreground">{groupReport.note}</p>
-                            ) : null}
-                            <p className="text-xs text-muted-foreground">
-                              {messages.thesis.report.submittedAt}:{' '}
-                              {formatDateTime(groupReport.submittedAt)}
-                            </p>
-                          </div>
-                        ) : (
-                          <p className="mt-3 text-sm text-muted-foreground">
-                            {messages.thesis.report.notSubmitted}
-                          </p>
-                        )}
-
-                        {isGroupLeader && isReportFormOpen ? (
-                          <form
-                            onSubmit={(e) => void handleSubmitReport(e)}
-                            className="mt-4 space-y-3 border-t border-border/60 pt-4"
-                          >
-                            {reportError ? (
-                              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
-                                {reportError}
-                              </div>
-                            ) : null}
-                            <div>
-                              <label
-                                className="mb-1 block text-xs font-medium text-foreground"
-                                htmlFor="thesis-report-title"
-                              >
-                                {messages.thesis.report.titleLabel}
-                              </label>
-                              <Input
-                                id="thesis-report-title"
-                                value={reportTitle}
-                                onChange={(e) => setReportTitle(e.target.value)}
-                                disabled={isActionPending}
-                              />
-                            </div>
-                            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.025] p-3">
-                              <div className="flex items-start gap-2.5">
-                                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                  <FileStack className="h-4 w-4" aria-hidden="true" />
-                                </span>
-                                <div className="min-w-0">
-                                  <label
-                                    className="block text-sm font-semibold text-foreground"
-                                    htmlFor="thesis-report-file"
-                                  >
-                                    {messages.thesis.report.fileLabel}
-                                  </label>
-                                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
-                                    {messages.thesis.report.uploadPrimaryHint}
-                                  </p>
-                                </div>
-                              </div>
-                              <input
-                                id="thesis-report-file"
-                                type="file"
-                                accept=".pdf,.doc,.docx"
-                                onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
-                                disabled={isActionPending}
-                                className="mt-3 block w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground hover:file:bg-secondary/80"
-                              />
-                              {reportFile ? (
-                                <p className="mt-2 truncate text-xs text-muted-foreground" title={reportFile.name}>
-                                  {messages.thesis.report.selectedFile}: {reportFile.name} ·{' '}
-                                  {formatReportFileSize(reportFile.size, locale)}
-                                </p>
-                              ) : null}
-                            </div>
-                            <details
-                              className="group rounded-xl border border-border/70 bg-secondary/20 px-3"
-                              open={Boolean(reportUrl)}
-                            >
-                              <summary className="cursor-pointer list-none py-3 text-sm font-medium text-foreground marker:hidden">
-                                <span className="inline-flex items-center gap-2">
-                                  <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
-                                  {messages.thesis.report.urlAlternative}
-                                </span>
-                              </summary>
-                              <div className="border-t border-border/60 pb-3 pt-3">
-                                <label
-                                  className="mb-1 block text-xs font-medium text-foreground"
-                                  htmlFor="thesis-report-url"
-                                >
-                                  {messages.thesis.report.urlLabel}
-                                </label>
-                                <Input
-                                  id="thesis-report-url"
-                                  value={reportUrl}
-                                  onChange={(e) => setReportUrl(e.target.value)}
-                                  placeholder="https://..."
-                                  disabled={isActionPending}
-                                />
-                                <p className="mt-1 text-[11px] text-muted-foreground">
-                                  {pageCopy.reportLinkHint}
-                                </p>
-                              </div>
-                            </details>
-                            <div>
-                              <label
-                                className="mb-1 block text-xs font-medium text-foreground"
-                                htmlFor="thesis-report-note"
-                              >
-                                {messages.thesis.report.noteLabel}
-                              </label>
-                              <Textarea
-                                id="thesis-report-note"
-                                value={reportNote}
-                                onChange={(e) => setReportNote(e.target.value)}
-                                rows={2}
-                                disabled={isActionPending}
-                              />
-                            </div>
-                            <div className="flex justify-end gap-2">
-                              <Button
-                                type="button"
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => setIsReportFormOpen(false)}
-                                disabled={isActionPending}
-                              >
-                                {messages.common.actions.cancel}
-                              </Button>
-                              <Button type="submit" size="sm" disabled={isActionPending}>
-                                {groupReport
-                                  ? messages.thesis.report.update
-                                  : messages.thesis.report.submit}
-                              </Button>
-                            </div>
-                          </form>
-                        ) : null}
-                      </div>
-                    ) : null}
+        {isReportLoading ? (
+          <p className="mt-3 text-xs text-muted-foreground">
+            {messages.common.states.loading}
+          </p>
+        ) : groupReport ? (
+          <div className="mt-3 space-y-1">
+            {groupReport.title ? (
+              <p className="text-sm font-medium text-foreground">
+                {groupReport.title}
+              </p>
+            ) : null}
+            {groupReport.fileName ? (
+              // Feedback item 7: the attached Word/PDF document.
+              <div className="flex flex-col gap-3 rounded-xl border border-primary/15 bg-primary/[0.035] p-3 sm:flex-row sm:items-center sm:justify-between">
+                <div className="flex min-w-0 items-start gap-2.5">
+                  <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <FileStack className="h-4 w-4" aria-hidden="true" />
+                  </span>
+                  <div className="min-w-0">
+                    <p className="text-[11px] font-semibold uppercase tracking-[0.08em] text-muted-foreground">
+                      {messages.thesis.report.documentAttached}
+                    </p>
+                    <p
+                      className="truncate text-sm font-medium text-foreground"
+                      title={groupReport.fileName}
+                    >
+                      {groupReport.fileName}
+                    </p>
+                    <p className="text-xs text-muted-foreground">
+                      {[groupReport.fileType, formatReportFileSize(groupReport.fileSize, locale)]
+                        .filter(Boolean)
+                        .join(' · ')}
+                    </p>
                   </div>
-                )}
-              </CardContent>
-            </Card>
-  );
+                </div>
+                <Button
+                  type="button"
+                  size="sm"
+                  variant="outline"
+                  onClick={() => void handleDownloadReportFile()}
+                  className="shrink-0 self-start sm:self-auto"
+                >
+                  {messages.thesis.report.downloadFile}
+                  <FileDown className="ml-1.5 h-3.5 w-3.5" aria-hidden="true" />
+                </Button>
+              </div>
+            ) : null}
+            {groupReport.url ? (
+              <a
+                href={groupReport.url}
+                target="_blank"
+                rel="noreferrer"
+                className="inline-flex min-h-8 items-center gap-1 text-sm text-primary underline-offset-2 hover:underline"
+              >
+                {messages.thesis.report.view}
+                <ExternalLink className="h-3.5 w-3.5" />
+              </a>
+            ) : null}
+            {groupReport.note ? (
+              <p className="text-xs text-muted-foreground">{groupReport.note}</p>
+            ) : null}
+            <p className="text-xs text-muted-foreground">
+              {messages.thesis.report.submittedAt}:{' '}
+              {formatDateTime(groupReport.submittedAt)}
+            </p>
+          </div>
+        ) : (
+          <p className="mt-3 text-sm text-muted-foreground">
+            {messages.thesis.report.notSubmitted}
+          </p>
+        )}
+
+        {isGroupLeader && isReportFormOpen ? (
+          <form
+            onSubmit={(e) => void handleSubmitReport(e)}
+            className="mt-4 space-y-3 border-t border-border/60 pt-4"
+          >
+            {reportError ? (
+              <div className="rounded-md border border-destructive/30 bg-destructive/5 p-2 text-xs text-destructive">
+                {reportError}
+              </div>
+            ) : null}
+            <div>
+              <label
+                className="mb-1 block text-xs font-medium text-foreground"
+                htmlFor="thesis-report-title"
+              >
+                {messages.thesis.report.titleLabel}
+              </label>
+              <Input
+                id="thesis-report-title"
+                value={reportTitle}
+                onChange={(e) => setReportTitle(e.target.value)}
+                disabled={isActionPending}
+              />
+            </div>
+            <div className="rounded-xl border border-dashed border-primary/30 bg-primary/[0.025] p-3">
+              <div className="flex items-start gap-2.5">
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                  <FileStack className="h-4 w-4" aria-hidden="true" />
+                </span>
+                <div className="min-w-0">
+                  <label
+                    className="block text-sm font-semibold text-foreground"
+                    htmlFor="thesis-report-file"
+                  >
+                    {messages.thesis.report.fileLabel}
+                  </label>
+                  <p className="mt-0.5 text-xs leading-5 text-muted-foreground">
+                    {messages.thesis.report.uploadPrimaryHint}
+                  </p>
+                </div>
+              </div>
+              <input
+                id="thesis-report-file"
+                type="file"
+                accept=".pdf,.doc,.docx"
+                onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
+                disabled={isActionPending}
+                className="mt-3 block w-full cursor-pointer rounded-lg border border-input bg-background px-3 py-2 text-xs text-foreground file:mr-3 file:cursor-pointer file:rounded-md file:border-0 file:bg-secondary file:px-3 file:py-1.5 file:text-xs file:font-semibold file:text-secondary-foreground hover:file:bg-secondary/80"
+              />
+              {reportFile ? (
+                <p className="mt-2 truncate text-xs text-muted-foreground" title={reportFile.name}>
+                  {messages.thesis.report.selectedFile}: {reportFile.name} ·{' '}
+                  {formatReportFileSize(reportFile.size, locale)}
+                </p>
+              ) : null}
+            </div>
+            <details
+              className="group rounded-xl border border-border/70 bg-secondary/20 px-3"
+              open={Boolean(reportUrl)}
+            >
+              <summary className="cursor-pointer list-none py-3 text-sm font-medium text-foreground marker:hidden">
+                <span className="inline-flex items-center gap-2">
+                  <ExternalLink className="h-4 w-4 text-muted-foreground" aria-hidden="true" />
+                  {messages.thesis.report.urlAlternative}
+                </span>
+              </summary>
+              <div className="border-t border-border/60 pb-3 pt-3">
+                <label
+                  className="mb-1 block text-xs font-medium text-foreground"
+                  htmlFor="thesis-report-url"
+                >
+                  {messages.thesis.report.urlLabel}
+                </label>
+                <Input
+                  id="thesis-report-url"
+                  value={reportUrl}
+                  onChange={(e) => setReportUrl(e.target.value)}
+                  placeholder="https://..."
+                  disabled={isActionPending}
+                />
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {pageCopy.reportLinkHint}
+                </p>
+              </div>
+            </details>
+            <div>
+              <label
+                className="mb-1 block text-xs font-medium text-foreground"
+                htmlFor="thesis-report-note"
+              >
+                {messages.thesis.report.noteLabel}
+              </label>
+              <Textarea
+                id="thesis-report-note"
+                value={reportNote}
+                onChange={(e) => setReportNote(e.target.value)}
+                rows={2}
+                disabled={isActionPending}
+              />
+            </div>
+            <div className="flex justify-end gap-2">
+              <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                onClick={() => setIsReportFormOpen(false)}
+                disabled={isActionPending}
+              >
+                {messages.common.actions.cancel}
+              </Button>
+              <Button type="submit" size="sm" disabled={isActionPending}>
+                {groupReport
+                  ? messages.thesis.report.update
+                  : messages.thesis.report.submit}
+              </Button>
+            </div>
+          </form>
+        ) : null}
+      </div>
+    ) : null;
+
+  // The group's own round gates its roster, not the round the page is
+  // currently viewing.
+  const isRegistrationOpenFor = (group: ThesisGroup) =>
+    rounds.find((round) => round.id === group.roundId)?.status === 'REGISTRATION_OPEN';
+
+  const groupStatusLabel = currentGroup
+    ? messages.thesis.status[currentGroup.status] ?? messages.common.statuses.UNKNOWN
+    : '';
+
+  const groupMemberRows: StudentGroupMemberRow[] = groupMemberList.map((member) => {
+    const memberDisplayName =
+      member.displayName || member.studentNumber || member.studentId || 'SV';
+    const memberIdentifier = member.studentNumber || member.studentId;
+    return { ...member, displayName: memberDisplayName, identifier: memberIdentifier };
+  });
 
   const renderTopicsCard = () => (
 <Card className="h-full">
@@ -1789,520 +1586,6 @@ export default function ThesisPage() {
               </CardContent>
             </Card>
   );
-
-  const renderCouncilDefenseWorkspace = () => (
-<Card className="rounded-xl border-border/80 shadow-xs">
-              <CardHeader>
-                <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <CardTitle className="flex items-center gap-2">
-                      <Users className="h-5 w-5 text-primary" />
-                      {messages.thesis.grading.title}
-                    </CardTitle>
-                    <CardDescription>{messages.thesis.grading.description}</CardDescription>
-                  </div>
-                </div>
-              </CardHeader>
-              <CardContent className="space-y-6">
-                {isLecturer && !isAdmin && !user?.lecturerId ? (
-                  <p className="rounded-lg border border-status-warning/30 bg-status-warning/10 px-4 py-3 text-sm text-foreground">
-                    {messages.thesis.councils.profileClaimMissing}
-                  </p>
-                ) : null}
-                {visibleCouncils.map((council) => {
-                  const myMembership = council.members?.find(
-                    (m) => m.lecturerId === myLecturerId,
-                  );
-                  const isChair = myMembership?.memberRole === 'CHAIR';
-                  const topicIds =
-                    (council as unknown as { topicIds?: string[] }).topicIds || [];
-
-                  return (
-                    <div
-                      key={council.id}
-                      className="rounded-xl border border-border/70 bg-card p-5 space-y-4"
-                    >
-                      <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between border-b border-border/50 pb-3">
-                        <div>
-                          <h4 className="font-semibold text-foreground text-base">
-                            {council.name}
-                          </h4>
-                          <p className="text-xs text-muted-foreground mt-0.5">
-                            {pageCopy.yourRoleLabel}{' '}
-                            <span className="font-medium text-primary">
-                              {myMembership?.memberRole === 'CHAIR'
-                                ? messages.thesis.councils.roleChair
-                                : myMembership?.memberRole === 'SECRETARY'
-                                ? messages.thesis.councils.roleSecretary
-                                : myMembership
-                                ? messages.thesis.councils.roleMember
-                                : pageCopy.roleAdmin}
-                            </span>
-                          </p>
-                        </div>
-                        <span className="text-xs font-medium text-muted-foreground">
-                          {fillCopy(pageCopy.assignedTopicsCount, { count: topicIds.length })}
-                        </span>
-                      </div>
-
-                      {topicIds.length === 0 ? (
-                        <p className="text-xs text-muted-foreground italic py-2">
-                          {messages.thesis.councils.noAssignedTopics}
-                        </p>
-                      ) : (
-                        <div className="space-y-4">
-                          {topicIds.map((tid: string) => {
-                            const topic = topics.find((t) => t.id === tid);
-                            const key = `${council.id}:${tid}`;
-                            const scores = councilScores[key] || [];
-                            const sups = topicSupervisors[tid] || [];
-                            const isSupervisor =
-                              sups.includes(myLecturerId) ||
-                              topic?.createdBy === myLecturerId;
-
-                            const isFinalized = topic?.finalScore != null;
-                            // Mirror the backend eligibility rule exactly
-                            // (ThesisCouncilService.eligibleGraderCount): a
-                            // member is ineligible only when a supervisor row
-                            // exists for them. Excluding topic.createdBy here
-                            // made the button enable before the server agreed
-                            // and finalize then failed with SCORES_INCOMPLETE.
-                            const eligibleGraderCount = (council.members || []).filter(
-                              (m) => !sups.includes(m.lecturerId),
-                            ).length;
-                            const submittedCount = scores.length;
-                            const canFinalize =
-                              isChair &&
-                              !isFinalized &&
-                              submittedCount >= eligibleGraderCount &&
-                              eligibleGraderCount > 0;
-
-                            return (
-                              <div
-                                key={tid}
-                                className="rounded-xl border border-border/60 bg-muted/20 p-4 space-y-3"
-                              >
-                                <div className="flex flex-col gap-1 sm:flex-row sm:items-start sm:justify-between">
-                                  <div className="space-y-1">
-                                    <h5 className="font-semibold text-foreground text-sm">
-                                      {topic?.title || tid}
-                                    </h5>
-                                    {topic?.description && (
-                                      <p className="text-xs text-muted-foreground line-clamp-2">
-                                        {topic.description}
-                                      </p>
-                                    )}
-                                    {topicReports[tid] ? (
-                                      <div className="pt-1.5 flex items-center gap-2">
-                                        {/* A report is a link, an attached document,
-                                            or both (feedback item 7). */}
-                                        {topicReports[tid]?.url ? (
-                                          <a
-                                            href={topicReports[tid]?.url || undefined}
-                                            target="_blank"
-                                            rel="noreferrer"
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
-                                          >
-                                            <FileText className="h-3.5 w-3.5" />
-                                            <span>{pageCopy.thesisDocumentLabel} {topicReports[tid]?.title || pageCopy.thesisReportFallback}</span>
-                                            <ExternalLink className="h-3 w-3" />
-                                          </a>
-                                        ) : null}
-                                        {topicReports[tid]?.fileName ? (
-                                          <button
-                                            type="button"
-                                            onClick={() => {
-                                              const report = topicReports[tid];
-                                              // The download route is group-scoped:
-                                              // the topic report carries the group id.
-                                              if (report?.groupId) {
-                                                void downloadReportArtifact(report.groupId, report);
-                                              }
-                                            }}
-                                            className="inline-flex items-center gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline"
-                                          >
-                                            <FileDown className="h-3.5 w-3.5" />
-                                            <span>{topicReports[tid]?.fileName}</span>
-                                          </button>
-                                        ) : null}
-                                        {topicReports[tid]?.note ? (
-                                          <span className="text-[11px] text-muted-foreground italic truncate max-w-xs">
-                                            ({topicReports[tid]?.note})
-                                          </span>
-                                        ) : null}
-                                      </div>
-                                    ) : null}
-                                  </div>
-                                  {isFinalized ? (
-                                    <div className="flex items-center gap-1.5 rounded-md bg-status-success/15 px-3 py-1 text-xs font-semibold text-status-success-foreground border border-status-success/30 shrink-0">
-                                      <Check className="h-3.5 w-3.5" />
-                                      {messages.thesis.grading.finalizedBadge}:{' '}
-                                      {topic.finalScore}
-                                    </div>
-                                  ) : null}
-                                </div>
-
-                                {/* Supervisor Constraint Warning (R8) */}
-                                {isSupervisor ? (
-                                  <div className="rounded-lg border border-status-warning/40 bg-status-warning/10 p-3 text-xs text-status-warning-foreground flex items-center gap-2">
-                                    <Shield className="h-4 w-4 shrink-0 text-status-warning" />
-                                    <span>
-                                      {messages.thesis.grading.supervisorCannotGrade}
-                                    </span>
-                                  </div>
-                                ) : !isFinalized ? (
-                                  /* Grading Input for Eligible Council Member */
-                                  <div className="flex flex-wrap items-center gap-3 pt-1">
-                                    <label className="text-xs font-medium text-foreground flex items-center gap-2">
-                                      {messages.thesis.grading.scoreInputLabel}:
-                                      <Input
-                                        type="number"
-                                        min="0"
-                                        max="10"
-                                        step="0.1"
-                                        placeholder="8.5"
-                                        value={draftScores[key] ?? ''}
-                                        onChange={(e) =>
-                                          setDraftScores((prev) => ({
-                                            ...prev,
-                                            [key]: e.target.value,
-                                          }))
-                                        }
-                                        className="h-8 w-24 text-xs font-semibold"
-                                        disabled={isActionPending}
-                                      />
-                                    </label>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      className="h-8 text-xs"
-                                      onClick={() => void handleSubmitScore(council.id, tid)}
-                                      disabled={isActionPending || !draftScores[key]}
-                                    >
-                                      {messages.thesis.grading.saveScore}
-                                    </Button>
-                                  </div>
-                                ) : null}
-
-                                {/* Scores Breakdown */}
-                                {scores.length > 0 && (
-                                  <div className="rounded-lg bg-background/60 p-2.5 text-xs space-y-1.5 border border-border/40">
-                                    <span className="font-semibold text-muted-foreground uppercase text-[10px] tracking-wider">
-                                      {messages.thesis.grading.scoresListTitle}:
-                                    </span>
-                                    <div className="flex flex-wrap gap-2">
-                                      {scores.map((s, sIdx) => {
-                                        const lect = lecturers.find(
-                                          (l) => l.id === s.lecturerId,
-                                        );
-                                        const name = lect?.user
-                                          ? `${lect.user.lastName} ${lect.user.firstName}`
-                                          : s.lecturerId;
-                                        return (
-                                          <span
-                                            key={sIdx}
-                                            className="inline-flex items-center rounded-md bg-muted px-2 py-1 text-[11px] font-medium text-foreground border border-border/50"
-                                          >
-                                            {name}:{' '}
-                                            <strong className="ml-1 text-primary">
-                                              {s.score}
-                                            </strong>
-                                          </span>
-                                        );
-                                      })}
-                                    </div>
-                                  </div>
-                                )}
-
-                                {/* Chair Finalize Action */}
-                                {isChair && !isFinalized && (
-                                  <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2 border-t border-border/40 pt-3">
-                                    <p className="text-xs text-muted-foreground">
-                                      {submittedCount >= eligibleGraderCount
-                                        ? messages.thesis.grading.readyToFinalize
-                                        : messages.thesis.grading.waitingGrades
-                                            .replace('{submitted}', String(submittedCount))
-                                            .replace('{total}', String(eligibleGraderCount))}
-                                    </p>
-                                    <Button
-                                      type="button"
-                                      size="sm"
-                                      variant={canFinalize ? 'default' : 'outline'}
-                                      onClick={() => void handleFinalizeScore(council.id, tid)}
-                                      disabled={isActionPending || !canFinalize}
-                                    >
-                                      {messages.thesis.grading.finalizeButton}
-                                    </Button>
-                                  </div>
-                                )}
-                              </div>
-                            );
-                          })}
-                        </div>
-                      )}
-                    </div>
-                  );
-                })}
-              </CardContent>
-            </Card>
-  );
-
-  const renderRepositoryWorkspace = () => {
-    const totalReports = repositoryReports.length;
-    const totalFiles = repositoryReports.filter((r) => r.fileName).length;
-    const totalUrls = repositoryReports.filter((r) => r.url).length;
-
-    return (
-      <Card className="rounded-xl border-border/80 shadow-xs">
-        <CardHeader>
-          <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-            <div className="space-y-1">
-              <CardTitle className="flex items-center gap-2 text-lg">
-                <Archive className="h-5 w-5 text-primary" />
-                {pageCopy.repositoryTitle}
-              </CardTitle>
-              <CardDescription className="text-xs sm:text-sm">
-                {pageCopy.repositoryDescription}
-              </CardDescription>
-            </div>
-            {/* Quick Metrics */}
-            <div className="flex flex-wrap items-center gap-2">
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-primary/20 bg-primary/5 px-3 py-1 text-xs font-semibold text-primary">
-                <FileStack className="h-3.5 w-3.5" />
-                {fillCopy(pageCopy.reportsCount, { count: totalReports })}
-              </span>
-              <span className="inline-flex items-center gap-1.5 rounded-lg border border-emerald-500/20 bg-emerald-500/10 px-3 py-1 text-xs font-semibold text-emerald-700 dark:text-emerald-300">
-                <FileDown className="h-3.5 w-3.5" />
-                {totalFiles} {locale === 'vi' ? 'tài liệu đính kèm' : 'attached files'}
-              </span>
-              {totalUrls > 0 && (
-                <span className="inline-flex items-center gap-1.5 rounded-lg border border-sky-500/20 bg-sky-500/10 px-3 py-1 text-xs font-semibold text-sky-700 dark:text-sky-300">
-                  <ExternalLink className="h-3.5 w-3.5" />
-                  {totalUrls} {locale === 'vi' ? 'liên kết ngoài' : 'external links'}
-                </span>
-              )}
-            </div>
-          </div>
-
-          {/* Search bar */}
-          <div className="pt-2">
-            <div className="relative">
-              <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
-              <Input
-                type="text"
-                value={repositorySearch}
-                onChange={(e) => setRepositorySearch(e.target.value)}
-                placeholder={pageCopy.repositorySearchPlaceholder}
-                className="pl-9 pr-8 text-xs sm:text-sm h-10 rounded-xl"
-              />
-              {repositorySearch ? (
-                <button
-                  type="button"
-                  onClick={() => setRepositorySearch('')}
-                  className="absolute right-3 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
-                >
-                  <X className="h-4 w-4" />
-                </button>
-              ) : null}
-            </div>
-          </div>
-        </CardHeader>
-
-        <CardContent className="space-y-4">
-          {isRepositoryLoading ? (
-            <div className="py-12 flex justify-center">
-              <LoadingState label={messages.common.states.loading} />
-            </div>
-          ) : repositoryReports.length === 0 ? (
-            <EmptyState
-              icon={Archive}
-              title={pageCopy.noRoundReportsYet}
-              description={locale === 'vi' ? 'Các nhóm nghiên cứu sau khi hoàn thành sẽ nộp báo cáo tại đây để lưu trữ và thẩm định.' : 'Research groups will submit their thesis reports here once ready for archival.'}
-              className="min-h-[220px]"
-            />
-          ) : filteredRepositoryReports.length === 0 ? (
-            <EmptyState
-              icon={Search}
-              title={pageCopy.noReportsFound}
-              description={locale === 'vi' ? 'Thử thay đổi từ khóa tìm kiếm theo tên đề tài, mã số sinh viên hoặc giảng viên hướng dẫn.' : 'Try adjusting your search keywords by topic, student ID or supervisor.'}
-              className="min-h-[200px]"
-            />
-          ) : (
-            <div className="space-y-4">
-              <div className="flex items-center justify-between text-xs text-muted-foreground px-1">
-                <span>{fillCopy(pageCopy.allReports, { count: filteredRepositoryReports.length })}</span>
-                <span>{locale === 'vi' ? 'Đợt:' : 'Round:'} <strong className="text-foreground">{selectedRound?.name}</strong></span>
-              </div>
-
-              <div className="grid grid-cols-1 gap-4">
-                {filteredRepositoryReports.map((report) => {
-                  return (
-                    <div
-                      key={report.reportId}
-                      className="rounded-xl border border-border/70 bg-card p-5 transition-all hover:border-primary/40 hover:shadow-xs space-y-4"
-                    >
-                      {/* Header row: Topic title & status badges */}
-                      <div className="flex flex-col gap-2 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="space-y-1 min-w-0 flex-1">
-                          <div className="flex flex-wrap items-center gap-2">
-                            <StatusBadge status={report.groupStatus} />
-                            <StatusBadge status={report.approvalStatus} variant="approval" />
-                            <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                              <Building2 className="h-3 w-3" /> {report.departmentName}
-                            </span>
-                          </div>
-                          <h4 className="text-base font-bold text-foreground leading-snug">
-                            {report.topicTitle || report.title || pageCopy.thesisDocumentLabel}
-                          </h4>
-                          {report.topicDescription && (
-                            <p className="text-xs text-muted-foreground line-clamp-2">
-                              {report.topicDescription}
-                            </p>
-                          )}
-                        </div>
-
-                        {/* Submission timestamp badge */}
-                        <div className="flex flex-col sm:items-end text-xs text-muted-foreground shrink-0">
-                          <span>
-                            {pageCopy.submittedAtLabel} <strong className="text-foreground">{formatDateTime(report.submittedAt)}</strong>
-                          </span>
-                          {report.updatedAt && report.updatedAt !== report.submittedAt && (
-                            <span className="text-[11px]">
-                              {pageCopy.lastUpdatedLabel} {formatDateTime(report.updatedAt)}
-                            </span>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Roster & Guidance grid */}
-                      <div className="grid grid-cols-1 md:grid-cols-2 gap-3 rounded-lg border border-border/60 bg-muted/20 p-3 text-xs">
-                        {/* Supervisors */}
-                        <div className="space-y-1.5">
-                          <span className="font-semibold text-foreground flex items-center gap-1.5">
-                            <BookOpen className="h-3.5 w-3.5 text-primary" />
-                            {pageCopy.archiveSupervisorLabel}
-                          </span>
-                          {report.supervisors.length === 0 ? (
-                            <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa phân công' : 'Not assigned'}</span>
-                          ) : (
-                            <div className="space-y-1">
-                              {report.supervisors.map((s) => (
-                                <div key={`${s.supervisorOrder}-${s.displayName}`} className="flex items-center gap-2">
-                                  <span className="font-medium text-foreground">
-                                    {s.displayName || (locale === 'vi' ? 'Chưa có tên' : 'Unnamed supervisor')}
-                                  </span>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-
-                        {/* Research group members */}
-                        <div className="space-y-1.5">
-                          <span className="font-semibold text-foreground flex items-center gap-1.5">
-                            <Users className="h-3.5 w-3.5 text-primary" />
-                            {pageCopy.membersLabel} ({report.members.length})
-                          </span>
-                          {report.members.length === 0 ? (
-                            <span className="text-muted-foreground italic">{locale === 'vi' ? 'Chưa có thông tin thành viên' : 'No roster details'}</span>
-                          ) : (
-                            <div className="space-y-1">
-                              {report.members.map((m) => {
-                                const name = m.displayName || m.studentNumber || (locale === 'vi' ? 'Thành viên' : 'Member');
-                                return (
-                                  <div key={`${m.studentNumber || name}-${m.isLeader ? 'leader' : 'member'}`} className="flex flex-wrap items-center gap-1.5">
-                                    <span className="font-medium text-foreground">{name}</span>
-                                    {m.studentNumber && (
-                                      <span className="font-mono text-muted-foreground text-[11px] bg-background/80 px-1.5 py-0.5 rounded">
-                                        MSSV: {m.studentNumber}
-                                      </span>
-                                    )}
-                                    {m.isLeader && (
-                                      <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
-                                        {messages.thesis.leaderBadge}
-                                      </span>
-                                    )}
-                                    {m.isExternal && (
-                                      <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
-                                        {messages.thesis.externalBadge}
-                                      </span>
-                                    )}
-                                  </div>
-                                );
-                              })}
-                            </div>
-                          )}
-                        </div>
-                      </div>
-
-                      {/* Notes / Abstract */}
-                      {report.note && (
-                        <div className="rounded-lg border border-border/50 bg-background/50 p-3 text-xs">
-                          <span className="font-semibold text-foreground block mb-1">
-                            {pageCopy.reportNotesLabel}
-                          </span>
-                          <p className="text-muted-foreground whitespace-pre-wrap leading-relaxed">
-                            {report.note}
-                          </p>
-                        </div>
-                      )}
-
-                      {/* Attached File Download & External Link */}
-                      <div className="flex flex-wrap items-center justify-between gap-3 pt-1 border-t border-border/50">
-                        <div className="flex flex-wrap items-center gap-2">
-                          {report.fileName ? (
-                            <Button
-                              type="button"
-                              size="sm"
-                              variant="outline"
-                              onClick={() => void handleDownloadRepositoryReport(report)}
-                              className="gap-2 border-primary/30 hover:bg-primary/10 hover:border-primary font-semibold text-xs"
-                            >
-                              <FileDown className="h-4 w-4 text-primary" />
-                              <span>{report.fileName}</span>
-                              <span className="text-muted-foreground text-[11px] font-normal">
-                                ({[report.fileType, formatReportFileSize(report.fileSize, locale)].filter(Boolean).join(' · ')})
-                              </span>
-                            </Button>
-                          ) : (
-                            <span className="text-xs text-muted-foreground italic">
-                              {locale === 'vi' ? 'Không có file đính kèm' : 'No attached file'}
-                            </span>
-                          )}
-
-                          {report.url && (
-                            <a
-                              href={report.url}
-                              target="_blank"
-                              rel="noreferrer"
-                              className="inline-flex items-center gap-1.5 text-xs font-semibold text-primary hover:underline bg-primary/5 border border-primary/20 rounded-lg px-3 py-1.5"
-                            >
-                              <ExternalLink className="h-3.5 w-3.5" />
-                              <span>{pageCopy.openExternalLink}</span>
-                            </a>
-                          )}
-                        </div>
-
-                        <div className="text-[11px] text-muted-foreground">
-                          {locale === 'vi' ? 'Người nộp:' : 'Submitted by:'}{' '}
-                          <strong className="text-foreground">
-                            {report.submittedByDisplayName || report.submittedByStudentNumber || (locale === 'vi' ? 'Không rõ' : 'Unavailable')}
-                          </strong>
-                          {report.submittedByDisplayName && report.submittedByStudentNumber && (
-                            <span className="ml-1 font-mono">({report.submittedByStudentNumber})</span>
-                          )}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })}
-              </div>
-            </div>
-          )}
-        </CardContent>
-      </Card>
-    );
-  };
 
   return (
     <div className="space-y-8">
@@ -2508,152 +1791,59 @@ export default function ThesisPage() {
 
               {lecturerTab === 'supervision' ? (
                 <div className="space-y-6">
-                  <Card variant="muted" className="border-primary/20">
-                  <CardHeader>
-                    <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
-                      <div>
-                        <CardTitle>{messages.thesis.supervisedGroupsTitle}</CardTitle>
-                        <CardDescription>{messages.thesis.supervisedGroupsDescription}</CardDescription>
-                      </div>
-                      <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-                        {supervisedGroups.length} {messages.thesis.groups.toLowerCase()}
-                      </span>
-                    </div>
-                  </CardHeader>
-                  <CardContent>
-                {supervisedGroups.length === 0 ? (
-                  <EmptyState
-                    icon={UsersRound}
-                    title={messages.thesis.noSupervisedGroups}
+                  <SupervisedGroupList
+                    messages={messages}
+                    title={messages.thesis.supervisedGroupsTitle}
                     description={messages.thesis.supervisedGroupsDescription}
-                    className="min-h-[160px]"
+                    groups={supervisedGroups}
+                    reportsByGroup={supervisedReports}
+                    isActionPending={isActionPending}
+                    getTopicTitle={getTopicTitle}
+                    isRoundOpen={isRegistrationOpenFor}
+                    onGroupUpdated={(next) =>
+                      setGroups((current) =>
+                        current.map((item) => (item.id === next.id ? next : item)),
+                      )
+                    }
+                    onApprove={approveGroup}
+                    onReject={openRejectModal}
+                    onDownloadReport={downloadReportArtifact}
                   />
-                ) : (
-                  <div className="divide-y divide-border/60">
-                    {supervisedGroups.map((group) => {
-                      const topicTitle = getTopicTitle(group.topicId);
-                      const isPending =
-                        group.status === 'SUBMITTED' && group.approvalStatus === 'PENDING';
-                      return (
-                        <div
-                          key={group.id}
-                          className="flex flex-col gap-4 py-4 first:pt-0 last:pb-0 lg:flex-row lg:items-center lg:justify-between"
-                        >
-                          <div className="min-w-0 flex-1 space-y-1.5">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <StatusBadge status={group.status} />
-                              <StatusBadge status={group.approvalStatus} variant="approval" />
-                            </div>
-                            <h4 className="truncate text-sm font-semibold text-foreground">
-                              {topicTitle}
-                            </h4>
-                            <div className="flex items-center gap-3 text-xs text-muted-foreground">
-                              <span>
-                                {messages.thesis.memberCount.replace(
-                                  '{count}',
-                                  String(group.memberStudentIds.length),
-                                )}
-                              </span>
-                              <MemberAvatars memberIds={group.memberStudentIds} max={3} />
-                            </div>
-                            {group.rejectionReason ? (
-                              <p className="text-xs italic text-destructive">
-                                {messages.thesis.rejectionReason}: {group.rejectionReason}
-                              </p>
-                            ) : null}
-
-                            <SupervisedGroupMembers
-                              group={group}
-                              roundOpen={
-                                // The group's own round gates its roster, not
-                                // the round the page is currently viewing.
-                                rounds.find((round) => round.id === group.roundId)?.status ===
-                                'REGISTRATION_OPEN'
-                              }
-                              onChanged={(next) =>
-                                setGroups((current) =>
-                                  current.map((item) => (item.id === next.id ? next : item)),
-                                )
-                              }
-                            />
-
-                            {group.approvalStatus === 'APPROVED' ? (
-                              <div className="mt-2 flex flex-wrap items-center gap-2">
-                                {supervisedReports[group.id] ? (
-                                  <>
-                                    {/* A report is a link, an attached document,
-                                        or both (feedback item 7). */}
-                                    {supervisedReports[group.id]?.url ? (
-                                      <a
-                                        href={supervisedReports[group.id]?.url || undefined}
-                                        target="_blank"
-                                        rel="noreferrer"
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
-                                      >
-                                        <FileText className="h-3.5 w-3.5" />
-                                        <span>{pageCopy.thesisReportLabel} {supervisedReports[group.id]?.title || pageCopy.projectDocumentsFallback}</span>
-                                        <ExternalLink className="h-3 w-3" />
-                                      </a>
-                                    ) : null}
-                                    {supervisedReports[group.id]?.fileName ? (
-                                      <button
-                                        type="button"
-                                        onClick={() => void downloadReportArtifact(group.id, supervisedReports[group.id])}
-                                        className="inline-flex items-center gap-1.5 rounded-lg border border-primary/40 bg-primary/10 px-2.5 py-1 text-xs font-semibold text-primary hover:underline transition-colors"
-                                      >
-                                        <FileDown className="h-3.5 w-3.5" />
-                                        <span>{supervisedReports[group.id]?.fileName}</span>
-                                      </button>
-                                    ) : null}
-                                  </>
-                                ) : (
-                                  <span className="inline-flex items-center gap-1 rounded-md bg-muted px-2 py-0.5 text-[11px] text-muted-foreground">
-                                    <FileText className="h-3 w-3" />
-                                    {pageCopy.reportNotSubmitted}
-                                  </span>
-                                )}
-                              </div>
-                            ) : null}
-                          </div>
-
-                          <div className="flex shrink-0 items-center gap-2">
-                            {isPending ? (
-                              <>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  className="bg-emerald-600 text-white hover:bg-emerald-700"
-                                  onClick={() => void approveGroup(group.id)}
-                                  disabled={isActionPending}
-                                >
-                                  <Check className="mr-1.5 h-4 w-4" />
-                                  {messages.thesis.approve}
-                                </Button>
-                                <Button
-                                  type="button"
-                                  size="sm"
-                                  variant="destructive"
-                                  onClick={() => openRejectModal(group.id)}
-                                  disabled={isActionPending}
-                                >
-                                  <X className="mr-1.5 h-4 w-4" />
-                                  {messages.thesis.reject}
-                                </Button>
-                              </>
-                            ) : null}
-                          </div>
-                        </div>
-                      );
-                    })}
-                  </div>
-                )}
-              </CardContent>
-            </Card>
                 </div>
               ) : lecturerTab === 'defense' ? (
-                renderCouncilDefenseWorkspace()
+                <CouncilDefenseWorkspace
+                  messages={messages}
+                  councils={visibleCouncils}
+                  myLecturerId={myLecturerId}
+                  topics={topics}
+                  lecturers={lecturers}
+                  councilScores={councilScores}
+                  topicSupervisors={topicSupervisors}
+                  topicReports={topicReports}
+                  draftScores={draftScores}
+                  isActionPending={isActionPending}
+                  showProfileClaimNotice={isLecturer && !isAdmin && !user?.lecturerId}
+                  profileClaimMissingLabel={messages.thesis.councils.profileClaimMissing}
+                  onScoreDraftChange={(key, value) =>
+                    setDraftScores((prev) => ({ ...prev, [key]: value }))
+                  }
+                  onSubmitScore={handleSubmitScore}
+                  onFinalizeScore={handleFinalizeScore}
+                  onDownloadReport={downloadReportArtifact}
+                />
               ) : (
-                renderRepositoryWorkspace()
+                <ThesisRepositoryWorkspace
+                  messages={messages}
+                  locale={locale}
+                  formatDateTime={formatDateTime}
+                  reports={repositoryReports}
+                  filteredReports={filteredRepositoryReports}
+                  roundName={selectedRound?.name}
+                  isLoading={isRepositoryLoading}
+                  search={repositorySearch}
+                  onSearchChange={setRepositorySearch}
+                  onDownloadReport={handleDownloadRepositoryReport}
+                />
               )}
         </div>
       ) : null}
@@ -2764,7 +1954,25 @@ export default function ThesisPage() {
 
               {/* 2-Column Grid for Student */}
               <div className="grid gap-6 xl:grid-cols-[0.92fr_1.08fr]">
-                {renderStudentGroupCard()}
+                <StudentGroupCard
+                  messages={messages}
+                  group={currentGroup ?? null}
+                  groupStatusLabel={groupStatusLabel}
+                  roleLabel={isGroupLeader ? pageCopy.roleGroupLeaderReport : pageCopy.roleMember}
+                  topicTitle={currentGroup?.topicId ? getTopicTitle(currentGroup.topicId) : null}
+                  supervisors={studentTopicSupervisors}
+                  members={groupMemberRows}
+                  canCreateGroup={isStudent && isRegistrationWindowOpen}
+                  canManageMembers={canManageMembers}
+                  isActionPending={isActionPending}
+                  onCreateGroup={() => void createGroup()}
+                  onAddMember={() => {
+                    resetStudentSearch();
+                    setIsAddMemberModalOpen(true);
+                  }}
+                  onRemoveMember={handleRemoveMember}
+                  reportSection={studentReportSection}
+                />
                 {renderTopicsCard()}
               </div>
             </div>
@@ -3466,29 +2674,5 @@ export default function ThesisPage() {
         </form>
       </Modal>
     </div>
-  );
-}
-
-function MetricCard({
-  label,
-  value,
-  icon,
-  tone,
-}: {
-  label: string;
-  value: string | number;
-  icon: React.ReactNode;
-  tone: StatusTone;
-}) {
-  return (
-    <Card variant="elevated">
-      <CardContent className="flex items-start justify-between gap-4 pt-6">
-        <div className={cn('flex h-11 w-11 shrink-0 items-center justify-center rounded-lg', metricToneClass(tone))}>{icon}</div>
-        <div className="min-w-0 text-right">
-          <div className="break-words text-2xl font-semibold tracking-tight text-foreground">{value}</div>
-          <div className="mt-1 text-sm text-muted-foreground">{label}</div>
-        </div>
-      </CardContent>
-    </Card>
   );
 }
