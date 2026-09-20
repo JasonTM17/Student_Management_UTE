@@ -278,7 +278,20 @@ test('profile first and last name fields are disabled', () => {
   const source = readSource('src/app/dashboard/profile/page.tsx');
   assert.ok(source.includes('id="profile-first-name"'), 'first name input exists');
   assert.ok(source.includes('id="profile-last-name"'), 'last name input exists');
-  assert.ok(source.includes('nameManagedHint'), 'has managed hint for name');
+  // The lock itself is the guarantee: both inputs stay disabled (immutable),
+  // while the redundant managed-by-office caption was removed by product
+  // decision — the caption asserted nothing the disabled state does not.
+  const firstInput = source.slice(
+    source.indexOf('id="profile-first-name"'),
+    source.indexOf('id="profile-first-name"') + 400,
+  );
+  const lastInput = source.slice(
+    source.indexOf('id="profile-last-name"'),
+    source.indexOf('id="profile-last-name"') + 400,
+  );
+  assert.ok(firstInput.includes('disabled'), 'first name input stays disabled');
+  assert.ok(lastInput.includes('disabled'), 'last name input stays disabled');
+  assert.ok(!source.includes('nameManagedHint'), 'managed caption is not rendered');
 });
 
 // ---------- Items 9 & 10: lecturer grading import and validation ----------

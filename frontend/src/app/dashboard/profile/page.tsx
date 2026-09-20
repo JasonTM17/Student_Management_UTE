@@ -364,14 +364,14 @@ export default function ProfilePage() {
                   {user?.roles?.map((role) => (
                     <span
                       key={role}
-                      className="rounded-full bg-card px-2.5 py-1 text-xs font-medium text-foreground"
+                      className="rounded-md bg-card px-2.5 py-1 text-xs font-medium text-foreground"
                     >
                       {roleLabel(role, messages.dashboardShell.roles)}
                     </span>
                   ))}
                   {isDemoUser(user) && (
-                    <span className="inline-flex items-center gap-1.5 rounded-full bg-amber-500/15 border border-amber-500/30 px-3 py-1 text-xs font-medium text-amber-700 dark:text-amber-300">
-                      <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                    <span className="inline-flex items-center gap-1.5 rounded-md border border-[var(--portal-yellow)]/40 bg-[var(--portal-yellow)]/15 px-3 py-1 text-xs font-medium text-foreground">
+                      <span className="h-1.5 w-1.5 rounded-full bg-[var(--portal-yellow)]" />
                       {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo experience account'}
                     </span>
                   )}
@@ -397,7 +397,6 @@ export default function ProfilePage() {
                     value={formData.firstName}
                     disabled
                     icon={<User className="h-4 w-4" />}
-                    hint={messages.profile.fields.nameManagedHint}
                   />
                 </div>
                 <div className="space-y-2">
@@ -410,7 +409,6 @@ export default function ProfilePage() {
                     value={formData.lastName}
                     disabled
                     icon={<User className="h-4 w-4" />}
-                    hint={messages.profile.fields.nameManagedHint}
                   />
                 </div>
                 <div className="space-y-2">
@@ -421,7 +419,6 @@ export default function ProfilePage() {
                     value={user?.email || ''}
                     disabled
                     icon={<Mail className="h-4 w-4" />}
-                    hint={messages.profile.fields.managedHint}
                   />
                 </div>
                 <div className="space-y-2">

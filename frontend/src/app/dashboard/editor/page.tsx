@@ -15,6 +15,7 @@ import {
   FileEdit,
   FileText,
   GripVertical,
+  ImageIcon,
   Layers,
   ListOrdered,
   Megaphone,
@@ -27,13 +28,17 @@ import {
   Sliders,
   Sparkles,
   Trash2,
+  X,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { announcementsApi, type AnnouncementRecord } from '@/lib/api';
 import { AnnouncementReaderModal } from '@/components/announcements/AnnouncementReaderModal';
-import { AnnouncementEditModal } from '@/components/announcements/AnnouncementEditModal';
+import {
+  AnnouncementEditModal,
+  EDIT_BANNER_PRESETS,
+} from '@/components/announcements/AnnouncementEditModal';
 import {
   DEFAULT_SITE_APPEARANCE,
   SITE_APPEARANCE_ACCENTS,
@@ -87,7 +92,7 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
     htmlContent: `  <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
     <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
     <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ I - Năm học 2026-2027 | Soạn thảo bởi Ban Giám Hiệu & Phòng Đào Tạo</p>
+    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
   </div>`,
   },
   {
@@ -127,15 +132,15 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
     <tbody>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 15/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">23:59 - 18/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên năm cuối & Làm đồ án</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
       </tr>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 19/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">17:00 - 22/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên các khóa còn lại</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
       </tr>
     </tbody>
   </table>`,
@@ -144,11 +149,11 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
     id: 'block-clauses',
     type: 'clauses',
     title: '5. Các Điều khoản Quy chế & Hạn mức',
-    description: 'Hạn mức chuẩn 28 tín chỉ / kỳ; tối đa 30 chỉ khi đơn được Phòng Đào tạo phê duyệt',
+    description: 'Hạn mức tín chỉ theo quy chế hiện hành; đăng ký vượt hạn mức chỉ khi có đơn được Phòng Đào tạo phê duyệt',
     enabled: true,
     htmlContent: `  <div style="margin-bottom: 20px;">
     <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">2. Quy định thực hiện và Hạn mức tín chỉ</h3>
-    <p><strong>- Hạn mức tín chỉ:</strong> Sinh viên không được đăng ký vượt quá 28 tín chỉ/học kỳ chính. Chỉ sinh viên có đơn được Phòng Đào tạo phê duyệt mới được đăng ký tối đa 30 tín chỉ.</p>
+    <p><strong>- Hạn mức tín chỉ:</strong> Sinh viên đăng ký theo hạn mức quy định trong quy chế hiện hành. Việc đăng ký vượt hạn mức chỉ được chấp nhận khi có đơn và được Phòng Đào tạo phê duyệt.</p>
     <p><strong>- Hủy học phần:</strong> Thời hạn xin rút/hủy học phần kết thúc vào tuần thứ 2 kể từ ngày bắt đầu học kỳ.</p>
   </div>`,
   },
@@ -166,7 +171,7 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
     id: 'block-signoff',
     type: 'signoff',
     title: '7. Nơi nhận & Dấu Mộc Đỏ Điện Tử e-Office',
-    description: 'Nơi nhận và con dấu điện tử chính thức của Hiệu trưởng PGS. TS. Lê Hiếu Giang',
+    description: 'Nơi nhận và chỗ trống dành cho chữ ký số / con dấu điện tử e-Office của đơn vị ban hành',
     enabled: true,
     htmlContent: `  <table style="width: 100%; margin-top: 32px; border: none;">
     <tr>
@@ -182,10 +187,9 @@ const DEFAULT_BLOCKS: ContentBlock[] = [
       <td style="width: 50%; text-align: right; vertical-align: top; border: none;">
         <p style="font-weight: bold; margin: 0; text-transform: uppercase; font-size: 13px; color: #334155;">HIỆU TRƯỞNG</p>
         <div style="display: inline-block; margin: 8px 0; padding: 4px 12px; border: 2px dashed #dc2626; border-radius: 6px; background-color: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: bold; text-align: center;">
-          [ĐÃ KÝ ĐIỆN TỬ - E-OFFICE]<br/>
-          TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP.HCM
+          [CHỖ KÝ SỐ / CON DẤU ĐIỆN TỬ E-OFFICE]
         </div>
-        <p style="font-weight: bold; margin: 4px 0 0 0; color: #0284c7; font-size: 14px;">PGS. TS. Lê Hiếu Giang</p>
+        <p style="font-weight: bold; margin: 4px 0 0 0; color: #0284c7; font-size: 14px;">[Họ tên &amp; học hàm người ký]</p>
       </td>
     </tr>
   </table>`,
@@ -208,7 +212,7 @@ const DEFAULT_TINYMCE_VI = `
   <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
     <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
     <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ I - Năm học 2026-2027 | Soạn thảo bởi Ban Giám Hiệu & Phòng Đào Tạo</p>
+    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
   </div>
 
   <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
@@ -230,15 +234,15 @@ const DEFAULT_TINYMCE_VI = `
     <tbody>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 15/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">23:59 - 18/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên năm cuối & Làm đồ án</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
       </tr>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - 19/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">17:00 - 22/09/2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Sinh viên các khóa còn lại</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
       </tr>
     </tbody>
   </table>
@@ -254,7 +258,7 @@ const DEFAULT_TINYMCE_EN = `
   <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
     <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">HCMC UNIVERSITY OF TECHNOLOGY AND ENGINEERING</h4>
     <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">ACADEMIC NOTICE & GOVERNANCE POLICY</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Term 1 - Academic Year 2026-2027 | Official Academic Affairs Notice</p>
+    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Term ... - Academic Year ...] | [Issuing office]</p>
   </div>
 
   <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
@@ -274,15 +278,15 @@ const DEFAULT_TINYMCE_EN = `
     <tbody>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Phase 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - Sep 15, 2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">23:59 - Sep 18, 2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Graduating & Thesis Students</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Target cohort]</td>
       </tr>
       <tr>
         <td style="border: 1px solid #cbd5e1; padding: 10px;">Phase 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">08:00 - Sep 19, 2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">17:00 - Sep 22, 2026</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">All remaining cohorts</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
+        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Target cohort]</td>
       </tr>
     </tbody>
   </table>
@@ -329,10 +333,10 @@ const TEMPLATES = [
   <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH QUYẾT ĐỊNH:</strong></p>
   <p><strong>Điều 1.</strong> Thành lập Hội đồng chấm bảo vệ Khóa luận tốt nghiệp chuyên ngành Kỹ thuật Phần mềm gồm các thành viên:</p>
   <ul>
-    <li><strong>Ghế 1 (Chủ tịch):</strong> ThS. Trần Văn Bình - Giảng viên chính</li>
-    <li><strong>Ghế 2 (Thư ký):</strong> TS. Nguyễn Thị Hoa - Giảng viên</li>
-    <li><strong>Ghế 3 (Ủy viên):</strong> ThS. Lê Minh Tuấn - Giảng viên</li>
-    <li><strong>Ghế 4 (Ủy viên):</strong> TS. Phạm Thị Ngọc Lan - Giảng viên</li>
+    <li><strong>Ghế 1 (Chủ tịch):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
+    <li><strong>Ghế 2 (Thư ký):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
+    <li><strong>Ghế 3 (Ủy viên):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
+    <li><strong>Ghế 4 (Ủy viên):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
   </ul>
   <p><strong>Điều 2.</strong> Hội đồng có nhiệm vụ tổ chức chấm điểm bảo vệ công tâm, minh bạch theo Quy định R1–R9.</p>
   <table style="width: 100%; margin-top: 24px; border: none;">
@@ -343,7 +347,7 @@ const TEMPLATES = [
       <td style="width: 50%; text-align: right; vertical-align: top; border: none;">
         <p style="font-weight: bold; margin: 0; text-transform: uppercase;">HIỆU TRƯỞNG</p>
         <div style="height: 48px;"></div>
-        <p style="font-weight: bold; margin: 0; color: #0d509d;">PGS. TS. Lê Hiếu Giang</p>
+        <p style="font-weight: bold; margin: 0; color: #0d509d;">[Họ tên &amp; học hàm người ký]</p>
       </td>
     </tr>
   </table>
@@ -369,7 +373,7 @@ const TEMPLATES = [
   <div style="text-align: center; border-bottom: 2px solid #16a34a; padding-bottom: 12px; margin-bottom: 20px;">
     <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
     <h2 style="margin: 8px 0 0 0; color: #15803d; font-size: 20px; font-weight: bold;">THÔNG BÁO XÉT CẤP HỌC BỔNG KHUYẾN KHÍCH HỌC TẬP</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ 1 - Năm học 2026-2027</p>
+    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ [ ... ] - Năm học [ ... ]</p>
   </div>
   <p>Phòng Đào tạo thông báo điều kiện và định mức xét học bổng khuyến khích học tập kỳ này:</p>
   <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
@@ -718,13 +722,65 @@ export default function AcademicEditorPage() {
     toast.info(isVi ? 'Đã khôi phục các khối cấu trúc mẫu mặc định.' : 'Reset blocks to default.');
   };
 
+  // Active cover image detection from content
+  const activeCoverUrl =
+    EDIT_BANNER_PRESETS.find((b) => content.includes(b.url))?.url ||
+    content.match(/src=["'](\/images\/(?:banners|news)\/[^"']+)["']/i)?.[1] ||
+    null;
+
+  const handleApplyBanner = (bannerUrl: string, bannerTitle: string) => {
+    const figureMarkup = `<figure class="my-3 text-center">\n  <img src="${bannerUrl}" alt="${bannerTitle}" class="w-full rounded-lg object-cover max-h-72 shadow-xs" />\n  <figcaption class="mt-1.5 text-xs text-muted-foreground italic">${bannerTitle}</figcaption>\n</figure>\n\n`;
+
+    if (activeCoverUrl) {
+      const figureRegex = new RegExp(
+        `<figure[^>]*>[\\s\\S]*?(?:${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}|\\/images\\/(?:banners|news)\\/[^"']+)[\\s\\S]*?<\\/figure>\\s*`,
+        'i'
+      );
+      if (figureRegex.test(content)) {
+        setContent((prev) => prev.replace(figureRegex, figureMarkup));
+        toast.success(isVi ? `Đã đổi ảnh bìa sang "${bannerTitle}"!` : `Changed cover banner to "${bannerTitle}"!`);
+        return;
+      }
+      const imgRegex = new RegExp(
+        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
+        'i'
+      );
+      if (imgRegex.test(content)) {
+        setContent((prev) => prev.replace(imgRegex, figureMarkup));
+        toast.success(isVi ? `Đã đổi ảnh bìa sang "${bannerTitle}"!` : `Changed cover banner to "${bannerTitle}"!`);
+        return;
+      }
+    }
+    setContent((prev) => figureMarkup + prev);
+    toast.success(isVi ? `Đã thêm ảnh bìa "${bannerTitle}"!` : `Added cover banner "${bannerTitle}"!`);
+  };
+
+  const handleRemoveBanner = () => {
+    if (!activeCoverUrl) return;
+    const figureRegex = new RegExp(
+      `<figure[^>]*>[\\s\\S]*?${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}[\\s\\S]*?<\\/figure>\\s*`,
+      'gi'
+    );
+    if (figureRegex.test(content)) {
+      setContent((prev) => prev.replace(figureRegex, '').trim());
+      toast.info(isVi ? 'Đã gỡ ảnh bìa học thuật khỏi văn bản.' : 'Removed cover banner from document.');
+    } else {
+      const imgRegex = new RegExp(
+        `<img[^>]+src=["']${activeCoverUrl.replace(/[.*+?^${}()|[\\]\\]/g, '\\$&')}["'][^>]*>\\s*`,
+        'gi'
+      );
+      setContent((prev) => prev.replace(imgRegex, '').trim());
+      toast.info(isVi ? 'Đã gỡ ảnh bìa học thuật khỏi văn bản.' : 'Removed cover banner from document.');
+    }
+  };
+
   // Reorder announcements via SortableJS
   const handleSortableNoticeReorder = (newNotices: AnnouncementRecord[]) => {
     setPublishedNotices(newNotices);
     setHasUnsavedNoticeOrder(true);
   };
 
-  // Save announcements order to site appearance
+  // Save announcements order to site appearance & Spring Boot backend
   const handleSaveNoticeOrder = async () => {
     try {
       const newOrder = publishedNotices.map((n) => n.id);
@@ -736,6 +792,16 @@ export default function AcademicEditorPage() {
       };
       await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
+
+      // Persist order to Spring Boot database via REST API
+      await Promise.all(
+        publishedNotices.map((n, index) =>
+          announcementsApi.updateDisplayOrder(n.id, index).catch((err) => {
+            console.warn(`Failed to update display order for announcement ${n.id}`, err);
+          }),
+        ),
+      );
+
       setSiteAppearance(updated);
       setHasUnsavedNoticeOrder(false);
       toast.success(
@@ -1389,7 +1455,7 @@ export default function AcademicEditorPage() {
                   <div>
                     <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
                       <span>{isVi ? 'Khung Lắp Ghép Khối Cấu Trúc Văn Bản' : 'Institutional Content Blocks Builder'}</span>
-                      <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
                         {isVi ? 'Sắp xếp trực quan' : 'Drag & Drop'}
                       </span>
                     </CardTitle>
@@ -1523,6 +1589,86 @@ export default function AcademicEditorPage() {
             )}
           </Card>
 
+          {/* Editorial Cover Banner Gallery (Stitch Screen a3c5abce08fb4069a3b2b1d7dd7aaea4) */}
+          <Card className="border-border/80 shadow-xs">
+            <CardHeader className="py-2.5 px-4 border-b border-border/60 bg-muted/20">
+              <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="flex items-center gap-2">
+                  <div className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                    <ImageIcon className="h-4 w-4" />
+                  </div>
+                  <div>
+                    <CardTitle className="text-xs font-bold text-foreground flex items-center gap-2">
+                      <span>{isVi ? 'Thư Viện Ảnh Bìa Học Thuật HCMUTE' : 'HCMUTE Editorial Cover Gallery'}</span>
+                      <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
+                        8K Nano Banana
+                      </span>
+                    </CardTitle>
+                    <p className="text-[11px] text-muted-foreground">
+                      {isVi
+                        ? '1-Click gắn ảnh bìa chuẩn học thuật vào đầu văn bản công văn / thông báo trước khi xuất bản'
+                        : '1-Click attach high-resolution academic header banner to document'}
+                    </p>
+                  </div>
+                </div>
+                {activeCoverUrl ? (
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    onClick={handleRemoveBanner}
+                    className="h-7 text-xs font-medium text-destructive hover:bg-destructive/10"
+                  >
+                    <X className="h-3.5 w-3.5 mr-1" />
+                    {isVi ? 'Gỡ ảnh bìa' : 'Remove Banner'}
+                  </Button>
+                ) : null}
+              </div>
+            </CardHeader>
+            <CardContent className="p-3">
+              <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 lg:grid-cols-8">
+                {EDIT_BANNER_PRESETS.map((banner) => {
+                  const isSelected = activeCoverUrl === banner.url;
+                  const bannerTitle = isVi ? banner.titleVi : banner.titleEn;
+                  const bannerTag = isVi ? banner.tagVi : banner.tagEn;
+                  return (
+                    <button
+                      key={banner.id}
+                      type="button"
+                      onClick={() => handleApplyBanner(banner.url, bannerTitle)}
+                      className={cn(
+                        'group relative flex flex-col overflow-hidden rounded-lg border text-left transition-all duration-150',
+                        isSelected
+                          ? 'border-primary ring-2 ring-primary/40 shadow-xs'
+                          : 'border-border/70 bg-card hover:border-primary/50'
+                      )}
+                    >
+                      <div className="relative h-14 w-full overflow-hidden bg-muted">
+                        {/* eslint-disable-next-line @next/next/no-img-element */}
+                        <img
+                          src={banner.url}
+                          alt={bannerTitle}
+                          className="h-full w-full object-cover object-center transition duration-300 group-hover:scale-105"
+                        />
+                        {isSelected ? (
+                          <div className="absolute right-1 top-1 rounded-full bg-primary p-0.5 text-primary-foreground shadow-xs">
+                            <Check className="h-3 w-3" />
+                          </div>
+                        ) : null}
+                      </div>
+                      <div className="p-1.5 bg-card">
+                        <p className="text-[10.5px] font-semibold text-foreground truncate" title={bannerTitle}>
+                          {bannerTitle}
+                        </p>
+                        <span className="text-[9px] text-muted-foreground">{bannerTag}</span>
+                      </div>
+                    </button>
+                  );
+                })}
+              </div>
+            </CardContent>
+          </Card>
+
           {/* Editor Workspace */}
           <div className="rounded-xl border border-border/80 bg-card p-1 shadow-sm sm:p-2">
             {editorType === 'tinymce' ? (
@@ -1554,7 +1700,7 @@ export default function AcademicEditorPage() {
                     {isVi
                       ? 'Kho Bài Viết & Thông Báo Đang Lưu Trong Cơ Sở Dữ Liệu'
                       : 'Live Announcements in Campus Records'}
-                    <span className="rounded-full bg-blue-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-blue-600 dark:text-blue-300 border border-blue-500/20">
+                    <span className="rounded-md bg-blue-500/10 px-2 py-0.5 text-[10.5px] font-semibold text-blue-600 dark:text-blue-300 border border-blue-500/20">
                       {isVi ? 'Kéo thả thứ tự' : 'Custom Order'}
                     </span>
                   </CardTitle>
@@ -1681,7 +1827,7 @@ export default function AcademicEditorPage() {
                           <td className="py-3 px-3 whitespace-nowrap">
                             <span
                               className={cn(
-                                'inline-flex items-center rounded-full px-2 py-0.5 text-[10.5px] font-semibold',
+                                'inline-flex items-center rounded-md px-2 py-0.5 text-[10.5px] font-semibold',
                                 ann.priority === 'URGENT'
                                   ? 'bg-red-500/10 text-red-600 dark:text-red-300 border border-red-500/30'
                                   : ann.priority === 'HIGH'

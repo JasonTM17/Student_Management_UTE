@@ -41,6 +41,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Modal } from '@/components/ui/modal';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
@@ -57,6 +58,7 @@ import { RoundMilestoneCard } from '@/components/thesis/RoundMilestoneCard';
 import { departmentsApi, lecturersApi } from '@/lib/api';
 import { getLocalizedName } from '@/lib/academic-content';
 import type { Department, Lecturer } from '@/types/api';
+import { FALLBACK_THESIS_ADVISORS } from '@/lib/thesis-advisors-data';
 import {
   thesisApi,
   type ThesisLecturerWorkload,
@@ -204,6 +206,8 @@ export default function ThesisPage() {
   const [studentResults, setStudentResults] = useState<ThesisStudentResult[]>([]);
   const [isSearching, setIsSearching] = useState(false);
   const [hasSearched, setHasSearched] = useState(false);
+
+  const { confirm, confirmationDialog } = useConfirmationDialog();
 
   // Group report state (approved groups only)
   const [groupReport, setGroupReport] = useState<ThesisGroupReport | null>(null);
@@ -470,22 +474,24 @@ export default function ThesisPage() {
     const loadLecturers = async () => {
       try {
         const response = await lecturersApi.getAll({ limit: 100 });
-        const list = Array.isArray(response?.data) ? response.data : [];
+        const list = Array.isArray(response?.data) && response.data.length > 0 ? response.data : FALLBACK_THESIS_ADVISORS;
         if (!cancelled && list.length > 0) {
           setLecturers(list);
         }
       } catch {
-        // Supervisor selects stay hidden when the lecturer directory is unavailable.
+        if (!cancelled) {
+          setLecturers(FALLBACK_THESIS_ADVISORS);
+        }
       }
     };
 
-    if (isSupervisorOrAdmin) {
+    if (isSupervisorOrAdmin || isProposeModalOpen) {
       void loadLecturers();
     }
     return () => {
       cancelled = true;
     };
-  }, [isSupervisorOrAdmin]);
+  }, [isSupervisorOrAdmin, isProposeModalOpen]);
 
   const refreshTopics = useCallback(
     async (roundId: string) => {
@@ -828,6 +834,17 @@ export default function ThesisPage() {
     }
   }, [searchParams, topics]);
 
+  useEffect(() => {
+    const actionParam = searchParams.get('action');
+    const advisorIdParam = searchParams.get('advisorId');
+    if (actionParam === 'propose') {
+      if (advisorIdParam) {
+        setProposeSupervisorId(advisorIdParam);
+      }
+      setIsProposeModalOpen(true);
+    }
+  }, [searchParams]);
+
   const studentTopicSupervisors = useMemo(() => {
     return currentTopicSupervisors.map((supervisor) => {
       // The API now ships the name with the row; fall back to the lecturer
@@ -996,7 +1013,16 @@ export default function ThesisPage() {
 
   const handleRemoveMember = async (targetStudentId: string) => {
     if (!currentGroup) return;
-    if (!window.confirm(messages.thesis.removeMemberConfirm)) return;
+    // App-standard destructive-action dialog (matches admin/user management),
+    // not a blocking native confirm.
+    const shouldRemove = await confirm({
+      title: messages.thesis.removeMemberTitle,
+      message: messages.thesis.removeMemberConfirm,
+      confirmText: messages.thesis.removeMember,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!shouldRemove) return;
 
     setIsActionPending(true);
     setActionError('');
@@ -1357,7 +1383,7 @@ export default function ThesisPage() {
                           <span className="text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
                             {messages.thesis.groupsTitle}
                           </span>
-                          <span className="rounded-full bg-secondary px-2 py-0.5 text-xs font-medium text-foreground">
+                          <span className="rounded-md bg-secondary px-2 py-0.5 text-xs font-medium text-foreground">
                             {messages.thesis.status[currentGroup.status] ?? messages.common.statuses.UNKNOWN}
                           </span>
                           <StatusBadge status={currentGroup.approvalStatus} variant="approval" />
@@ -1464,17 +1490,17 @@ export default function ThesisPage() {
                                     {memberDisplayName}
                                   </span>
                                   {member.isLeader ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-amber-500/15 px-2 py-0.5 text-[11px] font-semibold text-amber-700 dark:text-amber-300">
                                       <Shield className="h-3 w-3" />
                                       {messages.thesis.leaderBadge}
                                     </span>
                                   ) : (
-                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
+                                    <span className="rounded-md bg-muted px-2 py-0.5 text-[11px] font-medium text-muted-foreground">
                                       {messages.thesis.memberBadge}
                                     </span>
                                   )}
                                   {member.isExternal ? (
-                                    <span className="inline-flex items-center gap-1 rounded-full bg-indigo-500/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
+                                    <span className="inline-flex items-center gap-1 rounded-md bg-indigo-500/15 px-2 py-0.5 text-[11px] font-semibold text-indigo-700 dark:text-indigo-300">
                                       <Building2 className="h-3 w-3" />
                                       {messages.thesis.externalBadge}
                                     </span>
@@ -1909,7 +1935,7 @@ export default function ThesisPage() {
                                     ) : null}
                                   </div>
                                   {isFinalized ? (
-                                    <div className="flex items-center gap-1.5 rounded-full bg-status-success/15 px-3 py-1 text-xs font-semibold text-status-success-foreground border border-status-success/30 shrink-0">
+                                    <div className="flex items-center gap-1.5 rounded-md bg-status-success/15 px-3 py-1 text-xs font-semibold text-status-success-foreground border border-status-success/30 shrink-0">
                                       <Check className="h-3.5 w-3.5" />
                                       {messages.thesis.grading.finalizedBadge}:{' '}
                                       {topic.finalScore}
@@ -2193,12 +2219,12 @@ export default function ThesisPage() {
                                       </span>
                                     )}
                                     {m.isLeader && (
-                                      <span className="rounded-full bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
+                                      <span className="rounded-md bg-primary/15 px-1.5 py-0.5 text-[10px] font-bold text-primary">
                                         {messages.thesis.leaderBadge}
                                       </span>
                                     )}
                                     {m.isExternal && (
-                                      <span className="rounded-full bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
+                                      <span className="rounded-md bg-indigo-500/15 px-1.5 py-0.5 text-[10px] font-bold text-indigo-700 dark:text-indigo-300">
                                         {messages.thesis.externalBadge}
                                       </span>
                                     )}
@@ -2380,9 +2406,10 @@ export default function ThesisPage() {
               <CardTitle>{messages.thesis.lifecycleViewsTitle}</CardTitle>
               <CardDescription>{messages.thesis.lifecycleViewsDescription}</CardDescription>
             </CardHeader>
-            <CardContent className="grid gap-3 sm:grid-cols-2">
+            <CardContent className="grid gap-3 sm:grid-cols-3">
               {([
                 ['catalog', '/dashboard/thesis/topics'],
+                ['advisors', '/dashboard/thesis/advisors'],
                 ['progress', '/dashboard/thesis/progress'],
               ] as const).map(([key, href]) => (
                 <LocalizedLink
@@ -2419,7 +2446,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabTopicsAndSupervisors}</span>
                     <span
                       className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
                         lecturerTab === 'supervision'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',
@@ -2442,7 +2469,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabCouncil}</span>
                     <span
                       className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
                         lecturerTab === 'defense'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',
@@ -2465,7 +2492,7 @@ export default function ThesisPage() {
                     <span>{pageCopy.tabRepository}</span>
                     <span
                       className={cn(
-                        'rounded-full px-2 py-0.5 text-[10px] font-mono font-bold',
+                        'rounded-md px-2 py-0.5 text-[10px] font-mono font-bold',
                         lecturerTab === 'repository'
                           ? 'bg-primary-foreground/20 text-primary-foreground'
                           : 'bg-muted text-foreground',
@@ -2651,7 +2678,7 @@ export default function ThesisPage() {
                 </div>
                 {currentGroup && (
                   <div className="shrink-0 flex items-center gap-2">
-                    <span className="rounded-full bg-background px-3 py-1 text-xs font-semibold text-foreground border border-border/80 shadow-2xs">
+                    <span className="rounded-md bg-background px-3 py-1 text-xs font-semibold text-foreground border border-border/80 shadow-2xs">
                         {pageCopy.yourRoleLabel} {isGroupLeader ? pageCopy.roleGroupLeader : pageCopy.roleMember}
                     </span>
                   </div>
@@ -2667,7 +2694,7 @@ export default function ThesisPage() {
                   </div>
                   <div>
                     <div className="flex items-center gap-2">
-                      <span className="rounded-full bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
+                      <span className="rounded-md bg-emerald-500/15 px-2.5 py-0.5 text-xs font-bold text-emerald-700 dark:text-emerald-300 border border-emerald-500/30">
                         {pageCopy.defenceCompleted}
                       </span>
                       <span className="text-xs font-semibold text-muted-foreground">
@@ -3234,6 +3261,9 @@ export default function ThesisPage() {
           )}
         </div>
       </Modal>
+
+      {/* App-standard confirmation dialog (member removal and other destructive actions). */}
+      {confirmationDialog}
 
       {/* Topic Detail & Selection Modal */}
       {viewingTopic ? (

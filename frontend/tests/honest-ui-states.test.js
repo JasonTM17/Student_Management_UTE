@@ -247,7 +247,13 @@ test('thesis council matching no longer falls back to the auth user id', () => {
 
 test('removing a supervised group member asks for confirmation', () => {
   const source = read('src/components/dashboard/thesis/SupervisedGroupMembers.tsx');
-  assert.match(source, /window\.confirm\(messages\.thesis\.removeMemberConfirm\)/);
+  // The gate must exist and use the app-standard confirmation dialog with the
+  // destructive variant — never a bare DELETE and never a native confirm().
+  assert.match(
+    source,
+    /await confirm\(\{[\s\S]*?messages\.thesis\.removeMemberConfirm[\s\S]*?variant: 'destructive'/,
+  );
+  assert.doesNotMatch(source, /window\.confirm/);
 });
 
 // ---------------------------------------------------------------------------
