@@ -28,4 +28,35 @@ class AssistantOutputGuardTest {
             assertFalse(AssistantOutputGuard.isSafe(output), output);
         }
     }
+
+    /**
+     * The SPECIALIZED corpus legitimately teaches CI/CD and REST design, so an
+     * answer quoting those strings from the retrieved context is a citation, not
+     * a leak. Regression: an unscoped isSafe() check on the provider stream
+     * rejected every technical answer, so the specialized mode could never
+     * answer its own published topics.
+     */
+    @Test
+    void allowsTechnicalContentThatIsQuotedFromTheApprovedContext() {
+        String approvedContext = "CI/CD cho đồ án nên dùng GitHub Actions: mỗi lần push sẽ chạy docker compose up -d --build. "
+                + "REST API nên trả về mã 2xx cho thành công. Không chia sẻ api key trong mã nguồn.";
+
+        assertTrue(AssistantOutputGuard.isSafeForAnswer(
+                "Bạn có thể dùng GitHub Actions, và chạy lệnh docker compose up -d --build khi push.", approvedContext));
+        assertTrue(AssistantOutputGuard.isSafeForAnswer(
+                "REST API nên trả về mã 2xx cho thành công, và không nhúng api key vào mã nguồn.", approvedContext));
+
+        // The same strings are still rejected when there is no context to quote from.
+        assertFalse(AssistantOutputGuard.isSafeForAnswer(
+                "Bạn có thể dùng GitHub Actions, và chạy lệnh docker compose up -d --build khi push.", null));
+        assertFalse(AssistantOutputGuard.isSafeForAnswer(
+                "Bạn có thể dùng GitHub Actions, và chạy lệnh docker compose up -d --build khi push.", ""));
+        // A detail that is NOT in the context stays rejected.
+        assertFalse(AssistantOutputGuard.isSafeForAnswer(
+                "Chạy psql -h localhost:5432 để xem bảng chat_message.", approvedContext));
+        // Code fences stay rejected even when the context has the command: a
+        // fence is a formatting leak rather than a quoted phrase.
+        assertFalse(AssistantOutputGuard.isSafeForAnswer(
+                "```bash\ndocker compose up\n```", approvedContext));
+    }
 }

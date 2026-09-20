@@ -248,6 +248,31 @@ test('student assistant smalltalk detection and personal-data delegation', async
     assert.equal(isStudentAssistantQuery(question), false, `gate must not claim personal-data question: ${question}`);
     assert.equal(await resolveStudentAssistantQuery(question, 'vi'), null, `client composed an answer for: ${question}`);
   }
+
+  // 2b. A courtesy word riding in front of a real question must never let the
+  // smalltalk branch swallow the question. The unanchored "cảm ơn"/"chào bạn"
+  // patterns once answered these locally and the question was dropped before it
+  // ever reached the backend, even though /assistant/chat answers them with
+  // citations. The gate may only claim a message that is nothing but smalltalk.
+  const courtesyWrappedQuestions = [
+    'Cảm ơn bạn, thư viện mở cửa đến mấy giờ?',
+    'Chào bạn, quy định vắng thi mấy lần bị cấm thi?',
+    'Hướng dẫn sử dụng phần mềm quản lý tài liệu?',
+    'cảm ơn bạn thư viện mở cửa lúc mấy giờ',
+    'chào bạn quy chế đồ án tốt nghiệp gồm những gì',
+  ];
+  for (const question of courtesyWrappedQuestions) {
+    assert.equal(
+      isStudentAssistantQuery(question),
+      false,
+      `smalltalk branch swallowed a real question: ${question}`,
+    );
+    assert.equal(
+      await resolveStudentAssistantQuery(question, 'vi'),
+      null,
+      `local resolver composed an answer for a real question: ${question}`,
+    );
+  }
 });
 
 test('personal schedule and materials questions stream to the backend instead of local cards (regression)', async () => {
