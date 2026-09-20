@@ -48,8 +48,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 
 /**
  * Brief-governed thesis mutations. Round lifecycle ownership sits with the
- * faculty head (TRUONG_KHOA) with ADMIN as staff fallback; the legacy
- * SUPER_ADMIN grant is intentionally not accepted in this package.
+ * faculty head (TRUONG_KHOA) with ADMIN as staff fallback; SUPER_ADMIN is
+ * accepted everywhere ADMIN is, matching ThesisMutationService.isAdmin() and the
+ * rest of the API surface, so the admin console never offers a button the
+ * server rejects.
  */
 @Tag(name = "Thesis Lifecycle Mutations", description = "Quy trình chuyển đổi trạng thái đợt khóa luận, đề xuất đề tài, phân công GVHD, quản lý nhóm và nộp báo cáo")
 @RestController
@@ -72,7 +74,7 @@ public class ThesisMutationController {
 
     @Operation(summary = "Khởi tạo đợt khóa luận mới", description = "Tạo một đợt đăng ký khóa luận/tiểu luận mới ở trạng thái DRAFT")
     @PostMapping("/rounds")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse createRound(@RequestBody RoundCreateRequest request) {
         return mutations.createRound(request);
     }
@@ -80,7 +82,7 @@ public class ThesisMutationController {
     /** Brief phase one: the faculty head opens the lecturer topic-submission window. */
     @Operation(summary = "Mở cổng đề xuất đề tài cho giảng viên", description = "Chuyển trạng thái đợt từ DRAFT sang PROPOSAL_OPEN để giảng viên nộp đề tài")
     @PostMapping("/rounds/{id}/open-proposals")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse openProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.DRAFT, RoundStatus.PROPOSAL_OPEN);
     }
@@ -88,7 +90,7 @@ public class ThesisMutationController {
     /** Brief phase one closure: publish the topic catalog to student groups. */
     @Operation(summary = "Công bố danh mục đề tài cho sinh viên", description = "Chuyển đợt sang PROPOSALS_PUBLISHED để sinh viên tìm hiểu danh mục đề tài đã duyệt")
     @PostMapping("/rounds/{id}/publish-proposals")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse publishProposals(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.PROPOSAL_OPEN, RoundStatus.PROPOSALS_PUBLISHED);
     }
@@ -96,14 +98,14 @@ public class ThesisMutationController {
     /** Brief phase two: student groups may register inside the student window. */
     @Operation(summary = "Mở cổng đăng ký đề tài cho nhóm sinh viên", description = "Chuyển đợt sang REGISTRATION_OPEN để các nhóm sinh viên nộp nguyện vọng đề tài")
     @PostMapping("/rounds/{id}/open-registration")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse openRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.PROPOSALS_PUBLISHED, RoundStatus.REGISTRATION_OPEN);
     }
 
     @Operation(summary = "Đóng cổng đăng ký đề tài", description = "Chuyển đợt sang REGISTRATION_CLOSED sau khi hết hạn đăng ký")
     @PostMapping("/rounds/{id}/close-registration")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse closeRegistration(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.transitionRound(id, RoundStatus.REGISTRATION_OPEN, RoundStatus.REGISTRATION_CLOSED);
     }
@@ -111,13 +113,13 @@ public class ThesisMutationController {
     /** Brief R9: publish graded results to the students of the round. */
     @Operation(summary = "Công bố điểm và kết quả bảo vệ khóa luận", description = "Chuyển đợt sang RESULTS_PUBLISHED để sinh viên xem điểm đánh giá chính thức")
     @PostMapping("/rounds/{id}/publish-results")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN')")
     public RoundResponse publishResults(@Parameter(description = "Mã UUID của đợt", required = true) @PathVariable UUID id) {
         return mutations.publishResults(id);
     }
 
     @PostMapping("/topics")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public TopicResponse createTopic(
             @RequestBody TopicCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -125,7 +127,7 @@ public class ThesisMutationController {
     }
 
     @PutMapping("/topics/{id}")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public TopicResponse updateTopic(
             @PathVariable UUID id,
             @RequestBody TopicUpdateRequest request,
@@ -134,14 +136,14 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/topics/{id}/publish")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public TopicResponse publishTopic(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         return mutations.publishTopic(id, actor);
     }
 
     /** Brief R3: replace the topic's supervisor list (one or two lecturers). */
     @PutMapping("/topics/{id}/supervisors")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public List<ThesisSupervisorService.SupervisorRow> setSupervisors(
             @PathVariable UUID id,
             @RequestBody Map<String, List<String>> request,
@@ -156,7 +158,7 @@ public class ThesisMutationController {
      * withholds contact details from anyone who is not staff or the owner.
      */
     @GetMapping("/topics/{id}/supervisors")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','STUDENT')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','STUDENT','SUPER_ADMIN')")
     public List<ThesisSupervisorService.SupervisorRow> listSupervisors(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -164,7 +166,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse createGroup(
             @RequestBody GroupCreateRequest request,
             @AuthenticationPrincipal Jwt actor) {
@@ -172,7 +174,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/members")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
     public GroupResponse addMember(
             @PathVariable UUID id,
             @RequestBody MemberRequest request,
@@ -181,13 +183,13 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/students/search")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
     public List<StudentSearchResponse> searchStudents(@RequestParam String q) {
         return mutations.searchStudents(q);
     }
 
     @DeleteMapping("/groups/{id}/members/{studentId}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN')")
     public GroupResponse removeMember(
             @PathVariable UUID id,
             @PathVariable String studentId,
@@ -196,7 +198,7 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/topic")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse assignTopic(
             @PathVariable UUID id,
             @RequestBody TopicAssignmentRequest request,
@@ -205,7 +207,7 @@ public class ThesisMutationController {
     }
 
     @PatchMapping("/groups/{id}/progress")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','SUPER_ADMIN')")
     public GroupResponse updateProgress(
             @PathVariable UUID id,
             @RequestBody ProgressRequest request,
@@ -242,7 +244,7 @@ public class ThesisMutationController {
 
     /** Feedback item 7: download the attached document; same read matrix as the report metadata. */
     @GetMapping("/groups/{id}/report/file")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<byte[]> downloadReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -263,7 +265,7 @@ public class ThesisMutationController {
 
     /** Download a repository artifact by its opaque report id. */
     @GetMapping("/reports/{id}/file")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<byte[]> downloadRepositoryReportFile(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -283,13 +285,13 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/groups/{id}/report")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public ReportResponse getReport(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         return reports.get(id, actor);
     }
 
     @GetMapping("/topics/{id}/report")
-    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('STUDENT','ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public org.springframework.http.ResponseEntity<ReportResponse> getReportByTopic(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         ReportResponse response = reports.getByTopic(id, actor);
         if (response == null) {
@@ -299,7 +301,7 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/rounds/{id}/reports")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public List<ReportResponse> listReportsByRound(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -307,7 +309,7 @@ public class ThesisMutationController {
     }
 
     @GetMapping("/rounds/{id}/repository")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public List<RepositoryReportResponse> listRepository(
             @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -315,13 +317,13 @@ public class ThesisMutationController {
     }
 
     @PostMapping("/groups/{id}/approve")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public GroupResponse approveGroup(@PathVariable UUID id, @AuthenticationPrincipal Jwt actor) {
         return mutations.approveGroup(id, actor);
     }
 
     @PostMapping("/groups/{id}/reject")
-    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','LECTURER','SUPER_ADMIN')")
     public GroupResponse rejectGroup(
             @PathVariable UUID id,
             @RequestBody GroupRejectionRequest request,
