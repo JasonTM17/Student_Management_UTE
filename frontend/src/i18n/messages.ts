@@ -1474,6 +1474,20 @@ export const en = {
       fileTypeUnsupported: 'Only .pdf, .doc and .docx documents are accepted.',
       downloadFile: 'Download document',
       documentAttached: 'Attached document',
+      lockedTitle: 'Report submissions are closed',
+      lockedDescription:
+        'The grading deadline for this round has passed, so the report can no longer be submitted or replaced.',
+      lockedAt: 'Locked since',
+      replaceConfirmTitle: 'Replace the submitted report?',
+      replaceConfirmDescription:
+        'Uploading again discards the current document and link. The previous version cannot be recovered.',
+      replaceConfirmAction: 'Replace report',
+      titleCounter: '{count}/240 characters',
+      noteCounter: '{count}/500 characters',
+      uploadProgress: 'Uploading document… {percent}%',
+      uploadCancel: 'Cancel upload',
+      leaderOnlyBanner:
+        'Only the group leader submits or replaces the report. {leader} submits it on behalf of the group.',
     },
     results: {
       title: 'Results',
@@ -3277,6 +3291,20 @@ export const vi: I18nMessages = {
       fileTypeUnsupported: 'Chỉ nhận tài liệu .pdf, .doc và .docx.',
       downloadFile: 'Tải tài liệu',
       documentAttached: 'Tài liệu đính kèm',
+      lockedTitle: 'Đã hết thời hạn nộp báo cáo',
+      lockedDescription:
+        'Hạn chót chấm điểm của đợt này đã qua nên báo cáo không thể nộp mới hoặc thay thế.',
+      lockedAt: 'Khoá từ',
+      replaceConfirmTitle: 'Thay thế báo cáo đã nộp?',
+      replaceConfirmDescription:
+        'Tải lên lần nữa sẽ ghi đè tài liệu và liên kết hiện có. Phiên bản trước không thể khôi phục.',
+      replaceConfirmAction: 'Thay thế báo cáo',
+      titleCounter: '{count}/240 ký tự',
+      noteCounter: '{count}/500 ký tự',
+      uploadProgress: 'Đang tải tài liệu… {percent}%',
+      uploadCancel: 'Huỷ tải lên',
+      leaderOnlyBanner:
+        'Chỉ nhóm trưởng mới nộp hoặc thay thế báo cáo. {leader} sẽ nộp thay nhóm.',
     },
     results: {
       title: 'Kết quả',
