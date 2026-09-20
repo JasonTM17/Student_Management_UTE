@@ -169,6 +169,13 @@ spring:
       validation-timeout: ${DB_VALIDATION_TIMEOUT_MS:3000}
   jpa:
     hibernate:
+      # Flyway owns two identifier families: snake_case (thesis, academic) and quoted
+      # camelCase objects such as engagement."ArticleCategory"."nameVi". The default
+      # camel-case-to-underscore strategy rewrites quoted names too, which made every
+      # entity-mapped article route fail with "table not found"; this strategy keeps
+      # quoted identifiers verbatim and is unchanged for all snake_case mappings.
+      naming:
+        physical-strategy: io.campuscore.restfulapi.config.PreserveQuotedIdentifierNamingStrategy
       # Flyway owns the schema; Hibernate must not reject focused fixture tests
       # that intentionally disable migrations and create only their own tables.
       ddl-auto: none

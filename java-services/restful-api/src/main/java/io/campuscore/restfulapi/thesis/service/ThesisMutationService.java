@@ -51,6 +51,16 @@ public class ThesisMutationService {
     private final ThesisGroupReadRepository groups;
     private final ThesisRoundReadService roundReads;
 
+    /**
+     * Wires the write boundary over the shared JDBC template and the thesis repositories.
+     *
+     * @param jdbc template used for the governance statements that need row locks
+     * @param rounds repository backing round existence checks
+     * @param roundReadPort read port used for round status assertions
+     * @param topics repository for thesis topics
+     * @param groups read repository for thesis groups
+     * @param roundReads round read service that renders the responses this service returns
+     */
     public ThesisMutationService(
             NamedParameterJdbcTemplate jdbc,
             ThesisRegistrationRoundRepository rounds,
@@ -66,6 +76,15 @@ public class ThesisMutationService {
         this.roundReads = roundReads;
     }
 
+    /**
+     * Creates a registration round and validates the window order its type requires.
+     *
+     * @param request round name, type, and window instants
+     * @return the created round as read back through {@link ThesisRoundReadService}
+     * @throws DomainException with code VALIDATION_ERROR when the round type's optional windows are
+     *         mismatched (TLCN/KLTN require a GVPB deadline and report date, KLTN also a defense
+     *         date) or when the supplied windows are out of chronological order
+     */
     @Transactional
     public RoundResponse createRound(RoundCreateRequest request) {
         requireText(request == null ? null : request.name(), "name");
@@ -138,6 +157,18 @@ public class ThesisMutationService {
         return roundReads.get(id);
     }
 
+    /**
+     * Moves a round to {@code next} only if it is still in the status the caller expects.
+     *
+     * @param id round to transition
+     * @param expected status the round must currently hold
+     * @param next status the round moves to
+     * @return the round after the transition
+     * @throws ResponseStatusException with status 404 when the round does not exist
+     * @throws DomainException with code ROUND_STATE_CONFLICT when a concurrent transition already
+     *         moved the round out of {@code expected}, or REGISTRATION_WINDOW_CLOSED when opening
+     *         registration outside the stored window
+     */
     @Transactional
     public RoundResponse transitionRound(UUID id, RoundStatus expected, RoundStatus next) {
         roundReadPort.requireExisting(id);
@@ -202,6 +233,12 @@ public class ThesisMutationService {
      * Publishes graded results for the round (brief phase two closure).
      * Requires every approved group in the round to carry a finalized score —
      * publishing with ungraded groups would hand students empty result rows.
+     *
+     * @param id round whose graded results are published
+     * @return the round in the {@code RESULTS_PUBLISHED} status
+     * @throws DomainException with code RESULTS_NOT_READY when no topic is graded yet,
+     *         SCORES_INCOMPLETE when an approved group still lacks a finalized score, or
+     *         ROUND_STATE_CONFLICT when the round is not registration-closed
      */
     @Transactional
     public RoundResponse publishResults(UUID id) {
@@ -223,6 +260,16 @@ public class ThesisMutationService {
         return transitionRound(id, RoundStatus.REGISTRATION_CLOSED, RoundStatus.RESULTS_PUBLISHED);
     }
 
+    /**
+     * Drafts a lecturer-owned thesis topic inside the round's proposal window.
+     *
+     * @param request topic title, description, department, and group limit
+     * @param actor caller JWT, which must carry a {@code lecturerId} claim
+     * @return the saved draft topic
+     * @throws DomainException with code VALIDATION_ERROR for a missing lecturer claim or a group
+     *         limit outside 1-20, or LECTURER_WINDOW_NOT_OPEN / LECTURER_WINDOW_CLOSED when the
+     *         round is not accepting proposals
+     */
     @Transactional
     public TopicResponse createTopic(TopicCreateRequest request, Jwt actor) {
         requireText(request == null ? null : request.departmentId(), "departmentId");
@@ -275,6 +322,16 @@ public class ThesisMutationService {
         return TopicResponse.from(topic);
     }
 
+    /**
+     * Edits a topic while it is still a draft.
+     *
+     * @param id topic to edit
+     * @param request replacement title, description, department, and group limit
+     * @param actor caller JWT; must be the owning lecturer or an admin
+     * @return the updated topic
+     * @throws DomainException with code TOPIC_STATE_CONFLICT once the topic has been published, or
+     *         VALIDATION_ERROR for a group limit outside 1-20
+     */
     @Transactional
     public TopicResponse updateTopic(UUID id, TopicUpdateRequest request, Jwt actor) {
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
@@ -299,6 +356,15 @@ public class ThesisMutationService {
         return TopicResponse.from(topics.save(topic));
     }
 
+    /**
+     * Publishes a draft topic so student groups can select it.
+     *
+     * @param id topic to publish
+     * @param actor caller JWT; must be the owning lecturer or an admin
+     * @return the published topic
+     * @throws DomainException with code TOPIC_SUPERVISOR_REQUIRED when the topic has no supervisor
+     *         yet, or TOPIC_STATE_CONFLICT when it cannot leave the draft state
+     */
     @Transactional
     public TopicResponse publishTopic(UUID id, Jwt actor) {
         ThesisTopic topic = topics.findById(id).orElseThrow(() -> notFound("TOPIC_NOT_FOUND", "Thesis topic not found"));
@@ -319,6 +385,17 @@ public class ThesisMutationService {
         return TopicResponse.from(topics.save(topic));
     }
 
+    /**
+     * Opens a student group in a round that is currently open for registration.
+     *
+     * @param request round the group is created in; its {@code roundId} is required
+     * @param actor caller JWT of the student who becomes the leader and first member
+     * @return the created draft group with the leader as its only member
+     * @throws DomainException with code VALIDATION_ERROR for a missing round id, ROUND_CLOSED or
+     *         REGISTRATION_WINDOW_CLOSED when registration is not open, FORBIDDEN with code
+     *         STUDENT_PROFILE_REQUIRED without an active student profile, and
+     *         STUDENT_ALREADY_IN_GROUP or STUDENT_ACTIVE_IN_OTHER_GROUP for a double membership
+     */
     @Transactional
     public GroupResponse createGroup(GroupCreateRequest request, Jwt actor) {
         UUID roundId = request == null ? null : request.roundId();
@@ -335,6 +412,18 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    /**
+     * Adds one member to a group, either a campus student or an external member.
+     *
+     * @param groupId group being staffed
+     * @param request student id to invite; a blank id takes the external-member path instead
+     * @param actor caller JWT; the group leader, a supervisor, or an admin may manage the roster
+     * @return the group with the new member listed
+     * @throws DomainException with code GROUP_FULL past four members, GROUP_STATE_CONFLICT once the
+     *         supervisor approved the roster, ROUND_CLOSED / REGISTRATION_WINDOW_CLOSED outside the
+     *         registration window, and STUDENT_PROFILE_REQUIRED, STUDENT_ALREADY_IN_GROUP, or
+     *         STUDENT_ACTIVE_IN_OTHER_GROUP for an unsuitable invitee
+     */
     @Transactional
     public GroupResponse addMember(UUID groupId, MemberRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -387,6 +476,17 @@ public class ThesisMutationService {
         jdbc.update("UPDATE thesis.thesis_group SET updated_at = CURRENT_TIMESTAMP, version = version + 1 WHERE id = :groupId", params().addValue("groupId", group.id()));
     }
 
+    /**
+     * Drops a student from the group roster.
+     *
+     * @param groupId group to change
+     * @param studentId member to remove
+     * @param actor caller JWT; the leader, a supervisor, or an admin
+     * @return the group without that member
+     * @throws DomainException with code LEADER_CANNOT_BE_REMOVED for the leader, GROUP_TOO_SMALL
+     *         when an approved group would fall below three members, MEMBER_NOT_FOUND for an
+     *         unknown member, or GROUP_STATE_CONFLICT once the roster is frozen
+     */
     @Transactional
     public GroupResponse removeMember(UUID groupId, String studentId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -416,6 +516,16 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    /**
+     * Binds a published topic to the group inside the registration window.
+     *
+     * @param groupId group choosing the topic
+     * @param request topic selection carrying a required {@code topicId}
+     * @param actor caller JWT; the group leader or an admin
+     * @return the group with its topic attached
+     * @throws DomainException with code GROUP_STATE_CONFLICT once approved, TOPIC_ROUND_MISMATCH,
+     *         TOPIC_NOT_PUBLISHED, or TOPIC_FULL when the topic reached its group limit
+     */
     @Transactional
     public GroupResponse assignTopic(UUID groupId, TopicAssignmentRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -446,6 +556,18 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    /**
+     * Records group progress without touching the supervisor approval state.
+     *
+     * @param groupId group whose progress changes
+     * @param request progress status, restricted to {@code DRAFT}, {@code SUBMITTED},
+     *         {@code COMPLETED}, or {@code CANCELLED}
+     * @param actor caller JWT; the leader, a supervisor, or an admin
+     * @return the group with its new progress status
+     * @throws DomainException with code VALIDATION_ERROR for a missing or unsupported status, or
+     *         GROUP_STATUS_INVALID when an approved group does something other than complete, or a
+     *         completed group reopens
+     */
     @Transactional
     public GroupResponse updateProgress(UUID groupId, ProgressRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -473,6 +595,17 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    /**
+     * Approves a submitted group, freezing its membership for the rest of the round.
+     *
+     * @param groupId group to approve
+     * @param actor caller JWT; a supervisor or an admin
+     * @return the approved group
+     * @throws DomainException with code GROUP_APPROVAL_STATE_CONFLICT unless the group is
+     *         submitted with a topic and still pending, GROUP_TOO_SMALL / GROUP_TOO_LARGE for a
+     *         roster outside three to four members, or GROUP_LEADER_INVALID without exactly one
+     *         matching leader
+     */
     @Transactional
     public GroupResponse approveGroup(UUID groupId, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -509,6 +642,17 @@ public class ThesisMutationService {
         return groups.findById(groupId);
     }
 
+    /**
+     * Rejects a submitted group and sends it back with a mandatory reason.
+     *
+     * @param groupId group to reject
+     * @param request rejection reason, 1-500 characters
+     * @param actor caller JWT; a supervisor or an admin
+     * @return the rejected group
+     * @throws DomainException with code GROUP_APPROVAL_STATE_CONFLICT unless the group is
+     *         submitted with a topic and still pending, or VALIDATION_ERROR for a blank or
+     *         over-long reason
+     */
     @Transactional
     public GroupResponse rejectGroup(UUID groupId, GroupRejectionRequest request, Jwt actor) {
         GroupRow group = lockGroup(groupId);
@@ -531,6 +675,10 @@ public class ThesisMutationService {
      * active round there is nothing to join, and an always-on lookup would let
      * any student enumerate the whole student directory. Email addresses are
      * never returned: the invite flow only needs the student number.
+     *
+     * @param query free-text student number or name fragment, at least two characters
+     * @return up to eight matching active students ordered by student number; empty when the query
+     *         is too short or no round is live enough to join
      */
     public List<StudentSearchResponse> searchStudents(String query) {
         String normalized = normalize(query).toLowerCase(java.util.Locale.ROOT);
