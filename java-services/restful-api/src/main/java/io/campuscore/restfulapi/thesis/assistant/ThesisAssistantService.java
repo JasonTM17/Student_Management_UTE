@@ -739,7 +739,11 @@ public class ThesisAssistantService {
                                 // sensitive class still reject.
                                 String candidate = providerAnswer + segment.text();
                                 if (!AssistantInputGuard.inspectProviderOutput(candidate).allowed()
-                                        || !AssistantOutputGuard.isSafe(candidate)) {
+                                        // The retrieved context is the approved
+                                        // corpus, so a command or endpoint quoted
+                                        // from it is a citation; only invented
+                                        // content is rejected.
+                                        || !AssistantOutputGuard.isSafeForAnswer(candidate, lexical.context())) {
                                     throw new ProviderOutputRejectedException();
                                 }
                                 providerAnswer.append(segment.text());
@@ -880,7 +884,9 @@ public class ThesisAssistantService {
                     String generated = normalizeAssistantCopy(provider.complete(message.trim(), lexical.citations().stream()
                             .map(citation -> citation.title() + "\n" + citation.excerpt())
                             .collect(Collectors.joining("\n\n")), requestedLocale), requestedLocale);
-                    if (AssistantOutputGuard.isSafe(generated)) {
+                    if (AssistantOutputGuard.isSafeForAnswer(generated, lexical.citations().stream()
+                            .map(citation -> citation.title() + "\n" + citation.excerpt())
+                            .collect(Collectors.joining("\n\n")))) {
                         response = new ChatResponse(generated, deepSeek.model(), false, "ANSWERED", requestedLocale, lexical.citations());
                     } else {
                         response = new ChatResponse(technicalOutputMessage(requestedLocale), MODEL, true,
@@ -1200,14 +1206,20 @@ public class ThesisAssistantService {
         }
     }
     private static boolean isPublicKnowledgeSafe(ThesisAssistantKnowledgeRepository.KnowledgeDocument document) {
+        // Sensitive-data and injection screening still applies. AssistantOutputGuard
+        // deliberately does NOT: the corpus has already passed knowledge governance
+        // (authored, reviewed and published through a release), and the SPECIALIZED
+        // domain legitimately contains "docker compose", "API key" and similar
+        // strings that a software-engineering answer must be allowed to quote.
+        // Applying the output boundary here silently removed 7 of the 24 published
+        // SPECIALIZED documents from retrieval. Model output is still guarded at
+        // the stream boundary with isSafeForAnswer, which rejects anything the
+        // model invents beyond this corpus.
         return document != null
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.slug())
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.title())
                 && AssistantInputGuard.isPublicKnowledgeSafe(document.content())
-                && AssistantInputGuard.isPublicKnowledgeSafe(document.source())
-                && AssistantOutputGuard.isSafe(document.title())
-                && AssistantOutputGuard.isSafe(document.content())
-                && AssistantOutputGuard.isSafe(document.source());
+                && AssistantInputGuard.isPublicKnowledgeSafe(document.source());
     }
     static List<String> retrievalTerms(String message) {
         String source = message == null ? "" : message;

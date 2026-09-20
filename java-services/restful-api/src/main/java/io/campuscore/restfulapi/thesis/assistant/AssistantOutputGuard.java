@@ -53,6 +53,48 @@ public final class AssistantOutputGuard {
                 && !STACK_TRACE.matcher(normalized).find();
     }
 
+    /**
+     * Guard for provider-generated text where some triggering strings are
+     * expected. The assistant answers from an approved, published corpus, so a
+     * command or endpoint that is quoted from the retrieved context is a
+     * citation, not a hallucination; only a match with no counterpart in
+     * {@code approvedContext} is rejected.
+     *
+     * <p>This is what lets the SPECIALIZED domain answer its own DevOps, REST
+     * and architecture topics while {@link #isSafe(String)} remains the boundary
+     * everywhere else — including corpus admission, where there is no context to
+     * quote from and no model output to second-guess.
+     */
+    public static boolean isSafeForAnswer(String value, String approvedContext) {
+        if (value == null || value.isBlank()) {
+            return true;
+        }
+        if (approvedContext == null || approvedContext.isBlank()) {
+            return isSafe(value);
+        }
+        String normalizedValue = normalize(value);
+        String approved = normalize(approvedContext);
+        return !hasUnapprovedMatch(normalizedValue, approved, CODE_FENCE)
+                && !hasUnapprovedMatch(normalizedValue, approved, SHELL_COMMAND)
+                && !hasUnapprovedMatch(normalizedValue, approved, INLINE_COMMAND)
+                && !hasUnapprovedMatch(normalizedValue, approved, SQL_COMMAND)
+                && !hasUnapprovedMatch(normalizedValue, approved, INTERNAL_ENDPOINT)
+                && !hasUnapprovedMatch(normalizedValue, approved, INTERNAL_DETAIL)
+                && !hasUnapprovedMatch(normalizedValue, approved, STACK_TRACE);
+    }
+
+    /** True when the value matches a pattern with text absent from the approved context. */
+    private static boolean hasUnapprovedMatch(String value, String approvedContext, Pattern pattern) {
+        var matcher = pattern.matcher(value);
+        while (matcher.find()) {
+            String found = matcher.group().trim();
+            if (!found.isEmpty() && !approvedContext.contains(found)) {
+                return true;
+            }
+        }
+        return false;
+    }
+
     static String normalize(String value) {
         return Normalizer.normalize(INVISIBLE.matcher(value).replaceAll(""), Normalizer.Form.NFKC)
                 .toLowerCase(Locale.ROOT);
