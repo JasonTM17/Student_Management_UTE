@@ -725,9 +725,15 @@ export const departmentsApi = {
 
 // Courses API
 export const coursesApi = {
+  // GET /courses allow-lists its query parameters server side and rejects
+  // anything else with HTTP 400, so this signature is the wire contract: only
+  // parameters the route actually answers may appear here. `departmentId` is a
+  // server-side filter on the course's department, which is what lets callers
+  // page a department instead of narrowing one 20-row page in the browser.
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
     departmentId?: string;
   }): Promise<ApiResponse<Course[]>> => {
     const response = await api.get<ApiResponse<Course[]>>('/courses', {
@@ -763,10 +769,11 @@ export const gradesApi = {
     return response.data;
   },
 
-  getMyTranscript: async (semesterId?: string): Promise<StudentTranscript> => {
+  // The transcript is cumulative over the whole programme: the route accepts no
+  // query parameters at all, so a semesterId here would be a guaranteed 400.
+  getMyTranscript: async (): Promise<StudentTranscript> => {
     const response = await api.get<StudentTranscript>(
       '/enrollments/my/transcript',
-      { params: { semesterId } },
     );
     return response.data;
   },

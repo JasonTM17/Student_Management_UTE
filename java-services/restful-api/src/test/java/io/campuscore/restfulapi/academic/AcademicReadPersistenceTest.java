@@ -620,6 +620,355 @@ class AcademicReadPersistenceTest {
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
     }
 
+    @Test
+    void catalogSearchIsEvaluatedByTheDatabaseAcrossEveryAdminCatalogList() throws Exception {
+        insertAcademicYear("ay-2025", 2025, false);
+        insertAcademicYear("ay-2026", 2026, true);
+        // Neither semester stores a digit, so a hit on "2025" can only come from
+        // the joined academic year.
+        insertSemester(
+                "semester-primary", "Primary", "Primary", "Chính", "FALL", "ay-2026", "2026-09-01T00:00:00Z");
+        insertSemester(
+                "semester-intensive", "Intensive", "Intensive", "Vừa học", "SPRING", "ay-2025", "2025-01-01T00:00:00Z");
+        insertFaculty("faculty-cs", "Computer Science", "Computer Science", "Công nghệ thông tin", "FCS", null, null, null);
+        insertFaculty("faculty-business", "Business", "Business", "Quản trị", "FBA", null, null, null);
+        insertDepartment(
+                "department-se", "Software Engineering", "Software Engineering", "Kỹ thuật phần mềm",
+                "SE", null, null, null, "faculty-cs", "Dr. SE");
+        insertDepartment(
+                "department-ba", "Business Administration", "Business Administration", "Quản trị kinh doanh",
+                "BA", null, null, null, "faculty-business", "Dr. BA");
+        insertCourse("se401", "SE401", "Web Development", "Web Development", "Phát triển web", "department-se", null, 3);
+        insertCourse("cs101", "CS101", "Intro", "Intro", "Nhập môn", "department-se", null, 4);
+        insertClassroom("classroom-b202", "B", "202", 60, "LECTURE_HALL");
+        insertClassroom("classroom-a101", "A", "101", 40, "LAB");
+
+        mvc.perform(get("/api/v1/semesters")
+                        .queryParam("search", "primary")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("semester-primary"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/semesters")
+                        .queryParam("search", "spring")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("semester-intensive"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/semesters")
+                        .queryParam("search", "2025")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("semester-intensive"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/academic-years")
+                        .queryParam("search", "2026")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("ay-2026"))
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.meta.totalPages").value(1));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "se4")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("se401"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "INTRO")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("cs101"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/departments")
+                        .queryParam("search", "se")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("department-se"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/departments")
+                        .queryParam("search", "administration")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("department-ba"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/classrooms")
+                        .queryParam("search", "202")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("classroom-b202"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/classrooms")
+                        .queryParam("search", "b")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("classroom-b202"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        // Without a search term the lists keep the rows and totals they had before.
+        mvc.perform(get("/api/v1/courses").with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+    }
+
+    @Test
+    void catalogSearchTreatsLikeWildcardsLiterallyAndKeepsBlankTermsUnfiltered() throws Exception {
+        insertAcademicYear("ay-2026", 2026, true);
+        insertFaculty("faculty-cs", "Computer Science", null, null, "FCS", null, null, null);
+        insertDepartment(
+                "department-se", "Software Engineering", null, null, "SE",
+                null, null, null, "faculty-cs", "Dr. SE");
+        insertCourse("se401", "SE401", "Web Development", null, null, "department-se", null, 3);
+        insertCourse("cs101", "CS101", "Intro", null, null, "department-se", null, 4);
+
+        // "%" reaches the database as text: unescaped it would match every row.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "%")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0));
+
+        // "_" is a single-character wildcard when it is not escaped: "S_401"
+        // would match SE401. Escaped, it is text and nothing contains it.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "S_401")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // The same row is reachable when the term is the text it really holds,
+        // which proves the assertion above filtered for the right reason.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "SE401")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("se401"));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "01")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "\\")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // An empty or blank term is the same request as no term at all.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "   ")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        // The ceiling is defensive, not a rejection: an over-long term still 200s
+        // and simply matches nothing it should not.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("search", "SE401" + "z".repeat(300))
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+    }
+
+    @Test
+    void coursesFilterByDepartmentInTheDatabaseAndAnUnknownDepartmentPagesNothing() throws Exception {
+        insertAcademicYear("ay-2026", 2026, true);
+        insertFaculty("faculty-cs", "Computer Science", null, null, "FCS", null, null, null);
+        insertFaculty("faculty-business", "Business", null, null, "FBA", null, null, null);
+        insertDepartment(
+                "department-se", "Software Engineering", null, null, "SE",
+                null, null, null, "faculty-cs", "Dr. SE");
+        insertDepartment(
+                "department-ba", "Business Administration", null, null, "BA",
+                null, null, null, "faculty-business", "Dr. BA");
+        insertCourse("se401", "SE401", "Web Development", null, null, "department-se", null, 3);
+        insertCourse("se501", "SE501", "Capstone", null, null, "department-se", null, 3);
+        insertCourse("cs101", "CS101", "Intro", null, null, "department-se", null, 4);
+        insertCourse("ba201", "BA201", "Marketing", null, null, "department-ba", null, 3);
+        insertCourse("ba301", "BA301", "Finance", null, null, "department-ba", null, 3);
+
+        // The filter runs in SQL, so a department bigger than one page is still
+        // walked in full instead of being cut down to the 20 rows the browser held.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-se")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "2")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("cs101"))
+                .andExpect(jsonPath("$.data[1].id").value("se401"))
+                .andExpect(jsonPath("$.meta.total").value(3))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        // The total describes the filtered set, which is what makes page 2 real.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-se")
+                        .queryParam("page", "2")
+                        .queryParam("limit", "2")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("se501"))
+                .andExpect(jsonPath("$.meta.total").value(3))
+                .andExpect(jsonPath("$.meta.totalPages").value(2));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-ba")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.data[0].id").value("ba201"))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        // Search and department are ANDed, and both predicates are shared with the
+        // count: a term that only exists in the other department narrows to zero.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-ba")
+                        .queryParam("search", "se4")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-ba")
+                        .queryParam("search", "ba2")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("ba201"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        // With no department filter the same rows are all reachable, which is the
+        // control for the assertions above.
+        mvc.perform(get("/api/v1/courses").with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(5))
+                .andExpect(jsonPath("$.meta.total").value(5));
+
+        // An id that matches nothing is an empty page, not an error. The route has
+        // no cheaper way to know whether a department exists than to ask for it.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-does-not-exist")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0))
+                .andExpect(jsonPath("$.meta.totalPages").value(0));
+
+        // Garbage is data, not syntax: it is bound as a parameter, so the table
+        // survives the request and the next one still sees all five rows.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "\"; DROP TABLE \"academic\".\"Course\"; --")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        mvc.perform(get("/api/v1/courses").with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(5));
+
+        // Surrounding whitespace is the operator's mistake, not part of an id.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "  department-ba  ")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        // A blank id is rejected rather than guessed at. Unlike a blank search
+        // term, treating it as "unfiltered" would silently widen the page the
+        // caller asked to narrow.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "   ")
+                        .with(studentJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        // The route still refuses everything outside its allow-list.
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-se")
+                        .queryParam("facultyId", "faculty-cs")
+                        .with(studentJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/courses")
+                        .queryParam("departmentId", "department-se", "department-ba")
+                        .with(studentJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void catalogSearchAllowListStaysPerEndpointAndStillRejectsAnythingElse() throws Exception {
+        insertAcademicYear("ay-2026", 2026, true);
+
+        // Accepting "search" must not turn these routes into open parameter sinks.
+        for (String route : List.of("/api/v1/semesters", "/api/v1/courses", "/api/v1/classrooms")) {
+            mvc.perform(get(route)
+                            .queryParam("sortBy", "name")
+                            .with(studentJwt()))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+        }
+
+        // Endpoints the admin catalog pages do not use keep their narrower lists.
+        mvc.perform(get("/api/v1/curricula")
+                        .queryParam("search", "SE")
+                        .with(studentJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/faculties")
+                        .queryParam("search", "FCS")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        // A repeated parameter is still ambiguous, even for an allowed name.
+        mvc.perform(get("/api/v1/academic-years")
+                        .queryParam("search", "2026", "2025")
+                        .with(studentJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/departments")
+                        .queryParam("status", "ACTIVE")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
     private void insertAcademicYear(String id, int year, boolean current) {
         Instant start = Instant.parse(year + "-01-01T00:00:00Z");
         jdbc.update(

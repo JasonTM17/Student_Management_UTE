@@ -47,6 +47,7 @@ export default function AdminAcademicYearsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -80,14 +81,11 @@ export default function AdminAcademicYearsPage() {
     setError('');
 
     try {
-      const response = await academicYearsApi.getAll({ page, limit: 20 });
-      const filteredYears = search
-        ? response.data.filter((entry) =>
-            entry.year.toString().includes(search.trim()),
-          )
-        : response.data;
-
-      setAcademicYears(filteredYears);
+      // Search is a server-side filter: paging through 20-row pages and narrowing
+      // them in the browser reports "no results" for anything on another page.
+      const query = { page, limit: 20, search: search || undefined };
+      const response = await academicYearsApi.getAll(query);
+      setAcademicYears(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch {
       setError(
@@ -234,10 +232,13 @@ export default function AdminAcademicYearsPage() {
     resetForm();
   };
 
-  const handleSearch = async (event: React.FormEvent) => {
+  const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    // `search` and `page` are fetch dependencies, so committing the term here is
+    // what re-issues the request. Calling the fetch directly would run it against
+    // the previous closure and fire twice.
+    setSearch(searchInput.trim());
     setPage(1);
-    await fetchAcademicYears();
   };
 
   const handleDelete = async (record: AcademicYear) => {
@@ -312,8 +313,8 @@ export default function AdminAcademicYearsPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />

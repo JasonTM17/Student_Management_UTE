@@ -24,6 +24,7 @@ import io.campuscore.restfulapi.academic.web.AcademicReadDtos.PageMeta;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterCatalogSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterListResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.SemesterResponse;
+import io.campuscore.restfulapi.common.LikePattern;
 import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
@@ -47,10 +48,11 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
-    public SemesterListResponse findSemesters(int page, int limit) {
+    public SemesterListResponse findSemesters(int page, int limit, String search) {
         requirePage(page, limit);
-        long total = academic.countSemesters();
-        List<SemesterResponse> data = academic.findSemesters(offset(page, limit), limit).stream()
+        String pattern = LikePattern.contains(search);
+        long total = academic.countSemesters(pattern);
+        List<SemesterResponse> data = academic.findSemesters(offset(page, limit), limit, pattern).stream()
                 .map(AcademicCatalogLocalizer::hydrateSemester)
                 .toList();
         return new SemesterListResponse(data, meta(total, page, limit));
@@ -79,10 +81,12 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
-    public DepartmentListResponse findDepartments(int page, int limit) {
+    public DepartmentListResponse findDepartments(int page, int limit, String search) {
         requirePage(page, limit);
-        long total = academic.countDepartments();
-        List<DepartmentResponse> departments = academic.findDepartments(offset(page, limit), limit);
+        String pattern = LikePattern.contains(search);
+        long total = academic.countDepartments(pattern);
+        List<DepartmentResponse> departments =
+                academic.findDepartments(offset(page, limit), limit, pattern);
         return new DepartmentListResponse(hydrateDepartments(departments), meta(total, page, limit));
     }
 
@@ -94,10 +98,12 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
-    public AcademicYearListResponse findAcademicYears(int page, int limit) {
+    public AcademicYearListResponse findAcademicYears(int page, int limit, String search) {
         requirePage(page, limit);
-        long total = academic.countAcademicYears();
-        List<AcademicYearResponse> years = academic.findAcademicYears(offset(page, limit), limit);
+        String pattern = LikePattern.contains(search);
+        long total = academic.countAcademicYears(pattern);
+        List<AcademicYearResponse> years =
+                academic.findAcademicYears(offset(page, limit), limit, pattern);
         return new AcademicYearListResponse(hydrateAcademicYears(years), meta(total, page, limit));
     }
 
@@ -109,10 +115,13 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
-    public CourseListResponse findCourses(int page, int limit) {
+    public CourseListResponse findCourses(int page, int limit, String search, String departmentId) {
         requirePage(page, limit);
-        long total = academic.countCourses();
-        List<CourseResponse> data = academic.findCourses(offset(page, limit), limit).stream()
+        String pattern = LikePattern.contains(search);
+        String normalizedDepartmentId = normalizeOptional("departmentId", departmentId);
+        long total = academic.countCourses(pattern, normalizedDepartmentId);
+        List<CourseResponse> data = academic
+                .findCourses(offset(page, limit), limit, pattern, normalizedDepartmentId).stream()
                 .map(AcademicCatalogLocalizer::hydrateCourse)
                 .toList();
         return new CourseListResponse(data, meta(total, page, limit));
@@ -207,10 +216,11 @@ public class AcademicReadService {
     }
 
     @Transactional(readOnly = true)
-    public ClassroomListResponse findClassrooms(int page, int limit) {
+    public ClassroomListResponse findClassrooms(int page, int limit, String search) {
         requirePage(page, limit);
-        long total = academic.countClassrooms();
-        List<ClassroomResponse> data = academic.findClassrooms(offset(page, limit), limit);
+        String pattern = LikePattern.contains(search);
+        long total = academic.countClassrooms(pattern);
+        List<ClassroomResponse> data = academic.findClassrooms(offset(page, limit), limit, pattern);
         return new ClassroomListResponse(data, meta(total, page, limit));
     }
 
@@ -371,5 +381,24 @@ public class AcademicReadService {
         if (limit < 1 || limit > MAX_PAGE_SIZE) {
             throw new IllegalArgumentException("limit must be between 1 and " + MAX_PAGE_SIZE);
         }
+    }
+
+    /**
+     * Optional identifier filter. Absent means unfiltered; blank means the caller
+     * meant to send nothing, which is a client bug rather than a wildcards-
+     * matching-everything request, so it is rejected instead of guessed at.
+     */
+    private static String normalizeOptional(String name, String value) {
+        if (value == null) {
+            return null;
+        }
+        String trimmed = value.trim();
+        if (trimmed.isEmpty()) {
+            throw new IllegalArgumentException(name + " must not be blank");
+        }
+        if (trimmed.length() > 100) {
+            throw new IllegalArgumentException(name + " is too long");
+        }
+        return trimmed;
     }
 }
