@@ -1,5 +1,6 @@
 import type { Locale } from '@/i18n/config';
 import type { AnnouncementRecord } from '@/lib/api';
+import { isSafeAnnouncementImageUrl } from '@/lib/html-sanitizer';
 
 export const ANNOUNCEMENT_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'] as const;
 export type AnnouncementPriority = (typeof ANNOUNCEMENT_PRIORITIES)[number];
@@ -831,20 +832,44 @@ export interface CoverImageDetails {
  * `data:image/` payloads are accepted because the editor inline-encodes every
  * upload as base64 — refusing them here made the reader strip the author's
  * first image from the body while showing a placeholder cover.
+ *
+ * A candidate still has to pass the reader's own image allow-list, so a cover is
+ * never picked from a source the body filter would delete (an inlined SVG would
+ * otherwise produce the broken frame the editor now refuses to insert).
  */
-export function extractCoverImage(content: string | null | undefined): string | null {
-  if (!content) return null;
-  // Match markdown image ![alt](url)
-  const mdMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)/i);
-  if (mdMatch && mdMatch[1]) {
-    return mdMatch[1];
-  }
-  // Match html img src
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["']/i);
-  if (htmlMatch && htmlMatch[1]) {
-    return htmlMatch[1];
+function usableCoverUrl(value: string | undefined): string | null {
+  return value && isSafeAnnouncementImageUrl(value) ? value : null;
+}
+
+const MARKDOWN_IMAGE_SOURCE = String.raw`!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)`;
+const HTML_IMAGE_SOURCE = String.raw`<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["']`;
+
+/** The same match with the remaining attribute run as group 2, so `alt` can be
+ *  read out of it. A trailing optional `(?:alt=...)?` group after a greedy
+ *  `[^>]*` never captures, which is why this is done in two steps. */
+const HTML_IMAGE_WITH_ATTRS_SOURCE = `${HTML_IMAGE_SOURCE}([^>]*)>`;
+
+/**
+ * The first image whose source the reader will actually render. Stopping at the
+ * first match would drop the cover entirely when an author leads with something
+ * the allow-list rejects, so the scan continues to the next candidate.
+ */
+function firstUsableImage(
+  content: string,
+  source: string,
+  group: number,
+): RegExpMatchArray | null {
+  for (const match of content.matchAll(new RegExp(source, 'gi'))) {
+    if (usableCoverUrl(match[group])) return match;
   }
   return null;
+}
+export function extractCoverImage(content: string | null | undefined): string | null {
+  if (!content) return null;
+  // Markdown image first, then an HTML one, each in document order.
+  const fromMarkdown = firstUsableImage(content, MARKDOWN_IMAGE_SOURCE, 1);
+  if (fromMarkdown?.[1]) return fromMarkdown[1];
+  return firstUsableImage(content, HTML_IMAGE_SOURCE, 1)?.[1] ?? null;
 }
 
 /**
@@ -857,29 +882,32 @@ export function extractCoverImageDetails(content: string | null | undefined): Co
   const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
   const figMatch = content.match(figureRegex);
   if (figMatch && figMatch[1]) {
+    const url = usableCoverUrl(figMatch[1]);
     const rawCaption = figMatch[3] ? figMatch[3].replace(/<[^>]+>/g, '').trim() : undefined;
-    return {
-      url: figMatch[1],
-      alt: figMatch[2] || '',
-      caption: rawCaption || undefined,
-    };
+    if (url) {
+      return {
+        url,
+        alt: figMatch[2] || '',
+        caption: rawCaption || undefined,
+      };
+    }
   }
 
-  // 2. Check for bare <img ...>
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/i);
-  if (htmlMatch && htmlMatch[1]) {
+  // 2. Check for bare <img ...>, carrying its own alt text.
+  const bare = firstUsableImage(content, HTML_IMAGE_WITH_ATTRS_SOURCE, 1);
+  if (bare?.[1]) {
     return {
-      url: htmlMatch[1],
-      alt: htmlMatch[2] || '',
+      url: bare[1],
+      alt: /alt=["']([^"']*)["']/i.exec(bare[2] ?? '')?.[1] ?? '',
     };
   }
 
   // 3. Check for Markdown image ![alt](url)
-  const mdMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)/i);
-  if (mdMatch && mdMatch[2]) {
+  const markdown = firstUsableImage(content, MARKDOWN_IMAGE_SOURCE, 2);
+  if (markdown?.[2]) {
     return {
-      url: mdMatch[2],
-      alt: mdMatch[1] || '',
+      url: markdown[2],
+      alt: markdown[1] || '',
     };
   }
 
