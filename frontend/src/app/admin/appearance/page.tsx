@@ -45,6 +45,7 @@ export default function AdminAppearancePage() {
   const [posts, setPosts] = useState<AnnouncementRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
   const [error, setError] = useState('');
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
 
@@ -108,7 +109,14 @@ export default function AdminAppearancePage() {
       }
       setDraft(saved);
       broadcastSiteAppearance(saved);
+      setSavedLocally(saved.persisted === false);
+      if (saved.persisted === false) {
+        // The API row is the only store that survives a redeploy; say so
+        // instead of letting the admin believe the whole portal was updated.
+        toast.warning(copy.saveNotDurable);
+      }
     } catch {
+      setSavedLocally(false);
       toast.error(copy.saveFailed);
       if (seq === persistSeq.current) {
         void load();
@@ -118,7 +126,7 @@ export default function AdminAppearancePage() {
         setIsSaving(false);
       }
     }
-  }, [copy.saveFailed, load]);
+  }, [copy.saveFailed, copy.saveNotDurable, load]);
 
   const orderedPosts = useMemo(() => {
     const rank = new Map(draft.postOrder.map((id, index) => [id, index]));
@@ -133,7 +141,9 @@ export default function AdminAppearancePage() {
     (_newItems: AnnouncementRow[], newKeys: string[]) => {
       const next = {
         ...draft,
-        postOrder: newKeys,
+        // `newKeys` only covers the rows this page loaded, so writing it
+        // straight to postOrder would unpin every post beyond that window.
+        postOrder: applyPageOrder(draft.postOrder, newKeys),
       };
       setDraft(next);
       broadcastSiteAppearance(next);
@@ -157,12 +167,19 @@ export default function AdminAppearancePage() {
       actions={
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span
+            role="status"
+            aria-live="polite"
+            title={savedLocally ? copy.saveNotDurable : undefined}
             className={cn(
               'inline-flex min-h-11 items-center rounded-md border px-3',
-              isSaving ? 'border-border' : 'border-[var(--portal-chrome-accent)] text-foreground',
+              isSaving
+                ? 'border-border'
+                : savedLocally
+                  ? 'border-amber-500/60 text-amber-600'
+                  : 'border-[var(--portal-chrome-accent)] text-foreground',
             )}
           >
-            {isSaving ? copy.saving : copy.saved}
+            {isSaving ? copy.saving : savedLocally ? copy.savedLocal : copy.saved}
           </span>
           <LinkButton href="/admin/announcements" variant="outline">
             {copy.openAnnouncements}
@@ -350,7 +367,11 @@ export default function AdminAppearancePage() {
                   itemClassName="transition-colors hover:bg-muted/30"
                   renderItem={(post, index) => (
                     <div className="flex items-center gap-2 py-3">
-                      <DragHandle className="shrink-0 cursor-grab" title="Kéo thả để sắp xếp vị trí" />
+                      <DragHandle
+                        className="shrink-0 cursor-grab"
+                        label={copy.dragToReorder}
+                        title={copy.dragToReorder}
+                      />
                       <span className="w-8 text-sm font-semibold tabular-nums text-muted-foreground">
                         {String(index + 1).padStart(2, '0')}
                       </span>

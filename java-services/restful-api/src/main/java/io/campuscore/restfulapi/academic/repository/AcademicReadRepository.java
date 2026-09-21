@@ -91,6 +91,21 @@ public class AcademicReadRepository {
             cur."updatedAt" AS curriculum_updated_at
             """;
 
+    /**
+     * Semester search terms. The year is reached through EXISTS rather than the
+     * list query's join so the count stays on the same predicate without turning
+     * {@code COUNT(*)} into a joined count.
+     */
+    private static final String SEMESTER_SEARCH_TERMS = likeTerms(
+            "s.\"name\"", "s.\"nameEn\"", "s.\"nameVi\"", "s.\"type\"")
+            + " OR EXISTS (SELECT 1 FROM \"academic\".\"AcademicYear\" sy"
+            + " WHERE sy.\"id\" = s.\"academicYearId\""
+            + " AND LOWER(CAST(sy.\"year\" AS VARCHAR)) LIKE :search ESCAPE '\\')";
+
+    /** Course catalog search terms, shared by the page and the count query. */
+    private static final String COURSE_SEARCH_TERMS = likeTerms(
+            "c.\"code\"", "c.\"name\"", "c.\"nameEn\"", "c.\"nameVi\"");
+
     private static final RowMapper<SemesterResponse> SEMESTER_ROW_MAPPER =
             AcademicReadRepository::mapSemester;
     private static final RowMapper<FacultyResponse> FACULTY_ROW_MAPPER =
@@ -162,20 +177,26 @@ public class AcademicReadRepository {
                 FACULTY_DEPARTMENT_ROW_MAPPER);
     }
 
-    public List<DepartmentResponse> findDepartments(long offset, int limit) {
+    public List<DepartmentResponse> findDepartments(long offset, int limit, String search) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 "SELECT " + DEPARTMENT_RESPONSE_COLUMNS + ", " + FACULTY_COLUMNS
                         + " FROM \"academic\".\"Department\" d"
                         + " INNER JOIN \"academic\".\"Faculty\" f ON f.\"id\" = d.\"facultyId\""
+                        + searchWhere(parameters, search,
+                                likeTerms("d.\"code\"", "d.\"name\"", "d.\"nameEn\"", "d.\"nameVi\""))
                         + " ORDER BY d.\"name\" ASC, d.\"id\" ASC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 DEPARTMENT_RESPONSE_ROW_MAPPER);
     }
 
-    public long countDepartments() {
+    public long countDepartments(String search) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"academic\".\"Department\"",
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM \"academic\".\"Department\" d"
+                        + searchWhere(parameters, search,
+                                likeTerms("d.\"code\"", "d.\"name\"", "d.\"nameEn\"", "d.\"nameVi\"")),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -206,7 +227,8 @@ public class AcademicReadRepository {
                 DEPARTMENT_LECTURER_ROW_MAPPER);
     }
 
-    public List<SemesterResponse> findSemesters(long offset, int limit) {
+    public List<SemesterResponse> findSemesters(long offset, int limit, String search) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 "SELECT s.\"id\", s.\"name\", s.\"nameEn\", s.\"nameVi\", s.\"type\","
                         + " s.\"academicYearId\", s.\"startDate\", s.\"endDate\","
@@ -216,15 +238,18 @@ public class AcademicReadRepository {
                         + " FROM \"academic\".\"Semester\" s"
                         + " INNER JOIN \"academic\".\"AcademicYear\" ay"
                         + " ON ay.\"id\" = s.\"academicYearId\""
+                        + searchWhere(parameters, search, SEMESTER_SEARCH_TERMS)
                         + " ORDER BY s.\"startDate\" DESC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 SEMESTER_ROW_MAPPER);
     }
 
-    public long countSemesters() {
+    public long countSemesters(String search) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"academic\".\"Semester\"",
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM \"academic\".\"Semester\" s"
+                        + searchWhere(parameters, search, SEMESTER_SEARCH_TERMS),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -245,19 +270,23 @@ public class AcademicReadRepository {
         return matches.stream().findFirst();
     }
 
-    public List<AcademicYearResponse> findAcademicYears(long offset, int limit) {
+    public List<AcademicYearResponse> findAcademicYears(long offset, int limit, String search) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 "SELECT " + ACADEMIC_YEAR_COLUMNS
                         + " FROM \"academic\".\"AcademicYear\" ay"
+                        + searchWhere(parameters, search, likeTerms("CAST(ay.\"year\" AS VARCHAR)"))
                         + " ORDER BY ay.\"startDate\" DESC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 ACADEMIC_YEAR_ROW_MAPPER);
     }
 
-    public long countAcademicYears() {
+    public long countAcademicYears(String search) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"academic\".\"AcademicYear\"",
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM \"academic\".\"AcademicYear\" ay"
+                        + searchWhere(parameters, search, likeTerms("CAST(ay.\"year\" AS VARCHAR)")),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -287,7 +316,8 @@ public class AcademicReadRepository {
                 SEMESTER_CATALOG_ROW_MAPPER);
     }
 
-    public List<CourseResponse> findCourses(long offset, int limit) {
+    public List<CourseResponse> findCourses(long offset, int limit, String search, String departmentId) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 "SELECT c.\"id\", c.\"code\", c.\"name\", c.\"nameEn\", c.\"nameVi\","
                         + " c.\"description\", c.\"descriptionEn\", c.\"descriptionVi\","
@@ -295,15 +325,18 @@ public class AcademicReadRepository {
                         + " c.\"createdAt\", c.\"updatedAt\", " + DEPARTMENT_COLUMNS
                         + " FROM \"academic\".\"Course\" c"
                         + " INNER JOIN \"academic\".\"Department\" d ON d.\"id\" = c.\"departmentId\""
+                        + courseWhere(parameters, search, departmentId)
                         + " ORDER BY c.\"code\" ASC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 COURSE_ROW_MAPPER);
     }
 
-    public long countCourses() {
+    public long countCourses(String search, String departmentId) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"academic\".\"Course\"",
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM \"academic\".\"Course\" c"
+                        + courseWhere(parameters, search, departmentId),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -365,20 +398,26 @@ public class AcademicReadRepository {
                 CURRICULUM_COURSE_ROW_MAPPER);
     }
 
-    public List<ClassroomResponse> findClassrooms(long offset, int limit) {
+    public List<ClassroomResponse> findClassrooms(long offset, int limit, String search) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 "SELECT cl.\"id\", cl.\"building\", cl.\"roomNumber\", cl.\"capacity\","
                         + " cl.\"type\", cl.\"isActive\", cl.\"createdAt\", cl.\"updatedAt\""
                         + " FROM \"academic\".\"Classroom\" cl"
+                        + searchWhere(parameters, search,
+                                likeTerms("cl.\"building\"", "cl.\"roomNumber\""))
                         + " ORDER BY cl.\"building\" ASC, cl.\"roomNumber\" ASC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 CLASSROOM_ROW_MAPPER);
     }
 
-    public long countClassrooms() {
+    public long countClassrooms(String search) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM \"academic\".\"Classroom\"",
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM \"academic\".\"Classroom\" cl"
+                        + searchWhere(parameters, search,
+                                likeTerms("cl.\"building\"", "cl.\"roomNumber\"")),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -413,6 +452,59 @@ public class AcademicReadRepository {
         return new MapSqlParameterSource()
                 .addValue("offset", offset)
                 .addValue("limit", limit);
+    }
+
+    /** {@code a LIKE :search ESCAPE '\' OR b LIKE :search ESCAPE '\'} for the given columns. */
+    private static String likeTerms(String... expressions) {
+        return java.util.Arrays.stream(expressions)
+                .map(expression -> "LOWER(" + expression + ") LIKE :search ESCAPE '\\'")
+                .collect(java.util.stream.Collectors.joining(" OR "));
+    }
+
+    /**
+     * Optional search predicate. A null pattern - every request without a
+     * {@code search} parameter - contributes no SQL at all, so the statement the
+     * server runs is byte-identical to the one it ran before search existed.
+     */
+    private static String searchWhere(
+            MapSqlParameterSource parameters,
+            String search,
+            String predicate) {
+        if (search == null) {
+            return "";
+        }
+        parameters.addValue("search", search);
+        return " WHERE (" + predicate + ")";
+    }
+
+    /**
+     * The course catalog filter, assembled in one place so the page query and the
+     * count query can never disagree: a total that counts rows the page predicate
+     * dropped is a pager that lies, and an {@code ORDER BY ... LIMIT} page would
+     * then show fewer or different rows than its own {@code meta} advertises.
+     */
+    private static String courseWhere(
+            MapSqlParameterSource parameters,
+            String search,
+            String departmentId) {
+        StringBuilder where = new StringBuilder(searchWhere(parameters, search, COURSE_SEARCH_TERMS));
+        appendFilter(where, "c.\"departmentId\" = :departmentId", "departmentId", departmentId, parameters);
+        return where.toString();
+    }
+
+    /** Appends {@code sql} as the first predicate or ANDed onto the existing ones, and binds {@code value}. */
+    private static void appendFilter(
+            StringBuilder where,
+            String sql,
+            String name,
+            String value,
+            MapSqlParameterSource parameters) {
+        if (value == null) {
+            return;
+        }
+        where.append(where.length() == 0 ? " WHERE " : " AND ");
+        where.append(sql);
+        parameters.addValue(name, value);
     }
 
     private static FacultyResponse mapFaculty(ResultSet resultSet, int ignored)

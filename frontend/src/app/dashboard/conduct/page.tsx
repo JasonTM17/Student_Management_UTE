@@ -66,6 +66,7 @@ const conductCopy = {
     optionScoreUnit: 'pts',
     info: 'Conduct score supports scholarship, awards, and graduation review.',
     criteriaTitle: '5 conduct criteria',
+    criteriaEmpty: 'Criterion details have not been published for this semester yet.',
     earned: 'Earned',
     scoreUnit: 'pts',
     reached: 'Reached',
@@ -121,7 +122,6 @@ const conductCopy = {
     fieldLabel: 'Field:',
     recordedDate: 'Recorded date:',
     organizerLabel: 'Organizer:',
-    appliedCriteria: 'Applied criterion:',
     bonusConductPoints: 'Bonus conduct points:',
     printCertificate: 'Print record',
     close: 'Close',
@@ -160,6 +160,7 @@ const conductCopy = {
     optionScoreUnit: 'điểm',
     info: 'Điểm rèn luyện dùng để xét học bổng, khen thưởng và điều kiện tốt nghiệp.',
     criteriaTitle: '5 tiêu chí rèn luyện',
+    criteriaEmpty: 'Chi tiết từng tiêu chí chưa được công bố cho học kỳ này.',
     earned: 'Tổng điểm đạt',
     scoreUnit: 'điểm',
     reached: 'Đạt',
@@ -215,7 +216,6 @@ const conductCopy = {
     fieldLabel: 'Lĩnh vực:',
     recordedDate: 'Ngày ghi nhận:',
     organizerLabel: 'Đơn vị tổ chức:',
-    appliedCriteria: 'Tiêu chí ĐRL áp dụng:',
     bonusConductPoints: 'Điểm cộng rèn luyện:',
     printCertificate: 'In bản ghi',
     close: 'Đóng',
@@ -242,32 +242,6 @@ const conductCriteriaDescriptions = {
     CRITERIA_5: 'Công tác cán bộ lớp, câu lạc bộ, nhóm học thuật và thành tích cấp trường.',
   },
 };
-
-const conductActivityCopy = {
-  en: {
-    'act-01': {
-      title: 'UTE Career Expo 2026',
-      category: 'Skills and careers',
-      organizer: 'UTE Career and Employment Center',
-    },
-    'act-02': {
-      title: 'Voluntary blood donation drive',
-      category: 'Community volunteering',
-      organizer: 'Youth Union and Red Cross',
-    },
-    'act-03': {
-      title: 'AI and big data seminar',
-      category: 'Academic research',
-      organizer: 'Faculty of Information Technology',
-    },
-    'act-04': {
-      title: 'Green Summer and school support campaign',
-      category: 'Community volunteering',
-      organizer: 'HCMUTE Student Association',
-    },
-  },
-  vi: {},
-} as const;
 
 export default function StudentConductPage() {
   // /conduct/my is hasRole('STUDENT')-only on the backend: a staff member has
@@ -323,25 +297,11 @@ export default function StudentConductPage() {
       ? summary.currentSemester
       : (summary.history.find((s) => s.semesterId === selectedSemesterId) || summary.currentSemester);
     if (!match) return null;
-    if (!match.criteria || match.criteria.length === 0) {
-      return {
-        ...match,
-        criteria: [
-          { code: 'CRITERIA_1', nameVi: 'Ý thức tham gia học tập', nameEn: 'Learning Attitude & Academic Results', maxScore: 20, score: match.criteria1Score, description: 'Tham gia đầy đủ các buổi học, chuyên cần, làm bài tập và thái độ tích cực trong giờ học, nghiên cứu khoa học.' },
-          { code: 'CRITERIA_2', nameVi: 'Ý thức chấp hành nội quy, quy chế', nameEn: 'Compliance with Regulations', maxScore: 25, score: match.criteria2Score, description: 'Chấp hành tốt các quy định của nhà trường, pháp luật và quy chế thi cử, không vi phạm an toàn giao thông.' },
-          { code: 'CRITERIA_3', nameVi: 'Ý thức tham gia hoạt động chính trị - xã hội, văn thể mỹ', nameEn: 'Extracurricular & Social Activities', maxScore: 20, score: match.criteria3Score, description: 'Tham gia tích cực ngày hội việc làm, hiến máu tình nguyện, hoạt động Đoàn - Hội, phong trào thanh niên.' },
-          { code: 'CRITERIA_4', nameVi: 'Phẩm chất công dân và quan hệ cộng đồng', nameEn: 'Civic Quality & Community Relations', maxScore: 25, score: match.criteria4Score, description: 'Ý thức trách nhiệm với xã hội, quan hệ hòa nhã với bạn bè, thầy cô, giữ gìn an ninh trật tự khu dân cư.' },
-          { code: 'CRITERIA_5', nameVi: 'Ý thức tham gia công tác cán bộ lớp, đoàn thể', nameEn: 'Class / Union Leadership & Special Achievements', maxScore: 10, score: match.criteria5Score, description: 'Đóng góp tích cực cho ban cán sự lớp, các câu lạc bộ học thuật hoặc đạt giải thưởng cấp trường.' },
-        ],
-        activities: match.activities && match.activities.length > 0 ? match.activities : (summary.currentSemester?.activities || []),
-      };
-    }
     return match;
   }, [summary, selectedSemesterId]);
 
   const formatSemesterName = (name: string | null | undefined) => {
-    const fallback = vi ? 'Học kỳ 1 năm học 2026-2027' : 'Semester 1, 2026-2027';
-    if (!name) return fallback;
+    if (!name) return '—';
     if (vi) return name;
     return name.replace(/Học kỳ\s+(\d+)\s+năm học\s+(\d{4})-(\d{4})/i, 'Semester $1, $2-$3');
   };
@@ -378,31 +338,16 @@ export default function StudentConductPage() {
     vi ? criterion.nameVi : (criterion.nameEn || criterion.nameVi);
 
   const criterionDescription = (criterion: ConductSemesterScore['criteria'][number]) =>
-    conductCriteriaDescriptions[locale][criterion.code as keyof typeof conductCriteriaDescriptions.en]
-    || criterion.description;
+    criterion.description
+    || conductCriteriaDescriptions[locale][criterion.code as keyof typeof conductCriteriaDescriptions.en]
+    || '—';
 
-  const activityDetails = (activity: ConductActivity) => {
-    const translated = vi
-      ? undefined
-      : conductActivityCopy.en[activity.id as keyof typeof conductActivityCopy.en];
-    return {
-      title: translated?.title || activity.title,
-      category: translated?.category || activity.category,
-      organizer: translated?.organizer || activity.organizer,
-      date: formatDate(activity.activityDate),
-    };
-  };
-
-  const activityCriterion = (activity: ConductActivity) => {
-    const category = activity.category.toLowerCase();
-    if (category.includes('tình nguyện') || category.includes('volunteer') || category.includes('phong trào')) {
-      return vi ? 'Tiêu chí 3: Hoạt động xã hội và phong trào' : 'Criterion 3: Social and student activities';
-    }
-    if (category.includes('học thuật') || category.includes('research') || category.includes('hướng nghiệp') || category.includes('career')) {
-      return vi ? 'Tiêu chí 1: Học tập và nghiên cứu' : 'Criterion 1: Learning and research';
-    }
-    return vi ? 'Tiêu chí 4: Công dân và cộng đồng' : 'Criterion 4: Civic and community conduct';
-  };
+  const activityDetails = (activity: ConductActivity) => ({
+    title: activity.title,
+    category: activity.category,
+    organizer: activity.organizer,
+    date: formatDate(activity.activityDate),
+  });
 
   if (authLoading || loading) {
     return <LoadingState label={messages.common.states.loadingContent} />;
@@ -654,6 +599,11 @@ export default function StudentConductPage() {
         </div>
 
         <div className="grid gap-3">
+          {(activeSemesterScore?.criteria || []).length === 0 && (
+            <p className="rounded-lg border border-dashed border-border/70 bg-secondary/30 px-4 py-3 text-sm text-muted-foreground">
+              {copy.criteriaEmpty}
+            </p>
+          )}
           {(activeSemesterScore?.criteria || []).map((crit, index) => {
             const ratio = crit.maxScore > 0 ? (crit.score / crit.maxScore) * 100 : 0;
             return (
@@ -1083,19 +1033,11 @@ export default function StudentConductPage() {
                   <p className="font-semibold text-foreground mt-0.5">{selectedActivityDetails.organizer}</p>
                 </div>
 
-                <div className="pt-2 border-t border-border/60 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
-                  <div>
-                    <span className="text-xs text-muted-foreground">{copy.appliedCriteria}</span>
-                    <p className="font-semibold text-xs text-foreground mt-0.5">
-                      {activityCriterion(selectedActivity)}
-                    </p>
-                  </div>
-                  <div className="sm:text-right">
-                    <span className="text-xs text-muted-foreground">{copy.bonusConductPoints}</span>
-                    <p className="text-lg font-black text-status-success-foreground">
-                      +{formatNumber(selectedActivity.points)} {copy.scoreUnit}
-                    </p>
-                  </div>
+                <div className="pt-2 border-t border-border/60 sm:text-right">
+                  <span className="text-xs text-muted-foreground">{copy.bonusConductPoints}</span>
+                  <p className="text-lg font-black text-status-success-foreground">
+                    +{formatNumber(selectedActivity.points)} {copy.scoreUnit}
+                  </p>
                 </div>
               </div>
             </div>

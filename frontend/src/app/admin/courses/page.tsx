@@ -69,6 +69,7 @@ export default function AdminCoursesPage() {
   const [error, setError] = useState('');
   const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [departmentFilter, setDepartmentFilter] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
@@ -121,27 +122,19 @@ export default function AdminCoursesPage() {
     setError('');
 
     try {
-      const response = await coursesApi.getAll({
+      // Search and department are server-side filters: paging through 20-row
+      // pages and narrowing them in the browser reports "no results" for
+      // anything that lives on another page, and the pager total would keep
+      // describing the unfiltered set.
+      const query = {
         page,
         limit: 20,
-      });
-      let filteredCourses = response.data || [];
-      if (departmentFilter) {
-        filteredCourses = filteredCourses.filter(
-          (course: Course) => course.departmentId === departmentFilter,
-        );
-      }
-      if (search) {
-        filteredCourses = filteredCourses.filter(
-          (course: Course) =>
-            course.code.toLowerCase().includes(search.toLowerCase()) ||
-            course.name.toLowerCase().includes(search.toLowerCase()) ||
-            course.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
-            course.nameVi?.toLowerCase().includes(search.toLowerCase()),
-        );
-      }
+        search: search || undefined,
+        departmentId: departmentFilter || undefined,
+      };
+      const response = await coursesApi.getAll(query);
 
-      setCourses(filteredCourses);
+      setCourses(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch {
       setError(
@@ -327,10 +320,13 @@ export default function AdminCoursesPage() {
     resetForm();
   };
 
-  const handleSearch = async (event: React.FormEvent) => {
+  const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    // `search` and `page` are fetch dependencies, so committing the term here is
+    // what re-issues the request. Calling the fetch directly would run it against
+    // the previous closure and fire twice.
+    setSearch(searchInput.trim());
     setPage(1);
-    await fetchCourses();
   };
 
   const handleDelete = async (course: Course) => {
@@ -413,8 +409,8 @@ export default function AdminCoursesPage() {
                   </label>
                   <Input
                     type="text"
-                    value={search}
-                    onChange={(event) => setSearch(event.target.value)}
+                    value={searchInput}
+                    onChange={(event) => setSearchInput(event.target.value)}
                     placeholder={copy.searchPlaceholder}
                     icon={<Search className="h-4 w-4" />}
                   />

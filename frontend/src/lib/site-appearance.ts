@@ -25,9 +25,16 @@ export type SiteAppearance = {
 
 export const SITE_APPEARANCE_CHANNEL = 'campuscore-site-appearance';
 
+/**
+ * Stamp for "no write has ever happened". Minting a live timestamp here would
+ * make an unstamped payload look like a fresh change on every poll, so readers
+ * must compare against this sentinel instead.
+ */
+export const SITE_APPEARANCE_UNSET_UPDATED_AT = '1970-01-01T00:00:00.000Z';
+
 export const DEFAULT_SITE_APPEARANCE: SiteAppearance = {
   version: 1,
-  updatedAt: '1970-01-01T00:00:00.000Z',
+  updatedAt: SITE_APPEARANCE_UNSET_UPDATED_AT,
   accent: 'ute-yellow',
   hero: {
     en: { eyebrow: '', title: '', description: '' },
@@ -80,9 +87,11 @@ export function sanitizeSiteAppearance(input: unknown): SiteAppearance {
     version: typeof record.version === 'number' && Number.isFinite(record.version)
       ? Math.max(1, Math.floor(record.version))
       : 1,
+    // An unstamped payload keeps the sentinel: substituting "now" would turn
+    // every empty answer into a new object identity on each poll.
     updatedAt: typeof record.updatedAt === 'string' && record.updatedAt
       ? record.updatedAt
-      : new Date().toISOString(),
+      : SITE_APPEARANCE_UNSET_UPDATED_AT,
     accent: isSiteAppearanceAccent(record.accent) ? record.accent : 'ute-yellow',
     hero: {
       en: parseCopy(hero.en),

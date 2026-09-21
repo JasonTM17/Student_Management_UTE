@@ -5,6 +5,7 @@ import {
   useMemo,
   useRef,
   useState,
+  useCallback,
 } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import {
@@ -29,6 +30,7 @@ import {
   Megaphone,
   Menu,
   Palette,
+  RefreshCw,
   School,
   ScrollText,
   Settings,
@@ -192,7 +194,10 @@ interface NotificationItem {
   createdAt: string;
 }
 
-function resolveNotificationTarget(notification: { title?: string; content?: string }): string {
+function resolveNotificationTarget(
+  notification: { title?: string; content?: string },
+  isLecturer: boolean,
+): string {
   const text = `${notification.title || ''} ${notification.content || ''}`.toLowerCase();
   if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
     return '/dashboard/thesis';
@@ -200,17 +205,28 @@ function resolveNotificationTarget(notification: { title?: string; content?: str
   if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
     return '/dashboard/conduct';
   }
-  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
-    return '/dashboard/register';
+  // Grade-entry intent is checked before the registration/class branch: a notice
+  // like "Kỳ nhập điểm giữa kỳ đang mở — lớp học phần của bạn sẵn sàng nhập
+  // điểm" mentions both, and the class wording must not bury it on the portal
+  // home when a specific grading surface exists.
+  if (text.includes('nhập điểm') || text.includes('bảng điểm') || text.includes('transcript')) {
+    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
   }
-  if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
-    return '/dashboard/transcript';
+  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
+    // The registration and conduct pages are student-only; a lecturer clicking
+    // this notification used to be bounced off the portal entirely.
+    return isLecturer ? '/dashboard/lecturer' : '/dashboard/register';
+  }
+  if (text.includes('điểm') || text.includes('grade')) {
+    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
   }
   if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
-    return '/dashboard/schedule';
+    return isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
   }
   if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
-    return '/dashboard/announcements';
+    // A lecturer's announcement home is the lecturer feed; the shared feed is
+    // student/admin only and the shell would bounce a lecturer out of it.
+    return isLecturer ? '/dashboard/lecturer/announcements' : '/dashboard/announcements';
   }
   return '/dashboard/notifications';
 }
@@ -232,6 +248,9 @@ export default function DashboardLayout({
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
+  // A failed load must never read as "nothing unread": this flag keeps an
+  // outage distinguishable from an honestly empty inbox.
+  const [notificationsError, setNotificationsError] = useState(false);
   const [avatarPhoto, setAvatarPhoto] = useState(user?.avatar ?? '');
   const profileRef = useRef<HTMLDivElement>(null);
   const notificationsRef = useRef<HTMLDivElement>(null);
@@ -247,19 +266,9 @@ export default function DashboardLayout({
       setAvatarPhoto('');
       return;
     }
+    // The avatar follows the saved profile only; staged-but-unsaved photo
+    // edits on the profile page never masquerade in the shell.
     setAvatarPhoto(user.avatar ?? '');
-
-    const handleAvatarUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ userId?: string; photo?: string }>;
-      if (!customEvent.detail || customEvent.detail.userId === user.id) {
-        setAvatarPhoto(customEvent.detail?.photo ?? user.avatar ?? '');
-      }
-    };
-
-    window.addEventListener('campuscore:avatar-updated', handleAvatarUpdate);
-    return () => {
-      window.removeEventListener('campuscore:avatar-updated', handleAvatarUpdate);
-    };
   }, [user?.avatar, user?.id]);
   const menuLabels = messages.dashboardShell.menu;
   const menuSectionLabels = messages.dashboardShell.menuSections;
@@ -599,39 +608,31 @@ export default function DashboardLayout({
     return () => document.removeEventListener('mousedown', handleClickOutside);
   }, []);
 
-  useEffect(() => {
+  const reloadNotifications = useCallback(async () => {
     if (!user) {
       return;
     }
 
-    let cancelled = false;
-
-    const loadNotifications = async () => {
-      setNotificationsLoading(true);
-      try {
-        const response = await notificationsApi.getMy({
-          limit: 5,
-          isRead: false,
-        });
-        if (!cancelled) {
-          setNotifications(response.data);
-        }
-      } catch {
-        if (!cancelled) {
-          setNotifications([]);
-        }
-      } finally {
-        if (!cancelled) {
-          setNotificationsLoading(false);
-        }
-      }
-    };
-
-    void loadNotifications();
-    return () => {
-      cancelled = true;
-    };
+    setNotificationsLoading(true);
+    setNotificationsError(false);
+    try {
+      const response = await notificationsApi.getMy({
+        limit: 5,
+        isRead: false,
+      });
+      setNotifications(response.data);
+    } catch {
+      // Surface the failure instead of rendering the bell as "no unread".
+      setNotifications([]);
+      setNotificationsError(true);
+    } finally {
+      setNotificationsLoading(false);
+    }
   }, [user]);
+
+  useEffect(() => {
+    void reloadNotifications();
+  }, [reloadNotifications]);
 
   const currentPage = useMemo(() => {
     if (pageMetadata[pathname]) {
@@ -1063,6 +1064,24 @@ export default function DashboardLayout({
                         <div className="py-6 text-sm text-muted-foreground">
                           {messages.dashboardShell.notifications.loading}
                         </div>
+                      ) : notificationsError ? (
+                        // An outage is not an empty inbox: say so and let the
+                        // reader retry the load.
+                        <div className="py-4" role="alert">
+                          <p className="text-sm leading-6 text-destructive">
+                            {messages.dashboardShell.notifications.loadFailed}
+                          </p>
+                          <Button
+                            type="button"
+                            variant="outline"
+                            size="sm"
+                            className="mt-2"
+                            onClick={() => void reloadNotifications()}
+                          >
+                            <RefreshCw className="mr-2 h-3.5 w-3.5" aria-hidden="true" />
+                            {messages.common.actions.retry}
+                          </Button>
+                        </div>
                       ) : notifications.length === 0 ? (
                         <div className="py-6 text-sm leading-6 text-muted-foreground">
                           {messages.dashboardShell.notifications.empty}
@@ -1070,7 +1089,7 @@ export default function DashboardLayout({
                       ) : (
                         <div className="space-y-2">
                           {notifications.map((notification) => {
-                            const targetUrl = resolveNotificationTarget(notification);
+                            const targetUrl = resolveNotificationTarget(notification, isLecturer);
                             return (
                               <button
                                 key={notification.id}

@@ -41,9 +41,21 @@ export function AdministrativeDispatchSheet({
   const { formatDate, formatDateTime } = useI18n();
   const publishDate = announcement.publishAt || announcement.createdAt;
   const dateObj = publishDate ? new Date(publishDate) : new Date();
-  const day = String(dateObj.getDate()).padStart(2, '0');
-  const month = String(dateObj.getMonth() + 1).padStart(2, '0');
-  const year = dateObj.getFullYear();
+  // Both date lines go through the shared locale-aware formatter (localeCodes →
+  // vi-VN) instead of re-deriving day/month here; the signature block already
+  // renders this DD/MM/YYYY shape.
+  const officialDate = formatDate(dateObj, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+  });
+  // Vietnamese dispatch headings are prose ("ngày 21 tháng 9 năm 2026"), not a
+  // slashed date, so the parts are formatted separately and re-joined here
+  // rather than re-derived from the numeric date above.
+  const proseDay = formatDate(dateObj, { day: 'numeric' });
+  const proseMonthRaw = formatDate(dateObj, { month: 'long' });
+  const proseMonth = proseMonthRaw.charAt(0).toLowerCase() + proseMonthRaw.slice(1);
+  const proseYear = formatDate(dateObj, { year: 'numeric' });
 
   // Deterministic official reference number based on ID/date
   const docHash =
@@ -68,7 +80,7 @@ export function AdministrativeDispatchSheet({
         departmentName: 'KHOA CÔNG NGHỆ THÔNG TIN & PHÒNG ĐÀO TẠO',
         nationalMotto1: 'CỘNG HÒA XÃ HỘI CHỦ NGHĨA VIỆT NAM',
         nationalMotto2: 'Độc lập - Tự do - Hạnh phúc',
-        datePrefix: `TP. Hồ Chí Minh, ngày ${day} tháng ${month} năm ${year}`,
+        datePrefix: `TP. Hồ Chí Minh, ngày ${proseDay} ${proseMonth} năm ${proseYear}`,
         docRef: `Số: ${docRefNumber}`,
         officialDocBadge: 'VĂN BẢN ĐIỆN TỬ',
         noticeHeader: 'THÔNG BÁO',
@@ -319,7 +331,7 @@ export function AdministrativeDispatchSheet({
           <span className="text-foreground/30">•</span>
           <span className="inline-flex items-center gap-1">
             <Calendar className="h-3.5 w-3.5 text-primary" />
-            {day}/{month}/{year}
+            {officialDate}
           </span>
         </div>
       </div>

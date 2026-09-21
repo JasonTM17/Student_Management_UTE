@@ -33,6 +33,7 @@ import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
 import { TableOfContents } from '../TableOfContents';
 import { RelatedAnnouncements } from '../RelatedAnnouncements';
 import type { ReadingPreferences } from '../ReadingToolbar';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 
 interface EditorialArticleMagazineProps {
   announcement: AnnouncementRecord;
@@ -50,11 +51,24 @@ export function EditorialArticleMagazine({
   locale = 'vi',
 }: EditorialArticleMagazineProps) {
   const isVi = locale === 'vi';
-  const domain = resolveAnnouncementDomain(announcement, locale);
+  const { categories } = useArticleTaxonomy();
+  const domain = resolveAnnouncementDomain(announcement, locale, categories);
   const readingTime = calculateReadingTime(announcement.content);
   const coverDetails = extractCoverImageDetails(announcement.content);
-  const coverImage = coverDetails?.url || extractCoverImage(announcement.content) || resolveArticleCover(announcement);
-  const bodyContent = coverImage ? stripFirstCoverImage(announcement.content) : announcement.content;
+  const inlineCoverImage = coverDetails?.url || extractCoverImage(announcement.content);
+  const coverImage = inlineCoverImage || resolveArticleCover(announcement);
+  // RT-P3-b: `resolveArticleCover` always answers (a branded placeholder is the
+  // last resort), so the old `coverImage ?` test stripped the body image on
+  // every article — including the ones whose hero is that placeholder, where
+  // the author's photo then appeared nowhere in the reader. Strip only when the
+  // image removed from the body is the one the hero actually shows, and only
+  // when the strip really removed it (`stripFirstCoverImage` picks the first
+  // figure/img in the document, which is not always the extracted hero).
+  const bodyContent = (() => {
+    if (!inlineCoverImage || coverImage !== inlineCoverImage) return announcement.content;
+    const stripped = stripFirstCoverImage(announcement.content);
+    return stripped.includes(inlineCoverImage) ? announcement.content : stripped;
+  })();
 
   const sapo = extractAnnouncementExcerpt(announcement.content, 220);
   const publisher = formatAnnouncementPublisher(announcement.publishedBy, locale);

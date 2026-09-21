@@ -431,6 +431,12 @@ export default function AcademicEditorPage() {
   const [publishedNotices, setPublishedNotices] = useState<AnnouncementRecord[]>([]);
   const [loadingNotices, setLoadingNotices] = useState(false);
   const [previewingNotice, setPreviewingNotice] = useState<AnnouncementRecord | null>(null);
+  // A toast here expires and is routinely missed, so a deep link that failed to
+  // resolve has to stay on the page until the author acknowledges it.
+  const [deepLinkNotice, setDeepLinkNotice] = useState<{
+    targetId: string;
+    reason: 'not-found' | 'load-failed';
+  } | null>(null);
   const [editingNoticeModal, setEditingNoticeModal] = useState<AnnouncementRecord | null>(null);
 
   // RT-P3-3: unsaved-changes guard (beforeunload + in-app confirm) shared with
@@ -455,6 +461,9 @@ export default function AcademicEditorPage() {
   const [showBlockBuilder, setShowBlockBuilder] = useState(true);
   const [blocks, setBlocks] = useState<ContentBlock[]>(DEFAULT_BLOCKS);
   const [hasUnsavedNoticeOrder, setHasUnsavedNoticeOrder] = useState(false);
+  // The pinned-notices list is a `tbody` SortableList, which cannot carry its own
+  // live region, so the page keeps the sentence here and renders it below.
+  const [noticeMove, setNoticeMove] = useState('');
 
   // Site Appearance (Hero / Banner control)
   const [siteAppearance, setSiteAppearance] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
@@ -790,31 +799,74 @@ export default function AcademicEditorPage() {
         // subset keeps pins set for announcements outside this batch.
         postOrder: applyPageOrder(siteAppearance.postOrder, newOrder),
       };
-      await saveSiteAppearance(updated);
+      const saved = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
+      setSiteAppearance(saved);
 
-      // Persist order to Spring Boot database via REST API
-      await Promise.all(
-        publishedNotices.map((n, index) =>
-          announcementsApi.updateDisplayOrder(n.id, index).catch((err) => {
-            console.warn(`Failed to update display order for announcement ${n.id}`, err);
-          }),
-        ),
+      // This list is page 1 of fifteen published notices, so writing 0..14 would
+      // re-seat every announcement outside the window as if it were the global
+      // order. The dragged rows therefore swap the ranks they already occupy.
+      // `displayOrder` is nullable by design (V70): a rank-less notice sorts
+      // after the pinned ones, so it stays out of the swap instead of being
+      // handed a number — and never an out-of-range one, since the column is a
+      // 32-bit INTEGER.
+      const ranked = publishedNotices.filter((n) => typeof n.displayOrder === 'number');
+      const rankless = publishedNotices.length - ranked.length;
+      const slots = ranked
+        .map((n) => n.displayOrder as number)
+        .sort((left, right) => left - right);
+      const settled = await Promise.allSettled(
+        ranked.map((n, index) => announcementsApi.updateDisplayOrder(n.id, slots[index])),
       );
+      const failed = settled.filter((outcome) => outcome.status === 'rejected').length;
+      if (failed > 0) {
+        // The pins are saved but the server order is not, so reload from the
+        // server rather than leave a success notice over a half-applied order.
+        void fetchPublishedNotices();
+        toast.error(
+          isVi
+            ? `Đã lưu danh sách ghim, nhưng ${failed} / ${ranked.length} bài không cập nhật được thứ tự trên máy chủ. Danh sách đã được tải lại.`
+            : `Pins saved, but ${failed} of ${ranked.length} announcements could not be updated on the server. The list has been reloaded.`,
+        );
+        return;
+      }
 
-      setSiteAppearance(updated);
       setHasUnsavedNoticeOrder(false);
-      toast.success(
-        isVi
-          ? 'Đã lưu và đồng bộ thứ tự ghim bài viết lên Bảng tin toàn trường!'
-          : 'Saved and broadcast announcement feed order!'
-      );
+      if (ranked.length === 0) {
+        // Nothing here carried a rank, so no server write could express the drag
+        // at all; the pins are saved but the feed order is unchanged.
+        toast.warning(
+          isVi
+            ? 'Đã lưu danh sách ghim, nhưng chưa bài nào có thứ tự trên máy chủ nên thứ tự hiển thị chưa đổi.'
+            : 'Pins saved, but no notice carries a server rank yet, so the displayed order could not change.',
+        );
+      } else if (rankless > 0) {
+        toast.info(
+          isVi
+            ? `Đã đổi thứ tự ${ranked.length} bài đã có thứ tự; ${rankless} bài chưa xếp hạng vẫn đứng sau nhóm ghim.`
+            : `Reordered the ${ranked.length} ranked notices; ${rankless} unranked notice(s) stay after the pinned group.`,
+        );
+      }
+      if (saved.persisted === false) {
+        toast.warning(
+          isVi
+            ? 'Thứ tự đã lưu trên web server này và sẽ mất ở lần deploy kế tiếp; API trung tâm đang không kết nối được.'
+            : 'Saved on this web server only; the central API is unreachable, so this order is lost on the next deploy.',
+        );
+      } else {
+        toast.success(
+          isVi
+            ? 'Đã lưu và đồng bộ thứ tự ghim bài viết lên Bảng tin toàn trường!'
+            : 'Saved and broadcast announcement feed order!'
+        );
+      }
     } catch {
       toast.error(
         isVi
           ? 'Không thể lưu thứ tự ghim bài viết.'
           : 'Could not save announcement order.'
       );
+      void fetchPublishedNotices();
     }
   };
 
@@ -893,16 +945,40 @@ export default function AcademicEditorPage() {
     const targetId = params.get('editId') || params.get('id');
     if (!targetId) return;
 
+    let cancelled = false;
     announcementsApi
       .getAll({ page: 1, limit: 50 })
       .then((res) => {
+        if (cancelled) return;
         const found = (res.data || []).find((a) => a.id === targetId);
         if (found) {
+          setDeepLinkNotice(null);
           handleLoadAnnouncement(found);
+        } else {
+          // The editor would otherwise show its blank seed document; the
+          // author must know the requested draft was not loaded.
+          setDeepLinkNotice({ targetId, reason: 'not-found' });
+          toast.error(
+            isVi
+              ? `Không tìm thấy thông báo cần sửa (mã ${targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`
+              : `The notice to edit (id ${targetId}) was not found. The editor is showing a new blank draft.`,
+          );
         }
       })
-      .catch(() => {});
-  }, [handleLoadAnnouncement]);
+      .catch(() => {
+        if (!cancelled) {
+          setDeepLinkNotice({ targetId, reason: 'load-failed' });
+          toast.error(
+            isVi
+              ? 'Không thể tải thông báo cần sửa. Trình soạn thảo đang hiển thị bản nháp mới.'
+              : 'The notice to edit could not be loaded. The editor is showing a new blank draft.',
+          );
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [handleLoadAnnouncement, isVi]);
 
   // Preview current draft in Official Administrative modal
   const handlePreviewCurrentDraft = () => {
@@ -1041,14 +1117,26 @@ export default function AcademicEditorPage() {
         },
       };
 
-      await saveSiteAppearance(updated);
+      const saved = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
-      setSiteAppearance(updated);
-      toast.success(
-        isVi
-          ? 'Đã cập nhật và xuất bản trực tiếp lên Trang chủ!'
-          : 'Homepage appearance updated and published live!',
-      );
+      setSiteAppearance(saved);
+      if (saved.persisted === false) {
+        // The hero block lives on the API row; this instance only is not
+        // "published live", and saying so is the difference between an admin
+        // leaving the page believing the banner changed everywhere and it
+        // disappearing on the next deploy.
+        toast.warning(
+          isVi
+            ? 'Hero đã lưu trên web server này; API trung tâm đang không kết nối được nên có thể mất ở lần deploy kế tiếp.'
+            : 'Hero saved on this web server only; the central API is unreachable, so it may be lost on the next deploy.',
+        );
+      } else {
+        toast.success(
+          isVi
+            ? 'Đã cập nhật và xuất bản trực tiếp lên Trang chủ!'
+            : 'Homepage appearance updated and published live!',
+        );
+      }
     } catch {
       toast.error(
         isVi
@@ -1087,6 +1175,18 @@ export default function AcademicEditorPage() {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
+  const deepLinkCopy = deepLinkNotice
+    ? deepLinkNotice.reason === 'not-found'
+      ? {
+          vi: `Không tìm thấy thông báo cần sửa (mã ${deepLinkNotice.targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`,
+          en: `The notice to edit (id ${deepLinkNotice.targetId}) was not found. The editor is showing a new blank draft.`,
+        }
+      : {
+          vi: `Không thể tải thông báo cần sửa (mã ${deepLinkNotice.targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`,
+          en: `The notice to edit (id ${deepLinkNotice.targetId}) could not be loaded. The editor is showing a new blank draft.`,
+        }
+    : null;
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -1094,6 +1194,24 @@ export default function AcademicEditorPage() {
         title={copy.title}
         description={copy.description}
       />
+
+      {deepLinkCopy ? (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <span>{isVi ? deepLinkCopy.vi : deepLinkCopy.en}</span>
+          <button
+            type="button"
+            onClick={() => setDeepLinkNotice(null)}
+            aria-label={isVi ? 'Đóng cảnh báo liên kết' : 'Dismiss deep-link warning'}
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       {/* Main Tab Controller */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border/70 pb-3">
@@ -1547,6 +1665,7 @@ export default function AcademicEditorPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         <DragHandle
                           className="cursor-grab hover:text-primary active:cursor-grabbing"
+                          label={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
                           title={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
                         />
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
@@ -1774,6 +1893,9 @@ export default function AcademicEditorPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
+                  <p aria-live="polite" role="status" className="sr-only">
+                    {noticeMove}
+                  </p>
                   <table className="w-full min-w-[920px] text-left text-xs border-collapse">
                     <thead className="border-b border-border/60 bg-muted/40 text-muted-foreground font-semibold">
                       <tr>
@@ -1793,12 +1915,20 @@ export default function AcademicEditorPage() {
                       items={publishedNotices}
                       keyExtractor={(ann) => ann.id}
                       onOrderChange={handleSortableNoticeReorder}
+                      announceMove={({ item, from, to, total }) => {
+                        const message = isVi
+                          ? `Đã chuyển "${item.title}" từ vị trí ${from + 1} sang ${to + 1} trong ${total} bài.`
+                          : `Moved "${item.title}" from position ${from + 1} to ${to + 1} of ${total}.`;
+                        setNoticeMove(message);
+                        return message;
+                      }}
                       itemClassName="hover:bg-muted/30 transition-colors border-b border-border/50"
                       renderItem={(ann, index) => (
                         <>
                           <td className="py-3 px-3 text-center">
                             <DragHandle
                               className="mx-auto cursor-grab hover:text-primary active:cursor-grabbing"
+                              label={isVi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Drag to reorder notice'}
                               title={isVi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Drag to reorder notice'}
                             />
                           </td>

@@ -76,6 +76,7 @@ export default function AdminSemestersPage() {
   const [error, setError] = useState('');
   const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -126,19 +127,12 @@ export default function AdminSemestersPage() {
     setError('');
 
     try {
-      const response = await adminSemestersApi.getAll({ page, limit: 20 });
-      const filteredSemesters = search
-        ? response.data.filter(
-            (semester: Semester) =>
-              semester.name.toLowerCase().includes(search.toLowerCase()) ||
-              semester.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
-              semester.nameVi?.toLowerCase().includes(search.toLowerCase()) ||
-              semester.type.toLowerCase().includes(search.toLowerCase()) ||
-              String(semester.academicYear?.year || '').includes(search.trim()),
-          )
-        : response.data;
+      // Search is a server-side filter: paging through 20-row pages and narrowing
+      // them in the browser reports "no results" for anything on another page.
+      const query = { page, limit: 20, search: search || undefined };
+      const response = await adminSemestersApi.getAll(query);
 
-      setSemesters(filteredSemesters);
+      setSemesters(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch {
       setError(
@@ -346,10 +340,13 @@ export default function AdminSemestersPage() {
     resetForm();
   };
 
-  const handleSearch = async (event: React.FormEvent) => {
+  const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    // `search` and `page` are fetch dependencies, so committing the term here is
+    // what re-issues the request. Calling the fetch directly would run it against
+    // the previous closure and fire twice.
+    setSearch(searchInput.trim());
     setPage(1);
-    await fetchSemesters();
   };
 
   const handleDelete = async (semester: Semester) => {
@@ -429,8 +426,8 @@ export default function AdminSemestersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />

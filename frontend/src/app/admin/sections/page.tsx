@@ -146,6 +146,9 @@ export default function AdminSectionsPage() {
     lecturerId: '',
   });
   const [schedules, setSchedules] = useState<ScheduleEntry[]>([]);
+  // A failed schedule read must never read as "no schedules added yet": this
+  // flag keeps an outage distinguishable from a schedule-free section.
+  const [schedulesError, setSchedulesError] = useState('');
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
   const { confirm, confirmationDialog } = useConfirmationDialog();
 
@@ -237,15 +240,6 @@ export default function AdminSectionsPage() {
     [locale],
   );
 
-  const getDayLabel = useCallback(
-    (day: number) => {
-      const normalized = day === 0 ? 1 : day;
-      const match = dayOptions.find((opt) => opt.value === String(normalized));
-      return match ? match.label : `Thứ ${normalized}`;
-    },
-    [dayOptions],
-  );
-
   const copy =
     locale === 'vi'
       ? {
@@ -305,6 +299,8 @@ export default function AdminSectionsPage() {
             'Chỉ thêm lịch khi lớp học phần đã có học kỳ, phòng và người phụ trách rõ ràng.',
           addSchedule: 'Thêm lịch',
           noSchedules: 'Chưa có lịch nào.',
+          schedulesLoadFailed: 'Không tải được lịch học hiện có của lớp học phần này.',
+          dayFallback: (day: number) => `Thứ ${day}`,
           removeSchedule: (index: number) => `Xóa lịch ${index}`,
           saving: 'Đang lưu...',
           editAction: messages.common.actions.saveChanges,
@@ -370,6 +366,8 @@ export default function AdminSectionsPage() {
             'Add meeting times only when the class already has a semester, room, and assigned lecturer.',
           addSchedule: 'Add schedule',
           noSchedules: 'No schedules added yet.',
+          schedulesLoadFailed: 'The existing schedules for this section could not be loaded.',
+          dayFallback: (day: number) => `Day ${day}`,
           removeSchedule: (index: number) => `Remove schedule ${index}`,
           saving: 'Saving...',
           editAction: messages.common.actions.saveChanges,
@@ -378,6 +376,12 @@ export default function AdminSectionsPage() {
           deleteLabel: (sectionNumber: string, courseCode: string) =>
             `Delete section ${sectionNumber} for ${courseCode}`,
         };
+
+  const getDayLabel = (day: number) => {
+    const normalized = day === 0 ? 1 : day;
+    const match = dayOptions.find((opt) => opt.value === String(normalized));
+    return match ? match.label : copy.dayFallback(normalized);
+  };
 
   useEffect(() => {
     if (canAccess) {
@@ -458,11 +462,32 @@ export default function AdminSectionsPage() {
       lecturerId: '',
     });
     setSchedules([]);
+    setSchedulesError('');
   };
 
   const openCreate = () => {
     resetForm();
     setIsModalOpen(true);
+  };
+
+  // The modal must never claim a section is schedule-free just because the
+  // schedule read failed: a failed load is surfaced with a retry instead.
+  const loadSectionSchedules = async (section: Section) => {
+    setSchedulesError('');
+    try {
+      const fullSection = await adminSectionsApi.getById(section.id);
+      setSchedules(
+        (fullSection.schedules || []).map((schedule) => ({
+          dayOfWeek: schedule.dayOfWeek,
+          startTime: schedule.startTime,
+          endTime: schedule.endTime,
+          classroomId: schedule.classroom?.id || '',
+        })),
+      );
+    } catch {
+      setSchedules([]);
+      setSchedulesError(copy.schedulesLoadFailed);
+    }
   };
 
   const openEdit = async (section: Section) => {
@@ -476,19 +501,7 @@ export default function AdminSectionsPage() {
       lecturerId: section.lecturerId || '',
     });
 
-    try {
-      const fullSection = await adminSectionsApi.getById(section.id);
-      setSchedules(
-        (fullSection.schedules || []).map((schedule) => ({
-          dayOfWeek: schedule.dayOfWeek,
-          startTime: schedule.startTime,
-          endTime: schedule.endTime,
-          classroomId: schedule.classroom?.id || '',
-        })),
-      );
-    } catch {
-      setSchedules([]);
-    }
+    await loadSectionSchedules(section);
 
     setIsModalOpen(true);
   };
@@ -1032,7 +1045,15 @@ export default function AdminSectionsPage() {
               </Button>
             </div>
 
-            {schedules.length === 0 ? (
+            {schedulesError ? (
+              <ErrorState
+                title={copy.schedulesTitle}
+                description={schedulesError}
+                onRetry={
+                  editingSection ? () => void loadSectionSchedules(editingSection) : undefined
+                }
+              />
+            ) : schedules.length === 0 ? (
               <div className="rounded-lg border border-dashed border-border/80 bg-secondary/20 px-4 py-6 text-sm text-muted-foreground">
                 {copy.noSchedules}
               </div>

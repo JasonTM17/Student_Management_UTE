@@ -1,5 +1,6 @@
 import type { Locale } from '@/i18n/config';
 import type { AnnouncementRecord } from '@/lib/api';
+import { isSafeAnnouncementImageUrl } from '@/lib/html-sanitizer';
 
 export const ANNOUNCEMENT_PRIORITIES = ['LOW', 'NORMAL', 'HIGH', 'URGENT'] as const;
 export type AnnouncementPriority = (typeof ANNOUNCEMENT_PRIORITIES)[number];
@@ -419,16 +420,87 @@ export interface DomainResolution {
 }
 
 /**
- * Intelligently classifies an announcement into institutional categories and domains
+ * Public-safe category row from `GET /api/v1/article-taxonomy/v2/categories`.
+ * When an announcement carries a categoryId that resolves against this feed,
+ * its label/tone/icon come from the editorial taxonomy — the keyword heuristics
+ * below remain only as the fallback for rows without a resolvable category.
+ */
+export interface TaxonomyCategory {
+  id: string;
+  code: string;
+  slug: string;
+  nameVi: string;
+  nameEn: string;
+  colorTone: string;
+  iconType: string;
+}
+
+const TAXONOMY_TONE_MAP: Record<string, DomainResolution['categoryTone']> = {
+  blue: 'info',
+  indigo: 'primary',
+  emerald: 'success',
+  amber: 'warning',
+  rose: 'danger',
+  purple: 'info',
+  cyan: 'info',
+  slate: 'primary',
+};
+
+const TAXONOMY_GRADIENT_MAP: Record<string, string> = {
+  blue: 'from-blue-600 via-sky-600 to-slate-700',
+  indigo: 'from-indigo-600 via-blue-600 to-slate-700',
+  emerald: 'from-emerald-600 via-teal-600 to-green-700',
+  amber: 'from-amber-600 via-orange-600 to-red-600',
+  rose: 'from-rose-600 via-pink-600 to-purple-700',
+  purple: 'from-purple-600 via-violet-600 to-indigo-700',
+  cyan: 'from-cyan-600 via-blue-600 to-indigo-700',
+  slate: 'from-slate-600 via-slate-700 to-slate-900',
+};
+
+const TAXONOMY_ICON_FALLBACK: DomainResolution['iconType'] = 'document';
+
+export function domainFromTaxonomyCategory(
+  category: TaxonomyCategory,
+  locale: Locale = 'vi',
+): DomainResolution {
+  const isVi = locale === 'vi';
+  return {
+    domain: 'EDITORIAL_ARTICLE',
+    categoryCode:
+      (INSTITUTIONAL_ARTICLE_CATEGORIES[category.code as ArticleCategoryCode]?.code ??
+        category.code) as ArticleCategoryCode,
+    categoryLabel: isVi ? category.nameVi : category.nameEn || category.nameVi,
+    categoryTone: TAXONOMY_TONE_MAP[category.colorTone] ?? 'info',
+    iconType:
+      (INSTITUTIONAL_ARTICLE_CATEGORIES[category.code as ArticleCategoryCode]?.iconType as DomainResolution['iconType']) ??
+      (category.iconType as DomainResolution['iconType']) ??
+      TAXONOMY_ICON_FALLBACK,
+    accentGradient: TAXONOMY_GRADIENT_MAP[category.colorTone] ?? TAXONOMY_GRADIENT_MAP.slate,
+  };
+}
+
+/**
+ * Intelligently classifies an announcement into institutional categories and domains.
+ * `categories` is the live taxonomy feed: pass it wherever available so the label is
+ * authoritative; the keyword heuristics then only fill in for unclassified rows.
  */
 export function resolveAnnouncementDomain(
   announcement: Pick<AnnouncementRecord, 'title' | 'content' | 'publishedBy'> & { documentType?: string; categoryId?: string | null },
   locale: Locale = 'vi',
+  categories?: readonly TaxonomyCategory[],
 ): DomainResolution {
   const isVi = locale === 'vi';
   const title = (announcement.title || '').toLowerCase();
   const publisher = (announcement.publishedBy || '').toLowerCase();
   const content = (announcement.content || '').toLowerCase();
+
+  // 0. Authoritative taxonomy: categoryId resolved against the live feed.
+  if (announcement.categoryId && categories?.length) {
+    const matched = categories.find((category) => category.id === announcement.categoryId);
+    if (matched) {
+      return domainFromTaxonomyCategory(matched, locale);
+    }
+  }
 
   // 1. Check categoryId explicit mapping if present
   if (announcement.categoryId) {
@@ -757,20 +829,47 @@ export interface CoverImageDetails {
 
 /**
  * Extracts the first image URL from Markdown or HTML content if present.
+ * `data:image/` payloads are accepted because the editor inline-encodes every
+ * upload as base64 — refusing them here made the reader strip the author's
+ * first image from the body while showing a placeholder cover.
+ *
+ * A candidate still has to pass the reader's own image allow-list, so a cover is
+ * never picked from a source the body filter would delete (an inlined SVG would
+ * otherwise produce the broken frame the editor now refuses to insert).
  */
-export function extractCoverImage(content: string | null | undefined): string | null {
-  if (!content) return null;
-  // Match markdown image ![alt](url)
-  const mdMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/i);
-  if (mdMatch && mdMatch[1]) {
-    return mdMatch[1];
-  }
-  // Match html img src
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["']/i);
-  if (htmlMatch && htmlMatch[1]) {
-    return htmlMatch[1];
+function usableCoverUrl(value: string | undefined): string | null {
+  return value && isSafeAnnouncementImageUrl(value) ? value : null;
+}
+
+const MARKDOWN_IMAGE_SOURCE = String.raw`!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)`;
+const HTML_IMAGE_SOURCE = String.raw`<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["']`;
+
+/** The same match with the remaining attribute run as group 2, so `alt` can be
+ *  read out of it. A trailing optional `(?:alt=...)?` group after a greedy
+ *  `[^>]*` never captures, which is why this is done in two steps. */
+const HTML_IMAGE_WITH_ATTRS_SOURCE = `${HTML_IMAGE_SOURCE}([^>]*)>`;
+
+/**
+ * The first image whose source the reader will actually render. Stopping at the
+ * first match would drop the cover entirely when an author leads with something
+ * the allow-list rejects, so the scan continues to the next candidate.
+ */
+function firstUsableImage(
+  content: string,
+  source: string,
+  group: number,
+): RegExpMatchArray | null {
+  for (const match of content.matchAll(new RegExp(source, 'gi'))) {
+    if (usableCoverUrl(match[group])) return match;
   }
   return null;
+}
+export function extractCoverImage(content: string | null | undefined): string | null {
+  if (!content) return null;
+  // Markdown image first, then an HTML one, each in document order.
+  const fromMarkdown = firstUsableImage(content, MARKDOWN_IMAGE_SOURCE, 1);
+  if (fromMarkdown?.[1]) return fromMarkdown[1];
+  return firstUsableImage(content, HTML_IMAGE_SOURCE, 1)?.[1] ?? null;
 }
 
 /**
@@ -780,32 +879,35 @@ export function extractCoverImageDetails(content: string | null | undefined): Co
   if (!content) return null;
 
   // 1. Check for <figure> with <img> and <figcaption>
-  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
+  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
   const figMatch = content.match(figureRegex);
   if (figMatch && figMatch[1]) {
+    const url = usableCoverUrl(figMatch[1]);
     const rawCaption = figMatch[3] ? figMatch[3].replace(/<[^>]+>/g, '').trim() : undefined;
-    return {
-      url: figMatch[1],
-      alt: figMatch[2] || '',
-      caption: rawCaption || undefined,
-    };
+    if (url) {
+      return {
+        url,
+        alt: figMatch[2] || '',
+        caption: rawCaption || undefined,
+      };
+    }
   }
 
-  // 2. Check for bare <img ...>
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/i);
-  if (htmlMatch && htmlMatch[1]) {
+  // 2. Check for bare <img ...>, carrying its own alt text.
+  const bare = firstUsableImage(content, HTML_IMAGE_WITH_ATTRS_SOURCE, 1);
+  if (bare?.[1]) {
     return {
-      url: htmlMatch[1],
-      alt: htmlMatch[2] || '',
+      url: bare[1],
+      alt: /alt=["']([^"']*)["']/i.exec(bare[2] ?? '')?.[1] ?? '',
     };
   }
 
   // 3. Check for Markdown image ![alt](url)
-  const mdMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/i);
-  if (mdMatch && mdMatch[2]) {
+  const markdown = firstUsableImage(content, MARKDOWN_IMAGE_SOURCE, 2);
+  if (markdown?.[2]) {
     return {
-      url: mdMatch[2],
-      alt: mdMatch[1] || '',
+      url: markdown[2],
+      alt: markdown[1] || '',
     };
   }
 

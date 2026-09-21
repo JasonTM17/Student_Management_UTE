@@ -18,6 +18,7 @@ import {
   FileText,
   GraduationCap,
   Info,
+  Lock,
   Plus,
   Search,
   Send,
@@ -192,6 +193,9 @@ export default function ThesisPage() {
   const [reportError, setReportError] = useState('');
   // Feedback item 7: the report may be an attached Word/PDF document.
   const [reportFile, setReportFile] = useState<File | null>(null);
+  // Live upload progress and the handle to abandon an in-flight document.
+  const [reportUploadPercent, setReportUploadPercent] = useState<number | null>(null);
+  const reportUploadAbortRef = useRef<AbortController | null>(null);
 
   // Round results state (shown once the round reaches RESULTS_PUBLISHED)
   const [roundResults, setRoundResults] = useState<ThesisRoundResult[]>([]);
@@ -223,6 +227,9 @@ export default function ThesisPage() {
   // Thesis Repository State (Faculty archive of submitted theses)
   const [repositoryReports, setRepositoryReports] = useState<ThesisRepositoryReport[]>([]);
   const [isRepositoryLoading, setIsRepositoryLoading] = useState(false);
+  // A failed archive load must never read as "no reports yet": this flag keeps
+  // an outage distinguishable from a genuinely empty repository.
+  const [repositoryError, setRepositoryError] = useState('');
   const [repositorySearch, setRepositorySearch] = useState('');
 
   // Supervisors for current student group's topic
@@ -515,11 +522,13 @@ export default function ThesisPage() {
             thesisApi.listRoundRepository(selectedRoundId).then((rList) => {
               if (!cancelled) {
                 setRepositoryReports(rList);
+                setRepositoryError('');
                 setIsRepositoryLoading(false);
               }
             }).catch(() => {
               if (!cancelled) {
                 setRepositoryReports([]);
+                setRepositoryError(messages.thesis.loadFailed);
                 setIsRepositoryLoading(false);
               }
             }),
@@ -539,6 +548,22 @@ export default function ThesisPage() {
       cancelled = true;
     };
   }, [isSupervisorOrAdmin, loadCouncilDetails, messages.thesis.loadFailed, refreshTopics, selectedRoundId]);
+
+  // Retry path for a failed repository load: the reader gets the real failure
+  // with a way back, instead of an archive that silently reads as empty.
+  const reloadRepository = useCallback(async () => {
+    if (!selectedRoundId || !isSupervisorOrAdmin) return;
+    setIsRepositoryLoading(true);
+    setRepositoryError('');
+    try {
+      setRepositoryReports(await thesisApi.listRoundRepository(selectedRoundId));
+    } catch {
+      setRepositoryReports([]);
+      setRepositoryError(messages.thesis.loadFailed);
+    } finally {
+      setIsRepositoryLoading(false);
+    }
+  }, [isSupervisorOrAdmin, messages.thesis.loadFailed, selectedRoundId]);
 
   const selectedRound = rounds.find((round) => round.id === selectedRoundId);
   const roundGroups = useMemo(() => {
@@ -776,7 +801,14 @@ export default function ThesisPage() {
     };
   }, [currentGroup?.topicId]);
 
+  // Once the reader picks a tab by hand, background refreshes and round
+  // changes must not snap them back to an auto-selected tab.
+  const userChoseTabRef = useRef(false);
+
   useEffect(() => {
+    if (userChoseTabRef.current) {
+      return;
+    }
     const tabParam = searchParams.get('tab');
     if (tabParam === 'repository') {
       setLecturerTab('repository');
@@ -795,7 +827,7 @@ export default function ThesisPage() {
     } else if (supervisedGroups.length > 0) {
       setLecturerTab('supervision');
     }
-  }, [searchParams, selectedRoundId, supervisedGroups.length, visibleCouncils.length]);
+  }, [searchParams, supervisedGroups.length, visibleCouncils.length]);
 
   useEffect(() => {
     const topicId = searchParams.get('topicId');
@@ -1070,6 +1102,7 @@ export default function ThesisPage() {
   };
 
   const openReportForm = () => {
+    if (reportDeadlinePassed) return;
     setReportTitle(groupReport?.title ?? '');
     setReportUrl(groupReport?.url ?? '');
     setReportNote(groupReport?.note ?? '');
@@ -1127,11 +1160,36 @@ export default function ThesisPage() {
     try {
       let saved: ThesisGroupReport;
       if (reportFile) {
-        saved = await thesisApi.submitReportFile(currentGroup.id, {
-          file: reportFile,
-          title: reportTitle.trim() || undefined,
-          note: reportNote.trim() || undefined,
-        });
+        // Replacing an existing report discards the stored document and the
+        // attached link, and the previous version cannot be recovered, so the
+        // leader confirms before the destructive call is made.
+        if (groupReport) {
+          const approved = await confirm({
+            title: messages.thesis.report.replaceConfirmTitle,
+            message: messages.thesis.report.replaceConfirmDescription,
+            confirmText: messages.thesis.report.replaceConfirmAction,
+            variant: 'destructive',
+          });
+          if (!approved) {
+            setIsActionPending(false);
+            return;
+          }
+        }
+        const controller = new AbortController();
+        reportUploadAbortRef.current = controller;
+        setReportUploadPercent(0);
+        try {
+          saved = await thesisApi.submitReportFile(currentGroup.id, {
+            file: reportFile,
+            title: reportTitle.trim() || undefined,
+            note: reportNote.trim() || undefined,
+            onUploadProgress: setReportUploadPercent,
+            signal: controller.signal,
+          });
+        } finally {
+          reportUploadAbortRef.current = null;
+          setReportUploadPercent(null);
+        }
       } else {
         // Keep the previous link when the leader only refreshes the metadata
         // of a link-based report without re-entering the URL.
@@ -1152,13 +1210,18 @@ export default function ThesisPage() {
       setIsReportFormOpen(false);
       setActionSuccess(messages.thesis.report.submitSuccess);
     } catch (caught) {
-      const code = getThesisErrorCode(caught);
-      if (code === 'FILE_TOO_LARGE') {
-        setReportError(messages.thesis.report.fileTooLarge);
-      } else if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
-        setReportError(messages.thesis.report.fileTypeUnsupported);
+      if (caught instanceof DOMException && caught.name === 'AbortError') {
+        // The leader cancelled the upload on purpose: not an error to report.
+        setReportError('');
       } else {
-        setReportError(messages.thesis.report.submitFailed);
+        const code = getThesisErrorCode(caught);
+        if (code === 'FILE_TOO_LARGE') {
+          setReportError(messages.thesis.report.fileTooLarge);
+        } else if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
+          setReportError(messages.thesis.report.fileTypeUnsupported);
+        } else {
+          setReportError(messages.thesis.report.submitFailed);
+        }
       }
     } finally {
       setIsActionPending(false);
@@ -1347,6 +1410,11 @@ export default function ThesisPage() {
   const reportDaysRemaining = Number.isFinite(reportDeadlineMs)
     ? Math.ceil((reportDeadlineMs - Date.now()) / 86_400_000)
     : null;
+  // The backend freezes a report once this deadline passes (409
+  // REPORT_DEADLINE_PASSED); the panel now says so instead of offering a button
+  // that can only fail. A round type without this date never freezes, matching
+  // the server.
+  const reportDeadlinePassed = Number.isFinite(reportDeadlineMs) && Date.now() >= reportDeadlineMs;
 
   // The report panel stays here: it owns the submission form, its state, and
   // the leader-only rights it renders.
@@ -1361,19 +1429,35 @@ export default function ThesisPage() {
             </span>
           </div>
           {isGroupLeader ? (
-            <Button
-              type="button"
-              size="sm"
-              variant="outline"
-              onClick={openReportForm}
-              disabled={isActionPending}
-              className="shrink-0"
-            >
-              {groupReport
-                ? messages.thesis.report.update
-                : messages.thesis.report.submit}
-            </Button>
-          ) : null}
+            reportDeadlinePassed ? (
+              <span className="inline-flex shrink-0 items-center gap-1.5 rounded-md border border-amber-300 bg-amber-50 px-2.5 py-1 text-xs font-semibold text-amber-800 dark:border-amber-800 dark:bg-amber-950/40 dark:text-amber-300">
+                <Lock className="h-3.5 w-3.5" aria-hidden="true" />
+                {messages.thesis.report.lockedTitle}
+              </span>
+            ) : (
+              <Button
+                type="button"
+                size="sm"
+                variant="outline"
+                onClick={openReportForm}
+                disabled={isActionPending}
+                className="shrink-0"
+              >
+                {groupReport
+                  ? messages.thesis.report.update
+                  : messages.thesis.report.submit}
+              </Button>
+            )
+          ) : (
+            // Read-only variant: a member must know the report is not theirs to
+            // change, and who submits it, rather than seeing no control at all.
+            <span className="inline-flex max-w-[16rem] shrink-0 items-start gap-1.5 rounded-md border border-border/70 bg-muted/40 px-2.5 py-1 text-xs text-muted-foreground">
+              <Info className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+              <span>
+                {fillCopy(messages.thesis.report.leaderOnlyBanner, { leader: currentLeaderName })}
+              </span>
+            </span>
+          )}
         </div>
 
         {/* Regulatory Notice R5 */}
@@ -1468,16 +1552,24 @@ export default function ThesisPage() {
               </div>
             ) : null}
             <div>
-              <label
-                className="mb-1 block text-xs font-medium text-foreground"
-                htmlFor="thesis-report-title"
-              >
-                {messages.thesis.report.titleLabel}
-              </label>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <label
+                  className="block text-xs font-medium text-foreground"
+                  htmlFor="thesis-report-title"
+                >
+                  {messages.thesis.report.titleLabel}
+                </label>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {fillCopy(messages.thesis.report.titleCounter, {
+                    count: reportTitle.length,
+                  })}
+                </span>
+              </div>
               <Input
                 id="thesis-report-title"
                 value={reportTitle}
-                onChange={(e) => setReportTitle(e.target.value)}
+                onChange={(e) => setReportTitle(e.target.value.slice(0, 240))}
+                maxLength={240}
                 disabled={isActionPending}
               />
             </div>
@@ -1606,20 +1698,58 @@ export default function ThesisPage() {
               </div>
             </details>
             <div>
-              <label
-                className="mb-1 block text-xs font-medium text-foreground"
-                htmlFor="thesis-report-note"
-              >
-                {messages.thesis.report.noteLabel}
-              </label>
+              <div className="mb-1 flex items-baseline justify-between gap-2">
+                <label
+                  className="block text-xs font-medium text-foreground"
+                  htmlFor="thesis-report-note"
+                >
+                  {messages.thesis.report.noteLabel}
+                </label>
+                <span className="text-[11px] tabular-nums text-muted-foreground">
+                  {fillCopy(messages.thesis.report.noteCounter, {
+                    count: reportNote.length,
+                  })}
+                </span>
+              </div>
               <Textarea
                 id="thesis-report-note"
                 value={reportNote}
-                onChange={(e) => setReportNote(e.target.value)}
+                onChange={(e) => setReportNote(e.target.value.slice(0, 500))}
+                maxLength={500}
                 rows={2}
                 disabled={isActionPending}
               />
             </div>
+            {reportUploadPercent !== null ? (
+              <div
+                className="rounded-lg border border-primary/25 bg-primary/[0.04] p-2.5"
+                role="status"
+                aria-live="polite"
+              >
+                <div className="flex items-center justify-between gap-2 text-xs text-foreground">
+                  <span>
+                    {fillCopy(messages.thesis.report.uploadProgress, {
+                      percent: reportUploadPercent,
+                    })}
+                  </span>
+                  <Button
+                    type="button"
+                    size="sm"
+                    variant="ghost"
+                    onClick={() => reportUploadAbortRef.current?.abort()}
+                    className="h-7 px-2 text-xs"
+                  >
+                    {messages.thesis.report.uploadCancel}
+                  </Button>
+                </div>
+                <div className="mt-1.5 h-1.5 w-full overflow-hidden rounded-full bg-muted">
+                  <div
+                    className="h-full rounded-full bg-primary transition-[width] duration-200"
+                    style={{ width: `${reportUploadPercent}%` }}
+                  />
+                </div>
+              </div>
+            ) : null}
             <div className="flex justify-end gap-2">
               <Button
                 type="button"
@@ -1824,7 +1954,10 @@ export default function ThesisPage() {
                 <div className="flex flex-wrap items-center gap-2">
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('supervision')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('supervision');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'supervision'
@@ -1847,7 +1980,10 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('defense')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('defense');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'defense'
@@ -1870,7 +2006,10 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
-                    onClick={() => setLecturerTab('repository')}
+                    onClick={() => {
+                      userChoseTabRef.current = true;
+                      setLecturerTab('repository');
+                    }}
                     className={cn(
                       'inline-flex items-center gap-2 rounded-xl px-4 py-2.5 text-xs font-bold transition-all border',
                       lecturerTab === 'repository'
@@ -1948,6 +2087,8 @@ export default function ThesisPage() {
                   filteredReports={filteredRepositoryReports}
                   roundName={selectedRound?.name}
                   isLoading={isRepositoryLoading}
+                  loadError={repositoryError}
+                  onRetry={() => void reloadRepository()}
                   search={repositorySearch}
                   onSearchChange={setRepositorySearch}
                   onDownloadReport={handleDownloadRepositoryReport}

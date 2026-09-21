@@ -14,7 +14,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
-import { EmptyState, LoadingState } from '@/components/ui/state-block';
+import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
 import type { I18nMessages } from '@/i18n/messages';
 import type { Locale } from '@/i18n/config';
@@ -29,6 +29,9 @@ interface ThesisRepositoryWorkspaceProps {
   filteredReports: ThesisRepositoryReport[];
   roundName?: string;
   isLoading: boolean;
+  /** A failed archive load; an outage must never read as an empty repository. */
+  loadError?: string;
+  onRetry?: () => void;
   search: string;
   onSearchChange: (value: string) => void;
   onDownloadReport: (report: ThesisRepositoryReport) => void | Promise<void>;
@@ -43,6 +46,8 @@ export default function ThesisRepositoryWorkspace({
   filteredReports,
   roundName,
   isLoading,
+  loadError,
+  onRetry,
   search,
   onSearchChange,
   onDownloadReport,
@@ -113,6 +118,18 @@ export default function ThesisRepositoryWorkspace({
           <div className="py-12 flex justify-center">
             <LoadingState label={messages.common.states.loading} />
           </div>
+        ) : loadError ? (
+          // An outage is not an empty archive: surface the real failure with a
+          // retry instead of the "no reports yet" state.
+          <ErrorState
+            title={
+              locale === 'vi'
+                ? 'Không thể tải kho lưu trữ báo cáo'
+                : 'The report archive could not be loaded'
+            }
+            description={loadError}
+            onRetry={onRetry}
+          />
         ) : reports.length === 0 ? (
           <EmptyState
             icon={Archive}

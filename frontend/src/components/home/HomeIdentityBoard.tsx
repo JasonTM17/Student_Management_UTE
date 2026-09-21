@@ -41,15 +41,9 @@ export function HomeIdentityBoard() {
   return (
     <aside className="flex flex-col justify-between rounded-xl border-l-4 border-[var(--portal-chrome-accent)] bg-[var(--portal-sidebar)] p-6 text-[var(--portal-sidebar-text)] shadow-xs">
       <div>
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-xs font-bold uppercase tracking-wider text-[var(--portal-chrome-accent)]">
-            {messages.home.snapshotEyebrow}
-          </p>
-          <span className="inline-flex items-center gap-1.5 text-[11px] font-medium text-emerald-400">
-            <span className="h-1.5 w-1.5 rounded-full bg-emerald-400 animate-pulse" />
-            {locale === 'vi' ? 'Hệ thống trực tuyến' : 'Live Gateway'}
-          </span>
-        </div>
+        <p className="text-xs font-bold uppercase tracking-wider text-[var(--portal-chrome-accent)]">
+          {messages.home.snapshotEyebrow}
+        </p>
         <div
           className="mt-4 flex gap-2 border-b border-white/15"
           role="tablist"
@@ -77,18 +71,14 @@ export function HomeIdentityBoard() {
         </div>
         <div className="mt-2 flex-1 divide-y divide-white/10" role="tabpanel">
           {rows.map((row) => (
-            <div
-              key={`${activeIndex}-${row.code}`}
-              className="grid grid-cols-[4.5rem_1fr_auto] items-center gap-3 py-3 text-sm"
-            >
-              <span className="inline-flex items-center gap-1.5 font-mono text-xs font-semibold text-[var(--portal-chrome-accent)]">
-                <CheckCircle2 className="h-3.5 w-3.5 text-emerald-400 shrink-0" />
-                {row.code}
-              </span>
-              <span className="min-w-0 truncate font-medium">{row.label}</span>
-              <span className="hidden text-right text-xs tabular-nums text-[var(--portal-sidebar-text)]/70 sm:block">
-                {row.meta}
-              </span>
+            <div key={`${activeIndex}-${row.title}`} className="py-3 text-sm">
+              <div className="flex items-center gap-1.5 font-medium">
+                <CheckCircle2 className="h-3.5 w-3.5 shrink-0 text-[var(--portal-chrome-accent)]" />
+                <span className="min-w-0">{row.title}</span>
+              </div>
+              <p className="mt-0.5 pl-5 text-xs leading-5 text-[var(--portal-sidebar-text)]/70">
+                {row.description}
+              </p>
             </div>
           ))}
         </div>
