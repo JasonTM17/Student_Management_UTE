@@ -185,6 +185,11 @@ export function sanitizeAnnouncementHtml(html: string): string {
         const afterClose = html.indexOf('>', closeAt);
         TAG_RE.lastIndex = afterClose === -1 ? html.length : afterClose + 1;
       }
+      // An unterminated container drops only its own tag: the text before it is
+      // kept as escaped literal text and scanning continues, so the remainder of
+      // the article still renders. The dropped tag's markup is never re-emitted,
+      // which is what keeps `onload`-style payloads out of the reader's DOM *and*
+      // out of its visible text, matching the Java sanitizer's discard behaviour.
       out += escapeText(html.slice(cursor, match.index));
       cursor = TAG_RE.lastIndex;
       continue;
