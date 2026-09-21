@@ -6,6 +6,10 @@ const ts = require('typescript');
 
 const root = path.resolve(__dirname, '..');
 const pagePath = 'src/app/admin/announcements/page.tsx';
+// The guard lives in a lib module, not the route file: a Next.js page may only
+// export route members, so a shared helper exported from the page breaks
+// `tsc` on the generated route types.
+const reorderLibPath = 'src/lib/announcement-reorder.ts';
 const sortablePath = 'src/components/ui/sortable-list.tsx';
 const copyPath = 'src/i18n/messages-sortable.ts';
 
@@ -55,10 +59,10 @@ function loadExports(relativePath) {
 
 const pageSource = read(pagePath);
 const sortableSource = read(sortablePath);
-const pageModule = loadExports(pagePath);
+const reorderModule = loadExports(reorderLibPath);
 const copyModule = loadExports(copyPath);
 
-const { canReorder, summarizeDisplayOrderWrites } = pageModule;
+const { canReorder, summarizeDisplayOrderWrites } = reorderModule;
 const { reorderCopyEn, reorderCopyVi } = copyModule;
 
 const PLAIN_FIRST_PAGE = { page: 1, filters: { semesterId: '', priority: '', status: 'ALL' } };
@@ -139,6 +143,10 @@ test('reorder lists every reason the admin has to clear, not just the first', ()
 
 test('the page consults the guard for both the affordance and the save', () => {
   assert.ok(pageSource.includes('canReorder('), 'the page must derive the guard from its own state');
+  assert.ok(
+    pageSource.includes("from '@/lib/announcement-reorder'"),
+    'the page must use the shared guard module rather than its own copy',
+  );
   assert.ok(pageSource.includes('disabled={!canDragReorder}'), 'the drag affordance must switch off');
   assert.ok(pageSource.includes('<ReorderGuardNotice'), 'the reason must be explained inline');
   assert.ok(pageSource.includes('disabled={isSavingOrder || !canDragReorder}'), 'saving must be blocked too');
