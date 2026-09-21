@@ -15,12 +15,12 @@
     "spacingBase": "4px"
   },
   "inventory": {
-    "observedAt": "2026-09-20",
-    "screenCount": 24,
-    "desktopCount": 11,
+    "observedAt": "2026-09-21",
+    "screenCount": 25,
+    "desktopCount": 12,
     "mobileCount": 13,
     "supplementaryImageCount": 1,
-    "note": "All named screen records have HTML and screenshot references. The supplementary image is excluded from the screen map. 2026-09-20: added web-thesis-submission-workspace and web-assistant-mascot-brand, generated into this project (see the export notes in plans/20260920-capstone-ultra-improvement)."
+    "note": "All named screen records have HTML and screenshot references. The supplementary image is excluded from the screen map. 2026-09-20: added web-thesis-submission-workspace and web-assistant-mascot-brand, generated into this project (see the export notes in plans/20260920-capstone-ultra-improvement). 2026-09-21: added web-lecturer-grade-entry (Bảng Nhập Điểm Học Phần - Giảng Viên); a student weekly-timetable screen was generated in the same round under session 7107419810640530628 and its atlas entry follows once the screen id is confirmed via list_screens."
   },
   "screens": {
     "web-dashboard": { "id": "0037b2522057432ea1d1b536360d6142", "title": "Dashboard - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 2234 },
@@ -34,6 +34,7 @@
     "web-thesis-progress": { "id": "7e36ca4735fb4cf3a90e8d8ea09c4d3c", "title": "Theo dõi tiến độ - Web Desktop", "deviceType": "DESKTOP", "width": 2560, "height": 3012 },
     "web-thesis-submission-workspace": { "id": "fa998d979e9e486588bbcf85cc8746cd", "title": "Nộp báo cáo đồ án tốt nghiệp - Graduation Thesis Submission Workspace", "deviceType": "DESKTOP", "width": 2560, "height": 3528 },
     "web-assistant-mascot-brand": { "id": "202d396d5c07423598622a80e118bda5", "title": "Quy chuẩn Nhận diện Linh vật - HCMUTE", "deviceType": "DESKTOP", "width": 2560, "height": 4734 },
+    "web-lecturer-grade-entry": { "id": "c98eb39c35cb4518af9d991403b01538", "title": "Bảng Nhập Điểm Học Phần - Giảng Viên (Web Desktop)", "deviceType": "DESKTOP", "width": 2560, "height": 2826 },
     "mobile-profile": { "id": "1a12e27f4365459eb1d4ed274514d04d", "title": "Hồ sơ Sinh viên - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 1768 },
     "mobile-thesis-evaluation": { "id": "3073bce589eb4d4e97ef9775e921a506", "title": "Đánh giá Đề tài - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 3462 },
     "mobile-lecturer-directory": { "id": "36c60dec6ed9458a80bc5b1cfe6f82a5", "title": "Danh sách Giảng viên - Mobile App", "deviceType": "MOBILE", "width": 780, "height": 2134 },
