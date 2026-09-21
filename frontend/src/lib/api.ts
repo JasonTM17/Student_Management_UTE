@@ -3,6 +3,7 @@ import axios, {
   AxiosRequestConfig,
   InternalAxiosRequestConfig,
 } from 'axios';
+import type { TaxonomyCategory } from '@/lib/announcement-presentation';
 import {
   LoginResponse,
   ApiResponse,
@@ -1055,6 +1056,15 @@ export const announcementsApi = {
       { displayOrder },
     );
     return response.data;
+  },
+};
+
+export const articleTaxonomyApi = {
+  getPublicCategories: async (): Promise<TaxonomyCategory[]> => {
+    const response = await api.get<TaxonomyCategory[]>(
+      '/article-taxonomy/v2/categories',
+    );
+    return Array.isArray(response.data) ? response.data : [];
   },
 };
 

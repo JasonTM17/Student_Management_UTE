@@ -22,6 +22,7 @@ import { AnnouncementFeedCard } from '@/components/announcements/feed/Announceme
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 import { cn } from '@/lib/utils';
 import {
   resolveAnnouncementDomain,
@@ -90,6 +91,7 @@ const CATEGORY_TABS: CategoryTab[] = [
 export function HomeNewsSection() {
   const { user } = useAuth();
   const { locale } = useI18n();
+  const { categories } = useArticleTaxonomy();
   const [items, setItems] = useState<AnnouncementRecord[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedNotice, setSelectedNotice] = useState<AnnouncementRecord | null>(null);
@@ -130,10 +132,10 @@ export function HomeNewsSection() {
       return items;
     }
     return items.filter((item) => {
-      const domain = resolveAnnouncementDomain(item, locale);
+      const domain = resolveAnnouncementDomain(item, locale, categories);
       return domain.categoryCode === activeCategory;
     });
-  }, [items, activeCategory, locale]);
+  }, [items, activeCategory, locale, categories]);
 
   // Featured and secondary streams
   const featured = filteredItems[0] || null;
@@ -176,7 +178,7 @@ export function HomeNewsSection() {
               tab.key === 'ALL'
                 ? items.length
                 : items.filter(
-                    (item) => resolveAnnouncementDomain(item, locale).categoryCode === tab.key,
+                    (item) => resolveAnnouncementDomain(item, locale, categories).categoryCode === tab.key,
                   ).length;
             const isActive = activeCategory === tab.key;
             return (
@@ -284,7 +286,7 @@ export function HomeNewsSection() {
             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3">
               {visibleGridItems.map((ann) => {
                 const cover = resolveArticleCover(ann);
-                const domain = resolveAnnouncementDomain(ann, locale);
+                const domain = resolveAnnouncementDomain(ann, locale, categories);
                 const reading = calculateReadingTime(ann.content);
                 const sapo = extractAnnouncementExcerpt(ann.content, 110);
                 const pub = formatAnnouncementPublisher(ann.publishedBy, locale);

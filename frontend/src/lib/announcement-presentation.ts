@@ -419,16 +419,87 @@ export interface DomainResolution {
 }
 
 /**
- * Intelligently classifies an announcement into institutional categories and domains
+ * Public-safe category row from `GET /api/v1/article-taxonomy/v2/categories`.
+ * When an announcement carries a categoryId that resolves against this feed,
+ * its label/tone/icon come from the editorial taxonomy — the keyword heuristics
+ * below remain only as the fallback for rows without a resolvable category.
+ */
+export interface TaxonomyCategory {
+  id: string;
+  code: string;
+  slug: string;
+  nameVi: string;
+  nameEn: string;
+  colorTone: string;
+  iconType: string;
+}
+
+const TAXONOMY_TONE_MAP: Record<string, DomainResolution['categoryTone']> = {
+  blue: 'info',
+  indigo: 'primary',
+  emerald: 'success',
+  amber: 'warning',
+  rose: 'danger',
+  purple: 'info',
+  cyan: 'info',
+  slate: 'primary',
+};
+
+const TAXONOMY_GRADIENT_MAP: Record<string, string> = {
+  blue: 'from-blue-600 via-sky-600 to-slate-700',
+  indigo: 'from-indigo-600 via-blue-600 to-slate-700',
+  emerald: 'from-emerald-600 via-teal-600 to-green-700',
+  amber: 'from-amber-600 via-orange-600 to-red-600',
+  rose: 'from-rose-600 via-pink-600 to-purple-700',
+  purple: 'from-purple-600 via-violet-600 to-indigo-700',
+  cyan: 'from-cyan-600 via-blue-600 to-indigo-700',
+  slate: 'from-slate-600 via-slate-700 to-slate-900',
+};
+
+const TAXONOMY_ICON_FALLBACK: DomainResolution['iconType'] = 'document';
+
+export function domainFromTaxonomyCategory(
+  category: TaxonomyCategory,
+  locale: Locale = 'vi',
+): DomainResolution {
+  const isVi = locale === 'vi';
+  return {
+    domain: 'EDITORIAL_ARTICLE',
+    categoryCode:
+      (INSTITUTIONAL_ARTICLE_CATEGORIES[category.code as ArticleCategoryCode]?.code ??
+        category.code) as ArticleCategoryCode,
+    categoryLabel: isVi ? category.nameVi : category.nameEn || category.nameVi,
+    categoryTone: TAXONOMY_TONE_MAP[category.colorTone] ?? 'info',
+    iconType:
+      (INSTITUTIONAL_ARTICLE_CATEGORIES[category.code as ArticleCategoryCode]?.iconType as DomainResolution['iconType']) ??
+      (category.iconType as DomainResolution['iconType']) ??
+      TAXONOMY_ICON_FALLBACK,
+    accentGradient: TAXONOMY_GRADIENT_MAP[category.colorTone] ?? TAXONOMY_GRADIENT_MAP.slate,
+  };
+}
+
+/**
+ * Intelligently classifies an announcement into institutional categories and domains.
+ * `categories` is the live taxonomy feed: pass it wherever available so the label is
+ * authoritative; the keyword heuristics then only fill in for unclassified rows.
  */
 export function resolveAnnouncementDomain(
   announcement: Pick<AnnouncementRecord, 'title' | 'content' | 'publishedBy'> & { documentType?: string; categoryId?: string | null },
   locale: Locale = 'vi',
+  categories?: readonly TaxonomyCategory[],
 ): DomainResolution {
   const isVi = locale === 'vi';
   const title = (announcement.title || '').toLowerCase();
   const publisher = (announcement.publishedBy || '').toLowerCase();
   const content = (announcement.content || '').toLowerCase();
+
+  // 0. Authoritative taxonomy: categoryId resolved against the live feed.
+  if (announcement.categoryId && categories?.length) {
+    const matched = categories.find((category) => category.id === announcement.categoryId);
+    if (matched) {
+      return domainFromTaxonomyCategory(matched, locale);
+    }
+  }
 
   // 1. Check categoryId explicit mapping if present
   if (announcement.categoryId) {

@@ -11,6 +11,7 @@ import {
   formatRelativeTime,
   resolveAnnouncementDomain,
 } from '@/lib/announcement-presentation';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 
 interface RelatedAnnouncementsProps {
   currentId: string;
@@ -28,6 +29,7 @@ export function RelatedAnnouncements({
   locale = 'vi',
 }: RelatedAnnouncementsProps) {
   const isVi = locale === 'vi';
+  const { categories } = useArticleTaxonomy();
 
   // Filter out current announcement and pick up to 3
   const related = items
@@ -49,7 +51,7 @@ export function RelatedAnnouncements({
 
       <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
         {related.map((ann) => {
-          const domain = resolveAnnouncementDomain(ann, locale);
+          const domain = resolveAnnouncementDomain(ann, locale, categories);
           const readingTime = calculateReadingTime(ann.content);
           const excerpt = extractAnnouncementExcerpt(ann.content, 90);
           const relativeTime = formatRelativeTime(ann.publishAt || ann.createdAt, locale);
