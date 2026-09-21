@@ -376,7 +376,14 @@ test('conduct score page localizes dense records and gives mobile its own cards'
   assert.match(page, /copy\.classificationScaleTitle/);
   assert.match(page, /selectedActivity && selectedActivityDetails/);
   assert.match(page, /copy\.certificateTitle/);
-  assert.match(page, /activityCriterion\(selectedActivity\)/);
+  // Honest conduct states: no client-side criterion guessing, no id-keyed EN
+  // rewrite of real activity records, no invented semester name, and the
+  // criteria grid says when details have not been published.
+  assert.doesNotMatch(page, /activityCriterion/);
+  assert.doesNotMatch(page, /conductActivityCopy/);
+  assert.doesNotMatch(page, /Học kỳ 1 năm học 2026/);
+  assert.match(page, /if \(!name\) return '—';/);
+  assert.match(page, /copy\.criteriaEmpty/);
   assert.match(page, /className="divide-y divide-border\/60 sm:hidden"/);
   assert.match(page, /className="hidden overflow-x-auto sm:block"/);
   assert.doesNotMatch(page, /Lịch Sử Điểm Rèn Luyện Qua Các Học Kỳ/);
