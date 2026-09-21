@@ -1,6 +1,10 @@
 import { NextRequest, NextResponse } from 'next/server';
+import { DEFAULT_SITE_APPEARANCE } from '@/lib/site-appearance';
 import { CSRF_COOKIE_NAME, hasCsrfSessionHint } from '@/lib/session-hint';
-import { readSiteAppearance, writeSiteAppearance } from '@/lib/site-appearance-store';
+import {
+  readSavedSiteAppearance,
+  writeSiteAppearance,
+} from '@/lib/site-appearance-store';
 
 export const runtime = 'nodejs';
 export const dynamic = 'force-dynamic';
@@ -44,12 +48,18 @@ async function requireAdmin(request: NextRequest): Promise<boolean> {
 }
 
 export async function GET() {
-  const appearance = await readSiteAppearance();
-  return NextResponse.json(appearance, {
-    headers: {
-      'Cache-Control': 'no-store',
+  // `hasSavedPayload` separates "this deployment really has branding in the
+  // legacy file" from "the file was never written, these are defaults", so a
+  // client migrating forward never promotes an imagined payload.
+  const saved = await readSavedSiteAppearance();
+  return NextResponse.json(
+    { ...(saved ?? DEFAULT_SITE_APPEARANCE), hasSavedPayload: saved !== null },
+    {
+      headers: {
+        'Cache-Control': 'no-store',
+      },
     },
-  });
+  );
 }
 
 export async function PUT(request: NextRequest) {

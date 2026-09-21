@@ -12,6 +12,10 @@
 *.scss text eol=lf
 *.html text eol=lf
 *.sh text eol=lf
+# Flyway fingerprints migration content, so a checkout that rewrites line
+# endings changes the recorded checksum and aborts the next boot.
+*.sql text eol=lf
+*.java text eol=lf
 *.ps1 text eol=crlf
 
 *.png binary

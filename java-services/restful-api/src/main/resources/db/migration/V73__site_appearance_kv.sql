@@ -9,7 +9,11 @@ CREATE SCHEMA IF NOT EXISTS site;
 CREATE TABLE IF NOT EXISTS site."Appearance" (
     "id" VARCHAR(40) PRIMARY KEY,
     "payload" TEXT NOT NULL,
-    "updatedBy" VARCHAR(120),
+    -- The writer label is a JWT subject, which is not bounded by our user id
+    -- column. 255 is the width SiteAppearanceStore.MAX_UPDATED_BY_CHARS clips
+    -- to, so a long subject degrades to a truncated label instead of failing
+    -- the branding save.
+    "updatedBy" VARCHAR(255),
     "updatedAt" TIMESTAMPTZ NOT NULL DEFAULT CURRENT_TIMESTAMP,
     CONSTRAINT site_appearance_payload_ck CHECK (length("payload") <= 131072)
 );

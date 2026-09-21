@@ -18,7 +18,13 @@ function appearancePath(): string {
 
 let memory: SiteAppearance | null = null;
 
-export async function readSiteAppearance(): Promise<SiteAppearance> {
+/**
+ * The legacy file payload, or `null` when nothing was ever saved. Callers that
+ * must tell "unset" apart from "saved defaults" (the migration forward to the
+ * API's KV table) use this instead of `readSiteAppearance`, which answers with
+ * defaults.
+ */
+export async function readSavedSiteAppearance(): Promise<SiteAppearance | null> {
   if (memory) {
     return memory;
   }
@@ -28,9 +34,12 @@ export async function readSiteAppearance(): Promise<SiteAppearance> {
     memory = sanitizeSiteAppearance(JSON.parse(raw));
     return memory;
   } catch {
-    memory = { ...DEFAULT_SITE_APPEARANCE };
-    return memory;
+    return null;
   }
+}
+
+export async function readSiteAppearance(): Promise<SiteAppearance> {
+  return (await readSavedSiteAppearance()) ?? { ...DEFAULT_SITE_APPEARANCE };
 }
 
 export async function writeSiteAppearance(

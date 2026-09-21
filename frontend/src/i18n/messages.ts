@@ -897,6 +897,8 @@ export const en = {
       saving: 'Saving',
       saved: 'Published',
       saveFailed: 'The campus look could not be saved right now.',
+      saveNotDurable:
+        'Saved to this web server only. The central API is unreachable, so other visitors will not see this until it is saved again.',
       loadFailed: 'The campus look could not be loaded right now.',
       heroEyebrow: 'Home eyebrow',
       heroTitle: 'Home title',
@@ -2742,6 +2744,8 @@ export const vi: I18nMessages = {
       saving: 'Đang lưu',
       saved: 'Đã phát hành',
       saveFailed: 'Hiện chưa thể lưu giao diện cổng.',
+      saveNotDurable:
+        'Chỉ vừa lưu trên web server này. API trung tâm đang không kết nối được, nên người dùng khác sẽ chưa thấy thay đổi cho tới khi lưu lại.',
       loadFailed: 'Hiện chưa thể tải giao diện cổng.',
       heroEyebrow: 'Dòng dẫn trang chủ',
       heroTitle: 'Tiêu đề trang chủ',
