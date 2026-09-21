@@ -431,6 +431,12 @@ export default function AcademicEditorPage() {
   const [publishedNotices, setPublishedNotices] = useState<AnnouncementRecord[]>([]);
   const [loadingNotices, setLoadingNotices] = useState(false);
   const [previewingNotice, setPreviewingNotice] = useState<AnnouncementRecord | null>(null);
+  // A toast here expires and is routinely missed, so a deep link that failed to
+  // resolve has to stay on the page until the author acknowledges it.
+  const [deepLinkNotice, setDeepLinkNotice] = useState<{
+    targetId: string;
+    reason: 'not-found' | 'load-failed';
+  } | null>(null);
   const [editingNoticeModal, setEditingNoticeModal] = useState<AnnouncementRecord | null>(null);
 
   // RT-P3-3: unsaved-changes guard (beforeunload + in-app confirm) shared with
@@ -790,31 +796,58 @@ export default function AcademicEditorPage() {
         // subset keeps pins set for announcements outside this batch.
         postOrder: applyPageOrder(siteAppearance.postOrder, newOrder),
       };
-      await saveSiteAppearance(updated);
+      const saved = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
+      setSiteAppearance(saved);
 
-      // Persist order to Spring Boot database via REST API
-      await Promise.all(
-        publishedNotices.map((n, index) =>
-          announcementsApi.updateDisplayOrder(n.id, index).catch((err) => {
-            console.warn(`Failed to update display order for announcement ${n.id}`, err);
-          }),
-        ),
+      // This list is page 1 of fifteen published notices, so writing 0..14 would
+      // re-seat every announcement outside the window as if it were the global
+      // order. The dragged rows therefore swap the ranks they already occupy.
+      // `displayOrder` is nullable by design (V70): a rank-less notice sorts
+      // after the pinned ones, so it stays out of the swap instead of being
+      // handed a number — and never an out-of-range one, since the column is a
+      // 32-bit INTEGER.
+      const ranked = publishedNotices.filter((n) => typeof n.displayOrder === 'number');
+      const slots = ranked
+        .map((n) => n.displayOrder as number)
+        .sort((left, right) => left - right);
+      const settled = await Promise.allSettled(
+        ranked.map((n, index) => announcementsApi.updateDisplayOrder(n.id, slots[index])),
       );
+      const failed = settled.filter((outcome) => outcome.status === 'rejected').length;
+      if (failed > 0) {
+        // The pins are saved but the server order is not, so reload from the
+        // server rather than leave a success notice over a half-applied order.
+        void fetchPublishedNotices();
+        toast.error(
+          isVi
+            ? `Đã lưu danh sách ghim, nhưng ${failed} / ${ranked.length} bài không cập nhật được thứ tự trên máy chủ. Danh sách đã được tải lại.`
+            : `Pins saved, but ${failed} of ${ranked.length} announcements could not be updated on the server. The list has been reloaded.`,
+        );
+        return;
+      }
 
-      setSiteAppearance(updated);
       setHasUnsavedNoticeOrder(false);
-      toast.success(
-        isVi
-          ? 'Đã lưu và đồng bộ thứ tự ghim bài viết lên Bảng tin toàn trường!'
-          : 'Saved and broadcast announcement feed order!'
-      );
+      if (saved.persisted === false) {
+        toast.warning(
+          isVi
+            ? 'Thứ tự đã lưu trên web server này và sẽ mất ở lần deploy kế tiếp; API trung tâm đang không kết nối được.'
+            : 'Saved on this web server only; the central API is unreachable, so this order is lost on the next deploy.',
+        );
+      } else {
+        toast.success(
+          isVi
+            ? 'Đã lưu và đồng bộ thứ tự ghim bài viết lên Bảng tin toàn trường!'
+            : 'Saved and broadcast announcement feed order!'
+        );
+      }
     } catch {
       toast.error(
         isVi
           ? 'Không thể lưu thứ tự ghim bài viết.'
           : 'Could not save announcement order.'
       );
+      void fetchPublishedNotices();
     }
   };
 
@@ -900,10 +933,12 @@ export default function AcademicEditorPage() {
         if (cancelled) return;
         const found = (res.data || []).find((a) => a.id === targetId);
         if (found) {
+          setDeepLinkNotice(null);
           handleLoadAnnouncement(found);
         } else {
           // The editor would otherwise show its blank seed document; the
           // author must know the requested draft was not loaded.
+          setDeepLinkNotice({ targetId, reason: 'not-found' });
           toast.error(
             isVi
               ? `Không tìm thấy thông báo cần sửa (mã ${targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`
@@ -913,6 +948,7 @@ export default function AcademicEditorPage() {
       })
       .catch(() => {
         if (!cancelled) {
+          setDeepLinkNotice({ targetId, reason: 'load-failed' });
           toast.error(
             isVi
               ? 'Không thể tải thông báo cần sửa. Trình soạn thảo đang hiển thị bản nháp mới.'
@@ -1108,6 +1144,18 @@ export default function AcademicEditorPage() {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
   }
 
+  const deepLinkCopy = deepLinkNotice
+    ? deepLinkNotice.reason === 'not-found'
+      ? {
+          vi: `Không tìm thấy thông báo cần sửa (mã ${deepLinkNotice.targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`,
+          en: `The notice to edit (id ${deepLinkNotice.targetId}) was not found. The editor is showing a new blank draft.`,
+        }
+      : {
+          vi: `Không thể tải thông báo cần sửa (mã ${deepLinkNotice.targetId}). Trình soạn thảo đang hiển thị bản nháp mới.`,
+          en: `The notice to edit (id ${deepLinkNotice.targetId}) could not be loaded. The editor is showing a new blank draft.`,
+        }
+    : null;
+
   return (
     <div className="space-y-6 pb-12">
       <PageHeader
@@ -1115,6 +1163,24 @@ export default function AcademicEditorPage() {
         title={copy.title}
         description={copy.description}
       />
+
+      {deepLinkCopy ? (
+        <div
+          role="alert"
+          aria-live="polite"
+          className="flex items-start justify-between gap-3 rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive"
+        >
+          <span>{isVi ? deepLinkCopy.vi : deepLinkCopy.en}</span>
+          <button
+            type="button"
+            onClick={() => setDeepLinkNotice(null)}
+            aria-label={isVi ? 'Đóng cảnh báo liên kết' : 'Dismiss deep-link warning'}
+            className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-sm text-destructive transition-colors hover:bg-destructive/10"
+          >
+            <X className="h-4 w-4" />
+          </button>
+        </div>
+      ) : null}
 
       {/* Main Tab Controller */}
       <div className="flex flex-wrap items-center gap-2 border-b border-border/70 pb-3">

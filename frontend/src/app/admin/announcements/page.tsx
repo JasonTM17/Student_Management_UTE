@@ -47,9 +47,14 @@ import { Textarea } from '@/components/ui/textarea';
 import { RichTextEditor } from '@/components/ui/rich-text-editor';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { TinyMceEditor } from '@/components/ui/tinymce-editor';
-import { SortableList, DragHandle } from '@/components/ui/sortable-list';
+import { SortableList, DragHandle, type SortableMoveContext } from '@/components/ui/sortable-list';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
+import {
+  reorderCopyEn,
+  reorderCopyVi,
+  type ReorderCopy,
+} from '@/i18n/messages-sortable';
 import { getLocalizedName } from '@/lib/academic-content';
 import { findAnnouncementLengthViolation } from '@/lib/announcement-limits';
 import { campusErrorCode, campusErrorMessage } from '@/lib/campus-error';
@@ -191,6 +196,86 @@ function actorDescription(locale: 'vi' | 'en') {
   return locale === 'vi' ? 'Tài khoản quản trị đã ghi nhận' : 'Recorded by an administrator';
 }
 
+export type ReorderBlockReason = 'filtered' | 'paged';
+
+export interface ReorderGuard {
+  allowed: boolean;
+  blockedBy: ReorderBlockReason[];
+}
+
+/**
+ * Reordering writes each row's position as its global `displayOrder`, and the
+ * server sorts the whole feed by that column. That is only honest while the
+ * dialog is looking at the feed itself: page 1 of an unfiltered list. Under a
+ * filter, or from page 2, the indexes on screen belong to a subset, so saving
+ * them would silently re-rank rows the admin never saw — including rows another
+ * admin just placed. Rather than guess a global offset, the affordance is
+ * switched off and the admin is told what to clear. Default-deny: an unknown
+ * status counts as a filter.
+ */
+export function canReorder(input: {
+  page: number;
+  filters: { semesterId: string; priority: string; status: string };
+}): ReorderGuard {
+  const blockedBy: ReorderBlockReason[] = [];
+  const filtered =
+    Boolean(input.filters?.semesterId?.trim()) ||
+    Boolean(input.filters?.priority?.trim()) ||
+    (input.filters?.status ?? '') !== 'ALL';
+  if (filtered) blockedBy.push('filtered');
+  if (input.page !== 1) blockedBy.push('paged');
+  return { allowed: blockedBy.length === 0, blockedBy };
+}
+
+export interface DisplayOrderWriteSummary {
+  attempted: number;
+  failed: number;
+  allSucceeded: boolean;
+}
+
+/**
+ * Settled-write accounting for the reorder save path.
+ *
+ * `Promise.all(...map(req => req.catch(...)))` swallows every rejection, so a
+ * half-written order looked identical to a saved one. Counting `allSettled`
+ * results keeps "every row saved" distinguishable from "some rows did not".
+ */
+export function summarizeDisplayOrderWrites(
+  results: ReadonlyArray<PromiseSettledResult<unknown>>,
+): DisplayOrderWriteSummary {
+  let failed = 0;
+  for (const result of results) {
+    if (result.status === 'rejected') failed += 1;
+  }
+  return { attempted: results.length, failed, allSucceeded: failed === 0 };
+}
+
+interface ReorderGuardNoticeProps {
+  copy: ReorderCopy;
+  blockedBy: ReorderBlockReason[];
+  extra?: string;
+}
+
+/** Inline explanation of why dragging is off, reused by the feed and the dialog. */
+function ReorderGuardNotice({ copy, blockedBy, extra }: ReorderGuardNoticeProps) {
+  if (blockedBy.length === 0) return null;
+  return (
+    <div
+      role="status"
+      className="flex items-start gap-3 rounded-md border border-border/70 bg-secondary/35 p-4 text-sm text-muted-foreground"
+    >
+      <ArrowUpDown className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+      <div className="space-y-1">
+        <p className="font-semibold text-foreground">{copy.guard.heading}</p>
+        {blockedBy.map((reason) => (
+          <p key={reason}>{copy.guard[reason]}</p>
+        ))}
+        {extra ? <p>{extra}</p> : null}
+      </div>
+    </div>
+  );
+}
+
 export default function AdminAnnouncementsPage() {
   const { user, isAdmin, isSuperAdmin, isLoading: authLoading, isLoggingOut } = useAuth();
   const { href, locale, formatDateTime } = useI18n();
@@ -230,34 +315,73 @@ export default function AdminAnnouncementsPage() {
   const [isSavingOrder, setIsSavingOrder] = useState(false);
   const [editorEngine, setEditorEngine] = useState<'tinymce' | 'markdown'>('tinymce');
 
+  const reorderCopy = vi ? reorderCopyVi : reorderCopyEn;
+  const reorderGuard = useMemo(() => canReorder({ page, filters }), [filters, page]);
+  const canDragReorder = reorderGuard.allowed;
+
+  // Stable identities for everything SortableList installs its drag effect with:
+  // the page re-renders on the 15-second site-appearance poll (see
+  // `useOrderedPosts`), and an unmemoised arrow used to rebuild the Sortable
+  // instance under a drag that was already in flight.
+  const extractReorderKey = useCallback((item: AnnouncementRecord) => item.id, []);
+  const handleReorderListChange = useCallback((newList: AnnouncementRecord[]) => {
+    setReorderList(newList);
+  }, []);
+  const announceReorderMove = useCallback(
+    (context: SortableMoveContext<AnnouncementRecord>) =>
+      reorderCopy.live.moved(context.item.title, context.from + 1, context.to + 1, context.total),
+    [reorderCopy],
+  );
+
   const handleSaveReorder = async () => {
+    const guard = canReorder({ page, filters });
+    if (!guard.allowed) {
+      // The dialog hides the handles, but a stale tab must not write a subset's
+      // indexes as the feed's global order.
+      toast.error(guard.blockedBy.map((reason) => reorderCopy.guard[reason]).join(' '));
+      return;
+    }
+
     setIsSavingOrder(true);
     try {
+      // Persist to backend database via Spring Boot REST API. `allSettled` so a
+      // rejected row is counted instead of swallowed into a green toast.
+      const writes = await Promise.allSettled(
+        reorderList.map((item, index) => announcementsApi.updateDisplayOrder(item.id, index)),
+      );
+      const outcome = summarizeDisplayOrderWrites(writes);
+      if (!outcome.allSucceeded) {
+        // Partial write: name how many failed and reload, so the UI returns to
+        // server truth instead of showing an order the database never accepted.
+        toast.error(reorderCopy.result.partialFailure(outcome.failed, outcome.attempted));
+        void fetchAnnouncements();
+        return;
+      }
+
       const newOrder = reorderList.map((item) => item.id);
       const currentAppearance = await fetchSiteAppearance();
       const updated = {
         ...currentAppearance,
-        // The reorder dialog only covers the current filtered page, so the new
-        // relative order is applied to that page while pins outside it are kept.
+        // The dialog is gated on page 1 of the unfiltered feed, so this re-seats
+        // exactly the rows the admin dragged while pins outside them are kept.
         postOrder: applyPageOrder(currentAppearance.postOrder, newOrder),
       };
-      await saveSiteAppearance(updated);
+      const savedAppearance = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
+      if (savedAppearance.persisted === false) {
+        // The server-side order is real, but the homepage pin list only lives in
+        // this instance, so saying "done" would promise a durability we lack.
+        toast.warning(reorderCopy.result.notDurable);
+      }
 
-      // Persist to backend database via Spring Boot REST API
-      await Promise.all(
-        reorderList.map((item, index) =>
-          announcementsApi.updateDisplayOrder(item.id, index).catch((err) => {
-            console.warn(`Failed to update display order for announcement ${item.id}`, err);
-          }),
-        ),
-      );
-
-      toast.success(vi ? 'Đã cập nhật thứ tự hiển thị thông báo thành công!' : 'Announcement order updated!');
+      toast.success(reorderCopy.result.success);
       setModal(null);
       void fetchAnnouncements();
     } catch {
-      toast.error(vi ? 'Không thể lưu thứ tự thông báo.' : 'Could not save announcement order.');
+      toast.error(reorderCopy.result.error);
+      // Something failed after the display-order writes went out; reload rather
+      // than leave the dialog showing an order nothing confirmed.
+      void fetchAnnouncements();
     } finally {
       setIsSavingOrder(false);
     }
@@ -810,10 +934,10 @@ export default function AdminAnnouncementsPage() {
                 setModal('reorder');
               }}
               disabled={isLoading || orderedItems.length < 2}
-              title={vi ? 'Kéo thả để sắp xếp thứ tự hiển thị' : 'Reorder feed announcements'}
+              title={reorderCopy.trigger.tooltip}
             >
               <ArrowUpDown className="mr-2 h-4 w-4" aria-hidden="true" />
-              {vi ? 'Sắp xếp thứ tự ghim' : 'Reorder feed'}
+              {reorderCopy.trigger.label}
             </Button>
             <Button type="button" variant="outline" onClick={() => void fetchAnnouncements()} disabled={isLoading}>
               <RefreshCw className={`mr-2 h-4 w-4 motion-reduce:animate-none ${isLoading ? 'animate-spin' : ''}`} aria-hidden="true" />
@@ -867,6 +991,12 @@ export default function AdminAnnouncementsPage() {
               </div>
             </div>
           </AdminToolbarCard>
+
+          {/* The dialog carries its own copy while it is open, so the page note
+              steps aside rather than announcing the same sentence twice. */}
+          {modal === 'reorder' ? null : (
+            <ReorderGuardNotice copy={reorderCopy} blockedBy={reorderGuard.blockedBy} />
+          )}
 
           {referenceError ? (
             <div className="flex items-start gap-3 rounded-md border border-border/70 bg-secondary/35 p-4 text-sm text-muted-foreground" role="status">
@@ -1244,22 +1374,31 @@ export default function AdminAnnouncementsPage() {
           className="max-w-2xl"
         >
           <div className="space-y-4">
-            <p className="text-xs text-muted-foreground">
-              {vi
-                ? 'Dùng chuột giữ biểu tượng tay cầm ⠿ để kéo thả sắp xếp thứ tự ưu tiên của các thông báo trên Bảng tin. Thông báo ở vị trí đầu tiên (Top 1) sẽ được ưu tiên hiển thị trước.'
-                : 'Drag items using the handle ⠿ to set priority order. Top items will appear first in campus feeds.'}
-            </p>
+            <p className="text-xs text-muted-foreground">{reorderCopy.dialog.intro}</p>
+            <ReorderGuardNotice
+              copy={reorderCopy}
+              blockedBy={reorderGuard.blockedBy}
+              extra={canDragReorder ? undefined : reorderCopy.dialog.readOnly}
+            />
             <div className="max-h-[60vh] overflow-y-auto rounded-lg border border-border p-2">
               <SortableList<AnnouncementRecord>
                 tag="ul"
                 items={reorderList}
-                keyExtractor={(item) => item.id}
-                onOrderChange={(newList) => setReorderList(newList)}
+                disabled={!canDragReorder}
+                keyExtractor={extractReorderKey}
+                onOrderChange={handleReorderListChange}
+                announceMove={announceReorderMove}
                 itemClassName="rounded-md border border-border/70 bg-card p-3 shadow-xs hover:border-primary/40 transition-colors"
                 renderItem={(item, index) => (
                   <div className="flex items-center justify-between gap-3">
                     <div className="flex items-center gap-3 min-w-0">
-                      <DragHandle className="cursor-grab active:cursor-grabbing hover:text-primary shrink-0" />
+                      {canDragReorder ? (
+                        <DragHandle
+                          className="hover:text-primary"
+                          label={reorderCopy.handle.label}
+                          title={reorderCopy.handle.label}
+                        />
+                      ) : null}
                       <span
                         className={cn(
                           'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-xs font-bold',
@@ -1309,10 +1448,10 @@ export default function AdminAnnouncementsPage() {
               <Button
                 type="button"
                 onClick={() => void handleSaveReorder()}
-                disabled={isSavingOrder}
+                disabled={isSavingOrder || !canDragReorder}
                 className="bg-primary text-primary-foreground font-semibold shadow-xs"
               >
-                {isSavingOrder ? (vi ? 'Đang lưu…' : 'Saving…') : (vi ? 'Lưu thứ tự hiển thị' : 'Save Feed Order')}
+                {isSavingOrder ? reorderCopy.dialog.saving : reorderCopy.dialog.save}
               </Button>
             </AdminDialogFooter>
           </div>
