@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useEffect, useMemo, useState } from 'react';
+import React, { useCallback, useMemo, useState } from 'react';
 import {
   ArrowRight,
   Award,
@@ -23,6 +23,7 @@ import { SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
 import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
+import { useApiQuery } from '@/lib/query';
 import { cn } from '@/lib/utils';
 import {
   resolveAnnouncementDomain,
@@ -92,39 +93,32 @@ export function HomeNewsSection() {
   const { user } = useAuth();
   const { locale } = useI18n();
   const { categories } = useArticleTaxonomy();
-  const [items, setItems] = useState<AnnouncementRecord[]>([]);
-  const [isLoading, setIsLoading] = useState<boolean>(true);
   const [selectedNotice, setSelectedNotice] = useState<AnnouncementRecord | null>(null);
   const [activeCategory, setActiveCategory] = useState<CategoryFilter>('ALL');
   const [isExpanded, setIsExpanded] = useState(false);
 
   const isVi = locale === 'vi';
 
-  useEffect(() => {
-    let isMounted = true;
-    setIsLoading(true);
-    const fetcher = user
-      ? announcementsApi.getMy({ page: 1, limit: 18 })
-      : announcementsApi.getPublic({ page: 1, limit: 18 });
-
-    fetcher
-      .then((res) => {
-        if (isMounted) {
-          if (res.data && Array.isArray(res.data)) {
-            setItems(res.data);
-          }
-          setIsLoading(false);
-        }
-      })
-      .catch(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
-      });
-    return () => {
-      isMounted = false;
-    };
-  }, [user]);
+  // TanStack Query caches the campus feed across mounts and dedupes the
+  // signed-in/anonymous variants; the old effect refetched 18 rows every time
+  // the identity flipped with no way to cancel the in-flight request.
+  const { data: pagedItems, isLoading } = useApiQuery<
+    { data?: AnnouncementRecord[] }
+  >(
+    ['home-news', user ? 'mine' : 'public'],
+    useCallback(
+      () =>
+        user
+          ? announcementsApi.getMy({ page: 1, limit: 18 })
+          : announcementsApi.getPublic({ page: 1, limit: 18 }),
+      [user],
+    ),
+    { staleTime: 60_000 },
+  );
+  const items = useMemo(
+    () => (Array.isArray(pagedItems?.data) ? pagedItems.data : []),
+    [pagedItems],
+  );
 
   // Filter items by active category
   const filteredItems = useMemo(() => {
