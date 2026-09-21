@@ -1068,6 +1068,17 @@ export const articleTaxonomyApi = {
   },
 };
 
+export const siteAppearanceApi = {
+  get: async (): Promise<unknown> => {
+    const response = await api.get<unknown>('/site-appearance');
+    return response.data;
+  },
+  put: async (appearance: unknown): Promise<unknown> => {
+    const response = await api.put<unknown>('/site-appearance', appearance);
+    return response.data;
+  },
+};
+
 export interface DepartmentStat {
   code: string;
   name: string;

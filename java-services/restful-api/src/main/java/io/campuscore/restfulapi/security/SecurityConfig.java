@@ -126,6 +126,11 @@ public class SecurityConfig {
                                 // anonymous homepage uses to label articles by
                                 // their editorial taxonomy instead of guessing.
                                 "/api/v1/article-taxonomy/v2/categories",
+                                // Public site chrome (accent, homepage hero,
+                                // post order). The filter chain only opens the
+                                // GET; PUT stays administrator-gated by
+                                // method security on the controller.
+                                "/api/v1/site-appearance",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
                                 // Mail endpoints used to be reachable without a
