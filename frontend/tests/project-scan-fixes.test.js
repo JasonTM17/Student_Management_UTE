@@ -521,3 +521,15 @@ test('schedule page keeps badges padded and never prints a UUID as the student I
   assert.doesNotMatch(page, /user\.id\?\.slice\(0, 10\)/);
   assert.match(page, /user\.studentId \?\? '—'/);
 });
+
+test('announcements banner names the live semester instead of a hardcoded term', () => {
+  const page = read('src/app/dashboard/announcements/page.tsx');
+
+  // A hardcoded term goes stale the day the calendar turns; the banner must
+  // render the semester the API reports, or an honest em-dash.
+  assert.doesNotMatch(page, /Học kỳ 1 • 2026-2027/);
+  assert.doesNotMatch(page, /Term 1 • 2026-2027/);
+  assert.match(page, /semestersApi/);
+  assert.match(page, /pickPreferredSemesterId/);
+  assert.match(page, /currentSemesterName \|\| '—'/);
+});
