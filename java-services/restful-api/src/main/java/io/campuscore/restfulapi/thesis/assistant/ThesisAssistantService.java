@@ -240,6 +240,18 @@ public class ThesisAssistantService {
             Map.entry("nghi hoc", "nghỉ học"),
             Map.entry("lam lai", "làm lại"));
     /**
+     * Multi-part acronyms that the {@code [^\p{L}\p{N}]+} splitter shreds. The
+     * corpus spells the concept "CI/CD", so every folded spelling collapses onto
+     * that one canonical retrieval term instead of the pair "ci"/"cd", which only
+     * ever match inside unrelated words. Keys are matched on the same folded
+     * phrase source the Vietnamese aliases use, so slash and hyphen spellings are
+     * equivalent; the list order is the emitted term order.
+     */
+    static final List<Map.Entry<String, String>> FOLDED_ACRONYM_PHRASES = List.of(
+            Map.entry("ci cd", "ci/cd"),
+            Map.entry("cicd", "ci/cd"),
+            Map.entry("dev ops", "devops"));
+    /**
      * Curated campus topic vocabulary for the pre-gate, kept as data so the
      * pattern below can be rebuilt from it.
      */
@@ -257,7 +269,14 @@ public class ThesisAssistantService {
             "khoa", "bo\\s+mon", "sinh\\s+vien", "cong", "chuong\\s+trinh", "tien\\s+quyet", "song\\s+hanh",
             "thi", "hoc\\s+bong", "tot\\s+nghiep", "thuc\\s+tap", "thu\\s+vien", "ky\\s+tuc\\s+xa",
             "tai\\s+khoan", "mat\\s+khau", "nghien\\s+cuu", "phuc\\s+khao", "rut\\s+hoc\\s+phan", "hoc\\s+lai",
-            "ren\\s+luyen", "diem\\s+danh", "phong", "giay\\s+xac\\s+nhan");
+            "ren\\s+luyen", "diem\\s+danh", "phong", "giay\\s+xac\\s+nhan",
+            // The SPECIALIZED corpus publishes the DevOps/CI-CD document, so the
+            // gate has to admit its vocabulary or the document can never be
+            // reached: a "CI/CD pipeline" question was refused before the query
+            // ever ran.
+            "devops", "ci[/+-]cd", "cicd", "ci", "cd", "pipeline", "pipelines",
+            "docker", "container", "containers", "kubernetes", "deploy", "deployment",
+            "deployments", "runbook");
     /**
      * Retrieval is deliberately scoped before the database query.  A generic
      * lexical overlap (for example "thời" or "hôm nay") is not evidence that
@@ -1239,7 +1258,24 @@ public class ThesisAssistantService {
                 expanded.add(accentedPhrase);
             }
         });
+        // Acronyms follow the aliases for the same crowding reason, and are
+        // matched on the same folded phrase source, so "CI/CD", "CI-CD" and
+        // "ci cd" are one concept here rather than two noise tokens.
+        List<String> acronymTerms = new ArrayList<>();
+        for (Map.Entry<String, String> acronym : FOLDED_ACRONYM_PHRASES) {
+            if (foldedPhraseSource.contains(" " + acronym.getKey() + " ")
+                    && !acronymTerms.contains(acronym.getValue())) {
+                acronymTerms.add(acronym.getValue());
+                expanded.add(acronym.getValue());
+            }
+        }
+        List<String> shreddedAcronymParts = acronymTerms.stream()
+                .flatMap(term -> java.util.Arrays.stream(term.split("[^\\p{L}\\p{N}]+")))
+                .toList();
         for (String term : baseTerms) {
+            // "ci" and "cd" alone match inside "decision" or "province"; the
+            // canonical acronym term above already carries their meaning.
+            if (shreddedAcronymParts.contains(term)) continue;
             expanded.add(term);
             switch (term) {
                 case "enroll", "enrolled", "enrolling", "enrollment", "enrolment" -> expanded.addAll(List.of("registration", "register"));
