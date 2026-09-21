@@ -724,6 +724,31 @@ class AcademicReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.data.length()").value(2))
                 .andExpect(jsonPath("$.meta.total").value(2));
+
+        // The search pattern is diacritic-folded, so the column side must fold
+        // too: an accented query ("Vừa học") still matches its stored row, and
+        // the unaccented spelling matches it as well. Folding the pattern
+        // without folding the column regressed every accented catalog query.
+        mvc.perform(get("/api/v1/semesters")
+                        .queryParam("search", "Vừa học")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("semester-intensive"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/semesters")
+                        .queryParam("search", "vua hoc")
+                        .with(studentJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("semester-intensive"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/departments")
+                        .queryParam("search", "quản trị")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("department-ba"))
+                .andExpect(jsonPath("$.meta.total").value(1));
     }
 
     @Test

@@ -140,7 +140,7 @@ export function DocumentAttachmentsList({
                 <div className="flex items-center gap-2 pt-0.5 text-[11px] text-muted-foreground">
                   <span
                     className={cn(
-                      'rounded px-1.5 py-0.2 uppercase font-mono font-bold text-[9px] border',
+                      'rounded px-1.5 py-0.5 uppercase font-mono font-bold text-[9px] border',
                       getBadgeStyle(file.type),
                     )}
                   >
