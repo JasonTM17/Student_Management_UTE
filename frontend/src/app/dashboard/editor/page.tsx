@@ -461,6 +461,9 @@ export default function AcademicEditorPage() {
   const [showBlockBuilder, setShowBlockBuilder] = useState(true);
   const [blocks, setBlocks] = useState<ContentBlock[]>(DEFAULT_BLOCKS);
   const [hasUnsavedNoticeOrder, setHasUnsavedNoticeOrder] = useState(false);
+  // The pinned-notices list is a `tbody` SortableList, which cannot carry its own
+  // live region, so the page keeps the sentence here and renders it below.
+  const [noticeMove, setNoticeMove] = useState('');
 
   // Site Appearance (Hero / Banner control)
   const [siteAppearance, setSiteAppearance] = useState<SiteAppearance>(DEFAULT_SITE_APPEARANCE);
@@ -808,6 +811,7 @@ export default function AcademicEditorPage() {
       // handed a number — and never an out-of-range one, since the column is a
       // 32-bit INTEGER.
       const ranked = publishedNotices.filter((n) => typeof n.displayOrder === 'number');
+      const rankless = publishedNotices.length - ranked.length;
       const slots = ranked
         .map((n) => n.displayOrder as number)
         .sort((left, right) => left - right);
@@ -828,6 +832,21 @@ export default function AcademicEditorPage() {
       }
 
       setHasUnsavedNoticeOrder(false);
+      if (ranked.length === 0) {
+        // Nothing here carried a rank, so no server write could express the drag
+        // at all; the pins are saved but the feed order is unchanged.
+        toast.warning(
+          isVi
+            ? 'Đã lưu danh sách ghim, nhưng chưa bài nào có thứ tự trên máy chủ nên thứ tự hiển thị chưa đổi.'
+            : 'Pins saved, but no notice carries a server rank yet, so the displayed order could not change.',
+        );
+      } else if (rankless > 0) {
+        toast.info(
+          isVi
+            ? `Đã đổi thứ tự ${ranked.length} bài đã có thứ tự; ${rankless} bài chưa xếp hạng vẫn đứng sau nhóm ghim.`
+            : `Reordered the ${ranked.length} ranked notices; ${rankless} unranked notice(s) stay after the pinned group.`,
+        );
+      }
       if (saved.persisted === false) {
         toast.warning(
           isVi
@@ -1098,14 +1117,26 @@ export default function AcademicEditorPage() {
         },
       };
 
-      await saveSiteAppearance(updated);
+      const saved = await saveSiteAppearance(updated);
       broadcastSiteAppearance(updated);
-      setSiteAppearance(updated);
-      toast.success(
-        isVi
-          ? 'Đã cập nhật và xuất bản trực tiếp lên Trang chủ!'
-          : 'Homepage appearance updated and published live!',
-      );
+      setSiteAppearance(saved);
+      if (saved.persisted === false) {
+        // The hero block lives on the API row; this instance only is not
+        // "published live", and saying so is the difference between an admin
+        // leaving the page believing the banner changed everywhere and it
+        // disappearing on the next deploy.
+        toast.warning(
+          isVi
+            ? 'Hero đã lưu trên web server này; API trung tâm đang không kết nối được nên có thể mất ở lần deploy kế tiếp.'
+            : 'Hero saved on this web server only; the central API is unreachable, so it may be lost on the next deploy.',
+        );
+      } else {
+        toast.success(
+          isVi
+            ? 'Đã cập nhật và xuất bản trực tiếp lên Trang chủ!'
+            : 'Homepage appearance updated and published live!',
+        );
+      }
     } catch {
       toast.error(
         isVi
@@ -1862,6 +1893,9 @@ export default function AcademicEditorPage() {
                 </div>
               ) : (
                 <div className="overflow-x-auto">
+                  <p aria-live="polite" role="status" className="sr-only">
+                    {noticeMove}
+                  </p>
                   <table className="w-full min-w-[920px] text-left text-xs border-collapse">
                     <thead className="border-b border-border/60 bg-muted/40 text-muted-foreground font-semibold">
                       <tr>
@@ -1881,6 +1915,13 @@ export default function AcademicEditorPage() {
                       items={publishedNotices}
                       keyExtractor={(ann) => ann.id}
                       onOrderChange={handleSortableNoticeReorder}
+                      announceMove={({ item, from, to, total }) => {
+                        const message = isVi
+                          ? `Đã chuyển "${item.title}" từ vị trí ${from + 1} sang ${to + 1} trong ${total} bài.`
+                          : `Moved "${item.title}" from position ${from + 1} to ${to + 1} of ${total}.`;
+                        setNoticeMove(message);
+                        return message;
+                      }}
                       itemClassName="hover:bg-muted/30 transition-colors border-b border-border/50"
                       renderItem={(ann, index) => (
                         <>

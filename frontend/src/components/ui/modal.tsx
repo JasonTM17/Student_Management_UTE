@@ -14,6 +14,12 @@ interface ModalProps {
   children: React.ReactNode;
   className?: string;
   closeLabel?: string;
+  /**
+   * Names the dialog for a screen reader when there is no visible `title`. Without
+   * it an untitled dialog falls back to the close-button label, so every document
+   * opened in one would be announced as "Close dialog".
+   */
+  dialogLabel?: string;
   showCloseButton?: boolean;
   printable?: boolean;
   /** When false the dialog cannot be dismissed (backdrop, close button and
@@ -30,6 +36,7 @@ export function Modal({
   children,
   className,
   closeLabel,
+  dialogLabel,
   showCloseButton = false,
   printable = false,
   dismissible = true,
@@ -131,7 +138,7 @@ export function Modal({
           role="dialog"
           aria-modal="true"
           aria-labelledby={title ? titleId : undefined}
-          aria-label={!title ? (closeLabel || messages.common.states.closeModal) : undefined}
+          aria-label={title ? undefined : (dialogLabel || closeLabel || messages.common.states.closeModal)}
           tabIndex={-1}
           className={cn(
             'relative flex max-h-[calc(100vh-2rem)] w-full max-w-lg flex-col rounded-lg border border-border/80 bg-card shadow-2xl sm:max-h-[calc(100vh-4rem)]',

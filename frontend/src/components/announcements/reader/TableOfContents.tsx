@@ -106,6 +106,11 @@ export function TableOfContents({
   const handleScrollTo = (id: string) => {
     const element = document.getElementById(id);
     if (element) {
+      // Carry focus to the section as well as the scroll: otherwise a keyboard or
+      // screen-reader user who follows a contents link is left back on the link,
+      // with the reading position moved out from under them.
+      element.tabIndex = -1;
+      element.focus({ preventScroll: true });
       element.scrollIntoView({ behavior: 'smooth', block: 'start' });
       setActiveId(id);
     }

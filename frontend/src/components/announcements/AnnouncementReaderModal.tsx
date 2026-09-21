@@ -33,7 +33,8 @@ export function AnnouncementReaderModal({
 }: AnnouncementReaderModalProps) {
   const { locale } = useI18n();
   const { categories } = useArticleTaxonomy();
-  const [copied, setCopied] = useState(false);
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copyReset = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -106,13 +107,15 @@ export function AnnouncementReaderModal({
       if (typeof window !== 'undefined') {
         const url = `${window.location.origin}/dashboard/announcements?id=${encodeURIComponent(announcement.id)}`;
         await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopyState('copied');
       }
     } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // A rejected clipboard write (insecure context, denied permission) is not a
+      // copy, so it must not render as one.
+      setCopyState('failed');
     }
+    if (copyReset.current) clearTimeout(copyReset.current);
+    copyReset.current = setTimeout(() => setCopyState('idle'), 2600);
   };
 
   const domain = resolveAnnouncementDomain(announcement, locale, categories);
@@ -122,6 +125,7 @@ export function AnnouncementReaderModal({
       isOpen={isOpen}
       onClose={onClose}
       showCloseButton={false}
+      dialogLabel={announcement.title}
       printable={true}
       className="max-w-4xl sm:max-w-5xl p-0 overflow-hidden"
     >
@@ -142,7 +146,7 @@ export function AnnouncementReaderModal({
           onPreferencesChange={setPreferences}
           onPrint={handlePrint}
           onShare={handleShare}
-          copied={copied}
+          copyState={copyState}
           onClose={onClose}
           onEdit={
             onEdit

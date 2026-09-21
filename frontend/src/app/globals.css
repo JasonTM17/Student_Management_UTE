@@ -745,6 +745,9 @@
   --reader-text: #172033;
   --reader-muted: #526078;
   --reader-border: #c7d0dc;
+  /* `mark` in an authored notice highlights with this token, so each reader
+     surface needs its own value or the highlight comes from the app theme. */
+  --accent-warm: 43 94% 48%;
   --background: 0 0% 100%;
   --foreground: 217 34% 16%;
   --card: 0 0% 100%;
@@ -773,6 +776,7 @@
   --reader-text: #2d2a26;
   --reader-muted: #675b4e;
   --reader-border: #d8c9aa;
+  --accent-warm: 36 82% 44%;
   --background: 42 72% 91%;
   --foreground: 30 18% 17%;
   --card: 42 72% 91%;
@@ -801,6 +805,7 @@
   --reader-text: #f8fafc;
   --reader-muted: #94a3b8;
   --reader-border: #334155;
+  --accent-warm: 38 92% 60%;
   --background: 220 18% 9%;
   --foreground: 210 18% 94%;
   --card: 220 14% 12%;
