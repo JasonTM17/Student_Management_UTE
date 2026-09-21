@@ -539,6 +539,67 @@
   color: #86efac;
 }
 
+/* RT-P3-e: the editor previews these through `content_style`, but the reader had
+   no rules for them, so an authored code block or accordion arrived unstyled —
+   a bare run of monospace text with no box, and a <details> that looked like a
+   stray sentence. Every value below is a semantic token, so the same markup
+   reads correctly on the light, sepia, and dark reader surfaces. */
+.rich-html-content pre {
+  background-color: hsl(var(--muted));
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.75rem 0.875rem;
+  margin: 1rem 0;
+  overflow-x: auto;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.85rem;
+  line-height: 1.6;
+  color: hsl(var(--foreground));
+}
+.rich-html-content code {
+  background-color: hsl(var(--secondary));
+  border: 1px solid hsl(var(--border) / 0.7);
+  border-radius: 0.25rem;
+  padding: 0.1rem 0.35rem;
+  font-family: ui-monospace, "SFMono-Regular", Menlo, Monaco, Consolas, "Liberation Mono", "Courier New", monospace;
+  font-size: 0.9em;
+  color: hsl(var(--foreground));
+}
+/* A code sample inside a <pre> already has its own box; do not double-draw it. */
+.rich-html-content pre code {
+  background-color: transparent;
+  border: none;
+  padding: 0;
+  font-size: 1em;
+}
+.rich-html-content details {
+  border: 1px solid hsl(var(--border));
+  border-radius: var(--radius);
+  padding: 0.625rem 0.875rem;
+  margin: 0.75rem 0;
+}
+.rich-html-content summary {
+  font-weight: 600;
+  cursor: pointer;
+  color: hsl(var(--primary));
+}
+.rich-html-content mark {
+  background-color: hsl(var(--accent-warm) / 0.35);
+  color: hsl(var(--foreground));
+  border-radius: 0.2em;
+  padding: 0.05em 0.2em;
+}
+.rich-html-content figure {
+  margin: 1rem 0;
+}
+.rich-html-content figcaption {
+  margin-top: 0.375rem;
+  font-size: 0.75rem;
+  font-style: italic;
+  text-align: center;
+  color: hsl(var(--muted-foreground));
+}
+
 @media (prefers-reduced-motion: reduce) {
   *,
   *::before,
@@ -608,8 +669,71 @@
   /* Remove card box shadows and borders in print */
   .card,
   article {
-    break-inside: avoid;
     box-shadow: none !important;
+  }
+
+  /* RT-P3-f: `article` must not sit in a `break-inside: avoid` rule. A magazine
+     article is longer than one A4 page, so the browser refused to split it,
+     pushed the whole thing to sheet 2, and printed a blank first page. Keep the
+     guard for the blocks that do fit on a page: cards, figures, headings. */
+  .card,
+  figure,
+  h1,
+  h2,
+  h3,
+  h4,
+  h5,
+  h6 {
+    break-inside: avoid;
+  }
+
+  /* A reader in the dark or sepia theme paints its own background, which comes
+     out of a printer as a near-black sheet. The reading surfaces are the only
+     places that opt in (`data-reader-theme` on the article / dispatch sheet),
+     so print forces them back to the light paper palette: the same values
+     `.reader-theme-light` declares below — keep the two in step, and the
+     `!important` is what wins over the theme class on the same element. */
+  [data-reader-theme] {
+    color-scheme: light !important;
+    --reader-bg: #ffffff !important;
+    --reader-surface: #ffffff !important;
+    --reader-text: #172033 !important;
+    --reader-muted: #526078 !important;
+    --reader-border: #c7d0dc !important;
+    --background: 0 0% 100% !important;
+    --foreground: 217 34% 16% !important;
+    --card: 0 0% 100% !important;
+    --card-foreground: 220 24% 14% !important;
+    --popover: 0 0% 100% !important;
+    --popover-foreground: 220 24% 14% !important;
+    --primary: 212 100% 26.5% !important;
+    --primary-foreground: 0 0% 100% !important;
+    --secondary: 214 30% 94% !important;
+    --secondary-foreground: 215 38% 20% !important;
+    --muted: 216 25% 95% !important;
+    --muted-foreground: 217 14% 38% !important;
+    --accent: 213 72% 38% !important;
+    --accent-foreground: 0 0% 100% !important;
+    --border: 215 22% 83% !important;
+    --input: 215 22% 76% !important;
+    --ring: 213 72% 38% !important;
+  }
+
+  /* Authored callouts follow the site theme, and a printer drops their
+     background: only the dark-mode text colour would remain, i.e. pale blue on
+     paper. Force the light callout inks already declared above, on the reader
+     surfaces only. */
+  [data-reader-theme] .academic-callout-info {
+    color: #1d4ed8 !important;
+    border-left-color: #3b82f6 !important;
+  }
+  [data-reader-theme] .academic-callout-warning {
+    color: #a16207 !important;
+    border-left-color: #eab308 !important;
+  }
+  [data-reader-theme] .academic-callout-success {
+    color: #15803d !important;
+    border-left-color: #22c55e !important;
   }
 }
 

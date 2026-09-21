@@ -187,9 +187,11 @@ export function sanitizeAnnouncementHtml(html: string): string {
       }
       // An unterminated container drops only its own tag: the text before it is
       // kept as escaped literal text and scanning continues, so the remainder of
-      // the article still renders. The dropped tag's markup is never re-emitted,
-      // which is what keeps `onload`-style payloads out of the reader's DOM *and*
-      // out of its visible text, matching the Java sanitizer's discard behaviour.
+      // the article still renders. Deliberate divergence from the Java sanitizer,
+      // which lets an unclosed `<style>` swallow the rest of the document; the
+      // writer-side Jsoup pass means the only bodies that reach here with an
+      // unclosed container are legacy rows, and dropping their text to reclaim
+      // parity would cost readers real content.
       out += escapeText(html.slice(cursor, match.index));
       cursor = TAG_RE.lastIndex;
       continue;

@@ -1,6 +1,6 @@
 'use client';
 
-import React, { useState } from 'react';
+import React, { useMemo, useState } from 'react';
 
 import {
   isSafeAnnouncementImageUrl,
@@ -33,6 +33,149 @@ export function slugify(text: string): string {
     .replace(/[^a-z0-9]+/g, '-')
     .replace(/(^-|-$)+/g, '');
 }
+
+/** One table-of-contents / anchor target. */
+export interface ArticleHeading {
+  id: string;
+  text: string;
+  level: number;
+}
+
+/**
+ * RT-P3-a: TinyMCE headings arrive as bare `<h1>`..`<h6>` with no anchor, so a
+ * `dangerouslySetInnerHTML` article had nothing for the table of contents to
+ * link to. The TOC and the rendered markup are produced by the same walker
+ * below on purpose: two independent slug implementations drift, and a drifting
+ * anchor silently scrolls the reader to the top of the page.
+ */
+const HTML_HEADING_SOURCE = '<h([1-6])([^>]*)>([\\s\\S]*?)<\\/h\\1\\s*>';
+
+function htmlHeadingPattern(): RegExp {
+  // Fresh instance per walk: `lastIndex` on a shared /g regex leaks between
+  // calls and would skip headings on the second body parsed.
+  return new RegExp(HTML_HEADING_SOURCE, 'gi');
+}
+
+/** Heading text with markup and character references removed. */
+function headingTextFromHtml(innerHtml: string): string {
+  return innerHtml
+    .replace(/<[^>]*>/g, ' ')
+    // Character references are literal in authored HTML and re-escaped in
+    // sanitizer output; decoding them here keeps both paths on one slug.
+    .replace(/&(?:[a-z]+|#\d+);/gi, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+/**
+ * Repeated heading text must not produce colliding ids: the second occurrence
+ * of the same title gets a `-2` suffix, the third `-3`, and so on.
+ */
+export function allocateHeadingId(used: Map<string, number>, base: string): string {
+  if (!base) return '';
+  const seen = (used.get(base) ?? 0) + 1;
+  used.set(base, seen);
+  return seen === 1 ? base : `${base}-${seen}`;
+}
+
+interface ResolvedHtmlHeading {
+  level: number;
+  text: string;
+  /** Null when the heading has neither text nor anchor: nothing to link to. */
+  id: string | null;
+  /** The author supplied the anchor (editor `anchor` plugin), so leave it be. */
+  authored: boolean;
+}
+
+function resolveHtmlHeadings(html: string): ResolvedHtmlHeading[] {
+  const pattern = htmlHeadingPattern();
+  const resolved: ResolvedHtmlHeading[] = [];
+  const used = new Map<string, number>();
+  let match: RegExpExecArray | null;
+  while ((match = pattern.exec(html)) !== null) {
+    const level = Number(match[1]);
+    const text = headingTextFromHtml(match[3] ?? '');
+    const authoredMatch = /\bid\s*=\s*(?:"([^"]*)"|'([^']*)')/i.exec(match[2] ?? '');
+    const authoredId = (authoredMatch?.[1] || authoredMatch?.[2] || '').trim();
+    if (authoredId) used.set(authoredId, (used.get(authoredId) ?? 0) + 1);
+    resolved.push({ level, text, id: authoredId || null, authored: Boolean(authoredId) });
+  }
+
+  // Generated slugs are allocated in a second pass so every authored anchor is
+  // already in `used`. Reserving while generating would let an earlier
+  // `<h2>Quy chế</h2>` claim `quy-che` before an authored `id="quy-che"` further
+  // down is even seen, and the two anchors would then collide.
+  return resolved.map((heading) => {
+    if (heading.authored) {
+      return { level: heading.level, text: heading.text, id: heading.id, authored: true };
+    }
+    const id = allocateHeadingId(used, slugify(heading.text));
+    return { level: heading.level, text: heading.text, id: id || null, authored: false };
+  });
+}
+
+/**
+ * Anchors and labels for every heading in an HTML body, in document order.
+ * Shares `resolveHtmlHeadings` with `annotateHtmlHeadingIds` so the contents and
+ * the rendered ids cannot drift apart.
+ */
+export function extractArticleHeadingsFromHtml(html: string): ArticleHeading[] {
+  if (!html) return [];
+  const headings: ArticleHeading[] = [];
+  for (const heading of resolveHtmlHeadings(html)) {
+    if (heading.id) headings.push({ id: heading.id, text: heading.text, level: heading.level });
+  }
+  return headings;
+}
+
+/**
+ * Adds the matching `id` to each heading element. Runs on sanitizer output —
+ * the sanitizer rejects ids that do not start with a letter, which is common
+ * for numbered headings ("2025 Quy chế"), and an injected slug is limited to
+ * `[a-z0-9-]`, so this cannot introduce markup.
+ */
+export function annotateHtmlHeadingIds(html: string): string {
+  if (!html || !/<h[1-6]/i.test(html)) return html;
+  const resolved = resolveHtmlHeadings(html);
+  if (resolved.length === 0) return html;
+  let index = 0;
+  return html.replace(
+    htmlHeadingPattern(),
+    (whole: string, tag: string, attrs: string, inner: string) => {
+      const heading = resolved[index++];
+      if (!heading || heading.authored || !heading.id) return whole;
+      return `<h${tag}${attrs} id="${heading.id}">${inner}</h${tag}>`;
+    },
+  );
+}
+
+/**
+ * Markdown headings resolved with the same de-duplication the TOC applies, so
+ * `# Phụ lục` twice yields `phu-luc` and `phu-luc-2`.
+ */
+export function resolveMarkdownHeading(
+  rawText: string,
+  level: number,
+  used: Map<string, number>,
+): ArticleHeading | null {
+  const text = rawText.replace(/[*_`]/g, '').trim();
+  if (!text) return null;
+  const id = allocateHeadingId(used, slugify(text));
+  // A heading whose text has no slug characters at all (`### ***`) cannot carry
+  // a valid id, so it stays out of the contents instead of shipping a dead link.
+  if (!id) return null;
+  return { id, text, level };
+}
+
+/** Per-level markdown heading styling, kept in one table so h1-h6 all render. */
+const MARKDOWN_HEADING_CLASS_NAMES: Record<number, string> = {
+  1: 'mt-6 mb-4 text-2xl font-extrabold tracking-tight text-foreground border-b-2 border-primary/40 pb-2',
+  2: 'mt-6 mb-3 text-xl font-bold tracking-tight text-foreground border-b border-border/60 pb-1.5',
+  3: 'mt-5 mb-2 text-lg font-semibold text-foreground',
+  4: 'mt-4 mb-2 text-base font-semibold text-foreground',
+  5: 'mt-4 mb-2 text-sm font-semibold text-foreground',
+  6: 'mt-3 mb-2 text-xs font-semibold uppercase tracking-wider text-muted-foreground',
+};
 
 function SafeImage({ src, alt }: { src: string; alt: string }) {
   const [hasError, setHasError] = useState(false);
@@ -352,6 +495,17 @@ export function isHtmlDocument(raw: string): boolean {
   return /<\/?[a-zA-Z][a-zA-Z0-9-]*(?:\s[^<>]*)?>/.test(withoutFences);
 }
 
+/**
+ * The whole HTML render computation, as one pure function of the body: sanitize,
+ * then anchor the headings. Keeping it in a single callable is what lets the
+ * component cache it (see `RichContentRenderer`) instead of rebuilding a
+ * 200k-character document on every scroll frame, and lets a test assert the
+ * output is byte-stable for a given input.
+ */
+export function renderHtmlDocument(content: string): string {
+  return annotateHtmlHeadingIds(sanitizeHtml(content));
+}
+
 function normalizeHtmlToMarkdown(raw: string): string {
   if (!raw || !raw.includes('<')) return raw;
   return raw
@@ -384,6 +538,25 @@ export function RichContentRenderer({
   className,
   fallbackText,
 }: RichContentRendererProps) {
+  // RT-P3-f: the reader re-renders on every scroll frame, and the allowlist
+  // rebuild walks the whole body (up to the server's 200k-character cap). The
+  // result depends only on `content`, so it is cached: same bytes in, same bytes
+  // out, sanitized once per document instead of once per frame.
+  const htmlBody = useMemo(() => {
+    if (!content || !content.trim()) return null;
+    if (!isHtmlDocument(content)) return null;
+    return renderHtmlDocument(content);
+  }, [content]);
+
+  if (htmlBody !== null) {
+    return (
+      <div
+        className={cn('space-y-2 text-foreground break-words rich-html-content', className)}
+        dangerouslySetInnerHTML={{ __html: htmlBody }}
+      />
+    );
+  }
+
   if (!content || !content.trim()) {
     if (fallbackText) {
       return <p className={cn('text-sm text-muted-foreground italic', className)}>{fallbackText}</p>;
@@ -391,19 +564,10 @@ export function RichContentRenderer({
     return null;
   }
 
-  // If content is generated by TinyMCE or is rich HTML document, render as sanitized HTML
-  if (isHtmlDocument(content)) {
-    return (
-      <div
-        className={cn('space-y-2 text-foreground break-words rich-html-content', className)}
-        dangerouslySetInnerHTML={{ __html: sanitizeHtml(content) }}
-      />
-    );
-  }
-
   const normalized = normalizeHtmlToMarkdown(content);
   const lines = normalized.replace(/\r\n/g, '\n').split('\n');
   const elements: React.ReactNode[] = [];
+  const usedHeadingIds = new Map<string, number>();
   let i = 0;
   let elementKey = 0;
 
@@ -492,41 +656,26 @@ export function RichContentRenderer({
       continue;
     }
 
-    // 4. Headings
-    if (trimmed.startsWith('# ') || trimmed.startsWith('## ') || trimmed.startsWith('### ') || trimmed.startsWith('#### ')) {
-      if (trimmed.startsWith('#### ')) {
-        const headingText = trimmed.slice(5).trim();
-        const slug = slugify(headingText);
-        elements.push(
-          <h4 key={`h4-${elementKey++}`} id={slug} className="scroll-mt-20 mt-4 mb-2 text-base font-semibold text-foreground">
-            {renderInline(headingText)}
-          </h4>
-        );
-      } else if (trimmed.startsWith('### ')) {
-        const headingText = trimmed.slice(4).trim();
-        const slug = slugify(headingText);
-        elements.push(
-          <h3 key={`h3-${elementKey++}`} id={slug} className="scroll-mt-20 mt-5 mb-2 text-lg font-semibold text-foreground">
-            {renderInline(headingText)}
-          </h3>
-        );
-      } else if (trimmed.startsWith('## ')) {
-        const headingText = trimmed.slice(3).trim();
-        const slug = slugify(headingText);
-        elements.push(
-          <h2 key={`h2-${elementKey++}`} id={slug} className="scroll-mt-20 mt-6 mb-3 text-xl font-bold tracking-tight text-foreground border-b border-border/60 pb-1.5">
-            {renderInline(headingText)}
-          </h2>
-        );
-      } else if (trimmed.startsWith('# ')) {
-        const headingText = trimmed.slice(2).trim();
-        const slug = slugify(headingText);
-        elements.push(
-          <h1 key={`h1-${elementKey++}`} id={slug} className="scroll-mt-20 mt-6 mb-4 text-2xl font-extrabold tracking-tight text-foreground border-b-2 border-primary/40 pb-2">
-            {renderInline(headingText)}
-          </h1>
-        );
-      }
+    // 4. Headings (`#` through `######`), anchored with the same ids the table
+    //    of contents derives, so a contents row always lands on its section.
+    const headingMatch = /^(#{1,6})\s+(.+)$/.exec(trimmed);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2].trim();
+      const heading = resolveMarkdownHeading(headingText, level, usedHeadingIds);
+      // `createElement` rather than a JSX tag: the element name comes from the
+      // hash count, and h1-h6 all take these same three props.
+      elements.push(
+        React.createElement(
+          `h${level}`,
+          {
+            key: `h${level}-${elementKey++}`,
+            id: heading?.id,
+            className: cn('scroll-mt-20', MARKDOWN_HEADING_CLASS_NAMES[level]),
+          },
+          renderInline(headingText),
+        ),
+      );
       i += 1;
       continue;
     }

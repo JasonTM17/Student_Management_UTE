@@ -332,6 +332,15 @@ export function TinyMceEditor({
 
   const isVi = locale === 'vi';
 
+  // RT-P3-d: the reader sanitizer accepts only base64 png/jpeg/gif/webp/bmp
+  // image sources, so an inlined SVG looks fine in the author's preview and
+  // comes back with its `src` deleted for every reader — an unexplained broken
+  // image. Refuse it at both insert points, before the payload is embedded,
+  // and say why in the author's language.
+  const svgRejected = isVi
+    ? 'Không chèn được ảnh SVG: bộ lọc nội dung sẽ loại bỏ nguồn ảnh khi phát hành và người đọc chỉ thấy khung ảnh vỡ. Hãy xuất ra PNG, JPEG, GIF, WEBP hoặc BMP rồi chèn lại.'
+    : 'SVG images cannot be inserted: the content filter drops their source when the notice is published, so readers would see a broken image. Export the graphic as PNG, JPEG, GIF, WEBP or BMP and insert it again.';
+
   // Apply academic template. Insert at the cursor instead of replacing the
   // document: the label says "chèn" and a misclick must not wipe the content
   // being edited.
@@ -557,7 +566,11 @@ export function TinyMceEditor({
               // list — its output is <iframe>/<video>, which the announcement
               // allowlist drops (no upload endpoint exists, RT-P2-6), so the
               // feature produced content that silently vanished for readers.
-              insert: { title: 'Insert', items: 'image link codesample inserttable | charmap emoticons hr | pagebreak nonbreaking anchor | insertdatetime' },
+              // RT-P3-c: `pagebreak` is gone for the same reason. The reader
+              // and print CSS never honoured `<!-- pagebreak -->`, the server
+              // sanitizer strips the comment, and the author's own preview
+              // showed it as literal junk.
+              insert: { title: 'Insert', items: 'image link codesample inserttable | charmap emoticons hr | nonbreaking anchor | insertdatetime' },
               format: { title: 'Format', items: 'bold italic underline strikethrough superscript subscript codeformat | styles blocks fontfamily fontsize align lineheight | forecolor backcolor | removeformat' },
               tools: { title: 'Tools', items: 'code wordcount' },
               table: { title: 'Table', items: 'inserttable | cell row column | tableprops deletetable' },
@@ -581,7 +594,6 @@ export function TinyMceEditor({
               'link',
               'lists',
               'nonbreaking',
-              'pagebreak',
               'preview',
               'quickbars',
               'searchreplace',
@@ -598,7 +610,7 @@ export function TinyMceEditor({
               'undo redo | blocks fontfamily fontsize lineheight | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent',
               [
                 'table link image codesample emoticons',
-                'accordion pagebreak charmap insertdatetime',
+                'accordion charmap insertdatetime',
                 'visualblocks visualchars searchreplace',
                 showWordCount ? 'wordcount' : null,
                 'preview fullscreen',
@@ -676,6 +688,13 @@ export function TinyMceEditor({
                 // old independent 1MB number, which made the base64-encoded
                 // image alone ~6.8x the entire server budget.
                 const blob = blobInfo.blob();
+                const blobType = String(blob.type || '').toLowerCase();
+                // Checked before the size test: a vector file is never going to
+                // be publishable, however small it is.
+                if (blobType.includes('svg')) {
+                  reject(svgRejected);
+                  return;
+                }
                 if (blob.size > MAX_INLINE_IMAGE_BYTES) {
                   reject(
                     isVi
@@ -704,10 +723,19 @@ export function TinyMceEditor({
               if (meta.filetype === 'image') {
                 const input = document.createElement('input');
                 input.setAttribute('type', 'file');
-                input.setAttribute('accept', 'image/*');
+                // The picker lists only the formats the reader sanitizer keeps;
+                // `image/*` offered SVG files that were rejected on publish.
+                input.setAttribute('accept', 'image/png,image/jpeg,image/gif,image/webp,image/bmp');
                 input.onchange = function () {
                   const file = (this as HTMLInputElement).files?.[0];
                   if (file) {
+                    if (file.type.toLowerCase().includes('svg')) {
+                      // Same non-blocking toast as the size rejection below: a
+                      // payload that cannot be published must never reach the
+                      // document.
+                      toast.error(svgRejected);
+                      return;
+                    }
                     if (file.size > MAX_INLINE_IMAGE_BYTES) {
                       // Fail before reading so the author gets the same quota
                       // message as the paste path instead of a silent drop.

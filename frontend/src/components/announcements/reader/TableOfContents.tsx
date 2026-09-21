@@ -1,9 +1,13 @@
 'use client';
 
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useMemo, useState } from 'react';
 import { List, ChevronRight } from 'lucide-react';
 import { cn } from '@/lib/utils';
-import { slugify } from '@/components/ui/rich-content-renderer';
+import {
+  extractArticleHeadingsFromHtml,
+  isHtmlDocument,
+  resolveMarkdownHeading,
+} from '@/components/ui/rich-content-renderer';
 import type { Locale } from '@/i18n/config';
 
 interface TocItem {
@@ -18,34 +22,41 @@ interface TableOfContentsProps {
   locale?: Locale;
 }
 
+/**
+ * RT-P3-a: TinyMCE bodies are HTML, so an author's `<h2>` produced no markdown
+ * `##` line and the contents stayed empty. Headings are read the same way the
+ * renderer anchors them (one shared slug/dedupe implementation in
+ * `rich-content-renderer.tsx`), otherwise a row points at an id that was never
+ * written to the DOM.
+ */
 export function extractTocHeadings(content: string | null | undefined): TocItem[] {
-  if (!content) return [];
+  if (!content || !content.trim()) return [];
+
+  // The renderer sends an HTML body through the sanitizer (with injected
+  // heading ids) and a plain body through the markdown converter; follow that
+  // same fork here or the two disagree on what is a heading.
+  if (isHtmlDocument(content)) return extractArticleHeadingsFromHtml(content);
 
   const items: TocItem[] = [];
+  const usedHeadingIds = new Map<string, number>();
+  let insideCodeFence = false;
   const lines = content.replace(/\r\n/g, '\n').split('\n');
 
   for (const line of lines) {
     const trimmed = line.trim();
-    let level = 0;
-    let text = '';
-
-    if (trimmed.startsWith('# ')) {
-      level = 1;
-      text = trimmed.slice(2).trim();
-    } else if (trimmed.startsWith('## ')) {
-      level = 2;
-      text = trimmed.slice(3).trim();
-    } else if (trimmed.startsWith('### ')) {
-      level = 3;
-      text = trimmed.slice(4).trim();
+    // The markdown renderer swallows fenced blocks, so their `#` comments are
+    // source text, not sections.
+    if (trimmed.startsWith('```')) {
+      insideCodeFence = !insideCodeFence;
+      continue;
     }
+    if (insideCodeFence) continue;
 
-    if (level > 0 && text) {
-      // Remove any markdown bold/italic inside heading
-      const cleanText = text.replace(/[*_`]/g, '').trim();
-      const id = slugify(cleanText);
-      items.push({ id, text: cleanText, level });
-    }
+    const match = /^(#{1,6})\s+(.+)$/.exec(trimmed);
+    if (!match) continue;
+
+    const heading = resolveMarkdownHeading(match[2].trim(), match[1].length, usedHeadingIds);
+    if (heading) items.push(heading);
   }
 
   return items;
@@ -56,7 +67,9 @@ export function TableOfContents({
   className,
   locale = 'vi',
 }: TableOfContentsProps) {
-  const headings = extractTocHeadings(content);
+  // Recomputed only when the body changes: the reader re-renders on every
+  // scroll frame, and a fresh array here would re-observe the whole document.
+  const headings = useMemo(() => extractTocHeadings(content), [content]);
   const [activeId, setActiveId] = useState<string>('');
   const isVi = locale === 'vi';
 
