@@ -889,6 +889,7 @@ export default function AdminUsersPage() {
                   value={searchInput}
                   onChange={(e) => setSearchInput(e.target.value)}
                   placeholder={copy.searchPlaceholder}
+                  aria-label={copy.searchUsers}
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>

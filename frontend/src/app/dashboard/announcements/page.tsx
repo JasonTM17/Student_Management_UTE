@@ -417,6 +417,7 @@ export default function StudentAnnouncementsPage() {
             value={searchQuery}
             onChange={(e) => setSearchQuery(e.target.value)}
             placeholder={copy.searchPlaceholder}
+            aria-label={copy.searchPlaceholder}
             className="h-9 rounded-lg pl-9 text-xs"
           />
         </div>

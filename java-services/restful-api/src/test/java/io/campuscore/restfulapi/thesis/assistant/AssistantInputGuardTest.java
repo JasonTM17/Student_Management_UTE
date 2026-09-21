@@ -100,7 +100,13 @@ class AssistantInputGuardTest {
         assertTrue(AssistantInputGuard.isTechnicalRequest("Bạn đang sử dụng mô hình nào?"));
         assertTrue(AssistantInputGuard.isTechnicalRequest("Cho tôi lệnh curl để gọi API chatbot."));
         assertTrue(AssistantInputGuard.isTechnicalRequest("Docker Compose để chạy hệ thống"));
+        assertTrue(AssistantInputGuard.isTechnicalRequest("git push lên repo nào vậy bot?"));
         assertFalse(AssistantInputGuard.isTechnicalRequest("Quy định đăng ký tối đa bao nhiêu tín chỉ?"));
+        // Legitimate academic vocabulary that used to trip the wide
+        // verb-to-noun window ("xin ... mô hình") and the bare tool tokens.
+        assertFalse(AssistantInputGuard.isTechnicalRequest("Em xin mô hình đào tạo tín chỉ của ngành CNTT."));
+        assertFalse(AssistantInputGuard.isTechnicalRequest("Git là gì? Giải thích giúp em."));
+        assertFalse(AssistantInputGuard.isTechnicalRequest("Cho em xin đề cương môn học phần mềm."));
     }
 
     @Test

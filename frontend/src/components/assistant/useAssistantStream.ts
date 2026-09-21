@@ -408,7 +408,9 @@ export function useAssistantStream({
                   : typeof navigator !== 'undefined' && !navigator.onLine
                     ? 'offline'
                     : 'unavailable';
-          dispatch({ type: 'error', kind });
+          // Single error surface: the degraded reply below already carries the
+          // same localized copy. Dispatching the banner as well stacked two
+          // identical messages on one failure.
           dispatch({
             type: 'complete',
             reply: {
