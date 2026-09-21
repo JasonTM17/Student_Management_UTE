@@ -694,6 +694,7 @@ export const departmentsApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ApiResponse<Department[]>> => {
     const response = await api.get<ApiResponse<Department[]>>('/departments', {
       params,
@@ -832,6 +833,7 @@ export const adminSemestersApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ApiResponse<Semester[]>> => {
     const response = await api.get<ApiResponse<Semester[]>>('/semesters', {
       params,
@@ -889,6 +891,7 @@ export const lecturersApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ApiResponse<Lecturer[]>> => {
     const response = await api.get<ApiResponse<Lecturer[]>>('/lecturers', {
       params,
@@ -918,6 +921,7 @@ export const classroomsApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ApiResponse<Classroom[]>> => {
     const response = await api.get<ApiResponse<Classroom[]>>('/classrooms', {
       params,
@@ -947,6 +951,7 @@ export const academicYearsApi = {
   getAll: async (params?: {
     page?: number;
     limit?: number;
+    search?: string;
   }): Promise<ApiResponse<AcademicYear[]>> => {
     const response = await api.get<ApiResponse<AcademicYear[]>>(
       '/academic-years',

@@ -343,6 +343,9 @@ test('the editor swaps only ranks it read, so a rank-less notice is never pinned
   const rankWrites = save.match(/updateDisplayOrder\(/g) ?? [];
   assert.equal(rankWrites.length, 1, 'one write site, fed by the ranks already in use');
   assert.ok(save.includes('slots[index]'), 'the dragged rows reuse the occupied ranks');
+  // Without the sort the "reuse" would hand out ranks in drag order, which is how
+  // a reorder silently becomes a reshuffle.
+  assert.ok(/\.sort\(\(left, right\) => left - right\)/.test(save), 'the reused ranks stay monotonic');
   assert.ok(
     save.includes("outcome.status === 'rejected'") && save.includes('return;'),
     'a partial write reloads from the server instead of reporting success',
