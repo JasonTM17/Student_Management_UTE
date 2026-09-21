@@ -192,6 +192,86 @@ class PeopleReadPersistenceTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void lecturerSearchRunsInDatabaseAndKeepsTheAllowListPerEndpoint() throws Exception {
+        insertLecturer("lecturer-alpha", "E001", BASE_TIME.minusSeconds(60));
+        insertLecturer("lecturer-beta", "GV_2026/002", BASE_TIME);
+
+        // Employee code, first name and last name all reach the rows an operator
+        // would type, wherever those rows sit in the page order.
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "e001")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("lecturer-alpha"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "beta")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data[0].id").value("lecturer-beta"))
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "LECTURER")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        // "_" and "%" stay literal: an unescaped "GV_2026" would also match a
+        // hypothetical "GVX2026", and "%" alone would return the whole directory.
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "%")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0))
+                .andExpect(jsonPath("$.meta.total").value(0));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "GV_2026")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("lecturer-beta"));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "E_01")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(0));
+
+        // A blank term is the same request as no term.
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "  ")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.data.length()").value(2))
+                .andExpect(jsonPath("$.meta.total").value(2));
+
+        // Widening "lecturers" must not widen the sibling student route, and the
+        // lecturer route still rejects everything outside its own allow-list.
+        mvc.perform(get("/api/v1/students")
+                        .queryParam("search", "S001")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("sortBy", "employeeId")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+
+        mvc.perform(get("/api/v1/lecturers")
+                        .queryParam("search", "E001", "E002")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (

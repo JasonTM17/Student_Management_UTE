@@ -55,6 +55,7 @@ export default function AdminDepartmentsPage() {
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -92,18 +93,12 @@ export default function AdminDepartmentsPage() {
     setError('');
 
     try {
-      const response = await departmentsApi.getAll({ page, limit: 20 });
-      const filteredDepartments = search
-        ? response.data.filter(
-            (department) =>
-              department.name.toLowerCase().includes(search.toLowerCase()) ||
-              department.nameEn?.toLowerCase().includes(search.toLowerCase()) ||
-              department.nameVi?.toLowerCase().includes(search.toLowerCase()) ||
-              department.code.toLowerCase().includes(search.toLowerCase()),
-          )
-        : response.data;
+      // Search is a server-side filter: paging through 20-row pages and narrowing
+      // them in the browser reports "no results" for anything on another page.
+      const query = { page, limit: 20, search: search || undefined };
+      const response = await departmentsApi.getAll(query);
 
-      setDepartments(filteredDepartments);
+      setDepartments(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch {
       setError(
@@ -267,10 +262,13 @@ export default function AdminDepartmentsPage() {
     resetForm();
   };
 
-  const handleSearch = async (event: React.FormEvent) => {
+  const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    // `search` and `page` are fetch dependencies, so committing the term here is
+    // what re-issues the request. Calling the fetch directly would run it against
+    // the previous closure and fire twice.
+    setSearch(searchInput.trim());
     setPage(1);
-    await fetchDepartments();
   };
 
   const handleDelete = async (department: Department) => {
@@ -407,8 +405,8 @@ export default function AdminDepartmentsPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />
