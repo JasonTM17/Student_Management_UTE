@@ -832,13 +832,16 @@ export const en = {
       illustrativeBadge: 'Sample data',
       illustrativeNotice:
         'Charts below show illustrative sample data to demonstrate the layout. Card totals above come from live campus records.',
+      liveBadge: 'Live data',
+      liveNotice:
+        'Charts below are rendered directly from the live academic-records API.',
       tabs: {
         departments: 'By faculty',
         enrollments: 'Enrollment trend',
         faculty: 'Faculty body',
         grades: 'Academic standing',
       },
-      departmentsTitle: 'Training scale across 8 key faculties',
+      departmentsTitle: 'Training scale across key faculties',
       metricStudents: 'Students',
       metricCourses: 'Courses',
       metricSections: 'Open sections',
@@ -2681,13 +2684,16 @@ export const vi: I18nMessages = {
       illustrativeBadge: 'Dữ liệu mẫu',
       illustrativeNotice:
         'Các biểu đồ dưới đây dùng dữ liệu mẫu minh họa cho bố cục giao diện. Số liệu tổng ở các thẻ trên lấy từ hồ sơ học vụ thực tế.',
+      liveBadge: 'Dữ liệu trực tiếp',
+      liveNotice:
+        'Các biểu đồ dưới đây được vẽ trực tiếp từ API hồ sơ học vụ thực tế.',
       tabs: {
         departments: 'Theo khoa',
         enrollments: 'Xu hướng ĐKHP',
         faculty: 'Đội ngũ giảng viên',
         grades: 'Xếp loại học lực',
       },
-      departmentsTitle: 'Phân bổ quy mô đào tạo theo 8 khoa trọng điểm',
+      departmentsTitle: 'Phân bổ quy mô đào tạo theo các khoa trọng điểm',
       metricStudents: 'Sinh viên',
       metricCourses: 'Môn học',
       metricSections: 'Lớp mở',
