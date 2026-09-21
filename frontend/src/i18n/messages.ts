@@ -896,6 +896,8 @@ export const en = {
       live: 'Live on the public site',
       saving: 'Saving',
       saved: 'Published',
+      /* Short pill form of saveNotDurable: the row is on this web server only. */
+      savedLocal: 'Saved locally only',
       saveFailed: 'The campus look could not be saved right now.',
       saveNotDurable:
         'Saved to this web server only. The central API is unreachable, so other visitors will not see this until it is saved again.',
@@ -2743,6 +2745,7 @@ export const vi: I18nMessages = {
       live: 'Đang hiện trên cổng công khai',
       saving: 'Đang lưu',
       saved: 'Đã phát hành',
+      savedLocal: 'Chỉ lưu tạm trên web server',
       saveFailed: 'Hiện chưa thể lưu giao diện cổng.',
       saveNotDurable:
         'Chỉ vừa lưu trên web server này. API trung tâm đang không kết nối được, nên người dùng khác sẽ chưa thấy thay đổi cho tới khi lưu lại.',

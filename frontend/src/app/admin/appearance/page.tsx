@@ -45,6 +45,7 @@ export default function AdminAppearancePage() {
   const [posts, setPosts] = useState<AnnouncementRow[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [isSaving, setIsSaving] = useState(false);
+  const [savedLocally, setSavedLocally] = useState(false);
   const [error, setError] = useState('');
   const canAccess = Boolean(user && (isAdmin || isSuperAdmin));
 
@@ -108,12 +109,14 @@ export default function AdminAppearancePage() {
       }
       setDraft(saved);
       broadcastSiteAppearance(saved);
+      setSavedLocally(saved.persisted === false);
       if (saved.persisted === false) {
         // The API row is the only store that survives a redeploy; say so
         // instead of letting the admin believe the whole portal was updated.
         toast.warning(copy.saveNotDurable);
       }
     } catch {
+      setSavedLocally(false);
       toast.error(copy.saveFailed);
       if (seq === persistSeq.current) {
         void load();
@@ -164,12 +167,19 @@ export default function AdminAppearancePage() {
       actions={
         <div className="flex items-center gap-2 text-sm text-muted-foreground">
           <span
+            role="status"
+            aria-live="polite"
+            title={savedLocally ? copy.saveNotDurable : undefined}
             className={cn(
               'inline-flex min-h-11 items-center rounded-md border px-3',
-              isSaving ? 'border-border' : 'border-[var(--portal-chrome-accent)] text-foreground',
+              isSaving
+                ? 'border-border'
+                : savedLocally
+                  ? 'border-amber-500/60 text-amber-600'
+                  : 'border-[var(--portal-chrome-accent)] text-foreground',
             )}
           >
-            {isSaving ? copy.saving : copy.saved}
+            {isSaving ? copy.saving : savedLocally ? copy.savedLocal : copy.saved}
           </span>
           <LinkButton href="/admin/announcements" variant="outline">
             {copy.openAnnouncements}
