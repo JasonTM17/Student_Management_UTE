@@ -9,14 +9,20 @@ function read(relativePath) {
   return fs.readFileSync(path.join(root, relativePath), 'utf8');
 }
 
-/** Transpile a DOM-free TS module (a lib) and evaluate it. */
-function loadTs(relativePath) {
+/**
+ * Transpile a DOM-free TS module (a lib) and evaluate it. `stubs` resolves the
+ * `@/...` specifiers the module imports at runtime; anything else falls through
+ * to this file's own require.
+ */
+function loadTs(relativePath, stubs = {}) {
   const ts = require('typescript');
   const output = ts.transpileModule(read(relativePath), {
     compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
   }).outputText;
   const moduleRecord = { exports: {} };
-  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  const resolve = (specifier) =>
+    Object.prototype.hasOwnProperty.call(stubs, specifier) ? stubs[specifier] : require(specifier);
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, resolve);
   return moduleRecord.exports;
 }
 
@@ -61,7 +67,11 @@ const lucideStub = new Proxy(
 const utilsStub = { cn: (...args) => args.filter(Boolean).join(' ') };
 
 const sanitizer = loadTs('src/lib/html-sanitizer.ts');
-const presentation = loadTs('src/lib/announcement-presentation.ts');
+const presentation = loadTs('src/lib/announcement-presentation.ts', {
+  '@/lib/html-sanitizer': sanitizer,
+  '@/lib/api': {},
+  '@/i18n/config': {},
+});
 const FIXTURE = JSON.parse(read('tests/fixtures/announcement-content-policy.json'));
 
 function rendererStubs() {
@@ -517,4 +527,42 @@ test('RT-P3-a an authored anchor later in the document wins over an earlier gene
     const hits = markup.match(new RegExp(`<h[1-6][^>]*\\bid="${heading.id}"`, 'g')) ?? [];
     assert.equal(hits.length, 1, `anchor "${heading.id}" must appear exactly once in: ${markup}`);
   }
+});
+
+// Round-2 review: the cover pickers accepted any `data:image/` subtype, so an
+// inlined SVG became the cover and then rendered as the broken frame the editor
+// refuses to insert. The cover must satisfy the same allow-list as the body.
+test('a cover is only taken from a source the reader allow-list keeps', () => {
+  const svg = '<img src="data:image/svg+xml;base64,PHN2Zy8+"/ alt="logo">';
+  assert.equal(presentation.extractCoverImage(svg), null, 'svg data uri must not become a cover');
+  assert.equal(presentation.extractCoverImageDetails(svg), null);
+  assert.equal(
+    presentation.extractCoverImageDetails(
+      '<figure><img src="data:image/svg+xml;base64,PHN2Zy8+"/><figcaption>hình</figcaption></figure>',
+    ),
+    null,
+    'the figure branch is held to the same rule',
+  );
+
+  const png = '<p>lead</p><img src="data:image/png;base64,iVBORw0KGgo=" alt="anh">';
+  assert.equal(
+    presentation.extractCoverImage(png),
+    'data:image/png;base64,iVBORw0KGgo=',
+    'an editor-inlined raster upload still becomes the cover',
+  );
+  assert.equal(
+    presentation.extractCoverImage(
+      '<p>a</p><img src="data:image/svg+xml;base64,PHN2Zy8+"><img src="https://x.test/y.png">',
+    ),
+    'https://x.test/y.png',
+    'an unsafe first image is skipped for the next usable one',
+  );
+});
+
+test('the cover keeps the author alt text while skipping an unusable image', () => {
+  const details = presentation.extractCoverImageDetails(
+    '<p>a</p><img src="data:image/svg+xml;base64,PHN2Zy8+" alt="logo svg"><img src="https://cdn.test/x.png" alt="Hội thảo">',
+  );
+  assert.equal(details?.url, 'https://cdn.test/x.png');
+  assert.equal(details?.alt, 'Hội thảo', 'the usable candidate carries its own alt');
 });

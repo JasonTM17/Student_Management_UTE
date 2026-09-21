@@ -36,6 +36,14 @@ const DROP_WITH_CONTENT = new Set([
   'math', 'form',
 ]);
 
+/**
+ * The subset whose body can never be reader prose. When one of these is left
+ * unclosed by a legacy row, everything after it is source rather than text, so it
+ * is dropped; `iframe`/`noscript`/`form` fallbacks can hold real sentences and
+ * keep the trailing-text behaviour.
+ */
+const SWALLOW_UNTERMINATED = new Set(['script', 'style', 'template']);
+
 const VOID_TAGS = new Set(['br', 'hr', 'col', 'img']);
 
 // `style` is allowlisted as an attribute but each value must pass the
@@ -181,17 +189,26 @@ export function sanitizeAnnouncementHtml(html: string): string {
 
     if (DROP_WITH_CONTENT.has(name)) {
       const closeAt = html.toLowerCase().indexOf(`</${name}`, TAG_RE.lastIndex);
+      if (closeAt === -1 && SWALLOW_UNTERMINATED.has(name)) {
+        // An unclosed script, style, or template has no reader prose behind it —
+        // what follows is code — so the rest of the body is dropped instead of
+        // being emitted as escaped text the reader would see as junk.
+        out += escapeText(html.slice(cursor, match.index));
+        cursor = html.length;
+        TAG_RE.lastIndex = html.length;
+        continue;
+      }
       if (closeAt !== -1) {
         const afterClose = html.indexOf('>', closeAt);
         TAG_RE.lastIndex = afterClose === -1 ? html.length : afterClose + 1;
       }
-      // An unterminated container drops only its own tag: the text before it is
-      // kept as escaped literal text and scanning continues, so the remainder of
-      // the article still renders. Deliberate divergence from the Java sanitizer,
-      // which lets an unclosed `<style>` swallow the rest of the document; the
-      // writer-side Jsoup pass means the only bodies that reach here with an
-      // unclosed container are legacy rows, and dropping their text to reclaim
-      // parity would cost readers real content.
+      // Any other unterminated container drops only its own tag: the text before
+      // it is kept as escaped literal text and scanning continues, so the
+      // remainder of the article still renders. Deliberate divergence from the
+      // Java sanitizer, which lets any unclosed container swallow the rest of the
+      // document; the writer-side Jsoup pass means the only bodies that reach here
+      // that way are legacy rows, and swallowing their prose would cost readers
+      // real content. Code-only containers are handled above.
       out += escapeText(html.slice(cursor, match.index));
       cursor = TAG_RE.lastIndex;
       continue;
