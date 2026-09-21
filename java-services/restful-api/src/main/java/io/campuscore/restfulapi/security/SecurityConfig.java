@@ -122,6 +122,10 @@ public class SecurityConfig {
                                 // Anonymous public campus news feed for the
                                 // homepage; read-only and safe-subset only.
                                 "/api/v1/announcements/public",
+                                // Read-only public-safe category feed the
+                                // anonymous homepage uses to label articles by
+                                // their editorial taxonomy instead of guessing.
+                                "/api/v1/article-taxonomy/v2/categories",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
                                 // Mail endpoints used to be reachable without a

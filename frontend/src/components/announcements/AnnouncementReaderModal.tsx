@@ -5,6 +5,7 @@ import type { AnnouncementRecord } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
 import { useI18n } from '@/i18n';
 import { resolveAnnouncementDomain } from '@/lib/announcement-presentation';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 import {
   ReadingToolbar,
   type ReadingPreferences,
@@ -31,6 +32,7 @@ export function AnnouncementReaderModal({
   onSelectAnnouncement,
 }: AnnouncementReaderModalProps) {
   const { locale } = useI18n();
+  const { categories } = useArticleTaxonomy();
   const [copied, setCopied] = useState(false);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
@@ -46,14 +48,14 @@ export function AnnouncementReaderModal({
   // Whenever a new announcement opens, intelligently choose the initial mode
   useEffect(() => {
     if (announcement) {
-      const resolved = resolveAnnouncementDomain(announcement, locale);
+      const resolved = resolveAnnouncementDomain(announcement, locale, categories);
       setPreferences((prev) => ({
         ...prev,
         mode: resolved.domain === 'EDITORIAL_ARTICLE' ? 'EDITORIAL' : 'OFFICIAL',
       }));
       setScrollProgress(0);
     }
-  }, [announcement, locale]);
+  }, [announcement, locale, categories]);
 
   // Track reading scroll progress
   useEffect(() => {
@@ -100,7 +102,7 @@ export function AnnouncementReaderModal({
     }
   };
 
-  const domain = resolveAnnouncementDomain(announcement, locale);
+  const domain = resolveAnnouncementDomain(announcement, locale, categories);
 
   return (
     <Modal

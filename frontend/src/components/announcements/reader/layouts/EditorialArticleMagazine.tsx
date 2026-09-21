@@ -33,6 +33,7 @@ import { DocumentAttachmentsList } from '../DocumentAttachmentsList';
 import { TableOfContents } from '../TableOfContents';
 import { RelatedAnnouncements } from '../RelatedAnnouncements';
 import type { ReadingPreferences } from '../ReadingToolbar';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 
 interface EditorialArticleMagazineProps {
   announcement: AnnouncementRecord;
@@ -50,7 +51,8 @@ export function EditorialArticleMagazine({
   locale = 'vi',
 }: EditorialArticleMagazineProps) {
   const isVi = locale === 'vi';
-  const domain = resolveAnnouncementDomain(announcement, locale);
+  const { categories } = useArticleTaxonomy();
+  const domain = resolveAnnouncementDomain(announcement, locale, categories);
   const readingTime = calculateReadingTime(announcement.content);
   const coverDetails = extractCoverImageDetails(announcement.content);
   const coverImage = coverDetails?.url || extractCoverImage(announcement.content) || resolveArticleCover(announcement);
