@@ -266,19 +266,9 @@ export default function DashboardLayout({
       setAvatarPhoto('');
       return;
     }
+    // The avatar follows the saved profile only; staged-but-unsaved photo
+    // edits on the profile page never masquerade in the shell.
     setAvatarPhoto(user.avatar ?? '');
-
-    const handleAvatarUpdate = (event: Event) => {
-      const customEvent = event as CustomEvent<{ userId?: string; photo?: string }>;
-      if (!customEvent.detail || customEvent.detail.userId === user.id) {
-        setAvatarPhoto(customEvent.detail?.photo ?? user.avatar ?? '');
-      }
-    };
-
-    window.addEventListener('campuscore:avatar-updated', handleAvatarUpdate);
-    return () => {
-      window.removeEventListener('campuscore:avatar-updated', handleAvatarUpdate);
-    };
   }, [user?.avatar, user?.id]);
   const menuLabels = messages.dashboardShell.menu;
   const menuSectionLabels = messages.dashboardShell.menuSections;
