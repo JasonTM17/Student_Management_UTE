@@ -935,7 +935,7 @@ export const thesisApi = {
       return fetch(`${base}/assistant/chat/stream`, {
         method: 'POST',
         credentials: 'include',
-        signal: options.signal,
+        signal: controller.signal,
         headers: {
           'Content-Type': 'application/json',
           Accept: 'text/event-stream',
@@ -946,6 +946,22 @@ export const thesisApi = {
         body: JSON.stringify(requestBody),
       });
     };
+    // A dead proxy can stall the reader indefinitely after the headers arrive,
+    // leaving the panel in "thinking" until the student manually stops. The
+    // idle watchdog aborts when no bytes arrive within the window and honors
+    // the caller's signal (Stop button) at the same time.
+    const IDLE_TIMEOUT_MS = 45_000;
+    const controller = new AbortController();
+    const onCallerAbort = () => controller.abort();
+    options.signal?.addEventListener('abort', onCallerAbort);
+    let idleTimer: ReturnType<typeof setTimeout> | undefined;
+    const resetIdleWatchdog = () => {
+      if (idleTimer !== undefined) clearTimeout(idleTimer);
+      idleTimer = setTimeout(() => {
+        controller.abort();
+      }, IDLE_TIMEOUT_MS);
+    };
+    resetIdleWatchdog();
     let response = await fetchStream();
     if (response.status === 401) {
       try {
@@ -984,6 +1000,7 @@ export const thesisApi = {
       while (true) {
         const { done, value } = await reader.read();
         if (done) break;
+        resetIdleWatchdog();
         parser.push(decoder.decode(value, { stream: true }));
       }
       parser.push(decoder.decode());
@@ -993,6 +1010,8 @@ export const thesisApi = {
       if (order.currentPhase !== 'terminal')
         throw new Error('assistant stream ended without a terminal event');
     } finally {
+      if (idleTimer !== undefined) clearTimeout(idleTimer);
+      options.signal?.removeEventListener('abort', onCallerAbort);
       reader.releaseLock();
     }
   },
