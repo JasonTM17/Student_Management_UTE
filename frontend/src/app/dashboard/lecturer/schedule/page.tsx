@@ -496,7 +496,7 @@ export default function LecturerSchedulePage() {
                           >
                             <div className="text-xs uppercase tracking-wider">{dayName}</div>
                             {isToday ? (
-                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.2 text-[9px] font-bold text-primary-foreground">
+                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
                                 {copy.today}
                               </span>
                             ) : null}
@@ -781,7 +781,7 @@ export default function LecturerSchedulePage() {
                         </span>
                       ) : null}
                       <span
-                        className={`rounded-md px-1.5 py-0.2 text-[10px] ${
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] ${
                           isSelected ? 'bg-primary-foreground/20' : 'bg-secondary text-muted-foreground'
                         }`}
                       >
