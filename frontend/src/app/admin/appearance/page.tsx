@@ -108,6 +108,11 @@ export default function AdminAppearancePage() {
       }
       setDraft(saved);
       broadcastSiteAppearance(saved);
+      if (saved.persisted === false) {
+        // The API row is the only store that survives a redeploy; say so
+        // instead of letting the admin believe the whole portal was updated.
+        toast.warning(copy.saveNotDurable);
+      }
     } catch {
       toast.error(copy.saveFailed);
       if (seq === persistSeq.current) {
@@ -118,7 +123,7 @@ export default function AdminAppearancePage() {
         setIsSaving(false);
       }
     }
-  }, [copy.saveFailed, load]);
+  }, [copy.saveFailed, copy.saveNotDurable, load]);
 
   const orderedPosts = useMemo(() => {
     const rank = new Map(draft.postOrder.map((id, index) => [id, index]));
@@ -133,7 +138,9 @@ export default function AdminAppearancePage() {
     (_newItems: AnnouncementRow[], newKeys: string[]) => {
       const next = {
         ...draft,
-        postOrder: newKeys,
+        // `newKeys` only covers the rows this page loaded, so writing it
+        // straight to postOrder would unpin every post beyond that window.
+        postOrder: applyPageOrder(draft.postOrder, newKeys),
       };
       setDraft(next);
       broadcastSiteAppearance(next);

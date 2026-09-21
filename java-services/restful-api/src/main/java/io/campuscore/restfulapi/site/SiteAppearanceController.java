@@ -17,10 +17,13 @@ import org.springframework.web.bind.annotation.RestController;
  * Site-wide appearance (accent theme, homepage hero copy, homepage post order).
  *
  * <p>GET is anonymous by design: the homepage renders this chrome for visitors
- * who have not signed in. PUT is administrator-only. The stored payload is the
- * same JSON object the frontend editor produces; the frontend re-sanitizes on
- * every read, and this controller only enforces that it is a JSON object
- * within the size bound.
+ * who have not signed in. PUT is administrator-only, and the filter chain keeps
+ * the anonymous rule on the GET verb alone. The stored payload is the same JSON
+ * object the frontend editor produces; the frontend re-sanitizes on every read,
+ * and this controller only enforces that it is a JSON object within the size
+ * bound. The write stamp ({@code version}, {@code updatedAt}) is applied by
+ * {@link SiteAppearanceStore}, so both the PUT response and every later GET
+ * carry the same change marker a polling browser compares against.
  */
 @RestController
 @RequestMapping(path = "/api/v1/site-appearance", produces = MediaType.APPLICATION_JSON_VALUE)
