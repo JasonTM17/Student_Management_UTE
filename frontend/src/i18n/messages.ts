@@ -776,6 +776,9 @@ export const en = {
       ['Campus assistant knowledge', 'Review the public campus guidance available to the CampusUTE assistant.'],
       ['Site appearance', 'Change the public campus look and the order of notices.'],
       ['Credit-limit applications', 'Review student requests to register up to 30 credits.'],
+      ['Academic years', 'Structure the year-by-year calendar that semesters hang from.'],
+      ['Knowledge base', 'Curate the reference documents the assistant retrieves for students.'],
+      ['Announcement editor', 'Compose and publish notices with the full editorial workspace.'],
     ],
     creditLimitApplications: {
       title: 'Credit-limit applications',
@@ -2628,6 +2631,9 @@ export const vi: I18nMessages = {
       ['Kho tri thức trợ lý CampusUTE', 'Quản lý nội dung campus công khai mà trợ lý CampusUTE sử dụng.'],
       ['Diện mạo cổng', 'Đổi giao diện công khai và thứ tự thông báo.'],
       ['Đơn xin vượt hạn mức tín chỉ', 'Xét duyệt đơn xin đăng ký tối đa 30 tín chỉ.'],
+      ['Năm học', 'Cấu trúc lịch theo từng năm học để các học kỳ gắn vào.'],
+      ['Kho tri thức', 'Quản lý tài liệu tham khảo mà trợ lý dùng để trả lời sinh viên.'],
+      ['Trình soạn thông báo', 'Soạn và xuất bản thông báo bằng workspace biên tập đầy đủ.'],
     ],
     creditLimitApplications: {
       title: 'Đơn xin vượt hạn mức tín chỉ',
