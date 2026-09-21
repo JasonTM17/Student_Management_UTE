@@ -828,16 +828,19 @@ export interface CoverImageDetails {
 
 /**
  * Extracts the first image URL from Markdown or HTML content if present.
+ * `data:image/` payloads are accepted because the editor inline-encodes every
+ * upload as base64 — refusing them here made the reader strip the author's
+ * first image from the body while showing a placeholder cover.
  */
 export function extractCoverImage(content: string | null | undefined): string | null {
   if (!content) return null;
   // Match markdown image ![alt](url)
-  const mdMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/i);
+  const mdMatch = content.match(/!\[[^\]]*\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)/i);
   if (mdMatch && mdMatch[1]) {
     return mdMatch[1];
   }
   // Match html img src
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["']/i);
+  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["']/i);
   if (htmlMatch && htmlMatch[1]) {
     return htmlMatch[1];
   }
@@ -851,7 +854,7 @@ export function extractCoverImageDetails(content: string | null | undefined): Co
   if (!content) return null;
 
   // 1. Check for <figure> with <img> and <figcaption>
-  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
+  const figureRegex = /<figure[^>]*>[\s\S]*?<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>[\s\S]*?(?:<figcaption[^>]*>([\s\S]*?)<\/figcaption>)?[\s\S]*?<\/figure>/i;
   const figMatch = content.match(figureRegex);
   if (figMatch && figMatch[1]) {
     const rawCaption = figMatch[3] ? figMatch[3].replace(/<[^>]+>/g, '').trim() : undefined;
@@ -863,7 +866,7 @@ export function extractCoverImageDetails(content: string | null | undefined): Co
   }
 
   // 2. Check for bare <img ...>
-  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/i);
+  const htmlMatch = content.match(/<img[^>]+src=["'](https?:\/\/[^"'\s]+|\/[^"'\s]+|data:image\/[^"'\s]+)["'][^>]*(?:alt=["']([^"']*)["'])?[^>]*>/i);
   if (htmlMatch && htmlMatch[1]) {
     return {
       url: htmlMatch[1],
@@ -872,7 +875,7 @@ export function extractCoverImageDetails(content: string | null | undefined): Co
   }
 
   // 3. Check for Markdown image ![alt](url)
-  const mdMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+)\)/i);
+  const mdMatch = content.match(/!\[([^\]]*)\]\((https?:\/\/[^)\s]+|\/[^)\s]+|data:image\/[^)\s]+)\)/i);
   if (mdMatch && mdMatch[2]) {
     return {
       url: mdMatch[2],

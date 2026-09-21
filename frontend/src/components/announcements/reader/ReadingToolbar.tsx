@@ -185,7 +185,7 @@ export function ReadingToolbar({
             className={cn(
               'inline-flex h-7 w-7 items-center justify-center rounded-sm transition-colors',
               preferences.theme === 'light'
-                ? 'bg-white text-amber-600 shadow-xs'
+                ? 'bg-background text-amber-600 shadow-xs ring-1 ring-border/70'
                 : 'text-muted-foreground hover:text-foreground',
             )}
             title={isVi ? 'Nền sáng tiêu chuẩn' : 'Light background'}
