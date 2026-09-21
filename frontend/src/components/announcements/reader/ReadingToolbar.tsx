@@ -2,6 +2,7 @@
 
 import React from 'react';
 import {
+  AlertCircle,
   BookOpen,
   Check,
   FileEdit,
@@ -36,7 +37,8 @@ interface ReadingToolbarProps {
   onPreferencesChange: (updater: (prev: ReadingPreferences) => ReadingPreferences) => void;
   onPrint: () => void;
   onShare: () => void;
-  copied: boolean;
+  /** Three states on purpose: a rejected clipboard write must not read as "Copied". */
+  copyState: 'idle' | 'copied' | 'failed';
   onClose: () => void;
   onEdit?: () => void;
   locale?: Locale;
@@ -49,7 +51,7 @@ export function ReadingToolbar({
   onPreferencesChange,
   onPrint,
   onShare,
-  copied,
+  copyState,
   onClose,
   onEdit,
   locale = 'vi',
@@ -185,7 +187,7 @@ export function ReadingToolbar({
             className={cn(
               'inline-flex h-7 w-7 items-center justify-center rounded-sm transition-colors',
               preferences.theme === 'light'
-                ? 'bg-white text-amber-600 shadow-xs'
+                ? 'bg-background text-amber-600 shadow-xs ring-1 ring-border/70'
                 : 'text-muted-foreground hover:text-foreground',
             )}
             title={isVi ? 'Nền sáng tiêu chuẩn' : 'Light background'}
@@ -262,10 +264,17 @@ export function ReadingToolbar({
           className="h-8 gap-1.5 rounded-lg text-xs"
           title={isVi ? 'Sao chép liên kết bài viết' : 'Copy notice link'}
         >
-          {copied ? (
+          {copyState === 'copied' ? (
             <>
               <Check className="h-3.5 w-3.5 text-emerald-500" />
               <span className="text-emerald-600 font-semibold">{isVi ? 'Đã chép!' : 'Copied!'}</span>
+            </>
+          ) : copyState === 'failed' ? (
+            <>
+              <AlertCircle className="h-3.5 w-3.5 text-amber-500" />
+              <span className="text-amber-600 font-semibold" role="status">
+                {isVi ? 'Không chép được liên kết' : 'Could not copy the link'}
+              </span>
             </>
           ) : (
             <>

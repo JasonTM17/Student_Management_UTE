@@ -61,6 +61,7 @@ export default function AdminLecturersPage() {
   const [error, setError] = useState('');
   const [referenceError, setReferenceError] = useState('');
   const [search, setSearch] = useState('');
+  const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
   const [isModalOpen, setIsModalOpen] = useState(false);
@@ -109,27 +110,12 @@ export default function AdminLecturersPage() {
     setError('');
 
     try {
-      const response = await lecturersApi.getAll({ page, limit: 20 });
-      const filteredLecturers = search
-        ? response.data.filter((lecturer: Lecturer) => {
-            const fullNameVi = `${lecturer.user?.lastName || ''} ${lecturer.user?.firstName || ''}`
-              .trim()
-              .toLowerCase();
-            const fullNameEn = `${lecturer.user?.firstName || ''} ${lecturer.user?.lastName || ''}`
-              .trim()
-              .toLowerCase();
-            const query = search.toLowerCase();
+      // Search is a server-side filter: paging through 20-row pages and narrowing
+      // them in the browser reports "no results" for anything on another page.
+      const query = { page, limit: 20, search: search || undefined };
+      const response = await lecturersApi.getAll(query);
 
-            return (
-              lecturer.employeeId.toLowerCase().includes(query) ||
-              lecturer.user?.email?.toLowerCase().includes(query) ||
-              fullNameVi.includes(query) ||
-              fullNameEn.includes(query)
-            );
-          })
-        : response.data;
-
-      setLecturers(filteredLecturers);
+      setLecturers(response.data || []);
       setTotalPages(response.meta?.totalPages || 1);
     } catch {
       setError(
@@ -321,10 +307,13 @@ export default function AdminLecturersPage() {
     resetForm();
   };
 
-  const handleSearch = async (event: React.FormEvent) => {
+  const handleSearch = (event: React.FormEvent) => {
     event.preventDefault();
+    // `search` and `page` are fetch dependencies, so committing the term here is
+    // what re-issues the request. Calling the fetch directly would run it against
+    // the previous closure and fire twice.
+    setSearch(searchInput.trim());
     setPage(1);
-    await fetchLecturers();
   };
 
   const handleDelete = async (lecturer: Lecturer) => {
@@ -399,8 +388,8 @@ export default function AdminLecturersPage() {
                 </label>
                 <Input
                   type="text"
-                  value={search}
-                  onChange={(event) => setSearch(event.target.value)}
+                  value={searchInput}
+                  onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
                   icon={<Search className="h-4 w-4" />}
                 />

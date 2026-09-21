@@ -182,6 +182,10 @@ export default function ProfilePage() {
     setAvatarPreview(user?.avatar ?? '');
   }, [user?.avatar, user?.id]);
 
+  // A staged photo lives in local state only until the profile is saved;
+  // surface that instead of letting the preview masquerade as saved data.
+  const avatarDirty = avatarPreview !== (user?.avatar ?? '');
+
   const togglePasswordField = (field: PasswordFieldKey) => {
     setVisiblePasswordFields((current) => ({
       ...current,
@@ -200,11 +204,6 @@ export default function ProfilePage() {
       const nextAvatar = await createProfileAvatarDataUrl(file);
       setProfileError('');
       setAvatarPreview(nextAvatar);
-      window.dispatchEvent(
-        new CustomEvent('campuscore:avatar-updated', {
-          detail: { userId: user.id, photo: nextAvatar },
-        }),
-      );
     } catch {
       setProfileError(messages.profile.photoUploadFailed);
       toast.error(messages.profile.photoUploadFailed);
@@ -213,11 +212,6 @@ export default function ProfilePage() {
 
   const removePhoto = () => {
     setAvatarPreview('');
-    window.dispatchEvent(
-      new CustomEvent('campuscore:avatar-updated', {
-        detail: { userId: user?.id, photo: '' },
-      }),
-    );
   };
 
   const handleSubmit = async (e: React.FormEvent) => {
@@ -360,6 +354,15 @@ export default function ProfilePage() {
                   ) : null}
                 </div>
                 <p className="text-xs text-muted-foreground">{messages.profile.photoHint}</p>
+                {avatarDirty && (
+                  <p
+                    role="status"
+                    className="inline-flex items-center gap-1.5 rounded-md border border-status-warning/40 bg-status-warning/10 px-2.5 py-1 text-xs font-medium text-status-warning-foreground"
+                  >
+                    <span className="h-1.5 w-1.5 rounded-full bg-status-warning" />
+                    {messages.profile.photoUnsaved}
+                  </p>
+                )}
                 <div className="flex flex-wrap items-center gap-2 pt-1">
                   {user?.roles?.map((role) => (
                     <span

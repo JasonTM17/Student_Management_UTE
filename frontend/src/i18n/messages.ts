@@ -384,19 +384,46 @@ export const en = {
     ],
     identityTabs: ['Student', 'Lecturer', 'Admin'],
     identityRows: [
-      { code: 'SE101', label: 'Software Engineering', meta: 'Mon 07:00' },
-      { code: 'MA201', label: 'Discrete Math', meta: 'Tue 09:00' },
-      { code: 'TH400', label: 'Thesis seminar', meta: 'Wed 13:00' },
+      {
+        title: 'Course registration in open rounds',
+        description: 'Pick classes that follow your curriculum.',
+      },
+      {
+        title: 'Timetable, grades and transcript',
+        description: 'Track published results for every term.',
+      },
+      {
+        title: 'Thesis and capstone progress',
+        description: 'Your group, topic and the milestones ahead.',
+      },
     ],
     lecturerIdentityRows: [
-      { code: 'SE101', label: 'Software Engineering', meta: 'Room A2' },
-      { code: 'SE204', label: 'Database systems', meta: 'Room B1' },
-      { code: 'TH400', label: 'Thesis seminar', meta: 'Hall 3' },
+      {
+        title: 'Classes you teach',
+        description: 'Section rosters and the teaching timetable.',
+      },
+      {
+        title: 'Enter and publish grades',
+        description: 'Update components, then publish to students.',
+      },
+      {
+        title: 'Supervised groups',
+        description: 'Follow each thesis group and its progress.',
+      },
     ],
     adminIdentityRows: [
-      { code: 'USR', label: 'User records', meta: 'Open' },
-      { code: 'CAT', label: 'Course catalog', meta: 'Review' },
-      { code: 'ENR', label: 'Enrollment window', meta: 'Active' },
+      {
+        title: 'People and catalog',
+        description: 'Accounts, courses, sections and terms.',
+      },
+      {
+        title: 'Official announcements',
+        description: 'Publish university and faculty notices.',
+      },
+      {
+        title: 'Thesis rounds',
+        description: 'Open rounds, councils and published results.',
+      },
     ],
     footerCopyright: 'All rights reserved.',
   },
@@ -869,7 +896,11 @@ export const en = {
       live: 'Live on the public site',
       saving: 'Saving',
       saved: 'Published',
+      /* Short pill form of saveNotDurable: the row is on this web server only. */
+      savedLocal: 'Saved locally only',
       saveFailed: 'The campus look could not be saved right now.',
+      saveNotDurable:
+        'Saved to this web server only. The central API is unreachable, so other visitors will not see this until it is saved again.',
       loadFailed: 'The campus look could not be loaded right now.',
       heroEyebrow: 'Home eyebrow',
       heroTitle: 'Home title',
@@ -891,6 +922,7 @@ export const en = {
       moveUp: 'Move up',
       moveDown: 'Move down',
       openAnnouncements: 'Open notices',
+      dragToReorder: 'Drag to reorder',
     },
   },
     dashboardShell: {
@@ -1180,6 +1212,7 @@ export const en = {
       'Keep the account record aligned with the information your campus teams rely on.',
     photoLabel: 'Profile photo',
     photoHint: 'Preview the photo here, then save the profile to keep it on your account.',
+    photoUnsaved: 'Photo not saved yet — click "Save changes" to keep it.',
     uploadPhoto: 'Upload photo',
     removePhoto: 'Remove photo',
     photoUploadFailed: 'Choose a PNG, JPEG, or WebP photo under 200 KB after resizing.',
@@ -1473,6 +1506,20 @@ export const en = {
       fileTypeUnsupported: 'Only .pdf, .doc and .docx documents are accepted.',
       downloadFile: 'Download document',
       documentAttached: 'Attached document',
+      lockedTitle: 'Report submissions are closed',
+      lockedDescription:
+        'The grading deadline for this round has passed, so the report can no longer be submitted or replaced.',
+      lockedAt: 'Locked since',
+      replaceConfirmTitle: 'Replace the submitted report?',
+      replaceConfirmDescription:
+        'Uploading again discards the current document and link. The previous version cannot be recovered.',
+      replaceConfirmAction: 'Replace report',
+      titleCounter: '{count}/240 characters',
+      noteCounter: '{count}/500 characters',
+      uploadProgress: 'Uploading document… {percent}%',
+      uploadCancel: 'Cancel upload',
+      leaderOnlyBanner:
+        'Only the group leader submits or replaces the report. {leader} submits it on behalf of the group.',
     },
     results: {
       title: 'Results',
@@ -1510,6 +1557,8 @@ export const en = {
       councilSeatOrderHint: 'Required seat order: 1st Chair, 2nd Secretary, then 3-5 Members.',
       councilCompleteBadge: 'Ready (3-5 members)',
       councilIncompleteBadge: 'Needs members ({count}/3-5)',
+      nextSeatRequired: 'Next seat (required):',
+      finalScorePoints: '{score} points',
     },
     grading: {
       title: 'Defense council grading',
@@ -2184,19 +2233,46 @@ export const vi: I18nMessages = {
     ],
     identityTabs: ['Sinh viên', 'Giảng viên', 'Quản trị'],
     identityRows: [
-      { code: 'SE101', label: 'Công nghệ phần mềm', meta: 'T2 07:00' },
-      { code: 'MA201', label: 'Toán rời rạc', meta: 'T3 09:00' },
-      { code: 'TH400', label: 'Seminar luận văn', meta: 'T4 13:00' },
+      {
+        title: 'Đăng ký học phần trong đợt mở',
+        description: 'Chọn lớp theo chương trình đào tạo của bạn.',
+      },
+      {
+        title: 'Thời khóa biểu, điểm và bảng điểm',
+        description: 'Theo dõi kết quả từng học kỳ đã công bố.',
+      },
+      {
+        title: 'Tiến độ đồ án – khóa luận',
+        description: 'Nhóm, đề tài và các mốc cần lưu ý.',
+      },
     ],
     lecturerIdentityRows: [
-      { code: 'SE101', label: 'Công nghệ phần mềm', meta: 'P. A2' },
-      { code: 'SE204', label: 'Cơ sở dữ liệu', meta: 'P. B1' },
-      { code: 'TH400', label: 'Seminar luận văn', meta: 'Hội trường 3' },
+      {
+        title: 'Lớp học phần đang giảng dạy',
+        description: 'Danh sách lớp và lịch dạy theo học kỳ.',
+      },
+      {
+        title: 'Nhập điểm và công bố',
+        description: 'Cập nhật điểm thành phần rồi công bố cho sinh viên.',
+      },
+      {
+        title: 'Nhóm hướng dẫn',
+        description: 'Theo dõi nhóm đồ án và tiến độ thực hiện.',
+      },
     ],
     adminIdentityRows: [
-      { code: 'USR', label: 'Hồ sơ người dùng', meta: 'Mở' },
-      { code: 'CAT', label: 'Danh mục môn', meta: 'Duyệt' },
-      { code: 'ENR', label: 'Cửa sổ đăng ký', meta: 'Đang mở' },
+      {
+        title: 'Người dùng và danh mục',
+        description: 'Tài khoản, môn học, lớp học phần, học kỳ.',
+      },
+      {
+        title: 'Thông báo chính thức',
+        description: 'Đăng và lưu hành thông báo của nhà trường, khoa.',
+      },
+      {
+        title: 'Đợt luận văn',
+        description: 'Khởi tạo đợt, hội đồng và công bố kết quả.',
+      },
     ],
     footerCopyright: 'Mọi quyền được bảo lưu.',
   },
@@ -2669,7 +2745,10 @@ export const vi: I18nMessages = {
       live: 'Đang hiện trên cổng công khai',
       saving: 'Đang lưu',
       saved: 'Đã phát hành',
+      savedLocal: 'Chỉ lưu tạm trên web server',
       saveFailed: 'Hiện chưa thể lưu giao diện cổng.',
+      saveNotDurable:
+        'Chỉ vừa lưu trên web server này. API trung tâm đang không kết nối được, nên người dùng khác sẽ chưa thấy thay đổi cho tới khi lưu lại.',
       loadFailed: 'Hiện chưa thể tải giao diện cổng.',
       heroEyebrow: 'Dòng dẫn trang chủ',
       heroTitle: 'Tiêu đề trang chủ',
@@ -2691,6 +2770,7 @@ export const vi: I18nMessages = {
       moveUp: 'Đưa lên',
       moveDown: 'Đưa xuống',
       openAnnouncements: 'Mở thông báo',
+      dragToReorder: 'Kéo thả để sắp xếp vị trí',
     },
   },
   dashboardShell: {
@@ -2980,6 +3060,7 @@ export const vi: I18nMessages = {
       'Giữ hồ sơ tài khoản khớp với thông tin mà nhà trường đang sử dụng.',
     photoLabel: 'Ảnh hồ sơ',
     photoHint: 'Xem trước ảnh tại đây, sau đó lưu hồ sơ để cập nhật vào tài khoản.',
+    photoUnsaved: 'Ảnh chưa được lưu — hãy bấm "Lưu thay đổi" để giữ lại.',
     uploadPhoto: 'Tải ảnh lên',
     removePhoto: 'Gỡ ảnh',
     photoUploadFailed: 'Chọn ảnh PNG, JPEG hoặc WebP dưới 200 KB sau khi nén.',
@@ -3273,6 +3354,20 @@ export const vi: I18nMessages = {
       fileTypeUnsupported: 'Chỉ nhận tài liệu .pdf, .doc và .docx.',
       downloadFile: 'Tải tài liệu',
       documentAttached: 'Tài liệu đính kèm',
+      lockedTitle: 'Đã hết thời hạn nộp báo cáo',
+      lockedDescription:
+        'Hạn chót chấm điểm của đợt này đã qua nên báo cáo không thể nộp mới hoặc thay thế.',
+      lockedAt: 'Khoá từ',
+      replaceConfirmTitle: 'Thay thế báo cáo đã nộp?',
+      replaceConfirmDescription:
+        'Tải lên lần nữa sẽ ghi đè tài liệu và liên kết hiện có. Phiên bản trước không thể khôi phục.',
+      replaceConfirmAction: 'Thay thế báo cáo',
+      titleCounter: '{count}/240 ký tự',
+      noteCounter: '{count}/500 ký tự',
+      uploadProgress: 'Đang tải tài liệu… {percent}%',
+      uploadCancel: 'Huỷ tải lên',
+      leaderOnlyBanner:
+        'Chỉ nhóm trưởng mới nộp hoặc thay thế báo cáo. {leader} sẽ nộp thay nhóm.',
     },
     results: {
       title: 'Kết quả',
@@ -3310,6 +3405,8 @@ export const vi: I18nMessages = {
       councilSeatOrderHint: 'Thứ tự ghế bắt buộc: 1 Chủ tịch, 2 Thư ký, sau đó là Ủy viên (tối thiểu 3, tối đa 5).',
       councilCompleteBadge: 'Đủ điều kiện (3-5 thành viên)',
       councilIncompleteBadge: 'Chưa đủ ghế ({count}/3-5)',
+      nextSeatRequired: 'Ghế tiếp theo (Bắt buộc):',
+      finalScorePoints: '{score} điểm',
     },
     grading: {
       title: 'Chấm điểm bảo vệ hội đồng',

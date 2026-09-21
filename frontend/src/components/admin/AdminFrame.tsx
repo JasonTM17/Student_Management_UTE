@@ -57,7 +57,12 @@ export function AdminFrame({
   actions,
   children,
 }: AdminFrameProps) {
-  const { user, logout } = useAuth();
+  const { user, logout, isAdmin, isSuperAdmin } = useAuth();
+  // A faculty head (TRUONG_KHOA) owns the thesis round lifecycle but is not
+  // administrative staff: the account-management, catalog and campus pages are
+  // gated to ADMIN/SUPER_ADMIN on both the page and the API, and following any
+  // of them bounced this role into a permanent forbidden state.
+  const fullAdminAccess = isAdmin || isSuperAdmin;
   const { messages, locale } = useI18n();
   const pathname = stripLocaleFromPathname(usePathname() ?? '/').pathname;
   const [sidebarOpen, setSidebarOpen] = React.useState(false);
@@ -137,6 +142,16 @@ export function AdminFrame({
       ],
     },
   ];
+
+  // Faculty heads see only what their role can open: the thesis administration
+  // console and the notification centre. Everything else is ADMIN/SUPER_ADMIN
+  // staff surface, and following it dead-ends in a forbidden state.
+  const visibleMenuSections = fullAdminAccess
+    ? adminMenuSections
+    : adminMenuSections.map((section) => ({
+        ...section,
+        items: section.items.filter((item) => item.href === '/dashboard/thesis' || item.href === '/admin/thesis'),
+      })).filter((section) => section.items.length > 0);
 
   React.useEffect(() => {
     const media = window.matchMedia('(min-width: 1024px)');
@@ -295,7 +310,7 @@ export function AdminFrame({
           }}
           className="flex-1 space-y-4 overflow-y-auto overscroll-contain px-4 py-3"
         >
-          {adminMenuSections.map((section) => (
+          {visibleMenuSections.map((section) => (
             <div key={section.key} className="space-y-2">
               <div className="portal-menu-label px-3">{section.label}</div>
               <div className="space-y-1">

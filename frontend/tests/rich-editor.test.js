@@ -415,3 +415,18 @@ test('sortablejs integration empowers admin block building and announcement reor
 });
 
 
+
+// Round-2 review: an unclosed container from a legacy row used to emit its
+// source as escaped prose, so the reader saw stylesheet text under the article.
+test('an unterminated code container cannot leave its source as visible text', () => {
+  const { sanitizeAnnouncementHtml } = loadTs('src/lib/html-sanitizer.ts');
+  for (const payload of [
+    '<p>hi</p><style>x{y:z}',
+    '<p>hi</p><script>evil()</script>',
+    '<p>hi</p><script>var q = "<b>x";',
+  ]) {
+    const out = sanitizeAnnouncementHtml(payload);
+    assert.doesNotMatch(out, /y:z|evil|var q/, `source leaked from ${payload}`);
+    assert.match(out, /hi/, 'the prose before the container survives');
+  }
+});

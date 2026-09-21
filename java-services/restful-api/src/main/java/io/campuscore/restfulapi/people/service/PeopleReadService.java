@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.people.service;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.people.repository.PeopleReadRepository;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerListResponse;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerResponse;
@@ -68,10 +69,11 @@ public class PeopleReadService {
     }
 
     @Transactional(readOnly = true)
-    public LecturerListResponse findLecturers(int page, int limit) {
+    public LecturerListResponse findLecturers(int page, int limit, String search) {
         requirePage(page, limit);
-        long total = people.countLecturers();
-        List<LecturerResponse> data = people.findLecturers(offset(page, limit), limit);
+        String pattern = LikePattern.contains(search);
+        long total = people.countLecturers(pattern);
+        List<LecturerResponse> data = people.findLecturers(offset(page, limit), limit, pattern);
         return new LecturerListResponse(data, meta(total, page, limit));
     }
 

@@ -5,6 +5,7 @@ import type { AnnouncementRecord } from '@/lib/api';
 import { Modal } from '@/components/ui/modal';
 import { useI18n } from '@/i18n';
 import { resolveAnnouncementDomain } from '@/lib/announcement-presentation';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 import {
   ReadingToolbar,
   type ReadingPreferences,
@@ -31,7 +32,9 @@ export function AnnouncementReaderModal({
   onSelectAnnouncement,
 }: AnnouncementReaderModalProps) {
   const { locale } = useI18n();
-  const [copied, setCopied] = useState(false);
+  const { categories } = useArticleTaxonomy();
+  const [copyState, setCopyState] = useState<'idle' | 'copied' | 'failed'>('idle');
+  const copyReset = useRef<ReturnType<typeof setTimeout> | null>(null);
   const [scrollProgress, setScrollProgress] = useState(0);
   const scrollContainerRef = useRef<HTMLDivElement>(null);
 
@@ -46,14 +49,14 @@ export function AnnouncementReaderModal({
   // Whenever a new announcement opens, intelligently choose the initial mode
   useEffect(() => {
     if (announcement) {
-      const resolved = resolveAnnouncementDomain(announcement, locale);
+      const resolved = resolveAnnouncementDomain(announcement, locale, categories);
       setPreferences((prev) => ({
         ...prev,
         mode: resolved.domain === 'EDITORIAL_ARTICLE' ? 'EDITORIAL' : 'OFFICIAL',
       }));
       setScrollProgress(0);
     }
-  }, [announcement, locale]);
+  }, [announcement, locale, categories]);
 
   // Track reading scroll progress
   useEffect(() => {
@@ -76,7 +79,20 @@ export function AnnouncementReaderModal({
     handleScroll();
 
     return () => container.removeEventListener('scroll', handleScroll);
-  }, [isOpen, announcement, preferences.mode]);
+    // RT-P3-f: the progress bar is measured against the document box, and the
+    // reading preferences resize that box — a bigger font or a serif/dark theme
+    // changes `scrollHeight` and the offset of the current position. The mode,
+    // theme, font family and font size therefore all re-run this effect so the
+    // bar is re-measured against the new layout instead of keeping a percentage
+    // captured before it.
+  }, [
+    isOpen,
+    announcement,
+    preferences.mode,
+    preferences.theme,
+    preferences.fontFamily,
+    preferences.fontSize,
+  ]);
 
   if (!announcement) return null;
 
@@ -91,22 +107,25 @@ export function AnnouncementReaderModal({
       if (typeof window !== 'undefined') {
         const url = `${window.location.origin}/dashboard/announcements?id=${encodeURIComponent(announcement.id)}`;
         await navigator.clipboard.writeText(url);
-        setCopied(true);
-        setTimeout(() => setCopied(false), 2000);
+        setCopyState('copied');
       }
     } catch {
-      setCopied(true);
-      setTimeout(() => setCopied(false), 2000);
+      // A rejected clipboard write (insecure context, denied permission) is not a
+      // copy, so it must not render as one.
+      setCopyState('failed');
     }
+    if (copyReset.current) clearTimeout(copyReset.current);
+    copyReset.current = setTimeout(() => setCopyState('idle'), 2600);
   };
 
-  const domain = resolveAnnouncementDomain(announcement, locale);
+  const domain = resolveAnnouncementDomain(announcement, locale, categories);
 
   return (
     <Modal
       isOpen={isOpen}
       onClose={onClose}
       showCloseButton={false}
+      dialogLabel={announcement.title}
       printable={true}
       className="max-w-4xl sm:max-w-5xl p-0 overflow-hidden"
     >
@@ -127,7 +146,7 @@ export function AnnouncementReaderModal({
           onPreferencesChange={setPreferences}
           onPrint={handlePrint}
           onShare={handleShare}
-          copied={copied}
+          copyState={copyState}
           onClose={onClose}
           onEdit={
             onEdit

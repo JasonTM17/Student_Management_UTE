@@ -10,6 +10,7 @@ import javax.crypto.spec.SecretKeySpec;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.context.annotation.Bean;
 import org.springframework.context.annotation.Configuration;
+import org.springframework.http.HttpMethod;
 import org.springframework.security.authentication.BadCredentialsException;
 import org.springframework.security.crypto.bcrypt.BCryptPasswordEncoder;
 import org.springframework.security.crypto.password.PasswordEncoder;
@@ -122,6 +123,10 @@ public class SecurityConfig {
                                 // Anonymous public campus news feed for the
                                 // homepage; read-only and safe-subset only.
                                 "/api/v1/announcements/public",
+                                // Read-only public-safe category feed the
+                                // anonymous homepage uses to label articles by
+                                // their editorial taxonomy instead of guessing.
+                                "/api/v1/article-taxonomy/v2/categories",
                                 "/internal/rag/assistant/**",
                                 "/internal/rag/thesis/assistant/**",
                                 // Mail endpoints used to be reachable without a
@@ -133,6 +138,13 @@ public class SecurityConfig {
                                 "/swagger-ui.html",
                                 "/swagger-ui/**",
                                 "/v3/api-docs/**")
+                        .permitAll()
+                        // Public site chrome (accent, homepage hero, post
+                        // order). Anonymous access is pinned to the read verb:
+                        // a PUT to the same path matches no permitAll rule, so
+                        // it falls through to authentication and then to the
+                        // controller's administrator-only @PreAuthorize.
+                        .requestMatchers(HttpMethod.GET, "/api/v1/site-appearance")
                         .permitAll()
                         .anyRequest()
                         .authenticated())

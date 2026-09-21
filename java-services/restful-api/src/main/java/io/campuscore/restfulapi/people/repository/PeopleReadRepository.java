@@ -77,18 +77,22 @@ public class PeopleReadRepository {
         return matches.stream().findFirst();
     }
 
-    public List<LecturerResponse> findLecturers(long offset, int limit) {
+    public List<LecturerResponse> findLecturers(long offset, int limit, String search) {
+        MapSqlParameterSource parameters = pageParameters(offset, limit);
         return jdbc.query(
                 lecturerSelect()
+                        + searchWhere(parameters, search)
                         + " ORDER BY lecturer.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
-                pageParameters(offset, limit),
+                parameters,
                 LECTURER_MAPPER);
     }
 
-    public long countLecturers() {
+    public long countLecturers(String search) {
+        MapSqlParameterSource parameters = new MapSqlParameterSource();
         Long count = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + LECTURER_TABLE,
-                new MapSqlParameterSource(),
+                "SELECT COUNT(*) FROM " + LECTURER_TABLE + " lecturer"
+                        + searchWhere(parameters, search),
+                parameters,
                 Long.class);
         return Objects.requireNonNullElse(count, 0L);
     }
@@ -105,6 +109,25 @@ public class PeopleReadRepository {
         return new MapSqlParameterSource()
                 .addValue("offset", offset)
                 .addValue("limit", limit);
+    }
+
+    /**
+     * Optional lecturer search predicate. The name and email live on the auth
+     * account, so they are reached through EXISTS instead of adding a join to the
+     * {@code COUNT(*)} statement - the list and the total then run the same
+     * predicate and a request without {@code search} keeps its original SQL.
+     */
+    private static String searchWhere(MapSqlParameterSource parameters, String search) {
+        if (search == null) {
+            return "";
+        }
+        parameters.addValue("search", search);
+        return " WHERE (LOWER(lecturer.\"employeeId\") LIKE :search ESCAPE '\\'"
+                + " OR EXISTS (SELECT 1 FROM " + USER_TABLE + " su"
+                + " WHERE su.\"id\" = lecturer.\"userId\""
+                + " AND (LOWER(su.\"firstName\") LIKE :search ESCAPE '\\'"
+                + " OR LOWER(su.\"lastName\") LIKE :search ESCAPE '\\'"
+                + " OR LOWER(su.\"email\") LIKE :search ESCAPE '\\')))";
     }
 
     private static String studentStatusFilter(MapSqlParameterSource parameters, String status) {

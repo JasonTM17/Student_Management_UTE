@@ -64,7 +64,7 @@ public class PeopleReadController {
         return people.findStudent(id, authentication);
     }
 
-    @Operation(summary = "Danh bạ giảng viên", description = "Truy vấn danh sách cán bộ giảng viên theo khoa và bộ môn")
+    @Operation(summary = "Danh bạ giảng viên", description = "Truy vấn danh sách cán bộ giảng viên theo khoa và bộ môn, hỗ trợ tìm kiếm theo mã giảng viên, họ tên hoặc email")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Truy vấn thành công danh sách giảng viên")
     })
@@ -73,9 +73,11 @@ public class PeopleReadController {
     public LecturerListResponse getLecturers(
             @Parameter(description = "Số trang") @RequestParam(defaultValue = "1") int page,
             @Parameter(description = "Số lượng bản ghi mỗi trang") @RequestParam(defaultValue = "20") int limit,
+            @Parameter(description = "Từ khóa tìm kiếm theo mã giảng viên, họ tên hoặc email")
+            @RequestParam(required = false) String search,
             @RequestParam MultiValueMap<String, String> queryParameters) {
-        requireAllowedQuery(queryParameters, Set.of("page", "limit"));
-        return people.findLecturers(page, limit);
+        requireAllowedQuery(queryParameters, Set.of("page", "limit", "search"));
+        return people.findLecturers(page, limit, search);
     }
 
     @Operation(summary = "Xem thông tin chi tiết cán bộ giảng viên", description = "Lấy thông tin học hàm, học vị, bộ môn và liên hệ của giảng viên")

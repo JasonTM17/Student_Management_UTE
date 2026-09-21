@@ -216,6 +216,20 @@ class ArticleTaxonomyV2PersistenceTest {
     }
 
     @Test
+    @DisplayName("v2 categories feed is readable anonymously: the homepage labels articles without a login")
+    void v2CategoriesFeedIsPublic() throws Exception {
+        mvc.perform(get("/api/v1/article-taxonomy/v2/categories"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2))
+                .andExpect(jsonPath("$[0].code").value("RESEARCH_TECH"))
+                .andExpect(jsonPath("$[0].createdAt").doesNotExist());
+
+        // Sibling taxonomy reads keep their authenticated contract.
+        mvc.perform(get("/api/v1/article-taxonomy/v2/categories/hoc-bong-khen-thuong"))
+                .andExpect(status().isUnauthorized());
+    }
+
+    @Test
     @DisplayName("v2 category lookup by slug returns the DTO, unknown slug stays 404")
     void v2CategoryBySlugReturnsDto() throws Exception {
         mvc.perform(get("/api/v1/article-taxonomy/v2/categories/hoc-bong-khen-thuong").with(portalUser()))

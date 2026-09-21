@@ -1,8 +1,10 @@
 'use client';
 
 import React, { useState, useEffect, useMemo } from 'react';
-import { useAuth } from '@/context/AuthContext';
+import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
+import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
+import { LoadingState } from '@/components/ui/state-block';
 import { curriculumApi } from '@/lib/api';
 import { MyCurriculumResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -133,7 +135,10 @@ function ShieldCheckIcon({ className }: { className?: string }) {
 }
 
 export default function CertificatesPage() {
-  const { user } = useAuth();
+  // The generator mints a student certificate from student identity claims, so a
+  // staff account reaching it by URL used to render a sheet prefilled with blank
+  // student attributes instead of a forbidden state.
+  const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, messages, formatDate } = useI18n();
   const isVi = locale === 'vi';
   const certCopy = messages.certificates;
@@ -197,6 +202,17 @@ export default function CertificatesPage() {
   })();
 
   const missing = certCopy.missingValue;
+
+  if (authLoading) {
+    return (
+      <div className="min-h-screen py-6 px-4 max-w-7xl mx-auto">
+        <LoadingState label={messages.common.states.loadingContent} />
+      </div>
+    );
+  }
+  if (!hasAccess) {
+    return <WorkspaceForbiddenState />;
+  }
 
   return (
     <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">

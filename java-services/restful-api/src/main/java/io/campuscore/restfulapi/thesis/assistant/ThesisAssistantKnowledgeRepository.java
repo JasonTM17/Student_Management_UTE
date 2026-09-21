@@ -22,6 +22,28 @@ public class ThesisAssistantKnowledgeRepository {
     private static final RowMapper<KnowledgeDocument> ROW_MAPPER =
             ThesisAssistantKnowledgeRepository::mapRow;
 
+    /**
+     * Characters that end a word in the published corpus. They are folded to
+     * spaces so "term flanked by spaces" is an exact whole-word test.
+     */
+    private static final String[] WORD_DELIMITERS = {
+            ".", ",", ":", ";", "!", "?", "(", ")", "[", "]", "\"", "'"};
+
+    /**
+     * A column as a space-delimited token stream, padded so a first or last word
+     * is still flanked by spaces. Only functions both PostgreSQL 15 and the H2
+     * test schema provide are used: neither engine's word-boundary regex syntax
+     * is portable to the other, and a dialect branch here would make retrieval in
+     * tests differ silently from retrieval in production.
+     */
+    private static String spaceDelimited(String column) {
+        String expression = "(' ' || LOWER(" + column + ") || ' ')";
+        for (String delimiter : WORD_DELIMITERS) {
+            expression = "REPLACE(" + expression + ", '" + delimiter.replace("'", "''") + "', ' ')";
+        }
+        return "REPLACE(REPLACE(REPLACE(" + expression + ", CHR(10), ' '), CHR(13), ' '), CHR(9), ' ')";
+    }
+
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean allowLegacyFallback;
 
@@ -65,13 +87,24 @@ public class ThesisAssistantKnowledgeRepository {
                 .addValue("limit", limit);
         List<String> predicates = new ArrayList<>();
         List<String> scoreTerms = new ArrayList<>();
+        String boundedTitle = spaceDelimited("p.title");
+        String boundedContent = spaceDelimited("p.content");
         for (int index = 0; index < usableTerms.size(); index++) {
             String parameter = "term" + index;
+            String wordParameter = "word" + index;
             params.addValue(parameter, "%" + usableTerms.get(index) + "%");
+            params.addValue(wordParameter, " " + usableTerms.get(index) + " ");
             predicates.add("(LOWER(p.title) LIKE :" + parameter
                     + " OR LOWER(p.content) LIKE :" + parameter + ")");
+            // A whole-word hit outranks an incidental substring inside an
+            // unrelated word ("ci" inside "decision"), which is what let a
+            // two-character token bury the document that answers the question.
+            // The substring score stays as the floor so a stem that only ever
+            // appears inside a longer word is still retrievable.
             scoreTerms.add("(CASE WHEN LOWER(p.title) LIKE :" + parameter + " THEN 3 ELSE 0 END + "
-                    + "CASE WHEN LOWER(p.content) LIKE :" + parameter + " THEN 1 ELSE 0 END)");
+                    + "CASE WHEN LOWER(p.content) LIKE :" + parameter + " THEN 1 ELSE 0 END + "
+                    + "CASE WHEN POSITION(:" + wordParameter + " IN " + boundedTitle + ") > 0 THEN 4 ELSE 0 END + "
+                    + "CASE WHEN POSITION(:" + wordParameter + " IN " + boundedContent + ") > 0 THEN 2 ELSE 0 END)");
         }
         String scoreExpression = String.join(" + ", scoreTerms);
 

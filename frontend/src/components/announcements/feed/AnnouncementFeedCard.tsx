@@ -28,6 +28,7 @@ import {
   resolveAnnouncementDomain,
   resolveArticleCover,
 } from '@/lib/announcement-presentation';
+import { useArticleTaxonomy } from '@/lib/use-article-taxonomy';
 
 interface AnnouncementFeedCardProps {
   announcement: AnnouncementRecord;
@@ -48,8 +49,9 @@ export function AnnouncementFeedCard({
 }: AnnouncementFeedCardProps) {
   const isVi = locale === 'vi';
   const [copied, setCopied] = useState(false);
+  const { categories } = useArticleTaxonomy();
 
-  const domain = resolveAnnouncementDomain(announcement, locale);
+  const domain = resolveAnnouncementDomain(announcement, locale, categories);
   const readingTime = calculateReadingTime(announcement.content);
   const coverImage = resolveArticleCover(announcement);
   const sapo = extractAnnouncementExcerpt(
