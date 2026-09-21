@@ -30,8 +30,13 @@ function say(step) {
   if (step.verdict === 'fail') bad += 1;
 }
 
-async function login(page, email) {
-  await page.goto(`${BASE}/vi/login`, { waitUntil: 'domcontentloaded' });
+/**
+ * Each portal refuses an identity that does not belong to it on purpose, so a
+ * lecturer or administrator must sign in through their own portal rather than the
+ * default student one.
+ */
+async function login(page, email, portal = 'student') {
+  await page.goto(`${BASE}/vi/login?portal=${portal}`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(1500);
   await page.locator('input[type="email"]').last().fill(email);
   await page.locator('input[type="password"]').last().fill(PASSWORD);
@@ -82,18 +87,9 @@ async function assistantFlow(page) {
   });
 }
 
-/** Reader integrity for whatever article is reachable. */
+/** Reader integrity, over enough articles to actually exercise the contents list. */
 async function readerFlow(page) {
-  await page.goto(`${BASE}/vi/dashboard/announcements`, { waitUntil: 'domcontentloaded' });
-  await page.waitForTimeout(3000);
-  const card = page.locator('article, [role="listitem"], a[href*="announcement"]').first();
-  if (!(await card.count())) {
-    say({ flow: 'reader', step: 'open', verdict: 'fail', reason: 'no announcement card' });
-    return;
-  }
-  await card.click().catch(() => {});
-  await page.waitForTimeout(3500);
-  const state = await page.evaluate(() => {
+  const probe = () => {
     const root = document.querySelector('article') || document.body;
     const toc = document.querySelector('nav[aria-label*="mục lục" i], nav[aria-label*="table of content" i]');
     const headings = [...root.querySelectorAll('h1,h2,h3,h4,h5,h6')];
@@ -111,30 +107,131 @@ async function readerFlow(page) {
       leakedMarkup: /<\/?(?:p|div|span|img|figure|strong)\b|-->/.test(bodyText),
       leakedPlaceholder: /\{\{|\bnull\b|\bundefined\b\}/.test(bodyText),
     };
-  });
+  };
+
+  await page.goto(`${BASE}/vi/dashboard/announcements`, { waitUntil: 'domcontentloaded' });
+  await page.waitForTimeout(3000);
+  const cards = page.locator('article, [role="listitem"], a[href*="announcement"]');
+  const total = await cards.count();
+  if (!total) {
+    say({ flow: 'reader', step: 'open', verdict: 'fail', reason: 'no announcement card' });
+    return;
+  }
+
+  // One feed card is not evidence: a notice with a single heading renders no
+  // contents list at all, so the anchor path stays untested. Scan up to three and
+  // keep the richest one.
+  let best = null;
+  const attempts = Math.min(total, 3);
+  for (let index = 0; index < attempts; index += 1) {
+    await cards.nth(index).click().catch(() => {});
+    await page.waitForTimeout(3000);
+    const state = await page.evaluate(probe).catch(() => null);
+    if (state && (!best || state.headings > best.state.headings)) best = { index, state };
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(1200);
+    if (best && best.state.tocItems >= 2) break;
+  }
+  if (!best) {
+    say({ flow: 'reader', step: 'inspect', verdict: 'fail', reason: 'no reader state captured' });
+    return;
+  }
+
+  await cards.nth(best.index).click().catch(() => {});
+  await page.waitForTimeout(3000);
   await shot(page, 'flow-reader');
-  say({ flow: 'reader', step: 'inspect', verdict: state.leakedMarkup ? 'fail' : 'ok', ...state });
+  say({
+    flow: 'reader',
+    step: 'inspect',
+    verdict: best.state.leakedMarkup || best.state.leakedPlaceholder ? 'fail' : 'ok',
+    cardsTried: attempts,
+    ...best.state,
+  });
+
+  if (best.state.tocItems >= 1) {
+    const jumped = await page.evaluate(async () => {
+      const scroller = document.querySelector('[data-reader-scroll], main') || document.scrollingElement;
+      const toc = document.querySelector('nav[aria-label*="mục lục" i], nav[aria-label*="table of content" i]');
+      const target = toc && toc.querySelector('button, a');
+      const before = scroller.scrollTop;
+      if (!target) return { clicked: false, before };
+      target.click();
+      await new Promise((resolve) => setTimeout(resolve, 1200));
+      return { clicked: true, before, after: scroller.scrollTop };
+    });
+    say({
+      flow: 'reader',
+      step: 'toc-anchor-jump',
+      verdict: jumped.clicked && jumped.after !== jumped.before ? 'ok' : 'info',
+      ...jumped,
+    });
+    await page.keyboard.press('Escape').catch(() => {});
+  }
 }
 
-/** Admin reorder must refuse on a filtered/paged list and persist a real reorder. */
+/**
+ * Admin reorder: the handles live inside the reorder dialog, so the probe has to
+ * open it. Page 1 of an unfiltered feed must allow a reorder, a keyboard move must
+ * actually move a row, and the move must be announced. The dialog is then closed
+ * without saving, because this proves the control, not the write path.
+ */
 async function reorderFlow(page) {
   await page.goto(`${BASE}/vi/admin/announcements`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3500);
+
+  const trigger = page.getByRole('button', { name: /sắp xếp|reorder/i }).first();
+  if (!(await trigger.count())) {
+    say({ flow: 'reorder', step: 'trigger', verdict: 'fail', reason: 'no reorder trigger on page 1' });
+    return;
+  }
+  await trigger.click().catch(() => {});
+  await page.waitForTimeout(2500);
+
   const handles = page.locator('[aria-roledescription="sortable"], .drag-handle, [class*="drag" i]');
   const handleCount = await handles.count();
-  const disabled = await page.evaluate(() => {
-    const el = document.querySelector('[aria-roledescription="sortable"], .drag-handle, [class*="drag" i]');
-    if (!el) return 'no-handle';
-    const btn = el.closest('button') || el;
-    return btn.getAttribute('aria-disabled') || btn.disabled ? 'disabled' : 'enabled';
+  const titles = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="dialog"] li, [role="dialog"] [data-sortable-item]')]
+      .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60))
+      .slice(0, 4),
+  );
+  await shot(page, 'flow-reorder-dialog');
+  say({
+    flow: 'reorder',
+    step: 'gating',
+    verdict: handleCount ? 'ok' : 'fail',
+    handleCount,
+    rows: titles.length,
+    first: titles[0] ?? null,
   });
-  const explanation = await page.evaluate(() => {
-    const t = document.body.innerText || '';
-    const line = t.split('\n').find((l) => /lọc|trang 1|xóa bộ lọc|bỏ lọc/i.test(l));
-    return line ? line.trim().slice(0, 140) : null;
+  if (!handleCount) return;
+
+  const before = titles.slice(0, 2);
+  await handles.first().focus().catch(() => {});
+  await page.keyboard.press('ArrowDown').catch(() => {});
+  await page.waitForTimeout(1500);
+  const after = await page.evaluate(() =>
+    [...document.querySelectorAll('[role="dialog"] li, [role="dialog"] [data-sortable-item]')]
+      .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60))
+      .slice(0, 4),
+  );
+  const announced = await page.evaluate(() =>
+    [...document.querySelectorAll('[aria-live], [role="status"]')]
+      .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim())
+      .filter(Boolean)
+      .slice(0, 2),
+  );
+  await shot(page, 'flow-reorder-keyboard');
+  say({
+    flow: 'reorder',
+    step: 'keyboard-move',
+    verdict: before.length >= 2 && after.length >= 2 && after[1] === before[0] ? 'ok' : 'fail',
+    before,
+    after: after.slice(0, 2),
+    announcements: announced,
   });
-  await shot(page, 'flow-reorder-gating');
-  say({ flow: 'reorder', step: 'gating', verdict: handleCount ? 'ok' : 'fail', handleCount, disabled, explanation });
+
+  await page.keyboard.press('Escape').catch(() => {});
+  await page.waitForTimeout(1000);
 }
 
 /** Dark and sepia reader themes must not print white-on-white. */
@@ -173,7 +270,9 @@ async function themeFlow(page) {
  */
 async function appearanceFlow(page) {
   const readApi = async () => {
-    const res = await page.request.get('/api/v1/site-appearance');
+    // `page.request` does not resolve a relative path against the current page,
+    // so the origin has to be spelled out.
+    const res = await page.request.get(`${BASE}/api/v1/site-appearance`);
     return { status: res.status(), body: await res.json().catch(() => null) };
   };
 
@@ -267,7 +366,7 @@ async function main() {
 
   const adminCtx = await browser.newContext({ viewport: { width: 1440, height: 960 } });
   const ap = await adminCtx.newPage();
-  if (await login(ap, 'admin@campuscore.edu')) {
+  if (await login(ap, 'admin@campuscore.edu', 'admin')) {
     await reorderFlow(ap);
     await appearanceFlow(ap);
   } else {
