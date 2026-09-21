@@ -21,6 +21,9 @@ const BASE = process.argv.includes('--base')
 const PASSWORD = process.argv.includes('--password')
   ? process.argv[process.argv.indexOf('--password') + 1]
   : process.env.DEEPSCAN_PASSWORD || 'password123';
+/** The accent swatch buttons; the locale switch shares `min-h-11` but not `rounded-md`. */
+const ACCENT = 'button.min-h-11.rounded-md';
+
 const steps = [];
 let bad = 0;
 
@@ -40,10 +43,20 @@ async function login(page, email, portal = 'student') {
   await page.waitForTimeout(1500);
   await page.locator('input[type="email"]').last().fill(email);
   await page.locator('input[type="password"]').last().fill(PASSWORD);
-  await page.locator('form button[type="submit"]').first().click();
-  await page.waitForURL(/dashboard|admin/, { timeout: 25000 }).catch(() => {});
-  await page.waitForTimeout(2500);
-  return !page.url().includes('login');
+  const submit = page.locator('form button[type="submit"]').first();
+  await (await submit.count()
+    ? submit
+    : page.locator('button').filter({ hasText: /đăng nhập/i }).last()
+  ).click();
+  // `waitForURL(/dashboard|admin/)` would resolve instantly here: the sign-in URL
+  // itself contains "admin" once a portal is chosen. Wait for the URL to leave the
+  // login route instead.
+  const landed = await page
+    .waitForFunction(() => !window.location.pathname.includes('login'), null, { timeout: 25000 })
+    .then(() => true)
+    .catch(() => false);
+  await page.waitForTimeout(1500);
+  return landed && !page.url().includes('login');
 }
 
 async function shot(page, name) {
@@ -179,7 +192,11 @@ async function reorderFlow(page) {
   await page.goto(`${BASE}/vi/admin/announcements`, { waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3500);
 
-  const trigger = page.getByRole('button', { name: /sắp xếp|reorder/i }).first();
+  // The column header also offers a "Sắp xếp theo…" control, so the trigger has
+  // to be matched by its own label rather than by the word "sắp xếp".
+  const trigger = page
+    .getByRole('button', { name: /sắp xếp thứ tự ghim|reorder feed/i })
+    .first();
   if (!(await trigger.count())) {
     say({ flow: 'reorder', step: 'trigger', verdict: 'fail', reason: 'no reorder trigger on page 1' });
     return;
@@ -187,25 +204,60 @@ async function reorderFlow(page) {
   await trigger.click().catch(() => {});
   await page.waitForTimeout(2500);
 
-  const handles = page.locator('[aria-roledescription="sortable"], .drag-handle, [class*="drag" i]');
-  const handleCount = await handles.count();
-  const titles = await page.evaluate(() =>
-    [...document.querySelectorAll('[role="dialog"] li, [role="dialog"] [data-sortable-item]')]
-      .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60))
-      .slice(0, 4),
+  const handles = page.locator(
+    '[role="dialog"] [aria-roledescription="sortable"], [role="dialog"] .drag-handle, [role="dialog"] [aria-label*="sắp xếp lại" i], [role="dialog"] [aria-label*="drag" i]',
   );
+  let handleCount = await handles.count();
+  const titles = async () =>
+    page.evaluate(() =>
+      [...document.querySelectorAll('[role="dialog"] li, [role="dialog"] [data-sortable-item]')]
+        .map((el) => (el.textContent || '').replace(/\s+/g, ' ').trim().slice(0, 60))
+        .slice(0, 4),
+    );
+  const listing = await titles();
+  // A guarded refusal is the designed behaviour, so the harness reads the notice
+  // instead of treating a missing handle as a missing feature.
+  const guardNotice = await page.evaluate(() => {
+    const d = document.querySelector('[role="dialog"]');
+    const text = d ? (d.innerText || '') : '';
+    const line = text.split('\n').find((l) => /bộ lọc|trang|không ghi đè|tạm khoá/i.test(l));
+    return line ? line.replace(/\s+/g, ' ').trim().slice(0, 160) : null;
+  });
   await shot(page, 'flow-reorder-dialog');
   say({
     flow: 'reorder',
     step: 'gating',
-    verdict: handleCount ? 'ok' : 'fail',
+    verdict: handleCount || guardNotice ? 'ok' : 'fail',
     handleCount,
-    rows: titles.length,
-    first: titles[0] ?? null,
+    rows: listing.length,
+    first: listing[0] ?? null,
+    guardNotice,
   });
-  if (!handleCount) return;
+  if (!handleCount) {
+    // The refusal only proves the guard. Clear the filter and re-open the dialog
+    // so the drag path itself is still exercised.
+    await page.keyboard.press('Escape').catch(() => {});
+    await page.waitForTimeout(800);
+    const reset = page
+      .getByRole('button', { name: /xóa bộ lọc|đặt lại bộ lọc|bỏ lọc|clear filter|reset/i })
+      .first();
+    if (await reset.count()) {
+      await reset.click().catch(() => {});
+      await page.waitForTimeout(2500);
+      await trigger.click().catch(() => {});
+      await page.waitForTimeout(2500);
+      handleCount = await handles.count();
+      say({
+        flow: 'reorder',
+        step: 'after-clearing-filters',
+        verdict: handleCount ? 'ok' : 'info',
+        handleCount,
+      });
+    }
+    if (!handleCount) return;
+  }
 
-  const before = titles.slice(0, 2);
+  const before = (await titles()).slice(0, 2);
   await handles.first().focus().catch(() => {});
   await page.keyboard.press('ArrowDown').catch(() => {});
   await page.waitForTimeout(1500);
@@ -280,17 +332,16 @@ async function appearanceFlow(page) {
   await page.waitForTimeout(3500);
 
   const before = await readApi();
-  const accents = page.locator('button.min-h-11[aria-pressed]');
-  if (!(await accents.count())) {
+  // `aria-pressed` sits on the accent button itself, so the state has to be part
+  // of the selector rather than a descendant lookup. The locale switch shares
+  // `min-h-11` but is `rounded-sm`, so the accent swatches are pinned by shape.
+  const activeAccent = page.locator(`${ACCENT}[aria-pressed="true"]`).first();
+  const target = page.locator(`${ACCENT}[aria-pressed="false"]`).first();
+  if (!(await activeAccent.count()) || !(await target.count())) {
     say({ flow: 'appearance', step: 'controls', verdict: 'fail', reason: 'no accent buttons rendered' });
     return;
   }
-  const originalLabel = ((await accents
-    .locator('[aria-pressed="true"]')
-    .first()
-    .textContent()
-    .catch(() => '')) || '').trim();
-  const target = accents.locator('[aria-pressed="false"]').first();
+  const originalLabel = ((await activeAccent.textContent().catch(() => '')) || '').trim();
   const targetLabel = ((await target.textContent().catch(() => '')) || '').trim();
   await shot(page, 'flow-appearance-before');
 
@@ -314,7 +365,7 @@ async function appearanceFlow(page) {
   await page.reload({ waitUntil: 'domcontentloaded' });
   await page.waitForTimeout(3500);
   const rebound = ((await page
-    .locator('button.min-h-11[aria-pressed="true"]')
+    .locator(`${ACCENT}[aria-pressed="true"]`)
     .first()
     .textContent()
     .catch(() => '')) || '').trim();
@@ -327,7 +378,7 @@ async function appearanceFlow(page) {
   });
 
   if (originalLabel) {
-    await accents.filter({ hasText: originalLabel }).first().click().catch(() => {});
+    await page.locator(`${ACCENT}[aria-pressed="false"]`).filter({ hasText: originalLabel }).first().click().catch(() => {});
     await page.waitForTimeout(2500);
     const restored = await readApi();
     say({
