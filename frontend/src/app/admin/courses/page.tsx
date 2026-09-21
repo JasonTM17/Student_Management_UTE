@@ -412,6 +412,7 @@ export default function AdminCoursesPage() {
                     value={searchInput}
                     onChange={(event) => setSearchInput(event.target.value)}
                     placeholder={copy.searchPlaceholder}
+                  aria-label="Tìm kiếm môn học"
                     icon={<Search className="h-4 w-4" />}
                   />
                 </div>
