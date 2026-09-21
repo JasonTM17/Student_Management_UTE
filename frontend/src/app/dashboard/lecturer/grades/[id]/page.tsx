@@ -1,7 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState } from 'react';
-import { useParams } from 'next/navigation';
+import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
+import { useParams, useRouter } from 'next/navigation';
 import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
@@ -21,6 +21,8 @@ import {
   LoadingState,
 } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
+import { UnsavedChangesConfirmDialog } from '@/components/ui/unsaved-changes-confirm';
+import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { useI18n } from '@/i18n';
 import { campusErrorMessage } from '@/lib/campus-error';
 import { toast } from 'sonner';
@@ -77,12 +79,16 @@ function formatVietnameseName(name: string): string {
 
 export default function SectionGradingPage() {
   const params = useParams<{ id: string }>();
+  const router = useRouter();
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
   const { locale, formatNumber, messages } = useI18n();
   const [sectionData, setSectionData] = useState<SectionGrades | null>(null);
   const [grades, setGrades] = useState<Map<string, GradeUpdate>>(new Map());
   const [editedIds, setEditedIds] = useState<Set<string>>(new Set());
   const [isLoading, setIsLoading] = useState(true);
+  // A background refetch (after save) must not unmount the matrix: the old
+  // full LoadingState swap scrolled the lecturer back to the top mid-session.
+  const [isRefreshing, setIsRefreshing] = useState(false);
   const [isSaving, setIsSaving] = useState(false);
   const [isPublishing, setIsPublishing] = useState(false);
   const [error, setError] = useState('');
@@ -124,6 +130,13 @@ export default function SectionGradingPage() {
           saved: 'Đã lưu điểm',
           saveFailed: 'Hiện chưa thể lưu điểm.',
           invalidScore: 'Điểm phải là số từ 0 đến 10.',
+          partialRowsOnly:
+            '{count} dòng mới nhập một nửa điểm — hãy điền đủ cả hai cột để lưu.',
+          partialRowsSkipped:
+            '{count} dòng chỉ mới nhập một nửa điểm nên chưa được lưu.',
+          unsavedTitle: 'Điểm chưa được lưu',
+          unsavedBody:
+            'Bạn còn ô điểm đã nhập chưa lưu. Rời khỏi màn hình sẽ mất các điểm đó. Tiếp tục?',
           publishTitle: 'Công bố điểm',
           publishMessage:
             'Công bố điểm ngay bây giờ? Sinh viên sẽ nhìn thấy kết quả đã công bố, nên đây cần là một bước phát hành có chủ đích.',
@@ -176,6 +189,13 @@ export default function SectionGradingPage() {
           saved: 'Grades saved',
           saveFailed: 'Grades could not be saved.',
           invalidScore: 'Score must be a number between 0 and 10.',
+          partialRowsOnly:
+            '{count} row(s) have only one score filled — complete both columns to save.',
+          partialRowsSkipped:
+            '{count} row(s) with only one score filled were not saved.',
+          unsavedTitle: 'Unsaved grades',
+          unsavedBody:
+            'Some score cells have not been saved yet. Leaving this screen discards them. Continue?',
           publishTitle: 'Release grades',
           publishMessage:
             'Release these grades now? Students will see the results immediately, so confirm that everything is ready.',
@@ -216,14 +236,18 @@ export default function SectionGradingPage() {
       (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
     ] ?? messages.common.statuses.UNKNOWN;
 
-  const fetchSectionGrades = useCallback(async () => {
+  const fetchSectionGrades = useCallback(async (options?: { silent?: boolean }) => {
     if (!sectionId) {
       setError(copy.missingSection);
       setIsLoading(false);
       return;
     }
 
-    setIsLoading(true);
+    if (options?.silent) {
+      setIsRefreshing(true);
+    } else {
+      setIsLoading(true);
+    }
     setError('');
 
     try {
@@ -247,6 +271,7 @@ export default function SectionGradingPage() {
       );
     } finally {
       setIsLoading(false);
+      setIsRefreshing(false);
     }
   }, [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId]);
 
@@ -257,6 +282,14 @@ export default function SectionGradingPage() {
   }, [fetchSectionGrades, hasAccess]);
 
   const hasChanges = editedIds.size > 0;
+
+  // Leaving the sheet with typed scores discards them; the shared guard adds
+  // the beforeunload dialog and an in-app confirm for the back link.
+  const unsaved = useUnsavedChangesGuard({
+    isDirty: useCallback(() => editedIds.size > 0, [editedIds]),
+    enabled: !isSaving,
+  });
+  const { requestLeave, confirmLeave, cancelLeave, confirmOpen } = unsaved;
 
   const allGraded = useMemo(() => {
     if (!sectionData) {
@@ -278,6 +311,49 @@ export default function SectionGradingPage() {
       next.add(enrollmentId);
       return next;
     });
+  };
+
+  /** Focus the first matching score cell that is actually on screen (the
+   *  mobile cards and the desktop table are both mounted, CSS-hidden). */
+  const focusCell = (dataCell: string) => {
+    if (typeof document === 'undefined') return;
+    const candidates = Array.from(
+      document.querySelectorAll<HTMLInputElement>(`[data-cell="${dataCell}"]`),
+    );
+    const visible = candidates.find((el) => el.offsetParent !== null) ?? candidates[0];
+    visible?.focus();
+    visible?.select();
+  };
+
+  const focusFirstInvalidCell = () => {
+    const firstErrorKey = scoreErrors.keys().next().value;
+    if (firstErrorKey) focusCell(`grade-${firstErrorKey}`);
+  };
+
+  const focusFirstPartialCell = () => {
+    const partial = sectionData?.enrollments.find(
+      (enrollment) => editedIds.has(enrollment.id) && !hasCompletedGrade(grades.get(enrollment.id)),
+    );
+    if (!partial) return;
+    const current = grades.get(partial.id);
+    focusCell(`grade-${partial.id}:${current?.processScore == null ? 'processScore' : 'finalExamScore'}`);
+  };
+
+  /** Enter / ArrowDown moves to the next student's same column, ArrowUp the
+   *  previous one — a 60-row matrix is unusable if every step is two Tabs. */
+  const handleCellKeyDown = (
+    event: KeyboardEvent<HTMLInputElement>,
+    enrollmentIndex: number,
+    field: 'processScore' | 'finalExamScore',
+  ) => {
+    if (!sectionData || (event.key !== 'Enter' && event.key !== 'ArrowDown' && event.key !== 'ArrowUp')) {
+      return;
+    }
+    event.preventDefault();
+    const delta = event.key === 'ArrowUp' ? -1 : 1;
+    const next = sectionData.enrollments[enrollmentIndex + delta];
+    if (!next) return;
+    focusCell(`grade-${next.id}:${field}`);
   };
 
   /**
@@ -352,8 +428,10 @@ export default function SectionGradingPage() {
 
     // The backend upserts only the rows it receives, so submit just the
     // enrollments the lecturer actually edited instead of the whole roster.
-    const updates = sectionData.enrollments
-      .filter((enrollment) => editedIds.has(enrollment.id))
+    const editedRows = sectionData.enrollments.filter((enrollment) => editedIds.has(enrollment.id));
+    const partialRows = editedRows.filter((enrollment) => !hasCompletedGrade(grades.get(enrollment.id)));
+    const updates = editedRows
+      .filter((enrollment) => hasCompletedGrade(grades.get(enrollment.id)))
       .map((enrollment) => grades.get(enrollment.id))
       .filter((update): update is GradeUpdate & { processScore: number; finalExamScore: number } => hasCompletedGrade(update));
 
@@ -361,10 +439,15 @@ export default function SectionGradingPage() {
     // would persist something other than what the lecturer sees on screen.
     if (scoreErrors.size > 0) {
       toast.error(copy.invalidScore);
+      focusFirstInvalidCell();
       return;
     }
 
-    if (updates.length === 0) {
+    // Partial rows cannot be submitted (the backend averages both columns),
+    // but dropping them silently made Save look broken. Name them instead.
+    if (editedRows.length > 0 && updates.length === 0) {
+      toast.error(copy.partialRowsOnly.replace('{count}', formatNumber(partialRows.length)));
+      focusFirstPartialCell();
       return;
     }
 
@@ -372,8 +455,11 @@ export default function SectionGradingPage() {
 
     try {
       await sectionsApi.updateSectionGrades(sectionId, updates);
+      if (partialRows.length > 0) {
+        toast.warning(copy.partialRowsSkipped.replace('{count}', formatNumber(partialRows.length)));
+      }
       toast.success(copy.saved);
-      await fetchSectionGrades();
+      await fetchSectionGrades({ silent: true });
     } catch (requestError: any) {
       toast.error(
         campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
@@ -465,6 +551,11 @@ export default function SectionGradingPage() {
               variant="outline"
               aria-label={copy.backToGrades}
               title={copy.backToGrades}
+              onClick={(event) => {
+                if (!hasChanges) return;
+                event.preventDefault();
+                requestLeave(() => router.push('/dashboard/lecturer/grades'));
+              }}
             >
               {copy.backToGrades}
             </LinkButton>
@@ -475,7 +566,11 @@ export default function SectionGradingPage() {
               onClick={() => void handleSave()}
             >
               <Save className="mr-2 h-4 w-4" />
-              {isSaving ? copy.savingGrades : copy.saveGrades}
+              {isSaving
+                ? copy.savingGrades
+                : hasChanges
+                  ? `${copy.saveGrades} (${formatNumber(editedIds.size)})`
+                  : copy.saveGrades}
             </Button>
             <Button
               type="button"
@@ -606,13 +701,14 @@ export default function SectionGradingPage() {
                     <div className="mt-4 grid gap-4 border-t border-border/60 pt-3 sm:grid-cols-2">
                       <label className="space-y-1.5 text-sm">
                         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          ĐQT (50%)
+                          {copy.headers.processScore}
                         </span>
                         <Input
                           type="number"
                           min="0"
                           max="10"
                           step="0.1"
+                          data-cell={`grade-${enrollment.id}:processScore`}
                           value={current.processScore ?? ''}
                           onChange={(event) =>
                             handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
@@ -624,9 +720,10 @@ export default function SectionGradingPage() {
                       </label>
                       <label className="space-y-1.5 text-sm">
                         <span className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                          ĐCK (50%)
+                          {copy.headers.finalExamScore}
                         </span>
                         <Input type="number" min="0" max="10" step="0.1"
+                          data-cell={`grade-${enrollment.id}:finalExamScore`}
                           value={current.finalExamScore ?? ''}
                           onChange={(event) =>
                             handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
@@ -637,7 +734,7 @@ export default function SectionGradingPage() {
                       </label>
                     </div>
                     <p className="mt-3 text-sm font-medium text-foreground">
-                      Tổng kết: {totalScore(current) ?? '—'} · Điểm chữ: {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
+                      {copy.headers.total}: {totalScore(current) ?? '—'} · {copy.headers.letter}: {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
                     </p>
                   </article>
                 );
@@ -657,18 +754,32 @@ export default function SectionGradingPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {sectionData.enrollments.map((enrollment) => {
+                  {sectionData.enrollments.map((enrollment, enrollmentIndex) => {
                     const current = grades.get(enrollment.id) ?? {
                       enrollmentId: enrollment.id,
                       processScore: enrollment.processScore ?? null,
                       finalExamScore: enrollment.finalExamScore ?? null,
                     };
                     const isPublished = enrollment.gradeStatus === 'PUBLISHED';
+                    const isDirtyRow = editedIds.has(enrollment.id);
 
                     return (
-                      <tr key={enrollment.id} className="transition-colors hover:bg-muted/40">
+                      <tr
+                        key={enrollment.id}
+                        className={
+                          isDirtyRow
+                            ? 'border-l-2 border-l-[var(--portal-chrome-accent)] bg-status-warning/5 transition-colors hover:bg-muted/40'
+                            : 'transition-colors hover:bg-muted/40'
+                        }
+                      >
                         <td className="px-3 py-3.5">
-                          <div className="font-medium text-foreground">
+                          <div className="flex items-center gap-1.5 font-medium text-foreground">
+                            {isDirtyRow && (
+                              <span
+                                aria-hidden="true"
+                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
+                              />
+                            )}
                             {formatVietnameseName(enrollment.studentName)}
                           </div>
                           <div className="mt-1 truncate text-xs text-muted-foreground" title={enrollment.email ?? copy.unavailableEmail}>
@@ -685,26 +796,30 @@ export default function SectionGradingPage() {
                               min="0"
                               max="10"
                               step="0.1"
+                              data-cell={`grade-${enrollment.id}:processScore`}
                               value={current.processScore ?? ''}
                               onChange={(event) =>
                                 handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
                               }
+                              onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'processScore')}
                               error={scoreErrors.get(`${enrollment.id}:processScore`)}
                               disabled={isPublished}
-                              aria-label={`ĐQT 50% - ${formatVietnameseName(enrollment.studentName)}`}
+                              aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                             />
                           </div>
                         </td>
                         <td className="px-3 py-3.5 text-center">
                           <div className="mx-auto max-w-[96px]">
                             <Input type="number" min="0" max="10" step="0.1"
+                              data-cell={`grade-${enrollment.id}:finalExamScore`}
                               value={current.finalExamScore ?? ''}
                               onChange={(event) =>
                                 handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
                               }
+                              onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'finalExamScore')}
                               error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
                               disabled={isPublished}
-                              aria-label={`ĐCK 50% - ${formatVietnameseName(enrollment.studentName)}`} />
+                              aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                           </div>
                         </td>
                         <td className="px-3 py-3.5 text-center font-semibold text-foreground">
@@ -731,6 +846,15 @@ export default function SectionGradingPage() {
       )}
 
       {confirmationDialog}
+      <UnsavedChangesConfirmDialog
+        open={unsaved.confirmOpen}
+        title={copy.unsavedTitle}
+        description={copy.unsavedBody}
+        confirmLabel={locale === 'vi' ? 'Tiếp tục' : 'Continue'}
+        cancelLabel={locale === 'vi' ? 'Ở lại nhập điểm' : 'Keep editing'}
+        onConfirm={unsaved.confirmLeave}
+        onCancel={unsaved.cancelLeave}
+      />
     </div>
   );
 }
