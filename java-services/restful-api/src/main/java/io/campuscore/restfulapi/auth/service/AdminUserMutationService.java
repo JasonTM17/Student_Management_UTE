@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.auth.service;
 
 import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.auth.repository.AuthUserRepository;
+import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.web.DomainException;
 import java.security.SecureRandom;
 import java.sql.Types;
@@ -74,27 +75,28 @@ public class AdminUserMutationService {
                 .addValue("limit", limit)
                 .addValue("offset", (long) (page - 1) * limit)
                 .addValue("status", status, Types.VARCHAR)
-                .addValue(
-                        "search",
-                        search == null ? null : likePattern(search),
-                        Types.VARCHAR);
+                .addValue("search", LikePattern.contains(search), Types.VARCHAR)
+                .addValue("foldFrom", LikePattern.FOLD_FROM)
+                .addValue("foldTo", LikePattern.FOLD_TO);
         List<Map<String, Object>> data = jdbc.queryForList(
                 "SELECT u.\"id\", u.\"email\", u.\"firstName\", u.\"lastName\", u.\"status\", u.\"phone\", u.\"createdAt\","
                         + " COALESCE((SELECT STRING_AGG(r.\"name\", ',') FROM " + USER_ROLE + " ur JOIN " + ROLE + " r ON r.\"id\" = ur.\"roleId\" WHERE ur.\"userId\" = u.\"id\"), '') AS roles"
                         // PostgreSQL cannot infer the type of an unbound NULL in an IS NULL
                         // predicate. Cast optional filters so the first request from the admin
                         // console (which intentionally sends neither filter) remains valid.
+                        // TRANSLATE folds Vietnamese diacritics on the column side so the
+                        // operator's unaccented typing still matches the stored spelling.
                         + " FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
-                        + " AND (CAST(:search AS VARCHAR) IS NULL OR LOWER(u.\"email\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR LOWER(u.\"firstName\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR LOWER(u.\"lastName\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\')"
+                        + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')"
                         + " ORDER BY u.\"createdAt\" DESC LIMIT :limit OFFSET :offset",
                 params);
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
-                        + " AND (CAST(:search AS VARCHAR) IS NULL OR LOWER(u.\"email\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR LOWER(u.\"firstName\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
-                        + " OR LOWER(u.\"lastName\") LIKE CAST(:search AS VARCHAR) ESCAPE '\\')",
+                        + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
+                        + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')",
                 params, Long.class);
         long totalItems = total == null ? 0 : total;
         int totalPages = (int) ((totalItems + limit - 1) / limit);
@@ -348,14 +350,8 @@ public class AdminUserMutationService {
                 .toList());
     }
 
-    /** LIKE pattern with %, _ and \ escaped: a search for "%" matches literal percent signs. */
-    private static String likePattern(String search) {
-        String escaped = search.trim().toLowerCase(java.util.Locale.ROOT)
-                .replace("\\", "\\\\")
-                .replace("%", "\\%")
-                .replace("_", "\\_");
-        return "%" + escaped + "%";
-    }
+    // Shared escaping/folding moved to common.LikePattern: the private copy is
+    // retired so every admin list folds diacritics identically.
 
     private void assignRole(String userId, String roleName) {
         String roleId = roleId(roleName);
