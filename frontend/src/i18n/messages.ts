@@ -384,19 +384,46 @@ export const en = {
     ],
     identityTabs: ['Student', 'Lecturer', 'Admin'],
     identityRows: [
-      { code: 'SE101', label: 'Software Engineering', meta: 'Mon 07:00' },
-      { code: 'MA201', label: 'Discrete Math', meta: 'Tue 09:00' },
-      { code: 'TH400', label: 'Thesis seminar', meta: 'Wed 13:00' },
+      {
+        title: 'Course registration in open rounds',
+        description: 'Pick classes that follow your curriculum.',
+      },
+      {
+        title: 'Timetable, grades and transcript',
+        description: 'Track published results for every term.',
+      },
+      {
+        title: 'Thesis and capstone progress',
+        description: 'Your group, topic and the milestones ahead.',
+      },
     ],
     lecturerIdentityRows: [
-      { code: 'SE101', label: 'Software Engineering', meta: 'Room A2' },
-      { code: 'SE204', label: 'Database systems', meta: 'Room B1' },
-      { code: 'TH400', label: 'Thesis seminar', meta: 'Hall 3' },
+      {
+        title: 'Classes you teach',
+        description: 'Section rosters and the teaching timetable.',
+      },
+      {
+        title: 'Enter and publish grades',
+        description: 'Update components, then publish to students.',
+      },
+      {
+        title: 'Supervised groups',
+        description: 'Follow each thesis group and its progress.',
+      },
     ],
     adminIdentityRows: [
-      { code: 'USR', label: 'User records', meta: 'Open' },
-      { code: 'CAT', label: 'Course catalog', meta: 'Review' },
-      { code: 'ENR', label: 'Enrollment window', meta: 'Active' },
+      {
+        title: 'People and catalog',
+        description: 'Accounts, courses, sections and terms.',
+      },
+      {
+        title: 'Official announcements',
+        description: 'Publish university and faculty notices.',
+      },
+      {
+        title: 'Thesis rounds',
+        description: 'Open rounds, councils and published results.',
+      },
     ],
     footerCopyright: 'All rights reserved.',
   },
@@ -2201,19 +2228,46 @@ export const vi: I18nMessages = {
     ],
     identityTabs: ['Sinh viên', 'Giảng viên', 'Quản trị'],
     identityRows: [
-      { code: 'SE101', label: 'Công nghệ phần mềm', meta: 'T2 07:00' },
-      { code: 'MA201', label: 'Toán rời rạc', meta: 'T3 09:00' },
-      { code: 'TH400', label: 'Seminar luận văn', meta: 'T4 13:00' },
+      {
+        title: 'Đăng ký học phần trong đợt mở',
+        description: 'Chọn lớp theo chương trình đào tạo của bạn.',
+      },
+      {
+        title: 'Thời khóa biểu, điểm và bảng điểm',
+        description: 'Theo dõi kết quả từng học kỳ đã công bố.',
+      },
+      {
+        title: 'Tiến độ đồ án – khóa luận',
+        description: 'Nhóm, đề tài và các mốc cần lưu ý.',
+      },
     ],
     lecturerIdentityRows: [
-      { code: 'SE101', label: 'Công nghệ phần mềm', meta: 'P. A2' },
-      { code: 'SE204', label: 'Cơ sở dữ liệu', meta: 'P. B1' },
-      { code: 'TH400', label: 'Seminar luận văn', meta: 'Hội trường 3' },
+      {
+        title: 'Lớp học phần đang giảng dạy',
+        description: 'Danh sách lớp và lịch dạy theo học kỳ.',
+      },
+      {
+        title: 'Nhập điểm và công bố',
+        description: 'Cập nhật điểm thành phần rồi công bố cho sinh viên.',
+      },
+      {
+        title: 'Nhóm hướng dẫn',
+        description: 'Theo dõi nhóm đồ án và tiến độ thực hiện.',
+      },
     ],
     adminIdentityRows: [
-      { code: 'USR', label: 'Hồ sơ người dùng', meta: 'Mở' },
-      { code: 'CAT', label: 'Danh mục môn', meta: 'Duyệt' },
-      { code: 'ENR', label: 'Cửa sổ đăng ký', meta: 'Đang mở' },
+      {
+        title: 'Người dùng và danh mục',
+        description: 'Tài khoản, môn học, lớp học phần, học kỳ.',
+      },
+      {
+        title: 'Thông báo chính thức',
+        description: 'Đăng và lưu hành thông báo của nhà trường, khoa.',
+      },
+      {
+        title: 'Đợt luận văn',
+        description: 'Khởi tạo đợt, hội đồng và công bố kết quả.',
+      },
     ],
     footerCopyright: 'Mọi quyền được bảo lưu.',
   },
