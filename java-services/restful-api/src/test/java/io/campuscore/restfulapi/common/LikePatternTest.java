@@ -36,4 +36,21 @@ class LikePatternTest {
 
         assertThat(bounded).isEqualTo("%" + "a".repeat(LikePattern.MAX_TERM_LENGTH) + "%");
     }
+
+    @Test
+    @DisplayName("the TRANSLATE fold pair stays aligned and folds Vietnamese diacritics")
+    void foldPairStaysAlignedAndFoldsDiacritics() {
+        assertThat(LikePattern.FOLD_FROM.length())
+                .isEqualTo(LikePattern.FOLD_TO.length())
+                .isGreaterThan(0);
+        // Every marked character maps to a plain ASCII base letter.
+        assertThat(LikePattern.FOLD_TO).doesNotContain("á", "ế", "ộ", "đ");
+
+        // fold strips marks but preserves case: contains() lower-cases first.
+        assertThat(LikePattern.fold("Nguyễn Văn Hóa")).isEqualTo("Nguyen Van Hoa");
+        assertThat(LikePattern.fold("TRIẾT")).isEqualTo("TRIET");
+        assertThat(LikePattern.contains("nguyen"))
+                .isEqualTo("%nguyen%")
+                .isEqualTo(LikePattern.contains("Nguyễn"));
+    }
 }

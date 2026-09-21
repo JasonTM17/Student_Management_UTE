@@ -1,8 +1,8 @@
 package io.campuscore.restfulapi.academic.repository;
 
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearSummary;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;
-import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
+import io.campuscore.restfulapi.common.LikePattern;
+import io.campuscore.restfulapi.academic.web.AcademicReadDtos.AcademicYearResponse;import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.ClassroomSectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CourseResponse;
 import io.campuscore.restfulapi.academic.web.AcademicReadDtos.CurriculumCourseSummary;
@@ -100,7 +100,7 @@ public class AcademicReadRepository {
             "s.\"name\"", "s.\"nameEn\"", "s.\"nameVi\"", "s.\"type\"")
             + " OR EXISTS (SELECT 1 FROM \"academic\".\"AcademicYear\" sy"
             + " WHERE sy.\"id\" = s.\"academicYearId\""
-            + " AND LOWER(CAST(sy.\"year\" AS VARCHAR)) LIKE :search ESCAPE '\\')";
+            + " AND TRANSLATE(LOWER(CAST(sy.\"year\" AS VARCHAR)), :foldFrom, :foldTo) LIKE :search ESCAPE '\\')";
 
     /** Course catalog search terms, shared by the page and the count query. */
     private static final String COURSE_SEARCH_TERMS = likeTerms(
@@ -454,10 +454,17 @@ public class AcademicReadRepository {
                 .addValue("limit", limit);
     }
 
-    /** {@code a LIKE :search ESCAPE '\' OR b LIKE :search ESCAPE '\'} for the given columns. */
+    /**
+     * {@code a LIKE :search ESCAPE '\' OR b LIKE :search ESCAPE '\'} for the given
+     * columns. The column side folds through {@code TRANSLATE} with the shared
+     * Vietnamese pair so a diacritic-folded pattern ("hoc ky") still matches the
+     * stored accented spelling ("Học kỳ") — the bound pattern is folded by
+     * {@code LikePattern.contains}, so folding only one side would regress the
+     * previously-exact accented queries.
+     */
     private static String likeTerms(String... expressions) {
         return java.util.Arrays.stream(expressions)
-                .map(expression -> "LOWER(" + expression + ") LIKE :search ESCAPE '\\'")
+                .map(expression -> "TRANSLATE(LOWER(" + expression + "), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'")
                 .collect(java.util.stream.Collectors.joining(" OR "));
     }
 
@@ -474,6 +481,8 @@ public class AcademicReadRepository {
             return "";
         }
         parameters.addValue("search", search);
+        parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+        parameters.addValue("foldTo", LikePattern.FOLD_TO);
         return " WHERE (" + predicate + ")";
     }
 

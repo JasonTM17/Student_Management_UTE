@@ -776,6 +776,9 @@ export const en = {
       ['Campus assistant knowledge', 'Review the public campus guidance available to the CampusUTE assistant.'],
       ['Site appearance', 'Change the public campus look and the order of notices.'],
       ['Credit-limit applications', 'Review student requests to register up to 30 credits.'],
+      ['Academic years', 'Structure the year-by-year calendar that semesters hang from.'],
+      ['Knowledge base', 'Curate the reference documents the assistant retrieves for students.'],
+      ['Announcement editor', 'Compose and publish notices with the full editorial workspace.'],
     ],
     creditLimitApplications: {
       title: 'Credit-limit applications',
@@ -832,13 +835,16 @@ export const en = {
       illustrativeBadge: 'Sample data',
       illustrativeNotice:
         'Charts below show illustrative sample data to demonstrate the layout. Card totals above come from live campus records.',
+      liveBadge: 'Live data',
+      liveNotice:
+        'Charts below are rendered directly from the live academic-records API.',
       tabs: {
         departments: 'By faculty',
         enrollments: 'Enrollment trend',
         faculty: 'Faculty body',
         grades: 'Academic standing',
       },
-      departmentsTitle: 'Training scale across 8 key faculties',
+      departmentsTitle: 'Training scale across key faculties',
       metricStudents: 'Students',
       metricCourses: 'Courses',
       metricSections: 'Open sections',
@@ -2625,6 +2631,9 @@ export const vi: I18nMessages = {
       ['Kho tri thức trợ lý CampusUTE', 'Quản lý nội dung campus công khai mà trợ lý CampusUTE sử dụng.'],
       ['Diện mạo cổng', 'Đổi giao diện công khai và thứ tự thông báo.'],
       ['Đơn xin vượt hạn mức tín chỉ', 'Xét duyệt đơn xin đăng ký tối đa 30 tín chỉ.'],
+      ['Năm học', 'Cấu trúc lịch theo từng năm học để các học kỳ gắn vào.'],
+      ['Kho tri thức', 'Quản lý tài liệu tham khảo mà trợ lý dùng để trả lời sinh viên.'],
+      ['Trình soạn thông báo', 'Soạn và xuất bản thông báo bằng workspace biên tập đầy đủ.'],
     ],
     creditLimitApplications: {
       title: 'Đơn xin vượt hạn mức tín chỉ',
@@ -2681,13 +2690,16 @@ export const vi: I18nMessages = {
       illustrativeBadge: 'Dữ liệu mẫu',
       illustrativeNotice:
         'Các biểu đồ dưới đây dùng dữ liệu mẫu minh họa cho bố cục giao diện. Số liệu tổng ở các thẻ trên lấy từ hồ sơ học vụ thực tế.',
+      liveBadge: 'Dữ liệu trực tiếp',
+      liveNotice:
+        'Các biểu đồ dưới đây được vẽ trực tiếp từ API hồ sơ học vụ thực tế.',
       tabs: {
         departments: 'Theo khoa',
         enrollments: 'Xu hướng ĐKHP',
         faculty: 'Đội ngũ giảng viên',
         grades: 'Xếp loại học lực',
       },
-      departmentsTitle: 'Phân bổ quy mô đào tạo theo 8 khoa trọng điểm',
+      departmentsTitle: 'Phân bổ quy mô đào tạo theo các khoa trọng điểm',
       metricStudents: 'Sinh viên',
       metricCourses: 'Môn học',
       metricSections: 'Lớp mở',

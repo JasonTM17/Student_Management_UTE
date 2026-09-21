@@ -508,3 +508,28 @@ test('dogfood audit: i18n, metadata, and language toggle regressions stay guarde
   assert.doesNotMatch(thesis, /'Reason must be at most 500 characters\.'/);
   assert.doesNotMatch(thesis, /'All fields are required'/);
 });
+
+test('schedule page keeps badges padded and never prints a UUID as the student ID', () => {
+  const page = read('src/app/dashboard/schedule/page.tsx');
+
+  // Tailwind has no py-0.2 spacing step, so the class silently resolved to
+  // zero padding and squeezed the HÔM NAY badge text against its edges.
+  assert.doesNotMatch(page, /py-0\.2/);
+  assert.match(page, /py-0\.5/);
+  // A printed UUID fragment presented as an MSSV is fabricated identity data;
+  // unknown student codes print an honest em-dash instead.
+  assert.doesNotMatch(page, /user\.id\?\.slice\(0, 10\)/);
+  assert.match(page, /user\.studentId \?\? '—'/);
+});
+
+test('announcements banner names the live semester instead of a hardcoded term', () => {
+  const page = read('src/app/dashboard/announcements/page.tsx');
+
+  // A hardcoded term goes stale the day the calendar turns; the banner must
+  // render the semester the API reports, or an honest em-dash.
+  assert.doesNotMatch(page, /Học kỳ 1 • 2026-2027/);
+  assert.doesNotMatch(page, /Term 1 • 2026-2027/);
+  assert.match(page, /semestersApi/);
+  assert.match(page, /pickPreferredSemesterId/);
+  assert.match(page, /currentSemesterName \|\| '—'/);
+});

@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.people.repository;
 
+import io.campuscore.restfulapi.common.LikePattern;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.CurriculumSummary;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.DepartmentSummary;
 import io.campuscore.restfulapi.people.web.PeopleReadDtos.LecturerResponse;
@@ -116,18 +117,25 @@ public class PeopleReadRepository {
      * account, so they are reached through EXISTS instead of adding a join to the
      * {@code COUNT(*)} statement - the list and the total then run the same
      * predicate and a request without {@code search} keeps its original SQL.
+     *
+     * <p>{@code search} arrives already lowered, escaped, and diacritic-folded by
+     * {@link LikePattern#contains} at the service layer; this predicate only adds
+     * the column-side {@code TRANSLATE} fold so "nguyen" matches "Nguyễn".
+     * Applying {@code contains} here as well would wrap the pattern twice.
      */
     private static String searchWhere(MapSqlParameterSource parameters, String search) {
         if (search == null) {
             return "";
         }
         parameters.addValue("search", search);
-        return " WHERE (LOWER(lecturer.\"employeeId\") LIKE :search ESCAPE '\\'"
+        parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
+        parameters.addValue("foldTo", LikePattern.FOLD_TO);
+        return " WHERE (TRANSLATE(LOWER(lecturer.\"employeeId\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
                 + " OR EXISTS (SELECT 1 FROM " + USER_TABLE + " su"
                 + " WHERE su.\"id\" = lecturer.\"userId\""
-                + " AND (LOWER(su.\"firstName\") LIKE :search ESCAPE '\\'"
-                + " OR LOWER(su.\"lastName\") LIKE :search ESCAPE '\\'"
-                + " OR LOWER(su.\"email\") LIKE :search ESCAPE '\\')))";
+                + " AND (TRANSLATE(LOWER(su.\"firstName\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
+                + " OR TRANSLATE(LOWER(su.\"lastName\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
+                + " OR TRANSLATE(LOWER(su.\"email\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\')))";
     }
 
     private static String studentStatusFilter(MapSqlParameterSource parameters, String status) {
