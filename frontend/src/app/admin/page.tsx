@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, DoorOpen, FileText, GraduationCap, Palette, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, CalendarDays, Database, DoorOpen, FileEdit, FileText, GraduationCap, Palette, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
@@ -35,6 +35,10 @@ const menuItems = [
   { href: '/admin/announcements', icon: Bell, tone: 'warning' as const },
   { href: '/admin/assistant-knowledge', icon: BrainCircuit, tone: 'info' as const },
   { href: '/admin/appearance', icon: Palette, tone: 'success' as const },
+  { href: '/admin/credit-limit-applications', icon: FileText, tone: 'info' as const },
+  { href: '/admin/academic-years', icon: CalendarDays, tone: 'neutral' as const },
+  { href: '/admin/knowledge', icon: Database, tone: 'success' as const },
+  { href: '/admin/editor', icon: FileEdit, tone: 'warning' as const },
 ];
 
 export default function AdminDashboardPage() {
