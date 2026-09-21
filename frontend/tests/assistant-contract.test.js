@@ -532,6 +532,15 @@ test('client assistant guard mirrors the server input guard', () => {
   assert.equal(inspectAssistantInput('bao gio thi lai mon hoc phan do').allowed, true);
   assert.equal(inspectAssistantInput('moi truong hoc phan nay la gi').allowed, true);
   assert.equal(inspectAssistantInput('khong biet cach nop hoc phi').allowed, true);
+
+  // Technical probes stay refused, but everyday academic vocabulary that the
+  // old wide verb-to-noun window ("xin ... mô hình") and the bare tool tokens
+  // ("git") caught wrongly passes through to the assistant.
+  assert.equal(inspectAssistantInput('Bạn đang sử dụng mô hình nào?').allowed, false);
+  assert.equal(inspectAssistantInput('git push lên repo nào vậy bot?').allowed, false);
+  assert.equal(inspectAssistantInput('Em xin mô hình đào tạo tín chỉ của ngành CNTT.').allowed, true);
+  assert.equal(inspectAssistantInput('Git là gì? Giải thích giúp em.').allowed, true);
+  assert.equal(inspectAssistantInput('Cho em xin đề cương môn học phần mềm.').allowed, true);
 });
 
 test('policy and personal-record questions alike defer to the server', async () => {
