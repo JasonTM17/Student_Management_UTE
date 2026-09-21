@@ -16,7 +16,8 @@ import {
   Search,
 } from 'lucide-react';
 import { useRequireAuth } from '@/context/AuthContext';
-import { announcementsApi, type AnnouncementRecord } from '@/lib/api';
+import { announcementsApi, semestersApi, type AnnouncementRecord } from '@/lib/api';
+import { pickPreferredSemesterId } from '@/lib/semesters';
 import { AnnouncementReaderModal } from '@/components/announcements/AnnouncementReaderModal';
 import { AnnouncementFeedCard } from '@/components/announcements/feed/AnnouncementFeedCard';
 import { Button } from '@/components/ui/button';
@@ -74,6 +75,9 @@ export default function StudentAnnouncementsPage() {
   const orderedItems = useOrderedPosts(items);
   const [isLoading, setIsLoading] = useState(true);
   const [error, setError] = useState('');
+  // The banner names the semester the feed is published under. It comes from
+  // the semesters API — a hardcoded term rots the moment the calendar moves.
+  const [currentSemesterName, setCurrentSemesterName] = useState('');
   // Feed pagination: the backend caps a page, so notices past page 1 stay
   // reachable through an explicit load-more instead of being cut off silently.
   const [page, setPage] = useState(1);
@@ -190,6 +194,27 @@ export default function StudentAnnouncementsPage() {
       void fetchFeed();
     }
   }, [fetchFeed, hasAccess]);
+
+  // Resolve the live current semester for the banner; an unknown calendar
+  // prints an em-dash rather than an invented term.
+  useEffect(() => {
+    if (!hasAccess) return;
+    let mounted = true;
+    semestersApi
+      .getAll()
+      .then((res) => {
+        if (!mounted) return;
+        const semesters = res.data ?? [];
+        const preferredId = pickPreferredSemesterId(semesters);
+        setCurrentSemesterName(semesters.find((s) => s.id === preferredId)?.name ?? '');
+      })
+      .catch(() => {
+        if (mounted) setCurrentSemesterName('');
+      });
+    return () => {
+      mounted = false;
+    };
+  }, [hasAccess]);
 
   // Deep-link handler: open announcement if ?id= is in the query params
   useEffect(() => {
@@ -332,7 +357,7 @@ export default function StudentAnnouncementsPage() {
             <div className="flex flex-wrap items-center gap-3 pt-1 text-xs text-muted-foreground">
               <span className="flex items-center gap-1 font-semibold text-foreground">
                 <Calendar className="h-3.5 w-3.5 text-primary" />
-                {locale === 'vi' ? 'Học kỳ 1 • 2026-2027' : 'Term 1 • 2026-2027'}
+                {currentSemesterName || '—'}
               </span>
               <span>•</span>
               <span className="flex items-center gap-1 text-emerald-600 dark:text-emerald-400 font-semibold">

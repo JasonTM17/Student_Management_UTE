@@ -157,7 +157,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               {copy.title}
             </CardTitle>
             <span
-              title={copy.illustrativeNotice}
+              title={isLive ? copy.liveNotice : copy.illustrativeNotice}
               className={cn(
                 'inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium',
                 isLive
@@ -166,7 +166,9 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               )}
             >
               <Info className="h-3 w-3" aria-hidden="true" />
-              {copy.illustrativeBadge}
+              {/* The label must match the data source: calling live rows
+                  "sample data" is the same dishonesty as the reverse. */}
+              {isLive ? copy.liveBadge : copy.illustrativeBadge}
             </span>
           </div>
 
@@ -221,7 +223,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               : 'border-status-warning/30 bg-status-warning/10 text-status-warning-foreground',
           )}
         >
-          {copy.illustrativeNotice}
+          {isLive ? copy.liveNotice : copy.illustrativeNotice}
         </p>
       </CardHeader>
 
@@ -276,7 +278,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               </div>
             ) : (
               <div className="rounded-xl border border-border/70 bg-card/60 p-4">
-                <svg viewBox="0 0 800 230" className="h-auto w-full" role="img" aria-label={copy.chartAria}>
+                <svg viewBox="0 0 800 250" className="h-auto w-full" role="img" aria-label={copy.chartAria}>
                   <defs>
                     <linearGradient id="deptMonoGradient" x1="0" y1="0" x2="0" y2="1">
                       <stop offset="0%" stopColor="#2563eb" stopOpacity="0.95" />
@@ -338,15 +340,17 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
                         >
                           {value}
                         </text>
-                        {/* Department code */}
+                        {/* Department code — rotated so long codes like
+                            AUTO-ENG never collide at 16+ departments */}
                         <text
                           x={x + barWidth / 2}
-                          y={204}
-                          fontSize={11}
+                          y={206}
+                          fontSize={10}
                           fontWeight={600}
                           fill="currentColor"
                           fillOpacity={0.9}
-                          textAnchor="middle"
+                          textAnchor="end"
+                          transform={`rotate(-38 ${x + barWidth / 2} 206)`}
                         >
                           {dept.code}
                         </text>

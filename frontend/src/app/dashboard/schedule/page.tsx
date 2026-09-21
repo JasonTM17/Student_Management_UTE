@@ -446,7 +446,7 @@ export default function SchedulePage() {
               {user ? (
                 <>
                   <span><strong>{locale === 'vi' ? 'Sinh viên:' : 'Student:'}</strong> {user.lastName} {user.firstName}</span>
-                  <span><strong>{locale === 'vi' ? 'MSSV:' : 'Student ID:'}</strong> {user.studentId ?? user.id?.slice(0, 10)}</span>
+                  <span><strong>{locale === 'vi' ? 'MSSV:' : 'Student ID:'}</strong> {user.studentId ?? '—'}</span>
                 </>
               ) : null}
               <span><strong>{copy.totalCourses}:</strong> {uniqueCoursesCount}</span>
@@ -569,7 +569,7 @@ export default function SchedulePage() {
                           >
                             <div className="text-xs uppercase tracking-wider">{dayName}</div>
                             {isToday ? (
-                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.2 text-[9px] font-bold text-primary-foreground">
+                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
                                 {copy.today}
                               </span>
                             ) : null}
@@ -833,7 +833,7 @@ export default function SchedulePage() {
                         </span>
                       ) : null}
                       <span
-                        className={`rounded-md px-1.5 py-0.2 text-[10px] ${
+                        className={`rounded-md px-1.5 py-0.5 text-[10px] ${
                           isSelected ? 'bg-primary-foreground/20' : 'bg-secondary text-muted-foreground'
                         }`}
                       >

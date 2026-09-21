@@ -157,6 +157,46 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void userSearchMatchesUnaccentedTypingAgainstDiacriticStoredNames() throws Exception {
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"User\""
+                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
+                        + " \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES ('fold-user', 'nguyen.van@campuscore.edu', 'x', 'Văn', 'Nguyễn', 'ACTIVE',"
+                        + " FALSE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)");
+
+        // Vietnamese operators routinely type without tone marks. The pre-fix
+        // accent-sensitive LIKE returned an empty page for "nguyen" even though
+        // the account's stored name is "Nguyễn".
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "nguyen")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.data[0].lastName").value("Nguyễn"));
+
+        // Diacritic input still matches the stored spelling, and so does
+        // uppercase unaccented input.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "Nguyễn")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1));
+
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "10")
+                        .queryParam("search", "NGUYEN")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1));
+    }
+
+    @Test
     void adminListSerializesRolesAsAnArrayLikeAuthUserResponse() throws Exception {
         mvc.perform(get("/api/v1/users")
                         .queryParam("page", "1")
