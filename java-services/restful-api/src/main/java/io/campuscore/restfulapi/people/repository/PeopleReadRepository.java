@@ -118,16 +118,16 @@ public class PeopleReadRepository {
      * {@code COUNT(*)} statement - the list and the total then run the same
      * predicate and a request without {@code search} keeps its original SQL.
      *
-     * <p>The term is bound through {@link LikePattern#contains}, which lower-cases,
-     * escapes LIKE wildcards, and folds Vietnamese diacritics; the column side
-     * folds with the same {@code TRANSLATE} pair so "nguyen" matches "Nguyễn".
+     * <p>{@code search} arrives already lowered, escaped, and diacritic-folded by
+     * {@link LikePattern#contains} at the service layer; this predicate only adds
+     * the column-side {@code TRANSLATE} fold so "nguyen" matches "Nguyễn".
+     * Applying {@code contains} here as well would wrap the pattern twice.
      */
     private static String searchWhere(MapSqlParameterSource parameters, String search) {
-        String pattern = LikePattern.contains(search);
-        if (pattern == null) {
+        if (search == null) {
             return "";
         }
-        parameters.addValue("search", pattern);
+        parameters.addValue("search", search);
         parameters.addValue("foldFrom", LikePattern.FOLD_FROM);
         parameters.addValue("foldTo", LikePattern.FOLD_TO);
         return " WHERE (TRANSLATE(LOWER(lecturer.\"employeeId\"), :foldFrom, :foldTo) LIKE :search ESCAPE '\\'"
