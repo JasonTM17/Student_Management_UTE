@@ -100,3 +100,5 @@ frontend/.mimosa/
 scratch/
 .workbuddy-ai/
 .zcodeignore
+.zcode/
+frontend/scripts/
