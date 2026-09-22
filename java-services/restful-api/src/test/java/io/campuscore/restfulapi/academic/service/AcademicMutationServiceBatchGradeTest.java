@@ -132,7 +132,17 @@ class AcademicMutationServiceBatchGradeTest {
 
     @Test
     void batchGradeUpdateWithEmptyListReturnsWithoutError() {
+        jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\") VALUES (?, ?, ?, ?)",
+                "sec-01", "sem-01", "lec-01", "OPEN");
         service.updateGrades("sec-01", "lec-01", true, List.of());
+    }
+
+    @Test
+    void batchGradeUpdateWithEmptyListStillValidatesSectionOwnership() {
+        // Guard order: section existence and ownership are checked before the
+        // empty-list early return, so a silent no-op cannot skip authorization.
+        assertThrows(DomainException.class, () ->
+                service.updateGrades("sec-missing", "lec-01", true, List.of()));
     }
 
     @Test

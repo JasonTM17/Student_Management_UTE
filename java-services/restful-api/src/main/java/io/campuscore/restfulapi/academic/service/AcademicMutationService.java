@@ -10,6 +10,7 @@ import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -152,20 +153,27 @@ public class AcademicMutationService {
 
     @Transactional
     public void updateGrades(String sectionId, String lecturerId, boolean admin, List<GradeUpdate> grades) {
-        if (grades == null || grades.isEmpty()) {
-            return;
-        }
         requireSection(sectionId);
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
+        }
+        if (grades == null || grades.isEmpty()) {
+            return;
         }
         // Official HCMUTE terminology for the two 50% components; the
         // canonical ids are stable so existing grade rows keep their item.
         String processItemId = canonicalGradeItem(sectionId, "PROCESS", "Điểm quá trình (ĐQT - 50%)");
         String finalItemId = canonicalGradeItem(sectionId, "FINAL", "Điểm kết thúc học phần (ĐKTHP - 50%)");
 
-        // Pre-fetch and lock all targeted enrollments in a single batch query
-        List<String> enrollmentIds = grades.stream().map(GradeUpdate::enrollmentId).distinct().toList();
+        // Pre-fetch and lock all targeted enrollments in a single batch query.
+        // A replayed or double-submitted row must merge last-write-wins like the
+        // per-row save did, never trip the (enrollmentId, gradeItemId) unique index.
+        Map<String, GradeUpdate> mergedGrades = new LinkedHashMap<>();
+        for (GradeUpdate grade : grades) {
+            mergedGrades.put(grade.enrollmentId(), grade);
+        }
+        List<GradeUpdate> effectiveGrades = List.copyOf(mergedGrades.values());
+        List<String> enrollmentIds = List.copyOf(mergedGrades.keySet());
         List<Map<String, Object>> enrollmentRows = jdbc.queryForList(
                 "SELECT \"id\", \"studentId\" AS student_id, \"sectionId\" AS section_id, \"status\","
                         + " \"gradeStatus\" AS grade_status"
@@ -177,10 +185,10 @@ public class AcademicMutationService {
             enrollmentMap.put(String.valueOf(row.get("id")), row);
         }
 
-        List<MapSqlParameterSource> componentBatch = new ArrayList<>(grades.size() * 2);
-        List<MapSqlParameterSource> enrollmentBatch = new ArrayList<>(grades.size());
+        List<MapSqlParameterSource> componentBatch = new ArrayList<>(effectiveGrades.size() * 2);
+        List<MapSqlParameterSource> enrollmentBatch = new ArrayList<>(effectiveGrades.size());
 
-        for (GradeUpdate grade : grades) {
+        for (GradeUpdate grade : effectiveGrades) {
             Map<String, Object> enrollment = enrollmentMap.get(grade.enrollmentId());
             if (enrollment == null) {
                 throw problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found");
