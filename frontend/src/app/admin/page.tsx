@@ -5,7 +5,7 @@ import { useRouter } from 'next/navigation';
 import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, CalendarDays, Database, DoorOpen, FileEdit, FileText, GraduationCap, Palette, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
-import { coursesApi, enrollmentsApi, lecturersApi, usersApi } from '@/lib/api';
+import { campusDistributionApi, coursesApi, enrollmentsApi } from '@/lib/api';
 import { AdminFrame } from '@/components/admin/AdminFrame';
 import { AdminMetricCard } from '@/components/admin/AdminSurface';
 import { AdminAnalyticsCharts } from '@/components/admin/AdminAnalyticsCharts';
@@ -75,15 +75,17 @@ export default function AdminDashboardPage() {
     setError('');
 
     try {
-      const [users, lecturers, courses, enrollments] = await Promise.all([
-        usersApi.getAll({ limit: 1 }),
-        lecturersApi.getAll({ limit: 1 }),
+      // Students and lecturers come from the same academic-distribution API the
+      // charts use: the /users endpoint totals every account (including staff),
+      // which once made the "Students" tile read 270 on a 230-student campus.
+      const [overview, courses, enrollments] = await Promise.all([
+        campusDistributionApi.getOverview(),
         coursesApi.getAll({ limit: 1 }),
         enrollmentsApi.getAll({ limit: 1 }),
       ]);
       setStats({
-        totalStudents: users.meta?.total ?? users.data.length,
-        totalLecturers: lecturers.meta?.total ?? lecturers.data.length,
+        totalStudents: overview.totals?.students ?? 0,
+        totalLecturers: overview.totals?.lecturers ?? 0,
         totalCourses: courses.meta?.total ?? courses.data.length,
         totalEnrollments: enrollments.meta?.total ?? enrollments.data.length,
       });

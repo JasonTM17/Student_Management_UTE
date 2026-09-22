@@ -580,6 +580,16 @@ test('conduct export opens the print dialog without claiming a produced report',
   assert.match(page, /window\.print\(\)/);
 });
 
+test('admin overview counts students from academic records, not all user accounts', () => {
+  const page = read('src/app/admin/page.tsx');
+
+  // /users totals every account (students + staff = 270); the "Students" tile
+  // must use the academic distribution totals (230) like the charts do.
+  assert.match(page, /campusDistributionApi\.getOverview/);
+  assert.match(page, /overview\.totals\?\.students/);
+  assert.doesNotMatch(page, /usersApi\.getAll/);
+});
+
 test('demo credentials agree on one password across README and runbook', () => {
   const readme = fs.readFileSync(path.join(root, '../README.md'), 'utf8');
   const runbook = fs.readFileSync(path.join(root, '../docs/DEMO_RUNBOOK.md'), 'utf8');
