@@ -43,6 +43,10 @@ services:
       JWT_SECRET: ${JWT_SECRET:-local-course-jwt-secret-change-me}
       JWT_REFRESH_SECRET: ${JWT_REFRESH_SECRET:-local-course-refresh-secret-change-me}
       FLYWAY_ENABLED: ${FLYWAY_ENABLED:-true}
+      # The rag service runs the same jar, so it also carries DemoAccountGate.
+      # Without this switch its gate (default false) re-locked the seeded
+      # accounts on every boot and silently overrode the API's opt-in above.
+      DEMO_ACCOUNTS_ENABLED: ${DEMO_ACCOUNTS_ENABLED:-true}
       ASSISTANT_RAG_SERVICE_MODE: "true"
       ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "disabled"
