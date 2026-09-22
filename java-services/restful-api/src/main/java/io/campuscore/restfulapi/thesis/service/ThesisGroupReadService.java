@@ -109,6 +109,6 @@ public class ThesisGroupReadService {
     }
 
     private static boolean isFacultyAdmin(List<String> roles) {
-        return roles.contains("ADMIN") || roles.contains("TRUONG_KHOA");
+        return roles.contains("ADMIN") || roles.contains("SUPER_ADMIN") || roles.contains("TRUONG_KHOA");
     }
 }

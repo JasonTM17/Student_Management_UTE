@@ -68,6 +68,18 @@ class ThesisTopicVisibilityTest {
     }
 
     @Test
+    void superAdminReceivesTheFullRequestedListingAndCanReadDraft() {
+        when(repository.findAllByRoundIdAndStatusOrderByTitle(eq(ROUND_ID), eq(TopicStatus.DRAFT)))
+                .thenReturn(List.of(draftTopic("22222222-2222-2222-2222-222222222201", "lecturer-user-002")));
+
+        assertEquals(1, service.list(ROUND_ID, TopicStatus.DRAFT, jwt("super-admin-user", "SUPER_ADMIN")).size());
+
+        ThesisTopic draft = draftTopic("22222222-2222-2222-2222-222222222201", "lecturer-user-002");
+        when(repository.findById(draft.getId())).thenReturn(Optional.of(draft));
+        assertEquals(draft.getId(), service.get(draft.getId(), jwt("super-admin-user", "SUPER_ADMIN")).id());
+    }
+
+    @Test
     void hiddenTopicRespondsNotFoundToNonOwnerWhileOwnerAndAdminCanRead() {
         ThesisTopic draft = draftTopic("22222222-2222-2222-2222-222222222201", "lecturer-user-002");
         when(repository.findById(draft.getId())).thenReturn(Optional.of(draft));

@@ -102,6 +102,23 @@ class MailEndpointSecurityTest {
                 .andExpect(status().isUnauthorized());
     }
 
+    @Test
+    void superAdminMaySendTestEmailAndGradeAlerts() throws Exception {
+        mvc.perform(post("/api/v1/mail/test")
+                        .with(superAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_TEST_MAIL))
+                .andExpect(status().isOk());
+        verify(emailService).sendTestEmail(any(), any(), any());
+
+        mvc.perform(post("/api/v1/mail/grade-alert")
+                        .with(superAdminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(VALID_GRADE_ALERT))
+                .andExpect(status().isOk());
+        verify(emailService).sendGradeAlert(any());
+    }
+
     private RequestPostProcessor studentJwt() {
         return jwt().jwt(token -> token
                         .subject("mail-student-user")
@@ -114,5 +131,12 @@ class MailEndpointSecurityTest {
                         .subject("mail-lecturer-user")
                         .claim("roles", List.of("LECTURER")))
                 .authorities(new SimpleGrantedAuthority("ROLE_LECTURER"));
+    }
+
+    private RequestPostProcessor superAdminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("mail-super-admin-user")
+                        .claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
     }
 }

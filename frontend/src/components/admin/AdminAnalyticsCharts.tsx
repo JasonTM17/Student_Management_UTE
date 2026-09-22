@@ -6,11 +6,14 @@ import {
   BarChart3,
   GraduationCap,
   Info,
+  RefreshCw,
   School,
   TrendingUp,
 } from 'lucide-react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
+import { EmptyState } from '@/components/ui/state-block';
+import { Skeleton } from '@/components/ui/skeleton';
 import { useI18n } from '@/i18n';
 import { cn } from '@/lib/utils';
 import {
@@ -53,25 +56,24 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
   const [overview, setOverview] = useState<AdminAnalyticsOverview | null>(null);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  useEffect(() => {
-    let isMounted = true;
+  const fetchOverview = React.useCallback(() => {
+    setIsLoading(true);
     campusDistributionApi
       .getOverview()
       .then((data) => {
-        if (isMounted) {
-          setOverview(data);
-          setIsLoading(false);
-        }
+        setOverview(data);
       })
       .catch(() => {
-        if (isMounted) {
-          setIsLoading(false);
-        }
+        setOverview(null);
+      })
+      .finally(() => {
+        setIsLoading(false);
       });
-    return () => {
-      isMounted = false;
-    };
   }, []);
+
+  useEffect(() => {
+    fetchOverview();
+  }, [fetchOverview]);
 
   const isLive = overview !== null;
 
@@ -156,28 +158,23 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             <CardTitle className="text-base font-semibold text-foreground">
               {copy.title}
             </CardTitle>
-            <span
-              title={isLive ? copy.liveNotice : copy.illustrativeNotice}
-              className={cn(
-                'inline-flex items-center gap-1.5 rounded-md px-2.5 py-0.5 text-xs font-medium',
-                isLive
-                  ? 'bg-status-success/15 text-status-success-foreground'
-                  : 'bg-status-warning/15 text-status-warning-foreground',
-              )}
-            >
-              <Info className="h-3 w-3" aria-hidden="true" />
-              {/* The label must match the data source: calling live rows
-                  "sample data" is the same dishonesty as the reverse. */}
-              {isLive ? copy.liveBadge : copy.illustrativeBadge}
-            </span>
+            {isLive ? (
+              <span
+                title={copy.liveNotice}
+                className="inline-flex items-center gap-1.5 rounded-md bg-status-success/15 px-2.5 py-0.5 text-xs font-medium text-status-success-foreground"
+              >
+                <Info className="h-3 w-3" aria-hidden="true" />
+                {copy.liveBadge}
+              </span>
+            ) : null}
           </div>
 
-          <div className="flex flex-wrap items-center gap-1.5 rounded-lg border border-border bg-secondary/30 p-1">
+          <div className="flex items-center gap-1 overflow-x-auto rounded-lg border border-border bg-secondary/30 p-1 max-w-full sm:gap-1.5 scrollbar-none">
             <Button
               type="button"
               size="sm"
               variant={activeTab === 'departments' ? 'default' : 'ghost'}
-              className="h-7 text-xs px-2.5"
+              className="h-7 shrink-0 text-xs px-2 sm:px-2.5"
               onClick={() => setActiveTab('departments')}
             >
               <BarChart3 className="mr-1.5 h-3.5 w-3.5" />
@@ -187,7 +184,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               type="button"
               size="sm"
               variant={activeTab === 'enrollments' ? 'default' : 'ghost'}
-              className="h-7 text-xs px-2.5"
+              className="h-7 shrink-0 text-xs px-2 sm:px-2.5"
               onClick={() => setActiveTab('enrollments')}
             >
               <TrendingUp className="mr-1.5 h-3.5 w-3.5" />
@@ -197,7 +194,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               type="button"
               size="sm"
               variant={activeTab === 'faculty' ? 'default' : 'ghost'}
-              className="h-7 text-xs px-2.5"
+              className="h-7 shrink-0 text-xs px-2 sm:px-2.5"
               onClick={() => setActiveTab('faculty')}
             >
               <School className="mr-1.5 h-3.5 w-3.5" />
@@ -207,7 +204,7 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               type="button"
               size="sm"
               variant={activeTab === 'grades' ? 'default' : 'ghost'}
-              className="h-7 text-xs px-2.5"
+              className="h-7 shrink-0 text-xs px-2 sm:px-2.5"
               onClick={() => setActiveTab('grades')}
             >
               <GraduationCap className="mr-1.5 h-3.5 w-3.5" />
@@ -215,20 +212,47 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
             </Button>
           </div>
         </div>
-        <p
-          className={cn(
-            'mt-3 rounded-md border px-3 py-2 text-xs leading-5',
-            isLive
-              ? 'border-status-success/30 bg-status-success/10 text-status-success-foreground'
-              : 'border-status-warning/30 bg-status-warning/10 text-status-warning-foreground',
-          )}
-        >
-          {isLive ? copy.liveNotice : copy.illustrativeNotice}
-        </p>
+        {isLive ? (
+          <p className="mt-3 rounded-md border border-status-success/30 bg-status-success/10 px-3 py-2 text-xs leading-5 text-status-success-foreground">
+            {copy.liveNotice}
+          </p>
+        ) : null}
       </CardHeader>
 
       <CardContent className="p-6">
-        {/* TAB 1: DEPARTMENTS */}
+        {isLoading ? (
+          <div role="status" aria-live="polite" className="space-y-4 py-4">
+            <div className="flex items-center justify-between">
+              <Skeleton className="h-5 w-44" />
+              <Skeleton className="h-7 w-56 rounded-md" />
+            </div>
+            <Skeleton className="h-52 w-full rounded-xl" />
+          </div>
+        ) : !overview ? (
+          <EmptyState
+            icon={BarChart3}
+            title={isVi ? 'Không có dữ liệu thống kê phân bố' : 'Distribution statistics unavailable'}
+            description={
+              isVi
+                ? 'Dữ liệu thống kê phân bố sinh viên, giảng viên và phổ điểm từ hệ thống hiện chưa sẵn sàng.'
+                : 'Live campus distribution and grade statistics are currently unavailable from the distribution service.'
+            }
+            action={
+              <Button
+                type="button"
+                variant="outline"
+                size="sm"
+                onClick={fetchOverview}
+                className="gap-2"
+              >
+                <RefreshCw className="h-3.5 w-3.5" />
+                {messages.common.actions.retry}
+              </Button>
+            }
+          />
+        ) : (
+          <>
+            {/* TAB 1: DEPARTMENTS */}
         {activeTab === 'departments' && (
           <div className="space-y-6">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
@@ -634,6 +658,8 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
               </>
             )}
           </div>
+        )}
+          </>
         )}
       </CardContent>
     </Card>

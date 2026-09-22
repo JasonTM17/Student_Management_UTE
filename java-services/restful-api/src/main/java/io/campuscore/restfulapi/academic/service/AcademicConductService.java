@@ -8,6 +8,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.sql.Date;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import org.springframework.context.annotation.Profile;
@@ -140,9 +141,13 @@ public class AcademicConductService {
         BigDecimal sumTotal = BigDecimal.ZERO;
         int count = 0;
 
+        // Eliminate N+1 query loop: batch-fetch all conduct activities for the student
+        Map<String, List<ConductActivityDto>> activitiesBySemester = fetchActivitiesGroupedBySemester(resolvedProfileId);
+
         for (Map<String, Object> row : scoreRows) {
             String semId = String.valueOf(row.get("semester_id"));
-            ConductSemesterScoreDto dto = semesterScoreRow(row, resolvedProfileId, semId);
+            List<ConductActivityDto> activities = activitiesBySemester.getOrDefault(semId, List.of());
+            ConductSemesterScoreDto dto = semesterScoreRow(row, resolvedProfileId, semId, activities);
             history.add(dto);
             sumTotal = sumTotal.add(dto.totalScore());
             count++;
@@ -185,11 +190,12 @@ public class AcademicConductService {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Conduct score not found for semester");
         }
 
-        return semesterScoreRow(rows.get(0), studentProfileId, semesterId);
+        List<ConductActivityDto> activities = fetchActivitiesForSemester(studentProfileId, semesterId);
+        return semesterScoreRow(rows.get(0), studentProfileId, semesterId, activities);
     }
 
     private ConductSemesterScoreDto semesterScoreRow(
-            Map<String, Object> row, String studentProfileId, String semesterId) {
+            Map<String, Object> row, String studentProfileId, String semesterId, List<ConductActivityDto> activities) {
         String id = String.valueOf(row.get("id"));
         String semesterName = String.valueOf(row.get("semester_name"));
         BigDecimal c1 = toBigDecimal(row.get("criteria1_score"));
@@ -210,8 +216,54 @@ public class AcademicConductService {
                 withScore(CRITERIA_TEMPLATE.get(3), c4),
                 withScore(CRITERIA_TEMPLATE.get(4), c5));
 
-        // Fetch activities for this student and semester
-        List<ConductActivityDto> activities = jdbc.query(
+        return new ConductSemesterScoreDto(
+                id,
+                semesterId,
+                semesterName,
+                c1,
+                c2,
+                c3,
+                c4,
+                c5,
+                total,
+                classification,
+                classificationVi,
+                status,
+                evaluatorName,
+                criteria,
+                activities == null ? List.of() : activities
+        );
+    }
+
+    private Map<String, List<ConductActivityDto>> fetchActivitiesGroupedBySemester(String studentProfileId) {
+        List<Map.Entry<String, ConductActivityDto>> entries = jdbc.query(
+                "SELECT id, semester_id, title, category, points, activity_date, organizer, certificate_url "
+                        + "FROM academic.conduct_activity "
+                        + "WHERE student_id = :studentId "
+                        + "ORDER BY activity_date DESC",
+                new MapSqlParameterSource("studentId", studentProfileId),
+                (rs, rowNum) -> {
+                    Date d = rs.getDate("activity_date");
+                    ConductActivityDto dto = new ConductActivityDto(
+                            rs.getString("id"),
+                            rs.getString("title"),
+                            rs.getString("category"),
+                            rs.getBigDecimal("points"),
+                            d != null ? d.toLocalDate() : null,
+                            rs.getString("organizer"),
+                            rs.getString("certificate_url"));
+                    return Map.entry(String.valueOf(rs.getObject("semester_id")), dto);
+                });
+
+        Map<String, List<ConductActivityDto>> grouped = new HashMap<>();
+        for (Map.Entry<String, ConductActivityDto> entry : entries) {
+            grouped.computeIfAbsent(entry.getKey(), k -> new ArrayList<>()).add(entry.getValue());
+        }
+        return grouped;
+    }
+
+    private List<ConductActivityDto> fetchActivitiesForSemester(String studentProfileId, String semesterId) {
+        return jdbc.query(
                 "SELECT id, title, category, points, activity_date, organizer, certificate_url "
                         + "FROM academic.conduct_activity "
                         + "WHERE student_id = :studentId AND semester_id = :semesterId "
@@ -228,24 +280,6 @@ public class AcademicConductService {
                             rs.getString("organizer"),
                             rs.getString("certificate_url"));
                 });
-
-        return new ConductSemesterScoreDto(
-                id,
-                semesterId,
-                semesterName,
-                c1,
-                c2,
-                c3,
-                c4,
-                c5,
-                total,
-                classification,
-                classificationVi,
-                status,
-                evaluatorName,
-                criteria,
-                activities
-        );
     }
 
     private static ConductCriteriaScoreDto withScore(ConductCriteriaScoreDto template, BigDecimal score) {

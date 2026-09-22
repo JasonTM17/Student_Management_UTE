@@ -9,6 +9,7 @@ import java.math.BigDecimal;
 import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.UUID;
@@ -151,6 +152,9 @@ public class AcademicMutationService {
 
     @Transactional
     public void updateGrades(String sectionId, String lecturerId, boolean admin, List<GradeUpdate> grades) {
+        if (grades == null || grades.isEmpty()) {
+            return;
+        }
         requireSection(sectionId);
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
@@ -159,8 +163,28 @@ public class AcademicMutationService {
         // canonical ids are stable so existing grade rows keep their item.
         String processItemId = canonicalGradeItem(sectionId, "PROCESS", "Điểm quá trình (ĐQT - 50%)");
         String finalItemId = canonicalGradeItem(sectionId, "FINAL", "Điểm kết thúc học phần (ĐKTHP - 50%)");
+
+        // Pre-fetch and lock all targeted enrollments in a single batch query
+        List<String> enrollmentIds = grades.stream().map(GradeUpdate::enrollmentId).distinct().toList();
+        List<Map<String, Object>> enrollmentRows = jdbc.queryForList(
+                "SELECT \"id\", \"studentId\" AS student_id, \"sectionId\" AS section_id, \"status\","
+                        + " \"gradeStatus\" AS grade_status"
+                        + " FROM " + ENROLLMENT + " WHERE \"id\" IN (:ids) FOR UPDATE",
+                new MapSqlParameterSource("ids", enrollmentIds));
+
+        Map<String, Map<String, Object>> enrollmentMap = new HashMap<>();
+        for (Map<String, Object> row : enrollmentRows) {
+            enrollmentMap.put(String.valueOf(row.get("id")), row);
+        }
+
+        List<MapSqlParameterSource> componentBatch = new ArrayList<>(grades.size() * 2);
+        List<MapSqlParameterSource> enrollmentBatch = new ArrayList<>(grades.size());
+
         for (GradeUpdate grade : grades) {
-            Map<String, Object> enrollment = enrollment(grade.enrollmentId());
+            Map<String, Object> enrollment = enrollmentMap.get(grade.enrollmentId());
+            if (enrollment == null) {
+                throw problem(HttpStatus.NOT_FOUND, "ENROLLMENT_NOT_FOUND", "Enrollment not found");
+            }
             if (!sectionId.equals(enrollment.get("section_id"))) {
                 throw problem(HttpStatus.BAD_REQUEST, "GRADE_SECTION_MISMATCH", "Grade enrollment is outside this section");
             }
@@ -177,16 +201,43 @@ public class AcademicMutationService {
             requireScoreRange(grade.processScore(), "processScore");
             requireScoreRange(grade.finalExamScore(), "finalExamScore");
             BigDecimal total = calculateFinalGrade(grade.processScore(), grade.finalExamScore());
-            saveComponent(grade.enrollmentId(), processItemId, grade.processScore());
-            saveComponent(grade.enrollmentId(), finalItemId, grade.finalExamScore());
-            jdbc.update(
-                    "UPDATE " + ENROLLMENT + " SET \"finalGrade\" = :finalGrade, \"letterGrade\" = :letterGrade,"
-                            + " \"gradeStatus\" = 'DRAFT', \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
-                    new MapSqlParameterSource()
-                            .addValue("finalGrade", total)
-                            .addValue("letterGrade", letterGrade(total))
-                            .addValue("id", grade.enrollmentId()));
+
+            componentBatch.add(new MapSqlParameterSource()
+                    .addValue("id", UUID.randomUUID().toString())
+                    .addValue("enrollmentId", grade.enrollmentId())
+                    .addValue("gradeItemId", processItemId)
+                    .addValue("score", grade.processScore()));
+
+            componentBatch.add(new MapSqlParameterSource()
+                    .addValue("id", UUID.randomUUID().toString())
+                    .addValue("enrollmentId", grade.enrollmentId())
+                    .addValue("gradeItemId", finalItemId)
+                    .addValue("score", grade.finalExamScore()));
+
+            enrollmentBatch.add(new MapSqlParameterSource()
+                    .addValue("finalGrade", total)
+                    .addValue("letterGrade", letterGrade(total))
+                    .addValue("id", grade.enrollmentId()));
         }
+
+        // Batch delete existing grade components for targeted enrollments and canonical items
+        jdbc.update(
+                "DELETE FROM " + STUDENT_GRADE + " WHERE \"enrollmentId\" IN (:enrollmentIds) AND \"gradeItemId\" IN (:itemIds)",
+                new MapSqlParameterSource()
+                        .addValue("enrollmentIds", enrollmentIds)
+                        .addValue("itemIds", List.of(processItemId, finalItemId)));
+
+        // Batch insert new grade component rows
+        jdbc.batchUpdate(
+                "INSERT INTO " + STUDENT_GRADE + " (\"id\", \"enrollmentId\", \"gradeItemId\", \"score\")"
+                        + " VALUES (:id, :enrollmentId, :gradeItemId, :score)",
+                componentBatch.toArray(new MapSqlParameterSource[0]));
+
+        // Batch update enrollment final grades and draft status
+        jdbc.batchUpdate(
+                "UPDATE " + ENROLLMENT + " SET \"finalGrade\" = :finalGrade, \"letterGrade\" = :letterGrade,"
+                        + " \"gradeStatus\" = 'DRAFT', \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                enrollmentBatch.toArray(new MapSqlParameterSource[0]));
     }
 
     @Transactional

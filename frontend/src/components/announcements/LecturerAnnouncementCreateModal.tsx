@@ -46,6 +46,8 @@ interface PresetItem {
   icon: React.ElementType;
   defaultPriority: 'NORMAL' | 'HIGH' | 'URGENT';
   defaultContent: string;
+  defaultContentVi: string;
+  defaultContentEn: string;
 }
 
 const PRESETS: PresetItem[] = [
@@ -62,6 +64,24 @@ const PRESETS: PresetItem[] = [
 </ul>
 <p>Đề nghị ban cán sự lớp thông báo đến toàn thể các bạn sinh viên trong lớp để nắm thông tin và tham gia học bù đầy đủ.</p>
 <p>Trân trọng cảm ơn các em./.</p>`,
+    defaultContentVi: `<p>Kính gửi các bạn sinh viên lớp học phần,</p>
+<p>Giảng viên phụ trách thông báo về việc hoãn buổi học và kế hoạch học bù như sau:</p>
+<ul>
+  <li><strong>Thời gian nghỉ:</strong> Buổi học ngày ... (Thứ ..., Tiết ...).</li>
+  <li><strong>Lý do:</strong> Công tác chuyên môn đột xuất của Giảng viên.</li>
+  <li><strong>Kế hoạch học bù:</strong> Buổi học bù dự kiến diễn ra vào Thứ ..., ngày ... (Tiết ...) tại phòng học ... / học trực tuyến qua MS Teams.</li>
+</ul>
+<p>Đề nghị ban cán sự lớp thông báo đến toàn thể các bạn sinh viên trong lớp để nắm thông tin và tham gia học bù đầy đủ.</p>
+<p>Trân trọng cảm ơn các em./.</p>`,
+    defaultContentEn: `<p>Dear students of the course section,</p>
+<p>The instructor announces a class postponement and the makeup session plan as follows:</p>
+<ul>
+  <li><strong>Postponed session:</strong> Class on ... (Day ..., Period ...).</li>
+  <li><strong>Reason:</strong> Urgent academic or professional duty.</li>
+  <li><strong>Makeup session plan:</strong> Scheduled for Day ..., date ... (Period ...) at room ... / online via MS Teams.</li>
+</ul>
+<p>Class representatives are requested to notify all students to ensure full attendance.</p>
+<p>Best regards./.</p>`,
   },
   {
     key: 'ASSIGNMENT_DEADLINE',
@@ -75,6 +95,22 @@ const PRESETS: PresetItem[] = [
   <li><strong>Lưu ý:</strong> Mọi trường hợp nộp muộn vì lý do cá nhân không chính đáng sẽ bị trừ điểm theo quy định. Các nhóm gặp sự cố kỹ thuật cần báo ngay cho giảng viên trước hạn chót.</li>
 </ul>
 <p>Chúc các bạn hoàn thành bài tập đúng tiến độ và đạt kết quả cao./.</p>`,
+    defaultContentVi: `<p>Kính gửi sinh viên các nhóm lớp học phần,</p>
+<p>Giảng viên xin nhắc nhở về thời hạn và quy cách nộp sản phẩm Bài tập lớn / Đồ án môn học như sau:</p>
+<ul>
+  <li><strong>Hạn chót nộp bài:</strong> 23h59 ngày ... (Hệ thống sẽ tự động khóa nộp bài sau thời gian này).</li>
+  <li><strong>Hồ sơ nộp gồm:</strong> Báo cáo định dạng PDF, Slide thuyết trình và Mã nguồn đính kèm đặt tên theo cú pháp: <code>[Nhom_XX]_[TenMonHoc].zip</code>.</li>
+  <li><strong>Lưu ý:</strong> Mọi trường hợp nộp muộn vì lý do cá nhân không chính đáng sẽ bị trừ điểm theo quy định. Các nhóm gặp sự cố kỹ thuật cần báo ngay cho giảng viên trước hạn chót.</li>
+</ul>
+<p>Chúc các bạn hoàn thành bài tập đúng tiến độ và đạt kết quả cao./.</p>`,
+    defaultContentEn: `<p>Dear students and course project teams,</p>
+<p>This is a reminder regarding the deadline and submission requirements for the major assignment / course project:</p>
+<ul>
+  <li><strong>Submission deadline:</strong> 23:59 on ... (The submission portal will close automatically after this deadline).</li>
+  <li><strong>Submission deliverables:</strong> PDF report, presentation slides, and source code archive named: <code>[Group_XX]_[CourseCode].zip</code>.</li>
+  <li><strong>Note:</strong> Late submissions without prior valid approval will be penalized per course regulations. Any technical issues must be reported to the instructor before the deadline.</li>
+</ul>
+<p>Wishing you productive completion and high marks on your submission./.</p>`,
   },
   {
     key: 'EXAM_SCHEDULE',
@@ -89,6 +125,24 @@ const PRESETS: PresetItem[] = [
   <li><strong>Quy định:</strong> Sinh viên mang theo Thẻ sinh viên hoặc CCCD để đối chiếu; không sử dụng tài liệu trong phòng thi.</li>
 </ul>
 <p>Đề nghị các bạn sinh viên chuẩn bị chu đáo để làm bài đạt kết quả tốt nhất./.</p>`,
+    defaultContentVi: `<p>Kính gửi các bạn sinh viên,</p>
+<p>Kế hoạch bài kiểm tra giữa kỳ (chiếm 50% điểm quá trình học phần) được sắp xếp cụ thể như sau:</p>
+<ul>
+  <li><strong>Thời gian kiểm tra:</strong> Tiết ..., Thứ ..., ngày ... tại phòng học ...</li>
+  <li><strong>Hình thức:</strong> Bài kiểm tra trắc nghiệm kết hợp tự luận (Thời gian làm bài: 60 phút).</li>
+  <li><strong>Nội dung trọng tâm:</strong> Toàn bộ kiến thức từ Chương 1 đến Chương ...</li>
+  <li><strong>Quy định:</strong> Sinh viên mang theo Thẻ sinh viên hoặc CCCD để đối chiếu; không sử dụng tài liệu trong phòng thi.</li>
+</ul>
+<p>Đề nghị các bạn sinh viên chuẩn bị chu đáo để làm bài đạt kết quả tốt nhất./.</p>`,
+    defaultContentEn: `<p>Dear students,</p>
+<p>The midterm exam schedule (accounting for 50% of the course continuous assessment) is arranged as follows:</p>
+<ul>
+  <li><strong>Exam schedule:</strong> Period ..., Day ..., date ... in room ...</li>
+  <li><strong>Exam format:</strong> Multiple-choice combined with constructed response (Duration: 60 minutes).</li>
+  <li><strong>Scope:</strong> Core topics from Chapter 1 through Chapter ...</li>
+  <li><strong>Regulations:</strong> Students must present their Student ID or National ID card; no unauthorized reference materials allowed in the exam room.</li>
+</ul>
+<p>Please prepare thoroughly to achieve your best performance./.</p>`,
   },
   {
     key: 'COURSE_GENERAL',
@@ -103,6 +157,24 @@ const PRESETS: PresetItem[] = [
 </ul>
 <p>Nếu có thắc mắc trong quá trình làm bài, các bạn có thể trao đổi trong giờ học hoặc gửi email cho giảng viên.</p>
 <p>Chúc các bạn có một tuần học tập hiệu quả./.</p>`,
+    defaultContentVi: `<p>Kính gửi các bạn sinh viên lớp học phần,</p>
+<p>Giảng viên gửi đến các bạn một số thông tin và dặn dò quan trọng cho tuần học tiếp theo:</p>
+<ul>
+  <li>Đã tải lên Slide bài giảng và bài tập thực hành tuần này lên hệ thống.</li>
+  <li>Các bạn sinh viên vui lòng đọc trước tài liệu trước khi đến lớp.</li>
+  <li>Chuẩn bị sẵn môi trường cài đặt phần mềm trên laptop cá nhân.</li>
+</ul>
+<p>Nếu có thắc mắc trong quá trình làm bài, các bạn có thể trao đổi trong giờ học hoặc gửi email cho giảng viên.</p>
+<p>Chúc các bạn có một tuần học tập hiệu quả./.</p>`,
+    defaultContentEn: `<p>Dear students of the course section,</p>
+<p>Please note the following important updates and guidelines for the upcoming academic week:</p>
+<ul>
+  <li>Lecture slides and lab practice materials for this week have been uploaded to the portal.</li>
+  <li>Please read the assigned materials prior to class.</li>
+  <li>Ensure all required software and development tools are set up on your personal laptops.</li>
+</ul>
+<p>If you have questions, please ask during class or contact the instructor by email.</p>
+<p>Wishing you an effective and rewarding study week./.</p>`,
   },
 ];
 
@@ -119,7 +191,7 @@ export function LecturerAnnouncementCreateModal({
   const initialTemplate = templateMeta(PRESETS[0].key);
 
   const [title, setTitle] = useState(initialTemplate.defaultTitle);
-  const [content, setContent] = useState(PRESETS[0].defaultContent);
+  const [content, setContent] = useState(isVi ? PRESETS[0].defaultContentVi : PRESETS[0].defaultContentEn);
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('HIGH');
   const [selectedPreset, setSelectedPreset] = useState<PresetKey>('LEAVE_MAKEUP');
   const [editorMode, setEditorMode] = useState<'visual' | 'code' | 'preview'>('visual');
@@ -176,7 +248,7 @@ export function LecturerAnnouncementCreateModal({
   const handleApplyPreset = (preset: PresetItem) => {
     setSelectedPreset(preset.key);
     setTitle(templateMeta(preset.key).defaultTitle);
-    setContent(preset.defaultContent);
+    setContent(isVi ? preset.defaultContentVi : preset.defaultContentEn);
     setPriority(preset.defaultPriority);
     setValidationError('');
   };

@@ -39,7 +39,7 @@ public class MailController {
     }
 
     @PostMapping("/test")
-    @PreAuthorize("hasRole('ADMIN')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Operation(summary = "Gửi email kiểm thử hệ thống SMTP Gmail")
     public ResponseEntity<MailDispatchResponse> sendTestEmail(@Valid @RequestBody(required = false) TestEmailRequest request) {
         String to = (request != null && request.to() != null && !request.to().isBlank())
@@ -61,7 +61,7 @@ public class MailController {
     }
 
     @PostMapping("/notice")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     @Operation(summary = "Gửi thông báo học vụ chính thức")
     public ResponseEntity<MailDispatchResponse> sendNotice(@Valid @RequestBody AcademicNoticeRequest request) {
         emailService.sendAcademicNotice(request);
@@ -74,7 +74,7 @@ public class MailController {
     }
 
     @PostMapping("/registration")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     @Operation(summary = "Gửi xác nhận đăng ký học phần & TKB")
     public ResponseEntity<MailDispatchResponse> sendRegistration(@Valid @RequestBody CourseRegistrationRequest request) {
         emailService.sendCourseRegistration(request);
@@ -87,7 +87,7 @@ public class MailController {
     }
 
     @PostMapping("/grade-alert")
-    @PreAuthorize("hasAnyRole('ADMIN','LECTURER')")
+    @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN','LECTURER')")
     @Operation(summary = "Gửi thông báo bảng điểm & điểm rèn luyện")
     public ResponseEntity<MailDispatchResponse> sendGradeAlert(@Valid @RequestBody GradeAlertRequest request) {
         emailService.sendGradeAlert(request);

@@ -90,7 +90,7 @@ public class ThesisTopicService {
             return false;
         }
         List<String> roles = actor.getClaimAsStringList("roles");
-        return roles != null && roles.contains("ADMIN");
+        return roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
     }
 
     private static boolean isLecturer(Jwt actor) {

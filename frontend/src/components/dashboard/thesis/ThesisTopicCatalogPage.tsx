@@ -14,6 +14,7 @@ import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { StatusBadge } from '@/components/thesis/StatusBadge';
+import { TopicCardGridSkeleton } from '@/components/ui/skeleton';
 import { cn } from '@/lib/utils';
 import { useThesisWorkspace } from './useThesisWorkspace';
 
@@ -234,10 +235,22 @@ export default function ThesisTopicCatalogPage() {
       {workspace.error ? (
         <ErrorState title={messages.thesis.loadFailed} description={workspace.error} />
       ) : workspace.workspaceLoading && workspace.topics.length === 0 ? (
-        <div className="flex flex-col items-center justify-center rounded-xl border border-dashed border-border/80 p-12 text-center">
-          <Loader2 className="h-8 w-8 animate-spin text-primary" />
-          <p className="mt-3 text-sm text-muted-foreground">{messages.thesis.loading}</p>
-        </div>
+        <Card variant="muted">
+          <CardHeader>
+            <div className="flex flex-col gap-1 sm:flex-row sm:items-center sm:justify-between">
+              <div>
+                <CardTitle>{messages.thesis.topicsTitle}</CardTitle>
+                <CardDescription>{messages.thesis.topicsDescription}</CardDescription>
+              </div>
+              <span className="text-xs font-semibold uppercase tracking-wider text-muted-foreground">
+                {messages.thesis.loading}
+              </span>
+            </div>
+          </CardHeader>
+          <CardContent>
+            <TopicCardGridSkeleton count={6} />
+          </CardContent>
+        </Card>
       ) : !searchActive ? (
         <div className="space-y-6">
           <EmptyState

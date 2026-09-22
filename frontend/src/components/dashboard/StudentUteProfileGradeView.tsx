@@ -119,7 +119,7 @@ export function StudentUteProfileGradeView({
 
   // Only real transcript records feed the chart. A 4.0 grade point is never
   // converted into an invented 10-scale score.
-  const sampleCourses = useMemo(() => {
+  const chartCourses = useMemo(() => {
     const records = transcriptSemesters.flatMap((s) => s.records || []);
     return records
       .filter((r) => typeof r.finalGrade === 'number')
@@ -140,7 +140,7 @@ export function StudentUteProfileGradeView({
 
   const barWidth = Math.min(
     24,
-    Math.max(14, Math.floor(plotWidth / Math.max(1, sampleCourses.length) - 12)),
+    Math.max(14, Math.floor(plotWidth / Math.max(1, chartCourses.length) - 12)),
   );
 
   // SVG Pie calculations (radius = 65, center = 80, 80)
@@ -356,7 +356,7 @@ export function StudentUteProfileGradeView({
               </div>
 
               {/* SVG Responsive Bar Chart — rendered only from real records */}
-              {sampleCourses.length === 0 ? (
+              {chartCourses.length === 0 ? (
                 <p className="rounded-lg border border-dashed border-border px-4 py-10 text-center text-xs text-muted-foreground">
                   {card.chartNoData}
                 </p>
@@ -407,8 +407,8 @@ export function StudentUteProfileGradeView({
 
                   {/* Bars: Điểm của bạn */}
                   {(chartType === 'combo' || chartType === 'bar') &&
-                    sampleCourses.map((c, i) => {
-                      const stepX = plotWidth / sampleCourses.length;
+                    chartCourses.map((c, i) => {
+                      const stepX = plotWidth / chartCourses.length;
                       const x = padding.left + i * stepX + (stepX - barWidth) / 2;
                       const barH = (c.studentScore / 10) * plotHeight;
                       const y = padding.top + plotHeight - barH;

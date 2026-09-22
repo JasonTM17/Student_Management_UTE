@@ -115,6 +115,13 @@ class ThesisGroupSupervisorScopeTest {
                 .andExpect(jsonPath("$[?(@.id == '%s')].members[?(@.isExternal == true)].contact"
                         .formatted(otherGroup.toString()),
                         org.hamcrest.Matchers.hasItem("ext-other@school.edu")));
+
+        // Super Admin also keeps the full roster view.
+        mvc.perform(get("/api/v1/thesis/groups")
+                        .queryParam("roundId", roundId.toString())
+                        .with(superAdminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(2));
     }
 
     @Test
@@ -246,5 +253,12 @@ class ThesisGroupSupervisorScopeTest {
                         .subject("scope-admin")
                         .claim("roles", List.of("ADMIN")))
                 .authorities(new SimpleGrantedAuthority("ROLE_ADMIN"));
+    }
+
+    private RequestPostProcessor superAdminJwt() {
+        return jwt().jwt(token -> token
+                        .subject("scope-super-admin")
+                        .claim("roles", List.of("SUPER_ADMIN")))
+                .authorities(new SimpleGrantedAuthority("ROLE_SUPER_ADMIN"));
     }
 }

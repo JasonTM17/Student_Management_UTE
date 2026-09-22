@@ -1,8 +1,10 @@
+'use client';
+
 import * as React from 'react';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-
+import { useI18n } from '@/i18n';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { ArrowUpRight } from 'lucide-react';
 
@@ -27,6 +29,9 @@ export function AdminMetricCard({
   className,
   href,
 }: AdminMetricCardProps) {
+  const { locale } = useI18n();
+  const isVi = locale === 'vi';
+
   const cardContent = (
     <Card
       variant="default"
@@ -77,7 +82,7 @@ export function AdminMetricCard({
             <span>{detail}</span>
             {href ? (
               <span className="font-medium text-primary opacity-0 transition-opacity duration-200 group-hover:opacity-100">
-                Chi tiết &rarr;
+                {isVi ? 'Chi tiết →' : 'Details →'}
               </span>
             ) : null}
           </div>
