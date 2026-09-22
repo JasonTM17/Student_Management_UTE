@@ -962,49 +962,57 @@ export const thesisApi = {
       }, IDLE_TIMEOUT_MS);
     };
     resetIdleWatchdog();
-    let response = await fetchStream();
-    if (response.status === 401) {
-      try {
-        await refreshSessionSingleFlight();
-        response = await fetchStream();
-      } catch {
-        throw new Error('assistant stream unauthorized');
-      }
-    }
-    if (!response.ok) {
-      const error = new Error(
-        `assistant stream failed (${response.status})`,
-      ) as Error & { status?: number };
-      error.status = response.status;
-      throw error;
-    }
-    if (!response.body) throw new Error('assistant stream has no body');
-
-    const order = new AssistantStreamOrder();
-    let invalidFrame = false;
-    const parser = createAssistantSseParser(
-      (event) => {
-        const validated = parseAssistantStreamEvent(event);
-        order.accept(validated);
-        options.onEvent(validated as AssistantStreamEvent);
-      },
-      {
-        onInvalid: () => {
-          invalidFrame = true;
-        },
-      },
-    );
-    const reader = response.body.getReader();
-    const decoder = new TextDecoder();
+    // The watchdog cleanup must cover EVERY exit — including fetch failures,
+    // the 401-refresh re-throw, and non-ok responses — so the arming try wraps
+    // the whole request rather than only the read loop.
     try {
-      while (true) {
-        const { done, value } = await reader.read();
-        if (done) break;
-        resetIdleWatchdog();
-        parser.push(decoder.decode(value, { stream: true }));
+      let response = await fetchStream();
+      if (response.status === 401) {
+        try {
+          await refreshSessionSingleFlight();
+          resetIdleWatchdog();
+          response = await fetchStream();
+        } catch {
+          throw new Error('assistant stream unauthorized');
+        }
       }
-      parser.push(decoder.decode());
-      parser.end();
+      if (!response.ok) {
+        const error = new Error(
+          `assistant stream failed (${response.status})`,
+        ) as Error & { status?: number };
+        error.status = response.status;
+        throw error;
+      }
+      if (!response.body) throw new Error('assistant stream has no body');
+
+      const order = new AssistantStreamOrder();
+      let invalidFrame = false;
+      const parser = createAssistantSseParser(
+        (event) => {
+          const validated = parseAssistantStreamEvent(event);
+          order.accept(validated);
+          options.onEvent(validated as AssistantStreamEvent);
+        },
+        {
+          onInvalid: () => {
+            invalidFrame = true;
+          },
+        },
+      );
+      const reader = response.body.getReader();
+      const decoder = new TextDecoder();
+      try {
+        while (true) {
+          const { done, value } = await reader.read();
+          if (done) break;
+          resetIdleWatchdog();
+          parser.push(decoder.decode(value, { stream: true }));
+        }
+        parser.push(decoder.decode());
+        parser.end();
+      } finally {
+        reader.releaseLock();
+      }
       if (invalidFrame)
         throw new Error('assistant stream contained malformed event');
       if (order.currentPhase !== 'terminal')
@@ -1012,7 +1020,6 @@ export const thesisApi = {
     } finally {
       if (idleTimer !== undefined) clearTimeout(idleTimer);
       options.signal?.removeEventListener('abort', onCallerAbort);
-      reader.releaseLock();
     }
   },
 
