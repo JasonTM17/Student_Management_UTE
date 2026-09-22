@@ -102,7 +102,7 @@ export function HomeNewsSection() {
   // TanStack Query caches the campus feed across mounts and dedupes the
   // signed-in/anonymous variants; the old effect refetched 18 rows every time
   // the identity flipped with no way to cancel the in-flight request.
-  const { data: pagedItems, isLoading } = useApiQuery<
+  const { data: pagedItems, isLoading, isError } = useApiQuery<
     { data?: AnnouncementRecord[] }
   >(
     ['home-news', user ? 'mine' : 'public'],
@@ -207,8 +207,23 @@ export function HomeNewsSection() {
         {/* Loading State (Google Stitch Bento Skeleton - CLS = 0) */}
         {isLoading && <HomeNewsBentoSkeleton />}
 
+        {/* Error State — a backend outage must not read as "no news" */}
+        {!isLoading && isError && (
+          <div className="rounded-2xl border border-status-warning/40 bg-status-warning/10 p-12 text-center">
+            <Newspaper className="mx-auto h-12 w-12 text-status-warning-foreground/60 mb-3" />
+            <h3 className="text-base font-semibold text-foreground">
+              {isVi ? 'Chưa tải được bản tin' : 'Could not load the news feed'}
+            </h3>
+            <p className="mt-1 text-sm text-muted-foreground max-w-md mx-auto">
+              {isVi
+                ? 'Máy chủ thông báo đang không phản hồi. Vui lòng thử tải lại trang sau ít phút.'
+                : 'The announcements service is not responding right now. Please refresh the page in a few minutes.'}
+            </p>
+          </div>
+        )}
+
         {/* Empty State */}
-        {!isLoading && items.length === 0 && (
+        {!isLoading && !isError && items.length === 0 && (
           <div className="rounded-2xl border border-dashed border-border/80 bg-card/60 p-12 text-center">
             <Newspaper className="mx-auto h-12 w-12 text-muted-foreground/40 mb-3" />
             <h3 className="text-base font-semibold text-foreground">

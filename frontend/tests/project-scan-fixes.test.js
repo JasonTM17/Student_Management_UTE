@@ -533,3 +533,58 @@ test('announcements banner names the live semester instead of a hardcoded term',
   assert.match(page, /pickPreferredSemesterId/);
   assert.match(page, /currentSemesterName \|\| '—'/);
 });
+
+test('registration picks only rounds whose admission window still covers today', () => {
+  const page = read('src/app/dashboard/register/page.tsx');
+
+  // The demo seed once kept an OPEN round whose windowEnd had passed; picking
+  // "first OPEN" then failed eligibility with WINDOW_CLOSED and rendered the
+  // wrong "no round is open" state during the live window.
+  assert.match(page, /withinWindow/);
+  assert.match(page, /windowStart\)\.getTime\(\) <= now/);
+  assert.match(page, /now <= new Date\(round\.windowEnd\)\.getTime\(\)/);
+  assert.match(page, /roundUnavailableDescription/);
+  assert.doesNotMatch(page, /description=\{copy\.exportUnavailable\}/);
+});
+
+test('admin analytics scale comes from real data and the top-band stat matches its label', () => {
+  const charts = read('src/components/admin/AdminAnalyticsCharts.tsx');
+
+  // An invented 1400 axis floor rendered gridline labels that exist in no
+  // dataset and flattened the real semester line to the bottom.
+  assert.doesNotMatch(charts, /,\s*1400/);
+  // The at-least-good headline counts letter bands by membership — matching
+  // its "(A+, A, A−, B+)" copy — not by positional slice.
+  assert.match(charts, /TOP_GRADE_BANDS = new Set\(\['A\+', 'A', 'A-', 'B\+'\]\)/);
+  assert.doesNotMatch(charts, /slice\(0, 4\)/);
+});
+
+test('retired sample-data copy stays out of the message catalog', () => {
+  const messages = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+
+  assert.doesNotMatch(messages, /illustrativeBadge/);
+  assert.doesNotMatch(messages, /illustrativeNotice/);
+  // Every faculty code from the V74 distribution must have a localized name
+  // so the English chart never falls back to Vietnamese department names.
+  assert.match(messages, /'AUTO-ENG':/);
+  for (const code of ['AIDS', 'AUTO', 'BIMENG', 'BTE', 'CIVIL', 'CNTT', 'ETEC', 'FIN', 'ISBD', 'LSCM', 'MANUF', 'MIS', 'NETSEC', 'ROBOT', 'SE']) {
+    assert.match(messages, new RegExp(`${code}:`));
+  }
+});
+
+test('conduct export opens the print dialog without claiming a produced report', () => {
+  const page = read('src/app/dashboard/conduct/page.tsx');
+
+  // A cancelled browser print must not be announced as a generated document.
+  assert.doesNotMatch(page, /exportToast/);
+  assert.match(page, /window\.print\(\)/);
+});
+
+test('demo credentials agree on one password across README and runbook', () => {
+  const readme = fs.readFileSync(path.join(root, '../README.md'), 'utf8');
+  const runbook = fs.readFileSync(path.join(root, '../docs/DEMO_RUNBOOK.md'), 'utf8');
+
+  // admin123 was a stale README credential that could not log in a fresh clone.
+  assert.doesNotMatch(readme, /admin123/);
+  assert.doesNotMatch(runbook, /admin123/);
+});

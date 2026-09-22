@@ -33,7 +33,6 @@ import { Modal } from '@/components/ui/modal';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState, ErrorState } from '@/components/ui/state-block';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { toast } from 'sonner';
 
 const conductCopy = {
   en: {
@@ -126,9 +125,6 @@ const conductCopy = {
     printCertificate: 'Print record',
     close: 'Close',
     loadErrorTitle: 'Could not load conduct data',
-    exportToast: 'Preparing the official conduct report...',
-    exportToastDescription: (semesterName: string | undefined, studentCode: string | undefined) =>
-      `The conduct report for "${semesterName ?? 'the selected semester'}" (${studentCode ?? 'student'}) is ready to print or save.`,
   },
   vi: {
     institution: 'TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH',
@@ -220,9 +216,6 @@ const conductCopy = {
     printCertificate: 'In bản ghi',
     close: 'Đóng',
     loadErrorTitle: 'Không thể tải dữ liệu điểm rèn luyện',
-    exportToast: 'Đang khởi tạo phiếu điểm rèn luyện chính thức...',
-    exportToastDescription: (semesterName: string | undefined, studentCode: string | undefined) =>
-      `Phiếu ĐRL học kỳ "${semesterName ?? 'đang chọn'}" (MSSV: ${studentCode ?? 'sinh viên'}) đã sẵn sàng để in/tải.`,
   },
 };
 
@@ -378,9 +371,8 @@ export default function StudentConductPage() {
   };
 
   const handleExportConductReport = () => {
-    toast.success(copy.exportToast, {
-      description: copy.exportToastDescription(formatSemesterName(activeSemesterScore?.semesterName), summary?.studentCode),
-    });
+    // No success toast here: the browser print dialog can still be cancelled,
+    // and a cancelled print must not be reported as a produced document.
     window.print();
   };
 

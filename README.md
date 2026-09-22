@@ -135,7 +135,7 @@ Tài khoản demo: `lecturer@campuscore.edu` | Mật khẩu: `password123`
 
 ### 4. Hành trình Quản trị viên (Admin Role)
 
-Tài khoản demo: `admin@campuscore.edu` | Mật khẩu: `admin123`
+Tài khoản demo: `admin@campuscore.edu` | Mật khẩu: `password123`
 
 | Bảng điều khiển quản trị (Admin Dashboard) | Quản lý người dùng & Phân quyền (Users Management) |
 | --- | --- |
@@ -555,8 +555,8 @@ Cơ sở dữ liệu seed sẵn các tài khoản tương ứng với các nhóm
 | --- | --- | --- | --- |
 | **Sinh viên (Student)** | `student@campuscore.edu` | `password123` | Đăng ký học phần, xem TKB, tra cứu điểm/bảng điểm, hỏi Trợ lý AI, đăng ký đề tài khóa luận |
 | **Giảng viên (Lecturer)** | `lecturer@campuscore.edu` | `password123` | Xem lịch dạy, chấm/nhập điểm học phần, đề xuất và hướng dẫn các nhóm khóa luận |
-| **Quản trị viên (Admin)** | `admin@campuscore.edu` | `admin123` | Quản trị người dùng, danh mục khoa/ngành/phòng học, mở lớp học phần, soạn thảo tri thức RAG |
-| **Quản trị viên thứ 2** | `admin002@campuscore.demo` | `admin123` | Tài khoản Quản trị độc lập dùng để duyệt chéo tri thức RAG theo nguyên tắc Four-Eyes |
+| **Quản trị viên (Admin)** | `admin@campuscore.edu` | `password123` | Quản trị người dùng, danh mục khoa/ngành/phòng học, mở lớp học phần, soạn thảo tri thức RAG |
+| **Quản trị viên thứ 2** | `admin002@campuscore.demo` | `password123` | Tài khoản Quản trị độc lập dùng để duyệt chéo tri thức RAG theo nguyên tắc Four-Eyes |
 
 Ngoài ra, dữ liệu demo còn seed sẵn một danh bạ giảng viên phụ (`lecturer002@campuscore.demo` đến `lecturer012@campuscore.demo`) để danh sách lớp, hội đồng và lịch dạy phản ánh môi trường trường học thực tế.
 

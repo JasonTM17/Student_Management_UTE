@@ -68,17 +68,20 @@ export default function RegisterPage() {
       if (generation !== loadGeneration.current) return;
       setEnrollments(enrollmentData);
       try {
-        const open = rounds.some((round) => round.status === 'OPEN');
-        setRoundOpen(open);
-        const currentRound = rounds.find((round) => round.status === 'OPEN');
+        const now = Date.now();
+        const withinWindow = (round: { status: string; windowStart: string; windowEnd: string }) =>
+          round.status === 'OPEN'
+          && new Date(round.windowStart).getTime() <= now
+          && now <= new Date(round.windowEnd).getTime();
+        const currentRound = rounds.find(withinWindow);
+        setRoundOpen(Boolean(currentRound));
         setCurrentRoundId(currentRound?.id ?? '');
-        if (!open) {
+        if (!currentRound) {
           setCreditLimit(28);
           setCreditApplication(null);
           setSections([]);
           return;
         }
-        if (!currentRound) return;
         const [eligibility, application, catalog] = await Promise.all([
           registrationApi.eligibility({
             semesterId: currentRound.semesterId,
@@ -343,7 +346,7 @@ export default function RegisterPage() {
         description={copy.description}
       />
       {!roundOpen ? (
-        <EmptyState icon={BookOpen} title={copy.roundUnavailable} description={copy.exportUnavailable} />
+        <EmptyState icon={BookOpen} title={copy.roundUnavailable} description={copy.roundUnavailableDescription} />
       ) : (
         <div className="grid min-w-0 gap-6 lg:grid-cols-12">
           <div className="min-w-0 space-y-6 lg:col-span-9">

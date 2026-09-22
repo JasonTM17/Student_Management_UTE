@@ -129,8 +129,12 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
   }, [overview]);
 
   const gradeTotal = gradeDistribution.reduce((sum, item) => sum + item.count, 0);
+  // Count by letter membership, not by list position: the backend appends
+  // unknown/legacy letters after the canonical bands, so a positional slice
+  // would overcount whenever fewer bands exist.
+  const TOP_GRADE_BANDS = new Set(['A+', 'A', 'A-', 'B+']);
   const atLeastGoodCount = gradeDistribution
-    .slice(0, 4)
+    .filter((item) => TOP_GRADE_BANDS.has(item.grade))
     .reduce((sum, item) => sum + item.count, 0);
   const atLeastGoodPercent = gradeTotal > 0 ? Math.round((atLeastGoodCount / gradeTotal) * 100) : 0;
 
@@ -148,7 +152,9 @@ export function AdminAnalyticsCharts({ stats, className }: AdminAnalyticsChartsP
   const currentTermLoad = semesterTrends[semesterTrends.length - 1];
 
   const maxDeptValue = Math.max(...departments.map((d) => d[departmentMetric]), 1);
-  const maxTrendCount = Math.max(...semesterTrends.map((s) => s.count), 1400);
+  // Scale from the data only — an invented floor renders axis labels that
+  // exist in no dataset and flattens the real line to the bottom.
+  const maxTrendCount = Math.max(...semesterTrends.map((s) => s.count), 1);
 
   return (
     <Card className={cn('border-border/80 shadow-xs', className)}>
