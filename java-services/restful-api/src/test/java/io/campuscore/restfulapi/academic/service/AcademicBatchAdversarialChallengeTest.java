@@ -21,7 +21,7 @@ import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.DisplayName;
 import org.junit.jupiter.api.Test;
 import org.springframework.aop.framework.ProxyFactory;
-import org.springframework.dao.DataIntegrityViolationException;
+
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
@@ -594,8 +594,8 @@ class AcademicBatchAdversarialChallengeTest {
     }
 
     @Test
-    @DisplayName("Mutation: Duplicate enrollment in batch violates unique constraint and rolls back entire transaction")
-    void gradeMutation_duplicateEnrollmentInBatchRollsBackWithUniqueConstraint() {
+    @DisplayName("Mutation: Duplicate enrollment in batch merges last-write-wins like the per-row save")
+    void gradeMutation_duplicateEnrollmentInBatchMergesLastWriteWins() {
         jdbc.update("INSERT INTO \"academic\".\"Section\" (\"id\", \"semesterId\", \"lecturerId\", \"status\") VALUES (?, ?, ?, ?)",
                 "sec-dup", "sem-01", "lec-01", "OPEN");
         jdbc.update("INSERT INTO \"academic\".\"Enrollment\" (\"id\", \"studentId\", \"sectionId\", \"status\", \"gradeStatus\") VALUES (?, ?, ?, 'ENROLLED', 'DRAFT')",
@@ -606,12 +606,14 @@ class AcademicBatchAdversarialChallengeTest {
                 new GradeUpdate("enr-dup-1", new BigDecimal("9.0"), new BigDecimal("9.0"))
         );
 
-        // Should throw DataIntegrityViolationException due to academic_student_grade_enrollment_item_uq unique index
-        assertThrows(DataIntegrityViolationException.class, () ->
-                mutationServiceProxy.updateGrades("sec-dup", "lec-01", false, gradesWithDuplicate));
+        // A replayed or double-submitted row must merge like the per-row save
+        // did, never trip the (enrollmentId, gradeItemId) unique index with a 500.
+        mutationServiceProxy.updateGrades("sec-dup", "lec-01", false, gradesWithDuplicate);
 
-        // Ensure database state rolled back completely
-        assertNull(jdbc.queryForObject("SELECT \"finalGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-dup-1'", BigDecimal.class));
-        assertEquals(0, jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"StudentGrade\"", Integer.class));
+        // The last write wins.
+        assertEquals(0, new BigDecimal("9.0").compareTo(
+                jdbc.queryForObject("SELECT \"finalGrade\" FROM \"academic\".\"Enrollment\" WHERE \"id\" = 'enr-dup-1'", BigDecimal.class)));
+        // Exactly one PROCESS and one FINAL component survive the merge.
+        assertEquals(2, jdbc.queryForObject("SELECT COUNT(*) FROM \"academic\".\"StudentGrade\"", Integer.class));
     }
 }
