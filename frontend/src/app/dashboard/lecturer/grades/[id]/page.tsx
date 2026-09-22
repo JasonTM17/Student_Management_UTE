@@ -714,7 +714,7 @@ export default function SectionGradingPage() {
                             handleScoreChange(enrollment.id, 'processScore', event.target.value, event.target.validity.badInput)
                           }
                           error={scoreErrors.get(`${enrollment.id}:processScore`)}
-                          disabled={isPublished}
+                          disabled={isPublished || isSaving}
                           aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                         />
                       </label>
@@ -729,7 +729,7 @@ export default function SectionGradingPage() {
                             handleScoreChange(enrollment.id, 'finalExamScore', event.target.value, event.target.validity.badInput)
                           }
                           error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
-                          disabled={isPublished}
+                          disabled={isPublished || isSaving}
                           aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                       </label>
                     </div>
@@ -803,7 +803,7 @@ export default function SectionGradingPage() {
                               }
                               onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'processScore')}
                               error={scoreErrors.get(`${enrollment.id}:processScore`)}
-                              disabled={isPublished}
+                              disabled={isPublished || isSaving}
                               aria-label={copy.processScoreLabel(formatVietnameseName(enrollment.studentName))}
                             />
                           </div>
@@ -818,7 +818,7 @@ export default function SectionGradingPage() {
                               }
                               onKeyDown={(event) => handleCellKeyDown(event, enrollmentIndex, 'finalExamScore')}
                               error={scoreErrors.get(`${enrollment.id}:finalExamScore`)}
-                              disabled={isPublished}
+                              disabled={isPublished || isSaving}
                               aria-label={copy.finalExamScoreLabel(formatVietnameseName(enrollment.studentName))} />
                           </div>
                         </td>
