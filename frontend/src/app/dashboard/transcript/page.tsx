@@ -786,7 +786,7 @@ export default function TranscriptPage() {
                                 setSelectedRecord(record);
                               }
                             }}
-                            className="group cursor-pointer transition-colors hover:bg-muted/50"
+                            className="group cursor-pointer transition-colors hover:bg-muted/50 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset"
                             title={copy.clickToViewDetail}
                           >
                             <td className="px-4 py-3.5">

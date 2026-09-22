@@ -57,19 +57,21 @@ test('lecturer announcement template picker localizes label, badge, and default 
   assert.match(vi, /label: 'Ngh\u1ec9 h\u1ecdc & H\u1ecdc b\u00f9'/);
 });
 
-test('admin analytics charts label sample data honestly and use tone tokens', () => {
+test('admin analytics charts enforce live honesty and use tone tokens', () => {
   const charts = read('src/components/admin/AdminAnalyticsCharts.tsx');
   const [en, vi] = localeHalves(read('src/i18n/messages.ts'));
 
-  // Honesty rule: the fabricated chart numbers must be labelled as sample
-  // data, and the false "real-time" badge must stay gone.
+  // Zero-mock honesty rule: live data uses liveNotice and liveBadge, never falls back
+  // to misleading "sample data" badges, and false "real-time" badge stays gone.
   assert.match(charts, /messages\.admin\.analytics/);
-  assert.match(charts, /copy\.illustrativeNotice/);
-  assert.match(charts, /copy\.illustrativeBadge/);
+  assert.match(charts, /copy\.liveNotice/);
+  assert.match(charts, /copy\.liveBadge/);
+  assert.doesNotMatch(charts, /copy\.illustrativeBadge/);
+  assert.doesNotMatch(charts, /copy\.illustrativeNotice/);
   assert.doesNotMatch(charts, /Th\u1eddi gian th\u1ef1c/);
   for (const half of [en, vi]) {
-    assert.match(half, /illustrativeBadge:\s*'/);
-    assert.match(half, /illustrativeNotice:\s*'/);
+    assert.match(half, /liveBadge:\s*'/);
+    assert.match(half, /liveNotice:\s*'/);
   }
 
   // Shared number formatter instead of hardcoded locales.

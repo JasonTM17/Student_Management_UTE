@@ -74,7 +74,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "401", description = "Chưa xác thực danh tính")
     })
     @PostMapping("/chat")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
@@ -105,7 +105,7 @@ public class ThesisAssistantController {
     /** Deprecated compatibility alias; clients should use /chat. */
     @Deprecated
     @PostMapping("/chat/complete")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public ChatResponse complete(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
         return chat(request, actor);
     }
@@ -124,7 +124,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Mở luồng SSE thành công", content = @io.swagger.v3.oas.annotations.media.Content(mediaType = MediaType.TEXT_EVENT_STREAM_VALUE))
     })
     @PostMapping(value = "/chat/stream", produces = MediaType.TEXT_EVENT_STREAM_VALUE)
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
         SseEmitter emitter = new SseEmitter(120_000L);
@@ -182,7 +182,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Hủy thành công")
     })
     @PostMapping("/requests/{clientRequestId}/cancel")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public CancelResponse cancel(
             @Parameter(description = "Mã định danh yêu cầu của client (UUID)", required = true) @PathVariable UUID clientRequestId,
             @AuthenticationPrincipal Jwt actor) {
@@ -208,7 +208,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Gửi đánh giá thành công")
     })
     @PutMapping("/messages/{messageId}/feedback")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public FeedbackResponse feedback(
             @Parameter(description = "Mã định danh tin nhắn AI (UUID)", required = true) @PathVariable UUID messageId,
             @Valid @RequestBody FeedbackRequest request,
@@ -226,7 +226,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "204", description = "Xóa đánh giá thành công")
     })
     @DeleteMapping("/messages/{messageId}/feedback")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteFeedback(
             @Parameter(description = "Mã định danh tin nhắn (UUID)", required = true) @PathVariable UUID messageId,
@@ -244,7 +244,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Lấy danh sách phiên hội thoại thành công")
     })
     @GetMapping("/conversations")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public List<ThesisAssistantRepository.Conversation> conversations(
             @AuthenticationPrincipal Jwt actor,
             @Parameter(description = "Giới hạn số bản ghi") @RequestParam(required = false) Integer limit,
@@ -267,7 +267,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Tạo phiên thành công")
     })
     @PostMapping("/conversations")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public ConversationCreated createConversation(@RequestBody(required = false) CreateConversationRequest request,
             @AuthenticationPrincipal Jwt actor) {
         String locale = request == null ? "vi" : request.locale();
@@ -287,7 +287,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "200", description = "Lấy lịch sử tin nhắn thành công")
     })
     @GetMapping("/conversations/{id}/messages")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public List<ThesisAssistantRepository.Message> messages(
             @Parameter(description = "Mã định danh phiên hội thoại (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor,
@@ -311,7 +311,7 @@ public class ThesisAssistantController {
         @ApiResponse(responseCode = "204", description = "Xóa phiên thành công")
     })
     @DeleteMapping("/conversations/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     @ResponseStatus(HttpStatus.NO_CONTENT)
     public void deleteConversation(
             @Parameter(description = "Mã định danh phiên hội thoại (UUID)", required = true) @PathVariable UUID id,

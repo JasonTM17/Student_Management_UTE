@@ -2,6 +2,10 @@ package io.campuscore.restfulapi.site;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import io.campuscore.restfulapi.web.DomainException;
+import io.swagger.v3.oas.annotations.Operation;
+import io.swagger.v3.oas.annotations.responses.ApiResponse;
+import io.swagger.v3.oas.annotations.responses.ApiResponses;
+import io.swagger.v3.oas.annotations.tags.Tag;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
 import org.springframework.security.access.prepost.PreAuthorize;
@@ -25,6 +29,7 @@ import org.springframework.web.bind.annotation.RestController;
  * {@link SiteAppearanceStore}, so both the PUT response and every later GET
  * carry the same change marker a polling browser compares against.
  */
+@Tag(name = "Site Appearance", description = "Quản lý cấu hình giao diện, màu sắc chủ đề và nội dung trang chủ toàn hệ thống")
 @RestController
 @RequestMapping(path = "/api/v1/site-appearance", produces = MediaType.APPLICATION_JSON_VALUE)
 public class SiteAppearanceController {
@@ -35,12 +40,23 @@ public class SiteAppearanceController {
         this.store = store;
     }
 
+    @Operation(summary = "Lấy cấu hình giao diện hệ thống", description = "Truy xuất cấu hình giao diện công khai: bảng màu, khẩu hiệu trang chủ, thứ tự bài viết")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Truy xuất cấu hình giao diện thành công")
+    })
     @GetMapping
     public String read() {
         String payload = store.read();
         return payload == null ? "{}" : payload;
     }
 
+    @Operation(summary = "Cập nhật cấu hình giao diện hệ thống", description = "Lưu cấu hình giao diện mới dành cho người quản trị (ADMIN, SUPER_ADMIN)")
+    @ApiResponses({
+        @ApiResponse(responseCode = "200", description = "Cập nhật cấu hình giao diện thành công"),
+        @ApiResponse(responseCode = "400", description = "Dữ liệu cấu hình không hợp lệ hoặc vượt quá dung lượng cho phép"),
+        @ApiResponse(responseCode = "401", description = "Chưa xác thực"),
+        @ApiResponse(responseCode = "403", description = "Không có quyền quản trị")
+    })
     @PutMapping
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public String save(@RequestBody JsonNode body, Authentication authentication) {

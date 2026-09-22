@@ -13,12 +13,12 @@ import {
   Newspaper,
   Sparkles,
   Users,
-  Loader2,
 } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { announcementsApi, type AnnouncementRecord } from '@/lib/api';
 import { AnnouncementReaderModal } from '@/components/announcements/AnnouncementReaderModal';
 import { AnnouncementFeedCard } from '@/components/announcements/feed/AnnouncementFeedCard';
+import { HomeNewsBentoSkeleton } from '@/components/ui/skeleton';
 import { SectionEyebrow } from '@/components/ui/page-header';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { useI18n } from '@/i18n';
@@ -204,17 +204,8 @@ export function HomeNewsSection() {
           })}
         </div>
 
-        {/* Loading State */}
-        {isLoading && (
-          <div className="flex h-64 items-center justify-center rounded-2xl border border-dashed border-border/80 bg-card/40">
-            <div className="flex flex-col items-center gap-3 text-muted-foreground">
-              <Loader2 className="h-8 w-8 animate-spin text-primary" />
-              <p className="text-sm font-medium">
-                {isVi ? 'Đang tải bản tin từ hệ thống...' : 'Loading campus announcements...'}
-              </p>
-            </div>
-          </div>
-        )}
+        {/* Loading State (Google Stitch Bento Skeleton - CLS = 0) */}
+        {isLoading && <HomeNewsBentoSkeleton />}
 
         {/* Empty State */}
         {!isLoading && items.length === 0 && (

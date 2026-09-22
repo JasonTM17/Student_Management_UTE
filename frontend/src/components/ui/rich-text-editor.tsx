@@ -396,6 +396,7 @@ export function RichTextEditor({
             onClick={handleUndo}
             disabled={historyIndex <= 0 || readOnly}
             title={isVi ? 'Hoàn tác (Ctrl+Z)' : 'Undo (Ctrl+Z)'}
+            aria-label={isVi ? 'Hoàn tác (Ctrl+Z)' : 'Undo (Ctrl+Z)'}
             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
           >
             <Undo2 className="h-4 w-4" />
@@ -551,6 +552,7 @@ export function RichTextEditor({
             onClick={openLinkModal}
             disabled={readOnly}
             title={isVi ? 'Chèn liên kết (Ctrl+K)' : 'Insert Link (Ctrl+K)'}
+            aria-label={isVi ? 'Chèn liên kết (Ctrl+K)' : 'Insert Link (Ctrl+K)'}
             className="rounded p-1.5 text-muted-foreground transition-colors hover:bg-secondary hover:text-foreground disabled:opacity-40"
           >
             <LinkIcon className="h-4 w-4" />

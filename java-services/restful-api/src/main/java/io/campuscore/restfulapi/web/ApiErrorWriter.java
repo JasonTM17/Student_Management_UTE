@@ -34,6 +34,7 @@ public class ApiErrorWriter {
         Object requestId = request.getAttribute(
                 io.campuscore.restfulapi.security.RequestIdFilter.ATTRIBUTE);
         Map<String, Object> body = new LinkedHashMap<>();
+        body.put("status", status.value());
         body.put("code", code);
         body.put("message", message);
         body.put("path", request.getRequestURI());

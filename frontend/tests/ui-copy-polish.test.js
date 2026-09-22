@@ -241,3 +241,92 @@ test('thesis page labels come from the dictionary instead of Vietnamese literals
   assert.match(page, /pageCopy\.classification\[studentGradeInfo\.band\]/);
   assert.doesNotMatch(page, /\brank: '/);
 });
+
+test('milestone 2: meta.defaults.keywords array length parity between en and vi', () => {
+  const ts = require('typescript');
+  const source = read('src/i18n/messages.ts');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const customRequire = (id) => {
+    if (id.includes('messages-thesis-workflow')) {
+      const target = path.join(root, 'src/i18n/messages-thesis-workflow.ts');
+      const modSource = fs.readFileSync(target, 'utf8');
+      const modOutput = ts.transpileModule(modSource, {
+        compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+      }).outputText;
+      const rec = { exports: {} };
+      Function('module', 'exports', modOutput)(rec, rec.exports);
+      return rec.exports;
+    }
+    return require(id);
+  };
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', 'require', output)(moduleRecord, moduleRecord.exports, customRequire);
+  const { en, vi } = moduleRecord.exports;
+
+  assert.equal(
+    en.meta.defaults.keywords.length,
+    vi.meta.defaults.keywords.length,
+    'en and vi keywords arrays must have the exact same length',
+  );
+  assert.equal(en.meta.defaults.keywords.length, 11);
+  assert.ok(en.meta.defaults.keywords.includes('Undergraduate Thesis'));
+  assert.ok(en.meta.defaults.keywords.includes('HCM-UTE'));
+  assert.equal(en.certificates.issuedByValue, 'Academic Affairs Office (OAA) — HCMUTE');
+  assert.ok(!en.certificates.issuedByValue.includes('Phòng Đào tạo'));
+  assert.equal(vi.certificates.issuedByValue, 'Phòng Đào tạo — HCMUTE');
+});
+
+test('milestone 2: component i18n localization in admin and announcements', () => {
+  const adminSurface = read('src/components/admin/AdminSurface.tsx');
+  assert.match(adminSurface, /useI18n/);
+  assert.match(adminSurface, /isVi \? 'Chi tiết →' : 'Details →'/);
+  assert.doesNotMatch(adminSurface, /<span>\s*Chi tiết &rarr;\s*<\/span>/);
+
+  const adminFrame = read('src/components/admin/AdminFrame.tsx');
+  assert.match(adminFrame, /\{locale === 'vi' \? 'PĐT' : 'OAA'\}/);
+  const rawPdt = adminFrame.match(/>\s*PĐT\s*</g);
+  assert.equal(rawPdt, null, 'all PĐT avatar badges must be localized');
+
+  const editModal = read('src/components/announcements/AnnouncementEditModal.tsx');
+  assert.match(editModal, /isVi\s*\?\s*'Chỉnh sửa nhanh qua giao diện quản trị Bảng tin'\s*:\s*'Quick edit via Admin Announcements'/);
+  assert.match(editModal, /publishedBy \|\| \(isVi \? 'Phòng Đào tạo' : 'Office of Academic Affairs'\)/);
+
+  const createModal = read('src/components/announcements/LecturerAnnouncementCreateModal.tsx');
+  assert.match(createModal, /defaultContentVi:/);
+  assert.match(createModal, /defaultContentEn:/);
+  assert.match(createModal, /isVi \? PRESETS\[0\]\.defaultContentVi : PRESETS\[0\]\.defaultContentEn/);
+  assert.match(createModal, /setContent\(isVi \? preset\.defaultContentVi : preset\.defaultContentEn\)/);
+
+  const notFound = read('src/app/not-found.tsx');
+  assert.match(notFound, /useI18n/);
+  assert.match(notFound, /LocalizedLink/);
+  assert.match(notFound, /isVi \? 'Trang không tồn tại' : 'Page Not Found'/);
+  assert.match(notFound, /isVi \? 'Quay lại trang chủ' : 'Back to Home'/);
+});
+
+test('milestone 2: a11y keyboard focus indicators and accessible names', () => {
+  const transcript = read('src/app/dashboard/transcript/page.tsx');
+  assert.match(
+    transcript,
+    /<tr[\s\S]*?role="button"[\s\S]*?focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-inset/,
+  );
+
+  const editor = read('src/components/ui/rich-text-editor.tsx');
+  assert.match(
+    editor,
+    /aria-label=\{isVi \? 'Hoàn tác \(Ctrl\+Z\)' : 'Undo \(Ctrl\+Z\)'\}/,
+  );
+  assert.match(
+    editor,
+    /aria-label=\{isVi \? 'Chèn liên kết \(Ctrl\+K\)' : 'Insert Link \(Ctrl\+K\)'\}/,
+  );
+
+  const feedCard = read('src/components/announcements/feed/AnnouncementFeedCard.tsx');
+  const matches = feedCard.match(
+    /onClick=\{handleShare\}[^>]*focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2/g,
+  );
+  assert.ok(matches && matches.length >= 2, 'both featured and standard share buttons must have focus rings');
+});
+

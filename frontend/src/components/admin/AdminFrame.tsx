@@ -281,7 +281,7 @@ export function AdminFrame({
         <div className="border-b border-white/10 bg-[var(--portal-sidebar-strong)] px-5 py-3">
           <div className="flex min-w-0 items-center gap-3">
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-[var(--portal-yellow)] text-xs font-bold text-[var(--portal-yellow-ink)] shadow-xs">
-              PĐT
+              {locale === 'vi' ? 'PĐT' : 'OAA'}
             </div>
             <div className="min-w-0 flex-1">
               <div className="truncate text-sm font-semibold text-[var(--portal-sidebar-text)]">
@@ -402,7 +402,7 @@ export function AdminFrame({
                   aria-haspopup="menu"
                 >
                   <div className="flex h-9 w-9 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-xs font-bold text-primary-foreground shadow-xs">
-                    PĐT
+                    {locale === 'vi' ? 'PĐT' : 'OAA'}
                   </div>
                   <div className="hidden min-w-0 text-left md:block">
                     <div className="truncate text-sm font-semibold text-foreground">
@@ -427,7 +427,7 @@ export function AdminFrame({
                   >
                     <div className="flex items-center gap-3 border-b border-border/70 px-4 py-4">
                       <div className="flex h-11 w-11 shrink-0 items-center justify-center overflow-hidden rounded-full bg-primary text-sm font-bold text-primary-foreground">
-                        PĐT
+                        {locale === 'vi' ? 'PĐT' : 'OAA'}
                       </div>
                       <div className="min-w-0 flex-1">
                         <p className="truncate font-semibold text-foreground text-sm">

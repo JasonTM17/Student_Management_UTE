@@ -231,7 +231,9 @@ export function AnnouncementEditModal({
         isGlobal,
         targetRoles,
         expectedVersion: announcement.version ?? 0,
-        reason: 'Chỉnh sửa nhanh qua giao diện quản trị Bảng tin',
+        reason: isVi
+          ? 'Chỉnh sửa nhanh qua giao diện quản trị Bảng tin'
+          : 'Quick edit via Admin Announcements',
       };
 
       await onSave(announcement.id, payload);
@@ -276,7 +278,9 @@ export function AnnouncementEditModal({
           </div>
           <div className="text-[11px] text-muted-foreground">
             {isVi ? 'Ban hành bởi:' : 'Published by:'}{' '}
-            <span className="font-medium text-foreground">{publishedBy || 'Phòng Đào tạo'}</span>
+            <span className="font-medium text-foreground">
+              {publishedBy || (isVi ? 'Phòng Đào tạo' : 'Office of Academic Affairs')}
+            </span>
           </div>
         </div>
 

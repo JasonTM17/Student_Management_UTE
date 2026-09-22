@@ -172,6 +172,8 @@ export const en = {
         'Class Schedule',
         'Student Transcripts',
         'Thesis Management',
+        'Undergraduate Thesis',
+        'HCM-UTE',
       ],
       ogAlt: 'CampusUTE Academic Portal Overview - HCMUTE',
       twitterTitle: 'CampusUTE - Academic Portal | HCMUTE',
@@ -1176,7 +1178,7 @@ export const en = {
     previewBannerNote:
       'This draft carries no serial number, QR code, or signature. The university has not issued it.',
     issuedByLabel: 'Official certificates are issued by',
-    issuedByValue: 'Academic Affairs Office (Phòng Đào tạo) — HCMUTE',
+    issuedByValue: 'Academic Affairs Office (OAA) — HCMUTE',
     issuedByNote:
       'Submit your request to the Academic Affairs Office to receive a sealed original with a real serial number, stamp, and verification code.',
     nationalHeader: 'MINISTRY OF EDUCATION AND TRAINING',

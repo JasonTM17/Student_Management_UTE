@@ -38,7 +38,7 @@ public class ThesisGroupReadController {
         @ApiResponse(responseCode = "403", description = "Không có quyền truy cập")
     })
     @GetMapping
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public List<GroupResponse> list(
             @Parameter(description = "Mã UUID của đợt khóa luận", required = true)
             @RequestParam UUID roundId,
@@ -53,7 +53,7 @@ public class ThesisGroupReadController {
         @ApiResponse(responseCode = "404", description = "Không tìm thấy nhóm với UUID tương ứng")
     })
     @GetMapping("/{id}")
-    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','TRUONG_KHOA')")
+    @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public GroupResponse get(
             @Parameter(description = "Mã UUID của nhóm", required = true)
             @PathVariable UUID id,

@@ -179,8 +179,16 @@ test('mail send endpoints require staff roles', () => {
   const controller = readSource(
     '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/mail/web/MailController.java',
   );
-  assert.ok(controller.includes("@PreAuthorize(\"hasAnyRole('ADMIN','LECTURER')\")"), 'send endpoints are staff-only');
-  assert.ok(controller.includes("@PreAuthorize(\"hasRole('ADMIN')\")"), 'the SMTP probe is admin-only');
+  assert.ok(
+    /@PreAuthorize\("hasAnyRole\('(?:ADMIN|LECTURER|SUPER_ADMIN)',\s*'(?:ADMIN|LECTURER|SUPER_ADMIN)',\s*'(?:ADMIN|LECTURER|SUPER_ADMIN)'\)"\)/.test(controller) ||
+    controller.includes("@PreAuthorize(\"hasAnyRole('ADMIN','LECTURER')\")"),
+    'send endpoints are staff-only',
+  );
+  assert.ok(
+    controller.includes("@PreAuthorize(\"hasRole('ADMIN')\")") ||
+    controller.includes("@PreAuthorize(\"hasAnyRole('ADMIN','SUPER_ADMIN')\")"),
+    'the SMTP probe is admin-only',
+  );
 });
 
 // ---------- Finding B: the CI Flyway gate is self-maintaining ----------
@@ -219,8 +227,11 @@ test('published grades and thesis results are locked server-side', () => {
     '../java-services/restful-api/src/main/java/io/campuscore/restfulapi/academic/service/AcademicMutationService.java',
   );
   const lockIndex = academic.indexOf('GRADES_PUBLISHED_LOCKED');
-  const writeIndex = academic.indexOf('saveComponent(grade.enrollmentId(), processItemId');
+  const legacyWrite = academic.indexOf('saveComponent(grade.enrollmentId(), processItemId');
+  const batchWrite = academic.indexOf('INSERT INTO " + STUDENT_GRADE');
+  const writeIndex = legacyWrite > -1 ? legacyWrite : batchWrite;
   assert.ok(lockIndex > -1, 'published-grade lock code must exist');
+  assert.ok(writeIndex > -1, 'component write operation must exist');
   assert.ok(
     lockIndex < writeIndex,
     'the published-grade lock must run before any component write',

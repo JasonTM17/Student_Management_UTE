@@ -217,7 +217,7 @@ export function AnnouncementFeedCard({
               <button
                 type="button"
                 onClick={handleShare}
-                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+                className="inline-flex h-8 w-8 items-center justify-center rounded-lg border border-border/70 text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
                 title={isVi ? 'Sao chép liên kết' : 'Copy link'}
                 aria-label={isVi ? 'Chia sẻ' : 'Share'}
               >
@@ -339,7 +339,7 @@ export function AnnouncementFeedCard({
             <button
               type="button"
               onClick={handleShare}
-              className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors"
+              className="inline-flex h-8 w-8 items-center justify-center rounded text-muted-foreground hover:text-foreground hover:bg-secondary transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2"
               title={isVi ? 'Sao chép liên kết' : 'Copy link'}
               aria-label={isVi ? 'Chia sẻ' : 'Share'}
             >

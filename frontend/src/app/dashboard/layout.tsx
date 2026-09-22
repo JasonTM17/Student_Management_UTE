@@ -1300,14 +1300,17 @@ export default function DashboardLayout({
                     aria-expanded={sidebarOpen}
                     aria-controls="dashboard-sidebar"
                     className={cn(
-                      'relative flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                      'relative flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                       sidebarOpen
                         ? 'bg-secondary text-primary'
                         : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                     )}
                   >
-                    <item.icon className="h-5 w-5" aria-hidden="true" />
-                    <span className="max-w-full text-center leading-4">
+                    <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                    <span
+                      title={messages.dashboardShell.controls.bottomNav.menu}
+                      className="w-full max-w-full truncate text-center text-[10px] leading-4"
+                    >
                       {messages.dashboardShell.controls.bottomNav.menu}
                     </span>
                     {unreadCount > 0 ? (
@@ -1325,23 +1328,29 @@ export default function DashboardLayout({
                   item.href !== '/dashboard/lecturer' &&
                   pathname.startsWith(item.href));
 
+              const itemLabel =
+                messages.dashboardShell.controls.bottomNav[
+                  item.labelKey as keyof typeof messages.dashboardShell.controls.bottomNav
+                ] ?? menuLabels[item.labelKey];
+
               return (
                 <LocalizedLink
                   key={item.href}
                   href={item.href}
                   aria-current={isActive ? 'page' : undefined}
                   className={cn(
-                    'flex min-h-11 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                    'flex min-h-11 min-w-0 flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
                     isActive
                       ? 'bg-secondary text-primary'
                       : 'text-muted-foreground hover:bg-secondary hover:text-foreground',
                   )}
                 >
-                  <item.icon className="h-5 w-5" aria-hidden="true" />
-                  <span className="max-w-full text-center leading-4">
-                    {messages.dashboardShell.controls.bottomNav[
-                      item.labelKey as keyof typeof messages.dashboardShell.controls.bottomNav
-                    ] ?? menuLabels[item.labelKey]}
+                  <item.icon className="h-5 w-5 shrink-0" aria-hidden="true" />
+                  <span
+                    title={itemLabel}
+                    className="w-full max-w-full truncate text-center text-[10px] leading-4"
+                  >
+                    {itemLabel}
                   </span>
                 </LocalizedLink>
               );
@@ -1356,10 +1365,13 @@ export default function DashboardLayout({
               }}
               aria-label={messages.assistant.open}
               title={messages.assistant.open}
-              className="flex min-h-11 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
+              className="flex min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
             >
-              <AssistantMascot className="h-5 w-5" />
-              <span className="max-w-full text-center leading-4">
+              <AssistantMascot className="h-5 w-5 shrink-0" />
+              <span
+                title={messages.assistant.slotLabel}
+                className="w-full max-w-full truncate text-center text-[10px] leading-4"
+              >
                 {messages.assistant.slotLabel}
               </span>
             </button>
