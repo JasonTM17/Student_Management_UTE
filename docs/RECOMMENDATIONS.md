@@ -1,7 +1,8 @@
 # Khuyến nghị hoàn thiện — CampusUTE sau v1.0.0
 
 > Tài liệu duy nhất tổng hợp kết quả vòng 7 (deep E2E + audit toàn chức năng bằng 8 subagents chuyên
-> trách + hội đồng Kongming/Advisor/Wukong). Trạng thái nền: `v1.0.0` tại `2b785aab` (đã phát hành,
+> trách + hội đồng Kongming/Advisor/Wukong) và vòng 8 (UI/UX deep sweep toàn frontend, 2026-09-23 —
+> mục 8). Trạng thái nền: `v1.0.0` tại `2b785aab` (đã phát hành,
 > Render LIVE, prod 200/200). Mọi khuyến nghị xếp theo **giá trị bảo vệ đồ án**, kèm ước lượng effort.
 
 ## 1. Các tuyên bố hệ thống ĐÃ CÓ BẰNG CHỨNG (feature → test/bằng chứng → ngày chạy)
@@ -94,5 +95,52 @@ node plans/2026-09-23-round7-feature-e2e/reports/layer3-partial-unique-index.mjs
 scratch/tools/gitleaks.exe git --log-opts='origin/main..HEAD' --no-banner
 ```
 
-*Tài liệu được tạo tự động từ vòng 7 (2026-09-23) — lead tổng hợp từ 8 báo cáo subagent; mỗi mục số 3
-đều có commit + test riêng trong lịch sử git.*
+## 8. Vòng 8 — UI/UX deep sweep toàn frontend
+
+> Fleet: 6 audit UI/UX theo domain (public/auth, học vụ SV, hỗ trợ SV, giảng viên, CRUD admin,
+> nội dung admin) + 2 contract sweep + hội đồng Kongming/Advisor. 30+ finding được Kongming phân
+> loại bằng thuật toán PATTERN/LOCAL/NOISE: defect local đã sửa (8.1), pattern chuyển backlog (8.3),
+> noise bị loại khỏi vòng lặp.
+
+### 8.1 Đã sửa vòng 8
+
+| Finding | Nguồn | Mức | Fix | Test chốt |
+| --- | --- | --- | --- | --- |
+| Bộ ba data-loss trang điểm: guard chưa-lưu không chặn điều hướng SPA; composer thông báo không reset ⇒ còn khả năng publish trùng; save hàng cục bộ đè làm mất điểm đã nhập dở | audit học vụ SV + nội dung admin | HIGH | (1) bắt chuyển hướng SPA: anchor capture + history sentinel + popstate; (2) composer reset + dirty-gated close; (3) merge-preserve hàng bán điền sau save | Guard riêng từng fix |
+| Trang Users: payload tạo bỏ rơi (drop) field faculty đã thu; modal sửa hiển field profile không bao giờ được lưu | audit CRUD admin | MEDIUM | Field faculty disable trung thực (DTO nhận-nhưng-bỏ-qua — office-assigned); modal ẩn field không lưu | Guard riêng |
+| Chuỗi "trạng thái giả": options học kỳ `hk1/hk2` bịa (StudentUteProfileGradeView); badge hardcode `Semester 1 • 2026-2027`; in transcript ký khống `TRƯỞNG KHOA CNTT`; meter tín chỉ clamp `Math.min(30)`; in hạnh kiểm + export sai phạm vi in; issuer thông báo bịa đơn vị; deep link notification đoán từ khóa | audit đa domain | MEDIUM | Xóa options giả; badge bind dữ liệu; bỏ chữ ký khống; meter render giá trị API; printable prop + `print:hidden`; issuer fallback `—`; deep link dùng field link/type | Guard riêng từng mục |
+| Admin content: Appearance Studio ghi đè + broadcast thứ tự pinned ngay khi tải; quick-edit thông báo rơi binding semester/schedule/audience (state BOTH không phân biệt); lỗi chuyển round đồ án không hiện mã cụ thể; ô đồ án hiển số 0 giả | audit nội dung admin | MEDIUM | Không clobber+broadcast khi load; carry-through binding + phân biệt state BOTH; surfacing đúng mã lỗi (`SCORES_INCOMPLETE`…); nhãn tile theo round đang chọn | Guard riêng từng mục |
+| API admin notification (`POST/GET/PUT/DELETE /notifications`) zero-consumer — admin không có UI gửi thông báo | BE→FE contract sweep | — (feature) | **Trang mới `/admin/notifications`**: composer broadcast từng người nhận (thiết kế Stitch, dựng lại bằng primitives của repo) + bảng đã-gửi có xóa; gắn vào admin nav — **đóng mục 5.7** | Guard riêng + xác minh Wukong K2 |
+| Tailwind thiếu `shadow-xs`/`shadow-2xs`/`drop-shadow-xs`/`rounded-xs` ⇒ 56 bề mặt âm thầm render phẳng | audit design system | MEDIUM | Thêm alias vào config | 56 bề mặt đủ chiều sâu |
+
+*Mỗi fix kèm guard test riêng; tại mọi bước: full FE suite 362–364 tests / 0 fail, `tsc` sạch,
+`npm run build` xanh.*
+
+### 8.2 Bằng chứng sweep sạch (release evidence)
+
+Contract sweep — bằng chứng release cho chu kỳ tới: FE→BE **0 cuộc gọi hỏng, 0 lệch tham số** trên
+~145 đường dẫn api.ts + fetch inline (17 client method chết được ghi danh sách dọn dẹp); BE→FE map
+xong các route zero-consumer với top-3 ứng viên trang: composer thông báo (**đã dựng vòng này**),
+attendance dashboard (7 dark route), mail template lab. E2E harness (hạ tầng release) được sửa: spec
+passcode admin căn theo V77, fixture mở lại round status (thẩm quyền V76), mock keys cho các endpoint
+mới, assertion cũ mã hóa lại theo product truth hiện tại — **official suite 29 passed / 0 failed /
+6 viewport-gated skips**. Wukong adversarial: K2 luồng broadcast NOT_FALSIFIED (201 → SV chưa đọc →
+cleanup), K3 appearance NOT_FALSIFIED, K5 double-submit NOT_FALSIFIED; K1 grade-guard chỉ FALSIFIED
+trên container local stale (nguồn trace sạch — re-probe chờ rebuild); phần còn lại của K4
+faculty-drop đã sửa trong source.
+
+### 8.3 Backlog bổ sung vòng 8
+
+| Hạng mục | Lý do để backlog / tiền đề |
+| --- | --- |
+| Song song card di động cho list-view thời khóa biểu; hiển lý do disabled của nút đăng ký | polish khả dụng, không phải defect chặn release — chưa xếp lịch vòng 8 |
+| Màu hex thô trong chart | **PATTERN** — cần một lượt token sweep toàn cục |
+| Bloc copy điều-kiện-theo-locale lớn → `messages.ts` | **PATTERN** — ~6 file, sửa lẻ dễ lệch hai bản ngữ |
+| Nâng cấp pattern CRUD admin: inline field error (8 trang), sort cột, lưu filter, chọn page-size | Pattern chung 8+ trang — không phải sửa đơn trang |
+| Bộ lọc role trang Users | Cần BE thêm query param role trước — đổi API contract, không thể pure-FE |
+| Trang attendance dashboard (7 dark route) + mail template lab | 2 ứng viên còn lại trong top-3 zero-consumer map (8.2) |
+| Leader transfer; SUPER_ADMIN nhất quán service-layer | Đã ghi ở 5.2 / 5.5 — sweep vòng 8 tái khẳng định |
+
+*Tài liệu được tạo tự động từ vòng 7 (2026-09-23), bổ sung vòng 8 (UI/UX deep sweep, 2026-09-23) —
+lead tổng hợp từ 8 báo cáo subagent vòng 7 và fleet vòng 8; mỗi mục số 3 và 8.1 đều có commit +
+test riêng trong lịch sử git.*
