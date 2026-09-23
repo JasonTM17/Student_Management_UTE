@@ -171,6 +171,18 @@ public class ThesisAssistantRepository {
         return new ConversationPage(List.copyOf(rows), next);
     }
 
+    public void requireOwnedConversation(UUID conversationId, String ownerId) {
+        Integer owned = jdbc.queryForObject(
+                "SELECT count(*) FROM assistant.chat_conversation WHERE id=:id AND owner_id=:owner",
+                p().addValue("id", conversationId).addValue("owner", ownerId), Integer.class);
+        if (owned == null || owned == 0) {
+            // Same contract as deleteConversation: a conversation the caller
+            // does not own is indistinguishable from one that does not exist.
+            throw new io.campuscore.restfulapi.web.DomainException(
+                    org.springframework.http.HttpStatus.NOT_FOUND, "CONVERSATION_NOT_FOUND", "Conversation not found");
+        }
+    }
+
     public MessagePage messagesPage(UUID conversationId, String ownerId, int requestedLimit, String cursor) {
         int limit = Math.max(1, Math.min(requestedLimit <= 0 ? 50 : requestedLimit, 200));
         Cursor boundary = decodeCursor(cursor);

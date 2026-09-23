@@ -631,6 +631,10 @@ public class ThesisAssistantService {
 
     public ThesisAssistantRepository.MessagePage messagePage(UUID conversationId, String ownerId, Integer limit, String cursor) {
         if (legacyHistory == null) return new ThesisAssistantRepository.MessagePage(List.of(), null);
+        // The page query itself silently scopes to the owner, which used to
+        // make a foreign conversation read answer 200 [] while DELETE on the
+        // same id answered 404. Assert ownership first so both verbs agree.
+        legacyHistory.requireOwnedConversation(conversationId, ownerId);
         return legacyHistory.messagesPage(conversationId, ownerId, limit == null ? 50 : limit, cursor);
     }
 
