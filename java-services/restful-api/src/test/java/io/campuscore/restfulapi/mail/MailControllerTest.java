@@ -37,14 +37,26 @@ class MailControllerTest {
 
     @Test
     void sendTestEmailInvokesService() {
-        TestEmailRequest request = new TestEmailRequest("conbocuoi1721@gmail.com", "Admin", "Hello");
+        TestEmailRequest request = new TestEmailRequest("admin@campuscore.local", "Admin", "Hello");
         ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(request);
 
         assertEquals(HttpStatus.OK, response.getStatusCode());
         assertNotNull(response.getBody());
         assertTrue(response.getBody().success());
-        assertEquals("conbocuoi1721@gmail.com", response.getBody().recipient());
-        verify(emailService).sendTestEmail("conbocuoi1721@gmail.com", "Admin", "Hello");
+        assertEquals("admin@campuscore.local", response.getBody().recipient());
+        verify(emailService).sendTestEmail("admin@campuscore.local", "Admin", "Hello");
+    }
+
+    @Test
+    void sendTestEmailFallsBackToInstitutionDefaultRecipient() {
+        // Regression: the default used to be a personal Gmail inbox. With no
+        // recipient supplied, dispatch must go to the institution-owned sink.
+        ResponseEntity<MailDispatchResponse> response = controller.sendTestEmail(null);
+
+        assertEquals(HttpStatus.OK, response.getStatusCode());
+        assertNotNull(response.getBody());
+        assertEquals("no-reply@campuscore.local", response.getBody().recipient());
+        verify(emailService).sendTestEmail("no-reply@campuscore.local", "Quản trị viên CampusUTE", null);
     }
 
     @Test

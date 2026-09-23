@@ -123,6 +123,8 @@ export const en = {
         // Thesis reports
         REPORT_NOT_FOUND: 'No report has been submitted for this group yet.',
         REPORT_DEADLINE_PASSED: 'The report submission deadline has passed.',
+        REPORT_WINDOW_CLOSED:
+          'Report submission opens after course registration closes for the round.',
         FILE_TOO_LARGE: 'The file is larger than the 20MB limit.',
         UNSUPPORTED_FILE_TYPE: 'Only Word (.doc, .docx) and PDF files are accepted.',
         INVALID_FILE_CONTENT: 'The file content does not match its extension.',
@@ -1984,6 +1986,8 @@ export const vi: I18nMessages = {
         // Nộp tài liệu khóa luận (Word/PDF) và hạn nộp
         REPORT_NOT_FOUND: 'Nhóm này chưa nộp tài liệu khóa luận.',
         REPORT_DEADLINE_PASSED: 'Đã quá hạn nộp tài liệu khóa luận.',
+        REPORT_WINDOW_CLOSED:
+          'Việc nộp tài liệu khóa luận mở sau khi đợt đăng ký chuyển sang trạng thái đã đóng.',
         FILE_TOO_LARGE: 'Tệp vượt quá giới hạn 20MB.',
         UNSUPPORTED_FILE_TYPE: 'Chỉ nhận tệp Word (.doc, .docx) và PDF.',
         INVALID_FILE_CONTENT: 'Nội dung tệp không khớp với phần mở rộng.',

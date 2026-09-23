@@ -247,6 +247,9 @@ export default function DashboardLayout({
   const [profileOpen, setProfileOpen] = useState(false);
   const [notificationsOpen, setNotificationsOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationItem[]>([]);
+  // Badge number owned by GET /notifications/my/unread-count, never by the
+  // dropdown's capped 5-row preview list.
+  const [unreadCount, setUnreadCount] = useState(0);
   const [notificationsLoading, setNotificationsLoading] = useState(false);
   // A failed load must never read as "nothing unread": this flag keeps an
   // outage distinguishable from an honestly empty inbox.
@@ -616,14 +619,21 @@ export default function DashboardLayout({
     setNotificationsLoading(true);
     setNotificationsError(false);
     try {
-      const response = await notificationsApi.getMy({
-        limit: 5,
-        isRead: false,
-      });
+      // Rows stay a 5-item preview for the dropdown; the badge count comes
+      // from the dedicated counter endpoint so it is not capped at 5.
+      const [response, count] = await Promise.all([
+        notificationsApi.getMy({
+          limit: 5,
+          isRead: false,
+        }),
+        notificationsApi.unreadCount(),
+      ]);
       setNotifications(response.data);
+      setUnreadCount(count);
     } catch {
       // Surface the failure instead of rendering the bell as "no unread".
       setNotifications([]);
+      setUnreadCount(0);
       setNotificationsError(true);
     } finally {
       setNotificationsLoading(false);
@@ -684,7 +694,6 @@ export default function DashboardLayout({
     );
   }
 
-  const unreadCount = notifications.filter((notification) => !notification.isRead).length;
   const roleLabel = isAdmin
     ? (user?.roles?.includes('SUPER_ADMIN') ? messages.adminShell.superAdminRole : messages.adminShell.adminRole)
     : isLecturer
@@ -1101,6 +1110,9 @@ export default function DashboardLayout({
                                     setNotifications((prev) =>
                                       prev.filter((n) => n.id !== notification.id)
                                     );
+                                    // The row was unread; keep the server-sourced
+                                    // badge in step with the local removal.
+                                    setUnreadCount((count) => Math.max(0, count - 1));
                                   } catch {
                                     // ignore
                                   }

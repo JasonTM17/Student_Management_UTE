@@ -57,3 +57,17 @@ test('global thesis workspaces do not call the lecturer-only workload endpoint',
   assert.match(page, /if \(!isLecturer \|\| !selectedRoundId\) return;/);
   assert.match(page, /thesisApi\s*\.myWorkload\(\)/);
 });
+
+test('report window lock keeps the backend REPORT_WINDOW_CLOSED code localized', () => {
+  const page = read('src/app/dashboard/thesis/page.tsx');
+  const messages = read('src/i18n/messages.ts');
+
+  // ThesisReportService answers 409 REPORT_WINDOW_CLOSED until the round
+  // reaches REGISTRATION_CLOSED: the panel must map that code and the
+  // dictionary must keep both the English and Vietnamese copies.
+  assert.ok(
+    page.includes('REPORT_WINDOW_CLOSED') &&
+      (messages.match(/REPORT_WINDOW_CLOSED:/g) || []).length === 2,
+    'REPORT_WINDOW_CLOSED must be mapped by the thesis page and localized in en + vi',
+  );
+});

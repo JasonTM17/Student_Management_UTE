@@ -1219,6 +1219,11 @@ export default function ThesisPage() {
           setReportError(messages.thesis.report.fileTooLarge);
         } else if (code === 'UNSUPPORTED_FILE_TYPE' || code === 'INVALID_FILE_CONTENT') {
           setReportError(messages.thesis.report.fileTypeUnsupported);
+        } else if (code === 'REPORT_WINDOW_CLOSED') {
+          // The round status can change between render and submit (the panel
+          // gates on it), so surface the localized window copy, not the
+          // generic failure, when the server rejects the race.
+          setReportError(messages.common.campusErrors.codes.REPORT_WINDOW_CLOSED);
         } else {
           setReportError(messages.thesis.report.submitFailed);
         }
@@ -1415,6 +1420,12 @@ export default function ThesisPage() {
   // that can only fail. A round type without this date never freezes, matching
   // the server.
   const reportDeadlinePassed = Number.isFinite(reportDeadlineMs) && Date.now() >= reportDeadlineMs;
+  // The backend also freezes reports until the owning round reaches
+  // REGISTRATION_CLOSED (409 REPORT_WINDOW_CLOSED, checked right after the
+  // deadline): gate the control on the round status the panel already loads,
+  // and keep the current behaviour while the owning round is unknown.
+  const reportWindowClosed =
+    reportDeadlineRound != null && reportDeadlineRound.status !== 'REGISTRATION_CLOSED';
 
   // The report panel stays here: it owns the submission form, its state, and
   // the leader-only rights it renders.
@@ -1434,6 +1445,19 @@ export default function ThesisPage() {
                 <Lock className="h-3.5 w-3.5" aria-hidden="true" />
                 {messages.thesis.report.lockedTitle}
               </span>
+            ) : reportWindowClosed ? (
+              // Locked until registration closes: show the real CTA disabled
+              // with the same copy the error map carries, never a button that
+              // can only fail with a generic toast.
+              <div className="flex shrink-0 flex-col items-end gap-1">
+                <Button type="button" size="sm" variant="outline" disabled>
+                  {groupReport ? messages.thesis.report.update : messages.thesis.report.submit}
+                </Button>
+                <span className="inline-flex max-w-[16rem] items-start gap-1.5 text-xs text-muted-foreground">
+                  <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" aria-hidden="true" />
+                  {messages.common.campusErrors.codes.REPORT_WINDOW_CLOSED}
+                </span>
+              </div>
             ) : (
               <Button
                 type="button"

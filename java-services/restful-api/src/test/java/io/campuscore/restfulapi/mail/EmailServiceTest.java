@@ -49,7 +49,7 @@ class EmailServiceTest {
         templateEngine.setTemplateResolver(resolver);
 
         mailConfig = new MailConfig();
-        mailConfig.setFrom("conbocuoi1721@gmail.com");
+        mailConfig.setFrom("no-reply@campuscore.local");
         mailConfig.setSenderName("CampusUTE - Cổng Đào Tạo HCMUTE");
         mailConfig.setEnabled(true);
 

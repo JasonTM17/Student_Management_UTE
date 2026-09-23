@@ -42,9 +42,10 @@ public class MailController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     @Operation(summary = "Gửi email kiểm thử hệ thống SMTP Gmail")
     public ResponseEntity<MailDispatchResponse> sendTestEmail(@Valid @RequestBody(required = false) TestEmailRequest request) {
+        // Default is an institution-owned sink; an explicitly passed `to` wins.
         String to = (request != null && request.to() != null && !request.to().isBlank())
                 ? request.to()
-                : "conbocuoi1721@gmail.com";
+                : "no-reply@campuscore.local";
         String name = (request != null && request.recipientName() != null)
                 ? request.recipientName()
                 : "Quản trị viên CampusUTE";
@@ -125,7 +126,7 @@ public class MailController {
                 data.put("introMessage", "Đây là thư kiểm thử để xác nhận dịch vụ email CampusUTE đã phản hồi thành công.");
                 data.put("statusBadge", "KẾT NỐI SMTP THÀNH CÔNG");
                 data.put("smtpProtocol", "Gmail SMTP (Port 587 - TLS)");
-                data.put("senderEmail", "conbocuoi1721@gmail.com");
+                data.put("senderEmail", "no-reply@campuscore.local");
                 data.put("timestamp", nowStr);
                 data.put("actionUrl", "https://www.campusute.io.vn");
                 data.put("actionText", "Truy cập Cổng Đào tạo CampusUTE");
