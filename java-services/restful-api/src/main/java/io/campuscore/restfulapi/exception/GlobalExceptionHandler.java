@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
 import org.springframework.web.bind.annotation.ExceptionHandler;
@@ -116,6 +117,22 @@ public class GlobalExceptionHandler {
                 HttpStatus.NOT_FOUND,
                 "NOT_FOUND",
                 "Resource not found",
+                request,
+                Map.of());
+    }
+
+    /**
+     * A wrong HTTP method on an existing route is a client mistake, not an
+     * internal failure: answer 405 so callers can correct the request instead
+     * of chasing a phantom server error.
+     */
+    @ExceptionHandler(HttpRequestMethodNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMethodNotSupported(
+            HttpRequestMethodNotSupportedException exception, HttpServletRequest request) {
+        return buildErrorResponse(
+                HttpStatus.METHOD_NOT_ALLOWED,
+                "METHOD_NOT_ALLOWED",
+                "Request method is not supported for this resource",
                 request,
                 Map.of());
     }
