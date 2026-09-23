@@ -804,6 +804,9 @@ export const usersApi = {
     limit?: number;
     status?: string;
     search?: string;
+    // Server-side role filter: the admin console's tabs must not re-filter a
+    // page of 20 in the browser (meta.total then counts the wrong set).
+    role?: string;
   }): Promise<ApiResponse<User[]>> => {
     const response = await api.get<ApiResponse<User[]>>('/users', { params });
     return response.data;
@@ -1303,6 +1306,80 @@ export const conductApi = {
   },
   getStudentConduct: async (studentId: string): Promise<StudentConductSummary> => {
     const response = await api.get<StudentConductSummary>(`/conduct/student/${studentId}`);
+    return response.data;
+  },
+};
+
+// Attendance API. Contract verified against the running backend: the student
+// reads return bare arrays, and the admin list answers the {data, meta}
+// envelope the other admin catalogs use. Status values observed in data are
+// PRESENT/ABSENT/LATE/EXCUSED, but pages must render any unknown status, so
+// the field stays an open string.
+export type AttendanceRecord = {
+  id: string;
+  studentId: string;
+  sectionId: string;
+  date: string;
+  status: string;
+  notes?: string | null;
+  createdAt?: string | null;
+  student?: {
+    id?: string;
+    studentId?: string;
+    user?: {
+      id?: string;
+      email?: string;
+      firstName?: string;
+      lastName?: string;
+    } | null;
+  } | null;
+  section?: {
+    id?: string;
+    sectionNumber?: string;
+    semesterId?: string;
+    course?: {
+      id?: string;
+      code?: string;
+      name?: string;
+      nameEn?: string;
+      nameVi?: string;
+    } | null;
+  } | null;
+};
+
+export type AttendanceSummary = {
+  sectionId: string;
+  courseCode: string;
+  courseName: string;
+  courseNameEn?: string | null;
+  courseNameVi?: string | null;
+  total: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  attendanceRate: number;
+};
+
+export const attendanceApi = {
+  my: async (): Promise<AttendanceRecord[]> => {
+    const response = await api.get<AttendanceRecord[]>('/attendance/my');
+    return response.data;
+  },
+  mySummary: async (): Promise<AttendanceSummary[]> => {
+    const response = await api.get<AttendanceSummary[]>(
+      '/attendance/my/summary',
+    );
+    return response.data;
+  },
+  adminList: async (params: {
+    page: number;
+    limit: number;
+  }): Promise<ApiResponse<AttendanceRecord[]>> => {
+    const response = await api.get<ApiResponse<AttendanceRecord[]>>(
+      '/attendance',
+      { params },
+    );
     return response.data;
   },
 };
