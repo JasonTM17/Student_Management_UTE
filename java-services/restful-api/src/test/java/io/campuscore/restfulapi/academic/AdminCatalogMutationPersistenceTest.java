@@ -377,6 +377,52 @@ class AdminCatalogMutationPersistenceTest {
                 .andExpect(status().isOk());
     }
 
+    @Test
+    void classroomCreateAndMutationsPersistProperly() throws Exception {
+        mvc.perform(post("/api/v1/classrooms")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {
+                                  "id": "room-new-test",
+                                  "building": "QA1",
+                                  "roomNumber": "999",
+                                  "capacity": 50,
+                                  "type": "LAB"
+                                }
+                                """))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.id").value("room-new-test"))
+                .andExpect(jsonPath("$.building").value("QA1"))
+                .andExpect(jsonPath("$.roomNumber").value("999"))
+                .andExpect(jsonPath("$.capacity").value(50))
+                .andExpect(jsonPath("$.type").value("LAB"));
+
+        Map<String, Object> room = jdbc.queryForMap(
+                "SELECT \"building\", \"roomNumber\", \"capacity\", \"type\" FROM \"academic\".\"Classroom\" WHERE \"id\" = ?",
+                "room-new-test");
+        assertThat(room)
+                .containsEntry("building", "QA1")
+                .containsEntry("roomNumber", "999")
+                .containsEntry("capacity", 50)
+                .containsEntry("type", "LAB");
+
+        mvc.perform(put("/api/v1/classrooms/room-new-test")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":60}"))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.capacity").value(60));
+
+        // Capacity <= 0 is rejected
+        mvc.perform(put("/api/v1/classrooms/room-new-test")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"capacity\":0}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_CAPACITY"));
+    }
+
     private void createTables() {
         jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."AcademicYear" (

@@ -105,13 +105,22 @@ public class AdminCatalogMutationService {
     @Transactional
     public Map<String, Object> createClassroom(Map<String, Object> input) {
         String id = id(input);
+        String building = required(input, "building");
+        String roomNumber = required(input, "roomNumber");
+        int capacity = number(input, "capacity", 30);
+        if (capacity < 1) {
+            throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Classroom capacity must be at least 1");
+        }
+        String type = text(input, "type", "LECTURE");
         jdbc.update(
                 "INSERT INTO " + CLASSROOM
-                        + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\")"
-                        + " VALUES (:id, :building, :roomNumber, :capacity, :type)",
+                        + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (:id, :building, :roomNumber, :capacity, :type, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 params(input, id)
-                        .addValue("capacity", number(input, "capacity", 30))
-                        .addValue("type", text(input, "type", "LECTURE")));
+                        .addValue("building", building)
+                        .addValue("roomNumber", roomNumber)
+                        .addValue("capacity", capacity)
+                        .addValue("type", type));
         return get(CLASSROOM, id);
     }
 
@@ -219,6 +228,12 @@ public class AdminCatalogMutationService {
         }
         if (SECTION.equals(table)) {
             validateSectionUpdate(id, input);
+        }
+        if (CLASSROOM.equals(table) && input.containsKey("capacity")) {
+            int capacity = number(input, "capacity", 30);
+            if (capacity < 1) {
+                throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Classroom capacity must be at least 1");
+            }
         }
         MapSqlParameterSource parameters = new MapSqlParameterSource("id", id);
         StringBuilder sql = new StringBuilder("UPDATE ").append(table).append(" SET ");
