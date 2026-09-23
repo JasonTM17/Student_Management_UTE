@@ -186,6 +186,9 @@ async function importCorpus(options) {
     return;
   }
   const config = requireSupabaseConfig();
+  if (config.schema === 'assistant' && config.table === 'knowledge_document') {
+    throw new Error('Governed assistant knowledge must use the two-admin review and release workflow; direct table import is disabled');
+  }
   const endpoint = `${config.baseUrl}/rest/v1/${config.table}?on_conflict=slug`;
   for (let index = 0; index < documents.length; index += 500) {
     await supabaseRequest(config, 'POST', endpoint, documents.slice(index, index + 500));

@@ -379,13 +379,22 @@ export type AssistantKnowledgeDomain =
   | 'ACADEMIC_CATALOG'
   | 'ANNOUNCEMENT'
   | 'POLICY'
-  | 'GENERAL_FAQ';
+  | 'GENERAL_FAQ'
+  | 'SPECIALIZED';
 
 export interface AssistantKnowledgeRevision {
   documentId: string;
   revisionId: string;
   version: number;
   state: AssistantKnowledgeState | string;
+  sync?: AssistantKnowledgeSyncResult | null;
+}
+
+export interface AssistantKnowledgeSyncResult {
+  status: string;
+  degraded: boolean;
+  releaseId?: string | null;
+  message?: string;
 }
 
 export interface AssistantCatalogCoverage {
@@ -1157,10 +1166,11 @@ export const assistantKnowledgeApi = {
     return response.data;
   },
 
-  archive: async (documentId: string): Promise<void> => {
-    await api.delete(
+  archive: async (documentId: string): Promise<AssistantKnowledgeSyncResult | undefined> => {
+    const response = await api.delete<AssistantKnowledgeSyncResult | undefined>(
       `/admin/assistant/knowledge/${encodeURIComponent(documentId)}`,
     );
+    return response.data;
   },
 
   /** Read-only coverage summary from the public academic catalog endpoints. */

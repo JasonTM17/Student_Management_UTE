@@ -125,10 +125,10 @@ public class AssistantKnowledgeRemoteAdminController {
     })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    public void archive(
+    public SupabaseKnowledgeSyncService.SyncResult archive(
             @Parameter(description = "Mã định danh (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
-        authority.archive(id, subject(actor));
+        return authority.archive(id, subject(actor));
     }
 
     @Operation(summary = "Đồng bộ hóa kho tri thức từ xa")

@@ -98,14 +98,14 @@ public class SupabaseKnowledgeInternalController {
     }
 
     @DeleteMapping("/{id}")
-    public void archive(@PathVariable UUID id,
+    public SupabaseKnowledgeSyncService.SyncResult archive(@PathVariable UUID id,
             @RequestHeader(name = TOKEN_HEADER, required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String actor) {
         verify(token);
         authority.archive(id, owner(actor));
-        // A later release publication will carry the tombstone.  Do not claim
-        // that the old active projection changed when Supabase has no new
-        // published release yet.
+        // Supabase published the tombstone release in the archive transaction.
+        // Return the cross-database projection state to the admin edge.
+        return sync.syncNow();
     }
 
     @PostMapping("/sync")

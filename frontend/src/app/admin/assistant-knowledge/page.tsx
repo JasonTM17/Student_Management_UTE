@@ -53,6 +53,7 @@ const domains: Array<{ value: '' | AssistantKnowledgeDomain; en: string; vi: str
   { value: 'ANNOUNCEMENT', en: 'Announcements', vi: 'Thông báo' },
   { value: 'POLICY', en: 'Policy', vi: 'Chính sách' },
   { value: 'GENERAL_FAQ', en: 'Campus FAQ', vi: 'Câu hỏi thường gặp' },
+  { value: 'SPECIALIZED', en: 'Specialized knowledge', vi: 'Kiến thức chuyên ngành' },
 ];
 
 const blankForm: AssistantKnowledgeRequest = {
@@ -197,9 +198,16 @@ export default function AdminAssistantKnowledgePage() {
     setError('');
     setNotice('');
     try {
-      if (operation === 'submit') await assistantKnowledgeApi.submit(document.documentId);
-      else await assistantKnowledgeApi.publish(document.documentId);
-      setNotice(vi ? 'Đã cập nhật trạng thái duyệt.' : 'Review status updated.');
+      if (operation === 'submit') {
+        await assistantKnowledgeApi.submit(document.documentId);
+        setNotice(vi ? 'Đã gửi xét duyệt.' : 'Submitted for review.');
+      } else {
+        const result = await assistantKnowledgeApi.publish(document.documentId);
+        const pendingProjection = result.sync && (result.sync.degraded || result.sync.status !== 'ACTIVATED');
+        setNotice(pendingProjection
+          ? (vi ? 'Đã xuất bản; trợ lý chưa cập nhật. Hãy kiểm tra trạng thái đồng bộ.' : 'Published; the assistant has not updated yet. Check sync status.')
+          : (vi ? 'Đã xuất bản nội dung cho trợ lý.' : 'Guidance published for the assistant.'));
+      }
       await load();
     } catch (transitionError) {
       setError(actionError(transitionError, locale));
@@ -213,9 +221,12 @@ export default function AdminAssistantKnowledgePage() {
     setIsSaving(true);
     setError('');
     try {
-      await assistantKnowledgeApi.archive(archiveTarget.documentId);
+      const sync = await assistantKnowledgeApi.archive(archiveTarget.documentId);
+      const pendingProjection = sync && (sync.degraded || (archiveTarget.state === 'PUBLISHED' && sync.status !== 'ACTIVATED'));
       setArchiveTarget(null);
-      setNotice(vi ? 'Đã lưu trữ nội dung. Lịch sử thay đổi vẫn được giữ.' : 'Guidance archived. Its change history remains available.');
+      setNotice(pendingProjection
+        ? (vi ? 'Đã lưu trữ trong kho quản trị; trợ lý chưa cập nhật. Hãy kiểm tra trạng thái đồng bộ.' : 'Archived in administration; the assistant has not updated yet. Check sync status.')
+        : (vi ? 'Đã lưu trữ nội dung. Lịch sử thay đổi vẫn được giữ.' : 'Guidance archived. Its change history remains available.'));
       await load();
     } catch (archiveError) {
       setError(actionError(archiveError, locale));

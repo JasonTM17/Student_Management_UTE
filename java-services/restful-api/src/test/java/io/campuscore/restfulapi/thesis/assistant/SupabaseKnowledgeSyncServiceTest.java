@@ -71,6 +71,26 @@ class SupabaseKnowledgeSyncServiceTest {
     }
 
     @Test
+    void specializedReleaseKeepsItsDomainAndHash() throws Exception {
+        UUID release = UUID.randomUUID();
+        UUID source = UUID.randomUUID();
+        String content = "Professional software design guidance";
+        String hash = hash(source, "SPECIALIZED", "software-design", "Software design", content, "faculty", 10);
+        Deque<HttpResponse<String>> responses = new ArrayDeque<>();
+        responses.add(response(200, "[{\"id\":\"" + release + "\",\"corpus_version\":\"specialized-1\",\"corpus_hash\":\""
+                + hash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{}}]"));
+        responses.add(response(200, "[{\"source_id\":\"" + source
+                + "\",\"revision_id\":null,\"version\":1,\"domain\":\"SPECIALIZED\",\"slug\":\"software-design\",\"locale\":\"en\",\"title\":\"Software design\",\"content\":\""
+                + content + "\",\"source\":\"faculty\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]"));
+
+        SupabaseKnowledgeSyncService.SyncResult result = service(responses).syncNow();
+
+        assertEquals("ACTIVATED", result.status(), result.message());
+        assertEquals("SPECIALIZED", raw.queryForObject(
+                "SELECT domain FROM assistant.knowledge_runtime_document WHERE release_id=?", String.class, release));
+    }
+
+    @Test
     void validationFailureRetainsLastPublishedRelease() {
         UUID release = UUID.randomUUID();
         Deque<HttpResponse<String>> responses = new ArrayDeque<>();

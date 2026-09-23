@@ -11,9 +11,10 @@ public final class AssistantKnowledgeDomains {
     public static final String ANNOUNCEMENT = "ANNOUNCEMENT";
     public static final String POLICY = "POLICY";
     public static final String GENERAL_FAQ = "GENERAL_FAQ";
+    public static final String SPECIALIZED = "SPECIALIZED";
 
     private static final Set<String> ALLOWED = Set.of(
-            THESIS, REGISTRATION, ACADEMIC_CATALOG, ANNOUNCEMENT, POLICY, GENERAL_FAQ);
+            THESIS, REGISTRATION, ACADEMIC_CATALOG, ANNOUNCEMENT, POLICY, GENERAL_FAQ, SPECIALIZED);
 
     private AssistantKnowledgeDomains() { }
 

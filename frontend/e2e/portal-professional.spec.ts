@@ -38,7 +38,8 @@ async function freeCourseForRegister(page: Page) {
   // SE402 section's Register button stays disabled as a duplicate course
   // until that enrollment is dropped. Drop it first so the register path is
   // the one under test.
-  const dropButton = page.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i }).first();
+  const dropButton = page.locator('article').filter({ hasText: /SE402-01/ })
+    .getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
   if (await dropButton.isVisible().catch(() => false)) {
     await dropButton.click();
     await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
@@ -169,6 +170,9 @@ test.describe('student workspace', () => {
   });
 
   test('student can register then drop a live section', async ({ page }) => {
+    // Cold Next.js compilation plus two successful write/refetch cycles can
+    // exceed the default 30-second budget on Windows without an app failure.
+    test.setTimeout(90_000);
     await signIn(page, student);
     await page.goto('/dashboard/register');
     await expect(page.getByRole('heading', { name: /course registration|đăng ký học phần/i })).toBeVisible({
@@ -188,7 +192,8 @@ test.describe('student workspace', () => {
       timeout: 15_000,
     });
     await dismissMobileSidebar(page);
-    const dropButton = page.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i }).first();
+    const dropButton = page.locator('article').filter({ hasText: /SE402-01/ })
+      .getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
     await expect(dropButton).toBeVisible({ timeout: 15_000 });
     await page.screenshot({
       path: process.env.COURSE_E2E_SCREENSHOT || path.join('test-results', 'register-after-enroll.png'),
@@ -200,6 +205,20 @@ test.describe('student workspace', () => {
     await expect(page.getByRole('button', { name: /^register$|^đăng ký$/i }).first()).toBeVisible({
       timeout: 15_000,
     });
+  });
+
+  test('student can upload and save an avatar image', async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, student);
+    await page.goto('/dashboard/profile');
+    const photo = page.locator('#profile-photo');
+    await expect(photo).toBeAttached();
+    await photo.setInputFiles(path.join(process.cwd(), 'public', 'hcmute-logo.webp'));
+    await expect(page.getByText(/photo not saved yet|ảnh chưa được lưu/i)).toBeVisible();
+    await page.getByRole('button', { name: /save changes|lưu thay đổi/i }).click();
+    await expect(page.getByText(/profile updated|đã cập nhật hồ sơ/i)).toBeVisible();
+    await page.reload();
+    await expect(page.locator('#dashboard-main-content img[src^="data:image/jpeg"]')).toBeVisible();
   });
 
   test('register API failure stays campus-language', async ({ page }) => {
