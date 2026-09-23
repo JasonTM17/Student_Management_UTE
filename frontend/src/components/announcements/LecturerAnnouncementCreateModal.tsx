@@ -432,7 +432,6 @@ export function LecturerAnnouncementCreateModal({
             onChange={(e) => setTitle(e.target.value)}
             placeholder={isVi ? 'Nhập tiêu đề thông báo...' : 'Enter notice title...'}
             className="text-sm font-medium"
-            required
           />
         </div>
 
@@ -571,7 +570,6 @@ export function LecturerAnnouncementCreateModal({
               rows={9}
               placeholder={isVi ? 'Nhập nội dung thông báo gửi đến sinh viên (mã HTML hoặc văn bản)...' : 'Enter notice body (HTML or plain text)...'}
               className="font-mono text-xs leading-relaxed"
-              required
             />
           )}
         </div>
