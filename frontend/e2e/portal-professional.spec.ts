@@ -221,6 +221,29 @@ test.describe('student workspace', () => {
     await expect(page.locator('#dashboard-main-content img[src^="data:image/jpeg"]')).toBeVisible();
   });
 
+  test('approved group leader can upload a report PDF', async ({ page }) => {
+    test.setTimeout(90_000);
+    await signIn(page, student);
+    await page.goto('/dashboard/thesis?roundId=22d65ee6-f485-40ae-a66b-528d35007745');
+    await dismissMobileSidebar(page);
+    await expect(page.getByRole('button', { name: /^submit report$|^nộp báo cáo$/i }).first())
+      .toBeEnabled({ timeout: 20_000 });
+    await page.getByRole('button', { name: /^submit report$|^nộp báo cáo$/i }).first().click();
+    await page.locator('#thesis-report-title').fill('E2E report upload');
+    await page.locator('#thesis-report-file').setInputFiles({
+      name: 'e2e-report.pdf',
+      mimeType: 'application/pdf',
+      buffer: Buffer.from('%PDF-1.4\n1 0 obj<</Type/Catalog>>endobj\n%%EOF\n'),
+    });
+    await expect(page.getByText('e2e-report.pdf').first()).toBeVisible();
+    await page.locator('form').filter({ has: page.locator('#thesis-report-file') })
+      .getByRole('button', { name: /^submit report$|^nộp báo cáo$/i }).click();
+    await expect(page.getByText(/report submitted successfully|đã nộp báo cáo thành công/i))
+      .toBeVisible({ timeout: 20_000 });
+    await page.reload();
+    await expect(page.locator('p[title="e2e-report.pdf"]')).toBeVisible();
+  });
+
   test('register API failure stays campus-language', async ({ page }) => {
     await signIn(page, student);
     await page.route('**/api/v1/me/enrollments', async (route) => {
