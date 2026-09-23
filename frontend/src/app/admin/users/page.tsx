@@ -69,16 +69,16 @@ function roleLabel(roles?: string[]) {
   return (roles ?? []).filter(Boolean).join(', ') || defaultRole;
 }
 
-function isRecordSuperAdmin(record: UserRecord): boolean {
-  return (record.roles ?? []).some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
+function isRecordSuperAdmin(u: UserRecord): boolean {
+  return recordRoles(u).some((role) => role.trim().toUpperCase() === 'SUPER_ADMIN');
 }
 
 function recordRoles(record: UserRecord): string[] {
   return record.roles ?? [];
 }
 
-function isRecordAdministrator(record: UserRecord): boolean {
-  const values = recordRoles(record).map((role) => role.trim().toUpperCase());
+function isRecordAdministrator(u: UserRecord): boolean {
+  const values = recordRoles(u).map((role) => role.trim().toUpperCase());
   return values.includes('ADMIN') || values.includes('SUPER_ADMIN');
 }
 
@@ -112,6 +112,10 @@ export default function AdminUsersPage() {
   const [searchInput, setSearchInput] = useState('');
   const [page, setPage] = useState(1);
   const [totalPages, setTotalPages] = useState(1);
+  // Server truth for the active filter: meta.total of the query that produced
+  // the current rows, so the tab count cannot describe a different set than
+  // the table.
+  const [totalItems, setTotalItems] = useState(0);
   const [roleFilter, setRoleFilter] = useState<'ALL' | 'STUDENT' | 'LECTURER' | 'ADMIN'>('ALL');
 
   const [showCreateModal, setShowCreateModal] = useState(false);
@@ -169,10 +173,14 @@ export default function AdminUsersPage() {
     setIsLoading(true);
     setError('');
     try {
+      // The active tab is a server-side filter, not a browser-side narrowing
+      // of the current 20-row page: with a filter applied, meta.total counts
+      // the matching set, which is what the tabs and pagination display.
       const response = await usersApi.getAll({
         page,
         limit: 20,
         search: search || undefined,
+        role: roleFilter === 'ALL' ? undefined : roleFilter,
       });
       const rows = Array.isArray(response.data)
         ? response.data
@@ -180,6 +188,7 @@ export default function AdminUsersPage() {
           ? response
           : [];
       setUsers(rows as UserRecord[]);
+      setTotalItems(Number(response.meta?.total ?? rows.length));
       setTotalPages(response.meta?.totalPages || 1);
     } catch (loadError) {
       const status = (loadError as { response?: { status?: number } }).response?.status;
@@ -195,7 +204,7 @@ export default function AdminUsersPage() {
     } finally {
       setIsLoading(false);
     }
-  }, [locale, page, search]);
+  }, [locale, page, search, roleFilter]);
 
   const fetchDepartments = useCallback(async () => {
     try {
@@ -227,20 +236,15 @@ export default function AdminUsersPage() {
     }
   }, [canAccess, fetchUsers, fetchDepartments, fetchCurricula]);
 
-  const filteredUsers = useMemo(() => {
-    if (roleFilter === 'ALL') return users;
-    return users.filter((u) => recordRoles(u).some((r) => r.trim().toUpperCase() === roleFilter));
-  }, [users, roleFilter]);
-
   const pageSummary = useMemo(() => {
-    if (filteredUsers.length === 0) {
+    if (totalItems === 0) {
       return locale === 'vi' ? 'Không có bản ghi phù hợp' : 'No matching records';
     }
 
     return locale === 'vi'
       ? `Trang ${page} / ${totalPages}`
       : `Page ${page} of ${totalPages}`;
-  }, [locale, page, totalPages, filteredUsers.length]);
+  }, [locale, page, totalPages, totalItems]);
 
   const copy =
     locale === 'vi'
@@ -327,6 +331,7 @@ export default function AdminUsersPage() {
             `Xóa người dùng ${lastName} ${firstName}`,
           filterByRole: 'Lọc theo phân loại:',
           filterAll: (count: number) => `Tất cả (${count})`,
+          filterAllNoCount: 'Tất cả',
           editRecord: 'Sửa',
           createAudienceLabel: 'Phân loại đối tượng tạo mới:',
           createAudienceHint:
@@ -471,6 +476,7 @@ export default function AdminUsersPage() {
             `Delete user ${lastName} ${firstName}`,
           filterByRole: 'Filter by role:',
           filterAll: (count: number) => `All (${count})`,
+          filterAllNoCount: 'All',
           editRecord: 'Edit',
           createAudienceLabel: 'Account type to create:',
           createAudienceHint:
@@ -847,7 +853,10 @@ export default function AdminUsersPage() {
               </span>
               <button
                 type="button"
-                onClick={() => setRoleFilter('ALL')}
+                onClick={() => {
+                  setRoleFilter('ALL');
+                  setPage(1);
+                }}
                 className={cn(
                   'rounded-lg px-3 py-1.5 text-xs font-medium transition',
                   roleFilter === 'ALL'
@@ -855,15 +864,18 @@ export default function AdminUsersPage() {
                     : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
                 )}
               >
-                {copy.filterAll(users.length)}
+                {roleFilter === 'ALL' ? copy.filterAll(totalItems) : copy.filterAllNoCount}
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('STUDENT')}
+                onClick={() => {
+                  setRoleFilter('STUDENT');
+                  setPage(1);
+                }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
                   roleFilter === 'STUDENT'
-                    ? 'bg-blue-600 text-white shadow-xs'
+                    ? 'bg-status-info text-status-info-foreground shadow-xs'
                     : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -872,11 +884,14 @@ export default function AdminUsersPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('LECTURER')}
+                onClick={() => {
+                  setRoleFilter('LECTURER');
+                  setPage(1);
+                }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
                   roleFilter === 'LECTURER'
-                    ? 'bg-emerald-600 text-white shadow-xs'
+                    ? 'bg-status-success text-status-success-foreground shadow-xs'
                     : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -885,11 +900,14 @@ export default function AdminUsersPage() {
               </button>
               <button
                 type="button"
-                onClick={() => setRoleFilter('ADMIN')}
+                onClick={() => {
+                  setRoleFilter('ADMIN');
+                  setPage(1);
+                }}
                 className={cn(
                   'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
                   roleFilter === 'ADMIN'
-                    ? 'bg-purple-600 text-white shadow-xs'
+                    ? 'bg-status-neutral text-status-neutral-foreground shadow-xs'
                     : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
                 )}
               >
@@ -932,7 +950,7 @@ export default function AdminUsersPage() {
           />
         ) : isLoading ? (
           <LoadingState label={copy.loading} />
-        ) : filteredUsers.length === 0 ? (
+        ) : users.length === 0 ? (
           <EmptyState
             title={copy.emptyTitle}
             description={copy.emptyDescription}
@@ -966,7 +984,7 @@ export default function AdminUsersPage() {
             }
           >
             <div className="divide-y divide-border/60 md:hidden">
-              {filteredUsers.map((record) => (
+              {users.map((record) => (
                 <article key={record.id} className="space-y-3 p-4">
                   <div className="flex items-start justify-between gap-3">
                     <div>
@@ -1006,7 +1024,7 @@ export default function AdminUsersPage() {
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
-                  {filteredUsers.map((record) => {
+                  {users.map((record) => {
                     const primary = primaryRole(record.roles);
                     return (
                       <tr key={record.id} className="hover:bg-secondary/20 transition-colors">

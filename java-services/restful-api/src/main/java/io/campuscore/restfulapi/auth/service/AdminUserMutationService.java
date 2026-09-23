@@ -68,13 +68,34 @@ public class AdminUserMutationService {
 
     @Transactional(readOnly = true)
     public Map<String, Object> list(int page, int limit, String status, String search) {
+        return list(page, limit, status, search, null);
+    }
+
+    /**
+     * The role filter joins through the assignment tables rather than reading a
+     * column: a user's roles live in {@code UserRole}/{@code Role}, and the same
+     * predicate is applied to both the page query and the count query so
+     * {@code meta.total} describes the filtered set, not the whole table. A tab
+     * whose count ignores its own filter is the defect this closes.
+     */
+    @Transactional(readOnly = true)
+    public Map<String, Object> list(int page, int limit, String status, String search, String role) {
         if (page < 1 || limit < 1 || limit > 100) {
             throw new IllegalArgumentException("page and limit are invalid");
+        }
+        String roleFilter = role == null || role.isBlank()
+                ? null
+                : role.trim().toUpperCase(java.util.Locale.ROOT);
+        if (roleFilter != null && !SYSTEM_ROLES.contains(roleFilter)) {
+            // Same code the mutation guards use for a name that is not a role,
+            // so consumers map one code across the whole admin API.
+            throw problem(HttpStatus.BAD_REQUEST, "ROLE_NOT_FOUND", "Role not found");
         }
         MapSqlParameterSource params = new MapSqlParameterSource()
                 .addValue("limit", limit)
                 .addValue("offset", (long) (page - 1) * limit)
                 .addValue("status", status, Types.VARCHAR)
+                .addValue("role", roleFilter, Types.VARCHAR)
                 .addValue("search", LikePattern.contains(search), Types.VARCHAR)
                 .addValue("foldFrom", LikePattern.FOLD_FROM)
                 .addValue("foldTo", LikePattern.FOLD_TO);
@@ -87,6 +108,8 @@ public class AdminUserMutationService {
                         // TRANSLATE folds Vietnamese diacritics on the column side so the
                         // operator's unaccented typing still matches the stored spelling.
                         + " FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
+                        + " AND (CAST(:role AS VARCHAR) IS NULL OR EXISTS (SELECT 1 FROM " + USER_ROLE + " fr JOIN " + ROLE + " g ON g.\"id\" = fr.\"roleId\""
+                        + " WHERE fr.\"userId\" = u.\"id\" AND g.\"name\" = CAST(:role AS VARCHAR)))"
                         + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
                         + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
                         + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')"
@@ -94,6 +117,8 @@ public class AdminUserMutationService {
                 params);
         Long total = jdbc.queryForObject(
                 "SELECT COUNT(*) FROM " + USER + " u WHERE (CAST(:status AS VARCHAR) IS NULL OR u.\"status\" = CAST(:status AS VARCHAR))"
+                        + " AND (CAST(:role AS VARCHAR) IS NULL OR EXISTS (SELECT 1 FROM " + USER_ROLE + " fr JOIN " + ROLE + " g ON g.\"id\" = fr.\"roleId\""
+                        + " WHERE fr.\"userId\" = u.\"id\" AND g.\"name\" = CAST(:role AS VARCHAR)))"
                         + " AND (CAST(:search AS VARCHAR) IS NULL OR TRANSLATE(LOWER(u.\"email\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
                         + " OR TRANSLATE(LOWER(u.\"firstName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\'"
                         + " OR TRANSLATE(LOWER(u.\"lastName\"), :foldFrom, :foldTo) LIKE CAST(:search AS VARCHAR) ESCAPE '\\')",

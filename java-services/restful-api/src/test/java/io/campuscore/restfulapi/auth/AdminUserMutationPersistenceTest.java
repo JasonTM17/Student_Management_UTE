@@ -157,6 +157,61 @@ class AdminUserMutationPersistenceTest {
     }
 
     @Test
+    void userRoleFilterNarrowsPageAndTotalAndRejectsUnknownRole() throws Exception {
+        insertUserRole("user-role-second-student", "second-user", "role-student");
+        insertUserRole("user-role-third-student", "third-user", "role-student");
+
+        // The role tabs used to narrow only the fetched page of 20, so the
+        // count beside "All" and the pagination below the table described an
+        // unfiltered set. Server-side the filter must join the assignment
+        // tables, and meta.total must count exactly the matching accounts:
+        // limit 1 proves the total comes from the COUNT query, not the page.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("page", "1")
+                        .queryParam("limit", "1")
+                        .queryParam("role", "STUDENT")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(2))
+                .andExpect(jsonPath("$.meta.totalPages").value(2))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].roles", org.hamcrest.Matchers.hasItem("STUDENT")));
+
+        // The ADMIN tab sees the account holding ADMIN, and only that one;
+        // the second user's STUDENT assignment must not leak through.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("role", "ADMIN")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.data.length()").value(1))
+                .andExpect(jsonPath("$.data[0].email").value("target@campuscore.edu"));
+
+        // A name that is not a system role is refused with the same code the
+        // mutation guards use; an empty page for a typo would masquerade as a
+        // genuinely empty role.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("role", "DIRECTOR")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("ROLE_NOT_FOUND"));
+
+        // Omitting the filter leaves the pre-existing contract untouched.
+        mvc.perform(get("/api/v1/users").with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(3))
+                .andExpect(jsonPath("$.data.length()").value(3));
+
+        // The route now carries the catalog query allow-list, so a parameter
+        // that looks like a filter but is silently ignored fails loudly.
+        mvc.perform(get("/api/v1/users")
+                        .queryParam("sort", "email")
+                        .with(adminJwt()))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
     void userSearchMatchesUnaccentedTypingAgainstDiacriticStoredNames() throws Exception {
         jdbc.update(
                 "INSERT INTO \"campuscore_auth\".\"User\""
