@@ -30,31 +30,47 @@ type NotificationItem = {
   title?: string;
   content?: string;
   message?: string;
+  // The notifications table carries both columns and the API passes them
+  // through: `link` is the feature the record was authored for, `type` is a
+  // category — a severity on rows written through the API (the write service
+  // accepts only INFO | WARNING | ERROR | SUCCESS) or a feature label on
+  // rows that predate that constraint.
+  type?: string;
+  link?: string;
   isRead: boolean;
   createdAt: string;
 };
 
 type Filter = 'all' | 'unread';
 
-function resolveNotificationTarget(notification: { title?: string; content?: string; message?: string }): string {
-  const text = `${notification.title || ''} ${notification.content || notification.message || ''}`.toLowerCase();
-  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài') || text.includes('đồ án') || text.includes('hội đồng')) {
-    return '/dashboard/thesis';
+// Fallback destinations for feature types seen on notification rows without an
+// authored link. Only types whose link is unambiguous across the seeded data
+// are mapped: every `REGISTRATION` row points at course registration and every
+// `SCHEDULE` row points at the timetable, while `ACADEMIC` and `EVENT` rows
+// link to thesis, grades, announcements and the lecturer console alike —
+// naming one page for them would be guessing, so they fall back to the
+// dashboard like anything else. The severities the write API enforces
+// (INFO/WARNING/ERROR/SUCCESS) name no feature and are intentionally absent.
+// The previous keyword guessing over the title/body was wrong by construction:
+// 'điểm' is a substring of 'điểm rèn luyện' (conduct) yet routed to the
+// transcript, and 'thi' matches 'thời khóa biểu', 'thông báo', 'thí sinh' and
+// dozens of unrelated words, so deep links routinely opened the wrong feature.
+const NOTIFICATION_TYPE_TARGETS: Record<string, string> = {
+  REGISTRATION: '/dashboard/register',
+  SCHEDULE: '/dashboard/schedule',
+};
+
+function resolveNotificationTarget(notification: {
+  type?: string;
+  link?: string;
+}): string {
+  const link = typeof notification.link === 'string' ? notification.link.trim() : '';
+  if (link) {
+    return link;
   }
-  if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
-    return '/dashboard/conduct';
-  }
-  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
-    return '/dashboard/register';
-  }
-  if (text.includes('điểm') || text.includes('bảng điểm') || text.includes('grade') || text.includes('transcript')) {
-    return '/dashboard/transcript';
-  }
-  if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
-    return '/dashboard/schedule';
-  }
-  if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
-    return '/dashboard/announcements';
+  const byType = NOTIFICATION_TYPE_TARGETS[(notification.type || '').trim().toUpperCase()];
+  if (byType) {
+    return byType;
   }
   return '/dashboard';
 }

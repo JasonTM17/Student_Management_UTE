@@ -314,8 +314,11 @@ export default function DashboardPage() {
       tooltip: locale === 'vi' ? 'Xem danh sách học phần' : 'View enrolled courses',
     },
     {
+      // "Active" is the subset that has actually been enrolled — confirmed
+      // seats only. Counting activeCourses here would duplicate the term
+      // chip above and silently promote PENDING requests to active status.
       label: copy.stats.active,
-      value: formatNumber(activeCourses.length),
+      value: formatNumber(enrollments.filter((enrollment) => enrollment.status === 'ENROLLED').length),
       icon: GraduationCap,
       tone: metricToneClass('success'),
       href: '/dashboard/enrollments',

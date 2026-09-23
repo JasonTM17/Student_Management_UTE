@@ -108,6 +108,9 @@ module.exports = {
         },
       },
       borderRadius: {
+        // Tailwind v4-name aliases used across the codebase: v3 has no xs step,
+        // so `rounded-xs` silently resolved to nothing until added here.
+        xs: "0.125rem",
         lg: "var(--radius)",
         md: "calc(var(--radius) - 2px)",
         sm: "calc(var(--radius) - 4px)",
@@ -117,6 +120,14 @@ module.exports = {
         xl: "0.5rem",
         "2xl": "0.625rem",
         "3xl": "0.75rem",
+      },
+      boxShadow: {
+        // v4-name aliases (shadow-xs / shadow-2xs appear on 56 surfaces).
+        "2xs": "0 1px rgb(0 0 0 / 0.05)",
+        xs: "0 1px 2px 0 rgb(0 0 0 / 0.05)",
+      },
+      dropShadow: {
+        xs: "0 1px 1px rgb(0 0 0 / 0.05)",
       },
       keyframes: {
         "accordion-down": {

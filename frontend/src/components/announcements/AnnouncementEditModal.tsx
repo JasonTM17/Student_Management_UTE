@@ -119,7 +119,10 @@ export function AnnouncementEditModal({
   const [title, setTitle] = useState('');
   const [content, setContent] = useState('');
   const [priority, setPriority] = useState<'URGENT' | 'HIGH' | 'NORMAL' | 'LOW'>('NORMAL');
-  const [targetRole, setTargetRole] = useState<'ALL' | 'STUDENT' | 'LECTURER'>('ALL');
+  // `BOTH` is a targeted STUDENT+LECTURER audience, distinct from `ALL`
+  // (isGlobal campus-wide). Collapsing the two made a quick save flip
+  // isGlobal to true on a notice that was deliberately role-scoped.
+  const [targetRole, setTargetRole] = useState<'ALL' | 'BOTH' | 'STUDENT' | 'LECTURER'>('ALL');
   const [publishedBy, setPublishedBy] = useState('');
   const [editorMode, setEditorMode] = useState<'visual' | 'code' | 'preview'>('visual');
   const [isSaving, setIsSaving] = useState(false);
@@ -180,13 +183,15 @@ export function AnnouncementEditModal({
     setPriority((announcement.priority as any) || 'NORMAL');
     setPublishedBy(announcement.publishedBy || '');
 
-    if (
-      announcement.isGlobal ||
-      !announcement.targetRoles ||
-      announcement.targetRoles.length === 0 ||
-      (announcement.targetRoles.includes('STUDENT') && announcement.targetRoles.includes('LECTURER'))
-    ) {
+    if (announcement.isGlobal || !announcement.targetRoles || announcement.targetRoles.length === 0) {
       setTargetRole('ALL');
+    } else if (
+      announcement.targetRoles.includes('STUDENT') &&
+      announcement.targetRoles.includes('LECTURER')
+    ) {
+      // Targeted at both roles without being campus-wide: keep that state
+      // distinct so saving the quick edit does not silently globalize it.
+      setTargetRole('BOTH');
     } else if (announcement.targetRoles.includes('STUDENT')) {
       setTargetRole('STUDENT');
     } else if (announcement.targetRoles.includes('LECTURER')) {
@@ -222,7 +227,10 @@ export function AnnouncementEditModal({
     setIsSaving(true);
     try {
       const isGlobal = targetRole === 'ALL';
-      const targetRoles = isGlobal ? ['STUDENT', 'LECTURER'] : [targetRole];
+      const targetRoles =
+        targetRole === 'ALL' || targetRole === 'BOTH'
+          ? ['STUDENT', 'LECTURER']
+          : [targetRole];
 
       const payload: AnnouncementMutation = {
         title: title.trim(),
@@ -230,6 +238,17 @@ export function AnnouncementEditModal({
         priority,
         isGlobal,
         targetRoles,
+        // The quick-edit form shows none of these, but the full editor always
+        // sends them — so an omitted field is rewritten, not left alone. A
+        // quick save that dropped them silently unbound the semester/section/
+        // lecturer, cleared the year filter and wiped the publish/expiry
+        // window. Carry each untouched field through unchanged.
+        semesterId: announcement.semesterId,
+        sectionId: announcement.sectionId,
+        lecturerId: announcement.lecturerId,
+        targetYears: announcement.targetYears,
+        publishAt: announcement.publishAt,
+        expiresAt: announcement.expiresAt,
         expectedVersion: announcement.version ?? 0,
         reason: isVi
           ? 'Chỉnh sửa nhanh qua giao diện quản trị Bảng tin'
@@ -326,6 +345,7 @@ export function AnnouncementEditModal({
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
               <option value="ALL">{isVi ? '🏛️ Toàn trường (Sinh viên & Giảng viên)' : '🏛️ All Campus'}</option>
+              <option value="BOTH">{isVi ? '🎓👨‍🏫 Sinh viên & Giảng viên (không toàn trường)' : '🎓👨‍🏫 Students & Lecturers (targeted)'}</option>
               <option value="STUDENT">{isVi ? '🎓 Chỉ Sinh viên' : '🎓 Students only'}</option>
               <option value="LECTURER">{isVi ? '👨‍🏫 Chỉ Giảng viên' : '👨‍🏫 Lecturers only'}</option>
             </select>
@@ -487,7 +507,10 @@ export function AnnouncementEditModal({
                   title,
                   content,
                   priority,
-                  targetRoles: targetRole === 'ALL' ? ['STUDENT', 'LECTURER'] : [targetRole],
+                  targetRoles:
+                    targetRole === 'ALL' || targetRole === 'BOTH'
+                      ? ['STUDENT', 'LECTURER']
+                      : [targetRole],
                   isGlobal: targetRole === 'ALL',
                 });
               }}

@@ -77,13 +77,15 @@ export default function AdminAppearancePage() {
         id: item.id,
         title: item.title,
       }));
-      const next = sanitizeSiteAppearance({
-        ...appearance,
-        postOrder: applyPageOrder(appearance.postOrder, rows.map((row) => row.id)),
-      });
+      // The fetched rows arrive in server display order. Re-seating the pinned
+      // order against them here overwrote every relative move the admin had
+      // made — and broadcasting the draft then pushed that clobbered order to
+      // the live homepage without the admin doing anything. Loading must keep
+      // the stored pin exactly as saved; the list below is rendered through
+      // the `orderedPosts` rank map instead, and a broadcast only happens on
+      // an explicit save (persist/reorder).
       setPosts(rows);
-      setDraft(next);
-      broadcastSiteAppearance(next);
+      setDraft(sanitizeSiteAppearance(appearance));
     } catch {
       setError(copy.loadFailed);
     } finally {

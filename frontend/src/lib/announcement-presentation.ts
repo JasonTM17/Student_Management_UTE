@@ -305,10 +305,16 @@ export function announcementDistribution(
       ];
 }
 
+/**
+ * Resolves the issuer badge for an announcement. A missing (or purely
+ * technical) publisher renders an honest em-dash: naming a specific office —
+ * "Faculty of IT & Academic Affairs" — for a record that never stated one
+ * attributes authorship the data does not carry.
+ */
 export function formatAnnouncementPublisher(
   publishedBy: string | null | undefined,
   locale: Locale,
-  fallback = locale === 'vi' ? 'Khoa Công nghệ Thông tin & Phòng Đào Tạo' : 'Faculty of Information Technology & Academic Affairs Office',
+  fallback = '—',
 ): string {
   const trimmed = typeof publishedBy === 'string' ? publishedBy.trim() : '';
   if (!trimmed) {

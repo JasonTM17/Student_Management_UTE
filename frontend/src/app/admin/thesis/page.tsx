@@ -46,6 +46,16 @@ import {
   type ThesisTopic,
 } from '@/lib/thesis-api';
 
+/** Shape of the API error envelope (`{ code, message }`) used for domain conflicts. */
+interface ThesisApiErrorShape {
+  response?: { data?: { code?: string } | null } | null;
+}
+
+function getThesisErrorCode(error: unknown): string {
+  const data = (error as ThesisApiErrorShape | undefined)?.response?.data;
+  return data?.code ?? '';
+}
+
 export default function AdminThesisPage() {
   const {
     user,
@@ -135,6 +145,23 @@ export default function AdminThesisPage() {
     }
   };
 
+  /**
+   * A round transition can fail with a domain the admin has to see: closing
+   * or publishing over unfinished grading answers SCORES_INCOMPLETE /
+   * RESULTS_NOT_READY, which previously were swallowed into the generic
+   * actionFailed line. Surface the codes that already carry translated copy
+   * (common.campusErrors.codes) and keep the generic fallback for the rest.
+   */
+  const transitionErrorMessage = (err: unknown): string => {
+    const { codes } = messages.common.campusErrors;
+    const code = getThesisErrorCode(err);
+    if (code === 'SCORES_INCOMPLETE') return codes.SCORES_INCOMPLETE;
+    if (code === 'RESULTS_NOT_READY') return codes.RESULTS_NOT_READY;
+    if (code === 'RESULTS_NOT_PUBLISHED') return codes.RESULTS_NOT_PUBLISHED;
+    if (code === 'GROUP_APPROVAL_STATE_CONFLICT') return codes.GROUP_APPROVAL_STATE_CONFLICT;
+    return messages.thesis.actionFailed;
+  };
+
   const handleCreateCouncil = async (roundId: string) => {
     if (!councilNameInput.trim()) return;
     setIsSaving(true);
@@ -147,8 +174,8 @@ export default function AdminThesisPage() {
       setShowCreateCouncilModal(false);
       const c = await thesisApi.listCouncils(roundId);
       setCouncils(c);
-    } catch {
-      setError(messages.thesis.actionFailed);
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -174,8 +201,8 @@ export default function AdminThesisPage() {
       setShowAddMemberModal(false);
       const c = await thesisApi.listCouncils(roundId);
       setCouncils(c);
-    } catch {
-      setError(messages.thesis.actionFailed);
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -296,8 +323,8 @@ export default function AdminThesisPage() {
         setSuccess(messages.thesis.admin.resultsPublished);
       }
       await loadData();
-    } catch {
-      setError(messages.thesis.actionFailed);
+    } catch (err: unknown) {
+      setError(transitionErrorMessage(err));
     } finally {
       setIsSaving(false);
     }
@@ -352,6 +379,12 @@ export default function AdminThesisPage() {
   }
 
   const openRounds = rounds.filter((r) => r.status === 'REGISTRATION_OPEN').length;
+  // `topics`/`groups` are filled by loadRoundDetail for the one expanded
+  // round only — they are not global totals. An unlabeled number therefore
+  // lied twice: 0 at rest, and one round's count otherwise. Name the round
+  // the numbers belong to, and show a dash until a round is expanded (no
+  // extra API calls; the counts simply do not exist yet).
+  const detailRound = rounds.find((round) => round.id === expandedRoundId) ?? null;
   const totalTopics = topics.length;
   const totalGroups = groups.length;
 
@@ -393,14 +426,22 @@ export default function AdminThesisPage() {
             toneClassName={metricToneClass('success')}
           />
           <AdminMetricCard
-            label={messages.thesis.topics}
-            value={totalTopics}
+            label={
+              detailRound
+                ? messages.thesis.admin.topicsForRound.replace('{round}', detailRound.name)
+                : messages.thesis.topics
+            }
+            value={detailRound ? totalTopics : '—'}
             icon={<FileStack className="h-5 w-5" />}
             toneClassName={metricToneClass('warning')}
           />
           <AdminMetricCard
-            label={messages.thesis.groups}
-            value={totalGroups}
+            label={
+              detailRound
+                ? messages.thesis.admin.groupsForRound.replace('{round}', detailRound.name)
+                : messages.thesis.groups
+            }
+            value={detailRound ? totalGroups : '—'}
             icon={<UsersRound className="h-5 w-5" />}
             toneClassName={metricToneClass('neutral')}
           />

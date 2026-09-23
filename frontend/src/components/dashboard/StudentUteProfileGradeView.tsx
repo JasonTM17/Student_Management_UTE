@@ -102,6 +102,23 @@ export function StudentUteProfileGradeView({
     };
   }, [card.notAvailable, curriculumData, user]);
 
+  // The info-card badge must name the semester the data actually resolves to
+  // (the current selection). Nothing selected or resolvable renders a plain
+  // em-dash — never a hardcoded term that goes stale or belongs to someone
+  // else's plan.
+  const semesterBadgeLabel = useMemo(() => {
+    if (!selectedSemesterId) return '—';
+    const fromList = availableSemesters.find((s) => s.id === selectedSemesterId)?.name;
+    if (fromList) return fromList;
+    const fromTranscript = transcriptSemesters.find((s) => s.semesterId === selectedSemesterId);
+    if (fromTranscript) {
+      const localized =
+        locale === 'vi' ? fromTranscript.semesterNameVi : fromTranscript.semesterNameEn;
+      return localized || fromTranscript.semesterName || '—';
+    }
+    return '—';
+  }, [availableSemesters, locale, selectedSemesterId, transcriptSemesters]);
+
   // Credit progress (Đã học / Còn lại). Numbers render only when the real
   // curriculum and completed coursework agree — no sample values, ever.
   const curriculumTotal = curriculumData?.curriculum?.totalCredits;
@@ -224,7 +241,7 @@ export function StudentUteProfileGradeView({
           <div className="bg-card rounded-lg border border-border shadow-2xs overflow-hidden">
             <div className="px-4 py-2.5 bg-muted/60 border-b border-border font-bold text-xs uppercase text-foreground tracking-wide flex items-center justify-between">
               <span>{card.infoTitle}</span>
-              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{card.semesterBadge}</span>
+              <span className="text-[10px] text-muted-foreground font-semibold bg-muted px-1.5 py-0.5 rounded-sm">{semesterBadgeLabel}</span>
             </div>
             <div className="divide-y divide-border text-xs">
               <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5">
@@ -288,11 +305,12 @@ export function StudentUteProfileGradeView({
                         </option>
                       ))
                     ) : (
-                      <>
-                        <option value="hk1">{card.hk1}</option>
-                        <option value="hk2">{card.hk2}</option>
-                        <option value="hk-he">{card.hkHe}</option>
-                      </>
+                      // No real semesters loaded: one visibly unavailable
+                      // option instead of invented ids that would filter the
+                      // chart to nothing.
+                      <option value="" disabled>
+                        {card.notAvailable}
+                      </option>
                     )}
                   </select>
                 </div>

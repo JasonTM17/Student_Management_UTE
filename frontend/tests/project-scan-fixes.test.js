@@ -32,7 +32,12 @@ test('registration E2E fixture refuses developer projects and fails closed on mi
   assert.match(fixture.registrationWindowSql, /CURRENT_TIMESTAMP \+ INTERVAL '1 day'/);
   assert.match(fixture.registrationWindowSql, /"semesterId" = 'semester-demo'/);
   assert.match(fixture.registrationWindowSql, /updated <> 2/);
-  assert.doesNotMatch(fixture.registrationWindowSql, /SET\s+"status"|DELETE|TRUNCATE|\b20\d\d-/);
+  // V76 closes every round whose windowEnd has passed, so the fixture must
+  // explicitly re-open the demo rounds it widens — the window columns alone
+  // no longer make a round usable. The rest of the guard stays: still no
+  // destructive statements and no hardcoded calendar years.
+  assert.match(fixture.registrationWindowSql, /"status" = 'OPEN'/);
+  assert.doesNotMatch(fixture.registrationWindowSql, /DELETE|TRUNCATE|\b20\d\d-/);
   const runner = fs.readFileSync(path.join(root, '../scripts/run-course-e2e.mjs'), 'utf8');
   assert.match(runner, /await seedCourseE2e\(projectName, compose\)/);
   assert.match(runner, /E2E_PLAYWRIGHT_PROJECT/);
@@ -597,4 +602,33 @@ test('demo credentials agree on one password across README and runbook', () => {
   // admin123 was a stale README credential that could not log in a fresh clone.
   assert.doesNotMatch(readme, /admin123/);
   assert.doesNotMatch(runbook, /admin123/);
+});
+
+test('the admin broadcast console ships both route twins on the admin API', () => {
+  const page = read('src/app/admin/notifications/page.tsx');
+  const twin = read('src/app/[locale]/admin/notifications/page.tsx');
+
+  // The locale-route-parity suite already fails the build if the English
+  // counterpart is missing; this pins the exact forwarding shape and the
+  // wiring the page must use so a refactor cannot quietly drop either.
+  assert.match(
+    twin,
+    /^export \{ default \} from '\.\.\/\.\.\/\.\.\/admin\/notifications\/page';\s*$/,
+    'the [locale] twin must forward to the canonical page',
+  );
+
+  // Recipients come from the directory search, sends from the admin routes.
+  assert.match(page, /adminNotificationsApi\.adminCreate/);
+  assert.match(page, /adminNotificationsApi\.adminList/);
+  assert.match(page, /adminNotificationsApi\.adminDelete/);
+  assert.match(page, /usersApi\.getAll/);
+
+  const api = read('src/lib/api.ts');
+  assert.match(api, /export const adminNotificationsApi = \{/);
+  assert.match(api, /api\.post<AdminNotificationRecord>\(\s*'\/notifications'/);
+
+  // Every visible string lives in the message catalog, in both blocks.
+  const messages = read('src/i18n/messages.ts');
+  assert.match(messages, /validationIncomplete: 'Fill in the recipient, title, and message\.'/);
+  assert.match(messages, /validationIncomplete: 'Điền đủ người nhận, tiêu đề và nội dung\.'/);
 });

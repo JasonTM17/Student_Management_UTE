@@ -94,7 +94,14 @@ export default function RegisterPage() {
           }),
         ]);
         if (generation !== loadGeneration.current) return;
-        setCreditLimit(Math.min(30, Math.max(1, eligibility.creditLimit || 28)));
+        // Render exactly the limit the API grants. The old Math.min(30, …)
+        // clamp silently hid a PĐT-approved cap above 30; 28 is only the
+        // fallback for when the response omits the field entirely.
+        setCreditLimit(
+          typeof eligibility.creditLimit === 'number' && eligibility.creditLimit > 0
+            ? eligibility.creditLimit
+            : 28,
+        );
         setCreditApplication(application);
         setSections(catalog);
       } catch (catalogError) {
@@ -285,9 +292,12 @@ export default function RegisterPage() {
       const application = await registrationApi.submitCreditLimitApplication(currentRoundId, reason);
       setCreditApplication(application);
       setApplicationReason('');
-      // A pending request never changes the effective limit. Only the PĐT
-      // approval returned by the API may move this student from 28 to 30.
-      setCreditLimit(28);
+      // A pending request never changes the effective limit, so this handler
+      // must not touch the credit limit at all. Overwriting with 28 here used
+      // to erase a limit the API had already approved; the raised cap arrives
+      // via eligibility on the next load once PĐT approves it. The submit
+      // response carries no effective-limit field, so there is nothing here
+      // to read back.
       toast.success(copy.applicationSubmitted);
     } catch (cause) {
       const code = campusErrorCode(cause);

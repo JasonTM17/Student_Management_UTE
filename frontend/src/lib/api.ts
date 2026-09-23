@@ -1180,6 +1180,70 @@ export const notificationsApi = {
   },
 };
 
+// Admin notification broadcast console. The Java API gates these routes to
+// ADMIN/SUPER_ADMIN; POST returns 201 with NotificationResponse, and the list
+// is the same {data, meta} envelope the other admin catalogs use.
+export type AdminNotificationType = 'INFO' | 'WARNING' | 'ERROR' | 'SUCCESS';
+
+export type AdminNotificationRecord = {
+  id: string;
+  userId: string;
+  title: string;
+  message: string;
+  type: string;
+  link?: string | null;
+  isRead: boolean;
+  createdAt: string;
+  updatedAt?: string;
+};
+
+export type AdminNotificationInput = {
+  userId: string;
+  title: string;
+  message: string;
+  type: AdminNotificationType;
+  link?: string;
+};
+
+export const adminNotificationsApi = {
+  adminList: async (params?: {
+    page?: number;
+    limit?: number;
+    userId?: string;
+  }): Promise<ApiResponse<AdminNotificationRecord[]>> => {
+    const response = await api.get<ApiResponse<AdminNotificationRecord[]>>(
+      '/notifications',
+      { params },
+    );
+    return response.data;
+  },
+  adminCreate: async (
+    body: AdminNotificationInput,
+  ): Promise<AdminNotificationRecord> => {
+    const response = await api.post<AdminNotificationRecord>(
+      '/notifications',
+      body,
+    );
+    return response.data;
+  },
+  adminUpdate: async (
+    id: string,
+    body: Partial<AdminNotificationInput>,
+  ): Promise<AdminNotificationRecord> => {
+    const response = await api.put<AdminNotificationRecord>(
+      `/notifications/${id}`,
+      body,
+    );
+    return response.data;
+  },
+  adminDelete: async (id: string): Promise<{ message: string }> => {
+    const response = await api.delete<{ message: string }>(
+      `/notifications/${id}`,
+    );
+    return response.data;
+  },
+};
+
 // Student Conduct / Training Points ("Điểm rèn luyện" - DRL) API
 export interface ConductCriteriaScore {
   code: string;
