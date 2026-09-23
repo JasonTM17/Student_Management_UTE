@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, CalendarDays, Database, DoorOpen, FileEdit, FileText, GraduationCap, Palette, School, TrendingUp, UserPlus, Users } from 'lucide-react';
+import { ArrowRight, Bell, BookMarked, BookOpen, BrainCircuit, Building2, CalendarDays, ClipboardCheck, Database, DoorOpen, FileEdit, FileText, GraduationCap, Palette, School, TrendingUp, UserPlus, Users } from 'lucide-react';
 
 import { useAuth } from '@/context/AuthContext';
 import { campusDistributionApi, coursesApi, enrollmentsApi } from '@/lib/api';
@@ -40,6 +40,7 @@ const menuItems = [
   { href: '/admin/knowledge', icon: Database, tone: 'success' as const },
   { href: '/admin/editor', icon: FileEdit, tone: 'warning' as const },
   { href: '/admin/notifications', icon: Bell, tone: 'warning' as const },
+  { href: '/admin/attendance', icon: ClipboardCheck, tone: 'info' as const },
 ];
 
 export default function AdminDashboardPage() {

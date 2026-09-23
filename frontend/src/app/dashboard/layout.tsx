@@ -16,6 +16,7 @@ import {
   BrainCircuit,
   Building2,
   Calendar,
+  CalendarCheck,
   CalendarRange,
   ChevronLeft,
   ChevronRight,
@@ -64,6 +65,7 @@ type DashboardMenuLabelKey =
   | 'grades'
   | 'transcript'
   | 'conduct'
+  | 'attendance'
   | 'thesis'
   | 'certificates'
   | 'editor'
@@ -101,6 +103,7 @@ const studentMenuSections: readonly DashboardMenuSectionConfig[] = [
       { href: '/dashboard/grades', icon: FileText, labelKey: 'grades' },
       { href: '/dashboard/transcript', icon: School, labelKey: 'transcript' },
       { href: '/dashboard/conduct', icon: Award, labelKey: 'conduct' },
+      { href: '/dashboard/attendance', icon: CalendarCheck, labelKey: 'attendance' },
     ],
   },
   {

@@ -632,3 +632,50 @@ test('the admin broadcast console ships both route twins on the admin API', () =
   assert.match(messages, /validationIncomplete: 'Fill in the recipient, title, and message\.'/);
   assert.match(messages, /validationIncomplete: 'Điền đủ người nhận, tiêu đề và nội dung\.'/);
 });
+
+test('attendance ships both route twins on the attendance API', () => {
+  const studentPage = read('src/app/dashboard/attendance/page.tsx');
+  const studentTwin = read('src/app/[locale]/dashboard/attendance/page.tsx');
+  const adminPage = read('src/app/admin/attendance/page.tsx');
+  const adminTwin = read('src/app/[locale]/admin/attendance/page.tsx');
+
+  // The locale-route-parity suite already fails the build if an English
+  // counterpart is missing; this pins the exact forwarding shape so a
+  // refactor cannot quietly turn a shim into a second implementation.
+  assert.match(
+    studentTwin,
+    /^export \{ default \} from '\.\.\/\.\.\/\.\.\/dashboard\/attendance\/page';\s*$/,
+    'the [locale] student twin must forward to the canonical page',
+  );
+  assert.match(
+    adminTwin,
+    /^export \{ default \} from '\.\.\/\.\.\/\.\.\/admin\/attendance\/page';\s*$/,
+    'the [locale] admin twin must forward to the canonical page',
+  );
+
+  // Student portal reads the two live-verified student endpoints...
+  assert.match(studentPage, /attendanceApi\.my\(\)/);
+  assert.match(studentPage, /attendanceApi\.mySummary\(\)/);
+  // ...and the admin console pages the {data, meta} list route with a bounded
+  // page size, never an unbounded pull.
+  assert.match(adminPage, /const PAGE_LIMIT = \d+/);
+  assert.match(adminPage, /attendanceApi\.adminList\(\{ page, limit: PAGE_LIMIT \}\)/);
+
+  const api = read('src/lib/api.ts');
+  assert.match(api, /export const attendanceApi = \{/);
+  assert.match(api, /api\.get<AttendanceRecord\[\]>\('\/attendance\/my'\)/);
+  assert.match(api, /api\.get<AttendanceSummary\[\]>\(\s*'\/attendance\/my\/summary'/);
+  assert.match(api, /api\.get<ApiResponse<AttendanceRecord\[\]>>\(\s*'\/attendance'/);
+
+  // Unknown status values must degrade to a neutral raw-value badge, never
+  // throw and never invent a translation.
+  assert.match(studentPage, /STATUS_TONES\[\(status \?\? ''\)\.toUpperCase\(\)\] \?\? 'neutral'/);
+  assert.match(adminPage, /STATUS_TONES\[\(status \?\? ''\)\.toUpperCase\(\)\] \?\? 'neutral'/);
+
+  // Every visible string lives in the message catalog, in both blocks.
+  const messages = read('src/i18n/messages.ts');
+  assert.match(messages, /statsPresentRateHint: 'present sessions ÷ recorded sessions'/);
+  assert.match(messages, /statsPresentRateHint: 'số phiên có mặt ÷ số phiên đã ghi'/);
+  assert.match(messages, /tableTitle: 'Attendance records'/);
+  assert.match(messages, /tableTitle: 'Bản ghi điểm danh'/);
+});
