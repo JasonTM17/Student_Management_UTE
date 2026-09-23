@@ -1953,7 +1953,10 @@ export default function ThesisPage() {
             <CardContent className="grid gap-3 sm:grid-cols-3">
               {([
                 ['catalog', '/dashboard/thesis/topics'],
-                ['advisors', '/dashboard/thesis/advisors'],
+                // The advisor directory reads the staff-only faculty directory
+                // (STUDENT is pinned to 403 by PeopleRead boundary tests), so
+                // students see the catalog and progress cards only.
+                ...(isSupervisorOrAdmin ? ([['advisors', '/dashboard/thesis/advisors']] as const) : []),
                 ['progress', '/dashboard/thesis/progress'],
               ] as const).map(([key, href]) => (
                 <LocalizedLink

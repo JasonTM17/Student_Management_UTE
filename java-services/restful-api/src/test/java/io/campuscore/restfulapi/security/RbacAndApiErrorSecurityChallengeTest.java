@@ -541,4 +541,31 @@ class RbacAndApiErrorSecurityChallengeTest {
             }
         }
     }
+
+    // =========================================================================
+    // 5. HTTP METHOD MISMATCH
+    // =========================================================================
+    @Nested
+    @DisplayName("5. Method-not-allowed answers 405 with the error envelope, never 500")
+    class MethodNotAllowedTests {
+
+        @Test
+        @DisplayName("POST on the GET-only attendance summary route returns 405 METHOD_NOT_ALLOWED")
+        void postOnGetOnlyRouteIsMethodNotAllowed() throws Exception {
+            mvc.perform(post("/api/v1/attendance/my/summary").with(studentJwt()))
+                    .andExpect(status().isMethodNotAllowed())
+                    .andExpect(jsonPath("$.status").value(405))
+                    .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"))
+                    .andExpect(jsonPath("$.requestId").exists());
+        }
+
+        @Test
+        @DisplayName("DELETE on the POST-only login route returns 405 for an authenticated caller")
+        void deleteOnPostOnlyRouteIsMethodNotAllowed() throws Exception {
+            mvc.perform(org.springframework.test.web.servlet.request.MockMvcRequestBuilders
+                            .delete("/api/v1/auth/login").with(studentJwt()))
+                    .andExpect(status().isMethodNotAllowed())
+                    .andExpect(jsonPath("$.code").value("METHOD_NOT_ALLOWED"));
+        }
+    }
 }

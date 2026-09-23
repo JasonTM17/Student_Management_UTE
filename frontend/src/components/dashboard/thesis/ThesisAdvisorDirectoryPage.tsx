@@ -17,6 +17,7 @@ import {
   Plus,
   Search,
   Users,
+  UsersRound,
 } from 'lucide-react';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { LinkButton } from '@/components/ui/link-button';
@@ -271,6 +272,16 @@ export default function ThesisAdvisorDirectoryPage() {
   useEffect(() => {
     let active = true;
 
+    // The directory endpoint is intentionally staff-only (PeopleReadController
+    // pins STUDENT -> 403 in its boundary tests). Firing it for a student would
+    // manufacture a 403 and an outage-looking error state, so students get the
+    // honest restricted panel instead (rendered below, before any data is used).
+    if (userRoles.includes('STUDENT')) {
+      return () => {
+        active = false;
+      };
+    }
+
     async function loadData() {
       setLoadState('loading');
       setError('');
@@ -427,6 +438,36 @@ export default function ThesisAdvisorDirectoryPage() {
 
   if (isForbidden || !hasAccess) {
     return <WorkspaceForbiddenState signedIn={Boolean(user)} />;
+  }
+
+  if (isStudent) {
+    return (
+      <div className="space-y-6">
+        <PageHeader
+          eyebrow={<SectionEyebrow>{isVi ? 'Khóa luận' : 'Thesis'}</SectionEyebrow>}
+          title={isVi ? 'Danh bạ giảng viên hướng dẫn' : 'Advisor directory'}
+          description={
+            isVi
+              ? 'Danh bạ liên hệ chi tiết của giảng viên do Phòng Đào tạo quản lý và dành cho giảng viên, quản trị viên.'
+              : 'The detailed faculty contact directory is maintained by the Academic Office and is available to lecturers and administrators.'
+          }
+        />
+        <EmptyState
+          icon={UsersRound}
+          title={isVi ? 'Mục này dành cho giảng viên và quản trị viên' : 'This section is for lecturers and administrators'}
+          description={
+            isVi
+              ? 'Thông tin người hướng dẫn theo từng đề tài có trong Danh mục đề tài — nơi bạn chọn đề tài và xem giảng viên phụ trách.'
+              : 'Per-topic supervisor information lives in the topic catalog, where you pick a topic and see its supervising lecturer.'
+          }
+        />
+        <div>
+          <LinkButton href="/dashboard/thesis/topics">
+            {isVi ? 'Mở danh mục đề tài' : 'Open the topic catalog'}
+          </LinkButton>
+        </div>
+      </div>
+    );
   }
 
   const tableColumns: TableColumn<Lecturer>[] = [
