@@ -39,6 +39,7 @@ const menuItems = [
   { href: '/admin/academic-years', icon: CalendarDays, tone: 'neutral' as const },
   { href: '/admin/knowledge', icon: Database, tone: 'success' as const },
   { href: '/admin/editor', icon: FileEdit, tone: 'warning' as const },
+  { href: '/admin/notifications', icon: Bell, tone: 'warning' as const },
 ];
 
 export default function AdminDashboardPage() {

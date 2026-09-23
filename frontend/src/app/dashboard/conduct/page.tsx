@@ -6,7 +6,6 @@ import {
   Calendar,
   CheckCircle2,
   ChevronRight,
-  Download,
   FileCheck,
   GraduationCap,
   HeartHandshake,
@@ -412,15 +411,16 @@ export default function StudentConductPage() {
               variant="outline"
               className="flex w-full items-center gap-2 border-primary/30 hover:bg-primary/5 sm:w-auto"
             >
-              <Download className="h-4 w-4 text-primary" />
+              <Printer className="h-4 w-4 text-primary" />
               <span>{copy.exportReport}</span>
             </Button>
           }
         />
       </div>
 
-      {/* Top 3 KPI Cards */}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      {/* Top 3 KPI Cards — screen-only: "Export conduct report" prints the
+          official header, the scores it carries, and the signatures block. */}
+      <div className="grid gap-4 print:hidden sm:grid-cols-2 lg:grid-cols-3">
         {/* Card 1: Selected Semester Conduct Score */}
         <Card className="relative overflow-hidden border-border/70 shadow-sm bg-gradient-to-br from-card to-secondary/30">
           <CardHeader className="pb-2">
@@ -579,7 +579,7 @@ export default function StudentConductPage() {
         </div>
       </div>
 
-      <div className="space-y-4">
+      <div className="space-y-4 print:hidden">
         <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
           <h3 className="text-base font-bold text-foreground flex items-center gap-2">
             <Layers className="h-5 w-5 text-primary" />
@@ -647,7 +647,7 @@ export default function StudentConductPage() {
         </div>
       </div>
 
-      <Card id="conduct-activities-section" className="border-border/70 shadow-sm overflow-hidden scroll-mt-6">
+      <Card id="conduct-activities-section" className="border-border/70 shadow-sm overflow-hidden scroll-mt-6 print:hidden">
         <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))] py-3.5">
           <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
             <CardTitle className="text-base font-bold flex items-center gap-2">
@@ -768,8 +768,8 @@ export default function StudentConductPage() {
         </CardContent>
       </Card>
 
-      {/* Historical DRL Record & Ranking Rules */}
-      <div className="grid gap-6 lg:grid-cols-12">
+      {/* Historical DRL Record & Ranking Rules — screen-only reference */}
+      <div className="grid gap-6 lg:grid-cols-12 print:hidden">
         {/* Semester History Table */}
         <Card className="min-w-0 lg:col-span-7 border-border/70 shadow-sm">
           <CardHeader className="border-b border-border/70 bg-[hsl(var(--surface-alt))] py-3.5">
@@ -949,6 +949,7 @@ export default function StudentConductPage() {
           onClose={() => setSelectedActivity(null)}
           title={copy.previewTitle}
           className="max-w-2xl"
+          printable
         >
         <div className="space-y-5 print:p-0">
           {/* Institutional Record Layout */}

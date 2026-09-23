@@ -115,7 +115,6 @@ export default function StudentAnnouncementsPage() {
           filterThesis: 'Đề tài & Luận văn',
           filterScholarship: 'Học bổng & ĐRL',
           filterExam: 'Thi cử & Khảo thí',
-          officialBadge: 'Khoa CNTT & Phòng Đào tạo',
           readFull: 'Đọc toàn văn',
           viewMagazine: 'Dạng Bản tin',
           viewDispatch: 'Dạng Công văn',
@@ -147,7 +146,6 @@ export default function StudentAnnouncementsPage() {
           filterThesis: 'Thesis & Topics',
           filterScholarship: 'Scholarship & Conduct',
           filterExam: 'Exams & Grading',
-          officialBadge: 'Faculty of IT & Academic Office',
           readFull: 'Read full notice',
           viewMagazine: 'Magazine Feed',
           viewDispatch: 'Official Dispatches',
@@ -509,7 +507,7 @@ export default function StudentAnnouncementsPage() {
                     <div className="flex flex-wrap items-center gap-2">
                       <span className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-0.5 text-[11px] font-bold text-primary dark:bg-primary/20">
                         <GraduationCap className="h-3 w-3" />
-                        {formatAnnouncementPublisher(announcement.publishedBy, locale, copy.officialBadge)}
+                        {formatAnnouncementPublisher(announcement.publishedBy, locale)}
                       </span>
                       <span className="inline-flex items-center gap-1 rounded-md bg-secondary px-2 py-0.5 text-[11px] font-semibold text-foreground border border-border/60">
                         {announcementAudienceBadge(announcement, locale).label}

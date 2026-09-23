@@ -28,6 +28,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { useI18n } from '@/i18n';
 import { RichContentRenderer } from '@/components/ui/rich-content-renderer';
 import { TinyMceEditor } from '@/components/ui/tinymce-editor';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { EDIT_BANNER_PRESETS } from '@/components/announcements/AnnouncementEditModal';
 import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
@@ -189,6 +190,14 @@ export function LecturerAnnouncementCreateModal({
   const templateCopy = messages.announcementTemplates;
   const templateMeta = (key: PresetKey) => templateCopy[key];
   const initialTemplate = templateMeta(PRESETS[0].key);
+  const draftCopy = messages.lecturerAnnouncementDraft;
+  const { confirm, confirmationDialog } = useConfirmationDialog();
+
+  // LEC-P3-B2: the host page keeps this modal mounted, so the values above
+  // are the pristine baseline every reset returns to and every dirty check
+  // compares against.
+  const initialTitle = initialTemplate.defaultTitle;
+  const initialContent = isVi ? PRESETS[0].defaultContentVi : PRESETS[0].defaultContentEn;
 
   const [title, setTitle] = useState(initialTemplate.defaultTitle);
   const [content, setContent] = useState(isVi ? PRESETS[0].defaultContentVi : PRESETS[0].defaultContentEn);
@@ -245,6 +254,38 @@ export function LecturerAnnouncementCreateModal({
     }
   };
 
+  // LEC-P3-B2: wipe every authored field back to the template defaults. The
+  // TinyMCE surface is driven by the controlled `value` prop, so resetting
+  // `content` here also clears the WYSIWYG document.
+  const resetForm = () => {
+    setSelectedPreset(PRESETS[0].key);
+    setTitle(initialTemplate.defaultTitle);
+    setContent(isVi ? PRESETS[0].defaultContentVi : PRESETS[0].defaultContentEn);
+    setPriority('HIGH');
+    setEditorMode('visual');
+    setValidationError('');
+  };
+
+  const isDraftDirty = title !== initialTitle || content !== initialContent || priority !== 'HIGH';
+
+  // LEC-P3-B2: closing mid-draft is destructive, so it goes through the same
+  // inline confirm the admin announcement editor uses before discarding.
+  const requestClose = async () => {
+    if (isSubmitting) return;
+    if (isDraftDirty) {
+      const discard = await confirm({
+        title: draftCopy.discardTitle,
+        message: draftCopy.discardMessage,
+        confirmText: draftCopy.discardConfirm,
+        cancelText: draftCopy.discardCancel,
+        variant: 'destructive',
+      });
+      if (!discard) return;
+    }
+    resetForm();
+    onClose();
+  };
+
   const handleApplyPreset = (preset: PresetItem) => {
     setSelectedPreset(preset.key);
     setTitle(templateMeta(preset.key).defaultTitle);
@@ -288,6 +329,10 @@ export function LecturerAnnouncementCreateModal({
 
       await announcementsApi.create(payload);
       toast.success(isVi ? 'Đã đăng thông báo cho sinh viên thành công!' : 'Notice published to students successfully!');
+      // LEC-P3-B2: clear the published draft BEFORE closing. The host page
+      // keeps this modal mounted, so leftover state used to reopen showing
+      // the just-published text, and a second Publish created a duplicate.
+      resetForm();
       onSuccess();
       onClose();
     } catch (err: any) {
@@ -301,9 +346,10 @@ export function LecturerAnnouncementCreateModal({
   };
 
   return (
+    <>
     <Modal
       isOpen={isOpen}
-      onClose={onClose}
+      onClose={() => void requestClose()}
       title={isVi ? 'Đăng thông báo cho Sinh viên lớp học phần' : 'Post Announcement for Students'}
       className="max-w-3xl"
     >
@@ -542,7 +588,7 @@ export function LecturerAnnouncementCreateModal({
           <Button
             type="button"
             variant="outline"
-            onClick={onClose}
+            onClick={() => void requestClose()}
             disabled={isSubmitting}
           >
             {isVi ? 'Hủy bỏ' : 'Cancel'}
@@ -567,5 +613,9 @@ export function LecturerAnnouncementCreateModal({
         </div>
       </form>
     </Modal>
+    {/* LEC-P3-B2: inline discard confirm, rendered beside the composer the
+        same way the admin announcements page renders it beside its editor. */}
+    {confirmationDialog}
+    </>
   );
 }

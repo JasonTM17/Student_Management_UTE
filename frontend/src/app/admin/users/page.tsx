@@ -357,12 +357,16 @@ export default function AdminUsersPage() {
             '4': 'Năm 4 (Khóa K2023)',
           },
           curriculumLabel: 'Khung chương trình *',
-          facultyLabel: 'Khoa / Viện đào tạo *',
+          facultyLabel: 'Khoa / Viện đào tạo',
+          facultyManagedHint:
+            'Khoa / Viện đào tạo của sinh viên do Phòng Đào tạo gán cùng chương trình đào tạo sau khi tài khoản được tạo.',
           selectFacultyPlaceholder: '-- Chọn Khoa / Viện đào tạo --',
           employeeIdLabel: 'Mã số Giảng viên (MSGV) *',
           employeeIdDescription: 'Mã định danh cán bộ giảng dạy và chấm thi luận văn',
           employeeIdPlaceholder: 'ví dụ: GV2026001 hoặc GV2026002',
-          academicTitleLabel: 'Học hàm / Học vị *',
+          academicTitleLabel: 'Học hàm / Học vị',
+          academicTitleManagedHint:
+            'Tài khoản tạo nhanh chỉ lưu bộ môn công tác; học hàm / học vị do Phòng Đào tạo cập nhật trong danh bạ Giảng viên.',
           academicTitleOptions: {
             'PGS.TS.': 'PGS.TS. (Phó Giáo sư - Tiến sĩ)',
             'GS.TS.': 'GS.TS. (Giáo sư - Tiến sĩ)',
@@ -373,6 +377,8 @@ export default function AdminUsersPage() {
           departmentLabel: 'Khoa / Bộ môn công tác *',
           selectDepartmentPlaceholder: '-- Chọn Khoa / Bộ môn --',
           specializationLabel: 'Lĩnh vực chuyên môn / Hướng nghiên cứu',
+          specializationManagedHint:
+            'Lĩnh vực chuyên môn do Phòng Đào tạo cập nhật trong danh bạ Giảng viên sau khi tạo tài khoản.',
           specializationDescription:
             'Ví dụ: Trí tuệ nhân tạo, Hệ thống nhúng, Kỹ thuật phần mềm',
           specializationPlaceholder: 'ví dụ: Kỹ thuật phần mềm & AI',
@@ -496,13 +502,17 @@ export default function AdminUsersPage() {
             '4': 'Year 4 (Cohort K2023)',
           },
           curriculumLabel: 'Curriculum *',
-          facultyLabel: 'Faculty / Training Institute *',
+          facultyLabel: 'Faculty / Training Institute',
+          facultyManagedHint:
+            'The student’s training faculty is assigned by the Academic Office together with the curriculum after the account is created.',
           selectFacultyPlaceholder: '-- Select Faculty / Institute --',
           employeeIdLabel: 'Employee ID (MSGV) *',
           employeeIdDescription:
             'The identifier for teaching staff and thesis examiners',
           employeeIdPlaceholder: 'e.g. GV2026001 or GV2026002',
-          academicTitleLabel: 'Academic title / Degree *',
+          academicTitleLabel: 'Academic title / Degree',
+          academicTitleManagedHint:
+            'Quick account creation only stores the teaching department; academic titles are set by the Academic Office in the lecturer directory.',
           academicTitleOptions: {
             'PGS.TS.': 'PGS.TS. (Associate Professor - PhD)',
             'GS.TS.': 'GS.TS. (Professor - PhD)',
@@ -513,6 +523,8 @@ export default function AdminUsersPage() {
           departmentLabel: 'Faculty / Department *',
           selectDepartmentPlaceholder: '-- Select Faculty / Department --',
           specializationLabel: 'Specialization / Research area',
+          specializationManagedHint:
+            'The specialization is set by the Academic Office in the lecturer directory after the account is created.',
           specializationDescription:
             'e.g. Artificial Intelligence, Embedded Systems, Software Engineering',
           specializationPlaceholder: 'e.g. Software Engineering & AI',
@@ -714,7 +726,14 @@ export default function AdminUsersPage() {
           payload.studentId = formData.studentId.trim();
           payload.year = formData.year;
           payload.curriculumId = formData.curriculumId || curricula[0]?.id || '';
+          // departmentId is deliberately NOT sent: the DTO accepts it but the
+          // student profile writer ignores it, so collecting a faculty choice
+          // here would silently discard the admin's input.
         } else if (formData.role === 'LECTURER') {
+          // academicTitle and specialization are not fields of the user-create
+          // DTO: they live on the lecturer directory record maintained by the
+          // Academic Office, so the disabled inputs above must not pretend the
+          // value travels with this account.
           payload.employeeId = formData.employeeId.trim();
           payload.departmentId = formData.departmentId;
         }
@@ -1232,7 +1251,12 @@ export default function AdminUsersPage() {
               </div>
             </div>
 
-            {/* CỘT 2: HỒ SƠ HỌC VỤ CHUYÊN BIỆT THEO VAI TRÒ */}
+            {/* CỘT 2: HỒ SƠ HỌC VỤ CHUYÊN BIỆT THEO VAI TRÒ.
+                The update endpoint only carries name/role/status, and openEdit
+                has no profile values to echo, so the profile-fields section is
+                hidden while a record is being edited: a required mark the form
+                can neither fill honestly nor submit is worse than no field. */}
+            {editingUser && (formData.role === 'STUDENT' || formData.role === 'LECTURER') ? null : (
             <div className="space-y-4 rounded-xl border border-border/80 bg-card p-4">
               {/* Header Cột 2 */}
               <div className="flex items-center justify-between border-b border-border/70 pb-3">
@@ -1333,18 +1357,18 @@ export default function AdminUsersPage() {
                     </AdminFormField>
                   </div>
 
-                  <AdminFormField label={copy.facultyLabel}>
+                  <AdminFormField label={copy.facultyLabel} description={copy.facultyManagedHint}>
+                    {/* AdminUserCreateRequest accepts departmentId but the student
+                        profile writer ignores it — show the field as office-assigned
+                        instead of collecting a value the server will drop. */}
                     <select
-                      value={formData.departmentId}
-                      onChange={(e) => setFormData((c) => ({ ...c, departmentId: e.target.value }))}
-                      className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                      value=""
+                      disabled
+                      aria-disabled="true"
+                      title={copy.facultyManagedHint}
+                      className="flex h-11 w-full cursor-not-allowed rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
                     >
-                      <option value="">{copy.selectFacultyPlaceholder}</option>
-                      {departments.map((d) => (
-                        <option key={d.id} value={d.id}>
-                          {d.name} {d.code ? `(${d.code})` : ''}
-                        </option>
-                      ))}
+                      <option value="">{copy.facultyManagedHint}</option>
                     </select>
                   </AdminFormField>
                 </div>
@@ -1368,11 +1392,16 @@ export default function AdminUsersPage() {
                   </AdminFormField>
 
                   <div className="grid grid-cols-2 gap-3">
-                    <AdminFormField label={copy.academicTitleLabel}>
+                    <AdminFormField
+                      label={copy.academicTitleLabel}
+                      description={copy.academicTitleManagedHint}
+                    >
                       <select
                         value={formData.academicTitle}
                         onChange={(e) => setFormData((c) => ({ ...c, academicTitle: e.target.value }))}
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
+                        disabled
+                        title={copy.academicTitleManagedHint}
+                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
                       >
                         <option value="PGS.TS.">{copy.academicTitleOptions['PGS.TS.']}</option>
                         <option value="GS.TS.">{copy.academicTitleOptions['GS.TS.']}</option>
@@ -1400,12 +1429,14 @@ export default function AdminUsersPage() {
 
                   <AdminFormField
                     label={copy.specializationLabel}
-                    description={copy.specializationDescription}
+                    description={copy.specializationManagedHint}
                   >
                     <Input
                       type="text"
                       value={formData.specialization}
-                      placeholder={copy.specializationPlaceholder}
+                      placeholder={copy.specializationDescription}
+                      disabled
+                      title={copy.specializationManagedHint}
                       onChange={(e) => setFormData((c) => ({ ...c, specialization: e.target.value }))}
                     />
                   </AdminFormField>
@@ -1455,6 +1486,7 @@ export default function AdminUsersPage() {
                 </div>
               )}
             </div>
+            )}
           </div>
 
           <AdminDialogFooter>

@@ -236,7 +236,8 @@ export default function SectionGradingPage() {
       (status ?? 'UNKNOWN').toUpperCase() as keyof typeof messages.common.statuses
     ] ?? messages.common.statuses.UNKNOWN;
 
-  const fetchSectionGrades = useCallback(async (options?: { silent?: boolean }) => {
+  const fetchSectionGrades = useCallback(
+    async (options?: { silent?: boolean; preserveLocalRows?: GradeUpdate[] }) => {
     if (!sectionId) {
       setError(copy.missingSection);
       setIsLoading(false);
@@ -263,8 +264,38 @@ export default function SectionGradingPage() {
         });
       });
 
+      // LEC-P3-B3: after a partial save the server copy of the skipped rows
+      // is older than what is on screen, so overlay the local half-entered
+      // drafts instead of wiping them, and keep those rows flagged as edited
+      // so the marker and the save-count stay truthful.
+      const preservedIds = new Set<string>();
+      (options?.preserveLocalRows ?? []).forEach((update) => {
+        if (nextGrades.has(update.enrollmentId)) {
+          nextGrades.set(update.enrollmentId, update);
+          preservedIds.add(update.enrollmentId);
+        }
+      });
+
       setGrades(nextGrades);
-      setEditedIds(new Set());
+      if (options?.preserveLocalRows) {
+        setEditedIds(preservedIds);
+        // Saved rows keep no stale inline errors; preserved rows keep theirs.
+        const keptErrorKeys = new Set<string>();
+        preservedIds.forEach((enrollmentId) => {
+          keptErrorKeys.add(`${enrollmentId}:processScore`);
+          keptErrorKeys.add(`${enrollmentId}:finalExamScore`);
+        });
+        setScoreErrors((previous) => {
+          if (previous.size === 0) return previous;
+          const next = new Map(previous);
+          Array.from(next.keys()).forEach((key) => {
+            if (!keptErrorKeys.has(key)) next.delete(key);
+          });
+          return next;
+        });
+      } else {
+        setEditedIds(new Set());
+      }
     } catch (requestError: any) {
       setError(
         campusErrorMessage(requestError, messages.common.campusErrors, copy.loadFailed),
@@ -273,7 +304,9 @@ export default function SectionGradingPage() {
       setIsLoading(false);
       setIsRefreshing(false);
     }
-  }, [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId]);
+    },
+    [copy.loadFailed, copy.missingSection, messages.common.campusErrors, sectionId],
+  );
 
   useEffect(() => {
     if (hasAccess) {
@@ -283,11 +316,16 @@ export default function SectionGradingPage() {
 
   const hasChanges = editedIds.size > 0;
 
-  // Leaving the sheet with typed scores discards them; the shared guard adds
-  // the beforeunload dialog and an in-app confirm for the back link.
+  // LEC-P3-B1: leaving the sheet with typed scores discards them. The shared
+  // guard adds the beforeunload dialog, the in-app confirm for the back link,
+  // and — with interceptRouteChanges — covers SPA route changes the browser
+  // dialog never sees: sidebar <Link> clicks and browser Back now confirm
+  // first. The header back link keeps its explicit requestLeave wiring; the
+  // two paths are idempotent against each other.
   const unsaved = useUnsavedChangesGuard({
     isDirty: useCallback(() => editedIds.size > 0, [editedIds]),
     enabled: !isSaving,
+    interceptRouteChanges: true,
   });
   const { requestLeave, confirmLeave, cancelLeave, confirmOpen } = unsaved;
 
@@ -459,7 +497,13 @@ export default function SectionGradingPage() {
         toast.warning(copy.partialRowsSkipped.replace('{count}', formatNumber(partialRows.length)));
       }
       toast.success(copy.saved);
-      await fetchSectionGrades({ silent: true });
+      // LEC-P3-B3: hand the silent refetch the drafts of the rows it skipped
+      // so their half-entered scores survive instead of vanishing from the
+      // cells behind the warning.
+      const skippedDrafts = partialRows
+        .map((enrollment) => grades.get(enrollment.id))
+        .filter((update): update is GradeUpdate => Boolean(update));
+      await fetchSectionGrades({ silent: true, preserveLocalRows: skippedDrafts });
     } catch (requestError: any) {
       toast.error(
         campusErrorMessage(requestError, messages.common.campusErrors, copy.saveFailed),
