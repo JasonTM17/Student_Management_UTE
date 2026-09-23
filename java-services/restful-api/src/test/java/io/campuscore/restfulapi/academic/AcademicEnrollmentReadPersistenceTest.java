@@ -213,13 +213,17 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.enrollment.id").value("enrollment-1"));
 
+        // Round-11 contract change: section-scoped reads for a lecturer who
+        // does not own the section now raise 403 SECTION_FORBIDDEN like the
+        // sibling grades write path, instead of answering a silent empty list
+        // that made "no rows" indistinguishable from "not yours".
         mvc.perform(get("/api/v1/grades/items/section/section-1").with(lecturerJwt("lecturer-other")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
 
         mvc.perform(get("/api/v1/grades/student-grades/section/section-1").with(lecturerJwt("lecturer-other")))
-                .andExpect(status().isOk())
-                .andExpect(jsonPath("$.length()").value(0));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
 
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(lecturerJwt("lecturer-other")))
                 .andExpect(status().isNotFound())

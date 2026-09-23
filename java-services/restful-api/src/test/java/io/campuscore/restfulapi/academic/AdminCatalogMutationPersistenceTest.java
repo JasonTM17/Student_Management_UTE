@@ -47,6 +47,10 @@ class AdminCatalogMutationPersistenceTest {
 
     @BeforeEach
     void prepareFixture() {
+        // Bare calendar dates are validated as UTC midnight by the service;
+        // pin the H2 session zone so the CAST matches that contract on any
+        // developer machine timezone.
+        jdbc.execute("SET TIME ZONE 'UTC'");
         jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"academic\"");
         // The account-state filter reads these columns on every authenticated
         // request, so the fixture mirrors the production schema.
@@ -206,6 +210,40 @@ class AdminCatalogMutationPersistenceTest {
                                  "registrationStart":"2026-01-01", "registrationEnd":"2026-01-31"}
                                 """))
                 .andExpect(status().isOk());
+
+        // The registration window must persist as timestamps, not be dropped:
+        // the live Postgres build used to 500 with "column registrationStart is
+        // of type timestamp with time zone but expression is of type character
+        // varying" because the two columns skipped the explicit CAST the main
+        // range already had.
+        Map<String, Object> semester = jdbc.queryForMap(
+                "SELECT \"registrationStart\", \"registrationEnd\""
+                        + " FROM \"academic\".\"Semester\" WHERE \"name\" = ?",
+                "Date Only");
+        assertThat(((OffsetDateTime) semester.get("registrationStart")).toInstant())
+                .isEqualTo(Instant.parse("2026-01-01T00:00:00Z"));
+        assertThat(((OffsetDateTime) semester.get("registrationEnd")).toInstant())
+                .isEqualTo(Instant.parse("2026-01-31T00:00:00Z"));
+    }
+
+    @Test
+    void semesterCreatePersistsWithoutARegistrationWindow() throws Exception {
+        // Null window must insert cleanly (CAST(NULL AS ...) stays NULL).
+        mvc.perform(post("/api/v1/semesters")
+                        .with(adminJwt())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("""
+                                {"name":"No Window", "startDate":"2027-02-01", "endDate":"2027-06-30",
+                                 "academicYearId":"year-new"}
+                                """))
+                .andExpect(status().isOk());
+
+        Map<String, Object> semester = jdbc.queryForMap(
+                "SELECT \"registrationStart\", \"registrationEnd\""
+                        + " FROM \"academic\".\"Semester\" WHERE \"name\" = ?",
+                "No Window");
+        assertThat(semester.get("registrationStart")).isNull();
+        assertThat(semester.get("registrationEnd")).isNull();
     }
 
     @Test
@@ -388,7 +426,8 @@ class AdminCatalogMutationPersistenceTest {
                                   "building": "QA1",
                                   "roomNumber": "999",
                                   "capacity": 50,
-                                  "type": "LAB"
+                                  "type": "LAB",
+                                  "isActive": false
                                 }
                                 """))
                 .andExpect(status().isOk())
@@ -396,16 +435,20 @@ class AdminCatalogMutationPersistenceTest {
                 .andExpect(jsonPath("$.building").value("QA1"))
                 .andExpect(jsonPath("$.roomNumber").value("999"))
                 .andExpect(jsonPath("$.capacity").value(50))
-                .andExpect(jsonPath("$.type").value("LAB"));
+                .andExpect(jsonPath("$.type").value("LAB"))
+                .andExpect(jsonPath("$.isActive").value(false));
 
         Map<String, Object> room = jdbc.queryForMap(
-                "SELECT \"building\", \"roomNumber\", \"capacity\", \"type\" FROM \"academic\".\"Classroom\" WHERE \"id\" = ?",
+                "SELECT \"building\", \"roomNumber\", \"capacity\", \"type\", \"isActive\" FROM \"academic\".\"Classroom\" WHERE \"id\" = ?",
                 "room-new-test");
         assertThat(room)
                 .containsEntry("building", "QA1")
                 .containsEntry("roomNumber", "999")
                 .containsEntry("capacity", 50)
-                .containsEntry("type", "LAB");
+                .containsEntry("type", "LAB")
+                // The unbound-parameter fix must also honor an explicit false:
+                // silently keeping the TRUE default hides a deactivated room.
+                .containsEntry("isActive", false);
 
         mvc.perform(put("/api/v1/classrooms/room-new-test")
                         .with(adminJwt())
@@ -472,6 +515,7 @@ class AdminCatalogMutationPersistenceTest {
                     "roomNumber" VARCHAR(80) NOT NULL,
                     "capacity" INTEGER NOT NULL,
                     "type" VARCHAR(80) NOT NULL,
+                    "isActive" BOOLEAN NOT NULL DEFAULT TRUE,
                     "createdAt" TIMESTAMP WITH TIME ZONE NOT NULL,
                     "updatedAt" TIMESTAMP WITH TIME ZONE NOT NULL
                 )
