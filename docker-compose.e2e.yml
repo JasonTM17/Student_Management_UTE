@@ -32,6 +32,13 @@ services:
     image: ${E2E_CORE_API_IMAGE:-student-management-ute-restful-api:e2e-local}
     environment:
       SPRING_PROFILES_ACTIVE: ${SPRING_PROFILES_ACTIVE:-persistence}
+      # The E2E stack exercises the Flyway-seeded showcase logins (student,
+      # lecturer, admin). DemoAccountGate re-applies their status on every boot
+      # and defaults to LOCKED unless the deployment opts in; the real-login
+      # Playwright journeys (portal-professional, announcement-governance,
+      # assistant-admin) only run once those accounts are ACTIVE. Authority:
+      # application.yml `accounts-enabled: ${DEMO_ACCOUNTS_ENABLED:false}`.
+      DEMO_ACCOUNTS_ENABLED: ${DEMO_ACCOUNTS_ENABLED:-true}
       SERVER_PORT: 4100
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful_e2e}?currentSchema=thesis
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}

@@ -9,7 +9,7 @@ async function login(page: Page) {
   if (!admin.passcode) {
     throw new Error('E2E_ADMIN_PASSCODE must be provided by the disposable test environment.');
   }
-  await page.goto('/login?portal=admin');
+  await page.goto('/en/login?portal=admin');
   const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(admin.email);
@@ -27,7 +27,7 @@ test('admin manages a student and lecturer announcement without exposing service
   const restoreReason = 'Schedule review completed.';
 
   await login(page);
-  await page.goto('/admin/announcements');
+  await page.goto('/en/admin/announcements');
 
   // The first cold Next.js development compile of the governed surface can
   // outlast the default expect timeout; keep the assertion strict but give
@@ -43,10 +43,14 @@ test('admin manages a student and lecturer announcement without exposing service
   let dialog = page.getByRole('dialog');
   await expect(dialog).toHaveAttribute('aria-modal', 'true');
   await dialog.getByLabel(/^Title/).fill(title);
+  // The content field defaults to the TinyMCE WYSIWYG engine; switch to the
+  // Markdown & Blocks engine so the plain-text body is a fillable textarea.
+  await dialog.getByRole('button', { name: /Markdown & Blocks/ }).click();
   await dialog.getByLabel(/^Content/).fill('A clear message for both campus audiences.');
   await dialog.getByLabel('Campus-wide').uncheck();
-  await dialog.getByLabel('Student', { exact: true }).check();
-  await dialog.getByLabel('Lecturer', { exact: true }).check();
+  // Audience roles are now aria-pressed toggle buttons (not labelled checkboxes).
+  await dialog.getByRole('button', { name: 'Student', exact: true }).click();
+  await dialog.getByRole('button', { name: 'Lecturer', exact: true }).click();
 
   await expect(dialog.getByText('Will be visible for this role')).toBeVisible();
   await dialog.getByRole('tab', { name: 'Lecturer' }).click();
@@ -68,7 +72,10 @@ test('admin manages a student and lecturer announcement without exposing service
   await card.getByRole('button', { name: `Change history: ${updatedTitle}` }).click();
   dialog = page.getByRole('dialog');
   await expect(dialog).toContainText(editReason);
-  await expect(dialog).toContainText('Changed by: Demo Admin');
+  // AnnouncementWriteController.actorLabel renders '<firstName lastName> ·
+  // <email>' from the JWT claims; V33 gave admin-user the identity
+  // 'Tiến Dũng' / 'ThS. Hoàng' (it replaced the earlier 'Demo Admin' seed).
+  await expect(dialog).toContainText('Changed by: Tiến Dũng ThS. Hoàng · admin@campuscore.edu');
   await dialog.getByRole('button', { name: 'Close' }).click();
 
   await card.getByRole('button', { name: `Archive: ${updatedTitle}` }).click();

@@ -158,6 +158,10 @@ const thesisRound = {
   thesisType: 'Capstone',
   registrationStart: '2026-09-01T00:00:00Z',
   registrationEnd: '2026-09-30T00:00:00Z',
+  // ThesisRound (thesis-api.ts) requires the Phase 1 lecturer window;
+  // RoundMilestoneCard formats it unconditionally.
+  lecturerSubmitStart: '2026-08-15T00:00:00Z',
+  lecturerSubmitEnd: '2026-08-29T00:00:00Z',
   proposalPublishAt: '2026-10-05T00:00:00Z',
   status: 'REGISTRATION_OPEN',
 };
@@ -213,8 +217,40 @@ async function mockStudent(page: Page, singleTerm = false) {
   }]);
   await page.route('**/api/**', async (route) => {
     const pathname = new URL(route.request().url()).pathname;
+    // Since the 2026-09 scope decision (assistant-student-resolver.ts) every
+    // non-smalltalk turn streams from /assistant/chat/stream; the panel only
+    // renders a canonical meta → delta(s) → done sequence (assistant-stream.ts
+    // AssistantStreamOrder), so answer with portal-grounded fixture copy.
+    if (pathname === '/api/v1/assistant/chat/stream') {
+      // Each turn needs a unique message id: the reducer keys assistant
+      // messages by the done event's messageId, so a reused id collides across
+      // the two questions in this test (duplicate React key).
+      const streamMessageId = `e2e-stream-message-${Date.now()}`;
+      await route.fulfill({
+        status: 200,
+        contentType: 'text/event-stream',
+        body: [
+          'event: meta',
+          'data: {"type":"meta","model":"CampusUTE Student Assistant","locale":"en"}',
+          '',
+          'event: delta',
+          'data: {"type":"delta","sequence":1,"text":"Your course materials are ready: Week 1 slides for WEEKEND0. "}',
+          '',
+          'event: delta',
+          'data: {"type":"delta","sequence":2,"text":"Slides and lecture notes cover the enrolled class. Sunday classes: WEEKEND0 SECTION-0 meets 07:00 - 09:30."}',
+          '',
+          'event: done',
+          `data: {"type":"done","messageId":"${streamMessageId}","degraded":false}`,
+          '',
+        ].join('\n'),
+      });
+      return;
+    }
     const payloads: Record<string, unknown> = {
       '/api/site-appearance': {},
+      // The authenticated chrome also reads the versioned appearance endpoint
+      // through the api client (api.ts siteAppearanceApi.get).
+      '/api/v1/site-appearance': {},
       '/api/v1/auth/me': {
         id: 'demo-student',
         email: 'demo@example.test',
@@ -225,6 +261,9 @@ async function mockStudent(page: Page, singleTerm = false) {
       },
       '/api/v1/semesters': { data: terms },
       '/api/v1/notifications/my': { data: [] },
+      // The sidebar badge reads the server-side counter (api.ts
+      // notificationsApi.unreadCount), not the capped inbox preview.
+      '/api/v1/notifications/my/unread-count': { unreadCount: 0 },
       '/api/v1/assistant/conversations': [],
       '/api/v1/announcements/my': {
         data: [{
@@ -245,6 +284,19 @@ async function mockStudent(page: Page, singleTerm = false) {
         kind: 'REGISTRATION', status: 'OPEN', windowStart: '2026-09-01T00:00:00Z',
         windowEnd: '2026-09-30T00:00:00Z', creditLimit: 18,
       }],
+      // Window-aware registration (register page) fetches eligibility and the
+      // credit-limit application for the OPEN round, and the student dashboard
+      // reads the live credit cap from the registration summary.
+      '/api/v1/me/registration/eligibility': {
+        roundId: 'round-demo', semesterId: 'term-2', kind: 'REGISTRATION',
+        eligible: true, creditLimit: 18, creditsUsed: 3, creditsRemaining: 15,
+        windowStart: '2026-09-01T00:00:00Z', windowEnd: '2026-09-30T00:00:00Z',
+      },
+      '/api/v1/me/registration/summary': {
+        roundId: 'round-demo', creditLimit: 18, creditsUsed: 3, creditsRemaining: 15,
+        enrollmentIds: ['meeting-0'],
+      },
+      '/api/v1/me/registration/credit-limit-application': null,
       '/api/v1/me/registration/sections': [
         {
           id: 'section-se101-01', sectionNumber: '01', courseId: 'course-se101',
@@ -280,6 +332,8 @@ async function mockStudent(page: Page, singleTerm = false) {
       },
       '/api/v1/thesis/rounds': [thesisRound],
       '/api/v1/thesis/topics': [thesisTopic],
+      // The student group card resolves the topic's supervisors on mount.
+      '/api/v1/thesis/topics/thesis-topic-demo/supervisors': [],
       '/api/v1/thesis/groups': [thesisGroup],
       '/api/v1/enrollments/my': [1, 7, 1].map((day, index) => ({
         id: `meeting-${index}`, sectionId: index === 0 ? 'section-se101-01' : `weekend-${index}`, status: 'CONFIRMED',
@@ -313,6 +367,7 @@ async function mockAdminEnrollments(page: Page) {
     const pathname = new URL(route.request().url()).pathname;
     const payloads: Record<string, unknown> = {
       '/api/site-appearance': {},
+      '/api/v1/site-appearance': {},
       '/api/v1/auth/me': {
         id: 'demo-admin',
         email: 'admin@example.test',
@@ -385,6 +440,9 @@ test('demo polish: feedback surfaces stay scannable on registration and schedule
   await page.goto('/en/dashboard/register');
   await expect(page.getByLabel('Course code or class')).toBeVisible();
   await expect(page.getByLabel('Course name')).toBeVisible();
+  // The two-level picker starts empty ('Search to see available sections');
+  // a course code search surfaces the grouped classes.
+  await page.getByLabel('Course code or class').fill('SE101');
   await expect(page.getByText('SE101', { exact: true }).filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByText('2 classes').filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Drop course' }).first()).toBeVisible();
@@ -396,7 +454,7 @@ test('demo polish: feedback surfaces stay scannable on registration and schedule
     const timetable = page.getByRole('table', { name: 'Weekly timetable grid' });
     await expect(timetable).toBeVisible();
     await expect(page.getByRole('heading', { name: 'Class section list' })).toHaveCount(0);
-    await page.getByRole('button', { name: 'List' }).click();
+    await page.getByRole('tab', { name: 'List View' }).click();
     await expect(page.getByRole('heading', { name: 'Class section list' })).toBeVisible();
     await expect(page.getByText('Saturday', { exact: true }).filter({ visible: true }).first()).toBeVisible();
     await expect(page.getByText(/WEEKEND1/).filter({ visible: true }).first()).toBeVisible();
@@ -445,8 +503,9 @@ test('demo polish: profile exposes photo upload and password visibility controls
 test('demo polish: admin opens a student enrollment profile from the student cell', async ({ page }) => {
   const errors = await mockAdminEnrollments(page);
   await page.goto('/en/admin/enrollments');
+  // getLearnerLabel renders lastName then firstName ('Student Demo').
   const studentButton = page.getByRole('button', {
-    name: 'Open student enrollment profile for Demo Student',
+    name: 'Open student enrollment profile for Student Demo',
   }).first();
   await expect(studentButton).toBeVisible();
   await studentButton.click();
@@ -477,14 +536,16 @@ test('demo polish: grade rows open API-backed midterm and final breakdown', asyn
 
   const dialog = page.getByRole('dialog', { name: 'Course Grade Breakdown' });
   await expect(dialog).toBeVisible();
-  await expect(dialog.getByText('Component Scores (Midterm & Final)')).toBeVisible();
+  // GradeDetailModal canonical 50/50 copy: the known FINAL component type
+  // renders through GRADE_ITEM_LABELS and the Grade Point cell uses toFixed(1).
+  await expect(dialog.getByText('Course Grade Components (50% In-Course + 50% Final)')).toBeVisible();
   await expect(dialog.getByRole('row', {
     name: /Midterm Exam MIDTERM 40% 8\.4 \/ 10/,
   })).toBeVisible();
   await expect(dialog.getByRole('row', {
-    name: /Final Exam FINAL 60% 8\.8 \/ 10/,
+    name: /Final exam score \(50%\) FINAL 60% 8\.8 \/ 10/,
   })).toBeVisible();
-  await expect(dialog.getByText('3.50', { exact: true })).toBeVisible();
+  await expect(dialog.getByText('3.5', { exact: true })).toBeVisible();
   await noOverflow(page);
   expect(errors).toEqual([]);
 });
@@ -494,7 +555,8 @@ test('demo polish: thesis member details render and add-member form stays concis
   await page.goto('/en/dashboard/thesis');
   const main = page.locator('#dashboard-main-content');
 
-  await expect(main.getByText('2/3 members')).toBeVisible();
+  // Standardized 3-4 group policy (V67/V72): the card renders '{count}/4 members'.
+  await expect(main.getByText('2/4 members')).toBeVisible();
   await expect(main.getByText('Demo Student', { exact: true })).toBeVisible();
   await expect(main.getByText('S20240001', { exact: true })).toBeVisible();
   await expect(main.getByText('demo@example.test', { exact: true })).toBeVisible();
@@ -516,7 +578,7 @@ test('demo polish: assistant answers schedule and materials from portal data', a
   const errors = await mockStudent(page);
   await page.goto('/en/dashboard');
 
-  await page.getByRole('button', { name: 'CampusCore assistant' }).first().click();
+  await page.getByRole('button', { name: 'CampusUTE assistant' }).first().click();
   const composer = page.getByRole('textbox', {
     name: /Ask about registration, schedules, announcements/,
   });
@@ -572,16 +634,28 @@ for (const singleTerm of [false, true]) {
         name: /Select semester for transcript|Chọn học kỳ cho bảng điểm/,
       });
       await expect(semesterSelector).toHaveCount(1);
-      const chart = page.getByRole('img', { name: /GPA trend|Xu hướng GPA/ });
+      // The GPA card and the 10-scale card both carry the 'GPA trend' stem,
+      // so scope each chart by its exact accessible name.
+      const trendName = locale === 'en' ? 'GPA trend' : 'Xu hướng GPA';
+      const termPrefix = locale === 'en' ? 'Semester' : 'Học kỳ';
+      const chart = page.getByRole('img', { name: trendName, exact: true });
       await expect(chart).toBeVisible();
-      await expect(chart.locator('polyline')).toHaveCount(singleTerm ? 0 : 3);
+      // Default 'Both' mode draws the semester line plus the cumulative line;
+      // one term leaves no segment to draw.
+      await expect(chart.locator('polyline')).toHaveCount(singleTerm ? 0 : 2);
       const chartTitles = await chart.locator('circle title').allTextContents();
       const termNumbers = singleTerm ? [2] : [1, 2];
-      expect(chartTitles.filter((title) => !title.endsWith('/10'))).toEqual(
-        termNumbers.map((number) => `${locale === 'en' ? 'Semester' : 'Học kỳ'} ${number}: ${number === 1 ? '3.00' : '3.30'}`),
+      expect(chartTitles).toEqual(
+        termNumbers.map((number) => `${termPrefix} ${number}: ${number === 1 ? '3.00' : '3.30'}`),
       );
-      expect(chartTitles.filter((title) => title.endsWith('/10'))).toEqual(
-        termNumbers.map((number) => `${locale === 'en' ? 'Semester' : 'Học kỳ'} ${number}: 8.0/10`),
+      // The 0-10 average gets its own axis in a second card.
+      const tenScaleChart = page.getByRole('img', {
+        name: `${trendName} — ${locale === 'en' ? '10-scale average' : 'ĐTB hệ 10'}`,
+        exact: true,
+      });
+      const tenScaleTitles = await tenScaleChart.locator('circle title').allTextContents();
+      expect(tenScaleTitles).toEqual(
+        termNumbers.map((number) => `${termPrefix} ${number}: 8.0/10`),
       );
       if (!singleTerm) {
         await semesterSelector.selectOption('term-1');

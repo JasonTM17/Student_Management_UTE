@@ -12,7 +12,7 @@ type Persona = 'student' | 'lecturer' | 'admin';
 const accounts: Record<Persona, { email: string; password: string }> = {
   student: { email: 'student@campuscore.edu', password: 'password123' },
   lecturer: { email: 'lecturer@campuscore.edu', password: 'password123' },
-  admin: { email: 'admin@campuscore.edu', password: 'admin123' },
+  admin: { email: 'admin@campuscore.edu', password: 'password123' },
 };
 
 const routes: Record<Persona, string[]> = {
