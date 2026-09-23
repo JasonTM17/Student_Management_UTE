@@ -4,16 +4,16 @@
 <body>
   <span th:replace="~{mail/fragments :: preheader(${subject})}">Kết quả học vụ CampusUTE</span>
 
-  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#edf2f7;">
     <tr>
-      <td class="outer-pad" align="center">
-        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0">
+      <td class="outer-pad" align="center" style="padding:36px 16px;">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;border:1px solid #dce5ef;border-radius:16px;background-color:#ffffff;">
           <th:block th:replace="~{mail/fragments :: masthead('KẾT QUẢ HỌC VỤ & RÈN LUYỆN', 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
 
           <tr>
-            <td class="content">
+            <td class="content" style="padding:36px 40px 38px;">
               <p class="section-label">THÔNG BÁO KẾT QUẢ CÁ NHÂN</p>
-              <h1 class="page-title">Kết quả học tập và rèn luyện</h1>
+              <h1 class="page-title" style="margin:0 0 24px;color:#132d50;font-family:Arial,Helvetica,sans-serif;font-size:27px;font-weight:700;line-height:34px;">Kết quả học tập và rèn luyện</h1>
 
               <p class="salutation">
                 Kính gửi <span th:text="${studentName}">Nguyễn Tiến Sơn</span> <span aria-hidden="true">·</span> MSSV <span th:text="${studentId}">22110001</span>,

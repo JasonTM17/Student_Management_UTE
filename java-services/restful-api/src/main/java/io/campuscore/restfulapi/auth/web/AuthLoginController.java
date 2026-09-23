@@ -105,7 +105,7 @@ public class AuthLoginController {
     @ApiResponse(responseCode = "200", description = "Hồ sơ đã được cập nhật thành công")
     public AuthUserResponse updateProfile(
             @AuthenticationPrincipal Jwt jwt,
-            @RequestBody(required = false) UpdateProfileRequest request) {
+            @Valid @RequestBody(required = false) UpdateProfileRequest request) {
         return auth.updateProfile(jwt.getSubject(), request);
     }
 

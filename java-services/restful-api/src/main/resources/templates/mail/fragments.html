@@ -18,7 +18,7 @@
       width: 100%;
       margin: 0;
       padding: 0;
-      background-color: #eef3f8;
+      background-color: #edf2f7;
     }
 
     body,
@@ -72,54 +72,54 @@
       overflow: hidden;
       font-size: 1px;
       line-height: 1px;
-      color: #eef3f8;
+      color: #edf2f7;
       opacity: 0;
     }
 
     .email-wrapper {
       width: 100%;
-      background-color: #eef3f8;
+      background-color: #edf2f7;
     }
 
     .outer-pad {
-      padding: 32px 16px;
+      padding: 36px 16px;
     }
 
     .email-shell {
       width: 100%;
       max-width: 640px;
       background-color: #ffffff;
-      border: 1px solid #d6e0eb;
-      border-radius: 12px;
+      border: 1px solid #dce5ef;
+      border-radius: 16px;
       overflow: hidden;
     }
 
     .masthead {
-      padding: 36px 40px 32px;
-      background-color: #0a2854;
+      padding: 34px 40px 30px;
+      background-color: #102d50;
       text-align: left;
     }
 
     .masthead-kicker {
       display: inline-block;
-      margin: 0 0 16px;
-      padding: 7px 10px;
+      margin: 0 0 20px;
+      padding: 6px 10px;
       border: 1px solid #6d8db8;
-      border-radius: 999px;
+      border-radius: 5px;
       color: #e9f0f8;
-      font-size: 11px;
+      font-size: 10px;
       font-weight: 700;
       line-height: 16px;
-      letter-spacing: 1.1px;
+      letter-spacing: 1.3px;
       text-transform: uppercase;
     }
 
     .masthead-title {
       margin: 0;
       color: #ffffff;
-      font-size: 28px;
+      font-size: 27px;
       font-weight: 700;
-      line-height: 34px;
+      line-height: 33px;
       letter-spacing: -0.2px;
     }
 
@@ -131,14 +131,14 @@
     }
 
     .brand-rule {
-      height: 4px;
-      background-color: #d59a2e;
+      height: 5px;
+      background-color: #dba83f;
       font-size: 0;
       line-height: 0;
     }
 
     .content {
-      padding: 40px 40px 36px;
+      padding: 36px 40px 38px;
     }
 
     .eyebrow-row {
@@ -173,10 +173,10 @@
     }
 
     .page-title {
-      margin: 0 0 20px;
+      margin: 0 0 24px;
       color: #132d50;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 28px;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      font-size: 27px;
       font-weight: 700;
       line-height: 34px;
       letter-spacing: -0.25px;
@@ -257,6 +257,7 @@
       color: #2f4965;
       font-size: 16px;
       line-height: 26px;
+      white-space: pre-line;
     }
 
     .prose p {
@@ -378,9 +379,10 @@
 
     .status-panel {
       margin: 0 0 24px;
-      padding: 16px;
-      background-color: #eaf7f1;
+      padding: 18px 20px;
+      background-color: #edf8f3;
       border-color: #a9d8c5;
+      border-left: 4px solid #168166;
     }
 
     .status-label {
@@ -396,8 +398,8 @@
     .status-title {
       margin: 0 0 4px;
       color: #16365f;
-      font-family: Georgia, "Times New Roman", serif;
-      font-size: 24px;
+      font-family: "Segoe UI", Arial, Helvetica, sans-serif;
+      font-size: 22px;
       font-weight: 700;
       line-height: 30px;
     }
@@ -414,6 +416,7 @@
       width: 100%;
       margin: 0 0 12px;
       background-color: #ffffff;
+      border-left: 3px solid #dba83f;
     }
 
     .course-item td,
@@ -553,7 +556,7 @@
       padding: 24px 40px 28px;
       border-top: 1px solid #d6e0eb;
       background-color: #f5f8fb;
-      text-align: center;
+      text-align: left;
     }
 
     .footer-brand {
@@ -600,7 +603,7 @@
       }
 
       .masthead {
-        padding: 28px 22px 24px !important;
+        padding: 27px 22px 24px !important;
       }
 
       .masthead-title {
@@ -614,12 +617,12 @@
       }
 
       .content {
-        padding: 28px 22px !important;
+        padding: 28px 22px 32px !important;
       }
 
       .page-title {
-        font-size: 24px !important;
-        line-height: 30px !important;
+        font-size: 23px !important;
+        line-height: 29px !important;
       }
 
       .meta-cell {
@@ -670,19 +673,19 @@
 
   <th:block th:fragment="masthead(kicker, subtitle)">
     <tr>
-      <td class="masthead" style="padding:36px 40px 32px;background-color:#0a2854;text-align:left;">
-        <div class="masthead-kicker" style="display:inline-block;margin:0 0 16px;padding:7px 10px;border:1px solid #6d8db8;border-radius:999px;color:#e9f0f8;font-size:11px;font-weight:700;line-height:16px;letter-spacing:1.1px;text-transform:uppercase;" th:text="${kicker}">CỔNG THÔNG TIN ĐÀO TẠO VÀ HỌC VỤ</div>
-        <p class="masthead-title" style="margin:0;color:#ffffff;font-size:28px;font-weight:700;line-height:34px;letter-spacing:-0.2px;">CampusUTE Academic</p>
+      <td class="masthead" style="padding:34px 40px 30px;background-color:#102d50;text-align:left;">
+        <div class="masthead-kicker" style="display:inline-block;margin:0 0 20px;padding:6px 10px;border:1px solid #6d8db8;border-radius:5px;color:#e9f0f8;font-size:10px;font-weight:700;line-height:16px;letter-spacing:1.3px;text-transform:uppercase;" th:text="${kicker}">CỔNG THÔNG TIN ĐÀO TẠO VÀ HỌC VỤ</div>
+        <p class="masthead-title" style="margin:0;color:#ffffff;font-size:27px;font-weight:700;line-height:33px;letter-spacing:-0.2px;">CampusUTE <span style="color:#efbd59;">Academic</span></p>
         <p class="masthead-subtitle" style="margin:8px 0 0;color:#cbd9ea;font-size:14px;line-height:22px;" th:text="${subtitle}">Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh</p>
       </td>
     </tr>
     <tr>
-      <td class="brand-rule" style="height:4px;background-color:#d59a2e;font-size:0;line-height:0;">&nbsp;</td>
+      <td class="brand-rule" style="height:5px;background-color:#dba83f;font-size:0;line-height:0;">&nbsp;</td>
     </tr>
   </th:block>
 
   <tr th:fragment="footer(note)">
-    <td class="footer" style="padding:24px 40px 28px;border-top:1px solid #d6e0eb;background-color:#f5f8fb;text-align:center;">
+    <td class="footer" style="padding:24px 40px 28px;border-top:1px solid #d6e0eb;background-color:#f5f8fb;text-align:left;">
       <p class="footer-brand" style="margin:0 0 4px;color:#16365f;font-size:14px;font-weight:700;line-height:21px;">TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH</p>
       <p class="footer-product" style="margin:0 0 2px;color:#42607f;font-size:12px;font-weight:700;line-height:20px;">CampusUTE Academic</p>
       <p class="footer-copy" style="margin:0;color:#63788f;font-size:12px;line-height:20px;">Hệ thống thông báo đào tạo và học vụ</p>

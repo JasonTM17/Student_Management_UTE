@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.mail;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
+import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.times;
@@ -18,6 +19,7 @@ import io.campuscore.restfulapi.mail.web.MailDtos.GradeItem;
 import jakarta.mail.Session;
 import jakarta.mail.internet.MimeMessage;
 import java.util.List;
+import java.util.Map;
 import java.util.Properties;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -134,5 +136,30 @@ class EmailServiceTest {
 
         MimeMessage sent = captor.getValue();
         assertEquals("[CampusUTE] Thông báo Kết quả Học tập & Rèn luyện - 22110001", sent.getSubject());
+    }
+
+    @Test
+    void rendersAllMailLayoutsWithReadableBrandAndSafeAnnouncementText() {
+        String verification = emailService.renderPreview("test-verification", Map.of(
+                "subject", "Kiểm tra email", "recipientName", "Sinh viên mẫu"));
+        String announcement = emailService.renderPreview("academic-announcement", Map.of(
+                "title", "Lịch đăng ký học phần", "content", "Dòng một\nDòng hai <script>alert(1)</script>"));
+        String registration = emailService.renderPreview("course-registration", Map.of(
+                "subject", "Xác nhận đăng ký", "studentName", "Sinh viên mẫu",
+                "studentId", "SV001", "totalCredits", 3,
+                "courses", List.of(new CourseItem("SE001", "Lập trình", 3, "GV", "T2"))));
+        String grades = emailService.renderPreview("grade-alert", Map.of(
+                "subject", "Kết quả học tập", "studentName", "Sinh viên mẫu", "studentId", "SV001",
+                "gpa4", 3.5, "gpa10", 8.8, "conductScore", 90,
+                "grades", List.of(new GradeItem("SE001", "Lập trình", 3, 8.8, "A"))));
+
+        for (String html : List.of(verification, announcement, registration, grades)) {
+            assertTrue(html.contains("CampusUTE"));
+            assertTrue(html.contains("@media screen and (max-width: 640px)"));
+            assertTrue(html.contains("class=\"email-shell\""));
+        }
+        assertTrue(registration.contains("Đăng ký học phần đã được ghi nhận"));
+        assertTrue(announcement.contains("white-space:pre-line"));
+        assertTrue(announcement.contains("&lt;script&gt;"));
     }
 }
