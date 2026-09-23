@@ -247,6 +247,62 @@ public class ThesisCouncilService {
     }
 
     /**
+     * Actor-scoped council listing for the API surface: governance staff see
+     * every council of the round; a lecturer sees only councils they sit on.
+     * Before round 11 the list endpoint answered {@code isAuthenticated()},
+     * which handed every authenticated caller — students included — the full
+     * roster and pre-publication topic assignments of every council.
+     *
+     * @param roundId round whose councils are listed
+     * @param actor caller JWT; governance roles bypass the membership filter
+     * @return the councils of the round visible to the caller
+     */
+    @Transactional(readOnly = true)
+    public List<CouncilResponse> listByRoundForActor(UUID roundId, Jwt actor) {
+        List<CouncilResponse> councils = listByRound(roundId);
+        if (isCouncilGovernanceStaff(actor)) {
+            return councils;
+        }
+        String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+        return councils.stream()
+                .filter(council -> council.members().stream()
+                        .anyMatch(member -> member.lecturerId().equals(lecturerId)))
+                .toList();
+    }
+
+    /**
+     * Actor-gated single-council read: governance staff always, otherwise only
+     * a sitting council member. A non-member lecturer and any caller without a
+     * council membership get 403 COUNCIL_MEMBER_REQUIRED, mirroring the
+     * scoring endpoints.
+     *
+     * @param councilId council to read
+     * @param actor caller JWT
+     * @return the fully hydrated council response
+     * @throws DomainException with code COUNCIL_NOT_FOUND when no council has
+     *         that id, or FORBIDDEN COUNCIL_MEMBER_REQUIRED for a non-member
+     */
+    @Transactional(readOnly = true)
+    public CouncilResponse readCouncil(UUID councilId, Jwt actor) {
+        CouncilResponse council = getCouncil(councilId);
+        if (!isCouncilGovernanceStaff(actor)) {
+            String lecturerId = normalize(actor == null ? null : actor.getClaimAsString("lecturerId"));
+            boolean member = StringUtils.hasText(lecturerId) && council.members().stream()
+                    .anyMatch(entry -> entry.lecturerId().equals(lecturerId));
+            if (!member) {
+                throw new DomainException(HttpStatus.FORBIDDEN, "COUNCIL_MEMBER_REQUIRED",
+                        "Only council members or governance staff can read a council roster");
+            }
+        }
+        return council;
+    }
+
+    private boolean isCouncilGovernanceStaff(Jwt actor) {
+        List<String> roles = actor == null ? null : actor.getClaimAsStringList("roles");
+        return roles != null && (roles.contains("ADMIN") || roles.contains("TRUONG_KHOA") || roles.contains("SUPER_ADMIN"));
+    }
+
+    /**
      * Reads one council: header, members ordered chair then secretary then members, and topics.
      *
      * @param councilId council to read

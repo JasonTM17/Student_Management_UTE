@@ -21,6 +21,12 @@ def connect():
     return psycopg.connect(DSN, autocommit=True)
 
 
+def connect_service():
+    conn = psycopg.connect(DSN, autocommit=True)
+    conn.execute("set role service_role")
+    return conn
+
+
 def rpc(conn, action, document_id, actor, payload=None):
     return conn.execute(
         "select assistant.knowledge_admin(%s, %s, %s, %s)",
@@ -53,7 +59,9 @@ def setup(conn):
         do $$ begin
             if not exists (select 1 from pg_roles where rolname='anon') then create role anon; end if;
             if not exists (select 1 from pg_roles where rolname='authenticated') then create role authenticated; end if;
-            if not exists (select 1 from pg_roles where rolname='service_role') then create role service_role; end if;
+            if not exists (select 1 from pg_roles where rolname='service_role') then
+                create role service_role bypassrls;
+            end if;
         end $$;
     """)
     for migration in (
@@ -105,6 +113,7 @@ def assert_active_consistent(conn, archived_id, revised_id):
 def main():
     with connect() as conn:
         setup(conn)
+    with connect_service() as conn:
         first = rpc(conn, "CREATE", None, "author-a", payload("archive-target", "Original guidance A."))
         first_id = first["documentId"]
         rpc(conn, "SUBMIT", first_id, "author-a")
@@ -124,6 +133,7 @@ def main():
     def publish():
         try:
             with psycopg.connect(DSN) as conn:
+                conn.execute("set role service_role")
                 rpc(conn, "PUBLISH", second_id, "reviewer-b")
                 published.set()
                 if not release_publish.wait(15):
@@ -135,6 +145,7 @@ def main():
     def archive():
         try:
             with psycopg.connect(DSN) as conn:
+                conn.execute("set role service_role")
                 rpc(conn, "ARCHIVE", first_id, "reviewer-a")
             archived.set()
         except Exception as exc:
@@ -169,7 +180,75 @@ def main():
         raise AssertionError(f"Concurrent operations failed: {failures}")
     with connect() as conn:
         assert_active_consistent(conn, first_id, second_id)
-    print("PASS: archive waited for publish; final release hash, count and rows agree")
+
+    # Reverse the order as a separate governed corpus transition: ARCHIVE
+    # holds its transaction first and PUBLISH must wait before its hash read.
+    with connect_service() as conn:
+        third = rpc(conn, "CREATE", None, "author-c", payload("archive-target-c", "Original guidance C."))
+        third_id = third["documentId"]
+        rpc(conn, "SUBMIT", third_id, "author-c")
+        rpc(conn, "PUBLISH", third_id, "reviewer-c")
+        fourth = rpc(conn, "CREATE", None, "author-d", payload("publish-target-d", "Original guidance D."))
+        fourth_id = fourth["documentId"]
+        rpc(conn, "SUBMIT", fourth_id, "author-d")
+        rpc(conn, "PUBLISH", fourth_id, "reviewer-d")
+        rpc(conn, "UPDATE", fourth_id, "author-d", payload("publish-target-d", "Revised guidance D."))
+        rpc(conn, "SUBMIT", fourth_id, "author-d")
+
+    archive_holding = threading.Event()
+    release_archive = threading.Event()
+    publisher_finished = threading.Event()
+    failures.clear()
+
+    def archive_first():
+        try:
+            with psycopg.connect(DSN) as conn:
+                conn.execute("set role service_role")
+                rpc(conn, "ARCHIVE", third_id, "reviewer-c")
+                archive_holding.set()
+                if not release_archive.wait(15):
+                    raise AssertionError("Archive hold timed out")
+        except Exception as exc:
+            failures.append(exc)
+            archive_holding.set()
+
+    def publish_second():
+        try:
+            with psycopg.connect(DSN) as conn:
+                conn.execute("set role service_role")
+                rpc(conn, "PUBLISH", fourth_id, "reviewer-d")
+            publisher_finished.set()
+        except Exception as exc:
+            failures.append(exc)
+            publisher_finished.set()
+
+    archiver = threading.Thread(target=archive_first, daemon=True)
+    publisher = threading.Thread(target=publish_second, daemon=True)
+    archiver.start()
+    if not archive_holding.wait(15) or failures:
+        raise AssertionError(f"Archive failed before publish: {failures}")
+    publisher.start()
+    with connect() as observer:
+        deadline = time.monotonic() + 10
+        saw_waiter = False
+        while time.monotonic() < deadline:
+            saw_waiter = observer.execute("""
+                select exists(select 1 from pg_locks
+                    where locktype='advisory' and granted=false)
+            """).fetchone()[0]
+            if saw_waiter:
+                break
+            time.sleep(0.05)
+        if not saw_waiter or publisher_finished.is_set():
+            raise AssertionError("Publish did not wait on the shared transaction lock")
+    release_archive.set()
+    archiver.join(15)
+    publisher.join(15)
+    if archiver.is_alive() or publisher.is_alive() or failures:
+        raise AssertionError(f"Reverse concurrent operations failed: {failures}")
+    with connect() as conn:
+        assert_active_consistent(conn, third_id, fourth_id)
+    print("PASS: both transaction orders serialized under service_role; final release hash, count and rows agree")
 
 
 if __name__ == "__main__":
