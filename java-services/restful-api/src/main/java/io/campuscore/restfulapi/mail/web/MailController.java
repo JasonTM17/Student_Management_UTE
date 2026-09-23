@@ -109,10 +109,19 @@ public class MailController {
         if (!templateName.matches("[a-z0-9-]+")) {
             return ResponseEntity.notFound().build();
         }
+        // WS-Admin round-11: an unknown but well-formed slug used to escape
+        // into the template engine and surface as a 500 TemplateInputException.
+        // Only the known preview templates exist; anything else is a 404.
+        if (!PREVIEW_TEMPLATES.contains(templateName)) {
+            return ResponseEntity.notFound().build();
+        }
         Map<String, Object> sampleData = buildSampleData(templateName);
         String html = emailService.renderPreview(templateName, sampleData);
         return ResponseEntity.ok(html);
     }
+
+    private static final java.util.Set<String> PREVIEW_TEMPLATES =
+            java.util.Set.of("test-verification", "academic-announcement", "course-registration", "grade-alert");
 
     private Map<String, Object> buildSampleData(String templateName) {
         Map<String, Object> data = new HashMap<>();

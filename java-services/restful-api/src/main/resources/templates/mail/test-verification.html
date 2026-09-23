@@ -4,16 +4,16 @@
 <body>
   <span th:replace="~{mail/fragments :: preheader(${subject})}">Kiểm tra dịch vụ email CampusUTE</span>
 
-  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#edf2f7;">
     <tr>
-      <td class="outer-pad" align="center">
-        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0">
+      <td class="outer-pad" align="center" style="padding:36px 16px;">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;border:1px solid #dce5ef;border-radius:16px;background-color:#ffffff;">
           <th:block th:replace="~{mail/fragments :: masthead('KIỂM TRA DỊCH VỤ EMAIL', 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
 
           <tr>
-            <td class="content">
+            <td class="content" style="padding:36px 40px 38px;">
               <p class="section-label">KIỂM TRA VẬN HÀNH</p>
-              <h1 class="page-title">Xác nhận kết nối dịch vụ email</h1>
+              <h1 class="page-title" style="margin:0 0 24px;color:#132d50;font-family:Arial,Helvetica,sans-serif;font-size:27px;font-weight:700;line-height:34px;">Xác nhận kết nối dịch vụ email</h1>
 
               <p class="salutation">
                 Kính chào <span th:text="${recipientName != null ? recipientName : 'Quý Thầy/Cô và các Bạn Sinh viên'}">Bạn</span>,
@@ -22,7 +22,7 @@
                 Đây là thư kiểm thử để xác nhận dịch vụ gửi email CampusUTE đã phản hồi.
               </p>
 
-              <div class="status-panel">
+              <div class="status-panel" style="margin:0 0 24px;padding:18px 20px;border:1px solid #a9d8c5;border-left:4px solid #168166;border-radius:10px;background-color:#edf8f3;">
                 <p class="status-label" th:text="${statusBadge != null ? statusBadge : 'KẾT NỐI SMTP THÀNH CÔNG'}">KẾT NỐI SMTP THÀNH CÔNG</p>
                 <h2 class="status-title">Dịch vụ đang phản hồi</h2>
                 <p class="status-copy">Các thông tin kiểm tra được ghi nhận dưới đây để đội vận hành đối chiếu.</p>

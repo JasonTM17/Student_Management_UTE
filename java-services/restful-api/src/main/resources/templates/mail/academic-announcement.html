@@ -4,20 +4,20 @@
 <body>
   <span th:replace="~{mail/fragments :: preheader(${title})}">Thông báo học vụ CampusUTE</span>
 
-  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0">
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#edf2f7;">
     <tr>
-      <td class="outer-pad" align="center">
-        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0">
+      <td class="outer-pad" align="center" style="padding:36px 16px;">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;border:1px solid #dce5ef;border-radius:16px;background-color:#ffffff;">
           <th:block th:replace="~{mail/fragments :: masthead(${category != null ? category : 'THÔNG BÁO HỌC VỤ'}, 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
 
           <tr>
-            <td class="content">
+            <td class="content" style="padding:36px 40px 38px;">
               <div class="eyebrow-row">
                 <span class="eyebrow" th:text="${category != null ? category : 'THÔNG BÁO HỌC VỤ'}">THÔNG BÁO HỌC VỤ</span>
                 <span class="official-label">THÔNG TIN CHÍNH THỨC</span>
               </div>
 
-              <h1 class="page-title" th:text="${title}">Kế hoạch Tổ chức Đăng ký Học phần Học kỳ 1 Năm học 2026-2027</h1>
+              <h1 class="page-title" style="margin:0 0 24px;color:#132d50;font-family:Arial,Helvetica,sans-serif;font-size:27px;font-weight:700;line-height:34px;" th:text="${title}">Kế hoạch Tổ chức Đăng ký Học phần Học kỳ 1 Năm học 2026-2027</h1>
 
               <table role="presentation" class="meta-panel" width="100%" cellpadding="0" cellspacing="0" border="0">
                 <tr>
@@ -36,7 +36,7 @@
                 Kính gửi <span th:text="${recipientName != null ? recipientName : 'Quý Thầy/Cô và các Bạn Sinh viên'}">Quý Thầy/Cô và các Bạn Sinh viên</span>,
               </p>
 
-              <div class="prose" th:text="${content}">
+              <div class="prose" style="white-space:pre-line;line-height:26px;" th:text="${content}">
                 Phòng Đào tạo trân trọng thông báo kế hoạch triển khai học vụ kỳ mới. Đề nghị toàn thể sinh viên chủ động theo dõi thời gian và hoàn tất các thủ tục theo đúng tiến độ quy định của Nhà trường.
               </div>
 

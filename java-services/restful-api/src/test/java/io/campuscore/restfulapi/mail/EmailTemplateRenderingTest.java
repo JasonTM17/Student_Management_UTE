@@ -132,7 +132,10 @@ class EmailTemplateRenderingTest {
         String html = templateEngine.process("mail/course-registration", context);
 
         assertNotNull(html);
-        assertTrue(html.contains("PHIẾU XÁC NHẬN ĐĂNG KÝ HỌC PHẦN"));
+        // Round-11: the course-registration template title was rewritten to
+        // sentence copy ("Đăng ký học phần đã được ghi nhận") alongside the
+        // client-safe inline-style sweep; pin the new title.
+        assertTrue(html.contains("Đăng ký học phần đã được ghi nhận"));
         assertTrue(html.contains("Nguyễn Tiến Sơn"));
         assertTrue(html.contains("22110001"));
         assertTrue(html.contains("SE013"));

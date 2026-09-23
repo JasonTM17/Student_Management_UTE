@@ -578,6 +578,31 @@ class AuthLoginPersistenceTest {
     }
 
     @Test
+    void updateProfileEnforcesAvatarSizeContract() throws Exception {
+        MvcResult login = loginStudent().andReturn();
+        Cookie accessCookie = login.getResponse().getCookie("cc_access_token");
+        Cookie csrfCookie = login.getResponse().getCookie("cc_csrf");
+
+        // The DTO declares @Size(max = 200_000) on the avatar data URL; the
+        // profile endpoint must reject oversized payloads with a 400 before
+        // anything is persisted.
+        String oversizedAvatar = "data:image/png;base64," + "A".repeat(200_001);
+        mvc.perform(put("/api/v1/auth/profile")
+                        .cookie(accessCookie, csrfCookie)
+                        .header("X-CSRF-Token", csrfCookie.getValue())
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"avatar\":\"" + oversizedAvatar + "\"}"))
+                .andExpect(status().isBadRequest());
+
+        Integer storedAvatarLength = jdbc.queryForObject(
+                "SELECT LENGTH(\"avatar\") FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Integer.class);
+        org.junit.jupiter.api.Assertions.assertTrue(
+                storedAvatarLength == null || storedAvatarLength <= 200_000,
+                "oversized avatar must not be persisted, got length " + storedAvatarLength);
+    }
+
+    @Test
     void changePasswordRequiresAuthenticationUpdatesHashAndRevokesRefreshSessions() throws Exception {
         // Random per-run secrets keep this file free of credential literals
         // while still proving the hash update end to end.
