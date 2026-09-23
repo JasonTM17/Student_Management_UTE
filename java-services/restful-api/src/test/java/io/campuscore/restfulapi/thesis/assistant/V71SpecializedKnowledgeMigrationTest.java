@@ -2,6 +2,7 @@ package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.assertj.core.api.Assertions.assertThat;
 
+import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.file.Files;
 import java.nio.file.Path;
 import java.util.regex.Pattern;
@@ -130,5 +131,20 @@ class V71SpecializedKnowledgeMigrationTest {
             assertThat(corpusJson).contains("\"" + base + "-vi\"");
             assertThat(corpusJson).contains("\"" + base + "-en\"");
         }
+    }
+
+    @Test
+    void specializedSupabaseSeedPassesThePublicKnowledgeGuard() throws Exception {
+        Path corpus = Path.of("../../supabase/seed/assistant-specialized-knowledge.json");
+        var documents = new ObjectMapper().readTree(Files.readString(corpus));
+        assertThat(documents.size()).isEqualTo(24);
+        var rejected = new java.util.ArrayList<String>();
+        for (var document : documents) {
+            for (String field : new String[] {"slug", "title", "content", "source"}) {
+                var result = AssistantInputGuard.inspectPublicKnowledge(document.path(field).asText());
+                if (!result.allowed()) rejected.add(document.path("slug").asText() + ":" + field + ":" + result.reasonCode());
+            }
+        }
+        assertThat(rejected).isEmpty();
     }
 }

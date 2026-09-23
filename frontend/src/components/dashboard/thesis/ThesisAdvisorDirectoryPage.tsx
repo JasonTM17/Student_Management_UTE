@@ -243,6 +243,9 @@ export default function ThesisAdvisorDirectoryPage() {
   const searchParams = useSearchParams();
   const preselectedRoundId = searchParams.get('roundId') || '';
 
+  const userRoles = user?.roles || (user?.role ? [user.role] : []);
+  const isStudent = userRoles.includes('STUDENT');
+
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
   const [departments, setDepartments] = useState<Department[]>([]);
   const [topics, setTopics] = useState<ThesisTopic[]>([]);
@@ -276,7 +279,7 @@ export default function ThesisAdvisorDirectoryPage() {
     // pins STUDENT -> 403 in its boundary tests). Firing it for a student would
     // manufacture a 403 and an outage-looking error state, so students get the
     // honest restricted panel instead (rendered below, before any data is used).
-    if (userRoles.includes('STUDENT')) {
+    if (isStudent) {
       return () => {
         active = false;
       };
@@ -330,7 +333,7 @@ export default function ThesisAdvisorDirectoryPage() {
     return () => {
       active = false;
     };
-  }, [locale, preselectedRoundId, reloadToken, loadFailedMessage]);
+  }, [locale, preselectedRoundId, reloadToken, loadFailedMessage, isStudent]);
 
   // Advisor workload calculation (how many published topics each lecturer supervises)
   const advisorWorkloadMap = useMemo(() => {
@@ -393,9 +396,6 @@ export default function ThesisAdvisorDirectoryPage() {
     setTablePage(1);
     setGridVisibleCount(GRID_PAGE_SIZE);
   }, [searchQuery, selectedDepartmentId, quotaFilter]);
-
-  const userRoles = user?.roles || (user?.role ? [user.role] : []);
-  const isStudent = userRoles.includes('STUDENT');
 
   const retryLoad = useCallback(() => {
     setReloadToken((token) => token + 1);

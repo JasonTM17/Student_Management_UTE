@@ -39,9 +39,12 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @RequestMapping({"/api/v1/admin/assistant/knowledge", "/api/v1/admin/thesis/assistant/knowledge"})
 public class ThesisAssistantKnowledgeAdminController {
     private final NamedParameterJdbcTemplate jdbc;
+    private final SqlKnowledgeReleasePromoter releasePromoter;
 
-    public ThesisAssistantKnowledgeAdminController(NamedParameterJdbcTemplate jdbc) {
+    public ThesisAssistantKnowledgeAdminController(NamedParameterJdbcTemplate jdbc,
+            SqlKnowledgeReleasePromoter releasePromoter) {
         this.jdbc = jdbc;
+        this.releasePromoter = releasePromoter;
     }
 
     @Operation(summary = "Danh sách tài liệu tri thức RAG", description = "Truy vấn danh sách tài liệu tri thức học vụ theo lĩnh vực (domain) và trạng thái (DRAFT, PENDING_REVIEW, PUBLISHED, ARCHIVED)")
@@ -204,6 +207,7 @@ public class ThesisAssistantKnowledgeAdminController {
         jdbc.update("UPDATE assistant.knowledge_document SET domain=:domain,slug=:slug,locale=:locale,title=:title,content=:content,source=:source,priority=:priority,active=TRUE,visibility='PUBLIC',updated_at=CURRENT_TIMESTAMP WHERE id=:id",
                 p().addValue("id", id).addValue("domain", payload.domain()).addValue("slug", payload.slug()).addValue("locale", payload.locale()).addValue("title", payload.title()).addValue("content", payload.content()).addValue("source", payload.source()).addValue("priority", payload.priority()));
         audit(selected.id(), "PUBLISH", owner);
+        releasePromoter.promote(id, selected.id(), owner);
         return new KnowledgeRevision(id, selected.id(), selected.version(), "PUBLISHED");
     }
 
@@ -226,6 +230,7 @@ public class ThesisAssistantKnowledgeAdminController {
                 p().addValue("id", id).addValue("actor", owner));
         if (changed != 1) throw notFound(id);
         if (!revisions.isEmpty()) audit(revisions.get(0).id(), "ARCHIVE", owner);
+        releasePromoter.promote(id, null, owner);
     }
 
     private void insertRevision(UUID revision, UUID document, int version, String state, KnowledgeRequest request, int priority, String actor) {

@@ -520,6 +520,8 @@ test('client assistant guard mirrors the server input guard', () => {
   // Ordinary academic questions and legitimate academic-year ranges pass.
   assert.equal(inspectAssistantInput('Đăng ký học phần thế nào?').allowed, true);
   assert.equal(inspectAssistantInput('Khóa 2023 - 2024 học mấy năm').allowed, true);
+  assert.equal(inspectAssistantInput('Prompt injection là gì trong an toàn ứng dụng web?').allowed, true);
+  assert.equal(inspectAssistantInput('How do I defend against prompt injection?').allowed, true);
 
   // C-P0-2: unaccented Vietnamese (the most common keyboard mode) meets the
   // same deterministic refusal, while unaccented legitimate questions and the

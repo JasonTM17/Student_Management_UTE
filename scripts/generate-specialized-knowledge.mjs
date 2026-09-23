@@ -7,15 +7,10 @@
 //   -> java-services/restful-api/src/main/resources/db/migration/
 //      V71__specialized_domain_knowledge.sql
 //
-// The JSON corpus is also the artifact uploaded to the Supabase authoring
-// project through scripts/supabase/assistant-knowledge.mjs, which reads
-// SUPABASE_URL / SUPABASE_SERVICE_ROLE_KEY from the process environment (those
-// values are never committed). The Supabase authoring table has no domain
-// column by design; domain = 'SPECIALIZED' is assigned here at Flyway seed
-// time, which is what the assistant's specialized retrieval scope filters on.
-//
-// Run: node scripts/generate-specialized-knowledge.mjs
-import { readFileSync, writeFileSync } from 'node:fs';
+// V71 is applied migration history. After initial generation, corpus changes
+// require a new additive Flyway migration and a governed Supabase release.
+// This script refuses to rewrite the checked-in V71 file.
+import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -232,8 +227,11 @@ WHERE singleton = TRUE;
 `;
 }
 
-const rows = loadRows();
-writeFileSync(MIGRATION_PATH, buildMigration(rows), 'utf8');
-console.log(
-  `rows=${rows.length} seed=assistant-specialized-knowledge.json migration=V71__specialized_domain_knowledge.sql`,
-);
+if (existsSync(MIGRATION_PATH)) {
+  console.error('V71 is applied migration history; add a new Flyway migration instead of regenerating it.');
+  process.exitCode = 1;
+} else {
+  const rows = loadRows();
+  writeFileSync(MIGRATION_PATH, buildMigration(rows), 'utf8');
+  console.log(`rows=${rows.length} seed=assistant-specialized-knowledge.json migration=V71__specialized_domain_knowledge.sql`);
+}

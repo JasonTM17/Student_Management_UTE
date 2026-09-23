@@ -6,6 +6,7 @@ import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.verify;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -89,6 +90,22 @@ class SupabaseKnowledgeAuthorityServiceTest {
 
         assertEquals(403, failure.status().value());
         assertEquals("RAG_SERVICE_UNAUTHORIZED", failure.code());
+    }
+
+    @Test
+    void internalArchiveReturnsTheActualProjectionState() {
+        SupabaseKnowledgeAuthorityService authority = mock(SupabaseKnowledgeAuthorityService.class);
+        SupabaseKnowledgeSyncService sync = mock(SupabaseKnowledgeSyncService.class);
+        AssistantRagProperties rag = new AssistantRagProperties("http://rag", "expected-token", true, 500, 1_000);
+        SupabaseKnowledgeInternalController controller = new SupabaseKnowledgeInternalController(authority, sync, rag);
+        UUID document = UUID.randomUUID();
+        when(sync.syncNow()).thenReturn(SupabaseKnowledgeSyncService.SyncResult.failed("Sync unavailable"));
+
+        var result = controller.archive(document, "expected-token", "admin-b");
+
+        verify(authority).archive(document, "admin-b");
+        assertEquals("FAILED", result.status());
+        assertEquals(true, result.degraded());
     }
 
     private static SupabaseKnowledgeProperties properties() {

@@ -84,8 +84,9 @@ public class AssistantKnowledgeAuthorityGateway {
                 new TypeReference<KnowledgeRevision>() { });
     }
 
-    public void archive(UUID id, String actor) {
-        exchange("DELETE", "/knowledge/" + id, Map.of(), null, actor, null);
+    public SupabaseKnowledgeSyncService.SyncResult archive(UUID id, String actor) {
+        return exchange("DELETE", "/knowledge/" + id, Map.of(), null, actor,
+                new TypeReference<SupabaseKnowledgeSyncService.SyncResult>() { });
     }
 
     public SupabaseKnowledgeSyncService.SyncResult sync(String actor) {
