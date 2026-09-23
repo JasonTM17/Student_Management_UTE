@@ -1,11 +1,13 @@
 package io.campuscore.restfulapi.thesis;
 
 import static org.assertj.core.api.Assertions.assertThat;
+import static org.hamcrest.Matchers.containsString;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.delete;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
+import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.content;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -512,6 +514,70 @@ class ThesisGovernanceIntegrationTest {
                         .with(truongKhoaJwt()))
                 .andExpect(status().isConflict())
                 .andExpect(jsonPath("$.code").value("COUNCIL_SIZE_INVALID"));
+    }
+
+    // ---------- R6: council roster read access ----------
+
+    @Test
+    void councilRostersAreOnlyReadableByMembersAndGovernanceStaff() throws Exception {
+        UUID roundId = insertRound("Gov Council Read Round", "REGISTRATION_CLOSED",
+                Instant.now().minusSeconds(3_600), Instant.now().plusSeconds(3_600));
+        for (int i = 1; i <= 4; i++) {
+            ensureLecturer("gov-read-" + i);
+        }
+        mvc.perform(post("/api/v1/thesis/councils")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"roundId\":\"" + roundId + "\",\"name\":\"Hội đồng đọc\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        UUID councilId = jdbc.queryForObject(
+                "SELECT id FROM thesis.thesis_council WHERE name = 'Hội đồng đọc'", UUID.class);
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-read-1\",\"memberRole\":\"CHAIR\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+        mvc.perform(post("/api/v1/thesis/councils/{id}/members", councilId)
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"lecturerId\":\"gov-read-2\",\"memberRole\":\"SECRETARY\"}")
+                        .with(truongKhoaJwt()))
+                .andExpect(status().isOk());
+
+        // A student used to read every council roster and pre-publication
+        // topic assignment; the boundary now refuses the role outright.
+        mvc.perform(get("/api/v1/thesis/councils").param("roundId", roundId.toString())
+                        .with(studentJwt("gov-read-student")))
+                .andExpect(status().isForbidden());
+        mvc.perform(get("/api/v1/thesis/councils/{id}", councilId)
+                        .with(studentJwt("gov-read-student")))
+                .andExpect(status().isForbidden());
+
+        // A lecturer outside the council sees an empty list and a 403 detail,
+        // never a foreign roster.
+        mvc.perform(get("/api/v1/thesis/councils").param("roundId", roundId.toString())
+                        .with(lecturerJwt("gov-read-3")))
+                .andExpect(status().isOk())
+                .andExpect(content().string("[]"));
+        mvc.perform(get("/api/v1/thesis/councils/{id}", councilId)
+                        .with(lecturerJwt("gov-read-3")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("COUNCIL_MEMBER_REQUIRED"));
+
+        // A sitting member reads their own council through both legs.
+        mvc.perform(get("/api/v1/thesis/councils").param("roundId", roundId.toString())
+                        .with(lecturerJwt("gov-read-1")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(councilId.toString())));
+        mvc.perform(get("/api/v1/thesis/councils/{id}", councilId)
+                        .with(lecturerJwt("gov-read-2")))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString("gov-read-1")));
+
+        // Governance staff keep the full list.
+        mvc.perform(get("/api/v1/thesis/councils").param("roundId", roundId.toString())
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(content().string(containsString(councilId.toString())));
     }
 
     // ---------- R6/R7/R8: assignment, scoring, finalize ----------

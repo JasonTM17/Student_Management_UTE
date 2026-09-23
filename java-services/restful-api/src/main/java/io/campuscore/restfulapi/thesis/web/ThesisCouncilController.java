@@ -54,18 +54,20 @@ public class ThesisCouncilController {
         return councils.createCouncil(parseUuid(request.roundId(), "roundId"), request.name(), actor);
     }
 
-    @Operation(summary = "Danh sách hội đồng theo đợt khóa luận", description = "Truy xuất danh sách tất cả các hội đồng bảo vệ trong một đợt khóa luận")
+    @Operation(summary = "Danh sách hội đồng theo đợt khóa luận", description = "Truy xuất danh sách tất cả các hội đồng bảo vệ trong một đợt khóa luận (giảng viên chỉ thấy hội đồng mình là thành viên)")
     @GetMapping("/councils")
-    @PreAuthorize("isAuthenticated()")
-    public List<CouncilResponse> listCouncils(@Parameter(description = "Mã UUID của đợt", required = true) @RequestParam UUID roundId) {
-        return councils.listByRound(roundId);
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN','LECTURER')")
+    public List<CouncilResponse> listCouncils(@Parameter(description = "Mã UUID của đợt", required = true) @RequestParam UUID roundId,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.listByRoundForActor(roundId, actor);
     }
 
-    @Operation(summary = "Xem chi tiết một hội đồng", description = "Truy xuất thông tin chi tiết một hội đồng: danh sách giảng viên thành viên và đề tài được phân công")
+    @Operation(summary = "Xem chi tiết một hội đồng", description = "Truy xuất thông tin chi tiết một hội đồng: danh sách giảng viên thành viên và đề tài được phân công (chỉ thành viên hội đồng hoặc cán bộ quản lý)")
     @GetMapping("/councils/{id}")
-    @PreAuthorize("isAuthenticated()")
-    public CouncilResponse getCouncil(@Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id) {
-        return councils.getCouncil(id);
+    @PreAuthorize("hasAnyRole('ADMIN','TRUONG_KHOA','SUPER_ADMIN','LECTURER')")
+    public CouncilResponse getCouncil(@Parameter(description = "Mã UUID của hội đồng", required = true) @PathVariable UUID id,
+            @AuthenticationPrincipal Jwt actor) {
+        return councils.readCouncil(id, actor);
     }
 
     @Operation(summary = "Thêm thành viên vào hội đồng đánh giá", description = "Bổ sung giảng viên vào hội đồng với vai trò cụ thể (Chủ tịch, Thư ký, Phản biện, v.v.)")
