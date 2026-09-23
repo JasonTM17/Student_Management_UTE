@@ -1,11 +1,11 @@
 import { test, expect, type Page } from '@playwright/test';
 
 const student = { email: 'student@campuscore.edu', password: 'password123' };
-const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
+const admin = { email: 'admin@campuscore.edu', password: 'password123' };
 
-const assistantLauncherName = /Open CampusCore assistant|Mở trợ lý CampusCore|CampusCore assistant|Trợ lý CampusCore/i;
-const assistantPanelTitle = /CampusCore assistant|Trợ lý CampusCore/i;
-const assistantCloseName = /Close CampusCore assistant|Đóng trợ lý CampusCore/i;
+const assistantLauncherName = /Open CampusUTE assistant|Mở trợ lý CampusUTE|CampusUTE assistant|Trợ lý CampusUTE/i;
+const assistantPanelTitle = /CampusUTE assistant|Trợ lý CampusUTE/i;
+const assistantCloseName = /Close CampusUTE assistant|Đóng trợ lý CampusUTE/i;
 const mobileNavigationName = /campus navigation on mobile|điều hướng cổng học vụ trên điện thoại/i;
 
 async function login(
@@ -90,8 +90,10 @@ test('authenticated student can use the assistant launcher, stream, citation, an
   const composer = page.getByRole('textbox', { name: /Ask about registration, schedules, announcements|Hỏi về đăng ký, lịch học, thông báo/i });
   await composer.fill('What campus guidance is available for new learners?');
   await page.getByRole('button', { name: /Send message|Gửi tin nhắn/i }).click();
-  await expect(page.getByRole('article', { name: /Campus helpdesk|Trợ lý học vụ CampusCore/i })).toContainText('Use the published thesis guide.');
-  await expect(page.getByLabel(/Sources|Nguồn tham khảo/i).getByText('Thesis guide')).toBeVisible();
+  await expect(page.getByRole('article', { name: /Campus helpdesk|Trợ lý học vụ CampusUTE/i })).toContainText('Use the published thesis guide.');
+  // Citations are a collapsible card (default closed); expand it before asserting.
+  await page.getByRole('button', { name: /Sources|Nguồn tham khảo/i }).click();
+  await expect(page.getByText('Thesis guide', { exact: true })).toBeVisible();
 
   await page.getByRole('button', { name: /Mark answer helpful|Đánh dấu câu trả lời hữu ích/i }).click();
   await expect.poll(() => feedbackCalls).toBe(1);
@@ -177,7 +179,12 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
       });
       expect(semesterHeight.height).toBeLessThanOrEqual(semesterHeight.lineHeight * 1.25);
     }
-    const launcher = page.getByRole('button', { name: assistantLauncherName }).last();
+    // Two buttons now carry the assistant-open name: the mobile nav slot and a
+    // floating desktop launcher (AssistantPanel). At mobile the launcher under
+    // test is the nav slot itself; on desktop it is the floating button.
+    const launcher = viewport.width < 768
+      ? page.locator('[data-mobile-assistant-slot="true"]')
+      : page.getByRole('button', { name: assistantLauncherName }).last();
     await expect(launcher).toBeVisible();
     const launcherBox = await launcher.boundingBox();
     expect(launcherBox).not.toBeNull();
@@ -213,11 +220,13 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(viewport.width);
     expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(viewport.height);
     if (viewport.width < 768) {
-      const maxHeight = await panel.evaluate((element) => Number.parseFloat(getComputedStyle(element).maxHeight));
-      expect(maxHeight).toBeLessThanOrEqual(viewport.height - 6.5 * 16 + 1);
-      const navBox = await mobileNav.boundingBox();
-      expect(navBox).not.toBeNull();
-      expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(navBox!.y);
+      // The mobile assistant is a full-screen sheet (fixed inset-0), not the
+      // old floating card that sat above the nav bar. Assert it fills the
+      // viewport (the within-edges checks above still bound it).
+      expect(Math.round(panelBox!.x)).toBe(0);
+      expect(Math.round(panelBox!.y)).toBe(0);
+      expect(Math.round(panelBox!.width)).toBeGreaterThanOrEqual(viewport.width - 1);
+      expect(Math.round(panelBox!.height)).toBeGreaterThanOrEqual(viewport.height - 1);
     }
     await page.getByRole('button', { name: assistantCloseName }).click();
   }

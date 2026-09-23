@@ -52,8 +52,9 @@ async function main() {
         E2E_API_URL: apiBaseURL,
         E2E_BASE_URL: frontendBaseURL,
         // The disposable stack seeds the Flyway demo admin; the governed
-        // announcement flows need that passcode to sign in.
-        E2E_ADMIN_PASSCODE: process.env.E2E_ADMIN_PASSCODE ?? 'admin123',
+        // announcement flows need that passcode to sign in. V77 aligned
+        // admin@campuscore.edu to the single runbook demo password (password123).
+        E2E_ADMIN_PASSCODE: process.env.E2E_ADMIN_PASSCODE ?? 'password123',
       },
     });
   } finally {

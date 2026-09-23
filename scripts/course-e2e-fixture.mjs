@@ -1,12 +1,17 @@
 // Only used after the E2E runner has created its collision-checked stack.
 // Real registration deadlines and Flyway migration checksums stay untouched.
+// V76 closes any round whose windowEnd has passed, so widening the demo
+// windows alone is not enough: the fixture must also re-open the rounds it
+// widens, otherwise the register flow renders "no round is open" on a stack
+// that is supposed to demonstrate a live registration window.
 export const registrationWindowSql = `
 DO $$
 DECLARE updated integer;
 BEGIN
   UPDATE academic."RegistrationRound"
   SET "windowStart" = CURRENT_TIMESTAMP - INTERVAL '1 day',
-      "windowEnd" = CURRENT_TIMESTAMP + INTERVAL '1 day'
+      "windowEnd" = CURRENT_TIMESTAMP + INTERVAL '1 day',
+      "status" = 'OPEN'
   WHERE "id" IN ('round-registration-demo', 'round-add-drop-demo')
     AND "semesterId" = 'semester-demo';
   GET DIAGNOSTICS updated = ROW_COUNT;

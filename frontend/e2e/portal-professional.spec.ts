@@ -3,7 +3,7 @@ import { test, expect, type Page } from '@playwright/test';
 
 const student = { email: 'student@campuscore.edu', password: 'password123' };
 const lecturer = { email: 'lecturer@campuscore.edu', password: 'password123' };
-const admin = { email: 'admin@campuscore.edu', password: 'admin123' };
+const admin = { email: 'admin@campuscore.edu', password: 'password123' };
 const TECHNICAL_COPY = /openapi|flyway|postgresql|\/api\/v1|java api|restful/i;
 
 async function signIn(
@@ -11,7 +11,7 @@ async function signIn(
   account: typeof student,
   portal: 'student' | 'lecturer' | 'admin' = 'student',
 ) {
-  await page.goto(`/login?portal=${portal}`);
+  await page.goto(`/en/login?portal=${portal}`);
   const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
   await expect(submit).toBeEnabled({ timeout: 20_000 });
   await page.locator('#email').fill(account.email);
@@ -27,8 +27,25 @@ async function dismissMobileSidebar(page: Page) {
   }
 }
 
-function sectionCard(page: Page, code: string) {
-  return page.locator('tr, article').filter({ hasText: new RegExp(code) }).filter({ visible: true });
+function searchCourse(page: Page, code: string) {
+  // The two-level registration picker lists sections only after a course-code
+  // search (feedback polish: registration separates searches, groups classes).
+  return page.getByLabel(/Course code or class|Mã học phần hoặc lớp/i).fill(code);
+}
+
+async function freeCourseForRegister(page: Page) {
+  // The demo student is seeded enrolled in one SE402 section, so the other
+  // SE402 section's Register button stays disabled as a duplicate course
+  // until that enrollment is dropped. Drop it first so the register path is
+  // the one under test.
+  const dropButton = page.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i }).first();
+  if (await dropButton.isVisible().catch(() => false)) {
+    await dropButton.click();
+    await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
+    await expect(page.getByText(/enrollment updated|đã cập nhật đăng ký/i)).toBeVisible({
+      timeout: 15_000,
+    });
+  }
 }
 
 async function confirmDialogAction(page: Page, buttonName: RegExp) {
@@ -41,7 +58,7 @@ async function confirmDialogAction(page: Page, buttonName: RegExp) {
 
 test.describe('public and auth', () => {
   test('homepage has skip-link, visible sign-in, and no 3-equal metric grid', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/en');
     await expect(page.getByRole('link', { name: /skip to content/i })).toBeAttached();
     const signIn = page.getByRole('navigation').getByRole('link', { name: /sign in|đăng nhập/i });
     await expect(signIn).toBeVisible();
@@ -54,10 +71,12 @@ test.describe('public and auth', () => {
     await expect(page.locator('main#main-content')).toBeVisible();
     await expect(page.locator('.sm\\:grid-cols-3')).toHaveCount(0);
     await expect(page.getByRole('tab', { name: /lecturer|giảng viên/i })).toBeVisible();
+    // HomeIdentityBoard renders prose identityRows (messages.ts), not the old
+    // invented course-code/user-record teasers.
     await page.getByRole('tab', { name: /lecturer|giảng viên/i }).click();
-    await expect(page.getByText('SE204')).toBeVisible();
+    await expect(page.getByText(/Classes you teach|Lớp học phần đang giảng dạy/)).toBeVisible();
     await page.getByRole('tab', { name: /admin|quản trị/i }).click();
-    await expect(page.getByText('USR')).toBeVisible();
+    await expect(page.getByText(/People and catalog|Người dùng và danh mục/)).toBeVisible();
     const overflow = await page.evaluate(() => document.documentElement.scrollWidth - window.innerWidth);
     expect(overflow).toBeLessThanOrEqual(1);
   });
@@ -69,7 +88,7 @@ test.describe('public and auth', () => {
         authCalls.push(`${response.request().method()} ${response.url()}`);
       }
     });
-    await page.goto('/');
+    await page.goto('/en');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     await page.waitForTimeout(1200);
     expect(authCalls.some((call) => /\/auth\/me(?:\?|$)/.test(call))).toBe(false);
@@ -77,7 +96,7 @@ test.describe('public and auth', () => {
   });
 
   test('theme toggle flips html.dark on the first click', async ({ page }) => {
-    await page.goto('/');
+    await page.goto('/en');
     await expect(page.getByRole('heading', { level: 1 })).toBeVisible();
     const before = await page.evaluate(() => document.documentElement.classList.contains('dark'));
     const toggle = page.getByRole('button', {
@@ -92,7 +111,7 @@ test.describe('public and auth', () => {
   });
 
   test('public signup explains that student accounts are issued by the Academic Office', async ({ page }) => {
-    await page.goto('/register');
+    await page.goto('/en/register');
     await expect(page.getByRole('heading', { name: /request an issued account|yêu cầu cấp tài khoản/i })).toBeVisible();
     await expect(page.getByText(/academic office|phòng đào tạo/i).first()).toBeVisible();
     await expect(page.getByRole('link', { name: /sign in|đăng nhập/i })).toBeVisible();
@@ -100,7 +119,7 @@ test.describe('public and auth', () => {
   });
 
   test('login labels stay visible and rejects empty submit', async ({ page }) => {
-    await page.goto('/login');
+    await page.goto('/en/login');
     await expect(page.getByLabel(/email/i)).toBeVisible();
     await expect(page.getByLabel(/^password$/i)).toBeVisible();
     await expect(page.getByText(/campus academic office/i)).toBeVisible();
@@ -108,7 +127,7 @@ test.describe('public and auth', () => {
   });
 
   test('student, lecturer, and admin login chrome stay distinct', async ({ page }) => {
-    await page.goto('/login?portal=student');
+    await page.goto('/en/login?portal=student');
     await expect(page.locator('[data-login-portal="student"]')).toBeVisible();
     await expect(page.getByRole('heading', { name: /student sign-in/i })).toBeVisible();
     await page.getByRole('tab', { name: /^lecturer$/i }).click();
@@ -123,7 +142,7 @@ test.describe('public and auth', () => {
   });
 
   test('student credentials are rejected on the admin portal', async ({ page }) => {
-    await page.goto('/login?portal=admin');
+    await page.goto('/en/login?portal=admin');
     const submit = page.locator('form').getByRole('button', { name: /sign in|đăng nhập/i });
     await expect(submit).toBeEnabled({ timeout: 20_000 });
     await page.locator('#email').fill(student.email);
@@ -158,35 +177,27 @@ test.describe('student workspace', () => {
     await expect(page.getByText(TECHNICAL_COPY)).toHaveCount(0);
 
     await dismissMobileSidebar(page);
-    const section = sectionCard(page, 'SE402');
-    await expect(section).toBeVisible({ timeout: 15_000 });
-
-    const dropButton = section.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
-    if (await dropButton.isVisible().catch(() => false)) {
-      await dropButton.click();
-      await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
-      await expect(section.getByRole('button', { name: /^register$|^đăng ký$/i })).toBeVisible({
-        timeout: 15_000,
-      });
-    }
-
-    await section.getByRole('button', { name: /^register$|^đăng ký$/i }).click();
+    await searchCourse(page, 'SE402');
+    await freeCourseForRegister(page);
+    const registerButton = page.getByRole('button', { name: /^register$|^đăng ký$/i }).first();
+    await expect(registerButton).toBeVisible({ timeout: 15_000 });
+    await expect(registerButton).toBeEnabled({ timeout: 15_000 });
+    await registerButton.click();
     await confirmDialogAction(page, /^register$|^đăng ký$/i);
     await expect(page.getByText(/enrollment updated|đã cập nhật đăng ký/i)).toBeVisible({
       timeout: 15_000,
     });
     await dismissMobileSidebar(page);
-    await expect(section.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i })).toBeVisible({
-      timeout: 15_000,
-    });
+    const dropButton = page.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i }).first();
+    await expect(dropButton).toBeVisible({ timeout: 15_000 });
     await page.screenshot({
       path: process.env.COURSE_E2E_SCREENSHOT || path.join('test-results', 'register-after-enroll.png'),
       fullPage: true,
     });
 
-    await section.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i }).click();
+    await dropButton.click();
     await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
-    await expect(section.getByRole('button', { name: /^register$|^đăng ký$/i })).toBeVisible({
+    await expect(page.getByRole('button', { name: /^register$|^đăng ký$/i }).first()).toBeVisible({
       timeout: 15_000,
     });
   });
@@ -212,9 +223,9 @@ test.describe('student workspace', () => {
     });
     await page.goto('/dashboard/register');
     await dismissMobileSidebar(page);
-    const section = sectionCard(page, 'SE402');
-    await expect(section).toBeVisible({ timeout: 15_000 });
-    await section.getByRole('button', { name: /^register$|^đăng ký$/i }).click();
+    await searchCourse(page, 'SE402');
+    await freeCourseForRegister(page);
+    await page.getByRole('button', { name: /^register$|^đăng ký$/i }).first().click();
     await confirmDialogAction(page, /^register$|^đăng ký$/i);
     const toast = page.locator('[data-sonner-toast]').first();
     await expect(toast).toBeVisible({ timeout: 10_000 });
@@ -259,7 +270,7 @@ test.describe('admin workspace', () => {
 
   test('admin can change campus accent from the appearance studio', async ({ page }) => {
     await signIn(page, admin, 'admin');
-    await page.goto('/admin/appearance');
+    await page.goto('/en/admin/appearance');
     await expect(page.getByRole('heading', { name: 'Site appearance', exact: true })).toBeVisible({
       timeout: 15_000,
     });
