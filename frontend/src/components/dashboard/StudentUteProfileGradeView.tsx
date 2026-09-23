@@ -178,13 +178,13 @@ export function StudentUteProfileGradeView({
   return (
     <div className="w-full bg-muted/30 text-foreground rounded-xl border border-border shadow-xs overflow-hidden mb-8 font-sans">
       {/* 1. Official UTE Header Ribbon */}
-      <div className="relative flex items-center bg-[#0d509d] text-white px-5 py-2.5 shadow-xs">
+      <div className="relative flex items-center bg-primary text-primary-foreground px-5 py-2.5 shadow-xs">
         <div className="flex items-center gap-2 font-extrabold text-sm uppercase tracking-wider">
-          <span className="inline-block w-2.5 h-2.5 bg-[#f59e0b] rounded-xs" />
+          <span className="inline-block w-2.5 h-2.5 bg-status-warning rounded-xs" />
           {card.ribbonTitle}
         </div>
         <div
-          className="absolute right-[-10px] top-0 bottom-0 w-4 bg-[#0d509d]"
+          className="absolute right-[-10px] top-0 bottom-0 w-4 bg-primary"
           style={{ clipPath: 'polygon(0 0, 100% 50%, 0 100%)' }}
         />
       </div>
@@ -196,7 +196,7 @@ export function StudentUteProfileGradeView({
           {/* Avatar card */}
           <div className="bg-card rounded-lg border border-border p-5 flex flex-col items-center justify-center shadow-2xs">
             <div className="relative mb-3">
-              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-[#0d509d]/30 bg-muted flex items-center justify-center shadow-inner">
+              <div className="w-28 h-28 rounded-full overflow-hidden border-2 border-primary/30 bg-muted flex items-center justify-center shadow-inner">
                 {avatarPreview || user?.avatar ? (
                   <img
                     src={avatarPreview || user?.avatar || ''}
@@ -215,8 +215,8 @@ export function StudentUteProfileGradeView({
             </h3>
             {isDemoUser(user) && (
               <div className="mt-1 flex justify-center">
-                <span className="inline-flex items-center gap-1 rounded bg-amber-500/15 border border-amber-500/30 px-2 py-0.5 text-[10.5px] font-medium text-amber-700 dark:text-amber-300">
-                  <span className="h-1.5 w-1.5 rounded-full bg-amber-500 animate-pulse" />
+                <span className="inline-flex items-center gap-1 rounded bg-status-warning/15 border border-status-warning/30 px-2 py-0.5 text-[10.5px] font-medium text-status-warning-foreground">
+                  <span className="h-1.5 w-1.5 rounded-full bg-status-warning animate-pulse" />
                   {locale === 'vi' ? 'Tài khoản demo để trải nghiệm' : 'Demo account'}
                 </span>
               </div>
@@ -231,7 +231,7 @@ export function StudentUteProfileGradeView({
             <button
               type="button"
               onClick={() => fileInputRef.current?.click()}
-              className="mt-2 inline-flex min-h-8 items-center text-xs text-[#0d509d] dark:text-sky-400 hover:underline font-medium cursor-pointer"
+              className="mt-2 inline-flex min-h-8 items-center text-xs text-primary hover:underline font-medium cursor-pointer"
             >
               {card.updatePhoto}
             </button>
@@ -264,12 +264,12 @@ export function StudentUteProfileGradeView({
                 <span className="sm:col-span-2 text-muted-foreground font-medium">{card.curriculum}</span>
                 <span className="sm:col-span-3 text-foreground">{studentInfo.curriculumName}</span>
               </div>
-              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5 bg-emerald-500/10 border-t border-emerald-500/20">
-                <span className="sm:col-span-2 text-emerald-700 dark:text-emerald-400 font-semibold flex items-center gap-1">
+              <div className="grid grid-cols-1 gap-0.5 sm:grid-cols-5 px-4 py-2.5 bg-status-success/10 border-t border-status-success/20">
+                <span className="sm:col-span-2 text-status-success-foreground font-semibold flex items-center gap-1">
                   <Award className="h-3.5 w-3.5 shrink-0" />
                   {card.fieldsConductPoints}
                 </span>
-                <span className="sm:col-span-3 font-semibold text-emerald-700 dark:text-emerald-400 flex items-center justify-between">
+                <span className="sm:col-span-3 font-semibold text-status-success-foreground flex items-center justify-between">
                   <span>{card.conductSeeRecord}</span>
                   <LocalizedLink href="/dashboard/conduct" className="inline-flex min-h-8 items-center text-[11px] hover:underline font-normal">{card.fieldsDetails}</LocalizedLink>
                 </span>
@@ -296,7 +296,7 @@ export function StudentUteProfileGradeView({
                   <select
                     value={selectedSemesterId || ''}
                     onChange={(e) => onSemesterChange?.(e.target.value)}
-                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-[#0d509d]"
+                    className="w-full bg-background border border-border rounded px-2 py-1 text-xs text-foreground focus:outline-none focus:ring-1 focus:ring-primary"
                   >
                     {availableSemesters.length > 0 ? (
                       availableSemesters.map((s) => (
@@ -327,7 +327,7 @@ export function StudentUteProfileGradeView({
                     onClick={() => setChartType('line')}
                     className={cn(
                       'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'line' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
+                      chartType === 'line' && 'text-primary bg-primary/10',
                     )}
                     title={card.chartLine}
                     aria-label={card.chartLine}
@@ -340,7 +340,7 @@ export function StudentUteProfileGradeView({
                     onClick={() => setChartType('bar')}
                     className={cn(
                       'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'bar' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
+                      chartType === 'bar' && 'text-primary bg-primary/10',
                     )}
                     title={card.chartBar}
                     aria-label={card.chartBar}
@@ -353,7 +353,7 @@ export function StudentUteProfileGradeView({
                     onClick={() => setChartType('combo')}
                     className={cn(
                       'p-1 rounded hover:bg-muted transition-colors',
-                      chartType === 'combo' && 'text-[#0d509d] dark:text-sky-400 bg-blue-500/10',
+                      chartType === 'combo' && 'text-primary bg-primary/10',
                     )}
                     title={card.chartCombo}
                     aria-label={card.chartCombo}
@@ -439,9 +439,8 @@ export function StudentUteProfileGradeView({
                             y={y}
                             width={barWidth}
                             height={barH}
-                            fill="#3b82f6"
                             rx="2"
-                            className="transition-all hover:fill-[#2563eb]"
+                            className="fill-status-info transition-all hover:opacity-80"
                           />
                           {/* Score on top of bar */}
                           <text
@@ -477,7 +476,7 @@ export function StudentUteProfileGradeView({
               {/* Legend Footer */}
               <div className="flex items-center justify-center gap-6 pt-2 border-t border-border/70 text-xs text-muted-foreground font-medium">
                 <div className="flex items-center gap-1.5">
-                  <span className="w-3 h-3 rounded bg-[#3b82f6] inline-block" />
+                  <span className="w-3 h-3 rounded bg-status-info inline-block" />
                   <span>{card.axisYourScore}</span>
                 </div>
               </div>
@@ -502,11 +501,11 @@ export function StudentUteProfileGradeView({
                 {/* Legend badges */}
                 <div className="flex items-center justify-center gap-4 text-xs font-semibold mb-2">
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-[#3b82f6] inline-block" />
+                    <span className="w-3 h-3 rounded-xs bg-status-info inline-block" />
                     <span className="text-muted-foreground">{card.earned}</span>
                   </div>
                   <div className="flex items-center gap-1.5">
-                    <span className="w-3 h-3 rounded-xs bg-[#84cc16] inline-block" />
+                    <span className="w-3 h-3 rounded-xs bg-status-success inline-block" />
                     <span className="text-muted-foreground">{card.remaining}</span>
                   </div>
                 </div>
@@ -516,10 +515,10 @@ export function StudentUteProfileGradeView({
               <div className="py-2">
                 {creditsKnown ? (
                   <svg width="160" height="160" viewBox="0 0 160 160">
-                    {/* Đã học Slice (Blue) */}
-                    <path d={earnedPath} fill="#3b82f6" className="stroke-card" strokeWidth="2" />
-                    {/* Còn lại Slice (Green) */}
-                    <path d={remainingPath} fill="#84cc16" className="stroke-card" strokeWidth="2" />
+                    {/* Đã học Slice (info) */}
+                    <path d={earnedPath} className="fill-status-info stroke-card" strokeWidth="2" />
+                    {/* Còn lại Slice (success) */}
+                    <path d={remainingPath} className="fill-status-success stroke-card" strokeWidth="2" />
                     {/* Center percentage badge */}
                     <circle cx="80" cy="80" r="28" className="fill-card" />
                     <text

@@ -80,12 +80,12 @@ function getMeetingShift(startTime: string, locale: string) {
   if (hour < 17) {
     return {
       label: locale === 'vi' ? 'Ca Chiều' : 'Afternoon',
-      tone: 'border-blue-500/25 bg-blue-500/10 text-blue-600 dark:text-blue-400',
+      tone: 'border-status-info/30 bg-status-info/10 text-status-info-foreground',
     };
   }
   return {
     label: locale === 'vi' ? 'Ca Tối' : 'Evening',
-    tone: 'border-purple-500/25 bg-purple-500/10 text-purple-600 dark:text-purple-400',
+    tone: 'border-status-neutral/30 bg-status-neutral/10 text-status-neutral-foreground',
   };
 }
 
@@ -542,7 +542,7 @@ export default function DashboardPage() {
               </div>
               {pendingCourses.length > 0 ? (
                 <div className="pt-0.5">
-                  <span className="inline-flex items-center gap-1.5 rounded-md border border-amber-500/20 bg-amber-500/10 px-2.5 py-1 text-xs font-semibold text-amber-600 dark:text-amber-400">
+                  <span className="inline-flex items-center gap-1.5 rounded-md border border-status-warning/30 bg-status-warning/10 px-2.5 py-1 text-xs font-semibold text-status-warning-foreground">
                     {copy.pendingBadge(formatNumber(pendingCourses.length))}
                   </span>
                 </div>
