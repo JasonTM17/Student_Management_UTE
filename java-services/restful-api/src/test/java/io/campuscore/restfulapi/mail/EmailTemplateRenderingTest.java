@@ -45,7 +45,7 @@ class EmailTemplateRenderingTest {
         vars.put("introMessage", "Dịch vụ gửi email SMTP qua Google Cloud Engine đã kết nối thành công.");
         vars.put("statusBadge", "● KẾT NỐI SMTP THÀNH CÔNG");
         vars.put("smtpProtocol", "Gmail SMTP (Port 587 - TLS)");
-        vars.put("senderEmail", "conbocuoi1721@gmail.com");
+        vars.put("senderEmail", "no-reply@campuscore.local");
         vars.put("timestamp", "09:00:00 15/09/2026");
         vars.put("actionUrl", "https://www.campusute.io.vn");
         vars.put("actionText", "Truy cập Cổng Đào tạo");
@@ -57,7 +57,7 @@ class EmailTemplateRenderingTest {
         assertTrue(html.contains("CampusUTE Academic"));
         assertTrue(html.contains("Nguyễn Tiến Sơn"));
         assertTrue(html.contains("KẾT NỐI SMTP THÀNH CÔNG"));
-        assertTrue(html.contains("conbocuoi1721@gmail.com"));
+        assertTrue(html.contains("no-reply@campuscore.local"));
         assertTrue(html.contains("TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KĨ THUẬT TP. HỒ CHÍ MINH") || html.contains("CÔNG NGHỆ KĨ THUẬT"));
     }
 

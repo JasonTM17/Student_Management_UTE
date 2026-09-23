@@ -13,7 +13,7 @@ import org.springframework.scheduling.annotation.EnableAsync;
 @ConfigurationProperties(prefix = "mail")
 public class MailConfig {
 
-    private String from = "conbocuoi1721@gmail.com";
+    private String from = "no-reply@campuscore.local";
     private String senderName = "CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM";
     private boolean enabled = true;
 

@@ -1155,6 +1155,15 @@ export const notificationsApi = {
       })),
     };
   },
+  // The inbox rows are a capped preview; the badge number must come from the
+  // server-side counter so it cannot truncate at the page size. The Java
+  // controller wraps it: UnreadCountResponse { unreadCount }.
+  unreadCount: async (): Promise<number> => {
+    const response = await api.get<{ unreadCount?: number }>(
+      '/notifications/my/unread-count',
+    );
+    return response.data.unreadCount ?? 0;
+  },
   markRead: async (id: string): Promise<ApiObject> => {
     const response = await api.patch<ApiObject>(
       `/notifications/my/${id}/read`,

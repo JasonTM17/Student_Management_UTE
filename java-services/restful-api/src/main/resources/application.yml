@@ -147,7 +147,7 @@ assistant:
     read-timeout-ms: ${ASSISTANT_SUPABASE_READ_TIMEOUT_MS:30000}
 
 mail:
-  from: ${MAIL_FROM:conbocuoi1721@gmail.com}
+  from: ${MAIL_FROM:no-reply@campuscore.local}
   sender-name: ${MAIL_SENDER_NAME:CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM}
   enabled: ${MAIL_ENABLED:true}
 
