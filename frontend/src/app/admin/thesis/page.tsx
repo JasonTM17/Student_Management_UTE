@@ -92,6 +92,7 @@ export default function AdminThesisPage() {
   // Council management state
   const [councils, setCouncils] = useState<ThesisCouncil[]>([]);
   const [lecturers, setLecturers] = useState<Lecturer[]>([]);
+  const [lecturerLoadError, setLecturerLoadError] = useState(false);
   const [showCreateCouncilModal, setShowCreateCouncilModal] = useState(false);
   const [councilNameInput, setCouncilNameInput] = useState('');
   const [targetRoundIdForCouncil, setTargetRoundIdForCouncil] = useState('');
@@ -122,6 +123,17 @@ export default function AdminThesisPage() {
     if (canAccess) void loadData();
   }, [canAccess, loadData]);
 
+  /** Council lecturer roster: a failure must surface with a retry, not an empty select. */
+  const loadLecturers = async () => {
+    try {
+      const res = await lecturersApi.getAll({ limit: 100 });
+      if (Array.isArray(res?.data)) setLecturers(res.data);
+      setLecturerLoadError(false);
+    } catch {
+      setLecturerLoadError(true);
+    }
+  };
+
   const loadRoundDetail = async (roundId: string) => {
     try {
       const [t, g, c] = await Promise.all([
@@ -133,12 +145,7 @@ export default function AdminThesisPage() {
       setGroups(g);
       setCouncils(c);
       if (lecturers.length === 0) {
-        try {
-          const res = await lecturersApi.getAll({ limit: 100 });
-          if (Array.isArray(res?.data)) setLecturers(res.data);
-        } catch {
-          // ignore lecturer list failure
-        }
+        await loadLecturers();
       }
     } catch {
       setError(messages.thesis.loadFailed);
@@ -908,6 +915,19 @@ export default function AdminThesisPage() {
                     })}
                   </select>
                 </label>
+                {lecturerLoadError ? (
+                  <div className="flex items-center justify-between gap-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning-foreground">
+                    <span>{messages.thesis.councils.lecturerLoadFailed}</span>
+                    <Button
+                      type="button"
+                      variant="outline"
+                      className="h-7 px-2 text-xs"
+                      onClick={() => void loadLecturers()}
+                    >
+                      {messages.common.actions.retry}
+                    </Button>
+                  </div>
+                ) : null}
                 <div className="flex justify-end gap-2 pt-2">
                   <Button type="button" variant="outline" onClick={() => setShowAddMemberModal(false)}>
                     {messages.common.actions.cancel}
