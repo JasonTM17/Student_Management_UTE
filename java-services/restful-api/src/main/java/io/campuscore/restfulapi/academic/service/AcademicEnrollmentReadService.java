@@ -214,12 +214,20 @@ public class AcademicEnrollmentReadService {
     @Transactional(readOnly = true)
     public List<GradeItemResponse> findGradeItemsBySection(String sectionId, List<String> roles, String lecturerId) {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
-        List<GradeItemRow> rows = isAdmin(roles)
-                ? academic.findGradeItemsBySection(normalizedSectionId)
-                : academic.findGradeItemsBySectionAndLecturer(
-                        normalizedSectionId,
-                        requireProfileId("lecturerId", lecturerId));
-        return rows.stream()
+        if (isAdmin(roles)) {
+            return academic.findGradeItemsBySection(normalizedSectionId).stream()
+                    .map(AcademicEnrollmentReadService::gradeItem)
+                    .toList();
+        }
+        // Round-11: a section the caller does not own used to answer a silent
+        // empty list while the sibling grades endpoints raise 403
+        // SECTION_FORBIDDEN; align the read with the domain contract.
+        String profileId = requireProfileId("lecturerId", lecturerId);
+        if (!academic.lecturerOwnsSection(normalizedSectionId, profileId)) {
+            throw new io.campuscore.restfulapi.web.DomainException(
+                    HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
+        }
+        return academic.findGradeItemsBySectionAndLecturer(normalizedSectionId, profileId).stream()
                 .map(AcademicEnrollmentReadService::gradeItem)
                 .toList();
     }
@@ -234,12 +242,17 @@ public class AcademicEnrollmentReadService {
     @Transactional(readOnly = true)
     public List<StudentGradeSectionRow> findStudentGradesBySection(String sectionId, List<String> roles, String lecturerId) {
         String normalizedSectionId = normalizeRequired("sectionId", sectionId);
-        List<StudentGradeRow> rows = isAdmin(roles)
-                ? academic.findStudentGradesBySection(normalizedSectionId)
-                : academic.findStudentGradesBySectionAndLecturer(
-                        normalizedSectionId,
-                        requireProfileId("lecturerId", lecturerId));
-        return studentGradeRows(rows);
+        if (isAdmin(roles)) {
+            return studentGradeRows(academic.findStudentGradesBySection(normalizedSectionId));
+        }
+        // Same round-11 alignment as the grade-items read: a section the
+        // caller does not own is 403 SECTION_FORBIDDEN, not a silent [].
+        String profileId = requireProfileId("lecturerId", lecturerId);
+        if (!academic.lecturerOwnsSection(normalizedSectionId, profileId)) {
+            throw new io.campuscore.restfulapi.web.DomainException(
+                    HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
+        }
+        return studentGradeRows(academic.findStudentGradesBySectionAndLecturer(normalizedSectionId, profileId));
     }
 
     @Transactional(readOnly = true)

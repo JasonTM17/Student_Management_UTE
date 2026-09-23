@@ -138,6 +138,20 @@ public class AcademicEnrollmentReadRepository {
                 AcademicEnrollmentReadRepository::mapGradeItem);
     }
 
+    /**
+     * Round-11: the grade-items read used to answer a silent empty list for a
+     * section the caller does not own, while the sibling grades read/write
+     * endpoints raise 403 SECTION_FORBIDDEN. Ownership must be checkable so
+     * all section-scoped reads agree.
+     */
+    public boolean lecturerOwnsSection(String sectionId, String lecturerId) {
+        Long count = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Section\" WHERE \"id\" = :sectionId AND \"lecturerId\" = :lecturerId",
+                new MapSqlParameterSource().addValue("sectionId", sectionId).addValue("lecturerId", lecturerId),
+                Long.class);
+        return count != null && count > 0;
+    }
+
     public List<StudentGradeRow> findStudentGradesByLecturer(String lecturerId, String sectionId) {
         MapSqlParameterSource parameters = new MapSqlParameterSource("lecturerId", lecturerId);
         String sectionFilter = "";

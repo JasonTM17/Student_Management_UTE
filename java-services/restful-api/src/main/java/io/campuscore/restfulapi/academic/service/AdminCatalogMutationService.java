@@ -112,15 +112,21 @@ public class AdminCatalogMutationService {
             throw problem(HttpStatus.BAD_REQUEST, "INVALID_CAPACITY", "Classroom capacity must be at least 1");
         }
         String type = text(input, "type", "LECTURE");
+        // isActive is part of the classroom contract: an explicit false must
+        // persist instead of falling back to the column default of TRUE.
+        Boolean isActive = input.containsKey("isActive") && input.get("isActive") != null
+                ? Boolean.parseBoolean(input.get("isActive").toString())
+                : Boolean.TRUE;
         jdbc.update(
                 "INSERT INTO " + CLASSROOM
-                        + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\", \"createdAt\", \"updatedAt\")"
-                        + " VALUES (:id, :building, :roomNumber, :capacity, :type, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
+                        + " (\"id\", \"building\", \"roomNumber\", \"capacity\", \"type\", \"isActive\", \"createdAt\", \"updatedAt\")"
+                        + " VALUES (:id, :building, :roomNumber, :capacity, :type, :isActive, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)",
                 params(input, id)
                         .addValue("building", building)
                         .addValue("roomNumber", roomNumber)
                         .addValue("capacity", capacity)
-                        .addValue("type", type));
+                        .addValue("type", type)
+                        .addValue("isActive", isActive));
         return get(CLASSROOM, id);
     }
 
@@ -154,7 +160,13 @@ public class AdminCatalogMutationService {
                         + " VALUES (:id, :name, :nameEn, :nameVi, :type, :academicYearId,"
                         + " COALESCE(CAST(:startDate AS TIMESTAMP WITH TIME ZONE), :startFallback),"
                         + " COALESCE(CAST(:endDate AS TIMESTAMP WITH TIME ZONE), :endFallback),"
-                        + " :registrationStart, :registrationEnd, :status)",
+                        // The registration window needs the same explicit cast as
+                        // the main range: an untyped VARCHAR parameter reaches
+                        // Postgres as character varying and the INSERT dies with
+                        // "column ... is of type timestamp with time zone but
+                        // expression is of type character varying" (a live 500).
+                        + " CAST(:registrationStart AS TIMESTAMP WITH TIME ZONE),"
+                        + " CAST(:registrationEnd AS TIMESTAMP WITH TIME ZONE), :status)",
                 params(input, id)
                         .addValue("type", text(input, "type", "FIRST"))
                         .addValue("academicYearId", academicYearId)
