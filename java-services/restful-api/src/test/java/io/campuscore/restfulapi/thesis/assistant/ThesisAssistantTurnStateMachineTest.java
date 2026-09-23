@@ -197,6 +197,29 @@ class ThesisAssistantTurnStateMachineTest {
                 .compareTo(java.time.Instant.parse(page.get(1).get("createdAt").asText())) <= 0);
     }
 
+    @Test
+    void foreignConversationMessagesReadAnswers404LikeDelete() throws Exception {
+        String owner = "d4b-owner-" + UUID.randomUUID();
+        String other = "d4b-other-" + UUID.randomUUID();
+        UUID key = UUID.randomUUID();
+        JsonNode result = mapper.readTree(mvc.perform(post("/api/v1/thesis/assistant/chat").with(student(owner))
+                        .contentType("application/json").content(body("How do I choose a thesis topic?", key)))
+                .andExpect(status().isOk()).andReturn().getResponse().getContentAsString());
+        UUID conversationId = UUID.fromString(result.get("conversationId").asText());
+
+        // The messages read used to answer 200 [] for a conversation the caller
+        // does not own (the page query silently filters on owner) while DELETE
+        // on the same id answered 404. Both verbs now agree on 404.
+        mvc.perform(get("/api/v1/thesis/assistant/conversations/{id}/messages", conversationId).with(student(other)))
+                .andExpect(status().isNotFound())
+                .andExpect(jsonPath("$.code").value("CONVERSATION_NOT_FOUND"));
+        mvc.perform(delete("/api/v1/thesis/assistant/conversations/{id}", conversationId).with(student(other)))
+                .andExpect(status().isNotFound());
+        // The owner still reads their own conversation.
+        mvc.perform(get("/api/v1/thesis/assistant/conversations/{id}/messages", conversationId).with(student(owner)))
+                .andExpect(status().isOk());
+    }
+
     private static String body(String message, UUID key) {
         return "{\"message\":\"" + message.replace("\"", "\\\"") + "\",\"locale\":\"en\",\"clientRequestId\":\"" + key + "\"}";
     }

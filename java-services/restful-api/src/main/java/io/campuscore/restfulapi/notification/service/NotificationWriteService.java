@@ -74,6 +74,11 @@ public class NotificationWriteService {
     public DeleteNotificationResponse deleteMyNotification(String userId, String notificationId) {
         requireSubject(userId);
         requireText(notificationId, "notification id");
+        // Round-11 honesty split: a notification that does not exist is a 404;
+        // only one that exists but belongs to someone else is a 403.
+        if (notifications.findById(notificationId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
+        }
         if (notifications.findOwned(userId, notificationId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete this notification");
         }
