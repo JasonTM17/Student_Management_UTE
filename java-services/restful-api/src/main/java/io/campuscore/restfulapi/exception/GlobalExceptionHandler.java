@@ -13,6 +13,7 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.http.converter.HttpMessageNotReadableException;
 import org.springframework.security.access.AccessDeniedException;
 import org.springframework.security.core.AuthenticationException;
+import org.springframework.web.HttpMediaTypeNotSupportedException;
 import org.springframework.web.HttpRequestMethodNotSupportedException;
 import org.springframework.web.bind.MethodArgumentNotValidException;
 import org.springframework.web.bind.MissingServletRequestParameterException;
@@ -133,6 +134,39 @@ public class GlobalExceptionHandler {
                 HttpStatus.METHOD_NOT_ALLOWED,
                 "METHOD_NOT_ALLOWED",
                 "Request method is not supported for this resource",
+                request,
+                Map.of());
+    }
+
+    /**
+     * WS-Security round-11: a JSON body endpoint hit with a non-JSON content
+     * type used to fall through to the 500 catch-all. A wrong media type is a
+     * client mistake: answer 415 with the standard envelope, never a 5xx.
+     */
+    @ExceptionHandler(HttpMediaTypeNotSupportedException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotSupported(
+            HttpMediaTypeNotSupportedException exception, HttpServletRequest request) {
+        return buildErrorResponse(
+                HttpStatus.UNSUPPORTED_MEDIA_TYPE,
+                "UNSUPPORTED_MEDIA_TYPE",
+                "Request content type is not supported",
+                request,
+                Map.of());
+    }
+
+    /**
+     * WS-Admin round-11: an Accept header the endpoint cannot honour (for
+     * example JSON on the HTML mail preview) used to fall through to the 500
+     * catch-all via HttpMediaTypeNotAcceptableException. An unacceptable
+     * Accept is a client mistake: answer 406 with the standard envelope.
+     */
+    @ExceptionHandler(org.springframework.web.HttpMediaTypeNotAcceptableException.class)
+    public ResponseEntity<ErrorResponse> handleMediaTypeNotAcceptable(
+            org.springframework.web.HttpMediaTypeNotAcceptableException exception, HttpServletRequest request) {
+        return buildErrorResponse(
+                HttpStatus.NOT_ACCEPTABLE,
+                "NOT_ACCEPTABLE",
+                "No acceptable representation for the requested Accept header",
                 request,
                 Map.of());
     }

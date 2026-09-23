@@ -146,6 +146,20 @@ public class SecurityConfig {
                         // controller's administrator-only @PreAuthorize.
                         .requestMatchers(HttpMethod.GET, "/api/v1/site-appearance")
                         .permitAll()
+                        // Admin-only mutation surfaces deny wrong roles at the
+                        // URL level, so a request that also fails bean
+                        // validation is answered 403 ACCESS_DENIED instead of
+                        // leaking the validation contract (400) to a caller
+                        // who was never allowed to write here. The controllers'
+                        // @PreAuthorize guards stay as defense in depth.
+                        .requestMatchers(HttpMethod.POST, "/api/v1/users/**", "/api/v1/admin/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PUT, "/api/v1/users/**", "/api/v1/admin/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.PATCH, "/api/v1/users/**", "/api/v1/admin/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
+                        .requestMatchers(HttpMethod.DELETE, "/api/v1/users/**", "/api/v1/admin/**")
+                        .hasAnyRole("ADMIN", "SUPER_ADMIN")
                         .anyRequest()
                         .authenticated())
                 .exceptionHandling(exceptions -> exceptions
