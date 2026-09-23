@@ -116,6 +116,11 @@ scratch/tools/gitleaks.exe git --log-opts='origin/main..HEAD' --no-banner
 *Mỗi fix kèm guard test riêng; tại mọi bước: full FE suite 362–364 tests / 0 fail, `tsc` sạch,
 `npm run build` xanh.*
 
+**Nguồn gốc thiết kế composer (kỷ luật Stitch):** input prompt + screenshot được lưu tĩnh tại
+`plans/2026-09-23-round7-feature-e2e/reports/stitch-composer-prompt.txt` và `stitch-composer-screen.png`;
+trang được tái hiện bằng primitives của repo (AdminFrame/Card/AdminFormField/status tokens) — markup
+Stitch không được paste; các phần trang trí không map được token đã bị loại.
+
 ### 8.2 Bằng chứng sweep sạch (release evidence)
 
 Contract sweep — bằng chứng release cho chu kỳ tới: FE→BE **0 cuộc gọi hỏng, 0 lệch tham số** trên
