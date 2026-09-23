@@ -14,6 +14,7 @@ import {
 } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
+import { statusToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
@@ -87,7 +88,7 @@ const accentForCourse = (_courseCode?: string): string => UNIFIED_COURSE_ACCENT;
 
 export default function SchedulePage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
-  const { locale, formatNumber } = useI18n();
+  const { locale, formatNumber, messages } = useI18n();
   const [enrollments, setEnrollments] = useState<Enrollment[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
@@ -507,7 +508,7 @@ export default function SchedulePage() {
                 </span>
                 <span>•</span>
                 <span className="flex items-center gap-1.5">
-                  <Clock className="h-4 w-4 text-emerald-600 dark:text-emerald-400" />
+                  <Clock className="h-4 w-4 text-status-success-foreground" />
                   <strong className="text-foreground">{agenda.length}</strong> {copy.totalMeetings}
                 </span>
                 <span>•</span>
@@ -940,7 +941,90 @@ export default function SchedulePage() {
                 </div>
               </CardHeader>
               <CardContent className="p-0">
-                <div className="overflow-x-auto">
+                {/* Mobile cards: the 10-column table is unusable below md, so
+                    the list view gets its own compact twin, mirroring the
+                    weekly grid's stacked fallback. */}
+                <div className="space-y-2.5 p-3 md:hidden">
+                  {agenda.map((item) => {
+                    const dayName = locale === 'vi' ? DAY_LABELS_VI[item.dayOfWeek] : DAY_LABELS_EN[item.dayOfWeek];
+                    const isToday = item.dayOfWeek === todayDow;
+                    const statusLabel = item.status
+                      ? messages.common.statuses[item.status as keyof typeof messages.common.statuses] ??
+                        item.status
+                      : null;
+                    const statusTone =
+                      item.status === 'PENDING'
+                        ? 'warning'
+                        : item.status === 'COMPLETED'
+                        ? 'neutral'
+                        : 'success';
+                    return (
+                      <div
+                        key={`list-card-${item.id}`}
+                        onClick={() => setSelectedDetail(item)}
+                        className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer ${accentForCourse(
+                          item.courseCode,
+                        )}`}
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="inline-flex items-center gap-1.5 text-[11px] font-bold text-muted-foreground">
+                            <CalendarDays className="h-3 w-3 text-primary" />
+                            <span className={isToday ? 'text-primary' : 'text-foreground'}>{dayName}</span>
+                            <span className="font-mono font-semibold text-foreground">
+                              {item.startTime} - {item.endTime}
+                            </span>
+                          </span>
+                          {statusLabel ? (
+                            <span
+                              className={`shrink-0 rounded-md px-2 py-0.5 text-[10px] font-bold ${statusToneClass(statusTone)}`}
+                            >
+                              {statusLabel}
+                            </span>
+                          ) : null}
+                        </div>
+                        <div className="mt-1.5 flex items-center justify-between gap-2">
+                          <span className="font-mono font-bold">{item.courseCode}</span>
+                          <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
+                            {copy.sectionPrefix} {item.sectionNumber}
+                          </span>
+                        </div>
+                        <div className="mt-1 font-semibold text-foreground text-xs">
+                          {getLocalizedCourseLabel(
+                            locale,
+                            {
+                              code: item.courseCode,
+                              name: item.courseName,
+                              nameEn: item.courseNameEn,
+                              nameVi: item.courseNameVi,
+                            },
+                            item.courseName,
+                          )}
+                        </div>
+                        <div className="mt-2 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11px] text-muted-foreground">
+                          {item.roomNumber ? (
+                            <span className="inline-flex items-center gap-1 font-medium text-foreground">
+                              <MapPin className="h-3 w-3" />
+                              {item.building ? `${item.building}-` : ''}
+                              {item.roomNumber}
+                            </span>
+                          ) : (
+                            <span className="inline-flex items-center gap-1 italic">
+                              <MapPin className="h-3 w-3" />
+                              {copy.roomPending}
+                            </span>
+                          )}
+                          {item.lecturerName ? (
+                            <span className="inline-flex min-w-0 items-center gap-1">
+                              <GraduationCap className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{item.lecturerName}</span>
+                            </span>
+                          ) : null}
+                        </div>
+                      </div>
+                    );
+                  })}
+                </div>
+                <div className="hidden overflow-x-auto md:block">
                   <table className="w-full text-left text-xs border-collapse">
                     <thead>
                       <tr className="border-b border-border/80 bg-secondary/50 font-bold text-muted-foreground uppercase tracking-wider text-[11px]">

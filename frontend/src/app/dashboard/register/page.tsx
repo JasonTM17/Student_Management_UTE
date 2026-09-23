@@ -576,7 +576,7 @@ export default function RegisterPage() {
                         >
                           {seats > 0 ? `${formatNumber(seats)} ${copy.seatsLeft}` : copy.full}
                         </p>
-                        <div className="mt-4 flex justify-end">
+                        <div className="mt-4 flex flex-col items-end gap-1">
                           {enrollment ? (
                             <Button
                               type="button"
@@ -592,26 +592,43 @@ export default function RegisterPage() {
                             const willExceedLimit = totalRegisteredCredits + (section.credits ?? 0) > creditLimit;
                             const isConflict = Boolean(section.scheduleConflict);
                             const alreadyHasCourse = enrolledCourseIds.has(section.courseId);
-                            const isDisabled = !roundOpen || seats === 0 || pending === section.id || section.status !== 'OPEN' || willExceedLimit || isConflict || alreadyHasCourse;
+                            const isFull = seats === 0;
+                            const isSectionClosed = section.status !== 'OPEN';
+                            const isDisabled = !roundOpen || isFull || pending === section.id || isSectionClosed || willExceedLimit || isConflict || alreadyHasCourse;
                             const disabledTitle = willExceedLimit
                               ? copy.creditLimitExceeded.replace('{limit}', String(creditLimit))
                               : isConflict
                                 ? copy.scheduleConflictTooltip
                                 : alreadyHasCourse
                                   ? copy.duplicateCourseTooltip
-                                  : undefined;
+                                  : isSectionClosed
+                                    ? messages.common.campusErrors.codes.SECTION_CLOSED
+                                    : isFull
+                                      ? copy.full
+                                      : undefined;
+                            // A hover title is invisible on touch, and a
+                            // missing one leaves the button silently dead.
+                            // State the same reason as a visible hint under
+                            // the button whenever it is disabled for cause.
                             return (
-                              <Button
-                                type="button"
-                                size="sm"
-                                variant="registration"
-                                onClick={() => void register(section.id)}
-                                disabled={isDisabled}
-                                title={disabledTitle}
-                              >
-                                <UserPlus className="mr-2 h-4 w-4" />
-                                {pending === section.id ? copy.working : copy.register}
-                              </Button>
+                              <>
+                                <Button
+                                  type="button"
+                                  size="sm"
+                                  variant="registration"
+                                  onClick={() => void register(section.id)}
+                                  disabled={isDisabled}
+                                  title={disabledTitle}
+                                >
+                                  <UserPlus className="mr-2 h-4 w-4" />
+                                  {pending === section.id ? copy.working : copy.register}
+                                </Button>
+                                {isDisabled && disabledTitle ? (
+                                  <p className="max-w-xs text-right text-[11px] leading-4 text-muted-foreground">
+                                    {disabledTitle}
+                                  </p>
+                                ) : null}
+                              </>
                             );
                           })()}
                         </div>
@@ -642,7 +659,7 @@ export default function RegisterPage() {
                 <div
                   className={`h-full transition-all duration-300 ${
                     totalRegisteredCredits >= creditLimit
-                      ? 'bg-amber-500'
+                      ? 'bg-status-warning'
                       : 'bg-primary'
                   }`}
                   style={{ width: `${Math.min(100, (totalRegisteredCredits / creditLimit) * 100)}%` }}
