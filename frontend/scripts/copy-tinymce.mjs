@@ -18,6 +18,19 @@ function copyDir(from, to) {
 
 if (fs.existsSync(srcDir)) {
   copyDir(srcDir, destDir);
+  // TinyMCE 8 autosave may see an editor during route teardown before its DOM
+  // has finished initializing. Its global BeforeUnload handler then calls
+  // editor.dom.isEmpty and crashes. Keep draft saving for initialized editors.
+  const autosavePath = path.join(destDir, 'plugins', 'autosave', 'plugin.min.js');
+  const autosave = fs.readFileSync(autosavePath, 'utf8');
+  const unsafeCheck = 'if(o(e))return t.dom.isEmpty(t.getBody());';
+  if (autosave.split(unsafeCheck).length !== 2) {
+    throw new Error('TinyMCE autosave guard needs review for this vendor version');
+  }
+  fs.writeFileSync(autosavePath, autosave.replace(
+    unsafeCheck,
+    'if(!t.dom||!t.getBody())return!0;if(o(e))return t.dom.isEmpty(t.getBody());',
+  ));
   console.log('[copy-tinymce] Successfully copied TinyMCE assets to public/tinymce');
 } else {
   console.warn('[copy-tinymce] node_modules/tinymce not found, skipping copy.');
