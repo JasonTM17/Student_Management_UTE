@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useRef, useState, type KeyboardEvent } from 'react';
 import { useParams, useRouter } from 'next/navigation';
-import { CheckCircle, FileText, Save, Send, Users } from 'lucide-react';
+import { CheckCircle, Download, FileText, Printer, Save, Send, Users } from 'lucide-react';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { metricToneClass } from '@/components/ui/status';
@@ -25,6 +25,12 @@ import { UnsavedChangesConfirmDialog } from '@/components/ui/unsaved-changes-con
 import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { useI18n } from '@/i18n';
 import { campusErrorMessage } from '@/lib/campus-error';
+import {
+  calculateGrade,
+  computeGradeSummary,
+  downloadCsvFile,
+  generateGradeCsv,
+} from '@/lib/grade-export';
 import { toast } from 'sonner';
 
 type GradeUpdate = {
@@ -35,19 +41,6 @@ type GradeUpdate = {
 
 function hasCompletedGrade(update: GradeUpdate | undefined) {
   return Boolean(update && update.processScore !== null && update.finalExamScore !== null);
-}
-
-// Standard Vietnamese university credit grading scale (Thang điểm 10 -> Chữ theo quy chế Bộ GD&ĐT & UTE)
-function calculateGrade(score: number) {
-  if (score >= 9.0) return 'A+';
-  if (score >= 8.5) return 'A';
-  if (score >= 8.0) return 'B+';
-  if (score >= 7.0) return 'B';
-  if (score >= 6.5) return 'C+';
-  if (score >= 5.5) return 'C';
-  if (score >= 5.0) return 'D+';
-  if (score >= 4.0) return 'D';
-  return 'F';
 }
 
 // Score drafts stay strings until commit so "9." and empty inputs survive
@@ -110,6 +103,21 @@ export default function SectionGradingPage() {
     [locale, sectionData],
   );
 
+  const semesterDisplayName = useMemo(() => {
+    if (!sectionData) return '';
+    return locale === 'vi'
+      ? (sectionData.semesterNameVi || sectionData.semester || 'Học kỳ hiện tại')
+      : (sectionData.semesterNameEn || sectionData.semester || 'Current term');
+  }, [locale, sectionData]);
+
+  const lecturerDisplayName = useMemo(() => {
+    if (sectionData?.lecturerName) return sectionData.lecturerName;
+    if (user?.lastName || user?.firstName) {
+      return [user.lastName, user.firstName].filter(Boolean).join(' ');
+    }
+    return locale === 'vi' ? 'Ban Giảng viên' : 'Faculty';
+  }, [locale, sectionData?.lecturerName, user]);
+
   const copy =
     locale === 'vi'
       ? {
@@ -170,6 +178,17 @@ export default function SectionGradingPage() {
           draftStatus: 'Bản nháp',
           sectionPrefix: 'Lớp',
           unavailableTitle: 'Lớp học phần chưa sẵn sàng',
+          exportCsv: 'Xuất CSV',
+          exportCsvSuccess: 'Đã xuất bảng điểm CSV thành công.',
+          printRoster: 'In bảng điểm',
+          printOfficialHeader: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH — CAMPUSCORE',
+          printDepartment: 'KHOA CÔNG NGHỆ THÔNG TIN',
+          printReportTitle: 'BẢNG ĐIỂM TỔNG KẾT HỌC PHẦN',
+          printInstructorSignature: 'GIẢNG VIÊN CHẤM ĐIỂM',
+          printDepartmentHeadSignature: 'TRƯỞNG BỘ MÔN DUYỆT',
+          printSignatureNotice: '(Ký và ghi rõ họ tên)',
+          printPassRate: 'Tỷ lệ đạt',
+          printAverageScore: 'Điểm TB',
         }
       : {
           eyebrow: 'Lecturer area',
@@ -229,6 +248,17 @@ export default function SectionGradingPage() {
           draftStatus: 'Draft',
           sectionPrefix: 'Class',
           unavailableTitle: 'Class grades unavailable',
+          exportCsv: 'Export CSV',
+          exportCsvSuccess: 'Grade roster CSV exported successfully.',
+          printRoster: 'Print grade sheet',
+          printOfficialHeader: 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING — CAMPUSCORE',
+          printDepartment: 'FACULTY OF INFORMATION TECHNOLOGY',
+          printReportTitle: 'COURSE SECTION FINAL GRADE ROSTER',
+          printInstructorSignature: 'COURSE INSTRUCTOR',
+          printDepartmentHeadSignature: 'DEPARTMENT HEAD',
+          printSignatureNotice: '(Signature and full name)',
+          printPassRate: 'Pass rate',
+          printAverageScore: 'Average',
         };
 
   const statusLabel = (status: string | null | undefined) =>
@@ -543,6 +573,81 @@ export default function SectionGradingPage() {
     }
   };
 
+  const gradeSummary = useMemo(() => {
+    if (!sectionData) {
+      return {
+        totalStudents: 0,
+        gradedCount: 0,
+        ungradedCount: 0,
+        passedCount: 0,
+        failedCount: 0,
+        passRate: 0,
+        averageScore: null,
+        counts: { 'A+': 0, A: 0, 'B+': 0, B: 0, 'C+': 0, C: 0, 'D+': 0, D: 0, F: 0 },
+      };
+    }
+    const studentList = sectionData.enrollments.map((enrollment) => {
+      const update = grades.get(enrollment.id);
+      const proc = update?.processScore ?? enrollment.processScore ?? null;
+      const final = update?.finalExamScore ?? enrollment.finalExamScore ?? null;
+      const total = totalScore({ enrollmentId: enrollment.id, processScore: proc, finalExamScore: final });
+      return {
+        studentId: enrollment.id,
+        studentCode: enrollment.studentCode,
+        studentName: enrollment.studentName,
+        processScore: proc,
+        finalExamScore: final,
+        totalScore: total,
+        letterGrade: total !== null ? calculateGrade(total) : null,
+      };
+    });
+    return computeGradeSummary(studentList);
+  }, [grades, sectionData]);
+
+  const handleExportCsv = () => {
+    if (!sectionData) {
+      return;
+    }
+
+    const exportStudents = sectionData.enrollments.map((enrollment) => {
+      const update = grades.get(enrollment.id);
+      const proc = update?.processScore ?? enrollment.processScore ?? null;
+      const final = update?.finalExamScore ?? enrollment.finalExamScore ?? null;
+      const total = totalScore({ enrollmentId: enrollment.id, processScore: proc, finalExamScore: final });
+      return {
+        studentId: enrollment.id,
+        studentCode: enrollment.studentCode,
+        studentName: formatVietnameseName(enrollment.studentName),
+        email: enrollment.email,
+        processScore: proc,
+        finalExamScore: final,
+        totalScore: total,
+        letterGrade: total !== null ? calculateGrade(total) : null,
+        gradeStatus: enrollment.gradeStatus,
+      };
+    });
+
+    const filename = `Bang_diem_${sectionData.courseCode}_Lop_${sectionData.sectionNumber}_${new Date().toISOString().slice(0, 10)}.csv`;
+    const csvContent = generateGradeCsv({
+      sectionNumber: sectionData.sectionNumber,
+      courseCode: sectionData.courseCode,
+      courseName: localizedCourseName,
+      semesterName: semesterDisplayName,
+      lecturerName: lecturerDisplayName,
+      students: exportStudents,
+      locale: locale as 'vi' | 'en',
+    });
+
+    downloadCsvFile(filename, csvContent);
+    toast.success(copy.exportCsvSuccess);
+  };
+
+  const handlePrintRoster = () => {
+    if (typeof window !== 'undefined') {
+      window.print();
+    }
+  };
+
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
   }
@@ -584,51 +689,71 @@ export default function SectionGradingPage() {
 
   return (
     <div className="space-y-8">
-      <PageHeader
-        eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
-        title={`${sectionData.courseCode} · ${copy.sectionPrefix} ${sectionData.sectionNumber}`}
-        description={copy.pageDescription(localizedCourseName)}
-        actions={
-          <div className="flex flex-wrap gap-3">
-            <LinkButton
-              href="/dashboard/lecturer/grades"
-              variant="outline"
-              aria-label={copy.backToGrades}
-              title={copy.backToGrades}
-              onClick={(event) => {
-                if (!hasChanges) return;
-                event.preventDefault();
-                requestLeave(() => router.push('/dashboard/lecturer/grades'));
-              }}
-            >
-              {copy.backToGrades}
-            </LinkButton>
-            <Button
-              type="button"
-              variant="outline"
-              disabled={!hasChanges || isSaving}
-              onClick={() => void handleSave()}
-            >
-              <Save className="mr-2 h-4 w-4" />
-              {isSaving
-                ? copy.savingGrades
-                : hasChanges
-                  ? `${copy.saveGrades} (${formatNumber(editedIds.size)})`
-                  : copy.saveGrades}
-            </Button>
-            <Button
-              type="button"
-              disabled={!allGraded || isPublishing}
-              onClick={() => void handlePublish()}
-            >
-              <Send className="mr-2 h-4 w-4" />
-              {isPublishing ? copy.publishingGrades : copy.publishGrades}
-            </Button>
-          </div>
-        }
-      />
+      <div className="print:hidden">
+        <PageHeader
+          eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
+          title={`${sectionData.courseCode} · ${copy.sectionPrefix} ${sectionData.sectionNumber}`}
+          description={copy.pageDescription(localizedCourseName)}
+          actions={
+            <div className="flex flex-wrap gap-3">
+              <LinkButton
+                href="/dashboard/lecturer/grades"
+                variant="outline"
+                aria-label={copy.backToGrades}
+                title={copy.backToGrades}
+                onClick={(event) => {
+                  if (!hasChanges) return;
+                  event.preventDefault();
+                  requestLeave(() => router.push('/dashboard/lecturer/grades'));
+                }}
+              >
+                {copy.backToGrades}
+              </LinkButton>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handleExportCsv}
+                disabled={!sectionData || sectionData.enrollments.length === 0}
+              >
+                <Download className="mr-2 h-4 w-4" />
+                {copy.exportCsv}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                onClick={handlePrintRoster}
+                disabled={!sectionData || sectionData.enrollments.length === 0}
+              >
+                <Printer className="mr-2 h-4 w-4" />
+                {copy.printRoster}
+              </Button>
+              <Button
+                type="button"
+                variant="outline"
+                disabled={!hasChanges || isSaving}
+                onClick={() => void handleSave()}
+              >
+                <Save className="mr-2 h-4 w-4" />
+                {isSaving
+                  ? copy.savingGrades
+                  : hasChanges
+                    ? `${copy.saveGrades} (${formatNumber(editedIds.size)})`
+                    : copy.saveGrades}
+              </Button>
+              <Button
+                type="button"
+                disabled={!allGraded || isPublishing}
+                onClick={() => void handlePublish()}
+              >
+                <Send className="mr-2 h-4 w-4" />
+                {isPublishing ? copy.publishingGrades : copy.publishGrades}
+              </Button>
+            </div>
+          }
+        />
+      </div>
 
-      <div className="grid gap-4 md:grid-cols-3">
+      <div className="grid gap-4 md:grid-cols-3 print:hidden">
         <Card variant="elevated">
           <CardContent className="flex items-center justify-between gap-4 pt-6">
             <div>
@@ -673,7 +798,7 @@ export default function SectionGradingPage() {
       </div>
 
       {!allGraded ? (
-        <Card variant="muted">
+        <Card variant="muted" className="print:hidden">
           <CardContent className="pt-6 text-sm leading-6 text-muted-foreground">
             {copy.publishWarning}
           </CardContent>
@@ -687,8 +812,8 @@ export default function SectionGradingPage() {
           description={copy.emptyDescription}
         />
       ) : (
-        <Card variant="muted">
-          <CardHeader>
+        <Card variant="muted" className="print:border-none print:shadow-none print:bg-transparent">
+          <CardHeader className="print:hidden">
             <div className="flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
               <CardTitle className="text-xl">{copy.tableTitle}</CardTitle>
               {isSaving ? null : (
@@ -704,9 +829,31 @@ export default function SectionGradingPage() {
               )}
             </div>
           </CardHeader>
-          <CardContent>
+          <CardContent className="print:p-0">
+            {/* Printable Official Institutional Header - Visible ONLY when printing */}
+            <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
+              <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
+                {copy.printOfficialHeader}
+              </div>
+              <div className="text-sm font-extrabold uppercase tracking-wide text-foreground">
+                {copy.printDepartment}
+              </div>
+              <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
+                {copy.printReportTitle}
+              </h1>
+              <div className="flex flex-wrap justify-center gap-6 mt-3 text-xs text-foreground font-medium">
+                <span><strong>{locale === 'vi' ? 'Lớp học phần:' : 'Section:'}</strong> {sectionData.sectionNumber}</span>
+                <span><strong>{locale === 'vi' ? 'Học phần:' : 'Course:'}</strong> {localizedCourseName} ({sectionData.courseCode})</span>
+                <span><strong>{locale === 'vi' ? 'Học kỳ:' : 'Semester:'}</strong> {semesterDisplayName}</span>
+                <span><strong>{locale === 'vi' ? 'Giảng viên:' : 'Instructor:'}</strong> {lecturerDisplayName}</span>
+                <span><strong>{copy.students}:</strong> {sectionData.enrollments.length}</span>
+                <span><strong>{copy.printPassRate}:</strong> {gradeSummary.passRate.toFixed(1)}%</span>
+                <span><strong>{copy.printAverageScore}:</strong> {gradeSummary.averageScore !== null ? gradeSummary.averageScore.toFixed(2) : '—'}</span>
+              </div>
+            </div>
+
             <div
-              className="space-y-3 md:hidden"
+              className="space-y-3 md:hidden print:hidden"
               role="list"
               aria-label={copy.tableTitle}
             >
@@ -784,17 +931,18 @@ export default function SectionGradingPage() {
                 );
               })}
             </div>
-            <div className="hidden overflow-x-auto md:block">
-              <table className="w-full min-w-[880px] table-fixed text-sm">
+            <div className="hidden overflow-x-auto md:block print:block">
+              <table className="w-full min-w-[880px] table-fixed text-sm print:min-w-0">
                 <thead>
-                  <tr className="border-b border-border/70 text-left text-muted-foreground">
-                    <th className="w-[21%] px-3 py-3.5 font-medium">{copy.headers.student}</th>
-                    <th className="w-[13%] px-3 py-3.5 font-medium">{copy.headers.studentId}</th>
-                    <th className="w-[13%] px-3 py-3.5 text-center font-medium">{copy.headers.processScore}</th>
-                    <th className="w-[13%] px-3 py-3.5 text-center font-medium">{copy.headers.finalExamScore}</th>
-                    <th className="w-[12%] px-3 py-3.5 text-center font-medium">{copy.headers.total}</th>
-                    <th className="w-[10%] px-3 py-3.5 text-center font-medium">{copy.headers.letter}</th>
-                    <th className="w-[18%] px-3 py-3.5 text-right font-medium">{copy.headers.status}</th>
+                  <tr className="border-b border-border/70 text-left text-muted-foreground print:text-foreground">
+                    <th className="w-[6%] px-2 py-3.5 text-center font-medium hidden print:table-cell">STT</th>
+                    <th className="w-[21%] px-3 py-3.5 font-medium print:w-[26%]">{copy.headers.student}</th>
+                    <th className="w-[13%] px-3 py-3.5 font-medium print:w-[16%]">{copy.headers.studentId}</th>
+                    <th className="w-[13%] px-3 py-3.5 text-center font-medium print:w-[14%]">{copy.headers.processScore}</th>
+                    <th className="w-[13%] px-3 py-3.5 text-center font-medium print:w-[14%]">{copy.headers.finalExamScore}</th>
+                    <th className="w-[12%] px-3 py-3.5 text-center font-medium print:w-[15%]">{copy.headers.total}</th>
+                    <th className="w-[10%] px-3 py-3.5 text-center font-medium print:w-[15%]">{copy.headers.letter}</th>
+                    <th className="w-[18%] px-3 py-3.5 text-right font-medium print:hidden">{copy.headers.status}</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-border/60">
@@ -812,29 +960,35 @@ export default function SectionGradingPage() {
                         key={enrollment.id}
                         className={
                           isDirtyRow
-                            ? 'border-l-2 border-l-[var(--portal-chrome-accent)] bg-status-warning/5 transition-colors hover:bg-muted/40'
+                            ? 'border-l-2 border-l-[var(--portal-chrome-accent)] bg-status-warning/5 transition-colors hover:bg-muted/40 print:border-l-0 print:bg-transparent'
                             : 'transition-colors hover:bg-muted/40'
                         }
                       >
+                        <td className="px-2 py-3 text-center hidden print:table-cell font-mono text-xs">
+                          {enrollmentIndex + 1}
+                        </td>
                         <td className="px-3 py-3.5">
                           <div className="flex items-center gap-1.5 font-medium text-foreground">
                             {isDirtyRow && (
                               <span
                                 aria-hidden="true"
-                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning"
+                                className="h-1.5 w-1.5 shrink-0 rounded-full bg-status-warning print:hidden"
                               />
                             )}
                             {formatVietnameseName(enrollment.studentName)}
                           </div>
-                          <div className="mt-1 truncate text-xs text-muted-foreground" title={enrollment.email ?? copy.unavailableEmail}>
+                          <div className="mt-1 truncate text-xs text-muted-foreground print:hidden" title={enrollment.email ?? copy.unavailableEmail}>
                             {enrollment.email ?? copy.unavailableEmail}
                           </div>
                         </td>
-                        <td className="px-3 py-3.5 text-muted-foreground">
+                        <td className="px-3 py-3.5 text-muted-foreground print:text-foreground font-mono">
                           {enrollment.studentCode}
                         </td>
                         <td className="px-3 py-3.5 text-center">
-                          <div className="mx-auto max-w-[96px]">
+                          <span className="hidden print:inline-block font-semibold text-foreground">
+                            {current.processScore !== null ? current.processScore.toFixed(1) : '—'}
+                          </span>
+                          <div className="mx-auto max-w-[96px] print:hidden">
                             <Input
                               type="number"
                               min="0"
@@ -853,7 +1007,10 @@ export default function SectionGradingPage() {
                           </div>
                         </td>
                         <td className="px-3 py-3.5 text-center">
-                          <div className="mx-auto max-w-[96px]">
+                          <span className="hidden print:inline-block font-semibold text-foreground">
+                            {current.finalExamScore !== null ? current.finalExamScore.toFixed(1) : '—'}
+                          </span>
+                          <div className="mx-auto max-w-[96px] print:hidden">
                             <Input type="number" min="0" max="10" step="0.1"
                               data-cell={`grade-${enrollment.id}:finalExamScore`}
                               value={current.finalExamScore ?? ''}
@@ -872,7 +1029,7 @@ export default function SectionGradingPage() {
                         <td className="px-3 py-3.5 text-center font-semibold text-foreground">
                           {totalScore(current) === null ? '—' : calculateGrade(totalScore(current)!)}
                         </td>
-                        <td className="px-3 py-3.5 text-right">
+                        <td className="px-3 py-3.5 text-right print:hidden">
                           <span className="rounded-md bg-secondary px-2.5 py-1 text-xs font-medium text-foreground">
                             {isPublished
                               ? copy.publishedStatus
@@ -884,6 +1041,37 @@ export default function SectionGradingPage() {
                   })}
                 </tbody>
               </table>
+            </div>
+
+            {/* Official Signature Block - Visible ONLY when printing */}
+            <div className="hidden print:grid grid-cols-2 mt-14 text-center">
+              <div className="space-y-16">
+                <p className="text-xs text-muted-foreground italic">
+                  &nbsp;
+                </p>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold uppercase text-foreground">{copy.printDepartmentHeadSignature}</p>
+                  <p className="text-xs text-muted-foreground italic">
+                    {copy.printSignatureNotice}
+                  </p>
+                </div>
+              </div>
+              <div className="space-y-16">
+                <p className="text-xs text-muted-foreground italic">
+                  {locale === 'vi'
+                    ? `TP. Hồ Chí Minh, ngày ${new Date().getDate()} tháng ${new Date().getMonth() + 1} năm ${new Date().getFullYear()}`
+                    : `Ho Chi Minh City, ${new Date().toLocaleDateString('en-US', { year: 'numeric', month: 'long', day: 'numeric' })}`}
+                </p>
+                <div className="space-y-1">
+                  <p className="text-sm font-bold uppercase text-foreground">{copy.printInstructorSignature}</p>
+                  <p className="text-xs text-muted-foreground italic">
+                    {copy.printSignatureNotice}
+                  </p>
+                  {lecturerDisplayName && (
+                    <p className="pt-10 text-sm font-semibold text-foreground">{lecturerDisplayName}</p>
+                  )}
+                </div>
+              </div>
             </div>
           </CardContent>
         </Card>
