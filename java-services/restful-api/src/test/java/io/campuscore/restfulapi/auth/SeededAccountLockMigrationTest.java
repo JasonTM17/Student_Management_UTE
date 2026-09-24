@@ -13,8 +13,13 @@ import org.springframework.test.context.TestPropertySource;
 
 /**
  * SEC-P0-1: every seeded demo account (README-documented credentials plus the
- * whole @campuscore.demo population) must end up LOCKED once V48 applies, so
- * a Flyway-initialized deployment never ships working documented logins.
+ * whole @campuscore.demo population) is LOCKED once V48 applies, so a
+ * Flyway-initialized deployment never ships working documented logins by
+ * default. V82 subsequently re-activates exactly the runbook-documented .demo
+ * subset (Four-Eyes approver + council examiners), and DemoAccountGate decides
+ * per environment whether that subset ends up ACTIVE (demo hosts) or is
+ * re-locked on every boot (public hosts, {@code DEMO_ACCOUNTS_ENABLED=false});
+ * {@code DemoAccountGateRunbookParityTest} pins that list parity.
  * Real accounts issued later with arbitrary emails must stay ACTIVE.
  */
 @SpringBootTest
