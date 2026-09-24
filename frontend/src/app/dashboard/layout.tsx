@@ -199,43 +199,36 @@ interface NotificationItem {
   id: string;
   title?: string;
   content?: string;
+  type?: string;
+  link?: string;
   isRead: boolean;
   createdAt: string;
 }
 
-function resolveNotificationTarget(
-  notification: { title?: string; content?: string },
-  isLecturer: boolean,
-): string {
-  const text = `${notification.title || ''} ${notification.content || ''}`.toLowerCase();
-  if (text.includes('luận văn') || text.includes('thesis') || text.includes('khóa luận') || text.includes('đề tài')) {
-    return '/dashboard/thesis';
+// Deep links resolve from the authored data, never from the title/body text:
+// the round-8 fix landed on the notifications center but not here, and the old
+// keyword matcher mis-routed on substring collisions ('thi' inside 'lịch thi'
+// opened the timetable, 'điểm' inside 'điểm rèn luyện' opened the transcript)
+// while silently discarding the link an admin broadcast was authored with.
+// Same contract as NotificationsCenterPage: authored link first, then the
+// feature types whose destination is unambiguous, then the notification center
+// itself for anything that would be a guess.
+const NOTIFICATION_TYPE_TARGETS: Record<string, string> = {
+  REGISTRATION: '/dashboard/register',
+  SCHEDULE: '/dashboard/schedule',
+};
+
+function resolveNotificationTarget(notification: {
+  type?: string;
+  link?: string;
+}): string {
+  const link = typeof notification.link === 'string' ? notification.link.trim() : '';
+  if (link) {
+    return link;
   }
-  if (text.includes('học bổng') || text.includes('scholarship') || text.includes('rèn luyện') || text.includes('đrl')) {
-    return '/dashboard/conduct';
-  }
-  // Grade-entry intent is checked before the registration/class branch: a notice
-  // like "Kỳ nhập điểm giữa kỳ đang mở — lớp học phần của bạn sẵn sàng nhập
-  // điểm" mentions both, and the class wording must not bury it on the portal
-  // home when a specific grading surface exists.
-  if (text.includes('nhập điểm') || text.includes('bảng điểm') || text.includes('transcript')) {
-    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
-  }
-  if (text.includes('đăng ký') || text.includes('tín chỉ') || text.includes('môn học') || text.includes('lớp học phần') || text.includes('registration')) {
-    // The registration and conduct pages are student-only; a lecturer clicking
-    // this notification used to be bounced off the portal entirely.
-    return isLecturer ? '/dashboard/lecturer' : '/dashboard/register';
-  }
-  if (text.includes('điểm') || text.includes('grade')) {
-    return isLecturer ? '/dashboard/lecturer/grades' : '/dashboard/transcript';
-  }
-  if (text.includes('thời khóa biểu') || text.includes('lịch') || text.includes('thi') || text.includes('schedule')) {
-    return isLecturer ? '/dashboard/lecturer/schedule' : '/dashboard/schedule';
-  }
-  if (text.includes('thông báo') || text.includes('announcement') || text.includes('công văn')) {
-    // A lecturer's announcement home is the lecturer feed; the shared feed is
-    // student/admin only and the shell would bounce a lecturer out of it.
-    return isLecturer ? '/dashboard/lecturer/announcements' : '/dashboard/announcements';
+  const byType = NOTIFICATION_TYPE_TARGETS[(notification.type || '').trim().toUpperCase()];
+  if (byType) {
+    return byType;
   }
   return '/dashboard/notifications';
 }
@@ -1107,7 +1100,7 @@ export default function DashboardLayout({
                       ) : (
                         <div className="space-y-2">
                           {notifications.map((notification) => {
-                            const targetUrl = resolveNotificationTarget(notification, isLecturer);
+                            const targetUrl = resolveNotificationTarget(notification);
                             return (
                               <button
                                 key={notification.id}
