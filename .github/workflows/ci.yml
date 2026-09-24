@@ -118,6 +118,23 @@ jobs:
       DEEPSEEK_API_KEY: ''
     steps:
       - uses: actions/checkout@v4
+        with:
+          # Full history so the immutable-migration guard can diff against
+          # origin/main (shallow clones make the merge-base diff empty).
+          fetch-depth: 0
+      - name: Flyway migrations are immutable once merged
+        shell: bash
+        run: |
+          edited="$(git diff --name-only origin/main...HEAD -- 'java-services/**/db/migration/*.sql' 'java-services/**/db/migration-h2/*.sql')"
+          if [ -n "$edited" ]; then
+            while IFS= read -r f; do
+              if git cat-file -e "origin/main:$f" 2>/dev/null; then
+                echo "IMMUTABLE migration edited: $f"
+                echo "Corrective changes are new forward migrations (V<n+1>); see db/migration/README.md."
+                exit 1
+              fi
+            done <<< "$edited"
+          fi
       - name: Validate Compose
         run: docker compose config
       - name: Secret hygiene
