@@ -449,7 +449,9 @@ export function AssistantPanel() {
           ? messages.assistant.sessionExpired
           : state.error === 'forbidden'
             ? messages.assistant.forbidden
-            : messages.assistant.unavailable;
+            : state.error === 'turn-in-progress'
+              ? messages.assistant.turnInProgress
+              : messages.assistant.unavailable;
 
   return (
     <>

@@ -25,8 +25,8 @@
   (ví dụ `created_by <> :actor` của four-eyes, `WHERE user_id` của notification) — bypass tầng trên
   vẫn bị tầng dưới chặn. Không tìm thấy đường đọc/ghi chéo nhóm đồ án cho sinh viên
   (`ThesisGroupSupervisorScopeTest`, `ThesisTopicVisibilityTest` giữ regression).
-- Lỗ hổng kiến trúc duy nhất tìm thấy (không phải lỗ hổng an ninh): **publish tri thức ≠ vào corpus RAG**
-  ở chế độ `sql` authority (mục 5.1).
+- Phát hiện ở baseline (23/09), đã được sửa và kiểm tra trong vòng 9: publish/archive tri thức ở
+  `sql` authority trước đây không cập nhật corpus RAG. Xem bằng chứng và ranh giới kiểm chứng ở mục 9.
 
 ## 3. Đã sửa vòng 7 (finding → commit → test chốt)
 
@@ -38,9 +38,9 @@
 
 ## 4. Hạn chế đã biết — nêu trung thực (không giấu)
 
-1. **Publish tri thức chưa tới được corpus RAG** ở local (mode `sql`): sync chỉ cấu hình cho Supabase và
-   đang DISABLED; `active_release` không rebuild sau publish ⇒ trợ lý khôngretrieve nội dung mới duyệt.
-   Four-eyes thì đúng, chuỗi publish→phục vụ còn thiếu một mắt xích (xem 5.1).
+1. **Đã khép ở vòng 9:** publish/archive tri thức local giờ chuyển con trỏ release bất biến trong cùng
+   transaction; kiểm thử PostgreSQL hai phiên đã xác nhận hai thứ tự đồng thời. Chưa suy rộng bằng chứng
+   này thành cutover Supabase production (xem ưu tiên 2 ở mục 9).
 2. **SUPER_ADMIN bị từ chối ở 6 service-layer thesis** dù `@PreAuthorize` cho qua (fail-closed, không rò
    quyền, nhưng console có nút bấm sẽ 403).
 3. **Chuyển trưởng nhóm chưa tồn tại**: nhóm có trưởng bất hoạt sẽ kẹt (chỉ admin cứu được thành viên/đề
@@ -54,7 +54,7 @@
 
 | # | Đề xuất | Vì sao | Effort | Giá trị bảo vệ |
 | --- | --- | --- | --- | --- |
-| 5.1 | **Rebuild knowledge release sau publish** (nút "rebuild runtime corpus" cho admin hoặc scheduled reconcile bỏ gate DISABLED khi mode=sql) | Four-eyes publish hiện không tới được trợ lý AI ở local; demo "duyệt xong hỏi lại được" sẽ rất ấn tượng | 0.5–1 ngày | Rất cao — khép vòng quản trị RAG |
+| 5.1 | **ĐÃ ĐÓNG ở vòng 9:** kích hoạt release tri thức bất biến sau publish/archive | Promotion cùng transaction và hai lịch publish/archive đồng thời đã được kiểm tra cục bộ; xem mục 9 để biết giới hạn môi trường đích | Đã thực hiện | Rất cao — khép vòng quản trị RAG |
 | 5.2 | **Leader transfer + self-leave** cho nhóm đồ án (endpoint + 2 nút UI) | Đóng lỗ hổng kẹt nhóm khi trưởng bỏ; quy trình thật có đổi trưởng | 0.5 ngày | Cao — vòng đời nhóm đầy đủ |
 | 5.3 | Đồng bộ enrollment tile với `distribution totals` (chọn 1 nguồn) | Provenance số liệu — cùng lớp bug a84d9aee đã sửa | 1–2 giờ | Trung bình |
 | 5.4 | Tách module thời khóa biểu trùng ~1000 dòng (giảng viên/sinh viên) | Maintainability; nguy cơ regress khi sửa 1 bên quên bên kia | 1–2 ngày + regression | Trung bình (chất lượng code) |
@@ -156,17 +156,20 @@ test riêng trong lịch sử git.*
 
 | Vấn đề | Kết quả |
 | --- | --- |
-| Bài viết tri thức SQL đã duyệt chưa đi vào release mà chatbot truy xuất; bài lưu trữ có thể còn trong kho phục vụ | Phát hành ảnh chụp release bất biến và chuyển con trỏ trong cùng transaction; Java regression qua. Với Supabase, cả hai thứ tự PUBLISH/ARCHIVE đồng thời đã qua thử nghiệm PostgreSQL hai phiên dưới `service_role`; Wukong độc lập trả `NOT_FALSIFIED` cho đường RPC chuẩn. |
+| Bài viết tri thức SQL đã duyệt chưa đi vào release mà chatbot truy xuất; bài lưu trữ có thể còn trong kho phục vụ | Phát hành ảnh chụp release bất biến và chuyển con trỏ trong cùng transaction; Java regression qua. Với Supabase, hai thứ tự PUBLISH/ARCHIVE đã qua thử nghiệm PostgreSQL hai phiên dưới `service_role`. Rà soát sâu phát hiện sidecar có thể kích hoạt snapshot cũ nếu hai lần sync tải đồng thời; đã khóa hàng con trỏ trước khi đọc upstream. Regression đồng thời FAIL trên baseline, source sửa PASS. Wukong sau đó chỉ ra pointer lỗi chưa bị chặn; code hiện từ chối trạng thái thiếu/null/dangling/chưa `PUBLISHED` trước upstream read. Regression đỏ trước sửa và suite sync H2 PASS 9/9, gồm ca thiếu singleton. Runtime PostgreSQL, cùng-actor route và môi trường triển khai vẫn chưa kiểm chứng. |
 | Miền `SPECIALIZED` bị Java/FE chuẩn hóa sai hoặc thiếu bộ lọc | Đồng bộ miền qua Java, FE và migration Supabase; 24 tài liệu seed được kiểm tra, regression hash release qua; trình duyệt thấy bộ lọc và trích dẫn `SPECIALIZED`. |
 | Câu hỏi học thuật về “prompt injection” bị bộ lọc đầu vào từ chối | Bỏ điều kiện bắt trần thuật ngữ, giữ các mẫu lệnh nguy hiểm; test FE/Java và luồng trình duyệt qua. |
 | Ảnh đại diện và PDF báo cáo trước đây ghi `NOT_RUN` do giới hạn IAB | Playwright mobile đã chọn tệp, lưu thành công, tải lại và thấy dữ liệu tồn tại cho cả hai luồng. Nhãn điểm thay đổi theo trạng thái lớp là chủ đích, không ghi là lỗi. |
 | Email học vụ khó quét trên mobile, tiêu đề đăng ký quá dài và nội dung thông báo dễ dồn dòng | Tinh chỉnh khung chung cùng bốn mẫu; render Java bốn mẫu qua, bản đăng ký được nhìn trực tiếp ở desktop và 390px. Không gửi email ra ngoài. |
+| Route matrix mobile sau các sửa FE và kiểm tra khả năng tiếp cận | Public/auth và Student đã qua sau sửa; lượt chạy bổ sung trên source cuối cùng cho Lecturer/Admin qua 2/2. Admin bao phủ 15 route qua hai locale và hai theme. Axe archetype và keyboard ở 768/1024px qua 2/2 mỗi nhóm. |
+| Dependency audit FE báo High ở `js-yaml` gián tiếp từ ESLint | Chỉ là dev dependency; production-only audit không có finding. Nâng lockfile `js-yaml` 4.3.1 lên 4.3.2; `npm ci` sau cập nhật báo 0 vulnerabilities. |
 
 ### Ưu tiên tiếp theo
 
-1. **P1 — Quyết định định danh học phần:** SE401–SE404 trùng mã ở các course khác nhau. Cần xác nhận mã phải duy nhất toàn trường hay theo khoa trước khi sửa dữ liệu hoặc API.
-2. **P1 — Chứng minh release trên môi trường đích:** chạy migration/đối soát trên bản sao Supabase và RAG sidecar có dữ liệu, kiểm tra rollback, hai quản trị viên và quyền trực tiếp với bảng. Bài PostgreSQL local chỉ chứng minh đường RPC chuẩn.
-3. **P2 — Hoàn tất các breakpoint E2E còn lại:** Chromium đã chạy 30 pass, 1 fail do thiếu fixture báo cáo và 6 skip theo thiết kế; ca báo cáo qua sau khi runner luôn tạo fixture. Ma trận desktop 1440px qua cho Sinh viên, Giảng viên và public/auth; admin tìm lỗi TinyMCE autosave khi rời editor, đã sửa và chạy lại 1/1 pass. Ma trận mobile 390px toàn tuyến và axe ở 768/1024px vẫn chưa chạy đến cuối trong lượt này.
-4. **P2 — Trang quản trị tri thức:** rút gọn nội dung bảng 131 dòng, đưa nội dung đầy đủ vào xem chi tiết để người quản trị quét nhanh hơn; bộ lọc `SPECIALIZED` đã có.
+1. **P1 — Xác minh migration mã học phần trước release:** người dùng đã chốt mã duy nhất toàn trường và SE421–SE424. DB local đã chạy Flyway V80/V81; truy vấn xác nhận không còn mã trùng, và Browser hiển thị đủ bốn học phần. Wukong vẫn `INCONCLUSIVE / BLOCK` cho mọi trạng thái dữ liệu vì V80 chỉ đổi section `-01` và `IF NOT EXISTS` có thể bỏ qua index sai cùng tên; local không có hai điều kiện này. Trước production, kiểm tra tất cả section của bốn course và định nghĩa `ux_course_code` trên bản sao đích; chưa chạy production/Supabase.
+2. **P1 — Chứng minh release trên môi trường đích:** kiểm tra migration/đối soát trên bản sao Supabase và RAG sidecar có dữ liệu; xác minh rollback, hai quản trị viên, quyền trực tiếp với bảng và đường nội bộ không thể gọi từ client. Edge truyền actor lấy từ JWT admin, còn sidecar dựa vào service token và header owner; chưa tái hiện bypass, nhưng cần negative same-actor qua đúng route. Bài PostgreSQL local trước đây chứng minh hai thứ tự RPC; H2 hiện chứng minh đồng bộ sidecar chặn pointer lỗi và snapshot cũ. Chưa chứng minh cutover, runtime PostgreSQL hoặc route thật.
+3. **P2 — Khả năng quét trang quản trị tri thức:** Browser hiện thấy 138 tài liệu; bộ lọc lĩnh vực/trạng thái hoạt động và nội dung dài không nằm inline trong từng dòng. Source cho thấy trang tải toàn bộ kết quả phù hợp, chưa có tìm kiếm hay phân trang; nên thêm tìm kiếm tiêu đề/nguồn và phân trang hoặc virtualize, kèm panel chỉ đọc để xem nội dung đầy đủ mà không phải mở form sửa.
+4. **P2 — Khả năng thử lại chatbot:** đã sửa trong working tree hiện tại. Khi stream và lần đối soát JSON cùng trả 503, Browser regression xác nhận nút “Thử lại” gửi lại đúng prompt và `clientRequestId`, rồi hoàn tất khi lần sau thành công. Quota, quyền truy cập và HTTP 4xx không chuyển thành retry; ngoại lệ chỉ là khi đối soát trả đúng mã `TURN_IN_PROGRESS`. Chưa xác minh trên build triển khai hoặc provider thật.
+5. **P2 — Feedback chatbot khi API lỗi:** đã sửa trong working tree hiện tại. Browser regression fault-test PUT và DELETE trả 503: UI báo đang lưu/lỗi, khóa thao tác trong lúc gửi, giữ nguyên lựa chọn đã lưu khi thất bại, và retry lại đúng rating/reason; DELETE chỉ xóa rating sau khi server xác nhận. Chưa xác minh trên build triển khai.
 
 Chi tiết tái hiện và ranh giới bằng chứng nằm tại `plans/260923-1705-campuscore-cross-layer-browser-and-ai-audit/reports/2026-09-23-findings.md`. Kiểm thử local không đồng nghĩa CI, push hay triển khai production.

@@ -104,14 +104,6 @@ export function AnnouncementFeedCard({
           isVertical ? 'flex-col' : 'flex-col md:flex-row',
           className,
         )}
-        role="button"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (e.key === 'Enter' || e.key === ' ') {
-            e.preventDefault();
-            onClick();
-          }
-        }}
       >
         {/* Featured 16:9 Banner */}
         <div
@@ -188,8 +180,17 @@ export function AnnouncementFeedCard({
               <span>{relativeTime}</span>
             </div>
 
-            <h3 className="text-xl sm:text-2xl font-bold text-foreground group-hover:text-primary transition-colors leading-snug">
-              {announcement.title}
+            <h3>
+              <button
+                type="button"
+                onClick={(event) => {
+                  event.stopPropagation();
+                  onClick();
+                }}
+                className="text-left text-xl sm:text-2xl font-bold text-foreground group-hover:text-primary transition-colors leading-snug"
+              >
+                {announcement.title}
+              </button>
             </h3>
 
             {sapo && (
@@ -243,14 +244,6 @@ export function AnnouncementFeedCard({
         'group flex flex-col justify-between overflow-hidden rounded-xl border border-border/70 bg-card shadow-xs transition-all duration-200 hover:-translate-y-0.5 hover:border-primary/50 hover:shadow-md cursor-pointer focus-within:ring-2 focus-within:ring-primary',
         className,
       )}
-      role="button"
-      tabIndex={0}
-      onKeyDown={(e) => {
-        if (e.key === 'Enter' || e.key === ' ') {
-          e.preventDefault();
-          onClick();
-        }
-      }}
     >
       {/* 16:9 Card Thumbnail */}
       <div className="relative aspect-video w-full overflow-hidden bg-muted">
@@ -320,8 +313,17 @@ export function AnnouncementFeedCard({
             </span>
           </div>
 
-          <h4 className="text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug line-clamp-2">
-            {announcement.title}
+          <h4>
+            <button
+              type="button"
+              onClick={(event) => {
+                event.stopPropagation();
+                onClick();
+              }}
+              className="text-left text-sm sm:text-base font-bold text-foreground group-hover:text-primary transition-colors leading-snug line-clamp-2"
+            >
+              {announcement.title}
+            </button>
           </h4>
 
           {sapo && (

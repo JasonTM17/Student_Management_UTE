@@ -50,7 +50,7 @@ type LecturerNoticeCategory =
   | 'EXAM_GRADES'
   | 'RESEARCH_SYLLABUS';
 
-export const noticeTemplates = [
+const noticeTemplates = [
   { label: 'Nghỉ học & Học bù', title: 'Thông báo nghỉ học và lịch học bù', content: 'Lớp học phần nghỉ buổi học theo lịch. Buổi học bù được tổ chức vào: ' },
   { label: 'Nhắc nhở nộp bài tập lớn/đồ án', title: 'Nhắc thời hạn nộp bài tập lớn/đồ án', content: 'Sinh viên hoàn thành và nộp bài trước thời hạn: ' },
   { label: 'Lịch thi & Kiểm tra', title: 'Thông báo lịch thi/kiểm tra', content: 'Lịch thi/kiểm tra của lớp học phần: ' },

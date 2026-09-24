@@ -296,7 +296,7 @@ export function HomeNewsSection() {
                   <article
                     key={ann.id}
                     onClick={() => setSelectedNotice(ann)}
-                    className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg cursor-pointer"
+                    className="group flex flex-col overflow-hidden rounded-2xl border border-border/70 bg-card shadow-2xs transition-all duration-300 hover:-translate-y-1 hover:border-primary/50 hover:shadow-lg cursor-pointer focus-within:ring-2 focus-within:ring-primary"
                   >
                     {/* 16:9 Thumbnail */}
                     <div className="relative aspect-video w-full overflow-hidden bg-muted">
@@ -321,8 +321,17 @@ export function HomeNewsSection() {
                           <span className="font-semibold text-primary">{pub}</span>
                           <span>{relTime}</span>
                         </div>
-                        <h4 className="font-bold text-sm sm:text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors">
-                          {ann.title}
+                        <h4>
+                          <button
+                            type="button"
+                            onClick={(event) => {
+                              event.stopPropagation();
+                              setSelectedNotice(ann);
+                            }}
+                            className="text-left font-bold text-sm sm:text-base leading-snug line-clamp-2 text-foreground group-hover:text-primary transition-colors"
+                          >
+                            {ann.title}
+                          </button>
                         </h4>
                         <p className="text-xs text-muted-foreground line-clamp-2 leading-relaxed">
                           {sapo}

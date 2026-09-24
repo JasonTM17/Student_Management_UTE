@@ -186,6 +186,32 @@ test('layout archetypes have no serious/critical axe findings', async ({ page },
   }
 });
 
+test('announcement card titles open the reader from the keyboard', async ({ page }, testInfo: TestInfo) => {
+  test.skip(!archetypeProjects.has(testInfo.project.name), 'Keyboard announcement proof runs with the archetype matrix.');
+  await page.goto('/en');
+
+  const card = page.locator('article:has(button[aria-label="Share"])').first();
+  const titleButton = card.getByRole('heading').getByRole('button');
+  await expect(titleButton).toBeVisible();
+  await titleButton.focus();
+  await page.keyboard.press('Enter');
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog).toBeVisible();
+  await page.keyboard.press('Escape');
+  await expect(dialog).not.toBeVisible();
+
+  const galleryTitleButton = page
+    .locator('article:has(h4 button):not(:has(button[aria-label="Share"]))')
+    .first()
+    .getByRole('heading')
+    .getByRole('button');
+  await expect(galleryTitleButton).toBeVisible();
+  await galleryTitleButton.focus();
+  await page.keyboard.press('Enter');
+  await expect(dialog).toBeVisible();
+});
+
 test('reduced-motion preference disables non-essential animation', async ({ page }, testInfo) => {
   test.skip(!archetypeProjects.has(testInfo.project.name), 'Reduced-motion proof runs with the archetype matrix.');
   await page.emulateMedia({ reducedMotion: 'reduce' });
