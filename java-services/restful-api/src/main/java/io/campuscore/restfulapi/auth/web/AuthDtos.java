@@ -23,13 +23,18 @@ public final class AuthDtos {
     public record LogoutRequest(String refreshToken) {
     }
 
-    /** Avatar accepts a base64 data URL produced by the client-side resize (≤ ~150 KB). */
+    /**
+     * Avatar accepts a base64 data URL produced by the client-side resize
+     * (≤ ~150 KB). phone/address bounds mirror the VARCHAR(80)/VARCHAR(500)
+     * columns of campuscore_auth."User" (V2) so overflow is a 400 validation
+     * error instead of a data-too-long 500.
+     */
     public record UpdateProfileRequest(
             String firstName,
             String lastName,
-            String phone,
+            @Size(max = 80, message = "phone must be at most 80 characters") String phone,
             String dateOfBirth,
-            String address,
+            @Size(max = 500, message = "address must be at most 500 characters") String address,
             @Size(max = 200_000, message = "avatar must be a data URL of at most 200k characters") String avatar) {
     }
 

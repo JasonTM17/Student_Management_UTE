@@ -45,7 +45,9 @@ public class NotificationWriteService {
         if (existing.isRead()) {
             return existing;
         }
-        notifications.markRead(notificationId);
+        if (notifications.markRead(userId, notificationId) == 0) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
+        }
         return notifications.findOwned(userId, notificationId)
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
     }
@@ -85,7 +87,9 @@ public class NotificationWriteService {
         if (notifications.findOwned(userId, notificationId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete this notification");
         }
-        notifications.delete(notificationId);
+        if (notifications.delete(userId, notificationId) == 0) {
+            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot delete this notification");
+        }
         return new DeleteNotificationResponse("Notification deleted successfully");
     }
 
@@ -95,7 +99,7 @@ public class NotificationWriteService {
         if (notifications.findById(notificationId).isEmpty()) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
         }
-        notifications.delete(notificationId);
+        notifications.deleteAny(notificationId);
         return new DeleteNotificationResponse("Notification deleted successfully");
     }
 

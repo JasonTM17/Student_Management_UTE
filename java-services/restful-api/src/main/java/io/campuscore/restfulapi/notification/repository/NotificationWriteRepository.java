@@ -74,12 +74,20 @@ public class NotificationWriteRepository {
                 .orElseThrow(() -> new IllegalStateException("created notification was not found"));
     }
 
-    public void markRead(String notificationId) {
-        jdbc.update(
+    /**
+     * Returns the number of rows updated: 0 means the row either vanished or
+     * belongs to another user. The ownership predicate lives in the SQL itself
+     * (same contract as findOwned), so a caller that skips the service-layer
+     * SELECT guard still cannot mutate another user's notification.
+     */
+    public int markRead(String userId, String notificationId) {
+        return jdbc.update(
                 "UPDATE " + TABLE
                         + " SET is_read = TRUE, read_at = CURRENT_TIMESTAMP, updated_at = CURRENT_TIMESTAMP"
-                        + " WHERE id = :id",
-                new MapSqlParameterSource("id", notificationId));
+                        + " WHERE id = :id AND user_id = :userId",
+                new MapSqlParameterSource()
+                        .addValue("id", notificationId)
+                        .addValue("userId", userId));
     }
 
     public int markAllRead(String userId) {
@@ -90,7 +98,17 @@ public class NotificationWriteRepository {
                 new MapSqlParameterSource("userId", userId));
     }
 
-    public void delete(String notificationId) {
+    /** Ownership-scoped like {@link #markRead(String, String)}: returns 0 for a foreign or missing row. */
+    public int delete(String userId, String notificationId) {
+        return jdbc.update(
+                "DELETE FROM " + TABLE + " WHERE id = :id AND user_id = :userId",
+                new MapSqlParameterSource()
+                        .addValue("id", notificationId)
+                        .addValue("userId", userId));
+    }
+
+    /** Admin path: unscoped by design, guarded by the ADMIN-only route. */
+    public void deleteAny(String notificationId) {
         jdbc.update(
                 "DELETE FROM " + TABLE + " WHERE id = :id",
                 new MapSqlParameterSource("id", notificationId));
