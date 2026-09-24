@@ -109,6 +109,38 @@ jobs:
         working-directory: mobile
         run: npm run typecheck
 
+  e2e:
+    name: Official Playwright e2e
+    runs-on: ubuntu-latest
+    env:
+      # Keep the suite deterministic and credential-free; the assistant flows
+      # under test must exercise the degraded lexical path, not a live model.
+      DEEPSEEK_ENABLED: 'false'
+      DEEPSEEK_API_KEY: ''
+      E2E_PLAYWRIGHT_PROJECT: chromium
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '20'
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+      - name: Install web dependencies
+        working-directory: frontend
+        run: npm ci
+      - name: Install Playwright Chromium
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+      - name: Run official e2e suite on a disposable stack
+        run: node scripts/run-course-e2e.mjs
+      - name: Upload Playwright failure traces
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-traces
+          path: frontend/test-results/playwright/
+          retention-days: 7
+
   compose:
     name: PostgreSQL and Compose runtime
     runs-on: ubuntu-latest

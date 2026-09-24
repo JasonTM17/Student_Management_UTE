@@ -523,11 +523,15 @@ export default function AdminEnrollmentsPage() {
   const handleExportCsv = async () => {
     try {
       const csvData = await enrollmentsApi.exportCsv(filters);
-      const blob = new Blob([csvData], { type: 'text/csv;charset=utf-8;' });
+      // Same BOM convention as grade-export/attendance-export: without it,
+      // Excel on Windows decodes the UTF-8 Vietnamese columns as mojibake.
+      const blob = new Blob(['\uFEFF', csvData], { type: 'text/csv;charset=utf-8;' });
+      const url = URL.createObjectURL(blob);
       const link = document.createElement('a');
-      link.href = URL.createObjectURL(blob);
+      link.href = url;
       link.download = `enrollments_${new Date().toISOString().split('T')[0]}.csv`;
       link.click();
+      URL.revokeObjectURL(url);
       toast.success(copy.exportStarted);
     } catch {
       toast.error(copy.exportFailed);
