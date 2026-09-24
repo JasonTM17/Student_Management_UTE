@@ -37,9 +37,28 @@ public class DemoAccountGate implements ApplicationRunner {
      * The accounts seeded for evaluation. Deliberately a fixed list: this gate
      * must never touch a real user, so it matches exact seeded addresses rather
      * than any pattern.
+     *
+     * <p>Covers the three .edu showcase accounts (V50) and the runbook-documented
+     * .demo accounts activated by V82 (the Four-Eyes second approver and the
+     * council examiners). {@code DemoAccountGateRunbookParityTest} pins this list
+     * to V82's, so the migration and the gate cannot drift apart.
      */
     static final List<String> DEMO_EMAILS = List.of(
-            "student@campuscore.edu", "lecturer@campuscore.edu", "admin@campuscore.edu");
+            "student@campuscore.edu",
+            "lecturer@campuscore.edu",
+            "admin@campuscore.edu",
+            "admin002@campuscore.demo",
+            "lecturer002@campuscore.demo",
+            "lecturer003@campuscore.demo",
+            "lecturer004@campuscore.demo",
+            "lecturer005@campuscore.demo",
+            "lecturer006@campuscore.demo",
+            "lecturer007@campuscore.demo",
+            "lecturer008@campuscore.demo",
+            "lecturer009@campuscore.demo",
+            "lecturer010@campuscore.demo",
+            "lecturer011@campuscore.demo",
+            "lecturer012@campuscore.demo");
 
     private static final String ACTIVE = "ACTIVE";
     /**
