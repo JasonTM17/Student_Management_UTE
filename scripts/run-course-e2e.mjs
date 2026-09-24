@@ -30,9 +30,7 @@ async function main() {
     await compose(['up', '-d', '--build', 'postgres', 'restful-api']);
     await waitForResponse(`${apiBaseURL}/health/liveness`, (_, response) => response.ok);
     await seedCourseE2e(projectName, compose);
-    if (process.env.E2E_REPORT_FIXTURE === '1') {
-      await seedReportE2e(projectName, compose);
-    }
+    await seedReportE2e(projectName, compose);
     await waitForResponse(frontendBaseURL, (_, response) => response.ok, {
       parseJson: false,
     });

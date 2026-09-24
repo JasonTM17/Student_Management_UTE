@@ -166,7 +166,7 @@ test riêng trong lịch sử git.*
 
 1. **P1 — Quyết định định danh học phần:** SE401–SE404 trùng mã ở các course khác nhau. Cần xác nhận mã phải duy nhất toàn trường hay theo khoa trước khi sửa dữ liệu hoặc API.
 2. **P1 — Chứng minh release trên môi trường đích:** chạy migration/đối soát trên bản sao Supabase và RAG sidecar có dữ liệu, kiểm tra rollback, hai quản trị viên và quyền trực tiếp với bảng. Bài PostgreSQL local chỉ chứng minh đường RPC chuẩn.
-3. **P2 — Hoàn tất official E2E toàn bộ:** lần chạy rộng trước bị cạn tài nguyên OS nên `NOT_RUN` đến cuối. Chia ma trận thành lô có giới hạn tài nguyên rồi chốt từng vai trò/breakpoint.
+3. **P2 — Hoàn tất các breakpoint E2E còn lại:** Chromium đã chạy 30 pass, 1 fail do thiếu fixture báo cáo và 6 skip theo thiết kế; ca báo cáo qua sau khi runner luôn tạo fixture. Ma trận desktop 1440px qua cho Sinh viên, Giảng viên và public/auth; admin tìm lỗi TinyMCE autosave khi rời editor, đã sửa và chạy lại 1/1 pass. Ma trận mobile 390px toàn tuyến và axe ở 768/1024px vẫn chưa chạy đến cuối trong lượt này.
 4. **P2 — Trang quản trị tri thức:** rút gọn nội dung bảng 131 dòng, đưa nội dung đầy đủ vào xem chi tiết để người quản trị quét nhanh hơn; bộ lọc `SPECIALIZED` đã có.
 
 Chi tiết tái hiện và ranh giới bằng chứng nằm tại `plans/260923-1705-campuscore-cross-layer-browser-and-ai-audit/reports/2026-09-23-findings.md`. Kiểm thử local không đồng nghĩa CI, push hay triển khai production.

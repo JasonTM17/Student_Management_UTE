@@ -24,6 +24,11 @@ function loadTs(relativePath) {
 const editorPolicy = loadTs('src/lib/editor-document.ts');
 const editorPage = read('src/app/dashboard/editor/page.tsx');
 
+test('self-hosted TinyMCE autosave tolerates a half-initialized editor during navigation', () => {
+  const plugin = read('public/tinymce/plugins/autosave/plugin.min.js');
+  assert.match(plugin, /if\(!t\.dom\|\|!t\.getBody\(\)\)return!0;if\(o\(e\)\)return t\.dom\.isEmpty/);
+});
+
 test('pristine editor without draft or edit reseeds the default document', () => {
   assert.equal(
     editorPolicy.shouldSeedDefaultEditorDocument({ hasStoredDraft: false, editingId: null }),

@@ -44,6 +44,8 @@ test('registration E2E fixture refuses developer projects and fails closed on mi
   assert.match(runner, /\['chromium', 'tablet-768', 'desktop-1024', 'desktop-1440', 'mobile-390'\]/);
   assert.match(runner, /args\.push\('--project', project\)/);
   assert.ok(runner.indexOf('assertDisposableProject(projectName)') < runner.indexOf('await seedCourseE2e'));
+  assert.ok(runner.includes('await seedReportE2e(projectName, compose);'));
+  assert.ok(runner.indexOf('await seedReportE2e(projectName, compose);') < runner.indexOf('await run(process.execPath, [playwrightCli'));
   await assert.rejects(fixture.seedCourseE2e('campuscore-course-e2e-fixture-test', async () => {
     throw new Error('seed missing');
   }), /seed missing/);
