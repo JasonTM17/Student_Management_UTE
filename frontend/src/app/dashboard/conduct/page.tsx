@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Award,
   Calendar,
@@ -250,38 +250,29 @@ export default function StudentConductPage() {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
 
-  useEffect(() => {
+  const loadConduct = useCallback(async () => {
     if (!hasAccess) return;
-    let mounted = true;
-
-    async function loadConduct() {
-      setLoading(true);
-      setError('');
-      try {
-        const data = await conductApi.getMyConduct();
-        if (!mounted) return;
-        setSummary(data);
-        if (data.currentSemester) {
-          setSelectedSemesterId(data.currentSemester.semesterId);
-        } else if (data.history.length > 0) {
-          setSelectedSemesterId(data.history[0].semesterId);
-        }
-      } catch (err: unknown) {
-        if (!mounted) return;
-        // A failed load must never be papered over with an invented training
-        // record: the student sees the real failure and can retry.
-        setSummary(null);
-        setError(copy.loadErrorTitle);
-      } finally {
-        if (mounted) setLoading(false);
+    setLoading(true);
+    setError('');
+    try {
+      const data = await conductApi.getMyConduct();
+      setSummary(data);
+      if (data.currentSemester) {
+        setSelectedSemesterId(data.currentSemester.semesterId);
+      } else if (data.history.length > 0) {
+        setSelectedSemesterId(data.history[0].semesterId);
       }
+    } catch {
+      setSummary(null);
+      setError(copy.loadErrorTitle);
+    } finally {
+      setLoading(false);
     }
-
-    void loadConduct();
-    return () => {
-      mounted = false;
-    };
   }, [copy.loadErrorTitle, hasAccess]);
+
+  useEffect(() => {
+    void loadConduct();
+  }, [loadConduct]);
 
   const activeSemesterScore = useMemo(() => {
     if (!summary) return null;
@@ -350,7 +341,7 @@ export default function StudentConductPage() {
   }
 
   if (error && !summary) {
-    return <ErrorState title={copy.loadErrorTitle} description={error} onRetry={() => window.location.reload()} />;
+    return <ErrorState title={copy.loadErrorTitle} description={error} onRetry={() => void loadConduct()} />;
   }
 
   const getRankBadgeClass = (rank: string | null | undefined) => {

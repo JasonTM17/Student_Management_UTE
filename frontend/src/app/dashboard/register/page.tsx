@@ -375,7 +375,7 @@ export default function RegisterPage() {
                       {copy.standardLimitLabel}
                     </p>
                     <p className="mt-2 text-2xl font-semibold text-foreground">
-                      28 <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
+                      {Math.min(28, creditLimit)} <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
                     </p>
                   </div>
                   <div className="rounded-xl border border-primary/20 bg-primary/[0.05] p-4">
@@ -383,7 +383,7 @@ export default function RegisterPage() {
                       {copy.approvedLimitLabel}
                     </p>
                     <p className="mt-2 text-2xl font-semibold text-foreground">
-                      30 <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
+                      {creditLimit > 28 ? creditLimit : (creditApplication?.requestedLimit ?? 30)} <span className="text-sm font-medium text-muted-foreground">{copy.creditsUnit}</span>
                     </p>
                     <p className="mt-1 text-xs leading-5 text-muted-foreground">{copy.approvedLimitHint}</p>
                   </div>
@@ -551,6 +551,7 @@ export default function RegisterPage() {
                   </div>
                   {activeCourse.sections.map((section) => {
                     const enrollment = enrollmentBySection.get(section.id);
+                    const isRegistered = Boolean(enrollment);
                     const seats = section.remainingSeats;
                     return (
                       <article key={section.id} className="rounded-md border border-border/70 bg-card p-4 shadow-sm">
@@ -558,7 +559,7 @@ export default function RegisterPage() {
                           <p className="font-semibold text-foreground">
                             {copy.columns.section} {section.sectionNumber}
                           </p>
-                          {section.alreadyEnrolled ? (
+                          {isRegistered ? (
                             <span className="rounded-md border border-primary/30 bg-primary/10 px-2 py-0.5 text-xs font-medium text-primary">
                               {copy.registered}
                             </span>

@@ -43,17 +43,22 @@ export function buildGpaTrendPoints(
 export function buildCumulativeGpaTrendPoints(
   semesters: StudentTranscriptSemester[],
   locale: string,
+  serverCumulativeGpa?: number | null,
 ): GpaTrendPoint[] {
   const chronological = [...semesters].reverse();
   let accumulatedPoints = 0;
   let accumulatedCredits = 0;
 
   return chronological.map((semester, index) => {
-    const semCredits = semester.creditsAttempted || 1;
+    const semCredits = semester.creditsAttempted ?? 0;
     accumulatedPoints += semester.gpa * semCredits;
     accumulatedCredits += semCredits;
-    const cumulativeGpa =
+    let cumulativeGpa =
       accumulatedCredits > 0 ? accumulatedPoints / accumulatedCredits : semester.gpa;
+
+    if (index === chronological.length - 1 && typeof serverCumulativeGpa === 'number') {
+      cumulativeGpa = serverCumulativeGpa;
+    }
 
     return {
       label: locale === 'vi' ? `HK${index + 1}` : `T${index + 1}`,

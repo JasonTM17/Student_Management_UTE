@@ -37,11 +37,30 @@ export default function ThesisTopicCatalogPage() {
     if (showAll || !normalizedQuery || normalizedQuery === 'all') {
       return workspace.topics;
     }
-    return workspace.topics.filter((topic) =>
-      [topic.title, topic.description]
+    const topicBilingualKeywords: Record<string, string[]> = {
+      'artificial intelligence': ['artificial intelligence', 'ai', 'trí tuệ nhân tạo'],
+      'software & web': ['software', 'web', 'phần mềm'],
+      'robotics & mechatronics': ['robotics', 'mechatronics', 'cơ điện tử', 'robot'],
+      'information systems': ['information systems', 'hệ thống thông tin'],
+      'iot & telecom': ['iot', 'telecom', 'viễn thông'],
+      'automotive': ['automotive', 'ô tô'],
+      'civil engineering': ['civil engineering', 'xây dựng'],
+    };
+
+    const searchTerms = [normalizedQuery];
+    for (const [key, synonyms] of Object.entries(topicBilingualKeywords)) {
+      if (normalizedQuery.includes(key) || key.includes(normalizedQuery)) {
+        searchTerms.push(...synonyms.map((s) => s.toLowerCase()));
+      }
+    }
+
+    return workspace.topics.filter((topic) => {
+      const fullText = [topic.title, topic.description]
         .filter(Boolean)
-        .some((value) => String(value).toLowerCase().includes(normalizedQuery)),
-    );
+        .join(' ')
+        .toLowerCase();
+      return searchTerms.some((term) => fullText.includes(term));
+    });
   }, [normalizedQuery, searchActive, showAll, workspace.topics]);
 
   if (authLoading) {

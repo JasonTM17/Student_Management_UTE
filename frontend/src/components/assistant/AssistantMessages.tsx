@@ -18,6 +18,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
+import { toast } from 'sonner';
 import type { AssistantCitation } from '@/lib/thesis-api';
 import { isFeedbackEligibleAssistantMessage, type ChatMessage } from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
@@ -44,7 +45,7 @@ interface AssistantMessagesProps {
   messageList: ChatMessage[];
   onFeedback: (
     messageId: string,
-    rating: 'UP' | 'DOWN',
+    rating: 'UP' | 'DOWN' | null,
     reason?: FeedbackReason,
   ) => void;
   /** Suggested follow-up questions shown under the latest answer. */
@@ -165,7 +166,11 @@ export function AssistantMessages({
         setCopiedId((current) => (current === message.id ? null : current));
       }, 1500);
     } catch {
-      /* clipboard unavailable (insecure context or permission denied) */
+      toast.error(
+        locale === 'vi'
+          ? 'Không thể sao chép vào bộ nhớ tạm.'
+          : 'Could not copy to clipboard.',
+      );
     }
   };
 
@@ -400,7 +405,7 @@ export function AssistantMessages({
                             )}
                             aria-label={messages.assistant.feedbackUp}
                             aria-pressed={message.feedback === 'UP'}
-                            onClick={() => onFeedback(message.id, 'UP')}
+                            onClick={() => onFeedback(message.id, message.feedback === 'UP' ? null : 'UP')}
                           >
                             <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
                           </Button>
@@ -415,7 +420,7 @@ export function AssistantMessages({
                             )}
                             aria-label={messages.assistant.feedbackDown}
                             aria-pressed={message.feedback === 'DOWN'}
-                            onClick={() => onFeedback(message.id, 'DOWN')}
+                            onClick={() => onFeedback(message.id, message.feedback === 'DOWN' ? null : 'DOWN')}
                           >
                             <ThumbsDown
                               className="h-3.5 w-3.5"

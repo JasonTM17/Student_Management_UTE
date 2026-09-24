@@ -237,16 +237,16 @@ export default function StudentAnnouncementsPage() {
         if (type !== 'STUDENT') return false;
       } else if (selectedCategory === 'REGISTRATION') {
         const text = (item.title + ' ' + item.content).toLowerCase();
-        if (!text.includes('đăng ký') && !text.includes('học phần') && !text.includes('registration')) return false;
+        if (!/\b(đăng ký|học phần|registration|course registration)\b/i.test(text)) return false;
       } else if (selectedCategory === 'THESIS') {
         const text = (item.title + ' ' + item.content).toLowerCase();
-        if (!text.includes('luận văn') && !text.includes('đề tài') && !text.includes('thesis') && !text.includes('kltn') && !text.includes('tlcn')) return false;
+        if (!/\b(luận văn|đề tài|thesis|kltn|tlcn|đồ án|capstone)\b/i.test(text)) return false;
       } else if (selectedCategory === 'SCHOLARSHIP') {
         const text = (item.title + ' ' + item.content).toLowerCase();
-        if (!text.includes('học bổng') && !text.includes('rèn luyện') && !text.includes('scholarship')) return false;
+        if (!/\b(học bổng|rèn luyện|scholarship|financial aid)\b/i.test(text)) return false;
       } else if (selectedCategory === 'EXAM') {
-        const text = (item.title + ' ' + item.content).toLowerCase();
-        if (!text.includes('thi') && !text.includes('khảo thí') && !text.includes('phúc khảo') && !text.includes('exam')) return false;
+        const text = item.title + ' ' + item.content;
+        if (!/\b(thi|khảo thí|phúc khảo|exam|examination|kỳ thi|lịch thi)\b/i.test(text)) return false;
       }
 
       // Keyword search

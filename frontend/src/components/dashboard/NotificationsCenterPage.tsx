@@ -77,7 +77,7 @@ function resolveNotificationTarget(notification: {
 
 export default function NotificationsCenterPage() {
   const { user, isLoading: authLoading, hasAccess, isForbidden } = useRequireAuth();
-  const { formatDateTime, messages } = useI18n();
+  const { formatDateTime, messages, locale } = useI18n();
   const copy = messages.dashboardShell.notifications;
   const [items, setItems] = useState<NotificationItem[]>([]);
   const [filter, setFilter] = useState<Filter>('all');
@@ -147,8 +147,8 @@ export default function NotificationsCenterPage() {
     try {
       const response = await notificationsApi.markAllRead();
       const updated = response.updated ?? unreadCount;
-      setItems((current) => current.map((item) => ({ ...item, isRead: true })));
       setStatus(copy.updatedCount.replace('{count}', String(updated)));
+      await fetchNotifications();
     } catch {
       setError(copy.updateFailed);
     } finally {
@@ -361,7 +361,7 @@ export default function NotificationsCenterPage() {
                             if (!item.isRead) void markRead(item.id);
                           }}
                         >
-                          <span>{copy.title === 'Thông báo' || copy.all === 'Tất cả' ? 'Mở tính năng liên quan' : 'Open related feature'}</span>
+                          <span>{locale === 'vi' ? 'Mở tính năng liên quan' : 'Open related feature'}</span>
                           <ArrowUpRight className="h-3.5 w-3.5" />
                         </LocalizedLink>
                         {!item.isRead ? (

@@ -392,6 +392,13 @@ export function AssistantPanel() {
 
   const createConversation = async () => {
     if (isSending) return;
+    if (state.messages.length === 0) {
+      selectedHistoryRef.current = true;
+      resetConversation(state.conversationId);
+      setMessageCursor(undefined);
+      setShowHistory(false);
+      return;
+    }
     try {
       const conversation = await thesisApi.createConversation(locale);
       selectedHistoryRef.current = true;

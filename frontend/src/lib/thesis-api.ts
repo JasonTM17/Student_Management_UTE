@@ -1131,6 +1131,13 @@ export const assistantKnowledgeApi = {
     return response.data;
   },
 
+  get: async (documentId: string): Promise<AssistantKnowledgeDocument> => {
+    const response = await api.get<AssistantKnowledgeDocument>(
+      `/admin/assistant/knowledge/${encodeURIComponent(documentId)}`,
+    );
+    return response.data;
+  },
+
   create: async (
     request: AssistantKnowledgeRequest,
   ): Promise<AssistantKnowledgeRevision> => {

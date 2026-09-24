@@ -62,7 +62,7 @@ export type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN'; reason?: string }
+  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' | null; reason?: string }
   | { type: 'clear-error' };
 
 /**
@@ -216,8 +216,8 @@ export function assistantReducer(
         message.id === action.messageId
           ? {
               ...message,
-              feedback: action.rating,
-              ...(action.reason ? { feedbackReason: action.reason } : {}),
+              feedback: action.rating ?? undefined,
+              feedbackReason: action.rating ? action.reason : undefined,
             }
           : message,
       );
