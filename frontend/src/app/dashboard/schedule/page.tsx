@@ -5,6 +5,7 @@ import {
   Calendar,
   CalendarDays,
   Clock,
+  Download,
   GraduationCap,
   LayoutGrid,
   List,
@@ -12,6 +13,12 @@ import {
   Printer,
   Sparkles,
 } from 'lucide-react';
+import { toast } from 'sonner';
+import {
+  buildScheduleIcsEvents,
+  downloadIcsFile,
+  generateIcsCalendar,
+} from '@/lib/ical-generator';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { LinkButton } from '@/components/ui/link-button';
 import { statusToneClass } from '@/components/ui/status';
@@ -326,6 +333,9 @@ export default function SchedulePage() {
           classroom: 'Phòng học',
           lecturer: 'Giảng viên',
           actions: 'Chi tiết',
+          exportIcs: 'Xuất lịch (.ics)',
+          exportIcsSuccess: 'Đã xuất lịch học dạng iCalendar (.ics) thành công.',
+          exportIcsEmpty: 'Không có buổi học nào để xuất lịch.',
         } as const
       : {
           eyebrow: 'Student area',
@@ -369,7 +379,34 @@ export default function SchedulePage() {
           classroom: 'Room',
           lecturer: 'Instructor',
           actions: 'Details',
+          exportIcs: 'Export iCalendar (.ics)',
+          exportIcsSuccess: 'Schedule exported as iCalendar (.ics) successfully.',
+          exportIcsEmpty: 'No scheduled meetings to export.',
         } as const;
+
+  const handleExportIcs = useCallback(() => {
+    if (agenda.length === 0) {
+      toast.info(copy.exportIcsEmpty);
+      return;
+    }
+    const targetSemester = semesters.find((semester) => semester.id === selectedSemester);
+    const events = buildScheduleIcsEvents(enrollments, targetSemester, locale);
+    if (events.length === 0) {
+      toast.info(copy.exportIcsEmpty);
+      return;
+    }
+    const calName =
+      locale === 'vi'
+        ? `Lịch học - ${selectedSemesterName || 'CampusCore'}`
+        : `Schedule - ${selectedSemesterName || 'CampusCore'}`;
+    const icsContent = generateIcsCalendar(events, calName);
+    const semCode = targetSemester?.name
+      ? targetSemester.name.toLowerCase().replace(/[^a-z0-9_-]/g, '_')
+      : 'semester';
+    const filename = `lich-hoc-${semCode}.ics`;
+    downloadIcsFile(filename, icsContent);
+    toast.success(copy.exportIcsSuccess);
+  }, [agenda.length, copy.exportIcsEmpty, copy.exportIcsSuccess, enrollments, locale, selectedSemester, selectedSemesterName, semesters]);
 
   if (authLoading) {
     return <LoadingState label={copy.loading} />;
@@ -401,6 +438,17 @@ export default function SchedulePage() {
                 ]}
               />
             </div>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExportIcs}
+              disabled={isLoading || agenda.length === 0}
+              className="gap-2"
+              title={copy.exportIcs}
+            >
+              <Download className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>{copy.exportIcs}</span>
+            </Button>
             <LinkButton href="/dashboard/enrollments" variant="outline">
               {copy.openCourses}
             </LinkButton>

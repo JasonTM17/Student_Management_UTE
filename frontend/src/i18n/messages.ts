@@ -2057,6 +2057,14 @@ export const en = {
       LATE: 'Late',
       EXCUSED: 'Excused',
     },
+    exportCsv: 'Export CSV',
+    exportCsvSuccess: 'Attendance sheet exported as CSV successfully.',
+    exportCsvEmpty: 'No student attendance records to export.',
+    printRoster: 'Print attendance sheet',
+    printOfficialHeader: 'HO CHI MINH CITY UNIVERSITY OF TECHNOLOGY AND ENGINEERING',
+    printDepartment: 'FACULTY OF INFORMATION TECHNOLOGY — CAMPUSCORE',
+    printReportTitle: 'CLASS SECTION ATTENDANCE ROSTER',
+    printInstructorSignature: 'Instructor signature (Full name)',
   },
 } as const;
 
@@ -4122,6 +4130,14 @@ export const vi: I18nMessages = {
       LATE: 'Đi muộn',
       EXCUSED: 'Có phép',
     },
+    exportCsv: 'Xuất CSV',
+    exportCsvSuccess: 'Đã xuất bảng điểm danh dạng CSV thành công.',
+    exportCsvEmpty: 'Không có dữ liệu điểm danh sinh viên để xuất.',
+    printRoster: 'In bảng điểm danh',
+    printOfficialHeader: 'TRƯỜNG ĐẠI HỌC SƯ PHẠM KỸ THUẬT TP. HỒ CHÍ MINH',
+    printDepartment: 'KHOA CÔNG NGHỆ THÔNG TIN — HỆ THỐNG CAMPUSCORE',
+    printReportTitle: 'BẢNG ĐIỂM DANH LỚP HỌC PHẦN',
+    printInstructorSignature: 'Giảng viên phụ trách (Ký và ghi rõ họ tên)',
   },
 };
 

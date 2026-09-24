@@ -6,11 +6,17 @@ import {
   CalendarCheck,
   CheckCircle2,
   Clock,
+  Download,
+  Printer,
   RefreshCw,
   Save,
   Users,
   XCircle,
 } from 'lucide-react';
+import {
+  downloadCsvFile,
+  generateAttendanceCsv,
+} from '@/lib/attendance-export';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { useRequireAuth } from '@/context/AuthContext';
 import {
@@ -239,6 +245,71 @@ export default function LecturerAttendancePage() {
     }
   };
 
+  const selectedSection = useMemo(
+    () => sections.find((s) => s.sectionId === selectedSectionId),
+    [sections, selectedSectionId],
+  );
+
+  const markedCount = roster.filter((r) => r.status !== null).length;
+  const presentCount = roster.filter((r) => r.status === 'PRESENT').length;
+  const absentCount = roster.filter((r) => r.status === 'ABSENT').length;
+  const lateCount = roster.filter((r) => r.status === 'LATE').length;
+  const excusedCount = roster.filter((r) => r.status === 'EXCUSED').length;
+
+  const handleExportCsv = useCallback(() => {
+    if (roster.length === 0) {
+      toast.info(copy.exportCsvEmpty);
+      return;
+    }
+    const currentSemester = semesters.find((s) => s.id === selectedSemester);
+    const csvContent = generateAttendanceCsv({
+      sectionNumber: selectedSection?.sectionNumber || selectedSectionId,
+      courseCode: selectedSection?.courseCode,
+      courseName: selectedSection?.courseName,
+      date: selectedDate,
+      semesterName: currentSemester ? getLocalizedName(locale, currentSemester, currentSemester.name) : '',
+      metrics: {
+        total: roster.length,
+        present: presentCount,
+        absent: absentCount,
+        late: lateCount,
+        excused: excusedCount,
+        rate: roster.length > 0 ? ((presentCount + lateCount) / roster.length) * 100 : 0,
+      },
+      students: roster.map((r) => ({
+        studentId: r.studentId,
+        studentCode: r.studentCode,
+        studentName: r.studentName,
+        status: r.status,
+        notes: r.notes,
+      })),
+      locale,
+    });
+
+    const safeSecNum = (selectedSection?.sectionNumber || selectedSectionId).replace(/[^a-zA-Z0-9_-]/g, '_');
+    const filename = `diem-danh-${safeSecNum}-${selectedDate}.csv`;
+    downloadCsvFile(filename, csvContent);
+    toast.success(copy.exportCsvSuccess);
+  }, [
+    absentCount,
+    copy.exportCsvEmpty,
+    copy.exportCsvSuccess,
+    excusedCount,
+    lateCount,
+    locale,
+    presentCount,
+    roster,
+    selectedDate,
+    selectedSection,
+    selectedSectionId,
+    selectedSemester,
+    semesters,
+  ]);
+
+  const handlePrint = useCallback(() => {
+    window.print();
+  }, []);
+
   if (authLoading) {
     return <LoadingState label="Đang xác thực thông tin giảng viên..." />;
   }
@@ -247,22 +318,42 @@ export default function LecturerAttendancePage() {
     return <WorkspaceForbiddenState />;
   }
 
-  const markedCount = roster.filter((r) => r.status !== null).length;
-  const presentCount = roster.filter((r) => r.status === 'PRESENT').length;
-  const absentCount = roster.filter((r) => r.status === 'ABSENT').length;
-  const lateCount = roster.filter((r) => r.status === 'LATE').length;
-  const excusedCount = roster.filter((r) => r.status === 'EXCUSED').length;
-
   return (
     <div className="space-y-6">
       <PageHeader
         eyebrow={<SectionEyebrow>{copy.eyebrow}</SectionEyebrow>}
         title={copy.title}
         description={copy.description}
+        actions={
+          <div className="flex flex-wrap items-center gap-2 print:hidden">
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handleExportCsv}
+              disabled={isLoadingRoster || roster.length === 0}
+              className="gap-2"
+              title={copy.exportCsv}
+            >
+              <Download className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>{copy.exportCsv}</span>
+            </Button>
+            <Button
+              type="button"
+              variant="outline"
+              onClick={handlePrint}
+              disabled={isLoadingRoster || roster.length === 0}
+              className="gap-2"
+              title={copy.printRoster}
+            >
+              <Printer className="h-4 w-4 text-primary" aria-hidden="true" />
+              <span>{copy.printRoster}</span>
+            </Button>
+          </div>
+        }
       />
 
       {/* Control bar: Semester, Section & Date */}
-      <WorkspacePanel title={copy.selectSection} className="p-4 sm:p-5">
+      <WorkspacePanel title={copy.selectSection} className="p-4 sm:p-5 print:hidden">
         <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
           {/* Semester Filter */}
           <div className="space-y-1.5">
@@ -323,7 +414,7 @@ export default function LecturerAttendancePage() {
 
       {/* Metrics Row */}
       {selectedSectionId && (
-        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4">
+        <div className="grid grid-cols-2 gap-3 sm:grid-cols-4 sm:gap-4 print:hidden">
           <WorkspaceMetricCard
             label={copy.statsTotalStudents}
             value={formatNumber(roster.length)}
@@ -383,8 +474,28 @@ export default function LecturerAttendancePage() {
         />
       ) : (
         <WorkspacePanel title="Bảng điểm danh lớp học phần" className="space-y-4 p-4 sm:p-6">
+          {/* Printable Official Institutional Header */}
+          <div className="hidden print:block mb-6 border-b-2 border-primary/40 pb-4 text-center">
+            <div className="text-xs uppercase font-bold tracking-wider text-muted-foreground">
+              {copy.printOfficialHeader}
+            </div>
+            <div className="text-sm font-extrabold text-foreground">
+              {copy.printDepartment}
+            </div>
+            <h1 className="text-xl font-black text-primary mt-2 uppercase tracking-wide">
+              {copy.printReportTitle}
+            </h1>
+            <div className="flex flex-wrap justify-center gap-6 mt-3 text-xs text-foreground font-medium">
+              <span><strong>{locale === 'vi' ? 'Lớp học phần:' : 'Section:'}</strong> {selectedSection?.sectionNumber || selectedSectionId}</span>
+              <span><strong>{locale === 'vi' ? 'Học phần:' : 'Course:'}</strong> {selectedSection?.courseName} ({selectedSection?.courseCode})</span>
+              <span><strong>{copy.dateLabel}:</strong> {selectedDate}</span>
+              <span><strong>{copy.statsTotalStudents}:</strong> {roster.length}</span>
+              <span><strong>{copy.statsPresentRate}:</strong> {((presentCount + lateCount) / (roster.length || 1) * 100).toFixed(1)}%</span>
+            </div>
+          </div>
+
           {/* Quick action bar */}
-          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4">
+          <div className="flex flex-wrap items-center justify-between gap-3 border-b pb-4 print:hidden">
             <div className="flex items-center gap-2 text-sm text-muted-foreground">
               <span className="font-semibold text-foreground">{roster.length}</span> sinh viên
               <span>•</span>
@@ -454,7 +565,10 @@ export default function LecturerAttendancePage() {
                         {row.studentName}
                       </td>
                       <td className="py-3 px-4">
-                        <div className="inline-flex rounded-lg border bg-muted/40 p-1 gap-1">
+                        <span className="hidden print:inline-block font-medium text-xs">
+                          {row.status ? copy.statuses[row.status] : '—'}
+                        </span>
+                        <div className="inline-flex rounded-lg border bg-muted/40 p-1 gap-1 print:hidden">
                           <button
                             type="button"
                             onClick={() => handleStatusChange(row.studentId, 'PRESENT')}
@@ -506,12 +620,15 @@ export default function LecturerAttendancePage() {
                         </div>
                       </td>
                       <td className="py-3 px-4">
+                        <span className="hidden print:inline-block text-xs">
+                          {row.notes || '—'}
+                        </span>
                         <Input
                           type="text"
                           value={row.notes}
                           onChange={(e) => handleNotesChange(row.studentId, e.target.value)}
                           placeholder={copy.notesPlaceholder}
-                          className="h-8 text-xs"
+                          className="h-8 text-xs print:hidden"
                         />
                       </td>
                     </tr>
@@ -522,7 +639,7 @@ export default function LecturerAttendancePage() {
           </div>
 
           {/* Bottom Save Bar */}
-          <div className="flex justify-end pt-2">
+          <div className="flex justify-end pt-2 print:hidden">
             <Button
               onClick={handleSave}
               disabled={isSaving}
@@ -531,6 +648,23 @@ export default function LecturerAttendancePage() {
               <Save className="mr-2 h-4 w-4" />
               {isSaving ? copy.savingButton : copy.saveButton}
             </Button>
+          </div>
+
+          {/* Official Signature Block - Visible ONLY when printing */}
+          <div className="hidden print:flex justify-end mt-12 pr-8 text-center">
+            <div className="space-y-16">
+              <p className="text-xs text-muted-foreground italic">
+                {locale === 'vi'
+                  ? `TP. Hồ Chí Minh, ngày ${selectedDate.split('-')[2]} tháng ${selectedDate.split('-')[1]} năm ${selectedDate.split('-')[0]}`
+                  : `Date: ${selectedDate}`}
+              </p>
+              <div className="space-y-1">
+                <p className="text-sm font-bold text-foreground">{copy.printInstructorSignature}</p>
+                <p className="text-xs text-muted-foreground italic">
+                  ({locale === 'vi' ? 'Ký và ghi rõ họ tên' : 'Signature & full name'})
+                </p>
+              </div>
+            </div>
           </div>
         </WorkspacePanel>
       )}
