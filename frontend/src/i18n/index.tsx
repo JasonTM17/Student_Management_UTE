@@ -104,15 +104,15 @@ export function I18nProvider({
       formatDate: (value, options) =>
         new Intl.DateTimeFormat(intlLocale, {
           year: 'numeric',
-          month: 'short',
-          day: 'numeric',
+          month: resolvedLocale === 'vi' ? '2-digit' : 'short',
+          day: resolvedLocale === 'vi' ? '2-digit' : 'numeric',
           ...options,
         }).format(new Date(value)),
       formatDateTime: (value, options) =>
         new Intl.DateTimeFormat(intlLocale, {
           year: 'numeric',
-          month: 'short',
-          day: 'numeric',
+          month: resolvedLocale === 'vi' ? '2-digit' : 'short',
+          day: resolvedLocale === 'vi' ? '2-digit' : 'numeric',
           hour: '2-digit',
           minute: '2-digit',
           ...options,
