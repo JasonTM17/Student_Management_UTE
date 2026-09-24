@@ -180,6 +180,12 @@ type NotificationRecord = {
   title?: string;
   content?: string;
   message?: string;
+  // Passed through from the backend row: `link` is the feature the record was
+  // authored for (admin broadcasts set it), `type` is a category or feature
+  // label. Notification surfaces deep-link off these instead of guessing from
+  // the title/body text.
+  type?: string;
+  link?: string;
   isRead: boolean;
   createdAt: string;
 };
