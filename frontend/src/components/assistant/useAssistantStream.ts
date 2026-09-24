@@ -537,7 +537,7 @@ export function useAssistantStream({
   const setFeedback = useCallback(
     async (
       messageId: string,
-      rating: 'UP' | 'DOWN',
+      rating: 'UP' | 'DOWN' | null,
       reason?:
         | 'HELPFUL'
         | 'CLEAR'
@@ -548,7 +548,11 @@ export function useAssistantStream({
     ) => {
       dispatch({ type: 'feedback', messageId, rating, reason });
       try {
-        await thesisApi.setMessageFeedback(messageId, rating, reason);
+        if (rating === null) {
+          await thesisApi.deleteMessageFeedback(messageId);
+        } else {
+          await thesisApi.setMessageFeedback(messageId, rating, reason);
+        }
       } catch {
         /* feedback is best effort and never changes answer state */
       }

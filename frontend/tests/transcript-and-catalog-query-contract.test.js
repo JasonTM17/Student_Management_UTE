@@ -238,3 +238,41 @@ test('gradesApi.getMyGrades still matches its own route allow-list', () => {
     serverAllowedQueryParams(ENROLLMENT_CONTROLLER, 'enrollments/my/grades'),
   );
 });
+
+function loadTs(relativePath) {
+  const output = ts.transpileModule(read(relativePath), {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const moduleRecord = { exports: {} };
+  Function('module', 'exports', output)(moduleRecord, moduleRecord.exports);
+  return moduleRecord.exports;
+}
+
+const { buildCumulativeGpaTrendPoints } = loadTs('src/lib/transcript-charts.ts');
+
+test('buildCumulativeGpaTrendPoints avoids phantom credits for zero-credit terms and aligns final GPA with server summary', () => {
+  const semesters = [
+    {
+      semesterId: 'sem-2',
+      semesterName: 'HK2 2025-2026',
+      gpa: 3.5,
+      creditsAttempted: 0,
+      records: [],
+    },
+    {
+      semesterId: 'sem-1',
+      semesterName: 'HK1 2025-2026',
+      gpa: 3.0,
+      creditsAttempted: 15,
+      records: [],
+    },
+  ];
+
+  const pointsWithoutServerOverride = buildCumulativeGpaTrendPoints(semesters, 'vi');
+  assert.equal(pointsWithoutServerOverride.length, 2);
+  assert.equal(pointsWithoutServerOverride[0].gpa, 3.0);
+  assert.equal(pointsWithoutServerOverride[1].gpa, 3.0);
+
+  const pointsWithServerOverride = buildCumulativeGpaTrendPoints(semesters, 'vi', 3.11);
+  assert.equal(pointsWithServerOverride[1].gpa, 3.11);
+});

@@ -169,7 +169,12 @@ export default function TranscriptPage() {
   );
 
   const cumulativeGpaTrendPoints = useMemo(
-    () => buildCumulativeGpaTrendPoints(transcriptData?.semesters ?? [], locale),
+    () =>
+      buildCumulativeGpaTrendPoints(
+        transcriptData?.semesters ?? [],
+        locale,
+        transcriptData?.summary?.cumulativeGpa,
+      ),
     [locale, transcriptData],
   );
 

@@ -1106,18 +1106,18 @@ export default function DashboardLayout({
                               <button
                                 key={notification.id}
                                 type="button"
-                                onClick={() => {
+                                onClick={async () => {
                                   setNotificationsOpen(false);
                                   try {
-                                    void notificationsApi.markRead(notification.id);
+                                    await notificationsApi.markRead(notification.id);
                                     setNotifications((prev) =>
                                       prev.filter((n) => n.id !== notification.id)
                                     );
                                     // The row was unread; keep the server-sourced
                                     // badge in step with the local removal.
                                     setUnreadCount((count) => Math.max(0, count - 1));
-                                  } catch {
-                                    // ignore
+                                  } catch (error) {
+                                    console.error('Failed to mark notification as read:', error);
                                   }
                                   router.push(href(targetUrl));
                                 }}
