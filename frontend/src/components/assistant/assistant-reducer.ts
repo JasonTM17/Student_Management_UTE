@@ -11,11 +11,32 @@ export interface ChatMessage {
   pending?: boolean;
   feedback?: 'UP' | 'DOWN';
   feedbackReason?: string;
+  feedbackPending?: boolean;
+  feedbackRetry?: AssistantFeedbackSelection;
   createdAt?: string;
 }
 
+export type AssistantFeedbackRating = 'UP' | 'DOWN' | null;
+export type AssistantFeedbackReason =
+  | 'HELPFUL'
+  | 'CLEAR'
+  | 'INCORRECT'
+  | 'OUTDATED'
+  | 'NOT_RELEVANT'
+  | 'UNSAFE';
+
+export interface AssistantFeedbackSelection {
+  rating: AssistantFeedbackRating;
+  reason?: AssistantFeedbackReason;
+}
+
 export type AssistantError =
-  'unavailable' | 'quota' | 'offline' | 'unauthorized' | 'forbidden';
+  | 'unavailable'
+  | 'quota'
+  | 'offline'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'turn-in-progress';
 
 /**
  * A message is only feedback-eligible once the server has replaced the
@@ -62,7 +83,14 @@ export type AssistantAction =
   | { type: 'citation'; citation: AssistantCitation }
   | { type: 'complete'; reply: AssistantReplyPatch }
   | { type: 'error'; kind?: AssistantState['error'] }
-  | { type: 'feedback'; messageId: string; rating: 'UP' | 'DOWN' | null; reason?: string }
+  | { type: 'stream-failed'; kind?: AssistantState['error'] }
+  | { type: 'feedback-start'; messageId: string }
+  | {
+      type: 'feedback-saved' | 'feedback-failed';
+      messageId: string;
+      rating: AssistantFeedbackRating;
+      reason?: AssistantFeedbackReason;
+    }
   | { type: 'clear-error' };
 
 /**
@@ -209,15 +237,49 @@ export function assistantReducer(
     }
     case 'error':
       return { ...state, error: action.kind ?? 'unavailable' };
+    case 'stream-failed': {
+      const last = state.messages[state.messages.length - 1];
+      const messages =
+        last?.role === 'assistant' && last.pending
+          ? state.messages.slice(0, -1)
+          : state.messages;
+      return { ...state, messages, error: action.kind ?? 'unavailable' };
+    }
     case 'clear-error':
       return { ...state, error: undefined };
-    case 'feedback': {
+    case 'feedback-start': {
+      const messages = state.messages.map((message) =>
+        message.id === action.messageId
+          ? {
+              ...message,
+              feedbackPending: true,
+              feedbackRetry: undefined,
+            }
+          : message,
+      );
+      return { ...state, messages };
+    }
+    case 'feedback-saved': {
       const messages = state.messages.map((message) =>
         message.id === action.messageId
           ? {
               ...message,
               feedback: action.rating ?? undefined,
               feedbackReason: action.rating ? action.reason : undefined,
+              feedbackPending: false,
+              feedbackRetry: undefined,
+            }
+          : message,
+      );
+      return { ...state, messages };
+    }
+    case 'feedback-failed': {
+      const messages = state.messages.map((message) =>
+        message.id === action.messageId
+          ? {
+              ...message,
+              feedbackPending: false,
+              feedbackRetry: { rating: action.rating, reason: action.reason },
             }
           : message,
       );

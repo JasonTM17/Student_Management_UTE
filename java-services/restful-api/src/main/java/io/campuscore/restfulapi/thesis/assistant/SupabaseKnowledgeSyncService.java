@@ -75,10 +75,13 @@ public class SupabaseKnowledgeSyncService {
             return lastResult;
         }
         try {
-            ReleasePayload release = fetchPublishedRelease();
-            List<DocumentPayload> documents = fetchDocuments(release.id());
-            validateRelease(release, documents);
-            SyncResult result = transactions.execute(status -> activate(release, documents));
+            SyncResult result = transactions.execute(status -> {
+                lockRuntimeStateBeforeFetch();
+                ReleasePayload release = fetchPublishedRelease();
+                List<DocumentPayload> documents = fetchDocuments(release.id());
+                validateRelease(release, documents);
+                return activate(release, documents);
+            });
             lastResult = result == null ? SyncResult.failed("Activation returned no result") : result;
         } catch (SyncFailure failure) {
             // Deliberately omit upstream response bodies and credentials.
@@ -117,6 +120,25 @@ public class SupabaseKnowledgeSyncService {
             // Keep the last safe status; do not turn a status probe into a data leak.
         }
         return lastResult;
+    }
+
+    /**
+     * Serialize the upstream read and local activation across all API instances.
+     * Fetching before this lock lets a slow older snapshot overwrite a newer one.
+     */
+    private void lockRuntimeStateBeforeFetch() {
+        List<UUID> rows = jdbc.query(
+                "SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE FOR UPDATE",
+                Map.of(), (rs, row) -> rs.getObject("active_release_id", UUID.class));
+        if (rows.isEmpty()) throw new SyncFailure("Runtime projection state is unavailable");
+        UUID activeReleaseId = rows.get(0);
+        if (activeReleaseId == null) throw new SyncFailure("Runtime projection pointer is inconsistent");
+        List<String> releaseStatuses = jdbc.query(
+                "SELECT status FROM assistant.knowledge_release WHERE id=:id",
+                new MapSqlParameterSource("id", activeReleaseId), (rs, row) -> rs.getString("status"));
+        if (releaseStatuses.size() != 1 || !"PUBLISHED".equals(releaseStatuses.get(0))) {
+            throw new SyncFailure("Runtime projection pointer is inconsistent");
+        }
     }
 
     private SyncResult activate(ReleasePayload release, List<DocumentPayload> documents) {

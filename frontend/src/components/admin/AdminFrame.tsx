@@ -411,7 +411,7 @@ export function AdminFrame({
                     <div className="truncate text-xs text-muted-foreground flex items-center gap-1">
                       <span>{user?.email ?? (locale === 'vi' ? 'Chưa có email' : 'No email on file')}</span>
                       {isDemoUser(user) && (
-                        <span className="text-[10px] text-amber-600 dark:text-amber-400 font-medium">
+                        <span className="text-[10px] text-status-warning-foreground font-medium">
                           ({locale === 'vi' ? 'Demo trải nghiệm' : 'Demo'})
                         </span>
                       )}

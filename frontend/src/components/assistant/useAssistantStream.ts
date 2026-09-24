@@ -19,6 +19,7 @@ import {
   TRANSIENT_TERMINAL_CODES,
   assistantReducer,
   initialState,
+  type AssistantFeedbackReason,
   type ChatMessage,
 } from './assistant-reducer';
 import {
@@ -72,6 +73,48 @@ function apiErrorCode(error: unknown): string | undefined {
   return typeof code === 'string' ? code : undefined;
 }
 
+type AssistantFailureKind =
+  | 'quota'
+  | 'unauthorized'
+  | 'forbidden'
+  | 'offline'
+  | 'turn-in-progress'
+  | 'unavailable';
+
+interface AssistantFailure {
+  kind: AssistantFailureKind;
+  retryable: boolean;
+}
+
+function classifyAssistantFailure(error: unknown): AssistantFailure {
+  const code = apiErrorCode(error);
+  if (code === 'TURN_IN_PROGRESS') {
+    return { kind: 'turn-in-progress', retryable: true };
+  }
+
+  const status = apiErrorStatus(error);
+  if (status === 429) return { kind: 'quota', retryable: false };
+  if (status === 401) return { kind: 'unauthorized', retryable: false };
+  if (status === 403) return { kind: 'forbidden', retryable: false };
+
+  const message = error instanceof Error ? error.message : '';
+  if (/assistant stream unauthorized/i.test(message)) {
+    return { kind: 'unauthorized', retryable: false };
+  }
+
+  // Known client responses will not improve by replaying the same request.
+  // Only the explicit TURN_IN_PROGRESS code above is an exception.
+  if (status !== undefined && status >= 400 && status < 500) {
+    return { kind: 'unavailable', retryable: false };
+  }
+
+  if (typeof navigator !== 'undefined' && !navigator.onLine) {
+    return { kind: 'offline', retryable: true };
+  }
+
+  return { kind: 'unavailable', retryable: true };
+}
+
 export function useAssistantStream({
   locale,
   scope,
@@ -95,6 +138,7 @@ export function useAssistantStream({
   const activeConversationIdRef = useRef<string | undefined>();
   const retryConversationIdRef = useRef<string | undefined>();
   const activePromptRef = useRef<string>();
+  const feedbackRequestsRef = useRef(new Set<string>());
   // Guard against 409 CAS terminal race overwriting recovered answer with CANCELLED
   const casResolvedRef = useRef(false);
 
@@ -395,47 +439,59 @@ export function useAssistantStream({
           }
         } else {
           if (!isCurrentRequest()) return;
-          const status = apiErrorStatus(fallbackError);
-          const code = apiErrorCode(fallbackError);
-          const turnStillProcessing = code === 'TURN_IN_PROGRESS';
-          const kind =
-            status === 429
-              ? 'quota'
-              : status === 401
-                ? 'unauthorized'
-                : status === 403
-                  ? 'forbidden'
-                  : typeof navigator !== 'undefined' && !navigator.onLine
-                    ? 'offline'
-                    : 'unavailable';
-          // Single error surface: the degraded reply below already carries the
-          // same localized copy. Dispatching the banner as well stacked two
-          // identical messages on one failure.
-          dispatch({
-            type: 'complete',
-            reply: {
-              content:
-                turnStillProcessing
-                  ? assistantMessages.turnInProgress
-                  : kind === 'quota'
-                  ? assistantMessages.quotaExceeded
-                  : kind === 'forbidden'
-                  ? assistantMessages.forbidden
-                  : kind === 'unauthorized'
-                  ? assistantMessages.sessionExpired
-                  : kind === 'offline'
-                  ? assistantMessages.offline
-                  : assistantMessages.unavailable,
-              degraded: true,
-              reasonCode: turnStillProcessing
-                ? 'TURN_IN_PROGRESS'
-                : kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
-            },
-          });
-          // Quota, auth, and offline failures are terminal. An active turn is
-          // different: retain its key so the explicit Retry action replays the
-          // original result instead of creating a duplicate turn.
-          if (!turnStillProcessing) {
+          const streamFailure = classifyAssistantFailure(error);
+          const reconciliationFailure = classifyAssistantFailure(fallbackError);
+          // The stream transport exposes only the 409 status, not its error
+          // envelope. Treat that response as the known TURN_IN_PROGRESS case
+          // only when JSON reconciliation confirms the exact server code.
+          const reconciliationConfirmsActiveTurn =
+            apiErrorStatus(error) === 409 &&
+            reconciliationFailure.kind === 'turn-in-progress';
+          const terminalFailure = (reconciliationConfirmsActiveTurn
+            ? [reconciliationFailure]
+            : [streamFailure, reconciliationFailure]
+          ).find(
+            (failure) => !failure.retryable,
+          );
+
+          // Preserve a known terminal result from either request. In
+          // particular, a transient reconciliation outage must not turn a
+          // stream quota/auth response into a retryable error. Conversely,
+          // reconciliation 4xx responses are not retried just because the
+          // original stream failed transiently.
+          if (!terminalFailure) {
+            const kind =
+              reconciliationFailure.kind === 'turn-in-progress'
+                ? 'turn-in-progress'
+                : streamFailure.kind === 'offline' || reconciliationFailure.kind === 'offline'
+                  ? 'offline'
+                  : 'unavailable';
+            dispatch({
+              type: 'stream-failed',
+              kind,
+            });
+            // The result may have committed even though both the stream and
+            // reconciliation request failed. Keep the same idempotency key so
+            // an explicit retry replays the original turn instead of creating
+            // a duplicate.
+          } else {
+            const kind = terminalFailure.kind;
+            dispatch({
+              type: 'complete',
+              reply: {
+                content:
+                  kind === 'quota'
+                    ? assistantMessages.quotaExceeded
+                    : kind === 'unavailable'
+                      ? assistantMessages.unavailable
+                    : kind === 'forbidden'
+                      ? assistantMessages.forbidden
+                      : assistantMessages.sessionExpired,
+                degraded: true,
+                reasonCode: kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
+              },
+            });
+            // Quota and authorization failures are terminal for this turn.
             retryRequestIdRef.current = undefined;
             retryConversationIdRef.current = undefined;
           }
@@ -461,13 +517,11 @@ export function useAssistantStream({
       assistantMessages.blocked,
       assistantMessages.cancelled,
       assistantMessages.forbidden,
-      assistantMessages.offline,
+      assistantMessages.unavailable,
       assistantMessages.quotaExceeded,
       assistantMessages.sensitiveBlocked,
       assistantMessages.sessionExpired,
       assistantMessages.technicalBlocked,
-      assistantMessages.turnInProgress,
-      assistantMessages.unavailable,
       input,
       isSending,
       locale,
@@ -538,23 +592,22 @@ export function useAssistantStream({
     async (
       messageId: string,
       rating: 'UP' | 'DOWN' | null,
-      reason?:
-        | 'HELPFUL'
-        | 'CLEAR'
-        | 'INCORRECT'
-        | 'OUTDATED'
-        | 'NOT_RELEVANT'
-        | 'UNSAFE',
+      reason?: AssistantFeedbackReason,
     ) => {
-      dispatch({ type: 'feedback', messageId, rating, reason });
+      if (feedbackRequestsRef.current.has(messageId)) return;
+      feedbackRequestsRef.current.add(messageId);
+      dispatch({ type: 'feedback-start', messageId });
       try {
         if (rating === null) {
           await thesisApi.deleteMessageFeedback(messageId);
         } else {
           await thesisApi.setMessageFeedback(messageId, rating, reason);
         }
+        dispatch({ type: 'feedback-saved', messageId, rating, reason });
       } catch {
-        /* feedback is best effort and never changes answer state */
+        dispatch({ type: 'feedback-failed', messageId, rating, reason });
+      } finally {
+        feedbackRequestsRef.current.delete(messageId);
       }
     },
     [],

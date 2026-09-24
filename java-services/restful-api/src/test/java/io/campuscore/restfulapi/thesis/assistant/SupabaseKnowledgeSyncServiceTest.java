@@ -1,9 +1,12 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import com.fasterxml.jackson.databind.ObjectMapper;
@@ -17,6 +20,11 @@ import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.HexFormat;
 import java.util.UUID;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 import org.h2.jdbcx.JdbcDataSource;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
@@ -88,6 +96,112 @@ class SupabaseKnowledgeSyncServiceTest {
         assertEquals("ACTIVATED", result.status(), result.message());
         assertEquals("SPECIALIZED", raw.queryForObject(
                 "SELECT domain FROM assistant.knowledge_runtime_document WHERE release_id=?", String.class, release));
+    }
+
+    @Test
+    void concurrentSyncsCannotActivateAnOlderSnapshotAfterANewerOne() throws Exception {
+        UUID olderRelease = UUID.randomUUID();
+        UUID newerRelease = UUID.randomUUID();
+        UUID olderSource = UUID.randomUUID();
+        UUID newerSource = UUID.randomUUID();
+        String olderContent = "Older published guidance";
+        String newerContent = "Newer published guidance";
+        String olderHash = hash(olderSource, "POLICY", "release-order", "Release order", olderContent, "office", 10);
+        String newerHash = hash(newerSource, "POLICY", "release-order", "Release order", newerContent, "office", 10);
+        CountDownLatch olderDocumentsRequested = new CountDownLatch(1);
+        CountDownLatch allowOlderDocuments = new CountDownLatch(1);
+        CountDownLatch newerReleaseRequested = new CountDownLatch(1);
+
+        HttpClient olderHttp = mock(HttpClient.class);
+        when(olderHttp.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    String uri = ((HttpRequest) invocation.getArgument(0)).uri().toString();
+                    if (uri.contains("knowledge_release_document")) {
+                        olderDocumentsRequested.countDown();
+                        assertTrue(allowOlderDocuments.await(5, TimeUnit.SECONDS), "older document response was not released");
+                        return response(200, "[{\"source_id\":\"" + olderSource + "\",\"revision_id\":null,\"version\":1,\"domain\":\"POLICY\",\"slug\":\"release-order\",\"locale\":\"en\",\"title\":\"Release order\",\"content\":\"" + olderContent + "\",\"source\":\"office\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-01T00:00:00Z\"}]");
+                    }
+                    return response(200, "[{\"id\":\"" + olderRelease + "\",\"corpus_version\":\"older-release\",\"corpus_hash\":\"" + olderHash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{}}]");
+                });
+
+        HttpClient newerHttp = mock(HttpClient.class);
+        when(newerHttp.send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class)))
+                .thenAnswer(invocation -> {
+                    String uri = ((HttpRequest) invocation.getArgument(0)).uri().toString();
+                    if (uri.contains("knowledge_release_document")) {
+                        return response(200, "[{\"source_id\":\"" + newerSource + "\",\"revision_id\":null,\"version\":1,\"domain\":\"POLICY\",\"slug\":\"release-order\",\"locale\":\"en\",\"title\":\"Release order\",\"content\":\"" + newerContent + "\",\"source\":\"office\",\"priority\":10,\"active\":true,\"visibility\":\"PUBLIC\",\"published_at\":\"2026-09-02T00:00:00Z\"}]");
+                    }
+                    newerReleaseRequested.countDown();
+                    return response(200, "[{\"id\":\"" + newerRelease + "\",\"corpus_version\":\"newer-release\",\"corpus_hash\":\"" + newerHash + "\",\"row_count\":1,\"status\":\"PUBLISHED\",\"manifest\":{}}]");
+                });
+
+        ExecutorService executor = Executors.newFixedThreadPool(2);
+        try {
+            SupabaseKnowledgeSyncService olderSync = service(olderHttp);
+            SupabaseKnowledgeSyncService newerSync = service(newerHttp);
+            Future<SupabaseKnowledgeSyncService.SyncResult> olderResult = executor.submit(olderSync::syncNow);
+            assertTrue(olderDocumentsRequested.await(2, TimeUnit.SECONDS), "older snapshot did not reach its document fetch");
+            CountDownLatch newerSyncStarted = new CountDownLatch(1);
+            Future<SupabaseKnowledgeSyncService.SyncResult> newerResult = executor.submit(() -> {
+                newerSyncStarted.countDown();
+                return newerSync.syncNow();
+            });
+            assertTrue(newerSyncStarted.await(2, TimeUnit.SECONDS), "newer sync did not start");
+            boolean newerFetchedBeforeOlderActivation = newerReleaseRequested.await(1, TimeUnit.SECONDS);
+
+            allowOlderDocuments.countDown();
+            assertEquals("ACTIVATED", olderResult.get(5, TimeUnit.SECONDS).status());
+            assertEquals("ACTIVATED", newerResult.get(5, TimeUnit.SECONDS).status());
+            assertEquals(newerRelease, raw.queryForObject(
+                    "SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE", UUID.class));
+            assertFalse(newerFetchedBeforeOlderActivation,
+                    "newer release fetch must wait for the older snapshot transaction to finish");
+        } finally {
+            allowOlderDocuments.countDown();
+            executor.shutdownNow();
+        }
+    }
+
+    @Test
+    void invalidRuntimePointerFailsClosedBeforeAnyUpstreamRead() {
+        HttpClient http = mock(HttpClient.class);
+
+        raw.update("UPDATE assistant.knowledge_runtime_state SET active_release_id=NULL WHERE singleton=TRUE");
+        assertRuntimePointerRejected(http);
+
+        UUID danglingRelease = UUID.randomUUID();
+        raw.update("UPDATE assistant.knowledge_runtime_state SET active_release_id=? WHERE singleton=TRUE", danglingRelease);
+        assertRuntimePointerRejected(http);
+
+        raw.update("UPDATE assistant.knowledge_release SET status='ARCHIVED' WHERE id=?", legacyRelease);
+        raw.update("UPDATE assistant.knowledge_runtime_state SET active_release_id=? WHERE singleton=TRUE", legacyRelease);
+        assertRuntimePointerRejected(http);
+
+        try {
+            verify(http, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+        } catch (Exception impossible) {
+            throw new AssertionError(impossible);
+        }
+    }
+
+    @Test
+    void missingRuntimeStateFailsClosedBeforeAnyUpstreamRead() throws Exception {
+        raw.update("DELETE FROM assistant.knowledge_runtime_state WHERE singleton=TRUE");
+        HttpClient http = mock(HttpClient.class);
+
+        SupabaseKnowledgeSyncService.SyncResult result = service(http).syncNow();
+
+        assertEquals("FAILED", result.status());
+        assertEquals("Runtime projection state is unavailable", result.message());
+        assertEquals(0, raw.queryForObject("SELECT COUNT(*) FROM assistant.knowledge_runtime_state", Integer.class));
+        verify(http, never()).send(any(HttpRequest.class), any(HttpResponse.BodyHandler.class));
+    }
+
+    private void assertRuntimePointerRejected(HttpClient http) {
+        SupabaseKnowledgeSyncService.SyncResult result = service(http).syncNow();
+
+        assertEquals("FAILED", result.status());
+        assertEquals("Runtime projection pointer is inconsistent", result.message());
     }
 
     @Test
@@ -166,6 +280,10 @@ class SupabaseKnowledgeSyncServiceTest {
         } catch (Exception impossible) {
             throw new AssertionError(impossible);
         }
+        return service(http);
+    }
+
+    private SupabaseKnowledgeSyncService service(HttpClient http) {
         SupabaseKnowledgeProperties properties = new SupabaseKnowledgeProperties(true,
                 "https://supabase.example", "service-role", "assistant",
                 "knowledge_release", "knowledge_release_document", 500, 1_000);

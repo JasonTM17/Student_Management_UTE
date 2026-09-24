@@ -1048,7 +1048,7 @@ export default function AdminUsersPage() {
                               {copy.roles.STUDENT}
                             </span>
                           ) : primary === 'LECTURER' ? (
-                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-600 dark:text-emerald-400">
+                            <span className="inline-flex items-center gap-1 rounded-md bg-emerald-500/10 px-2 py-0.5 text-xs font-medium text-emerald-800 dark:text-emerald-300">
                               <School className="h-3 w-3" />
                               {copy.roles.LECTURER}
                             </span>

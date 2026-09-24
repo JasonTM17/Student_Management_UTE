@@ -9,6 +9,7 @@ import {
   Copy,
   FileText,
   LockKeyhole,
+  RotateCcw,
   ShieldCheck,
   Sparkles,
   ThumbsDown,
@@ -20,7 +21,11 @@ import { cn } from '@/lib/utils';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 import type { AssistantCitation } from '@/lib/thesis-api';
-import { isFeedbackEligibleAssistantMessage, type ChatMessage } from './assistant-reducer';
+import {
+  isFeedbackEligibleAssistantMessage,
+  type AssistantFeedbackReason,
+  type ChatMessage,
+} from './assistant-reducer';
 import { AssistantMarkdownContent } from './AssistantMarkdownContent';
 import {
   isAssistantOutputSafe,
@@ -46,7 +51,7 @@ interface AssistantMessagesProps {
   onFeedback: (
     messageId: string,
     rating: 'UP' | 'DOWN' | null,
-    reason?: FeedbackReason,
+    reason?: AssistantFeedbackReason,
   ) => void;
   /** Suggested follow-up questions shown under the latest answer. */
   followUps?: readonly string[];
@@ -372,62 +377,92 @@ export function AssistantMessages({
                   {message.role === 'assistant' && !message.pending ? (
                     <div
                       data-assistant-feedback={message.id}
-                      className="mt-2 flex items-center justify-end gap-1 border-t border-border/50 pt-1"
+                      className="mt-2 border-t border-border/50 pt-1"
                     >
-                      <Button
-                        type="button"
-                        variant="ghost"
-                        size="icon"
-                        className="min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary"
-                        aria-label={
-                          copiedId === message.id
-                            ? messages.assistant.copiedMessage
-                            : messages.assistant.copyMessage
-                        }
-                        onClick={() => void copyMessage(message)}
-                      >
-                        {copiedId === message.id ? (
-                          <Check className="h-3.5 w-3.5 text-status-success-foreground" aria-hidden="true" />
-                        ) : (
-                          <Copy className="h-3.5 w-3.5" aria-hidden="true" />
-                        )}
-                      </Button>
-                      {isFeedbackEligibleAssistantMessage(message) ? (
-                        <>
+                      <div className="flex items-center justify-end gap-1">
+                        {message.feedbackPending ? (
+                          <span
+                            role="status"
+                            className="mr-auto text-[11px] text-muted-foreground"
+                          >
+                            {messages.assistant.feedbackSaving}
+                          </span>
+                        ) : null}
+                        <Button
+                          type="button"
+                          variant="ghost"
+                          size="icon"
+                          className="min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary"
+                          aria-label={
+                            copiedId === message.id
+                              ? messages.assistant.copiedMessage
+                              : messages.assistant.copyMessage
+                          }
+                          onClick={() => void copyMessage(message)}
+                        >
+                          {copiedId === message.id ? (
+                            <Check className="h-3.5 w-3.5 text-status-success-foreground" aria-hidden="true" />
+                          ) : (
+                            <Copy className="h-3.5 w-3.5" aria-hidden="true" />
+                          )}
+                        </Button>
+                        {isFeedbackEligibleAssistantMessage(message) ? (
+                          <>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary',
+                                message.feedback === 'UP' &&
+                                  'bg-secondary text-primary',
+                              )}
+                              aria-label={messages.assistant.feedbackUp}
+                              aria-pressed={message.feedback === 'UP'}
+                              disabled={message.feedbackPending}
+                              onClick={() => onFeedback(message.id, message.feedback === 'UP' ? null : 'UP')}
+                            >
+                              <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                            <Button
+                              type="button"
+                              variant="ghost"
+                              size="icon"
+                              className={cn(
+                                'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-destructive',
+                                message.feedback === 'DOWN' &&
+                                  'bg-secondary text-destructive',
+                              )}
+                              aria-label={messages.assistant.feedbackDown}
+                              aria-pressed={message.feedback === 'DOWN'}
+                              disabled={message.feedbackPending}
+                              onClick={() => onFeedback(message.id, message.feedback === 'DOWN' ? null : 'DOWN')}
+                            >
+                              <ThumbsDown className="h-3.5 w-3.5" aria-hidden="true" />
+                            </Button>
+                          </>
+                        ) : null}
+                      </div>
+                      {message.feedbackRetry ? (
+                        <div
+                          role="alert"
+                          className="mt-1 flex items-center justify-between gap-2 rounded-lg border border-destructive/20 bg-destructive/5 px-2.5 py-2 text-xs text-destructive"
+                        >
+                          <span>{messages.assistant.feedbackSaveFailed}</span>
                           <Button
                             type="button"
                             variant="ghost"
-                            size="icon"
-                            className={cn(
-                              'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-primary',
-                              message.feedback === 'UP' &&
-                                'bg-secondary text-primary',
-                            )}
-                            aria-label={messages.assistant.feedbackUp}
-                            aria-pressed={message.feedback === 'UP'}
-                            onClick={() => onFeedback(message.id, message.feedback === 'UP' ? null : 'UP')}
+                            size="sm"
+                            className="min-h-9 shrink-0 px-2 text-destructive hover:bg-transparent hover:underline"
+                            onClick={() => {
+                              const retry = message.feedbackRetry;
+                              if (retry) onFeedback(message.id, retry.rating, retry.reason);
+                            }}
                           >
-                            <ThumbsUp className="h-3.5 w-3.5" aria-hidden="true" />
+                            <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                            {messages.assistant.retryFeedback}
                           </Button>
-                          <Button
-                            type="button"
-                            variant="ghost"
-                            size="icon"
-                            className={cn(
-                              'min-h-11 min-w-11 rounded-lg text-muted-foreground hover:text-destructive',
-                              message.feedback === 'DOWN' &&
-                                'bg-secondary text-destructive',
-                            )}
-                            aria-label={messages.assistant.feedbackDown}
-                            aria-pressed={message.feedback === 'DOWN'}
-                            onClick={() => onFeedback(message.id, message.feedback === 'DOWN' ? null : 'DOWN')}
-                          >
-                            <ThumbsDown
-                              className="h-3.5 w-3.5"
-                              aria-hidden="true"
-                            />
-                          </Button>
-                        </>
+                        </div>
                       ) : null}
                     </div>
                   ) : null}
@@ -447,6 +482,7 @@ export function AssistantMessages({
                         <button
                           key={reason}
                           type="button"
+                          disabled={message.feedbackPending}
                           onClick={() => onFeedback(message.id, 'DOWN', reason)}
                           className="min-h-11 rounded-md border border-border/80 bg-background px-3 py-2 text-[11px] text-muted-foreground transition-colors hover:border-destructive/50 hover:text-destructive"
                         >
