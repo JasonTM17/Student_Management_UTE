@@ -60,6 +60,39 @@ class NotificationWritePersistenceTest {
                 )
                 """);
         jdbc.update("DELETE FROM notifications.notification");
+
+        // Every /api/v1/** request passes AccountStateFilter, which reads the
+        // account row from the database when a token is presented.
+        jdbc.execute("CREATE SCHEMA IF NOT EXISTS \"campuscore_auth\"");
+        jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "campuscore_auth"."User" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "email" VARCHAR(320) NOT NULL,
+                    "password" VARCHAR(200) NOT NULL DEFAULT 'password',
+                    "firstName" VARCHAR(120) NOT NULL DEFAULT 'Test',
+                    "lastName" VARCHAR(120) NOT NULL DEFAULT 'User',
+                    "status" VARCHAR(40) NOT NULL DEFAULT 'ACTIVE',
+                    "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "emailVerified" BOOLEAN NOT NULL DEFAULT TRUE,
+                    "isSuperAdmin" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "failedLoginAttempts" INTEGER NOT NULL DEFAULT 0,
+                    "createdAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+                    "updatedAt" TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+                )
+                """);
+        jdbc.update("DELETE FROM \"campuscore_auth\".\"User\" WHERE \"id\" IN (?, ?, ?)",
+                STUDENT, OTHER_USER, "admin-user");
+        jdbc.update("""
+                INSERT INTO "campuscore_auth"."User"
+                ("id", "email", "password", "firstName", "lastName", "status", "emailVerified", "isSuperAdmin", "failedLoginAttempts", "createdAt", "updatedAt")
+                VALUES
+                (?, ?, 'password', 'Test', 'User', 'ACTIVE', true, false, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (?, ?, 'password', 'Test', 'User', 'ACTIVE', true, false, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP),
+                (?, ?, 'password', 'Test', 'User', 'ACTIVE', true, false, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
+                """,
+                STUDENT, "student1@campuscore.edu",
+                OTHER_USER, "student2@campuscore.edu",
+                "admin-user", "admin@campuscore.edu");
     }
 
     @Test
@@ -94,8 +127,8 @@ class NotificationWritePersistenceTest {
 
         mvc.perform(patch("/api/v1/notifications/my/other-unread/read")
                         .with(jwt().jwt(token -> token.subject(STUDENT))))
-                .andExpect(status().isNotFound())
-                .andExpect(jsonPath("$.code").value("HTTP_404"));
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("HTTP_403"));
 
         assertThat(readFlag("other-unread")).isFalse();
     }

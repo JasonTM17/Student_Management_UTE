@@ -37,8 +37,11 @@ public class NotificationWriteService {
     public NotificationResponse markRead(String userId, String notificationId) {
         requireSubject(userId);
         requireText(notificationId, "notification id");
+        if (notifications.findById(notificationId).isEmpty()) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found");
+        }
         NotificationResponse existing = notifications.findOwned(userId, notificationId)
-                .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Notification not found"));
+                .orElseThrow(() -> new ResponseStatusException(HttpStatus.FORBIDDEN, "Cannot modify this notification"));
         if (existing.isRead()) {
             return existing;
         }

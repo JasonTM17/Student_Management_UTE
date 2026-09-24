@@ -225,7 +225,14 @@ class AcademicEnrollmentReadPersistenceTest {
                 .andExpect(status().isForbidden())
                 .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
 
+        // Round-12 alignment: reading grades for an enrollment belonging to another
+        // lecturer's section now raises 403 SECTION_FORBIDDEN matching the section grades read.
         mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-1").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
+
+        // Nonexistent enrollment still answers 404.
+        mvc.perform(get("/api/v1/grades/student-grades/enrollment/enrollment-nonexistent").with(lecturerJwt("lecturer-other")))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));
 

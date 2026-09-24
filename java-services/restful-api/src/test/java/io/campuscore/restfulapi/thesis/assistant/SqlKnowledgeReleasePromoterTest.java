@@ -105,6 +105,36 @@ class SqlKnowledgeReleasePromoterTest {
         assertEquals(0, raw.queryForObject("SELECT COUNT(*) FROM assistant.knowledge_document_audit WHERE action='PUBLISH'", Integer.class));
     }
 
+    @Test
+    void archivedDocumentRejectsPublishWithConflict() {
+        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+                "test-archive-resurrection", "en", "Archive rule", "Public archive guidance", "academic office", 10, "REGISTRATION");
+        UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
+        tx(() -> controller.submit(document, actor("admin-a")));
+
+        // Archive the document
+        tx(() -> { controller.delete(document, actor("admin-b")); return null; });
+        assertEquals(Boolean.FALSE, raw.queryForObject("SELECT active FROM assistant.knowledge_document WHERE id=?", Boolean.class, document));
+
+        // Attempting to publish an archived document must fail with 409 KNOWLEDGE_STATE_CONFLICT
+        DomainException ex = assertThrows(DomainException.class, () -> tx(() -> controller.publish(document, actor("admin-b"))));
+        assertEquals("KNOWLEDGE_STATE_CONFLICT", ex.getCode());
+    }
+
+    @Test
+    void listProjectionOmitsContentWhileGetIncludesIt() {
+        var request = new ThesisAssistantKnowledgeAdminController.KnowledgeRequest(
+                "test-list-projection", "en", "Projection test", "Detailed guidance body content", "academic office", 10, "REGISTRATION");
+        UUID document = tx(() -> controller.create(request, actor("admin-a"))).documentId();
+
+        var listRows = controller.list("REGISTRATION", null);
+        var found = listRows.stream().filter(r -> r.documentId().equals(document)).findFirst().orElseThrow();
+        assertEquals("", found.content());
+
+        var detail = controller.get(document);
+        assertEquals("Detailed guidance body content", detail.content());
+    }
+
     private UUID activeRelease() {
         return raw.queryForObject("SELECT active_release_id FROM assistant.knowledge_runtime_state WHERE singleton=TRUE", UUID.class);
     }
