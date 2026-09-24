@@ -149,3 +149,24 @@ faculty-drop đã sửa trong source.
 *Tài liệu được tạo tự động từ vòng 7 (2026-09-23), bổ sung vòng 8 (UI/UX deep sweep, 2026-09-23) —
 lead tổng hợp từ 8 báo cáo subagent vòng 7 và fleet vòng 8; mỗi mục số 3 và 8.1 đều có commit +
 test riêng trong lịch sử git.*
+
+## 9. Vòng rà soát chéo Browser, FE, AI và BE (23–24/09/2026)
+
+### Đã sửa và xác minh tại local
+
+| Vấn đề | Kết quả |
+| --- | --- |
+| Bài viết tri thức SQL đã duyệt chưa đi vào release mà chatbot truy xuất; bài lưu trữ có thể còn trong kho phục vụ | Phát hành ảnh chụp release bất biến và chuyển con trỏ trong cùng transaction; Java regression qua. Với Supabase, cả hai thứ tự PUBLISH/ARCHIVE đồng thời đã qua thử nghiệm PostgreSQL hai phiên dưới `service_role`; Wukong độc lập trả `NOT_FALSIFIED` cho đường RPC chuẩn. |
+| Miền `SPECIALIZED` bị Java/FE chuẩn hóa sai hoặc thiếu bộ lọc | Đồng bộ miền qua Java, FE và migration Supabase; 24 tài liệu seed được kiểm tra, regression hash release qua; trình duyệt thấy bộ lọc và trích dẫn `SPECIALIZED`. |
+| Câu hỏi học thuật về “prompt injection” bị bộ lọc đầu vào từ chối | Bỏ điều kiện bắt trần thuật ngữ, giữ các mẫu lệnh nguy hiểm; test FE/Java và luồng trình duyệt qua. |
+| Ảnh đại diện và PDF báo cáo trước đây ghi `NOT_RUN` do giới hạn IAB | Playwright mobile đã chọn tệp, lưu thành công, tải lại và thấy dữ liệu tồn tại cho cả hai luồng. Nhãn điểm thay đổi theo trạng thái lớp là chủ đích, không ghi là lỗi. |
+| Email học vụ khó quét trên mobile, tiêu đề đăng ký quá dài và nội dung thông báo dễ dồn dòng | Tinh chỉnh khung chung cùng bốn mẫu; render Java bốn mẫu qua, bản đăng ký được nhìn trực tiếp ở desktop và 390px. Không gửi email ra ngoài. |
+
+### Ưu tiên tiếp theo
+
+1. **P1 — Quyết định định danh học phần:** SE401–SE404 trùng mã ở các course khác nhau. Cần xác nhận mã phải duy nhất toàn trường hay theo khoa trước khi sửa dữ liệu hoặc API.
+2. **P1 — Chứng minh release trên môi trường đích:** chạy migration/đối soát trên bản sao Supabase và RAG sidecar có dữ liệu, kiểm tra rollback, hai quản trị viên và quyền trực tiếp với bảng. Bài PostgreSQL local chỉ chứng minh đường RPC chuẩn.
+3. **P2 — Hoàn tất official E2E toàn bộ:** lần chạy rộng trước bị cạn tài nguyên OS nên `NOT_RUN` đến cuối. Chia ma trận thành lô có giới hạn tài nguyên rồi chốt từng vai trò/breakpoint.
+4. **P2 — Trang quản trị tri thức:** rút gọn nội dung bảng 131 dòng, đưa nội dung đầy đủ vào xem chi tiết để người quản trị quét nhanh hơn; bộ lọc `SPECIALIZED` đã có.
+
+Chi tiết tái hiện và ranh giới bằng chứng nằm tại `plans/260923-1705-campuscore-cross-layer-browser-and-ai-audit/reports/2026-09-23-findings.md`. Kiểm thử local không đồng nghĩa CI, push hay triển khai production.
