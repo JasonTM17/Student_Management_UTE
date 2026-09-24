@@ -129,6 +129,7 @@ const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
     items: [
       { href: '/dashboard/lecturer/schedule', icon: Calendar, labelKey: 'teachingSchedule' },
       { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
+      { href: '/dashboard/lecturer/attendance', icon: CalendarCheck, labelKey: 'attendance' },
     ],
   },
   {
@@ -181,11 +182,16 @@ const lecturerMobileNavItems: readonly MobileNavItemConfig[] = [
   },
   {
     kind: 'link',
+    href: '/dashboard/lecturer/attendance',
+    icon: CalendarCheck,
+    labelKey: 'attendance',
+  },
+  {
+    kind: 'link',
     href: '/dashboard/lecturer/grades',
     icon: FileText,
     labelKey: 'gradeManagement',
   },
-  { kind: 'link', href: '/dashboard/thesis', icon: ScrollText, labelKey: 'thesis' },
   { kind: 'menu', icon: Menu },
 ];
 

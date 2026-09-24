@@ -1361,6 +1361,37 @@ export type AttendanceSummary = {
   attendanceRate: number;
 };
 
+export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
+
+export type StudentAttendanceEntry = {
+  studentId: string;
+  status: AttendanceStatus;
+  notes?: string | null;
+};
+
+export type SectionAttendanceSavePayload = {
+  date: string;
+  records: StudentAttendanceEntry[];
+};
+
+export type AttendanceMutationResponse = {
+  sectionId: string;
+  date: string;
+  updatedCount: number;
+  message: string;
+};
+
+export type SectionAttendanceSummary = {
+  sectionId: string;
+  totalSessions: number;
+  totalRecords: number;
+  present: number;
+  absent: number;
+  late: number;
+  excused: number;
+  attendanceRate: number;
+};
+
 export const attendanceApi = {
   my: async (): Promise<AttendanceRecord[]> => {
     const response = await api.get<AttendanceRecord[]>('/attendance/my');
@@ -1369,6 +1400,34 @@ export const attendanceApi = {
   mySummary: async (): Promise<AttendanceSummary[]> => {
     const response = await api.get<AttendanceSummary[]>(
       '/attendance/my/summary',
+    );
+    return response.data;
+  },
+  getSectionAttendance: async (
+    sectionId: string,
+    date?: string,
+  ): Promise<AttendanceRecord[]> => {
+    const response = await api.get<AttendanceRecord[]>(
+      `/attendance/section/${sectionId}`,
+      { params: date ? { date } : undefined },
+    );
+    return response.data;
+  },
+  getSectionSummary: async (
+    sectionId: string,
+  ): Promise<SectionAttendanceSummary> => {
+    const response = await api.get<SectionAttendanceSummary>(
+      `/attendance/section/${sectionId}/summary`,
+    );
+    return response.data;
+  },
+  saveSectionAttendance: async (
+    sectionId: string,
+    payload: SectionAttendanceSavePayload,
+  ): Promise<AttendanceMutationResponse> => {
+    const response = await api.put<AttendanceMutationResponse>(
+      `/attendance/sections/${sectionId}`,
+      payload,
     );
     return response.data;
   },
