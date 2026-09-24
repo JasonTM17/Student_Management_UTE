@@ -87,6 +87,10 @@ public class AuthTokenService {
                 .expiresAt(expiresAt)
                 .subject(principal.id())
                 .claim("email", principal.email())
+                // The resource-server decoder refuses any bearer token whose
+                // tokenType is not "access", so a refresh token can never ride
+                // the Authorization header even when both secrets are identical.
+                .claim("tokenType", "access")
                 .claim("roles", roles)
                 .claim("permissions", permissions);
 

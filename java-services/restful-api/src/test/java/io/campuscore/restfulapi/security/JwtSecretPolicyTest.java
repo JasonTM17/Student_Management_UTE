@@ -103,4 +103,26 @@ class JwtSecretPolicyTest {
         assertThrows(IllegalStateException.class,
                 () -> JwtSecretPolicy.enforce("JWT_SECRET", " Edge-E2E-Jwt-Secret-0123456789abcdef ", true));
     }
+
+    @Test
+    @DisplayName("identical access and refresh secrets fail in strict mode and warn only otherwise")
+    void identicalPairIsRejectedInStrictMode() {
+        assertThrows(IllegalStateException.class,
+                () -> JwtSecretPolicy.enforceDistinct(
+                        "JWT_SECRET", TEST_ACCESS_SECRET, "JWT_REFRESH_SECRET", TEST_ACCESS_SECRET, true));
+        assertDoesNotThrow(() -> JwtSecretPolicy.enforceDistinct(
+                "JWT_SECRET", TEST_ACCESS_SECRET, "JWT_REFRESH_SECRET", TEST_ACCESS_SECRET, false));
+    }
+
+    @Test
+    @DisplayName("distinct or unset secrets never trip the pair guard")
+    void distinctOrMissingPairIsAccepted() {
+        assertDoesNotThrow(() -> JwtSecretPolicy.enforceDistinct(
+                "JWT_SECRET", TEST_ACCESS_SECRET, "JWT_REFRESH_SECRET", TEST_REFRESH_SECRET, true));
+        // A blank/missing secret is the length rule's job, not the pair guard's.
+        assertDoesNotThrow(() -> JwtSecretPolicy.enforceDistinct(
+                "JWT_SECRET", "", "JWT_REFRESH_SECRET", "", true));
+        assertDoesNotThrow(() -> JwtSecretPolicy.enforceDistinct(
+                "JWT_SECRET", null, "JWT_REFRESH_SECRET", null, true));
+    }
 }

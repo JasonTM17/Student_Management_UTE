@@ -74,4 +74,28 @@ public final class JwtSecretPolicy {
     static boolean isKnownDefault(String secret) {
         return secret != null && KNOWN_DEFAULTS.contains(secret.strip().toLowerCase(Locale.ROOT));
     }
+
+    /**
+     * The access and refresh token families must be signed by different secrets.
+     * When both resolve to one value, a leaked 7-day refresh token is also a
+     * syntactically valid access token; the decoder-side tokenType check is the
+     * remaining line of defence, so an operator who configured one secret for
+     * both variables gets a loud warning (or, in strict mode, a refused boot)
+     * instead of silence.
+     */
+    static void enforceDistinct(
+            String accessVariable, String accessSecret, String refreshVariable, String refreshSecret, boolean strict) {
+        if (accessSecret == null || accessSecret.isBlank()) {
+            return; // A missing or blank secret is reported by enforce() instead.
+        }
+        if (!accessSecret.equals(refreshSecret)) {
+            return;
+        }
+        String message = accessVariable + " and " + refreshVariable + " resolve to the same value;"
+                + " generate each one separately with 'openssl rand -base64 48'";
+        if (strict) {
+            throw new IllegalStateException(message);
+        }
+        LOG.warn("{} (startup continues because security.jwt.reject-known-defaults is not enabled)", message);
+    }
 }

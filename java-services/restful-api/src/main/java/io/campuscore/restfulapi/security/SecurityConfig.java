@@ -44,9 +44,44 @@ public class SecurityConfig {
             @Value("${security.jwt.secret}") String secret,
             @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
         SecretKeySpec key = jwtSecretKey("JWT_SECRET", secret, rejectKnownDefaults);
-        return NimbusJwtDecoder.withSecretKey(key)
+        JwtDecoder decoder = NimbusJwtDecoder.withSecretKey(key)
                 .macAlgorithm(MacAlgorithm.HS256)
                 .build();
+        return token -> requireAccessTokenShape(decoder.decode(token));
+    }
+
+    /**
+     * Refuse any bearer token that was not issued as an access token. Refresh
+     * tokens carry {@code tokenType=refresh} and no authority claims, so without
+     * this check a refresh token presented as {@code Authorization: Bearer}
+     * authenticates as a claim-less principal wherever the route only asks for
+     * {@code isAuthenticated()}. The {@code roles} claim is likewise required:
+     * every access token this service mints carries it.
+     */
+    static Jwt requireAccessTokenShape(Jwt jwt) {
+        if (!"access".equals(jwt.getClaimAsString("tokenType"))) {
+            throw new BadCredentialsException("Invalid access token");
+        }
+        if (jwt.getClaims().get("roles") == null) {
+            throw new BadCredentialsException("Invalid authority claim");
+        }
+        return jwt;
+    }
+
+    /**
+     * Startup guard against the misconfiguration where both JWT secrets resolve
+     * to the same value (the refresh-secret property deliberately falls back to
+     * the access secret when unset). With identical secrets the tokenType checks
+     * are the only thing separating the two token families, so production asks
+     * for two independently generated secrets and fails closed here.
+     */
+    @Bean
+    Object jwtSecretPairPolicy(
+            @Value("${security.jwt.secret}") String secret,
+            @Value("${security.jwt.refresh-secret:${security.jwt.secret}}") String refreshSecret,
+            @Value("${security.jwt.reject-known-defaults:false}") boolean rejectKnownDefaults) {
+        JwtSecretPolicy.enforceDistinct("JWT_SECRET", secret, "JWT_REFRESH_SECRET", refreshSecret, rejectKnownDefaults);
+        return new Object();
     }
 
     @Bean
