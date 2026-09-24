@@ -153,6 +153,11 @@ class AcademicSectionReadPersistenceTest {
                 .andExpect(jsonPath("$.enrollments[1].studentCode").value("S002"))
                 .andExpect(jsonPath("$.enrollments[1].gradeStatus").value("DRAFT"));
 
+        // Foreign lecturer receives 403 SECTION_FORBIDDEN
+        mvc.perform(get("/api/v1/sections/section-1/grades").with(lecturerJwt("lecturer-other")))
+                .andExpect(status().isForbidden())
+                .andExpect(jsonPath("$.code").value("SECTION_FORBIDDEN"));
+
         mvc.perform(get("/api/v1/sections/missing").with(adminJwt()))
                 .andExpect(status().isNotFound())
                 .andExpect(jsonPath("$.code").value("HTTP_404"));

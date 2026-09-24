@@ -70,7 +70,7 @@ public class ThesisAssistantKnowledgeAdminController {
             suffix += " AND COALESCE(r.domain,d.domain)=:domain";
             params.addValue("domain", AssistantKnowledgeDomains.normalize(domain));
         }
-        return jdbc.query(latestRevisionSql(suffix) + " ORDER BY d.slug ASC", params, this::mapView);
+        return jdbc.query(latestRevisionSql(suffix, false) + " ORDER BY d.slug ASC", params, this::mapView);
     }
 
     @Operation(summary = "Xem chi tiết tài liệu tri thức", description = "Lấy nội dung tài liệu và phiên bản mới nhất theo ID")
@@ -82,7 +82,7 @@ public class ThesisAssistantKnowledgeAdminController {
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
     public KnowledgeDocumentView get(
             @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id) {
-        List<KnowledgeDocumentView> rows = jdbc.query(latestRevisionSql(" AND d.id=:id"), p().addValue("id", id), this::mapView);
+        List<KnowledgeDocumentView> rows = jdbc.query(latestRevisionSql(" AND d.id=:id", true), p().addValue("id", id), this::mapView);
         if (rows.isEmpty()) throw notFound(id);
         return rows.get(0);
     }
@@ -182,6 +182,13 @@ public class ThesisAssistantKnowledgeAdminController {
             @AuthenticationPrincipal Jwt actor) {
         String owner = requireActor(actor);
         lockDocument(id);
+        Boolean active = jdbc.queryForObject(
+                "SELECT active FROM assistant.knowledge_document WHERE id=:id",
+                p().addValue("id", id),
+                Boolean.class);
+        if (Boolean.FALSE.equals(active)) {
+            throw new DomainException(HttpStatus.CONFLICT, "KNOWLEDGE_STATE_CONFLICT", "Cannot publish an archived document");
+        }
         List<RevisionRow> pending = jdbc.query(
                 "SELECT id,version,created_by FROM assistant.knowledge_document_revision WHERE document_id=:id AND state='PENDING_REVIEW' AND created_by<>:actor ORDER BY version DESC LIMIT 1 FOR UPDATE",
                 p().addValue("id", id).addValue("actor", owner), (rs, row) -> new RevisionRow(rs.getObject("id", UUID.class), rs.getInt("version"), rs.getString("created_by")));
@@ -258,8 +265,9 @@ public class ThesisAssistantKnowledgeAdminController {
         return value == null ? 1 : value;
     }
 
-    private static String latestRevisionSql(String suffix) {
-        return "SELECT d.id document_id,r.id revision_id,COALESCE(r.version,0) version,CASE WHEN d.active=FALSE THEN 'ARCHIVED' ELSE COALESCE(r.state,'UNVERSIONED') END state,COALESCE(r.domain,d.domain,'THESIS') domain,COALESCE(r.locale,d.locale) locale,COALESCE(r.slug,d.slug) slug,COALESCE(r.title,d.title) title,COALESCE(r.content,d.content) content,COALESCE(r.source,d.source) source,COALESCE(r.priority,d.priority) priority,r.created_by,r.reviewed_by,r.created_at,r.published_at FROM assistant.knowledge_document d LEFT JOIN assistant.knowledge_document_revision r ON r.document_id=d.id AND r.version=(SELECT MAX(r2.version) FROM assistant.knowledge_document_revision r2 WHERE r2.document_id=d.id) WHERE 1=1" + (suffix == null ? "" : suffix);
+    private static String latestRevisionSql(String suffix, boolean includeContent) {
+        String contentField = includeContent ? "COALESCE(r.content,d.content) content" : "'' content";
+        return "SELECT d.id document_id,r.id revision_id,COALESCE(r.version,0) version,CASE WHEN d.active=FALSE THEN 'ARCHIVED' ELSE COALESCE(r.state,'UNVERSIONED') END state,COALESCE(r.domain,d.domain,'THESIS') domain,COALESCE(r.locale,d.locale) locale,COALESCE(r.slug,d.slug) slug,COALESCE(r.title,d.title) title," + contentField + ",COALESCE(r.source,d.source) source,COALESCE(r.priority,d.priority) priority,r.created_by,r.reviewed_by,r.created_at,r.published_at FROM assistant.knowledge_document d LEFT JOIN assistant.knowledge_document_revision r ON r.document_id=d.id AND r.version=(SELECT MAX(r2.version) FROM assistant.knowledge_document_revision r2 WHERE r2.document_id=d.id) WHERE 1=1" + (suffix == null ? "" : suffix);
     }
 
     private KnowledgeDocumentView mapView(ResultSet rs, int row) throws SQLException {

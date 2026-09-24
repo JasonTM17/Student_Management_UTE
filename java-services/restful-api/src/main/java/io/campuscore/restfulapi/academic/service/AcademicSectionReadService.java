@@ -92,7 +92,8 @@ public class AcademicSectionReadService {
                 .orElseThrow(() -> new ResponseStatusException(HttpStatus.NOT_FOUND, "Section not found"));
         boolean admin = roles != null && (roles.contains("ADMIN") || roles.contains("SUPER_ADMIN"));
         if (!admin && !java.util.Objects.equals(section.lecturerId(), requireProfileId("lecturerId", lecturerId))) {
-            throw new ResponseStatusException(HttpStatus.FORBIDDEN, "Section is not assigned to the current lecturer");
+            throw new io.campuscore.restfulapi.web.DomainException(
+                    HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
         }
         return new SectionGradesResponse(
                 section.id(),

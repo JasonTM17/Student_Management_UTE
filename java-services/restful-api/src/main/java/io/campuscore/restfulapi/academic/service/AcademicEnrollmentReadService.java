@@ -279,9 +279,17 @@ public class AcademicEnrollmentReadService {
         if (isAdmin(roles)) {
             rows = studentGradeRows(academic.findStudentGradesByEnrollment(normalizedEnrollmentId));
         } else if (roles != null && roles.contains("LECTURER")) {
+            String profileId = requireProfileId("lecturerId", lecturerId);
+            if (academic.findEnrollmentById(normalizedEnrollmentId).isEmpty()) {
+                throw new ResponseStatusException(HttpStatus.NOT_FOUND, "Enrollment not found");
+            }
             rows = studentGradeRows(academic.findStudentGradesByEnrollmentAndLecturer(
                     normalizedEnrollmentId,
-                    requireProfileId("lecturerId", lecturerId)));
+                    profileId));
+            if (rows.isEmpty()) {
+                throw new io.campuscore.restfulapi.web.DomainException(
+                        HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
+            }
         } else {
             academic.findEnrollmentById(normalizedEnrollmentId)
                     .filter(row -> row.studentId().equals(normalizeOptional("studentId", studentId)))
