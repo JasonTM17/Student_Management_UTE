@@ -83,6 +83,28 @@ class SecurityConfigTest {
                 corsConfig.getAllowedOriginPatterns());
     }
 
+    @Test
+    void accessShapeValidatorAcceptsOnlyAccessTokensWithRoles() {
+        Jwt access = token()
+                .claim("tokenType", "access")
+                .claim("roles", List.of("STUDENT"))
+                .build();
+        assertNotNull(SecurityConfig.requireAccessTokenShape(access));
+
+        assertThrows(
+                BadCredentialsException.class,
+                () -> SecurityConfig.requireAccessTokenShape(
+                        token().claim("tokenType", "refresh").claim("roles", List.of()).build()));
+        assertThrows(
+                BadCredentialsException.class,
+                () -> SecurityConfig.requireAccessTokenShape(
+                        token().claim("roles", List.of("STUDENT")).build()));
+        assertThrows(
+                BadCredentialsException.class,
+                () -> SecurityConfig.requireAccessTokenShape(
+                        token().claim("tokenType", "access").build()));
+    }
+
     private static Jwt.Builder token() {
         return Jwt.withTokenValue("test-token")
                 .header("alg", "none")
