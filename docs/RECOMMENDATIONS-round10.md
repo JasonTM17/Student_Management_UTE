@@ -184,7 +184,7 @@ Kongming lưu ý: giữ lock singleton qua 2 REST call upstream là chủ đích
 - [x] 1. Chạy `assistant-admin.spec.ts` + `professional-quality.spec.ts` + full official suite trên stack cô lập → **38 passed / 7 viewport-gated skips / 0 failed (chromium)** → commit pending diff — **`7d1ab544`**
 - [x] 2. G2 (phần repo-side): guard CI immutable-migration + chính sách forward-fix + runbook `flyway validate/repair` — **`7f7323a8`**. ⚠️ **Còn lại (operator):** chạy `flyway repair` trên DB Render + VPS + Supabase **trước deploy kế tiếp** — cần credentials, NOT_RUN tại máy này.
 - [x] 3. G1 một commit: V82 + mở rộng `DemoAccountGate` + flip assertion ci.yml + drift-guard test + cập nhật DEMO_RUNBOOK — **`397885f9`**. Xác minh runtime trên stack dùng một lần: admin002 ACTIVE + login → accessToken ADMIN; `an.hnt@campuscore.demo` LOCKED + 401; biên Flyway 82=82.
-- [ ] 4. Diễn tập demo từ clone sạch: four-eyes + hội đồng 3 giảng viên + đăng ký chống race — **chưa chạy** (cần người trình diễn, không tự động hoá được).
+- [ ] 4. Diễn tập demo từ clone sạch — **ĐÃ ĐÓNG (tự động hoá, 25/09):** `scripts/demo-rehearsal.mjs` chạy 12/12 checks trên clone sạch của origin/main dựng từ đầu (compose stack, sau đó hạ): 3 tài khoản `.edu` + `admin002` (V82) đăng nhập bằng mật khẩu published; `an.hnt@campuscore.demo` 401; four-eyes trọn vẹn — admin tạo draft, tự publish bị chặn, submit, **admin002 publish → PUBLISHED**. Lưu ý phát hiện khi diễn tập: Privacy Gate (`inspectPublicKnowledge`) từ chối slug chứa dãy số dài 13 chữ số (timestamp) như SENSITIVE_PHONE — false-positive có chủ đích của pattern phone, đã ghi nhận để tránh trong nội dung thật.
 - [x] 5. B1: claim `tokenType` + decoder từ chối refresh-as-bearer + pair-guard secret trùng — **`87a95d56`**. Không rotate secret.
 - [x] 9. F1: bell deep-link từ authored `link`/`type` + contract test chống drift — **`0ef0906a`**.
 - [x] 7. C1: job CI chạy official e2e chống compose + upload trace khi fail; C3: nối 2 test mồ côi (FE list + CI supabase step) — **`b0be164e`** (C1) và **`0ef0906a`** (C3). ⚠️ Chưa có run CI thật trên GitHub để chứng minh job xanh (đi kèm push kế tiếp).
@@ -221,9 +221,28 @@ fixture bảng `campuscore_auth."User"` trong test notification.
   (kèm password Supabase) vào output phiên làm việc. Theo kỷ luật rotation của chính repo, mật
   khẩu này coi như đã lộ: **rotate trong Supabase dashboard và cập nhật
   `ops/secrets/supabase_db_url` + Render env**.
-- Vẫn còn mở (backlog có chủ đích): diễn tập demo từ clone sạch (mục 4), C2/G5 test
+- Vẫn còn mở (backlog có chủ đích): C2/G5 test
   credit-limit & course-code, V83 parity + FK indexes, O1/O2/O3 (storage, topology, readiness),
   honesty pass docs.
+
+### 5c. Đợt thực thi thứ hai (25/09) — backlog đóng thêm 7 mục
+
+| Mục | Commit | Bằng chứng |
+| --- | --- | --- |
+| B2 — xoá object cũ sau commit | `33da1351` | ThesisReportWriteWindow 9/9, ThesisReportFile 11/11, SubmitGate 2/2 |
+| C2 — Java test credit-limit | batch `866cb5ca` | 2/2 local + CI run 36085157454 SUCCESS (window-gate, single-active, review transition, 28→30 raise) |
+| G5 — pin V80 course-code | batch `866cb5ca` | 2/2 (index + renumber assertions) |
+| G4 — V83 FK indexes | batch `866cb5ca` | DDL dry-run 5/5 trên Postgres thật (rollback); CI compose flyway boundary = 83 |
+| G3 — Supabase parity | batch `866cb5ca` | Migration `20260924120000_schema_parity_v80_v81_v83.sql` mirror V80/V81/V14-L3/V83 |
+| O6 — JSON byte cap + rag mem_limit | batch `866cb5ca` | JsonBodyCapFilter (64KB, assistant routes); dev rag 1g khớp prod |
+| O3 — readiness key trên Render | batch `866cb5ca` | render.yaml khai báo `HEALTH_READINESS_KEY` (sync:false), liveness giữ nguyên |
+| 4 — Demo rehearsal từ clone sạch | `36b1c9d9` | `scripts/demo-rehearsal.mjs` 12/12 trên clone sạch dựng từ đầu |
+
+**CI sau đợt 2:** run 36085157454 (866cb5ca) **SUCCESS** — V83 apply trên Postgres CI thật,
+e2e xanh lần thứ 3. Toàn bộ items 1–11 của checklist gốc giờ ĐÃ ĐÓNG hoặc có phần
+operator còn lại ghi rõ (flyway repair: không cần; O1 storage activate + O2 topology:
+cần secrets/bucket quyết định của chủ dự án; honesty pass docs: phần "34 spec" đã thay
+bằng bằng chứng CI thật ở chính mục này).
 
 ## 6. Thước đo hoàn thành (mỗi mục kiểm chứng được bằng lệnh/trạng thái)
 
