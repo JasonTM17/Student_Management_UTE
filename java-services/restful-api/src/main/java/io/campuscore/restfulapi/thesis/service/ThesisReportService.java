@@ -16,6 +16,8 @@ import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.annotation.Transactional;
+import org.springframework.transaction.support.TransactionSynchronization;
+import org.springframework.transaction.support.TransactionSynchronizationManager;
 import org.springframework.util.StringUtils;
 import org.springframework.web.multipart.MultipartFile;
 import org.slf4j.Logger;
@@ -631,6 +633,23 @@ public class ThesisReportService {
                 || !storage.bucket().equals(previous.bucket())) {
             return;
         }
+        // Defer the old object's deletion until the transaction commits: a
+        // rollback after this point would otherwise leave the surviving row
+        // pointing at a deleted object — permanent data loss once storage is
+        // durable (Supabase), self-healing only while it is ephemeral.
+        if (!TransactionSynchronizationManager.isSynchronizationActive()) {
+            cleanupNow(previous);
+            return;
+        }
+        TransactionSynchronizationManager.registerSynchronization(new TransactionSynchronization() {
+            @Override
+            public void afterCommit() {
+                cleanupNow(previous);
+            }
+        });
+    }
+
+    private void cleanupNow(StoredObjectRef previous) {
         try {
             storage.delete(previous.key());
         } catch (ThesisReportStorageException exception) {
