@@ -47,6 +47,10 @@ class SeededAccountLockMigrationTest {
      */
     @AfterEach
     void restoreMigrationSeed() {
+        // This test runs against its own H2 database (seed_lock), so the
+        // restore below is a courtesy for any future in-database consumer of
+        // the demo student, not a dependency of AuthRuntimeConfigurationTest —
+        // that test re-seeds itself on the shared restful_api database.
         jdbc.update(
                 "INSERT INTO \"campuscore_auth\".\"User\""
                         + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
