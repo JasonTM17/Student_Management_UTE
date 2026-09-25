@@ -597,12 +597,16 @@ test('admin overview counts students from academic records, not all user account
   assert.doesNotMatch(page, /usersApi\.getAll/);
 });
 
-test('demo credentials agree on one password across README and runbook', () => {
+test('demo credentials agree on one password across README variants and runbook', () => {
   const readme = fs.readFileSync(path.join(root, '../README.md'), 'utf8');
+  const readmeVi = fs.readFileSync(path.join(root, '../README.vi.md'), 'utf8');
+  const readmeEn = fs.readFileSync(path.join(root, '../README.en.md'), 'utf8');
   const runbook = fs.readFileSync(path.join(root, '../docs/DEMO_RUNBOOK.md'), 'utf8');
 
   // admin123 was a stale README credential that could not log in a fresh clone.
   assert.doesNotMatch(readme, /admin123/);
+  assert.doesNotMatch(readmeVi, /admin123/);
+  assert.doesNotMatch(readmeEn, /admin123/);
   assert.doesNotMatch(runbook, /admin123/);
 });
 

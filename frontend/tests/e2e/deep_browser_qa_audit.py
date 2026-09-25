@@ -301,7 +301,7 @@ def run_deep_qa_audit():
         time.sleep(1)
 
         admin_page.locator('input[type="email"]').fill("admin@campuscore.edu")
-        admin_page.locator('input[type="password"]').fill("admin123")
+        admin_page.locator('input[type="password"]').fill("password123")
         admin_page.locator('button:has-text("Đăng nhập")').click()
         admin_page.wait_for_url("**/admin**", timeout=10000)
         time.sleep(3)

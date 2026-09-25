@@ -122,7 +122,7 @@ Demo Account: `lecturer@campuscore.edu` | Password: `password123`
 
 ### 4. Administrator Journey (Role: ADMIN)
 
-Demo Account: `admin@campuscore.edu` | Password: `admin123`
+Demo Account: `admin@campuscore.edu` | Password: `password123`
 
 | Operational Administration Dashboard | User Accounts & Role Provisioning |
 | --- | --- |
@@ -495,8 +495,8 @@ The values below are the **Docker Compose defaults**. Every host port can be ove
 | --- | --- | --- | --- |
 | **Student** | `student@campuscore.edu` | `password123` | Course enrollment, timetable, grades, AI assistant, thesis |
 | **Lecturer** | `lecturer@campuscore.edu` | `password123` | Teaching schedule, gradebook entry, thesis guidance |
-| **Admin** | `admin@campuscore.edu` | `admin123` | User administration, catalog & section scheduling, RAG drafting |
-| **Second Admin** | `admin002@campuscore.demo` | `admin123` | Independent admin used for the Four-Eyes cross-review of RAG knowledge |
+| **Admin** | `admin@campuscore.edu` | `password123` | User administration, catalog & section scheduling, RAG drafting |
+| **Second Admin** | `admin002@campuscore.demo` | `password123` | Independent admin used for the Four-Eyes cross-review of RAG knowledge |
 
 The demo seed also provisions a supporting lecturer directory (`lecturer002@campuscore.demo` through `lecturer012@campuscore.demo`) so section rosters, committees, and teaching schedules mirror a real campus population.
 

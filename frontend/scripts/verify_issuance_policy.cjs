@@ -100,7 +100,7 @@ async function main() {
     console.log('6. Logging in as admin to check user management policy...');
     await page.goto(`${BASE_URL}/login?portal=admin`, { waitUntil: 'networkidle', timeout: 30000 });
     await page.locator('#email').fill('admin@campuscore.edu');
-    await page.locator('#password').fill('admin123');
+    await page.locator('#password').fill('password123');
     await page.locator('button[type="submit"]').click();
     await page.waitForURL(/admin/, { timeout: 30000 });
     await page.waitForTimeout(1500);

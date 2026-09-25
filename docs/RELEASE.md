@@ -43,7 +43,7 @@ reproducible smoke. The published-artifact overlay rejects an unset tag so a
 moving registry alias cannot be selected accidentally. This
 includes `student-management-ute-database`, a thin
 `postgres:15-alpine` wrapper with no migrations or credentials. Flyway in the
-REST API remains the only schema/seed owner; upgrading PostgreSQL requires a
+Java services (rag-service in compose / REST API standalone) remains the only schema/seed owner; upgrading PostgreSQL requires a
 fresh database and the same Flyway/health checks above:
 
 ```powershell
