@@ -22,6 +22,12 @@ services:
         value: "-XX:+UseSerialGC -Xmx300m -Xss512k -XX:MaxMetaspaceSize=128m -XX:ReservedCodeCacheSize=36m -XX:+ExitOnOutOfMemoryError"
       - key: SECURITY_JWT_REJECT_KNOWN_DEFAULTS
         value: "true"
+      # Unlocks /api/v1/health/readiness (the DB-aware probe). liveness stays
+      # the Render healthCheckPath on purpose: coupling liveness to a remote
+      # database would restart the service on every Supabase blip, while
+      # readiness exists precisely to report that dependency.
+      - key: HEALTH_READINESS_KEY
+        sync: false
       - key: SPRING_DATASOURCE_URL
         sync: false
       - key: SPRING_DATASOURCE_USERNAME
