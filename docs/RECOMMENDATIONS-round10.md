@@ -200,6 +200,31 @@ class + fixture của test notification thiếu cột mà lookup của `AccountS
 không bị ảnh hưởng (EXIT=0). Đây là dạng thứ tự-phụ thuộc của test — nên sửa bằng cách hoàn thiện
 fixture bảng `campuscore_auth."User"` trong test notification.
 
+## 5b. Trạng thái sau push (25/09/2026)
+
+- **Push:** `d1d14fe9..81917d28` → `origin/main`. **CI run 36082029486: SUCCESS 6/6 jobs** —
+  lần đầu tiên Official Playwright e2e chạy trong CI (xanh 2 lần liên tiếp, 6m45s–6m59s) —
+  **C1 đóng bằng chứng thật**. Mobile xanh (re-pin atlas). Java xanh (fix thứ tự H2 seed,
+  2 commit `0692157e`, `81917d28`). Compose job chạy assertion mới: admin002 ACTIVE + login trên
+  demo stack, `an.hnt@campuscore.demo` LOCKED + 401.
+- **G2 trên production: KHÔNG TỒN TẠI drift** — `flyway validate` (read-only, qua
+  `ops/secrets/supabase_db_url`) EXIT=0 với mọi checksum đã apply; duy nhất V82 pending như kỳ
+  vọng → **không cần repair**; Render đã tự apply V82 khi boot (history: 82/81/80).
+- ⚠️ **Phát hiện production 1 — config split-brain (cần quyết định của chủ dự án):** trên Render
+  live, `admin002@campuscore.demo` **đăng nhập 200 với mật khẩu published** (xác minh DB:
+  admin002 + lecturer002 ACTIVE, an.hnt LOCKED). render.yaml khai báo
+  `DEMO_ACCOUNTS_ENABLED="false"` nhưng env thực tế của service khác blueprint (dashboard
+  override hoặc gate fail-soft skip). Kết quả: một **admin login công khai** trên host public.
+  Hành động đề xuất: kiểm tra Render dashboard → Environment → `DEMO_ACCOUNTS_ENABLED`, đặt về
+  `false` (gate sẽ re-lock đúng bộ V82 ở boot kế tiếp).
+- ⚠️ **Phát hiện production 2 — rotate mật khẩu DB:** một lần chạy `flyway` ban đầu in URL
+  (kèm password Supabase) vào output phiên làm việc. Theo kỷ luật rotation của chính repo, mật
+  khẩu này coi như đã lộ: **rotate trong Supabase dashboard và cập nhật
+  `ops/secrets/supabase_db_url` + Render env**.
+- Vẫn còn mở (backlog có chủ đích): diễn tập demo từ clone sạch (mục 4), C2/G5 test
+  credit-limit & course-code, V83 parity + FK indexes, O1/O2/O3 (storage, topology, readiness),
+  honesty pass docs.
+
 ## 6. Thước đo hoàn thành (mỗi mục kiểm chứng được bằng lệnh/trạng thái)
 
 - Pending diff committed với evidence: 2 spec mới xanh + full suite xanh (log lưu kèm commit).
