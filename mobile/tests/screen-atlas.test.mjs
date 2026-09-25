@@ -111,9 +111,12 @@ test('Stitch mobile references stay traceable and live sign-in enforces the stud
   );
 
   assert.equal(stitchReferenceIds.length, 12);
-  assert.equal(stitchMetadata.inventory.screenCount, 22);
+  // The web atlas grew by three legitimate boards on 2026-09-20/21
+  // (web-thesis-submission-workspace, web-assistant-mascot-brand,
+  // web-lecturer-grade-entry): 22 -> 25 total, mobile unchanged at 13.
+  assert.equal(stitchMetadata.inventory.screenCount, 25);
   assert.equal(stitchMetadata.inventory.mobileCount, 13);
-  assert.equal(Object.keys(stitchMetadata.screens).length, 22);
+  assert.equal(Object.keys(stitchMetadata.screens).length, 25);
   assert.equal(
     Object.values(stitchMetadata.screens).filter((screen) => screen.deviceType === 'MOBILE').length,
     13,
