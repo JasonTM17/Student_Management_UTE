@@ -44,9 +44,25 @@ class AuthRuntimeConfigurationTest {
      * unlocks the account with explicit SQL — exactly what the CI compose job
      * and the README "Local demo accounts" section describe — and only then
      * starts a session.
+     *
+     * <p>Several persistence tests legitimately wipe the shared H2 User table
+     * and class execution order is not guaranteed across platforms, so this
+     * test re-establishes the migration-seeded demo student idempotently
+     * instead of assuming the Flyway seed survived.
      */
     @Test
     void migratedDemoStudentIsLockedUntilExplicitlyUnlocked() throws Exception {
+        jdbc.update("""
+                INSERT INTO "campuscore_auth"."User"
+                 ("id", "email", "password", "firstName", "lastName", "status",
+                  "emailVerified", "isSuperAdmin", "failedLoginAttempts", "createdAt", "updatedAt")
+                SELECT 'student-user', 'student@campuscore.edu',
+                 '$2a$10$raV9MB3Qmj1Rbu2Rmo1vNup7VsC2OM3AqmcTcTLzbNyMyI4r2rJBe', 'Demo', 'Student',
+                 'LOCKED', TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP
+                WHERE NOT EXISTS (
+                 SELECT 1 FROM "campuscore_auth"."User" WHERE "email" = 'student@campuscore.edu')
+                """);
+
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
                         .content("{\"email\":\"student@campuscore.edu\",\"password\":\"password123\"}"))

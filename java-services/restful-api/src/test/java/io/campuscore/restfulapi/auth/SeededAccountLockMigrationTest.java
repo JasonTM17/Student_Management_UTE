@@ -4,6 +4,7 @@ import static org.assertj.core.api.Assertions.assertThat;
 
 import java.nio.file.Files;
 import java.nio.file.Path;
+import org.junit.jupiter.api.AfterEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.context.SpringBootTest;
@@ -35,6 +36,26 @@ class SeededAccountLockMigrationTest {
 
     @Autowired
     private JdbcTemplate jdbc;
+
+    /**
+     * This is the only test in the auth package that clears the shared User
+     * table, and AuthRuntimeConfigurationTest depends on the migration-seeded
+     * demo student surviving between classes. Re-seed the canonical demo rows
+     * afterwards so class order can never strand that test with an empty
+     * table (the CI failure this guard prevents: EmptyResultDataAccess in
+     * AuthRuntimeConfigurationTest).
+     */
+    @AfterEach
+    void restoreMigrationSeed() {
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"User\""
+                        + " (\"id\", \"email\", \"password\", \"firstName\", \"lastName\", \"status\","
+                        + "  \"emailVerified\", \"isSuperAdmin\", \"failedLoginAttempts\", \"createdAt\", \"updatedAt\")"
+                        + " SELECT 'student-user', 'student@campuscore.edu',"
+                        + " '$2a$10$raV9MB3Qmj1Rbu2Rmo1vNup7VsC2OM3AqmcTcTLzbNyMyI4r2rJBe', 'Demo', 'Student',"
+                        + " 'LOCKED', TRUE, FALSE, 0, CURRENT_TIMESTAMP, CURRENT_TIMESTAMP"
+                        + " WHERE NOT EXISTS (SELECT 1 FROM \"campuscore_auth\".\"User\" WHERE \"email\" = 'student@campuscore.edu')");
+    }
 
     @Test
     void v48AndItsH2TwinCarryTheSameCompleteLockPredicate() throws Exception {
