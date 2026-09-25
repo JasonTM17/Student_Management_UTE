@@ -62,6 +62,15 @@ class AuthRuntimeConfigurationTest {
                 WHERE NOT EXISTS (
                  SELECT 1 FROM "campuscore_auth"."User" WHERE "email" = 'student@campuscore.edu')
                 """);
+        // A re-seeded row has no roles; the response contract under test
+        // (user.roles[0] = STUDENT) needs the migration-seeded grant back.
+        jdbc.update("""
+                INSERT INTO "campuscore_auth"."UserRole" ("id", "userId", "roleId")
+                SELECT 'user-role-student', 'student-user', 'role-student'
+                WHERE NOT EXISTS (
+                 SELECT 1 FROM "campuscore_auth"."UserRole"
+                 WHERE "userId" = 'student-user' AND "roleId" = 'role-student')
+                """);
 
         mvc.perform(post("/api/v1/auth/login")
                         .contentType(MediaType.APPLICATION_JSON)
