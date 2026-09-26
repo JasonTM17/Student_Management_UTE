@@ -69,7 +69,7 @@ public class AuthLoginController {
                     null,
                     Boolean.TRUE,
                     result.challengeId(),
-                    result.maskedEmail());
+                    result.email());
         }
         cookies.issue(
                 servletRequest,

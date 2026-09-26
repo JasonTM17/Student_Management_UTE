@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.auth;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.anyString;
@@ -245,7 +246,7 @@ class TwoFactorLoginPersistenceTest {
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$.twoFactorRequired").value(true))
                 .andExpect(jsonPath("$.challengeId", org.hamcrest.Matchers.notNullValue()))
-                .andExpect(jsonPath("$.maskedEmail").value("s***@campuscore.edu"))
+                .andExpect(jsonPath("$.email").value("s***@campuscore.edu"))
                 .andExpect(jsonPath("$.accessToken").doesNotExist())
                 .andExpect(jsonPath("$.refreshToken").doesNotExist())
                 .andExpect(jsonPath("$.user").doesNotExist())
@@ -298,6 +299,53 @@ class TwoFactorLoginPersistenceTest {
                         .content("{\"challengeId\":\"" + loginChallengeId + "\",\"code\":\"" + loginCode + "\"}"))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("TWO_FACTOR_CHALLENGE_INVALID"));
+    }
+
+    @Test
+    void enableChallengeLocksAfterFiveWrongAttemptsEvenWhenTheRightCodeArrivesLater() throws Exception {
+        MvcResult enable = mvc.perform(post("/api/v1/me/two-factor/enable")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"password\":\"" + STUDENT_PASSWORD + "\"}"))
+                .andExpect(status().isOk())
+                .andReturn();
+        String enableChallengeId = objectMapper
+                .readTree(enable.getResponse().getContentAsString())
+                .path("challengeId").asText();
+        latestCode();
+
+        // Attempts 1-4: wrong code -> TWO_FACTOR_CODE_INVALID; each attempt must
+        // persist across the transaction boundary (Kongming condition on the
+        // ENABLE branch).
+        for (int attempt = 1; attempt <= 4; attempt++) {
+            mvc.perform(post("/api/v1/me/two-factor/confirm")
+                            .with(jwt().jwt(token -> token.subject("student-user")))
+                            .contentType(MediaType.APPLICATION_JSON)
+                            .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"000000\"}"))
+                    .andExpect(status().isBadRequest())
+                    .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_INVALID"));
+        }
+
+        // Attempt 5: the challenge locks.
+        mvc.perform(post("/api/v1/me/two-factor/confirm")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"000000\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_LOCKED"));
+
+        // Even the correct code is refused afterwards, and the flag stays off.
+        mvc.perform(post("/api/v1/me/two-factor/confirm")
+                        .with(jwt().jwt(token -> token.subject("student-user")))
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content("{\"challengeId\":\"" + enableChallengeId + "\",\"code\":\"" + latestCode() + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TWO_FACTOR_CHALLENGE_INVALID"));
+
+        Boolean flag = jdbc.queryForObject(
+                "SELECT \"twoFactorEnabled\" FROM \"campuscore_auth\".\"User\" WHERE \"id\" = 'student-user'",
+                Boolean.class);
+        assertFalse(flag, "twoFactorEnabled must stay off after a locked enable challenge");
     }
 
     @Test

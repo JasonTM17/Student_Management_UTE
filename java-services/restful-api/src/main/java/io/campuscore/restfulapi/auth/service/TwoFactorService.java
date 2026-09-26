@@ -16,7 +16,6 @@ import java.time.Duration;
 import java.time.Instant;
 import java.util.HexFormat;
 import java.util.Map;
-import java.util.Objects;
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -115,8 +114,13 @@ public class TwoFactorService {
         return createAndDeliverChallenge(user.id(), TwoFactorChallengeRepository.PURPOSE_ENABLE);
     }
 
-    /** Confirms the ENABLE challenge and flips the account switch on. */
-    @Transactional
+    /**
+     * Confirms the ENABLE challenge and flips the account switch on.
+     * Wrong attempts must persist across the transaction boundary (same
+     * 5-strikes lock as the LOGIN branch), so AppException is exempted from
+     * the rollback.
+     */
+    @Transactional(noRollbackFor = AppException.class)
     public void confirmEnable(String userId, String challengeId, String code) {
         ChallengeRecord challenge = requireUsableChallenge(
                 challengeId, TwoFactorChallengeRepository.PURPOSE_ENABLE, userId);
@@ -190,7 +194,12 @@ public class TwoFactorService {
 
     private void verifyCode(ChallengeRecord challenge, String code) {
         String submitted = requireText(code, "code is required");
-        if (Objects.equals(challenge.codeHash(), sha256(submitted))) {
+        // Constant-time comparison of the stored hex digest against the
+        // submitted code's digest; MessageDigest.isEqual also tolerates the
+        // length difference without leaking where the mismatch starts.
+        if (MessageDigest.isEqual(
+                challenge.codeHash().getBytes(StandardCharsets.UTF_8),
+                sha256(submitted).getBytes(StandardCharsets.UTF_8))) {
             return;
         }
         int attempts = challenges.incrementAttempts(challenge.id());

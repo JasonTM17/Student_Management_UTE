@@ -325,7 +325,7 @@ public class AuthLoginService {
             Instant accessTokenExpiresAt,
             Instant refreshTokenExpiresAt,
             String challengeId,
-            String maskedEmail) {
+            String email) {
 
         public static LoginResult session(
                 LoginResponse response,
@@ -334,8 +334,8 @@ public class AuthLoginService {
             return new LoginResult(response, accessTokenExpiresAt, refreshTokenExpiresAt, null, null);
         }
 
-        public static LoginResult challenge(String challengeId, String maskedEmail) {
-            return new LoginResult(null, null, null, challengeId, maskedEmail);
+        public static LoginResult challenge(String challengeId, String email) {
+            return new LoginResult(null, null, null, challengeId, email);
         }
     }
 }

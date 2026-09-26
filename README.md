@@ -584,6 +584,14 @@ khai công khai, và là giá trị `render.yaml` đặt tường minh.
 Nếu không đặt `NEXT_PUBLIC_SHOW_DEMO_CREDENTIALS=true` kèm mật khẩu, nút "Điền nhanh" sẽ **ẩn**.
 Đăng nhập bằng tay vẫn hoạt động bình thường — trang đăng nhập chỉ không quảng cáo thông tin đăng nhập.
 
+### Xác thực hai yếu tố (2FA) qua email OTP
+
+Mỗi tài khoản **tự bật** 2FA trong trang *Hồ sơ → Xác thực hai yếu tố*: nhập mật khẩu, nhận mã 6 chữ số
+qua email, xác nhận một lần. Khi 2FA đang bật, bước đăng nhập sẽ dừng sau mật khẩu và yêu cầu mã OTP —
+mã lưu dưới dạng SHA-256, hạn 10 phút, sai 5 lần thì khoá yêu cầu; endpoint xác minh có rate limit riêng.
+Tắt 2FA chỉ cần nhập lại mật khẩu. Luồng gửi mail phụ thuộc SMTP đã cấu hình (`SPRING_MAIL_*`); môi
+trường chưa cấu hình SMTP sẽ nhận lỗi 502 `MAIL_DELIVERY_FAILED` thay vì gửi giả thành công.
+
 ---
 
 ## Đặc tả RESTful API
