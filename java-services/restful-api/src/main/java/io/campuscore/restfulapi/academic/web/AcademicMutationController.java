@@ -78,15 +78,16 @@ public class AcademicMutationController {
                 .body(Map.of("message", "Enrollment dropped successfully"));
     }
 
-    @Operation(summary = "Quản trị xóa vĩnh viễn bản ghi ghi danh", description = "Xóa một bản ghi ghi danh của sinh viên khỏi hệ thống học vụ")
+    @Operation(summary = "Quản trị xóa vĩnh viễn bản ghi ghi danh", description = "Xóa một bản ghi ghi danh của sinh viên khỏi hệ thống học vụ và ghi vết hành vi quản trị (EnrollmentEvent + AdminAudit)")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Xóa thành công")
     })
     @DeleteMapping("enrollments/{id}")
     @PreAuthorize("hasAnyRole('ADMIN', 'SUPER_ADMIN')")
     public Map<String, String> deleteEnrollment(
+            @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh ghi danh (UUID)", required = true) @PathVariable String id) {
-        mutations.deleteEnrollment(id);
+        mutations.deleteEnrollment(id, jwt != null ? jwt.getSubject() : null);
         return Map.of("message", "Enrollment deleted successfully");
     }
 
@@ -116,7 +117,7 @@ public class AcademicMutationController {
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId,
             @Valid @RequestBody GradeUpdateRequest request) {
         List<String> roles = jwt.getClaimAsStringList("roles");
-        mutations.updateGrades(sectionId, jwt.getClaimAsString("lecturerId"), isAdmin(roles), request.grades());
+        mutations.updateGrades(sectionId, jwt.getClaimAsString("lecturerId"), isAdmin(roles), jwt.getSubject(), request.grades());
         return Map.of("message", "Grades saved as draft");
     }
 
@@ -130,7 +131,7 @@ public class AcademicMutationController {
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã định danh lớp học phần (UUID)", required = true) @PathVariable String sectionId) {
         List<String> roles = jwt.getClaimAsStringList("roles");
-        mutations.publishGrades(sectionId, jwt.getClaimAsString("lecturerId"), isAdmin(roles));
+        mutations.publishGrades(sectionId, jwt.getClaimAsString("lecturerId"), isAdmin(roles), jwt.getSubject());
         return Map.of("message", "Grades published successfully");
     }
 

@@ -14,6 +14,10 @@ public enum RateLimitCategory {
     ASSISTANT_CHAT(20, 60, "Hội thoại trợ lý ảo"),
     ADMIN_MUTATION(30, 60, "Quản trị hệ thống"),
     NOTIFICATION_MUTATION(30, 60, "Thông báo cá nhân"),
+    /** Audit S6: outbound mail is expensive; 5 sends per hour per identity. */
+    MAIL_MUTATION(5, 3600, "Gửi thông báo qua mail"),
+    /** Audit S6: password-reset issuance; 3 resets per hour per identity. */
+    PASSWORD_RESET(3, 3600, "Đặt lại mật khẩu người dùng"),
     DEFAULT_POST(40, 60, "Thao tác chung");
 
     private final int defaultLimit;

@@ -31,7 +31,7 @@ class RateLimitFilterTest {
         limiterService = new RateLimiterService();
         // trustProxyHeaders=false keeps the default socket-address client key,
         // matching direct (non-proxied) request handling in these tests.
-        properties = new RateLimitProperties(true, false, 5, 40, 60);
+        properties = new RateLimitProperties(true, false, false, 5, 40, 60);
         errorWriter = new ApiErrorWriter(new ObjectMapper());
         filter = new RateLimitFilter(limiterService, properties, errorWriter);
         SecurityContextHolder.clearContext();
@@ -115,7 +115,7 @@ class RateLimitFilterTest {
     }
 
     @Test
-    void xForwardedForHeaderExtractsFirstClientIp() throws Exception {
+    void proxiedRequestsKeepTheSocketAddressWhenHeaderTrustIsOff() throws Exception {
         MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/login");
         req.addHeader("X-Forwarded-For", "203.0.113.195, 70.41.3.18, 150.172.238.178");
         req.setRemoteAddr("172.18.0.5"); // proxy/docker internal address
@@ -127,6 +127,68 @@ class RateLimitFilterTest {
         verify(chain).doFilter(req, res);
         assertEquals("5", res.getHeader("X-RateLimit-Limit"));
         assertEquals("4", res.getHeader("X-RateLimit-Remaining"));
+    }
+
+    /**
+     * Audit S1: behind a trusted proxy the RIGHTMOST X-Forwarded-For element is
+     * the one the proxy appended; earlier entries are client-supplied and
+     * spoofable (Render appends the real client IP last).
+     */
+    @Test
+    void trustedProxyUsesTheRightmostForwardedForEntry() {
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.addHeader("X-Forwarded-For", "1.2.3.4, 5.6.7.8, 203.0.113.9");
+        request.setRemoteAddr("10.0.0.1");
+
+        assertEquals("203.0.113.9", proxyFilter.resolveClientIp(request));
+    }
+
+    /** Audit S1: a spoofed X-Real-IP is ignored unless explicitly opted in. */
+    @Test
+    void realIpIsIgnoredUnlessExplicitlyTrusted() {
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+
+        MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        request.addHeader("X-Real-IP", "6.6.6.6");
+        request.addHeader("X-Forwarded-For", "1.2.3.4, 203.0.113.9");
+        request.setRemoteAddr("10.0.0.1");
+
+        assertEquals("203.0.113.9", proxyFilter.resolveClientIp(request));
+
+        RateLimitProperties realIpTrusted = new RateLimitProperties(true, true, true, 5, 40, 60);
+        assertEquals("6.6.6.6",
+                new RateLimitFilter(limiterService, realIpTrusted, errorWriter).resolveClientIp(request));
+    }
+
+    /** Audit S1: spoofed first entries must not open extra IP buckets. */
+    @Test
+    void spoofedForwardedPrefixesShareOneBucketWhileDistinctRealIpsDoNot() throws Exception {
+        RateLimitProperties proxyTrusted = new RateLimitProperties(true, true, false, 5, 40, 60);
+        RateLimitFilter proxyFilter = new RateLimitFilter(limiterService, proxyTrusted, errorWriter);
+
+        for (int i = 1; i <= 3; i++) {
+            MockHttpServletRequest request = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+            request.addHeader("X-Forwarded-For", "spoofed-" + i + ", 203.0.113.9");
+            request.setRemoteAddr("10.0.0.1");
+            MockHttpServletResponse response = new MockHttpServletResponse();
+            proxyFilter.doFilter(request, response, mock(FilterChain.class));
+            assertEquals(String.valueOf(5 - i), response.getHeader("X-RateLimit-Remaining"));
+        }
+        // Three spoofed variants of one real client = exactly one bucket.
+        assertEquals(1, limiterService.getActiveKeyCount());
+
+        MockHttpServletRequest other = new MockHttpServletRequest("POST", "/api/v1/auth/login");
+        other.addHeader("X-Forwarded-For", "spoofed-1, 198.51.100.7");
+        other.setRemoteAddr("10.0.0.1");
+        MockHttpServletResponse otherResponse = new MockHttpServletResponse();
+        proxyFilter.doFilter(other, otherResponse, mock(FilterChain.class));
+        // A different real (rightmost) client gets a fresh bucket of 5.
+        assertEquals("4", otherResponse.getHeader("X-RateLimit-Remaining"));
+        assertEquals(2, limiterService.getActiveKeyCount());
     }
 
     @Test
@@ -181,5 +243,27 @@ class RateLimitFilterTest {
 
         // Two distinct buckets for the same caller identity.
         assertEquals(2, limiterService.getActiveKeyCount());
+    }
+
+    /** Audit S6: outbound mail gets its own 5/hour bucket. */
+    @Test
+    void mailMutationsAreCappedAtFivePerHour() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/mail/notice");
+        req.setRemoteAddr("10.0.0.8");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        filter.doFilter(req, res, mock(FilterChain.class));
+        assertEquals("5", res.getHeader("X-RateLimit-Limit"));
+        assertEquals("4", res.getHeader("X-RateLimit-Remaining"));
+    }
+
+    /** Audit S6: admin password-reset issuance gets its own 3/hour bucket. */
+    @Test
+    void passwordResetIssuanceIsCappedAtThreePerHour() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/users/user-42/password-reset");
+        req.setRemoteAddr("10.0.0.9");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        filter.doFilter(req, res, mock(FilterChain.class));
+        assertEquals("3", res.getHeader("X-RateLimit-Limit"));
+        assertEquals("2", res.getHeader("X-RateLimit-Remaining"));
     }
 }
