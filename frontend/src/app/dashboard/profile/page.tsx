@@ -1,7 +1,7 @@
 'use client';
 
-import { useEffect, useState } from 'react';
-import { Calendar, Camera, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, Save, User } from 'lucide-react';
+import { useEffect, useMemo, useState } from 'react';
+import { Calendar, Camera, Eye, EyeOff, KeyRound, Mail, MapPin, Phone, Save, ShieldCheck, ShieldOff, User } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { authApi } from '@/lib/api';
 import { Button } from '@/components/ui/button';
@@ -11,10 +11,12 @@ import { LoadingState } from '@/components/ui/state-block';
 import { WorkspacePanel } from '@/components/dashboard/WorkspaceSurface';
 import { useI18n } from '@/i18n';
 import { isDemoUser } from '@/lib/login-portal';
-import { campusErrorMessage } from '@/lib/campus-error';
+import { campusCodeMessage, campusErrorMessage, type CampusErrorCopy } from '@/lib/campus-error';
+import { maskEmail, normalizeOtpCode } from '@/lib/two-factor';
+import { cn } from '@/lib/utils';
 import { toast } from 'sonner';
 
-type PasswordFieldKey = 'oldPassword' | 'newPassword' | 'confirmPassword';
+type PasswordFieldKey = 'oldPassword' | 'newPassword' | 'confirmPassword' | 'twoFactorPassword';
 
 const MAX_AVATAR_DATA_URL_LENGTH = 200_000;
 const MAX_AVATAR_DIMENSION = 320;
@@ -112,6 +114,7 @@ function PasswordField({
   placeholder,
   hint,
   minLength,
+  autoComplete,
   visible,
   showLabel,
   hideLabel,
@@ -122,6 +125,7 @@ function PasswordField({
   placeholder: string;
   hint?: string;
   minLength?: number;
+  autoComplete?: string;
   visible: boolean;
   showLabel: string;
   hideLabel: string;
@@ -137,6 +141,7 @@ function PasswordField({
       required
       minLength={minLength}
       hint={hint}
+      autoComplete={autoComplete}
       icon={<KeyRound className="h-4 w-4" />}
       endAction={
         <button
@@ -166,7 +171,18 @@ export default function ProfilePage() {
     oldPassword: false,
     newPassword: false,
     confirmPassword: false,
+    twoFactorPassword: false,
   });
+  // Two-factor (2FA) card state. `null` means the status has not loaded yet;
+  // the one-time code never leaves component state and is never logged.
+  const [twoFactorEnabled, setTwoFactorEnabled] = useState<boolean | null>(null);
+  const [twoFactorStatusError, setTwoFactorStatusError] = useState('');
+  const [twoFactorStage, setTwoFactorStage] = useState<'idle' | 'confirm'>('idle');
+  const [twoFactorPassword, setTwoFactorPassword] = useState('');
+  const [twoFactorCode, setTwoFactorCode] = useState('');
+  const [twoFactorChallengeId, setTwoFactorChallengeId] = useState('');
+  const [isTwoFactorBusy, setIsTwoFactorBusy] = useState(false);
+  const [twoFactorError, setTwoFactorError] = useState('');
   // Key the form by user id so it initializes only after the profile has
   // loaded: seeding from a null user then saving would wipe every field.
   const [formData, setFormData] = useState(() => profileFormState(user));
@@ -191,6 +207,151 @@ export default function ProfilePage() {
       ...current,
       [field]: !current[field],
     }));
+  };
+
+  // Two-factor status belongs to the signed-in account, so reload it when the
+  // user context resolves (or changes) rather than once per mount.
+  useEffect(() => {
+    if (!user?.id) {
+      return;
+    }
+    let active = true;
+    authApi
+      .getTwoFactorStatus()
+      .then((status) => {
+        if (active) {
+          setTwoFactorEnabled(Boolean(status.enabled));
+          setTwoFactorStatusError('');
+        }
+      })
+      .catch(() => {
+        if (active) {
+          setTwoFactorEnabled(null);
+          setTwoFactorStatusError(messages.profile.twoFactor.errors.statusFailed);
+        }
+      });
+    return () => {
+      active = false;
+    };
+  }, [user?.id, messages.profile.twoFactor.errors.statusFailed]);
+
+  // Business codes from the two-factor endpoints take priority over the
+  // generic HTTP-kind copy so the message names the actual failure.
+  const twoFactorErrorCopy: CampusErrorCopy = useMemo(
+    () => ({
+      ...messages.common.campusErrors,
+      codes: {
+        ...messages.common.campusErrors.codes,
+        TWO_FACTOR_CODE_INVALID: messages.profile.twoFactor.errors.codeInvalid,
+        TWO_FACTOR_CODE_LOCKED: messages.profile.twoFactor.errors.codeLocked,
+        TWO_FACTOR_CODE_EXPIRED: messages.profile.twoFactor.errors.codeExpired,
+        TWO_FACTOR_ALREADY_ENABLED: messages.profile.twoFactor.errors.alreadyEnabled,
+        MAIL_DELIVERY_FAILED: messages.profile.twoFactor.errors.mailFailed,
+      },
+    }),
+    [messages.common.campusErrors, messages.profile.twoFactor.errors],
+  );
+
+  const resetTwoFactorFlow = () => {
+    setTwoFactorStage('idle');
+    setTwoFactorPassword('');
+    setTwoFactorCode('');
+    setTwoFactorChallengeId('');
+  };
+
+  const handleEnableTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorError('');
+    if (!twoFactorPassword) {
+      setTwoFactorError(messages.profile.twoFactor.errors.passwordRequired);
+      return;
+    }
+
+    setIsTwoFactorBusy(true);
+    try {
+      const { challengeId } = await authApi.beginTwoFactorEnable(twoFactorPassword);
+      setTwoFactorChallengeId(challengeId);
+      setTwoFactorCode('');
+      setTwoFactorStage('confirm');
+    } catch (error: unknown) {
+      setTwoFactorError(
+        campusCodeMessage(
+          error,
+          twoFactorErrorCopy,
+          messages.profile.twoFactor.errors.enableFailed,
+        ),
+      );
+    } finally {
+      // The password is needed only for the request itself; drop it either way.
+      setTwoFactorPassword('');
+      setIsTwoFactorBusy(false);
+    }
+  };
+
+  const handleConfirmTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorError('');
+    if (!twoFactorChallengeId) {
+      setTwoFactorStage('idle');
+      return;
+    }
+
+    const normalizedCode = normalizeOtpCode(twoFactorCode);
+    if (normalizedCode.length !== 6) {
+      setTwoFactorError(messages.profile.twoFactor.errors.invalidFormat);
+      return;
+    }
+
+    setIsTwoFactorBusy(true);
+    try {
+      const result = await authApi.confirmTwoFactorEnable(twoFactorChallengeId, normalizedCode);
+      setTwoFactorEnabled(Boolean(result.enabled));
+      resetTwoFactorFlow();
+      toast.success(messages.profile.twoFactor.enabledToast);
+    } catch (error: unknown) {
+      setTwoFactorError(
+        campusCodeMessage(
+          error,
+          twoFactorErrorCopy,
+          messages.profile.twoFactor.errors.confirmFailed,
+        ),
+      );
+    } finally {
+      setIsTwoFactorBusy(false);
+    }
+  };
+
+  const handleDisableTwoFactor = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setTwoFactorError('');
+    if (!twoFactorPassword) {
+      setTwoFactorError(messages.profile.twoFactor.errors.passwordRequired);
+      return;
+    }
+
+    setIsTwoFactorBusy(true);
+    try {
+      const result = await authApi.disableTwoFactor(twoFactorPassword);
+      setTwoFactorEnabled(Boolean(result.enabled));
+      resetTwoFactorFlow();
+      toast.success(messages.profile.twoFactor.disabledToast);
+    } catch (error: unknown) {
+      setTwoFactorError(
+        campusCodeMessage(
+          error,
+          twoFactorErrorCopy,
+          messages.profile.twoFactor.errors.disableFailed,
+        ),
+      );
+    } finally {
+      setTwoFactorPassword('');
+      setIsTwoFactorBusy(false);
+    }
+  };
+
+  const cancelTwoFactorConfirm = () => {
+    resetTwoFactorFlow();
+    setTwoFactorError('');
   };
 
   const handlePhotoChange = async (event: React.ChangeEvent<HTMLInputElement>) => {
@@ -269,6 +430,7 @@ export default function ProfilePage() {
         oldPassword: false,
         newPassword: false,
         confirmPassword: false,
+        twoFactorPassword: false,
       });
     } catch (error: any) {
       const message = campusErrorMessage(
@@ -540,6 +702,141 @@ export default function ProfilePage() {
                   </Button>
                 </div>
               </form>
+          </WorkspacePanel>
+
+          <WorkspacePanel
+            title={messages.profile.twoFactor.title}
+            description={messages.profile.twoFactor.description}
+            variant="muted"
+            contentClassName="space-y-4"
+          >
+            <div className="flex flex-wrap items-center gap-2.5">
+              {twoFactorEnabled === null ? (
+                <span className="text-sm text-muted-foreground">
+                  {messages.common.states.loading}
+                </span>
+              ) : (
+                <span
+                  className={cn(
+                    'inline-flex items-center gap-1.5 rounded-md border px-2.5 py-1 text-xs font-medium',
+                    twoFactorEnabled
+                      ? 'border-emerald-500/40 bg-emerald-500/10 text-emerald-700 dark:text-emerald-300'
+                      : 'border-border bg-card text-muted-foreground',
+                  )}
+                >
+                  {twoFactorEnabled ? (
+                    <ShieldCheck className="h-3.5 w-3.5" aria-hidden="true" />
+                  ) : (
+                    <ShieldOff className="h-3.5 w-3.5" aria-hidden="true" />
+                  )}
+                  {twoFactorEnabled
+                    ? messages.profile.twoFactor.statusEnabled
+                    : messages.profile.twoFactor.statusDisabled}
+                </span>
+              )}
+              <span className="inline-flex items-center gap-1.5 text-xs text-muted-foreground">
+                <Mail className="h-3.5 w-3.5" aria-hidden="true" />
+                {messages.profile.twoFactor.otpEmailLabel}: {user.email}
+              </span>
+            </div>
+
+            {twoFactorStatusError ? (
+              <p role="status" aria-live="polite" className="text-sm text-muted-foreground">
+                {twoFactorStatusError}
+              </p>
+            ) : null}
+
+            {twoFactorError ? (
+              <div role="alert" aria-live="assertive" className="rounded-lg border border-destructive/30 bg-destructive/5 px-4 py-3 text-sm text-destructive">
+                {twoFactorError}
+              </div>
+            ) : null}
+
+            {twoFactorStage === 'confirm' ? (
+              <form className="space-y-4" onSubmit={handleConfirmTwoFactor}>
+                <p
+                  role="status"
+                  aria-live="polite"
+                  className="rounded-lg border border-primary/25 bg-primary/5 px-3.5 py-2.5 text-sm font-medium text-foreground"
+                >
+                  {messages.profile.twoFactor.codeSentNotice.replace(
+                    '{email}',
+                    maskEmail(user.email),
+                  )}
+                </p>
+                <div className="space-y-2">
+                  <label htmlFor="two-factor-code" className="text-sm font-medium text-foreground">
+                    {messages.profile.twoFactor.codeLabel}
+                  </label>
+                  <Input
+                    id="two-factor-code"
+                    type="text"
+                    inputMode="numeric"
+                    autoComplete="one-time-code"
+                    value={twoFactorCode}
+                    onChange={(e) => setTwoFactorCode(normalizeOtpCode(e.target.value))}
+                    placeholder={messages.profile.twoFactor.codePlaceholder}
+                    maxLength={6}
+                    icon={<KeyRound className="h-4 w-4" />}
+                    required
+                  />
+                </div>
+                <div className="flex flex-wrap justify-end gap-2">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    onClick={cancelTwoFactorConfirm}
+                    disabled={isTwoFactorBusy}
+                  >
+                    {messages.common.actions.cancel}
+                  </Button>
+                  <Button type="submit" disabled={isTwoFactorBusy}>
+                    {isTwoFactorBusy
+                      ? messages.profile.twoFactor.confirming
+                      : messages.profile.twoFactor.confirm}
+                  </Button>
+                </div>
+              </form>
+            ) : (
+              <form
+                className="space-y-4"
+                onSubmit={twoFactorEnabled ? handleDisableTwoFactor : handleEnableTwoFactor}
+              >
+                <p className="text-sm leading-6 text-muted-foreground">
+                  {twoFactorEnabled
+                    ? messages.profile.twoFactor.disableHint
+                    : messages.profile.twoFactor.enableHint}
+                </p>
+                <div className="space-y-2">
+                  <label htmlFor="two-factor-password" className="text-sm font-medium text-foreground">
+                    {messages.profile.twoFactor.passwordLabel}
+                  </label>
+                  <PasswordField
+                    id="two-factor-password"
+                    name="twoFactorPassword"
+                    placeholder={messages.profile.twoFactor.passwordPlaceholder}
+                    autoComplete="current-password"
+                    visible={visiblePasswordFields.twoFactorPassword}
+                    showLabel={messages.login.showPassword}
+                    hideLabel={messages.login.hidePassword}
+                    onToggle={() => togglePasswordField('twoFactorPassword')}
+                  />
+                </div>
+                <div className="flex justify-end">
+                  <Button
+                    type="submit"
+                    variant={twoFactorEnabled ? 'destructive' : 'default'}
+                    disabled={isTwoFactorBusy || twoFactorEnabled === null}
+                  >
+                    {isTwoFactorBusy
+                      ? messages.profile.twoFactor.working
+                      : twoFactorEnabled
+                        ? messages.profile.twoFactor.disable
+                        : messages.profile.twoFactor.enable}
+                  </Button>
+                </div>
+              </form>
+            )}
           </WorkspacePanel>
 
           <WorkspacePanel

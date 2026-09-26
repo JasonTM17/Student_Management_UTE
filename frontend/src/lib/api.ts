@@ -6,6 +6,7 @@ import axios, {
 import type { TaxonomyCategory } from '@/lib/announcement-presentation';
 import {
   LoginResponse,
+  LoginResult,
   ApiResponse,
   User,
   Section,
@@ -393,8 +394,11 @@ api.interceptors.response.use(
 
 // Auth API
 export const authApi = {
-  login: async (email: string, password: string): Promise<LoginResponse> => {
-    const response = await api.post<LoginResponse>(
+  // A normal sign-in resolves to a full session; an account with two-factor
+  // enabled instead answers with TwoFactorChallengeResponse (no tokens) and
+  // the caller must finish with verifyTwoFactor.
+  login: async (email: string, password: string): Promise<LoginResult> => {
+    const response = await api.post<LoginResult>(
       '/auth/login',
       {
         email,
@@ -404,6 +408,62 @@ export const authApi = {
         skipAuthRefresh: true,
         skipAuthRedirect: true,
       } as AuthRequestConfig,
+    );
+    return response.data;
+  },
+
+  /**
+   * Second step of a two-factor sign-in: exchange the challenge id and the
+   * one-time code for the same session shape a normal login returns.
+   */
+  verifyTwoFactor: async (
+    challengeId: string,
+    code: string,
+  ): Promise<LoginResponse> => {
+    const response = await api.post<LoginResponse>(
+      '/auth/two-factor/verify',
+      { challengeId, code },
+      {
+        skipAuthRefresh: true,
+        skipAuthRedirect: true,
+      } as AuthRequestConfig,
+    );
+    return response.data;
+  },
+
+  getTwoFactorStatus: async (): Promise<{ enabled: boolean }> => {
+    const response = await api.get<{ enabled: boolean }>('/me/two-factor', {
+      skipAuthRefresh: true,
+      skipAuthRedirect: true,
+    } as AuthRequestConfig);
+    return response.data;
+  },
+
+  beginTwoFactorEnable: async (
+    password: string,
+  ): Promise<{ challengeId: string }> => {
+    const response = await api.post<{ challengeId: string }>(
+      '/me/two-factor/enable',
+      { password },
+    );
+    return response.data;
+  },
+
+  confirmTwoFactorEnable: async (
+    challengeId: string,
+    code: string,
+  ): Promise<{ enabled: boolean }> => {
+    const response = await api.post<{ enabled: boolean }>(
+      '/me/two-factor/confirm',
+      { challengeId, code },
+    );
+    return response.data;
+  },
+
+  disableTwoFactor: async (password: string): Promise<{ enabled: boolean }> => {
+    const response = await api.post<{ enabled: boolean }>(
+      '/me/two-factor/disable',
+      { password },
     );
     return response.data;
   },
