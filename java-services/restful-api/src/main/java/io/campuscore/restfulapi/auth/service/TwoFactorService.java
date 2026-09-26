@@ -166,7 +166,9 @@ public class TwoFactorService {
     private String createAndDeliverChallenge(String userId, String purpose) {
         String code = generateCode();
         Instant expiresAt = clock.instant().plus(CODE_TTL);
-        String challengeId = challenges.insert(userId, purpose, sha256(code), expiresAt);
+        // The digest binds the owner id: a code issued for one account can
+        // never verify against another account's challenge (Wukong P2.3).
+        String challengeId = challenges.insert(userId, purpose, sha256(userId + ':' + code), expiresAt);
         sendCodeEmail(userId, code);
         return challengeId;
     }
@@ -196,10 +198,12 @@ public class TwoFactorService {
         String submitted = requireText(code, "code is required");
         // Constant-time comparison of the stored hex digest against the
         // submitted code's digest; MessageDigest.isEqual also tolerates the
-        // length difference without leaking where the mismatch starts.
+        // length difference without leaking where the mismatch starts. The
+        // digest binds the challenge owner, so a code minted for one account
+        // is worthless against another account's challenge.
         if (MessageDigest.isEqual(
                 challenge.codeHash().getBytes(StandardCharsets.UTF_8),
-                sha256(submitted).getBytes(StandardCharsets.UTF_8))) {
+                sha256(challenge.userId() + ':' + submitted).getBytes(StandardCharsets.UTF_8))) {
             return;
         }
         int attempts = challenges.incrementAttempts(challenge.id());
