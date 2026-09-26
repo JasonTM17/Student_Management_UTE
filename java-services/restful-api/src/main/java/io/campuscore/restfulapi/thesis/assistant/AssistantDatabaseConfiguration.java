@@ -67,7 +67,7 @@ public class AssistantDatabaseConfiguration {
         if (url == null || url.isBlank() || !url.startsWith("jdbc:postgresql://")) {
             throw new IllegalStateException("A PostgreSQL Assistant datasource URL is required");
         }
-        if (!RUNTIME_ROLE.equals(username)) {
+        if (!isRuntimeLogin(username)) {
             throw new IllegalStateException("Assistant datasource must use the dedicated runtime login");
         }
         if (password == null || password.isBlank()) {
@@ -123,6 +123,17 @@ public class AssistantDatabaseConfiguration {
             @Qualifier(JDBC_TEMPLATE) NamedParameterJdbcTemplate assistantJdbc,
             @Value("${assistant.rls.test-mode:false}") boolean testMode) {
         return new AssistantRlsTransactionRunner(assistantTransactionManager, assistantJdbc, testMode);
+    }
+
+    /**
+     * Accepts the dedicated runtime login either bare or in the Supabase session-pooler
+     * form {@code <role>.<project-ref>}, where the ref suffix identifies the tenant to
+     * the pooler and the server strips it before authenticating. Any other spelling —
+     * including the primary application credentials — is rejected.
+     */
+    private static boolean isRuntimeLogin(String username) {
+        return username != null
+                && (username.equals(RUNTIME_ROLE) || username.startsWith(RUNTIME_ROLE + "."));
     }
 
     private static void rejectCredentialsEmbeddedInUrl(String url) {
