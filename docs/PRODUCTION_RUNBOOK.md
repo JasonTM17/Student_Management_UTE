@@ -38,6 +38,32 @@ assistant JSON, assistant SSE event order, citation rendering and logout from
 an external browser. Verify that `/internal/rag/*`, PostgreSQL and service
 ports are not reachable from the public interface.
 
+## Demo-account and rate-limit switches
+
+`DemoAccountGate` re-applies demo account state on every boot from
+`DEMO_ACCOUNTS_ENABLED` (ACTIVE when `true`, LOCKED when `false`). The public
+Render deployment intentionally ships `DEMO_ACCOUNTS_ENABLED=true` (owner
+decision, 2026-09-25) so visitors can use the published runbook credentials —
+this includes a demo admin login; see the risk note in `render.yaml` and the
+guidance in `docs/DEMO_RUNBOOK.md`.
+
+- `DEMO_ACCOUNTS_ROLES` (optional, comma-separated roles such as `STUDENT`):
+  when set, only demo accounts holding one of these roles stay ACTIVE and the
+  rest of the demo list is LOCKED. Empty/unset keeps the historical behavior
+  (all demo accounts follow the enabled switch). Accounts with no role row are
+  LOCKED.
+- `RATE_LIMIT_TRUST_PROXY_HEADERS=true`: the API takes the rightmost
+  `X-Forwarded-For` element as the client IP — set this when a proxy (Render,
+  Vercel, Nginx) appends the real client address. Without it the rate limiter
+  uses the peer address.
+- `RATE_LIMIT_TRUST_REAL_IP=true`: additionally trust an `X-Real-IP` header
+  ahead of `X-Forwarded-For`. Only enable it for proxies that overwrite (not
+  append) that header, otherwise clients can spoof their bucket.
+- Dedicated buckets to know when reading logs: `/api/v1/mail/**` 5/hour per
+  user, `/api/v1/users/*/password-reset` 3/hour per user, JSON body caps of
+  1 MB global / 64 KB assistant / 4 KB on credential routes (login, refresh,
+  change-password, logout).
+
 ## Rollback
 
 Stop Caddy traffic, set the previous verified full SHA, pull and restart the
