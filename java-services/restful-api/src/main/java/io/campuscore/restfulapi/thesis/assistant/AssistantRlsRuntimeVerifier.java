@@ -32,7 +32,11 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                    (SELECT count(*) FROM pg_policies
                      WHERE schemaname='assistant'
                        AND roles <> ARRAY['campuscore_assistant_runtime']::name[]) AS policies_for_other_roles,
-                   (SELECT count(*) FROM pg_auth_members m WHERE m.member=r.oid OR m.roleid=r.oid) AS role_memberships,
+                   (SELECT count(*)
+                      FROM pg_auth_members m
+                      LEFT JOIN pg_roles member_role ON member_role.oid = m.member
+                     WHERE (m.member=r.oid OR m.roleid=r.oid)
+                       AND NOT (m.roleid=r.oid AND member_role.rolname='postgres')) AS role_memberships,
                    (SELECT count(*)
                       FROM unnest(COALESCE(r.rolconfig, ARRAY[]::text[])) cfg(value)
                      WHERE split_part(cfg.value, '=', 1) LIKE 'app.assistant.%') AS role_context_defaults,
