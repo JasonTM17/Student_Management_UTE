@@ -40,7 +40,26 @@ export interface LoginResponse {
   user: User;
   accessToken: string;
   refreshToken: string;
+  // Present on the plain login endpoint: false/null for accounts without
+  // two-factor, so a normal sign-in never changes shape.
+  twoFactorRequired?: boolean;
 }
+
+/**
+ * A password-only sign-in for an account with two-factor enabled stops here:
+ * no tokens, no user — the client must verify a one-time code next.
+ */
+export interface TwoFactorChallengeResponse {
+  twoFactorRequired: true;
+  challengeId: string;
+  /** Masked by the backend; safe to display (e.g. "s***@gmail.com"). */
+  email: string;
+  user: null;
+  accessToken?: null;
+  refreshToken?: null;
+}
+
+export type LoginResult = LoginResponse | TwoFactorChallengeResponse;
 
 // Student Types
 export interface Student {

@@ -3,13 +3,15 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { AxiosError } from 'axios';
-import { ArrowRight, CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
+import { ArrowLeft, ArrowRight, CheckCircle2, Eye, EyeOff, Lock, Mail, ShieldCheck, X } from 'lucide-react';
 import { useAuth } from '@/context/AuthContext';
 import { AuthShell } from '@/components/auth/AuthShell';
 import { LocalizedLink } from '@/components/LocalizedLink';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n';
+import type { User } from '@/types/api';
+import { campusCodeMessage, type CampusErrorCopy } from '@/lib/campus-error';
 import {
   LOGIN_PORTALS,
   parseLoginPortal,
@@ -17,6 +19,7 @@ import {
   postLoginRoute,
   type LoginPortal,
 } from '@/lib/login-portal';
+import { isTwoFactorChallenge, maskEmail, normalizeOtpCode } from '@/lib/two-factor';
 import { cn } from '@/lib/utils';
 
 /**
@@ -69,8 +72,12 @@ export default function LoginPage() {
   const [isClientReady, setIsClientReady] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   const [formError, setFormError] = useState('');
+  // Two-factor step 2: set after the password answered with a challenge.
+  const [challenge, setChallenge] = useState<{ challengeId: string; email: string } | null>(null);
+  const [code, setCode] = useState('');
+  const [isVerifying, setIsVerifying] = useState(false);
   const formErrorRef = useRef<HTMLDivElement>(null);
-  const { login, logout } = useAuth();
+  const { login, verifyTwoFactor, logout } = useAuth();
   const { href, messages, locale } = useI18n();
   const router = useRouter();
   const searchParams = useSearchParams();
@@ -142,30 +149,94 @@ export default function LoginPage() {
     return messages.login.errors.fallback;
   };
 
+  // Business codes from the two-factor endpoints take priority over the
+  // generic HTTP-kind copy so the message names the actual failure.
+  const twoFactorErrorCopy: CampusErrorCopy = useMemo(
+    () => ({
+      ...messages.common.campusErrors,
+      codes: {
+        ...messages.common.campusErrors.codes,
+        TWO_FACTOR_CODE_INVALID: messages.login.twoFactor.errors.codeInvalid,
+        TWO_FACTOR_CODE_LOCKED: messages.login.twoFactor.errors.codeLocked,
+        TWO_FACTOR_CODE_EXPIRED: messages.login.twoFactor.errors.codeExpired,
+      },
+    }),
+    [messages.common.campusErrors, messages.login.twoFactor.errors],
+  );
+
+  /** Shared tail of both sign-in steps: portal check, then role routing. */
+  const finishLogin = async (user: User) => {
+    if (!portalMatchesUser(portal, user)) {
+      await logout({ redirect: false });
+      setFormError(portalCopy.mismatch);
+      return;
+    }
+
+    if (portal === 'admin' && user.roles?.includes('TRUONG_KHOA') && !user.roles?.includes('ADMIN')) {
+      router.push(href('/admin/thesis'));
+    } else {
+      router.push(href(postLoginRoute(portal)));
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setFormError('');
     setIsLoading(true);
 
     try {
-      const user = await login(email.trim(), password);
-      if (!portalMatchesUser(portal, user)) {
-        await logout({ redirect: false });
-        setFormError(portalCopy.mismatch);
+      const result = await login(email.trim(), password);
+      if (isTwoFactorChallenge(result)) {
+        setChallenge({
+          challengeId: result.challengeId,
+          email: result.email || maskEmail(email),
+        });
         return;
       }
-
-      if (portal === 'admin' && user.roles?.includes('TRUONG_KHOA') && !user.roles?.includes('ADMIN')) {
-        router.push(href('/admin/thesis'));
-      } else {
-        router.push(href(postLoginRoute(portal)));
-      }
+      await finishLogin(result);
     } catch (error: unknown) {
       const message = getLoginErrorMessage(error);
       setFormError(message);
     } finally {
       setIsLoading(false);
     }
+  };
+
+  const handleVerifySubmit = async (e: React.FormEvent) => {
+    e.preventDefault();
+    setFormError('');
+    if (!challenge) {
+      return;
+    }
+
+    const normalizedCode = normalizeOtpCode(code);
+    if (normalizedCode.length !== 6) {
+      setFormError(messages.login.twoFactor.errors.invalidFormat);
+      return;
+    }
+
+    setIsVerifying(true);
+    try {
+      const user = await verifyTwoFactor(challenge.challengeId, normalizedCode);
+      await finishLogin(user);
+    } catch (error: unknown) {
+      setFormError(
+        campusCodeMessage(
+          error,
+          twoFactorErrorCopy,
+          messages.login.twoFactor.errors.fallback,
+        ),
+      );
+    } finally {
+      setIsVerifying(false);
+    }
+  };
+
+  const backToPasswordStep = () => {
+    setChallenge(null);
+    setCode('');
+    setFormError('');
+    setPassword('');
   };
 
   const portalHref = (next: LoginPortal) => {
@@ -346,6 +417,73 @@ export default function LoginPage() {
           </div>
         ) : null}
 
+        {challenge ? (
+          <form
+            onSubmit={handleVerifySubmit}
+            className="space-y-5"
+            aria-describedby={formError ? 'login-error' : undefined}
+          >
+            <div
+              role="status"
+              aria-live="polite"
+              className="rounded-xl border border-primary/25 bg-primary/5 p-4 text-sm shadow-xs"
+            >
+              <p className="flex items-start gap-2.5 font-medium text-foreground">
+                <Mail className="mt-0.5 h-4 w-4 shrink-0 text-primary" aria-hidden="true" />
+                {messages.login.twoFactor.sentNotice.replace('{email}', challenge.email)}
+              </p>
+              <p className="mt-1.5 pl-6 text-xs leading-5 text-muted-foreground">
+                {messages.login.twoFactor.sentNoticeHint}
+              </p>
+            </div>
+
+            <div className="space-y-2">
+              <label htmlFor="otp-code" className="text-sm font-medium text-foreground">
+                {messages.login.twoFactor.codeLabel}
+              </label>
+              <Input
+                id="otp-code"
+                type="text"
+                inputMode="numeric"
+                autoComplete="one-time-code"
+                value={code}
+                onChange={(e) => setCode(normalizeOtpCode(e.target.value))}
+                placeholder={messages.login.twoFactor.codePlaceholder}
+                maxLength={6}
+                icon={<ShieldCheck className="h-4 w-4" />}
+                required
+                autoFocus
+              />
+            </div>
+
+            <Button type="submit" className="w-full" disabled={isVerifying || !isClientReady}>
+              {isVerifying ? (
+                <span className="inline-flex items-center gap-2">
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
+                  {messages.login.twoFactor.verifying}
+                </span>
+              ) : (
+                <span className="inline-flex items-center gap-2">
+                  {messages.login.twoFactor.verify}
+                  <ArrowRight className="h-4 w-4" />
+                </span>
+              )}
+            </Button>
+
+            <Button
+              type="button"
+              variant="ghost"
+              className="w-full"
+              onClick={backToPasswordStep}
+              disabled={isVerifying}
+            >
+              <span className="inline-flex items-center gap-2">
+                <ArrowLeft className="h-4 w-4" />
+                {messages.login.twoFactor.backToPassword}
+              </span>
+            </Button>
+          </form>
+        ) : (
         <form
           onSubmit={handleSubmit}
           className="space-y-5"
@@ -436,6 +574,7 @@ export default function LoginPage() {
             )}
           </Button>
         </form>
+        )}
 
         {portal === 'student' || portal === 'lecturer' ? (
           <p className="text-sm text-muted-foreground">
