@@ -153,6 +153,11 @@ public class SecurityConfig {
                         .requestMatchers(
                                 "/api/v1/auth/login",
                                 "/api/v1/auth/refresh",
+                                // Second step of a two-factor login: the
+                                // caller holds only the emailed challenge id,
+                                // no token yet, so it must stay anonymous.
+                                // IP rate limiting lives in RateLimitFilter.
+                                "/api/v1/auth/two-factor/verify",
                                 "/api/v1/contract",
                                 "/api/v1/health/**",
                                 // Anonymous public campus news feed for the
