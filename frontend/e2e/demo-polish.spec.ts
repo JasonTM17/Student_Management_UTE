@@ -438,11 +438,12 @@ test('demo polish: feedback surfaces stay scannable on registration and schedule
   const width = testInfo.project.use.viewport?.width ?? 1280;
 
   await page.goto('/en/dashboard/register');
-  await expect(page.getByLabel('Course code or class')).toBeVisible();
-  await expect(page.getByLabel('Course name')).toBeVisible();
-  // The two-level picker starts empty ('Search to see available sections');
-  // a course code search surfaces the grouped classes.
-  await page.getByLabel('Course code or class').fill('SE101');
+  // Browse-first: the catalog renders immediately behind one unified search;
+  // typing narrows it to the SE101 groups.
+  const search = page.getByLabel('Search sections by code or name');
+  await expect(search).toBeVisible();
+  await expect(page.getByText('SE101').filter({ visible: true }).first()).toBeVisible();
+  await search.fill('SE101');
   await expect(page.getByText('SE101', { exact: true }).filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByText('2 classes').filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Drop course' }).first()).toBeVisible();

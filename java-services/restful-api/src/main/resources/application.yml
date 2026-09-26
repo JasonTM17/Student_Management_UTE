@@ -210,6 +210,10 @@ app:
     # X-Forwarded-For (e.g. Render). Direct/local deployments must keep this
     # false so spoofed forwarded headers cannot evade IP-keyed limits.
     trust-proxy-headers: ${RATE_LIMIT_TRUST_PROXY_HEADERS:false}
+    # Only when the trusted proxy OVERWRITES X-Real-IP (rather than the client
+    # supplying it). Leave false unless the proxy is known to sanitize the
+    # header; X-Forwarded-For's rightmost entry is always preferred instead.
+    trust-real-ip: ${RATE_LIMIT_TRUST_REAL_IP:false}
     login-limit: ${RATE_LIMIT_LOGIN:15}
     default-limit: ${RATE_LIMIT_DEFAULT:40}
     default-window-seconds: ${RATE_LIMIT_WINDOW_SECONDS:60}
@@ -218,6 +222,11 @@ app:
     # history, so they are DISABLED unless a deployment opts in. Local and
     # evaluation builds set DEMO_ACCOUNTS_ENABLED=true; a public host must not.
     accounts-enabled: ${DEMO_ACCOUNTS_ENABLED:false}
+    # Optional scope: comma-separated role names, e.g. STUDENT or STUDENT,LECTURER.
+    # When set AND accounts-enabled=true, only demo accounts holding one of these
+    # roles become ACTIVE; the rest are LOCKED. Empty (default) keeps the
+    # historical behavior of activating every demo role.
+    roles: ${DEMO_ACCOUNTS_ROLES:}
 
 deepseek:
   enabled: ${DEEPSEEK_ENABLED:false}

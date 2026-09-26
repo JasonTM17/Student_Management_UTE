@@ -28,9 +28,11 @@ async function dismissMobileSidebar(page: Page) {
 }
 
 function searchCourse(page: Page, code: string) {
-  // The two-level registration picker lists sections only after a course-code
-  // search (feedback polish: registration separates searches, groups classes).
-  return page.getByLabel(/Course code or class|Mã học phần hoặc lớp/i).fill(code);
+  // The browse-first catalog shows every group immediately; the unified search
+  // narrows it to the requested course (matches code OR name, diacritics-free).
+  return page
+    .getByLabel(/Search sections by code or name|Tìm lớp học phần theo mã hoặc tên/i)
+    .fill(code);
 }
 
 async function freeCourseForRegister(page: Page) {

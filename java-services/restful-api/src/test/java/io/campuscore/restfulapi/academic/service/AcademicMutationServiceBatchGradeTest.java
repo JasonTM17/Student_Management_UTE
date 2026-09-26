@@ -84,7 +84,8 @@ class AcademicMutationServiceBatchGradeTest {
         service = new AcademicMutationService(
                 namedJdbc,
                 mock(AcademicEnrollmentReadService.class),
-                mock(RegistrationService.class));
+                mock(RegistrationService.class),
+                mock(io.campuscore.restfulapi.audit.AdminAuditRecorder.class));
     }
 
     @Test

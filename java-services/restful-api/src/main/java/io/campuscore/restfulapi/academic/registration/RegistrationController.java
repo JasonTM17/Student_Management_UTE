@@ -1,8 +1,11 @@
 package io.campuscore.restfulapi.academic.registration;
 
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.CatalogSectionResponse;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.CurriculumRelevance;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.DropResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.EligibilityResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.RoundResponse;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationService.SlipPayload;
 import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationDtos.CreateRequest;
@@ -13,7 +16,6 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.EnrollRequest;
 import jakarta.validation.Valid;
 import java.util.List;
-import java.util.Map;
 import org.springframework.context.annotation.Profile;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
@@ -66,9 +68,12 @@ public class RegistrationController {
         return registration.listRounds(semesterId);
     }
 
-    @Operation(summary = "Kiểm tra điều kiện đăng ký học phần của sinh viên", description = "Kiểm tra quyền hạn, đợt mở đăng ký, số tín chỉ tối thiểu/tối đa và trạng thái học phí")
+    @Operation(summary = "Kiểm tra điều kiện đăng ký học phần của sinh viên", description = "Kiểm tra vai trò sinh viên, đợt đăng ký đang mở trong cửa sổ thời gian (REGISTRATION hoặc ADD_DROP), phạm vi khoá/ngành theo cohort và trần tín chỉ đã dùng/còn lại. Endpoint KHÔNG kiểm tra trạng thái học phí")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Kiểm tra điều kiện thành công")
+        @ApiResponse(responseCode = "200", description = "Kiểm tra điều kiện thành công"),
+        @ApiResponse(responseCode = "403", description = "Không có hồ sơ sinh viên hoạt động"),
+        @ApiResponse(responseCode = "409", description = "Không có đợt đăng ký nào đang mở"),
+        @ApiResponse(responseCode = "422", description = "Sinh viên ngoài phạm vi cohort của đợt")
     })
     @GetMapping("me/registration/eligibility")
     @PreAuthorize("hasRole('STUDENT')")
@@ -79,7 +84,7 @@ public class RegistrationController {
         return registration.eligibility(jwt.getClaimAsString("studentId"), semesterId, roundId);
     }
 
-    @Operation(summary = "Tra cứu danh mục lớp học phần khả dụng để đăng ký", description = "Lấy danh sách các lớp học phần sinh viên đủ điều kiện tiên quyết và có thể đăng ký trong đợt")
+    @Operation(summary = "Tra cứu danh mục lớp học phần khả dụng để đăng ký", description = "Lấy toàn bộ lớp học phần của học kỳ trong đợt đang mở kèm lịch học (thứ/giờ/phòng/giảng viên), cột chỗ, trạng thái xung đột lịch với các lớp đã đăng ký, cờ đã đăng ký và mức độ liên quan chương trình đào tạo (MANDATORY/ELECTIVE/OUTSIDE). Danh sách KHÔNG tự lọc theo điều kiện tiên quyết — kiểm tra tiên quyết chỉ diễn ra khi bấm đăng ký")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Lấy danh sách lớp học phần thành công")
     })
@@ -185,10 +190,12 @@ public class RegistrationController {
         return enrollments.findStudentEnrollments(jwt.getClaimAsString("studentId"), null);
     }
 
-    @Operation(summary = "Đăng ký vào lớp học phần", description = "Ghi danh sinh viên vào lớp học phần với kiểm tra idempotent và xác thực điều kiện tiên quyết")
+    @Operation(summary = "Đăng ký vào lớp học phần", description = "Ghi danh sinh viên vào lớp học phần với khóa Idempotency bắt buộc; máy chủ tự kiểm tra đợt mở, trần tín chỉ, điều kiện tiên quyết/song hành và xung đột lịch trước khi trừ chỗ")
     @ApiResponses({
         @ApiResponse(responseCode = "200", description = "Đăng ký thành công"),
-        @ApiResponse(responseCode = "400", description = "Vi phạm ràng buộc đợt hoặc sĩ số")
+        @ApiResponse(responseCode = "400", description = "Thiếu khóa Idempotency"),
+        @ApiResponse(responseCode = "409", description = "Lớp đã đầy/đóng, trùng lịch học, đăng ký trùng, hoặc khóa Idempotency đang được xử lý"),
+        @ApiResponse(responseCode = "422", description = "Vượt trần tín chỉ hoặc thiếu điều kiện tiên quyết/song hành")
     })
     @PostMapping("me/enrollments")
     @PreAuthorize("hasRole('STUDENT')")
@@ -203,17 +210,20 @@ public class RegistrationController {
                 idempotencyKey);
     }
 
-    @Operation(summary = "Hủy đăng ký lớp học phần", description = "Rút khỏi lớp học phần đã đăng ký trong thời hạn cho phép của đợt")
+    @Operation(summary = "Hủy đăng ký lớp học phần", description = "Rút khỏi lớp học phần đã đăng ký trong thời hạn cho phép của đợt (đợt ADD_DROP đang mở, hoặc đợt REGISTRATION còn cửa sổ); yêu cầu khóa Idempotency để chống phát lại")
     @ApiResponses({
-        @ApiResponse(responseCode = "200", description = "Hủy học phần thành công")
+        @ApiResponse(responseCode = "200", description = "Hủy học phần thành công"),
+        @ApiResponse(responseCode = "400", description = "Thiếu khóa Idempotency"),
+        @ApiResponse(responseCode = "404", description = "Không tìm thấy bản ghi ghi danh"),
+        @ApiResponse(responseCode = "409", description = "Đợt hủy đã đóng hoặc bản ghi không còn trạng thái active")
     })
     @PostMapping("me/enrollments/{id}/drop")
     @PreAuthorize("hasAnyRole('STUDENT', 'ADMIN', 'SUPER_ADMIN')")
-    public Map<String, String> drop(
+    public DropResponse drop(
             @AuthenticationPrincipal Jwt jwt,
             @Parameter(description = "Mã ghi danh (UUID)", required = true) @PathVariable String id,
             @Parameter(description = "Khóa chống trùng lặp Idempotency") @RequestHeader(value = "Idempotency-Key", required = false) String idempotencyKey) {
         registration.drop(id, jwt.getClaimAsString("studentId"), jwt.getClaimAsStringList("roles"), idempotencyKey);
-        return Map.of("message", "Enrollment dropped successfully");
+        return new DropResponse("Enrollment dropped successfully");
     }
 }
