@@ -112,6 +112,17 @@ deepseek:
   max-concurrent: ${DEEPSEEK_MAX_CONCURRENT:4}
 
 assistant:
+  datasource:
+    # The Assistant-only connection uses the same PostgreSQL endpoint as the
+    # primary pool unless an operator supplies a dedicated URL. Credentials
+    # are separate and never fall back to the primary postgres credentials.
+    url: ${ASSISTANT_DB_URL:${SPRING_DATASOURCE_URL:}}
+    username: ${ASSISTANT_DB_USERNAME:campuscore_assistant_runtime}
+    password: ${ASSISTANT_DB_PASSWORD:}
+    maximum-pool-size: ${ASSISTANT_DB_POOL_MAX:4}
+    connection-timeout-ms: ${ASSISTANT_DB_CONNECTION_TIMEOUT_MS:15000}
+  rls:
+    test-mode: ${ASSISTANT_RLS_TEST_MODE:false}
   knowledge:
     # sql keeps the course/local authoring compatibility path; production REST
     # uses remote and private rag-service uses supabase.

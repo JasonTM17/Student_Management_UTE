@@ -21,6 +21,7 @@ import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.BadSqlGrammarException;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.stereotype.Service;
 import org.springframework.transaction.support.TransactionSynchronizationManager;
 
@@ -31,7 +32,8 @@ public class SqlKnowledgeReleasePromoter {
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean legacyTestFallback;
 
-    public SqlKnowledgeReleasePromoter(NamedParameterJdbcTemplate jdbc,
+    public SqlKnowledgeReleasePromoter(
+            @Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE) NamedParameterJdbcTemplate jdbc,
             @Value("${assistant.legacy-retrieval-fallback:false}") boolean legacyTestFallback) {
         this.jdbc = jdbc;
         this.legacyTestFallback = legacyTestFallback;

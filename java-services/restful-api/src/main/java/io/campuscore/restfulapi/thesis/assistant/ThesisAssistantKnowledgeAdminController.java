@@ -11,6 +11,7 @@ import org.springframework.context.annotation.Profile;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.annotation.AuthenticationPrincipal;
 import org.springframework.security.oauth2.jwt.Jwt;
@@ -37,11 +38,13 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 @Profile("persistence")
 @ConditionalOnProperty(prefix = "assistant.knowledge", name = "authority-mode", havingValue = "sql", matchIfMissing = true)
 @RequestMapping({"/api/v1/admin/assistant/knowledge", "/api/v1/admin/thesis/assistant/knowledge"})
+@AssistantRlsBoundary(access = AssistantRlsBoundary.Access.ADMIN_GOVERNANCE)
 public class ThesisAssistantKnowledgeAdminController {
     private final NamedParameterJdbcTemplate jdbc;
     private final SqlKnowledgeReleasePromoter releasePromoter;
 
-    public ThesisAssistantKnowledgeAdminController(NamedParameterJdbcTemplate jdbc,
+    public ThesisAssistantKnowledgeAdminController(
+            @Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE) NamedParameterJdbcTemplate jdbc,
             SqlKnowledgeReleasePromoter releasePromoter) {
         this.jdbc = jdbc;
         this.releasePromoter = releasePromoter;
@@ -93,7 +96,7 @@ public class ThesisAssistantKnowledgeAdminController {
     })
     @PostMapping
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public KnowledgeRevision create(@RequestBody KnowledgeRequest request, @AuthenticationPrincipal Jwt actor) {
         validate(request);
         String owner = requireActor(actor);
@@ -115,7 +118,7 @@ public class ThesisAssistantKnowledgeAdminController {
     })
     @PutMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public KnowledgeRevision update(
             @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
             @RequestBody KnowledgeRequest request,
@@ -151,7 +154,7 @@ public class ThesisAssistantKnowledgeAdminController {
     })
     @PostMapping("/{id}/submit")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public KnowledgeRevision submit(
             @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -176,7 +179,7 @@ public class ThesisAssistantKnowledgeAdminController {
     })
     @PostMapping("/{id}/publish")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public KnowledgeRevision publish(
             @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {
@@ -225,7 +228,7 @@ public class ThesisAssistantKnowledgeAdminController {
     })
     @DeleteMapping("/{id}")
     @PreAuthorize("hasAnyRole('ADMIN','SUPER_ADMIN')")
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public void delete(
             @Parameter(description = "Mã định danh tài liệu tri thức (UUID)", required = true) @PathVariable UUID id,
             @AuthenticationPrincipal Jwt actor) {

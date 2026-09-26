@@ -23,11 +23,14 @@ import org.springframework.transaction.annotation.Transactional;
 
 @Repository
 @Profile("persistence")
+@AssistantRlsBoundary
 public class ThesisAssistantRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean postgres;
 
-    public ThesisAssistantRepository(NamedParameterJdbcTemplate jdbc) {
+    public ThesisAssistantRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
         this.postgres = databaseIsPostgres(jdbc);
     }
@@ -72,7 +75,8 @@ public class ThesisAssistantRepository {
         }
     }
 
-    @Transactional
+    @AssistantRlsBoundary(access = AssistantRlsBoundary.Access.RETENTION)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public int purgeExpired() {
         List<Conversation> expired = jdbc.query("SELECT id,owner_id FROM assistant.chat_conversation WHERE expires_at <= CURRENT_TIMESTAMP AND state <> 'PURGED' ORDER BY expires_at LIMIT 100",
                 new MapSqlParameterSource(), (rs, row) -> new Conversation(rs.getObject("id", UUID.class), null, null, null, null, rs.getString("owner_id")));
@@ -148,7 +152,7 @@ public class ThesisAssistantRepository {
         return messagesPage(conversationId, ownerId, 50, null).data();
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public int deleteConversation(UUID id, String ownerId) {
         int exists = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='PURGED',terminal_reason='PURGED',purged_at=CURRENT_TIMESTAMP,tombstone_until=:tombstone WHERE owner_id=:owner AND conversation_id=:id AND state <> 'PURGED'",
                 p().addValue("id", id).addValue("owner", ownerId).addValue("tombstone", Timestamp.from(Instant.now().plus(7, ChronoUnit.DAYS))));

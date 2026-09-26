@@ -228,7 +228,7 @@ class SupabaseKnowledgeSyncServiceTest {
                 "https://supabase.example", "service-role", "assistant",
                 "knowledge_release", "knowledge_release_document", 500, 1_000);
         SupabaseKnowledgeSyncService sync = new SupabaseKnowledgeSyncService(properties, jdbc,
-                new ObjectMapper(), new DataSourceTransactionManager(jdbc.getJdbcTemplate().getDataSource()), http);
+                new ObjectMapper(), runner(), http);
 
         SupabaseKnowledgeSyncService.SyncResult result = sync.syncNow();
 
@@ -288,7 +288,12 @@ class SupabaseKnowledgeSyncServiceTest {
                 "https://supabase.example", "service-role", "assistant",
                 "knowledge_release", "knowledge_release_document", 500, 1_000);
         return new SupabaseKnowledgeSyncService(properties, jdbc, new ObjectMapper(),
-                new DataSourceTransactionManager(jdbc.getJdbcTemplate().getDataSource()), http);
+                runner(), http);
+    }
+
+    private AssistantRlsTransactionRunner runner() {
+        return new AssistantRlsTransactionRunner(
+                new DataSourceTransactionManager(jdbc.getJdbcTemplate().getDataSource()), jdbc, true);
     }
 
     @SuppressWarnings("unchecked")

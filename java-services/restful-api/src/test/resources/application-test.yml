@@ -10,6 +10,10 @@ deepseek:
   enabled: false
 
 assistant:
+  rls:
+    # H2 has no PostgreSQL RLS engine. This fallback is active only under the
+    # explicit test profile; production startup rejects test mode.
+    test-mode: true
   # H2-focused legacy fixtures predate the V16 runtime projection. Production
   # keeps this false so a missing projection is a hard startup/runtime defect.
   legacy-retrieval-fallback: true
