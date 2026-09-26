@@ -43,6 +43,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
     /** Audit S6: password-reset issuance is capped at 3 per hour per identity. */
     static final int PASSWORD_RESET_LIMIT_PER_HOUR = 3;
 
+    /** Two-factor OTP verification: 10 tries per 15 minutes per IP. */
+    static final int TWO_FACTOR_VERIFY_LIMIT_PER_WINDOW = 10;
+
+    /** Window (seconds) for the two-factor OTP verification bucket. */
+    static final int TWO_FACTOR_VERIFY_WINDOW_SECONDS = 900;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -165,6 +171,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
     private RateLimitPolicy resolvePolicy(String uri) {
         if (uri.startsWith("/api/v1/auth/login")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_LOGIN, properties.getLoginLimit(), 60);
+        }
+        // Two-factor verify is anonymous and code-guessable, so — like login —
+        // it is bound strictly to the client IP with its own tight bucket,
+        // layered on top of the per-challenge 5-attempt lock.
+        if (uri.startsWith("/api/v1/auth/two-factor/verify")) {
+            return new RateLimitPolicy(
+                    RateLimitCategory.TWO_FACTOR_VERIFY,
+                    TWO_FACTOR_VERIFY_LIMIT_PER_WINDOW,
+                    TWO_FACTOR_VERIFY_WINDOW_SECONDS);
         }
         if (uri.startsWith("/api/v1/auth/change-password")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_CHANGE_PASSWORD, 5, 60);

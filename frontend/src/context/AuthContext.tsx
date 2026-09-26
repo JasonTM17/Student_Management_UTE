@@ -11,8 +11,9 @@ import React, {
 } from 'react';
 import { useRouter } from 'next/navigation';
 import { useI18n } from '@/i18n';
-import { User } from '@/types/api';
+import { User, TwoFactorChallengeResponse } from '@/types/api';
 import { authApi, refreshSessionSingleFlight } from '@/lib/api';
+import { isTwoFactorChallenge } from '@/lib/two-factor';
 import { hasCsrfSessionHint } from '@/lib/session-hint';
 import { loginHref, portalFromPathname, portalFromUser } from '@/lib/login-portal';
 
@@ -25,7 +26,11 @@ interface AuthContextType {
   isAdmin: boolean;
   isSuperAdmin: boolean;
   isFacultyHead: boolean;
-  login: (email: string, password: string) => Promise<User>;
+  login: (
+    email: string,
+    password: string,
+  ) => Promise<User | TwoFactorChallengeResponse>;
+  verifyTwoFactor: (challengeId: string, code: string) => Promise<User>;
   logout: (options?: { redirect?: boolean }) => Promise<void>;
   refreshUser: () => Promise<void>;
 }
@@ -71,6 +76,18 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const login = useCallback(async (email: string, password: string) => {
     const response = await authApi.login(email, password);
+    // Two-factor accounts stop after the password step: no session is opened
+    // here, the caller must collect a one-time code and call verifyTwoFactor.
+    if (isTwoFactorChallenge(response)) {
+      return response;
+    }
+    setIsLoggingOut(false);
+    setUser(response.user);
+    return response.user;
+  }, []);
+
+  const verifyTwoFactor = useCallback(async (challengeId: string, code: string) => {
+    const response = await authApi.verifyTwoFactor(challengeId, code);
     setIsLoggingOut(false);
     setUser(response.user);
     return response.user;
@@ -111,6 +128,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         isSuperAdmin,
         isFacultyHead,
         login,
+        verifyTwoFactor,
         logout,
         refreshUser,
       }}

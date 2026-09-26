@@ -44,7 +44,7 @@ public class AuthLoginController {
     }
 
     @PostMapping("login")
-    @Operation(summary = "Đăng nhập hệ thống", description = "Xác thực tài khoản bằng email và mật khẩu, trả về cặp Access Token và Refresh Token cùng thông tin vai trò.")
+    @Operation(summary = "Đăng nhập hệ thống", description = "Xác thực tài khoản bằng email và mật khẩu, trả về cặp Access Token và Refresh Token cùng thông tin vai trò. Với tài khoản đã bật xác thực hai yếu tố, trả về twoFactorRequired=true kèm challengeId và email che khuất thay cho token.")
     @ApiResponses({
             @ApiResponse(responseCode = "200", description = "Đăng nhập thành công, phát hành token"),
             @ApiResponse(responseCode = "401", description = "Email hoặc mật khẩu không chính xác"),
@@ -59,6 +59,18 @@ public class AuthLoginController {
                 request.password(),
                 servletRequest.getRemoteAddr(),
                 servletRequest.getHeader("User-Agent"));
+        // Two-factor accounts get a challenge, not a session: no tokens and
+        // deliberately no auth cookies. The client finishes via
+        // POST /api/v1/auth/two-factor/verify.
+        if (result.response() == null) {
+            return new LoginResponse(
+                    null,
+                    null,
+                    null,
+                    Boolean.TRUE,
+                    result.challengeId(),
+                    result.email());
+        }
         cookies.issue(
                 servletRequest,
                 servletResponse,

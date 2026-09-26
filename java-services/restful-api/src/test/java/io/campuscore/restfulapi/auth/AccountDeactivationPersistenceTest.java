@@ -185,6 +185,7 @@ class AccountDeactivationPersistenceTest {
                     "avatar" VARCHAR(500),
                     "status" VARCHAR(40) NOT NULL,
                     "mustChangePassword" BOOLEAN NOT NULL DEFAULT FALSE,
+                    "twoFactorEnabled" BOOLEAN NOT NULL DEFAULT FALSE,
                     "emailVerified" BOOLEAN NOT NULL,
                     "isSuperAdmin" BOOLEAN NOT NULL,
                     "failedLoginAttempts" INTEGER NOT NULL,
