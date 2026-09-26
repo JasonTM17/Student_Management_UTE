@@ -83,7 +83,7 @@ public final class AuthDtos {
             String refreshToken,
             Boolean twoFactorRequired,
             String challengeId,
-            String maskedEmail) {
+            String email) {
 
         public LoginResponse(AuthUserResponse user, String accessToken, String refreshToken) {
             this(user, accessToken, refreshToken, null, null, null);
