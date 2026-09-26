@@ -51,8 +51,9 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        return assistant.answer(request.message(), request.locale(), request.conversationId(),
-                owner(owner), request.clientRequestId(), request.scope());
+        String ownerId = owner(owner);
+        return AssistantRlsContext.withInternalOwner(ownerId, () -> assistant.answer(request.message(),
+                request.locale(), request.conversationId(), ownerId, request.clientRequestId(), request.scope()));
     }
 
     @Deprecated
@@ -72,18 +73,21 @@ public class ThesisAssistantInternalController {
         SseEmitter emitter = new SseEmitter(120_000L);
         AtomicBoolean terminal = new AtomicBoolean(false);
         try {
-            assistant.stream(request.message(), request.locale(), request.conversationId(), ownerId,
-                    request.clientRequestId(), event -> {
-                        if (event instanceof ThesisAssistantService.StreamDone
-                                || event instanceof ThesisAssistantService.StreamError) {
-                            terminal.set(true);
-                        }
-                        send(emitter, event);
-                    }, request.scope());
-            if (terminal.compareAndSet(false, true)) {
-                sendError(emitter, "ASSISTANT_STREAM_INCOMPLETE", true);
-            }
-            emitter.complete();
+            AssistantRlsContext.withInternalOwner(ownerId, () -> {
+                assistant.stream(request.message(), request.locale(), request.conversationId(), ownerId,
+                        request.clientRequestId(), event -> {
+                            if (event instanceof ThesisAssistantService.StreamDone
+                                    || event instanceof ThesisAssistantService.StreamError) {
+                                terminal.set(true);
+                            }
+                            send(emitter, event);
+                        }, request.scope());
+                if (terminal.compareAndSet(false, true)) {
+                    sendError(emitter, "ASSISTANT_STREAM_INCOMPLETE", true);
+                }
+                emitter.complete();
+                return null;
+            });
         } catch (DomainException exception) {
             terminal.set(true);
             sendError(emitter, exception.code(), exception.status().is5xxServerError()
@@ -103,7 +107,9 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        var result = assistant.cancel(clientRequestId, owner(owner));
+        String ownerId = owner(owner);
+        var result = AssistantRlsContext.withInternalOwner(ownerId,
+                () -> assistant.cancel(clientRequestId, ownerId));
         if (!result.cancelled() && "COMPLETED".equals(result.status())) {
             throw new DomainException(HttpStatus.CONFLICT, "TURN_COMPLETED", "Completed turns are replayable and cannot be cancelled");
         }
@@ -121,7 +127,11 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        assistant.setFeedback(messageId, owner(owner), request.rating(), request.reason());
+        String ownerId = owner(owner);
+        AssistantRlsContext.withInternalOwner(ownerId, () -> {
+            assistant.setFeedback(messageId, ownerId, request.rating(), request.reason());
+            return null;
+        });
         return new FeedbackResponse(messageId, request.rating(), request.reason(), false);
     }
 
@@ -131,7 +141,11 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        assistant.deleteFeedback(messageId, owner(owner));
+        String ownerId = owner(owner);
+        AssistantRlsContext.withInternalOwner(ownerId, () -> {
+            assistant.deleteFeedback(messageId, ownerId);
+            return null;
+        });
     }
 
     @GetMapping("/conversations")
@@ -142,7 +156,9 @@ public class ThesisAssistantInternalController {
             @RequestParam(required = false) String cursor,
             jakarta.servlet.http.HttpServletResponse response) {
         verify(token);
-        ThesisAssistantRepository.ConversationPage page = assistant.conversationPage(owner(owner), limit, cursor);
+        String ownerId = owner(owner);
+        ThesisAssistantRepository.ConversationPage page = AssistantRlsContext.withInternalOwner(ownerId,
+                () -> assistant.conversationPage(ownerId, limit, cursor));
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -156,7 +172,9 @@ public class ThesisAssistantInternalController {
         if (locale != null && !locale.isBlank() && !locale.equals("vi") && !locale.equals("en")) {
             throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_LOCALE", "locale must be en or vi");
         }
-        String id = assistant.createConversation(owner(owner), locale);
+        String ownerId = owner(owner);
+        String id = AssistantRlsContext.withInternalOwner(ownerId,
+                () -> assistant.createConversation(ownerId, locale));
         return new ConversationCreated(id, locale == null || locale.isBlank() ? "vi" : locale);
     }
 
@@ -168,7 +186,9 @@ public class ThesisAssistantInternalController {
             @RequestParam(required = false) String cursor,
             jakarta.servlet.http.HttpServletResponse response) {
         verify(token);
-        ThesisAssistantRepository.MessagePage page = assistant.messagePage(id, owner(owner), limit, cursor);
+        String ownerId = owner(owner);
+        ThesisAssistantRepository.MessagePage page = AssistantRlsContext.withInternalOwner(ownerId,
+                () -> assistant.messagePage(id, ownerId, limit, cursor));
         if (page.nextCursor() != null) response.setHeader("X-Next-Cursor", page.nextCursor());
         return page.data();
     }
@@ -179,7 +199,11 @@ public class ThesisAssistantInternalController {
             @RequestHeader(name = "X-Rag-Service-Token", required = false) String token,
             @RequestHeader(name = "X-Assistant-Owner", required = false) String owner) {
         verify(token);
-        assistant.deleteConversation(id, owner(owner));
+        String ownerId = owner(owner);
+        AssistantRlsContext.withInternalOwner(ownerId, () -> {
+            assistant.deleteConversation(id, ownerId);
+            return null;
+        });
     }
 
     private void verify(String token) {

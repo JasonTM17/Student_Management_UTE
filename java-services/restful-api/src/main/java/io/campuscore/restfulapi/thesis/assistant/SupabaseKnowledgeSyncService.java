@@ -24,13 +24,13 @@ import java.util.UUID;
 import java.util.stream.Collectors;
 import org.springframework.context.annotation.Profile;
 import org.springframework.beans.factory.annotation.Autowired;
+import org.springframework.beans.factory.annotation.Qualifier;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
 import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.scheduling.annotation.Scheduled;
 import org.springframework.stereotype.Service;
-import org.springframework.transaction.support.TransactionTemplate;
 
 /**
  * Pulls a completely published Supabase release and promotes it as one
@@ -44,28 +44,27 @@ public class SupabaseKnowledgeSyncService {
     private final NamedParameterJdbcTemplate jdbc;
     private final ObjectMapper mapper;
     private final HttpClient http;
-    private final TransactionTemplate transactions;
+    private final AssistantRlsTransactionRunner transactions;
 
     private volatile SyncResult lastResult = SyncResult.disabled();
 
     @Autowired
     public SupabaseKnowledgeSyncService(SupabaseKnowledgeProperties properties,
-            NamedParameterJdbcTemplate jdbc, ObjectMapper mapper,
-            org.springframework.transaction.PlatformTransactionManager transactionManager) {
-        this(properties, jdbc, mapper, transactionManager, HttpClient.newBuilder()
+            @Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE) NamedParameterJdbcTemplate jdbc,
+            ObjectMapper mapper, AssistantRlsTransactionRunner transactions) {
+        this(properties, jdbc, mapper, transactions, HttpClient.newBuilder()
                 .connectTimeout(Duration.ofMillis(properties.connectTimeoutMs()))
                 .build());
     }
 
     SupabaseKnowledgeSyncService(SupabaseKnowledgeProperties properties,
-            NamedParameterJdbcTemplate jdbc, ObjectMapper mapper,
-            org.springframework.transaction.PlatformTransactionManager transactionManager,
+            NamedParameterJdbcTemplate jdbc, ObjectMapper mapper, AssistantRlsTransactionRunner transactions,
             HttpClient http) {
         this.properties = properties;
         this.jdbc = jdbc;
         this.mapper = mapper;
         this.http = http;
-        this.transactions = new TransactionTemplate(transactionManager);
+        this.transactions = transactions;
     }
 
     /** Operator-triggered sync; safe to call repeatedly for the same release. */
@@ -75,7 +74,7 @@ public class SupabaseKnowledgeSyncService {
             return lastResult;
         }
         try {
-            SyncResult result = transactions.execute(status -> {
+            SyncResult result = transactions.executeUnchecked(AssistantRlsBoundary.Access.KNOWLEDGE_PROJECTION, () -> {
                 lockRuntimeStateBeforeFetch();
                 ReleasePayload release = fetchPublishedRelease();
                 List<DocumentPayload> documents = fetchDocuments(release.id());
@@ -102,14 +101,15 @@ public class SupabaseKnowledgeSyncService {
 
     public SyncResult status() {
         try {
-            List<SyncStatusRow> rows = jdbc.query(
+            List<SyncStatusRow> rows = transactions.executeUnchecked(
+                    AssistantRlsBoundary.Access.KNOWLEDGE_PROJECTION, () -> jdbc.query(
                     "SELECT s.active_release_id, r.corpus_version, r.corpus_hash, r.row_count, r.status, r.activated_at "
                             + "FROM assistant.knowledge_runtime_state s LEFT JOIN assistant.knowledge_release r ON r.id=s.active_release_id "
                             + "WHERE s.singleton=TRUE",
                     Map.of(), (rs, row) -> new SyncStatusRow(
                             rs.getObject("active_release_id", UUID.class), rs.getString("corpus_version"),
                             rs.getString("corpus_hash"), rs.getObject("row_count", Integer.class),
-                            rs.getString("status"), rs.getTimestamp("activated_at") == null ? null : rs.getTimestamp("activated_at").toInstant()));
+                            rs.getString("status"), rs.getTimestamp("activated_at") == null ? null : rs.getTimestamp("activated_at").toInstant())));
             if (!rows.isEmpty()) {
                 SyncStatusRow row = rows.get(0);
                 return new SyncResult("ACTIVE", row.releaseId() == null ? null : row.releaseId().toString(),

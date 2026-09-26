@@ -17,6 +17,7 @@ import org.springframework.stereotype.Repository;
 /** Bounded, database-side lexical retrieval for the curated thesis corpus. */
 @Repository
 @Profile("persistence")
+@AssistantRlsBoundary
 public class ThesisAssistantKnowledgeRepository {
 
     private static final RowMapper<KnowledgeDocument> ROW_MAPPER =
@@ -47,12 +48,16 @@ public class ThesisAssistantKnowledgeRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean allowLegacyFallback;
 
-    public ThesisAssistantKnowledgeRepository(NamedParameterJdbcTemplate jdbc) {
+    public ThesisAssistantKnowledgeRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc) {
         this(jdbc, false);
     }
 
     @Autowired
-    public ThesisAssistantKnowledgeRepository(NamedParameterJdbcTemplate jdbc,
+    public ThesisAssistantKnowledgeRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc,
             @Value("${assistant.legacy-retrieval-fallback:false}") boolean allowLegacyFallback) {
         this.jdbc = jdbc;
         this.allowLegacyFallback = allowLegacyFallback;

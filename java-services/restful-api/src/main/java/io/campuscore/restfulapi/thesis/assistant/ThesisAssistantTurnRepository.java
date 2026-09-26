@@ -25,6 +25,7 @@ import org.springframework.transaction.annotation.Transactional;
 /** Transaction-owned persistence boundary for the V12 turn state machine. */
 @Repository
 @Profile("persistence")
+@AssistantRlsBoundary
 public class ThesisAssistantTurnRepository {
     private static final long PRE_DISPATCH_LEASE_SECONDS = 60L;
     private static final long DISPATCH_LEASE_SECONDS = 90L;
@@ -33,12 +34,14 @@ public class ThesisAssistantTurnRepository {
     private final NamedParameterJdbcTemplate jdbc;
     private final boolean postgres;
 
-    public ThesisAssistantTurnRepository(NamedParameterJdbcTemplate jdbc) {
+    public ThesisAssistantTurnRepository(
+            @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.JDBC_TEMPLATE)
+            NamedParameterJdbcTemplate jdbc) {
         this.jdbc = jdbc;
         this.postgres = databaseIsPostgres(jdbc);
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public Reservation reserve(String ownerId, UUID clientRequestId, String requestHash,
             UUID requestedConversationId, String locale, String leaseOwner, int retentionDays) {
         return reserve(ownerId, clientRequestId, requestHash, requestedConversationId, locale,
@@ -50,7 +53,7 @@ public class ThesisAssistantTurnRepository {
      * happen inline on a retry, so the caller must fence an in-process worker
      * before the transaction returns and a new generation is exposed.
      */
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public Reservation reserve(String ownerId, UUID clientRequestId, String requestHash,
             UUID requestedConversationId, String locale, String leaseOwner, int retentionDays,
             Consumer<ExpiredLease> fence) {
@@ -108,12 +111,12 @@ public class ThesisAssistantTurnRepository {
         return new Reservation(ReservationStatus.NEW, turnId, conversationId, 1L, createdConversation, null, null, false);
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public boolean markSnapshotReady(UUID turnId, String ownerId, long generation, String snapshotHash) {
         return markSnapshotReady(turnId, ownerId, generation, snapshotHash, ignored -> { });
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public boolean markSnapshotReady(UUID turnId, String ownerId, long generation, String snapshotHash,
             Consumer<ExpiredLease> fence) {
         int changed = jdbc.update("UPDATE assistant.chat_turn_ledger SET state='SNAPSHOT_READY',source_snapshot_hash=:snapshot,lease_expires_at=:leaseExpires,updated_at=CURRENT_TIMESTAMP WHERE turn_id=:turn AND owner_id=:owner AND lease_generation=:generation AND state='RESERVED' AND lease_expires_at>CURRENT_TIMESTAMP",
@@ -124,12 +127,12 @@ public class ThesisAssistantTurnRepository {
         return false;
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public DispatchDecision dispatch(UUID turnId, String ownerId, long generation, int userLimit, int globalLimit) {
         return dispatch(turnId, ownerId, generation, userLimit, globalLimit, ignored -> { });
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public DispatchDecision dispatch(UUID turnId, String ownerId, long generation, int userLimit, int globalLimit,
             Consumer<ExpiredLease> fence) {
         ExpiredLease recovered = recoverExpiredByTurn(turnId, ownerId, generation);
@@ -186,14 +189,14 @@ public class ThesisAssistantTurnRepository {
         return new DispatchDecision(true, true, "DISPATCHED");
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public TerminalResult complete(UUID turnId, String ownerId, long generation, String prompt,
             String model, String answer, boolean degraded, String reasonCode, List<Citation> citations) {
         return complete(turnId, ownerId, generation, prompt, model, answer, degraded, reasonCode, citations,
                 ignored -> { });
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public TerminalResult complete(UUID turnId, String ownerId, long generation, String prompt,
             String model, String answer, boolean degraded, String reasonCode, List<Citation> citations,
             Consumer<ExpiredLease> fence) {
@@ -247,13 +250,13 @@ public class ThesisAssistantTurnRepository {
                 citations == null ? List.of() : List.copyOf(citations), false, "COMPLETED");
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public CancelResult cancel(UUID turnId, String ownerId, UUID clientRequestId) {
         return cancel(turnId, ownerId, clientRequestId, ignored -> { });
     }
 
     /** Cancellation callback is deferred until the short CAS transaction commits. */
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public CancelResult cancel(UUID turnId, String ownerId, UUID clientRequestId,
             Consumer<DispatchHandle> fence) {
         TurnRow hint = findForUpdateReadByTurn(turnId, ownerId);
@@ -294,13 +297,13 @@ public class ThesisAssistantTurnRepository {
      * The caller uses the returned handles to abort any in-process provider
      * readers; the database CAS remains the authority for completion races.
      */
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<DispatchHandle> purgeConversation(UUID conversation, String ownerId) {
         if (conversation == null) return List.of();
         return purgeConversationInternal(conversation, ownerId, false, (ignored, handle) -> { });
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<DispatchHandle> purgeConversation(UUID conversation, String ownerId,
             BiConsumer<String, DispatchHandle> fence) {
         if (conversation == null) return List.of();
@@ -308,13 +311,13 @@ public class ThesisAssistantTurnRepository {
     }
 
     /** Atomically fences active turns and physically deletes private history. */
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<DispatchHandle> purgeAndDeleteConversation(UUID conversation, String ownerId) {
         if (conversation == null) return List.of();
         return purgeConversationInternal(conversation, ownerId, true, (ignored, handle) -> { });
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<DispatchHandle> purgeAndDeleteConversation(UUID conversation, String ownerId,
             BiConsumer<String, DispatchHandle> fence) {
         if (conversation == null) return List.of();
@@ -322,12 +325,14 @@ public class ThesisAssistantTurnRepository {
     }
 
     /** Batch retention path; each conversation is deleted under the same owner/CAS boundary. */
-    @Transactional
+    @AssistantRlsBoundary(access = AssistantRlsBoundary.Access.RETENTION)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<PurgedConversation> purgeExpiredConversations() {
         return purgeExpiredConversations((ignored, handle) -> { });
     }
 
-    @Transactional
+    @AssistantRlsBoundary(access = AssistantRlsBoundary.Access.RETENTION)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<PurgedConversation> purgeExpiredConversations(BiConsumer<String, DispatchHandle> fence) {
         List<ExpiredConversation> expired = jdbc.query(
                 "SELECT id,owner_id FROM assistant.chat_conversation WHERE expires_at<=CURRENT_TIMESTAMP AND state<>'PURGED' ORDER BY expires_at LIMIT 100 FOR UPDATE",
@@ -381,12 +386,14 @@ public class ThesisAssistantTurnRepository {
      * permanently ambiguous and is never automatically re-dispatched. The
      * generation bump fences any late worker that still holds the old lease.
      */
-    @Transactional
+    @AssistantRlsBoundary(access = AssistantRlsBoundary.Access.RETENTION)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<ExpiredLease> recoverExpiredLeases() {
         return recoverExpiredLeases(ignored -> { });
     }
 
-    @Transactional
+    @AssistantRlsBoundary(access = AssistantRlsBoundary.Access.RETENTION)
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public List<ExpiredLease> recoverExpiredLeases(Consumer<ExpiredLease> fence) {
         List<LeaseRow> rows = jdbc.query(
                 "SELECT owner_id,client_request_id,turn_id,lease_generation,state FROM assistant.chat_turn_ledger "
@@ -489,7 +496,7 @@ public class ThesisAssistantTurnRepository {
         return new ExpiredLease(row.ownerId(), row.clientRequestId(), row.turnId(), row.generation(), terminalState);
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public int setFeedback(UUID messageId, String ownerId, String rating, String reason) {
         if (!List.of("UP", "DOWN").contains(rating) || (reason != null && !List.of("HELPFUL", "CLEAR", "INCORRECT", "OUTDATED", "NOT_RELEVANT", "UNSAFE").contains(reason))) {
             throw problem(400, "INVALID_FEEDBACK", "Feedback rating or reason is not supported");
@@ -513,7 +520,7 @@ public class ThesisAssistantTurnRepository {
         return changed;
     }
 
-    @Transactional
+    @Transactional(transactionManager = AssistantDatabaseConfiguration.TRANSACTION_MANAGER)
     public int deleteFeedback(UUID messageId, String ownerId) {
         int changed = jdbc.update("DELETE FROM assistant.chat_message_feedback WHERE message_id=:message AND owner_id=:owner AND :message IN (SELECT m.id FROM assistant.chat_message m JOIN assistant.chat_conversation c ON c.id=m.conversation_id WHERE c.owner_id=:owner AND m.role='ASSISTANT')",
                 p().addValue("message", messageId).addValue("owner", ownerId));
