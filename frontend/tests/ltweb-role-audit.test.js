@@ -199,13 +199,18 @@ test('the CI gate derives the expected schema boundary from the migrations', () 
   assert.ok(!workflow.includes('= "39"'), 'the stale literal boundary must be gone');
 });
 
-// ---------- Item 1: search prompt before catalog display ----------
+// ---------- Item 1: browse-first catalog (2026-09 registration redesign) ----------
 
-test('the course registration page requires search query before showing courses', () => {
+test('the course registration page renders the full catalog immediately, browse-first', () => {
   const source = readSource('src/app/dashboard/register/page.tsx');
-  assert.ok(source.includes('const hasSearchQuery ='), 'must have hasSearchQuery guard');
-  assert.ok(source.includes('!hasSearchQuery ? ('), 'must guard catalog with search prompt');
-  assert.ok(source.includes('searchPromptTitle'), 'must render search prompt title');
+  // The old search-gate empty state is gone: the catalog renders unconditionally
+  // behind one unified search box plus filter chips with live counts.
+  assert.ok(!source.includes('hasSearchQuery'), 'the search gate must stay removed');
+  assert.ok(!source.includes('searchPromptTitle'), 'the search prompt must stay removed');
+  assert.ok(source.includes('matchesSectionSearch(section, searchText)'), 'one unified search filters code and name');
+  assert.ok(source.includes('curriculumFilter'), 'curriculum chips filter the catalog');
+  assert.ok(source.includes('copy.sectionCount'), 'the live result count is always rendered');
+  assert.ok(source.includes('courseGroups.map'), 'sections stay grouped by course');
 });
 
 test('the thesis topic catalog is search-first and loads no topics before a query', () => {

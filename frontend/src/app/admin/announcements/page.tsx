@@ -8,12 +8,14 @@ import {
   Bell,
   CalendarClock,
   Check,
+  FileText,
   History,
   Pencil,
   Plus,
   RefreshCw,
   RotateCcw,
   ShieldCheck,
+  Sparkles,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import { useAuth } from '@/context/AuthContext';
@@ -85,6 +87,7 @@ import {
   announcementRoleValues,
   announcementSectionLabel,
   announcementSemesterName,
+  extractAnnouncementExcerpt,
   type AnnouncementPriority,
   type AnnouncementRole,
 } from '@/lib/announcement-presentation';
@@ -982,7 +985,7 @@ export default function AdminAnnouncementsPage() {
                         </div>
                         <div>
                           <h3 className="text-lg font-semibold text-foreground">{item.title}</h3>
-                          <p className="mt-2 whitespace-pre-line text-sm leading-7 text-muted-foreground">{item.content}</p>
+                          <p className="mt-2 line-clamp-3 text-sm leading-7 text-muted-foreground">{extractAnnouncementExcerpt(item.content, 320)}</p>
                         </div>
                         <div className="flex flex-wrap gap-x-4 gap-y-2 text-sm text-muted-foreground">
                           <span>{audience}</span>
@@ -1047,7 +1050,8 @@ export default function AdminAnnouncementsPage() {
                               : 'text-muted-foreground hover:text-foreground',
                           )}
                         >
-                          {vi ? '✨ Trực quan TinyMCE' : '✨ TinyMCE Visual'}
+                          <Sparkles aria-hidden className="mr-1 inline size-3.5" />
+                          {vi ? 'Trực quan TinyMCE' : 'TinyMCE Visual'}
                         </button>
                         <button
                           type="button"
@@ -1059,7 +1063,8 @@ export default function AdminAnnouncementsPage() {
                               : 'text-muted-foreground hover:text-foreground',
                           )}
                         >
-                          {vi ? '📝 Markdown & Khối' : '📝 Markdown & Blocks'}
+                          <FileText aria-hidden className="mr-1 inline size-3.5" />
+                          {vi ? 'Markdown & Khối' : 'Markdown & Blocks'}
                         </button>
                       </div>
                       <span className="text-[11px] text-muted-foreground">

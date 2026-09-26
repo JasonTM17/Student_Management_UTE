@@ -521,18 +521,51 @@ export const sectionsApi = {
 };
 
 // Enrollments API
+
+/** CampusCore day convention: 1=Sunday .. 7=Saturday (same as weekly-grid.ts). */
+export interface RegistrationSectionSchedule {
+  dayOfWeek: number;
+  startTime: string;
+  endTime: string;
+  room: string | null;
+  lecturer: string | null;
+}
+
+export type RegistrationCurriculumRelevance = 'MANDATORY' | 'ELECTIVE' | 'OUTSIDE';
+
+export interface RegistrationSection {
+  id: string;
+  sectionNumber: string;
+  courseId: string;
+  courseCode: string;
+  courseName: string;
+  credits: number;
+  capacity: number;
+  enrolledCount: number;
+  remainingSeats: number;
+  status: string;
+  scheduleConflict: boolean;
+  alreadyEnrolled: boolean;
+  /** How the section relates to the student's curriculum plan (additive). */
+  curriculumRelevance?: RegistrationCurriculumRelevance;
+  /** Class meetings; may be empty for sections not yet timetabled. */
+  schedules?: RegistrationSectionSchedule[];
+}
+
+export interface RegistrationRound {
+  id: string;
+  semesterId: string;
+  name: string;
+  kind: string;
+  status: string;
+  windowStart: string;
+  windowEnd: string;
+  creditLimit: number;
+}
+
 export const registrationApi = {
-  rounds: async (semesterId?: string) => {
-    const response = await api.get<Array<{
-      id: string;
-      semesterId: string;
-      name: string;
-      kind: string;
-      status: string;
-      windowStart: string;
-      windowEnd: string;
-      creditLimit: number;
-    }>>('/registration/rounds', { params: { semesterId } });
+  rounds: async (semesterId?: string): Promise<RegistrationRound[]> => {
+    const response = await api.get<RegistrationRound[]>('/registration/rounds', { params: { semesterId } });
     return response.data;
   },
   eligibility: async (params?: { semesterId?: string; roundId?: string }) => {
@@ -549,21 +582,8 @@ export const registrationApi = {
     }>('/me/registration/eligibility', { params });
     return response.data;
   },
-  sections: async (params?: { semesterId?: string; roundId?: string }) => {
-    const response = await api.get<Array<{
-      id: string;
-      sectionNumber: string;
-      courseId: string;
-      courseCode: string;
-      courseName: string;
-      credits: number;
-      capacity: number;
-      enrolledCount: number;
-      remainingSeats: number;
-      status: string;
-      scheduleConflict: boolean;
-      alreadyEnrolled: boolean;
-    }>>('/me/registration/sections', { params });
+  sections: async (params?: { semesterId?: string; roundId?: string }): Promise<RegistrationSection[]> => {
+    const response = await api.get<RegistrationSection[]>('/me/registration/sections', { params });
     return response.data;
   },
   summary: async (semesterId?: string) => {
