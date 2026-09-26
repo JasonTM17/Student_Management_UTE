@@ -38,11 +38,13 @@ services:
         generateValue: true
       - key: JWT_REFRESH_SECRET
         generateValue: true
-      # The seeded showcase accounts carry passwords published in this repository's
-      # history. This deployment is public, so the accounts stay DISABLED. Flip to
-      # "true" only on a host you are willing to expose an administrator login on.
+      # Owner decision (2026-09-25): the demo accounts stay ACTIVE on this public
+      # deployment so visitors can experience the full portal with the published
+      # runbook credentials. Accepted trade-off: the demo admin login is public.
+      # To narrow the exposure without redeploying secrets, set
+      # DEMO_ACCOUNTS_ROLES (see DemoAccountGate) to e.g. "STUDENT".
       - key: DEMO_ACCOUNTS_ENABLED
-        value: "false"
+        value: "true"
       - key: DEEPSEEK_ENABLED
         value: "true"
       - key: DEEPSEEK_API_KEY

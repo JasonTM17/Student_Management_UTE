@@ -54,9 +54,11 @@ curl.exe -s -o NUL -w "Web Status: %{http_code}\n" http://127.0.0.1:3100/vi
 > **Điều kiện tiên quyết — đọc trước khi demo.** Các tài khoản dưới đây bị **KHOÁ** ở trạng thái seed
 > (`V48`), và `DemoAccountGate` **áp lại trạng thái đó ở mỗi lần khởi động** theo công tắc
 > `DEMO_ACCOUNTS_ENABLED`. `V82` sau đó kích hoạt đúng bộ tài khoản được runbook nêu (Quản trị viên 2
-> và `lecturer002–012`) nên công tắc dưới đây là **đủ** cho toàn bộ bảng tài khoản; trên host công khai
-> (`DEMO_ACCOUNTS_ENABLED=false`, mặc định của `render.yaml`/prod compose) gate khoá lại đúng bộ đó
-> ở mỗi lần boot. Vì vậy:
+> và `lecturer002–012`) nên công tắc dưới đây là **đủ** cho toàn bộ bảng tài khoản. Quyết định của chủ
+> sở hữu (25/09/2026): **production giữ `DEMO_ACCOUNTS_ENABLED=true`** (`render.yaml`) để khách truy cập
+> trải nghiệm đầy đủ bằng đúng bộ tài khoản công khai — rủi ro tài khoản demo admin công khai đã được
+> chấp nhận và ghi chú ngay trong `render.yaml`; cần thu hẹp phạm vi mà không chỉnh secret thì đặt
+> `DEMO_ACCOUNTS_ROLES` (ví dụ `STUDENT`) để gate chỉ ACTIVE tài khoản demo đúng vai trò đó. Vì vậy:
 >
 > - Cụm demo cục bộ phải có `DEMO_ACCOUNTS_ENABLED=true` trong `.env` (đây cũng là giá trị mặc định
 >   của `docker-compose.yml`); nếu không, mọi tài khoản bên dưới sẽ trả 401.
