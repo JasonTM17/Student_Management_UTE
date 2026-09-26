@@ -18,6 +18,8 @@ public enum RateLimitCategory {
     MAIL_MUTATION(5, 3600, "Gửi thông báo qua mail"),
     /** Audit S6: password-reset issuance; 3 resets per hour per identity. */
     PASSWORD_RESET(3, 3600, "Đặt lại mật khẩu người dùng"),
+    /** Two-factor OTP verification; 10 tries per 15 minutes per IP. */
+    TWO_FACTOR_VERIFY(10, 900, "Xác thực OTP hai yếu tố"),
     DEFAULT_POST(40, 60, "Thao tác chung");
 
     private final int defaultLimit;

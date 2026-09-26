@@ -5,6 +5,7 @@ import io.campuscore.restfulapi.auth.repository.AuthUserRepository.AuthUserRecor
 import io.campuscore.restfulapi.auth.web.AuthDtos.AuthUserResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.LoginResponse;
 import io.campuscore.restfulapi.auth.web.AuthDtos.UpdateProfileRequest;
+import io.campuscore.restfulapi.exception.AppException;
 import io.campuscore.restfulapi.security.AuthPrincipal;
 import io.campuscore.restfulapi.security.AuthTokenService;
 import io.campuscore.restfulapi.security.AuthTokenService.IssuedAccessToken;
@@ -44,24 +45,28 @@ public class AuthLoginService {
     private final AuthUserRepository users;
     private final PasswordEncoder passwordEncoder;
     private final AuthTokenService tokens;
+    private final TwoFactorService twoFactor;
     private final Clock clock;
 
     @Autowired
     public AuthLoginService(
             AuthUserRepository users,
             PasswordEncoder passwordEncoder,
-            AuthTokenService tokens) {
-        this(users, passwordEncoder, tokens, Clock.systemUTC());
+            AuthTokenService tokens,
+            TwoFactorService twoFactor) {
+        this(users, passwordEncoder, tokens, twoFactor, Clock.systemUTC());
     }
 
     AuthLoginService(
             AuthUserRepository users,
             PasswordEncoder passwordEncoder,
             AuthTokenService tokens,
+            TwoFactorService twoFactor,
             Clock clock) {
         this.users = users;
         this.passwordEncoder = passwordEncoder;
         this.tokens = tokens;
+        this.twoFactor = twoFactor;
         this.clock = clock;
     }
 
@@ -86,6 +91,33 @@ public class AuthLoginService {
             throw new BadCredentialsException("Invalid credentials");
         }
 
+        users.recordSuccessfulLogin(user.id(), now);
+        // Opt-in second factor: accounts with the switch on never receive
+        // tokens here; they get an emailed LOGIN challenge instead. The
+        // single-step response shape is untouched for everyone else.
+        if (users.isTwoFactorEnabled(user.id())) {
+            String challengeId = twoFactor.startLoginChallenge(user);
+            return LoginResult.challenge(challengeId, TwoFactorService.maskEmail(user.email()));
+        }
+        return issueSession(user, ipAddress, userAgent);
+    }
+
+    /**
+     * Second step of a two-factor login: validates the emailed code, re-runs
+     * the same account-state gate as a password login, then issues the same
+     * session result (tokens, cookies handled by the controller). Structured
+     * two-factor rejections (wrong code, locked, expired) are committed, not
+     * rolled back, so the per-challenge attempt counter survives.
+     */
+    @Transactional(noRollbackFor = {BadCredentialsException.class, AppException.class})
+    public LoginResult completeLogin(String challengeId, String code, String ipAddress, String userAgent) {
+        String userId = twoFactor.consumeLoginChallenge(challengeId, code);
+        AuthUserRecord user = users.findById(userId)
+                .orElseThrow(() -> new BadCredentialsException("Invalid credentials"));
+        Instant now = clock.instant();
+        if (!"ACTIVE".equals(user.status()) || (user.lockedUntil() != null && user.lockedUntil().isAfter(now))) {
+            throw new BadCredentialsException("Invalid credentials");
+        }
         users.recordSuccessfulLogin(user.id(), now);
         return issueSession(user, ipAddress, userAgent);
     }
@@ -131,7 +163,7 @@ public class AuthLoginService {
                 userAgent,
                 nextRefreshToken.expiresAt());
 
-        return new LoginResult(
+        return LoginResult.session(
                 new LoginResponse(user.toResponse(), accessToken.accessToken(), nextRefreshToken.refreshToken()),
                 accessToken.expiresAt(),
                 nextRefreshToken.expiresAt());
@@ -248,7 +280,7 @@ public class AuthLoginService {
                 ipAddress,
                 userAgent,
                 refreshToken.expiresAt());
-        return new LoginResult(
+        return LoginResult.session(
                 new LoginResponse(user.toResponse(), accessToken.accessToken(), refreshToken.refreshToken()),
                 accessToken.expiresAt(),
                 refreshToken.expiresAt());
@@ -283,9 +315,27 @@ public class AuthLoginService {
         }
     }
 
+    /**
+     * A full session (response + expiry instants, challenge fields null) or a
+     * second-factor challenge (response null, challenge fields set). The
+     * controller branches on {@code response == null}.
+     */
     public record LoginResult(
             LoginResponse response,
             Instant accessTokenExpiresAt,
-            Instant refreshTokenExpiresAt) {
+            Instant refreshTokenExpiresAt,
+            String challengeId,
+            String email) {
+
+        public static LoginResult session(
+                LoginResponse response,
+                Instant accessTokenExpiresAt,
+                Instant refreshTokenExpiresAt) {
+            return new LoginResult(response, accessTokenExpiresAt, refreshTokenExpiresAt, null, null);
+        }
+
+        public static LoginResult challenge(String challengeId, String email) {
+            return new LoginResult(null, null, null, challengeId, email);
+        }
     }
 }

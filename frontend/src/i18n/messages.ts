@@ -490,6 +490,24 @@ export const en = {
       temporaryUnavailable:
         'Sign-in is temporarily unavailable. Please try again in a moment.',
     },
+    twoFactor: {
+      title: 'Two-step verification',
+      sentNotice: 'We sent a 6-digit code to {email}.',
+      sentNoticeHint:
+        'Enter the code to finish signing in. The code is valid for a short time only.',
+      codeLabel: 'Verification code',
+      codePlaceholder: '6 digits',
+      verify: 'Verify code',
+      verifying: 'Verifying…',
+      backToPassword: 'Back to password',
+      errors: {
+        invalidFormat: 'The code must be exactly 6 digits.',
+        codeInvalid: 'That code is not correct. Check the latest email and try again.',
+        codeLocked: 'Too many attempts. Start again with your password.',
+        codeExpired: 'The code has expired. Start again with your password.',
+        fallback: 'We could not verify that code. Please try again.',
+      },
+    },
     returnHomeLead: 'Need a different starting point?',
     portals: {
       groupLabel: 'Choose your campus portal',
@@ -1430,6 +1448,44 @@ export const en = {
     buttons: {
       savingChanges: 'Saving changes',
       updatingPassword: 'Updating password',
+    },
+    twoFactor: {
+      title: 'Two-factor sign-in (2FA)',
+      description:
+        'When enabled, signing in also asks for a one-time code sent to your email.',
+      statusEnabled: 'Enabled',
+      statusDisabled: 'Not enabled',
+      otpEmailLabel: 'Code sent to',
+      enableHint:
+        'Turn on two-factor sign-in. Each sign-in will then ask for a code from your email in addition to your password.',
+      disableHint:
+        'Turn off two-factor sign-in. Confirm with your password.',
+      enable: 'Turn on 2FA',
+      disable: 'Turn off 2FA',
+      working: 'Working…',
+      confirm: 'Confirm code',
+      confirming: 'Verifying code…',
+      codeSentNotice:
+        'We sent a 6-digit code to {email}. Enter it below to finish turning on 2FA.',
+      codeLabel: 'Verification code',
+      codePlaceholder: '6 digits',
+      passwordLabel: 'Your password',
+      passwordPlaceholder: 'Enter your password to confirm',
+      enabledToast: 'Two-factor sign-in is on.',
+      disabledToast: 'Two-factor sign-in is off.',
+      errors: {
+        statusFailed: 'The 2FA status could not be loaded right now.',
+        passwordRequired: 'Enter your password first.',
+        invalidFormat: 'The code must be exactly 6 digits.',
+        codeInvalid: 'That code is not correct. Check the latest email and try again.',
+        codeLocked: 'Too many attempts. Request a new code from the beginning.',
+        codeExpired: 'The code has expired. Start the change again.',
+        alreadyEnabled: 'Two-factor sign-in is already enabled for this account.',
+        mailFailed: 'The code email could not be sent. Try again in a moment.',
+        enableFailed: 'We could not start 2FA. Please try again.',
+        confirmFailed: 'We could not confirm that code. Please try again.',
+        disableFailed: 'We could not turn off 2FA. Please try again.',
+      },
     },
   },
   lecturerDashboard: {
@@ -2612,6 +2668,24 @@ export const vi: I18nMessages = {
       temporaryUnavailable:
         'Đăng nhập tạm thời chưa sẵn sàng. Vui lòng thử lại sau ít phút.',
     },
+    twoFactor: {
+      title: 'Xác thực hai yếu tố',
+      sentNotice: 'Mã xác thực 6 chữ số đã được gửi tới {email}.',
+      sentNoticeHint:
+        'Nhập mã để hoàn tất đăng nhập. Mã chỉ có hiệu lực trong thời gian ngắn.',
+      codeLabel: 'Mã xác thực',
+      codePlaceholder: '6 chữ số',
+      verify: 'Xác nhận mã',
+      verifying: 'Đang xác nhận…',
+      backToPassword: 'Quay lại nhập mật khẩu',
+      errors: {
+        invalidFormat: 'Mã phải gồm đúng 6 chữ số.',
+        codeInvalid: 'Mã không đúng. Hãy kiểm tra email mới nhất rồi thử lại.',
+        codeLocked: 'Bạn đã thử quá nhiều lần. Hãy quay lại bước nhập mật khẩu.',
+        codeExpired: 'Mã đã hết hạn. Hãy quay lại bước nhập mật khẩu.',
+        fallback: 'Hiện chưa thể xác nhận mã này. Vui lòng thử lại.',
+      },
+    },
     returnHomeLead: 'Cần một điểm vào khác?',
     portals: {
       groupLabel: 'Chọn khu vực học vụ của bạn',
@@ -3548,6 +3622,43 @@ export const vi: I18nMessages = {
     buttons: {
       savingChanges: 'Đang lưu thay đổi',
       updatingPassword: 'Đang cập nhật mật khẩu',
+    },
+    twoFactor: {
+      title: 'Xác thực hai yếu tố (2FA)',
+      description:
+        'Khi bật, mỗi lần đăng nhập sẽ yêu cầu thêm mã OTP gửi về email của bạn.',
+      statusEnabled: 'Đang bật',
+      statusDisabled: 'Chưa bật',
+      otpEmailLabel: 'Email nhận mã',
+      enableHint:
+        'Bật xác thực hai yếu tố: sau này đăng nhập cần thêm mã OTP gửi về email, ngoài mật khẩu.',
+      disableHint: 'Tắt xác thực hai yếu tố. Xác nhận bằng mật khẩu của bạn.',
+      enable: 'Bật 2FA',
+      disable: 'Tắt 2FA',
+      working: 'Đang xử lý…',
+      confirm: 'Xác nhận mã',
+      confirming: 'Đang xác nhận mã…',
+      codeSentNotice:
+        'Mã xác thực 6 chữ số đã được gửi tới {email}. Nhập mã bên dưới để hoàn tất bật 2FA.',
+      codeLabel: 'Mã xác thực',
+      codePlaceholder: '6 chữ số',
+      passwordLabel: 'Mật khẩu của bạn',
+      passwordPlaceholder: 'Nhập mật khẩu để xác nhận',
+      enabledToast: 'Đã bật xác thực hai yếu tố.',
+      disabledToast: 'Đã tắt xác thực hai yếu tố.',
+      errors: {
+        statusFailed: 'Hiện chưa thể tải trạng thái 2FA.',
+        passwordRequired: 'Vui lòng nhập mật khẩu trước.',
+        invalidFormat: 'Mã phải gồm đúng 6 chữ số.',
+        codeInvalid: 'Mã không đúng. Hãy kiểm tra email mới nhất rồi thử lại.',
+        codeLocked: 'Bạn đã thử quá nhiều lần. Hãy bắt đầu lại từ đầu để nhận mã mới.',
+        codeExpired: 'Mã đã hết hạn. Hãy thực hiện lại từ đầu.',
+        alreadyEnabled: 'Tài khoản này đã bật xác thực hai yếu tố.',
+        mailFailed: 'Hiện chưa gửi được email chứa mã. Vui lòng thử lại sau ít phút.',
+        enableFailed: 'Hiện chưa thể bật 2FA. Vui lòng thử lại.',
+        confirmFailed: 'Hiện chưa thể xác nhận mã. Vui lòng thử lại.',
+        disableFailed: 'Hiện chưa thể tắt 2FA. Vui lòng thử lại.',
+      },
     },
   },
   lecturerDashboard: {
