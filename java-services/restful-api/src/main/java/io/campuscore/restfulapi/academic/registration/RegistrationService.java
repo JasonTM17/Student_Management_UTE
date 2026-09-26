@@ -1,8 +1,10 @@
 package io.campuscore.restfulapi.academic.registration;
 
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.CatalogSectionResponse;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.CurriculumRelevance;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.EligibilityResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.RoundResponse;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SectionScheduleView;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
@@ -14,10 +16,14 @@ import java.sql.Timestamp;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.HexFormat;
+import java.util.LinkedHashMap;
+import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Locale;
 import java.util.Map;
+import java.util.Set;
 import java.util.UUID;
+import java.util.stream.Collectors;
 import org.springframework.context.annotation.Profile;
 import org.springframework.dao.DataIntegrityViolationException;
 import org.springframework.dao.EmptyResultDataAccessException;
@@ -45,6 +51,11 @@ public class RegistrationService {
     private static final String COURSE = "academic.\"Course\"";
     private static final String STUDENT = "academic.\"Student\"";
     private static final String SCHEDULE = "academic.\"SectionSchedule\"";
+    private static final String CLASSROOM = "academic.\"Classroom\"";
+    private static final String LECTURER = "academic.\"Lecturer\"";
+    /** Display names live on the auth profile; same join convention as AcademicEnrollmentReadRepository. */
+    private static final String AUTH_USER = "campuscore_auth.\"User\"";
+    private static final String CURRICULUM_COURSE = "academic.\"CurriculumCourse\"";
     private static final int STANDARD_CREDIT_LIMIT = CreditLimitApplicationService.STANDARD_LIMIT;
 
     private final NamedParameterJdbcTemplate jdbc;
@@ -110,6 +121,19 @@ public class RegistrationService {
                 timestamp((Timestamp) round.get("window_end")));
     }
 
+    /**
+     * Query budget contract: catalog() runs a FIXED number of queries —
+     * student (1), round (1), cohort gate (1), active enrollments (1), and ONE
+     * fan-out fetch for catalog rows + schedules + curriculum relevance that
+     * is grouped in memory. The budget does not grow with the section count
+     * (no per-row schedule lookups); any new catalog field must stay batched —
+     * a join or a single IN (...) query — never a per-row round trip.
+     *
+     * <p>Upper bound is 5 queries on the happy REGISTRATION path and 6 when the
+     * ADD_DROP fallback re-opens the round (openReadRound retries once after
+     * the REGISTRATION round is closed). Never let either path grow with the
+     * catalog size.
+     */
     @Transactional
     public List<CatalogSectionResponse> catalog(String studentId, String semesterId, String roundId) {
         Map<String, Object> student = requireStudent(studentId);
@@ -119,20 +143,52 @@ public class RegistrationService {
         assertEligible(student, round, Instant.now());
         String effectiveSemester = String.valueOf(round.get("semester_id"));
         List<Map<String, Object>> active = activeEnrollments(studentId, effectiveSemester);
-        List<TimeRange> busy = schedulesForSections(active.stream().map(row -> String.valueOf(row.get("section_id"))).toList());
-        List<String> enrolledSections = active.stream().map(row -> String.valueOf(row.get("section_id"))).toList();
-        return jdbc.query(
+        Set<String> enrolledSections = active.stream()
+                .map(row -> String.valueOf(row.get("section_id")))
+                .collect(Collectors.toCollection(LinkedHashSet::new));
+
+        // One fan-out query: every section contributes at least one row
+        // (sections without schedules yield a single row with null schedule
+        // columns); sections with N schedule rows yield N rows. Grouped into
+        // one response per section below, in result order.
+        List<CatalogRow> rows = jdbc.query(
                 "SELECT section.\"id\", section.\"sectionNumber\", section.\"courseId\", course.\"code\", course.\"name\","
-                        + " course.\"credits\", section.\"capacity\", section.\"enrolledCount\", section.\"status\""
-                        + " FROM " + SECTION + " section JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
-                        + " WHERE section.\"semesterId\" = :semesterId ORDER BY course.\"code\"",
-                new MapSqlParameterSource("semesterId", effectiveSemester),
+                        + " course.\"credits\", section.\"capacity\", section.\"enrolledCount\", section.\"status\","
+                        + " schedule.\"dayOfWeek\" AS schedule_day, schedule.\"startTime\" AS schedule_start,"
+                        + " schedule.\"endTime\" AS schedule_end,"
+                        + " classroom.\"building\" AS room_building, classroom.\"roomNumber\" AS room_number,"
+                        + " lecturer_user.\"firstName\" AS lecturer_first_name, lecturer_user.\"lastName\" AS lecturer_last_name,"
+                        + " (SELECT cc.\"isMandatory\" FROM " + CURRICULUM_COURSE + " cc"
+                        + "  WHERE cc.\"curriculumId\" = :curriculumId AND cc.\"courseId\" = section.\"courseId\" LIMIT 1)"
+                        + "   AS curriculum_mandatory"
+                        + " FROM " + SECTION + " section"
+                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
+                        + " LEFT JOIN " + SCHEDULE + " schedule ON schedule.\"sectionId\" = section.\"id\""
+                        + " LEFT JOIN " + CLASSROOM + " classroom ON classroom.\"id\" = schedule.\"classroomId\""
+                        + " LEFT JOIN " + LECTURER + " lecturer ON lecturer.\"id\" = section.\"lecturerId\""
+                        + " LEFT JOIN " + AUTH_USER + " lecturer_user ON lecturer_user.\"id\" = lecturer.\"userId\""
+                        + " WHERE section.\"semesterId\" = :semesterId"
+                        + " ORDER BY course.\"code\", section.\"id\", schedule.\"dayOfWeek\", schedule.\"startTime\", schedule.\"id\"",
+                new MapSqlParameterSource()
+                        .addValue("curriculumId", student.get("curriculum_id"))
+                        .addValue("semesterId", effectiveSemester),
                 (rs, rowNum) -> {
-                    String sectionId = rs.getString("id");
-                    boolean conflict = overlaps(busy, schedulesForSection(sectionId));
-                    int remaining = Math.max(0, rs.getInt("capacity") - rs.getInt("enrolledCount"));
-                    return new CatalogSectionResponse(
-                            sectionId,
+                    TimeRange schedule = rs.getObject("schedule_day") == null ? null : new TimeRange(
+                            rs.getInt("schedule_day"),
+                            rs.getString("schedule_start"),
+                            rs.getString("schedule_end"));
+                    String building = rs.getString("room_building");
+                    String roomNumber = rs.getString("room_number");
+                    String room = building == null || roomNumber == null
+                            ? null
+                            : (building.trim() + " " + roomNumber.trim()).trim();
+                    String lecturer = displayName(rs.getString("lecturer_first_name"), rs.getString("lecturer_last_name"));
+                    boolean mandatory = rs.getBoolean("curriculum_mandatory");
+                    CurriculumRelevance relevance = rs.wasNull()
+                            ? CurriculumRelevance.OUTSIDE
+                            : (mandatory ? CurriculumRelevance.MANDATORY : CurriculumRelevance.ELECTIVE);
+                    return new CatalogRow(
+                            rs.getString("id"),
                             rs.getString("sectionNumber"),
                             rs.getString("courseId"),
                             rs.getString("code"),
@@ -140,11 +196,107 @@ public class RegistrationService {
                             rs.getInt("credits"),
                             rs.getInt("capacity"),
                             rs.getInt("enrolledCount"),
-                            remaining,
                             rs.getString("status"),
-                            conflict && !enrolledSections.contains(sectionId),
-                            enrolledSections.contains(sectionId));
+                            schedule,
+                            room,
+                            lecturer,
+                            relevance);
                 });
+
+        // Group the fan-out back to one response per section and compute the
+        // schedule-conflict flag entirely in memory from the fetched ranges.
+        Map<String, CatalogSectionResponse> bySection = new LinkedHashMap<>();
+        for (CatalogRow row : rows) {
+            CatalogSectionResponse assembled = bySection.get(row.id());
+            List<TimeRange> scheduleRanges = row.schedule() == null
+                    ? List.of()
+                    : List.of(row.schedule());
+            if (assembled == null) {
+                bySection.put(row.id(), new CatalogSectionResponse(
+                        row.id(),
+                        row.sectionNumber(),
+                        row.courseId(),
+                        row.courseCode(),
+                        row.courseName(),
+                        row.credits(),
+                        row.capacity(),
+                        row.enrolledCount(),
+                        Math.max(0, row.capacity() - row.enrolledCount()),
+                        row.status(),
+                        false,
+                        enrolledSections.contains(row.id()),
+                        row.schedule() == null
+                                ? List.of()
+                                : List.of(new SectionScheduleView(
+                                        row.schedule().day(),
+                                        row.schedule().start(),
+                                        row.schedule().end(),
+                                        row.room(),
+                                        row.lecturer())),
+                        row.relevance()));
+                continue;
+            }
+            if (row.schedule() == null) {
+                continue;
+            }
+            List<SectionScheduleView> schedules = new ArrayList<>(assembled.schedules());
+            schedules.add(new SectionScheduleView(
+                    row.schedule().day(),
+                    row.schedule().start(),
+                    row.schedule().end(),
+                    row.room(),
+                    row.lecturer()));
+            bySection.put(row.id(), new CatalogSectionResponse(
+                    assembled.id(),
+                    assembled.sectionNumber(),
+                    assembled.courseId(),
+                    assembled.courseCode(),
+                    assembled.courseName(),
+                    assembled.credits(),
+                    assembled.capacity(),
+                    assembled.enrolledCount(),
+                    assembled.remainingSeats(),
+                    assembled.status(),
+                    false,
+                    assembled.alreadyEnrolled(),
+                    List.copyOf(schedules),
+                    assembled.curriculumRelevance()));
+        }
+
+        List<TimeRange> busy = new ArrayList<>();
+        for (String enrolledSection : enrolledSections) {
+            CatalogSectionResponse enrolled = bySection.get(enrolledSection);
+            if (enrolled != null) {
+                enrolled.schedules().forEach(view -> busy.add(
+                        new TimeRange(view.dayOfWeek(), view.startTime(), view.endTime())));
+            }
+        }
+        List<CatalogSectionResponse> catalog = new ArrayList<>(bySection.values());
+        for (int index = 0; index < catalog.size(); index++) {
+            CatalogSectionResponse current = catalog.get(index);
+            boolean conflict = !enrolledSections.contains(current.id())
+                    && overlaps(busy, current.schedules().stream()
+                            .map(view -> new TimeRange(view.dayOfWeek(), view.startTime(), view.endTime()))
+                            .toList());
+            if (conflict) {
+                catalog.set(index, new CatalogSectionResponse(
+                        current.id(),
+                        current.sectionNumber(),
+                        current.courseId(),
+                        current.courseCode(),
+                        current.courseName(),
+                        current.credits(),
+                        current.capacity(),
+                        current.enrolledCount(),
+                        current.remainingSeats(),
+                        current.status(),
+                        true,
+                        current.alreadyEnrolled(),
+                        current.schedules(),
+                        current.curriculumRelevance()));
+            }
+        }
+        return catalog;
     }
 
     @Transactional
@@ -318,6 +470,12 @@ public class RegistrationService {
         if (!List.of("ENROLLED", "PENDING").contains(String.valueOf(enrollment.get("status")))) {
             throw problem(HttpStatus.CONFLICT, "ENROLLMENT_NOT_ACTIVE", "Enrollment is no longer active");
         }
+        // Global lock order on mutation paths is Student → Enrollment → Section →
+        // Round. Taking the Section lock before the Round lock keeps dropLocked in
+        // the same order as enrollLocked; the opposite order (Round first) let a
+        // concurrent enroll+drop on the same section deadlock (40P01) — reproduced
+        // adversarially on Postgres 18 (Wukong evidence, 2026-09-26).
+        lockSection(String.valueOf(enrollment.get("section_id")));
         openRound(String.valueOf(enrollment.get("semester_id")), "ADD_DROP");
         jdbc.update(
                 "UPDATE " + ENROLLMENT + " SET \"status\" = 'DROPPED', \"droppedAt\" = CURRENT_TIMESTAMP,"
@@ -551,23 +709,24 @@ public class RegistrationService {
         if (!"OPEN".equals(String.valueOf(round.get("status"))) || !inWindow(round, now)) {
             throw problem(HttpStatus.CONFLICT, "WINDOW_CLOSED", "Registration window is closed");
         }
-        Long cohorts = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + COHORT + " WHERE \"roundId\" = :roundId",
-                new MapSqlParameterSource("roundId", round.get("id")),
-                Long.class);
-        if (cohorts == null || cohorts == 0) {
-            return;
-        }
-        Long matched = jdbc.queryForObject(
-                "SELECT COUNT(*) FROM " + COHORT
-                        + " WHERE \"roundId\" = :roundId AND (\"curriculumId\" IS NULL OR \"curriculumId\" = :curriculumId)"
-                        + " AND (\"year\" IS NULL OR \"year\" = :year)",
+        // One query answers both "does this round restrict cohorts" and "does
+        // the student match one": counting the two populations in a single
+        // round trip keeps the catalog query budget contract at a constant.
+        Map<String, Object> counts = jdbc.queryForMap(
+                "SELECT COUNT(*) AS total,"
+                        + " SUM(CASE WHEN (\"curriculumId\" IS NULL OR \"curriculumId\" = :curriculumId)"
+                        + " AND (\"year\" IS NULL OR \"year\" = :year) THEN 1 ELSE 0 END) AS matched"
+                        + " FROM " + COHORT + " WHERE \"roundId\" = :roundId",
                 new MapSqlParameterSource()
                         .addValue("roundId", round.get("id"))
                         .addValue("curriculumId", student.get("curriculum_id"))
-                        .addValue("year", student.get("year")),
-                Long.class);
-        if (matched == null || matched == 0) {
+                        .addValue("year", student.get("year")));
+        long total = counts.get("total") == null ? 0 : ((Number) counts.get("total")).longValue();
+        if (total == 0) {
+            return;
+        }
+        long matched = counts.get("matched") == null ? 0 : ((Number) counts.get("matched")).longValue();
+        if (matched == 0) {
             throw problem(HttpStatus.UNPROCESSABLE_ENTITY, "COHORT_INELIGIBLE", "Student is outside this registration cohort");
         }
     }
@@ -720,5 +879,27 @@ public class RegistrationService {
     }
 
     private record TimeRange(int day, String start, String end) {
+    }
+
+    /** One fan-out row of the catalog query: section columns + optional schedule + relevance. */
+    private record CatalogRow(
+            String id,
+            String sectionNumber,
+            String courseId,
+            String courseCode,
+            String courseName,
+            int credits,
+            int capacity,
+            int enrolledCount,
+            String status,
+            TimeRange schedule,
+            String room,
+            String lecturer,
+            CurriculumRelevance relevance) {
+    }
+
+    private static String displayName(String firstName, String lastName) {
+        String name = ((firstName == null ? "" : firstName.trim()) + " " + (lastName == null ? "" : lastName.trim())).trim();
+        return name.isEmpty() ? null : name;
     }
 }
