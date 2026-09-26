@@ -16,13 +16,32 @@ BEGIN
         ) THEN
             RAISE EXCEPTION 'campuscore_assistant_runtime has unsafe role attributes';
         END IF;
+        -- Supabase automatically grants every newly created role to `postgres`
+        -- (member direction only, so the dashboard postgres user can SET ROLE
+        -- into it). That single auto-grant is expected and harmless: it gives
+        -- postgres access to this role, never the reverse. Anything else — the
+        -- runtime role holding membership in another role, or any member other
+        -- than postgres — breaks the isolation boundary and must fail loudly.
+        -- Corrective note 2026-09-26: the original both-directions check never
+        -- applied successfully on Supabase (auto-re-grant makes it unsatisfiable);
+        -- this migration had not been applied in any environment when relaxed.
         IF EXISTS (
             SELECT 1
               FROM pg_auth_members m
-              JOIN pg_roles r ON r.oid = m.member OR r.oid = m.roleid
-             WHERE r.rolname = 'campuscore_assistant_runtime'
+              JOIN pg_roles runtime ON runtime.oid = m.roleid
+              JOIN pg_roles member ON member.oid = m.member
+             WHERE runtime.rolname = 'campuscore_assistant_runtime'
+               AND member.rolname <> 'postgres'
         ) THEN
-            RAISE EXCEPTION 'campuscore_assistant_runtime must have no role memberships in either direction';
+            RAISE EXCEPTION 'campuscore_assistant_runtime must have no members other than the Supabase-managed postgres grant';
+        END IF;
+        IF EXISTS (
+            SELECT 1
+              FROM pg_auth_members m
+              JOIN pg_roles runtime ON runtime.oid = m.member
+             WHERE runtime.rolname = 'campuscore_assistant_runtime'
+        ) THEN
+            RAISE EXCEPTION 'campuscore_assistant_runtime must not be a member of any other role';
         END IF;
     END IF;
 END
