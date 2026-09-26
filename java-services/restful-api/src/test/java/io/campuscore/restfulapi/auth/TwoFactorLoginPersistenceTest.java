@@ -413,6 +413,33 @@ class TwoFactorLoginPersistenceTest {
     }
 
     @Test
+    void externallyWrittenExpiryIsHonouredRegardlessOfJvmTimezone() throws Exception {
+        // Regression for the TZ conversion defect (Wukong, 2026-09-26): an
+        // external writer stamps expiresAt with plain SQL relative to the
+        // database clock. The repository must honour the stored instant — the
+        // previous toLocalDateTime()/UTC round trip shifted it by the JVM
+        // offset and kept an expired challenge verifiable for +TZ hours.
+        enableTwoFactorDirectly();
+        MvcResult challenge = loginStudent().andReturn();
+        String loginChallengeId = objectMapper
+                .readTree(challenge.getResponse().getContentAsString())
+                .path("challengeId").asText();
+        String correctCode = latestCode();
+
+        jdbc.update(
+                "UPDATE \"campuscore_auth\".\"TwoFactorChallenge\""
+                        + " SET \"expiresAt\" = now() - INTERVAL '11' MINUTE WHERE \"id\" = ?",
+                loginChallengeId);
+
+        mvc.perform(post("/api/v1/auth/two-factor/verify")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .header("User-Agent", "jest-java-2fa-tz")
+                        .content("{\"challengeId\":\"" + loginChallengeId + "\",\"code\":\"" + correctCode + "\"}"))
+                .andExpect(status().isBadRequest())
+                .andExpect(jsonPath("$.code").value("TWO_FACTOR_CODE_EXPIRED"));
+    }
+
+    @Test
     void disableRestoresTheSingleStepLoginContract() throws Exception {
         enableTwoFactorDirectly();
         MvcResult challenge = loginStudent()

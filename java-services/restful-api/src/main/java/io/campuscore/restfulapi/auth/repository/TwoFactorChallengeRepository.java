@@ -2,7 +2,7 @@ package io.campuscore.restfulapi.auth.repository;
 
 import java.sql.Timestamp;
 import java.time.Instant;
-import java.time.LocalDateTime;
+import java.time.OffsetDateTime;
 import java.time.ZoneOffset;
 import java.util.List;
 import java.util.Optional;
@@ -46,7 +46,7 @@ public class TwoFactorChallengeRepository {
                         .addValue("userId", userId)
                         .addValue("purpose", purpose)
                         .addValue("codeHash", codeHash)
-                        .addValue("expiresAt", localDateTime(expiresAt)));
+                        .addValue("expiresAt", offsetDateTime(expiresAt)));
         return id;
     }
 
@@ -88,7 +88,7 @@ public class TwoFactorChallengeRepository {
                         + " WHERE \"id\" = :id AND \"consumedAt\" IS NULL",
                 new MapSqlParameterSource()
                         .addValue("id", id)
-                        .addValue("consumedAt", localDateTime(consumedAt)));
+                        .addValue("consumedAt", offsetDateTime(consumedAt)));
     }
 
     private static ChallengeRecord mapChallenge(java.sql.ResultSet resultSet, int ignored)
@@ -104,16 +104,19 @@ public class TwoFactorChallengeRepository {
                 instant(resultSet.getTimestamp("createdAt")));
     }
 
+    /**
+     * TIMESTAMP WITH TIME ZONE columns carry an absolute instant; reading them
+     * through {@code Timestamp#toLocalDateTime()} re-interpreted that
+     * wall-clock as UTC and shifted expiry windows by the JVM offset (a
+     * challenge that had just expired could still verify on a +07 JVM). The
+     * driver-provided offset is authoritative in both directions.
+     */
     private static Instant instant(Timestamp timestamp) {
-        if (timestamp == null) {
-            return null;
-        }
-        LocalDateTime localDateTime = timestamp.toLocalDateTime();
-        return localDateTime.toInstant(ZoneOffset.UTC);
+        return timestamp == null ? null : timestamp.toInstant();
     }
 
-    private static LocalDateTime localDateTime(Instant instant) {
-        return instant == null ? null : LocalDateTime.ofInstant(instant, ZoneOffset.UTC);
+    private static OffsetDateTime offsetDateTime(Instant instant) {
+        return instant == null ? null : OffsetDateTime.ofInstant(instant, ZoneOffset.UTC);
     }
 
     public record ChallengeRecord(
