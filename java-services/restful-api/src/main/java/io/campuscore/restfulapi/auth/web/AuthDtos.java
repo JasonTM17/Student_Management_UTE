@@ -70,9 +70,23 @@ public final class AuthDtos {
     public record StudentContext(Integer year) {
     }
 
+    /**
+     * The two-factor fields are additive and omitted (NON_NULL) whenever a
+     * login completes in one step, keeping the historical single-step JSON
+     * byte-compatible. A second-step challenge returns null user/tokens with
+     * twoFactorRequired=true plus the challengeId and masked email.
+     */
+    @JsonInclude(JsonInclude.Include.NON_NULL)
     public record LoginResponse(
             AuthUserResponse user,
             String accessToken,
-            String refreshToken) {
+            String refreshToken,
+            Boolean twoFactorRequired,
+            String challengeId,
+            String maskedEmail) {
+
+        public LoginResponse(AuthUserResponse user, String accessToken, String refreshToken) {
+            this(user, accessToken, refreshToken, null, null, null);
+        }
     }
 }

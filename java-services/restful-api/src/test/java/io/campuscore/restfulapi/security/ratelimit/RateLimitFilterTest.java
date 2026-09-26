@@ -266,4 +266,25 @@ class RateLimitFilterTest {
         assertEquals("3", res.getHeader("X-RateLimit-Limit"));
         assertEquals("2", res.getHeader("X-RateLimit-Remaining"));
     }
+
+    /** Two-factor OTP verification: own tight 10-per-15-minutes IP bucket. */
+    @Test
+    void twoFactorVerifyIsCappedAtTenPerFifteenMinutesPerIp() throws Exception {
+        MockHttpServletRequest req = new MockHttpServletRequest("POST", "/api/v1/auth/two-factor/verify");
+        req.setRemoteAddr("10.0.0.42");
+        MockHttpServletResponse res = new MockHttpServletResponse();
+        filter.doFilter(req, res, mock(FilterChain.class));
+        assertEquals("10", res.getHeader("X-RateLimit-Limit"));
+        assertEquals("9", res.getHeader("X-RateLimit-Remaining"));
+
+        // The 11th try from the same IP is refused with 429.
+        MockHttpServletResponse last = new MockHttpServletResponse();
+        for (int i = 0; i < 10; i++) {
+            last = new MockHttpServletResponse();
+            filter.doFilter(req, last, mock(FilterChain.class));
+        }
+        assertEquals(429, last.getStatus());
+        assertEquals("0", last.getHeader("X-RateLimit-Remaining"));
+        assertNotNull(last.getHeader("Retry-After"));
+    }
 }

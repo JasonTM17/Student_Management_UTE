@@ -135,6 +135,24 @@ public class AuthUserRepository {
                 .findFirst();
     }
 
+    /** Opt-in email OTP switch added by V85; read per login, never cached. */
+    public boolean isTwoFactorEnabled(String userId) {
+        Boolean enabled = jdbc.queryForObject(
+                "SELECT \"twoFactorEnabled\" FROM " + USER_TABLE + " WHERE \"id\" = :id",
+                new MapSqlParameterSource("id", userId),
+                Boolean.class);
+        return Boolean.TRUE.equals(enabled);
+    }
+
+    public void setTwoFactorEnabled(String userId, boolean enabled) {
+        jdbc.update(
+                "UPDATE " + USER_TABLE + " SET \"twoFactorEnabled\" = :enabled,"
+                        + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
+                new MapSqlParameterSource()
+                        .addValue("id", userId)
+                        .addValue("enabled", enabled));
+    }
+
     public void setMustChangePassword(String userId, boolean mustChangePassword) {
         jdbc.update(
                 "UPDATE " + USER_TABLE + " SET \"mustChangePassword\" = :flag,"

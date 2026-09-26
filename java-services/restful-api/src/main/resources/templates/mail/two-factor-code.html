@@ -1,0 +1,53 @@
+<!DOCTYPE html>
+<html xmlns:th="http://www.thymeleaf.org" lang="vi">
+<head th:replace="~{mail/fragments :: emailHead(${subject})}"></head>
+<body>
+  <span th:replace="~{mail/fragments :: preheader('Mã xác thực đăng nhập có hiệu lực trong 10 phút')}">Mã xác thực đăng nhập của bạn</span>
+
+  <table role="presentation" class="email-wrapper" width="100%" cellpadding="0" cellspacing="0" border="0" style="width:100%;background-color:#edf2f7;">
+    <tr>
+      <td class="outer-pad" align="center" style="padding:36px 16px;">
+        <table role="presentation" class="email-shell" width="640" cellpadding="0" cellspacing="0" border="0" style="width:100%;max-width:640px;border:1px solid #dce5ef;border-radius:16px;background-color:#ffffff;">
+          <th:block th:replace="~{mail/fragments :: masthead('XÁC THỰC HAI YẾU TỐ', 'Trường Đại học Công Nghệ Kĩ thuật TP. Hồ Chí Minh')}"></th:block>
+
+          <tr>
+            <td class="content" style="padding:36px 40px 38px;">
+              <p class="section-label">MÃ XÁC THỰC ĐĂNG NHẬP</p>
+              <h1 class="page-title" style="margin:0 0 24px;color:#132d50;font-family:Arial,Helvetica,sans-serif;font-size:27px;font-weight:700;line-height:34px;">Mã OTP xác thực hai yếu tố</h1>
+
+              <p class="salutation">
+                Kính chào <span th:text="${recipientName != null ? recipientName : 'Bạn'}">Bạn</span>,
+              </p>
+              <p class="prose">
+                Bạn (hoặc ai đó) vừa thực hiện bước xác thực hai yếu tố trên Cổng Đào tạo CampusCore.
+                Nhập mã dưới đây để tiếp tục:
+              </p>
+
+              <div style="margin:28px 0;text-align:center;">
+                <div style="display:inline-block;padding:18px 36px;border:1px solid #dce5ef;border-radius:12px;background-color:#f6f9fd;">
+                  <span style="font-family:'Courier New',Courier,monospace;font-size:38px;font-weight:700;letter-spacing:12px;color:#132d50;" th:text="${code}">000000</span>
+                </div>
+              </div>
+
+              <div class="status-panel" style="margin:0 0 24px;padding:18px 20px;border:1px solid #f0d9a8;border-left:4px solid #b7791f;border-radius:10px;background-color:#fdf8ec;">
+                <p class="status-label">LƯU Ý BẢO MẬT</p>
+                <p class="status-copy">
+                  Mã có hiệu lực trong <strong th:text="${expiryMinutes != null ? expiryMinutes : 10}">10</strong> phút
+                  và chỉ dùng được một lần. Không chia sẻ mã này cho bất kỳ ai —
+                  nhân viên của trường không bao giờ yêu cầu mã xác thực của bạn.
+                </p>
+              </div>
+
+              <p class="prose" style="color:#64748b;">
+                Nếu bạn không yêu cầu mã này, hãy bỏ qua email và đổi mật khẩu để bảo vệ tài khoản.
+              </p>
+            </td>
+          </tr>
+
+          <tr th:replace="~{mail/fragments :: footer('Email tự động từ hệ thống CampusCore — vui lòng không trả lời')}"></tr>
+        </table>
+      </td>
+    </tr>
+  </table>
+</body>
+</html>
