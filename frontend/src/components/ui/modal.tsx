@@ -201,6 +201,8 @@ interface ConfirmModalProps {
   cancelText?: string;
   variant?: 'default' | 'destructive';
   isLoading?: boolean;
+  /** Optional amber caution banner rendered above the actions (soft warnings). */
+  warning?: string;
 }
 
 export function ConfirmModal({
@@ -213,6 +215,7 @@ export function ConfirmModal({
   cancelText,
   variant = 'default',
   isLoading = false,
+  warning,
 }: ConfirmModalProps) {
   const { messages } = useI18n();
 
@@ -220,6 +223,14 @@ export function ConfirmModal({
     <Modal isOpen={isOpen} onClose={onClose} title={title}>
       <div className="space-y-4">
         <p className="text-sm leading-6 text-muted-foreground">{message}</p>
+        {warning ? (
+          <div
+            role="status"
+            className="rounded-lg border border-status-warning/40 bg-status-warning/12 px-3 py-2.5 text-sm leading-6 text-status-warning-foreground"
+          >
+            {warning}
+          </div>
+        ) : null}
         <div className="flex justify-end gap-2">
           <Button
             type="button"

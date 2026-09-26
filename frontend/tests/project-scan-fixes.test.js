@@ -133,32 +133,35 @@ test('admin user search commits one query per submit instead of per keystroke', 
   assert.doesNotMatch(page, /onChange=\{\(e\) => setSearch\(e\.target\.value\)\}/);
 });
 
-test('feedback polish: registration separates searches, groups classes, and keeps drop nearby', () => {
+test('feedback polish: registration groups classes, filters browse-first, and keeps drop nearby', () => {
   const page = read('src/app/dashboard/register/page.tsx');
   const messages = read('src/i18n/messages.ts');
 
-  assert.match(page, /courseCodeSearch/);
-  assert.match(page, /courseNameSearch/);
-  // Sections are grouped by course; the student picks a course first and then
-  // sees only that course's class groups (two-level selection).
+  // 2026-09 redesign: one unified search box (code OR name, diacritics-insensitive)
+  // plus filter chips with live counts; the old two-search two-level picker is gone.
+  assert.match(page, /searchText/);
+  assert.match(page, /matchesSectionSearch/);
+  assert.match(page, /curriculumFilter/);
+  assert.match(page, /aria-pressed/);
+  // Sections are grouped by course with expandable section rows.
   assert.match(page, /courseGroups/);
-  assert.match(page, /selectedCourseId/);
   assert.match(page, /lg:col-span-9/);
   assert.match(page, /lg:col-span-3/);
-  assert.match(page, /copy\.courseCodePlaceholder/);
-  assert.match(page, /copy\.courseNamePlaceholder/);
   assert.match(page, /registered\.map\(\(item\) =>/);
   assert.match(page, /onClick=\{\(\) => void drop\(item\)\}/);
-  assert.match(messages, /searchByCode/);
-  assert.match(messages, /searchByName/);
+  assert.match(messages, /searchLabel/);
   assert.match(messages, /groupSectionCount/);
 });
 
 test('feedback polish: schedule makes the timetable primary and removes summary cards', () => {
   const page = read('src/app/dashboard/schedule/page.tsx');
+  const grid = read('src/components/schedule/weekly-grid.tsx');
 
-  assert.match(page, /gridTemplateColumns: '72px repeat\(7, minmax\(130px, 1fr\)\)'/);
-  assert.match(page, /min-h-\[105px\]/);
+  // The weekly grid renderer is shared now; the page must still use it and the
+  // shared component must keep the full-size layout.
+  assert.match(page, /<WeeklyGrid/);
+  assert.match(grid, /'72px repeat\(7, minmax\(130px, 1fr\)\)'/);
+  assert.match(grid, /min-h-\[105px\]/);
   assert.doesNotMatch(page, /className="grid gap-4 md:grid-cols-3"/);
   assert.doesNotMatch(page, /metricToneClass/);
 });
