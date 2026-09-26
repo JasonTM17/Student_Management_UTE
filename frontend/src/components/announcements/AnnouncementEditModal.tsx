@@ -328,10 +328,10 @@ export function AnnouncementEditModal({
               onChange={(e) => setPriority(e.target.value as any)}
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="URGENT">{isVi ? '🚨 Khẩn cấp (Urgent)' : '🚨 Urgent'}</option>
-              <option value="HIGH">{isVi ? '⚠️ Ưu tiên cao (High)' : '⚠️ High'}</option>
-              <option value="NORMAL">{isVi ? 'ℹ️ Bình thường (Normal)' : 'ℹ️ Normal'}</option>
-              <option value="LOW">{isVi ? '📝 Thông tin chung (Low)' : '📝 Low'}</option>
+              <option value="URGENT">{isVi ? 'Khẩn cấp (Urgent)' : 'Urgent'}</option>
+              <option value="HIGH">{isVi ? 'Ưu tiên cao (High)' : 'High'}</option>
+              <option value="NORMAL">{isVi ? 'Bình thường (Normal)' : 'Normal'}</option>
+              <option value="LOW">{isVi ? 'Thông tin chung (Low)' : 'Low'}</option>
             </select>
           </div>
 
@@ -344,10 +344,10 @@ export function AnnouncementEditModal({
               onChange={(e) => setTargetRole(e.target.value as any)}
               className="h-9 w-full rounded-md border border-input bg-background px-3 py-1.5 text-xs font-medium focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
             >
-              <option value="ALL">{isVi ? '🏛️ Toàn trường (Sinh viên & Giảng viên)' : '🏛️ All Campus'}</option>
-              <option value="BOTH">{isVi ? '🎓👨‍🏫 Sinh viên & Giảng viên (không toàn trường)' : '🎓👨‍🏫 Students & Lecturers (targeted)'}</option>
-              <option value="STUDENT">{isVi ? '🎓 Chỉ Sinh viên' : '🎓 Students only'}</option>
-              <option value="LECTURER">{isVi ? '👨‍🏫 Chỉ Giảng viên' : '👨‍🏫 Lecturers only'}</option>
+              <option value="ALL">{isVi ? 'Toàn trường (Sinh viên & Giảng viên)' : 'All Campus'}</option>
+              <option value="BOTH">{isVi ? 'Sinh viên & Giảng viên (không toàn trường)' : 'Students & Lecturers (targeted)'}</option>
+              <option value="STUDENT">{isVi ? 'Chỉ Sinh viên' : 'Students only'}</option>
+              <option value="LECTURER">{isVi ? 'Chỉ Giảng viên' : 'Lecturers only'}</option>
             </select>
           </div>
         </div>

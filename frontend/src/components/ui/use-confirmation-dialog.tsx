@@ -9,6 +9,8 @@ type ConfirmationOptions = {
   confirmText?: string;
   cancelText?: string;
   variant?: 'default' | 'destructive';
+  /** Optional amber caution banner; the action stays allowed (soft warning). */
+  warning?: string;
 };
 
 export function useConfirmationDialog() {
@@ -45,6 +47,7 @@ export function useConfirmationDialog() {
       confirmText={options?.confirmText}
       cancelText={options?.cancelText}
       variant={options?.variant ?? 'default'}
+      warning={options?.warning}
     />
   );
 

@@ -570,7 +570,7 @@ export function TinyMceEditor({
               // and print CSS never honoured `<!-- pagebreak -->`, the server
               // sanitizer strips the comment, and the author's own preview
               // showed it as literal junk.
-              insert: { title: 'Insert', items: 'image link codesample inserttable | charmap emoticons hr | nonbreaking anchor | insertdatetime' },
+              insert: { title: 'Insert', items: 'image link codesample inserttable | charmap hr | nonbreaking anchor | insertdatetime' },
               format: { title: 'Format', items: 'bold italic underline strikethrough superscript subscript codeformat | styles blocks fontfamily fontsize align lineheight | forecolor backcolor | removeformat' },
               tools: { title: 'Tools', items: 'code wordcount' },
               table: { title: 'Table', items: 'inserttable | cell row column | tableprops deletetable' },
@@ -586,7 +586,6 @@ export function TinyMceEditor({
               'code',
               'codesample',
               'directionality',
-              'emoticons',
               'fullscreen',
               'help',
               'image',
@@ -606,10 +605,13 @@ export function TinyMceEditor({
             // (<details>/<summary> and a restricted `id`) is allowlisted by
             // the sanitizer on both the read and write paths; RT-P3-4:
             // `wordcount` is only offered when `showWordCount` is set.
+            // `emoticons` is deliberately absent: official administrative
+            // content offers no sticker insertion; `charmap` covers the
+            // typographic characters that remain appropriate.
             toolbar: [
               'undo redo | blocks fontfamily fontsize lineheight | bold italic underline strikethrough | forecolor backcolor | alignleft aligncenter alignright alignjustify | bullist numlist outdent indent',
               [
-                'table link image codesample emoticons',
+                'table link image codesample',
                 'accordion charmap insertdatetime',
                 'visualblocks visualchars searchreplace',
                 showWordCount ? 'wordcount' : null,

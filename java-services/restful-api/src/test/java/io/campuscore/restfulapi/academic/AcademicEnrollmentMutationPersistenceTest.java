@@ -23,6 +23,7 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import io.campuscore.restfulapi.academic.registration.RegistrationPdfRenderer;
+import org.hamcrest.Matchers;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -176,6 +177,87 @@ class AcademicEnrollmentMutationPersistenceTest {
                         .with(studentJwt("student-user-1", "student-1")))
                 .andExpect(status().isOk())
                 .andExpect(jsonPath("$[0].id").value("section-open"));
+    }
+
+    /**
+     * Catalog v2: every section carries its schedules (day/time/room/lecturer)
+     * and its curriculum relevance label. dayOfWeek is emitted verbatim from
+     * the DB in the CampusCore convention (1=Chủ Nhật .. 7=Thứ Bảy); the fixture
+     * seeds Monday as 2. Sections without schedules expose an empty list so the
+     * FE renders "Chưa có lịch".
+     */
+    @Test
+    void catalogReturnsSchedulesRoomLecturerAndCurriculumRelevance() throws Exception {
+        seedLecturerAndCurriculumCourses();
+        // A second weekly meeting on section-open proves multi-row fan-out
+        // still groups into exactly one catalog entry.
+        jdbc.update(
+                "INSERT INTO \"academic\".\"SectionSchedule\""
+                        + " (\"id\", \"sectionId\", \"classroomId\", \"dayOfWeek\", \"startTime\", \"endTime\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                "sched-open-2", "section-open", "room-1", 4, "13:00", "15:00");
+
+        mvc.perform(get("/api/v1/me/registration/sections")
+                        .with(studentJwt("student-user-1", "student-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.length()").value(3))
+                // SE402 section-open: in curriculum as mandatory, two meetings with room + lecturer.
+                .andExpect(jsonPath("$[0].id").value("section-open"))
+                .andExpect(jsonPath("$[0].schedules.length()").value(2))
+                .andExpect(jsonPath("$[0].schedules[0].dayOfWeek").value(2))
+                .andExpect(jsonPath("$[0].schedules[0].startTime").value("07:00"))
+                .andExpect(jsonPath("$[0].schedules[0].endTime").value("09:30"))
+                .andExpect(jsonPath("$[0].schedules[0].room").value("A 101"))
+                .andExpect(jsonPath("$[0].schedules[0].lecturer").value("Minh Nguyen"))
+                .andExpect(jsonPath("$[0].schedules[1].dayOfWeek").value(4))
+                .andExpect(jsonPath("$[0].schedules[1].startTime").value("13:00"))
+                .andExpect(jsonPath("$[0].curriculumRelevance").value("MANDATORY"))
+                // SE403 section-overlap: elective in curriculum, schedule without lecturer.
+                .andExpect(jsonPath("$[1].id").value("section-overlap"))
+                .andExpect(jsonPath("$[1].schedules.length()").value(1))
+                .andExpect(jsonPath("$[1].schedules[0].dayOfWeek").value(2))
+                .andExpect(jsonPath("$[1].schedules[0].lecturer").value(Matchers.nullValue()))
+                .andExpect(jsonPath("$[1].curriculumRelevance").value("ELECTIVE"))
+                // SE404 section-two: absent from the curriculum, no schedules at all.
+                .andExpect(jsonPath("$[2].id").value("section-two"))
+                .andExpect(jsonPath("$[2].schedules.length()").value(0))
+                .andExpect(jsonPath("$[2].curriculumRelevance").value("OUTSIDE"));
+    }
+
+    /** Seeds one assigned lecturer and one mandatory/elective curriculum pair for the relevance test. */
+    private void seedLecturerAndCurriculumCourses() {
+        LocalDateTime now = localDateTime(BASE_TIME);
+        jdbc.update(
+                "INSERT INTO \"campuscore_auth\".\"User\" (\"id\", \"email\", \"firstName\", \"lastName\") VALUES (?, ?, ?, ?)",
+                "lecturer-user-1",
+                "lecturer1@campuscore.edu",
+                "Minh",
+                "Nguyen");
+        jdbc.update(
+                "INSERT INTO \"academic\".\"Lecturer\""
+                        + " (\"id\", \"userId\", \"departmentId\", \"employeeId\", \"isActive\") VALUES (?, ?, ?, ?, ?)",
+                "lecturer-1",
+                "lecturer-user-1",
+                "department-1",
+                "GV001",
+                true);
+        jdbc.update("UPDATE \"academic\".\"Section\" SET \"lecturerId\" = ? WHERE \"id\" = ?",
+                "lecturer-1", "section-open");
+        insertCurriculumCourse("curriculum-course-mandatory", "curriculum-1", "course-open", true);
+        insertCurriculumCourse("curriculum-course-elective", "curriculum-1", "course-overlap", false);
+    }
+
+    private void insertCurriculumCourse(String id, String curriculumId, String courseId, boolean mandatory) {
+        jdbc.update(
+                "INSERT INTO \"academic\".\"CurriculumCourse\""
+                        + " (\"id\", \"curriculumId\", \"courseId\", \"year\", \"semester\", \"isMandatory\")"
+                        + " VALUES (?, ?, ?, ?, ?, ?)",
+                id,
+                curriculumId,
+                courseId,
+                2,
+                1,
+                mandatory);
     }
 
     /**
@@ -717,6 +799,16 @@ class AcademicEnrollmentMutationPersistenceTest {
                 )
                 """);
         jdbc.execute("""
+                CREATE TABLE IF NOT EXISTS "academic"."CurriculumCourse" (
+                    "id" VARCHAR(120) PRIMARY KEY,
+                    "curriculumId" VARCHAR(120) NOT NULL,
+                    "courseId" VARCHAR(120) NOT NULL,
+                    "year" INTEGER NOT NULL,
+                    "semester" INTEGER NOT NULL,
+                    "isMandatory" BOOLEAN NOT NULL DEFAULT TRUE
+                )
+                """);
+        jdbc.execute("""
                 CREATE TABLE IF NOT EXISTS "academic"."Enrollment" (
                     "id" VARCHAR(120) PRIMARY KEY,
                     "studentId" VARCHAR(120) NOT NULL,
@@ -835,6 +927,7 @@ class AcademicEnrollmentMutationPersistenceTest {
         jdbc.update("DELETE FROM \"academic\".\"RegistrationIdempotency\"");
         jdbc.update("DELETE FROM \"academic\".\"CourseRequirement\"");
         jdbc.update("DELETE FROM \"academic\".\"RegistrationRoundCohort\"");
+        jdbc.update("DELETE FROM \"academic\".\"CurriculumCourse\"");
         jdbc.update("DELETE FROM \"academic\".\"RegistrationRound\"");
         jdbc.update("DELETE FROM \"academic\".\"Enrollment\"");
         jdbc.update("DELETE FROM \"academic\".\"SectionSchedule\"");

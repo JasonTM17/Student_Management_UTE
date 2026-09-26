@@ -1,6 +1,6 @@
 'use client';
 
-import { Fragment, useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
   Calendar,
   CalendarDays,
@@ -27,8 +27,15 @@ import { enrollmentsApi, semestersApi } from '@/lib/api';
 import { getLocalizedCourseLabel, getLocalizedName } from '@/lib/academic-content';
 import { isActiveEnrollment } from '@/lib/enrollment-status';
 import { pickPreferredSemesterId } from '@/lib/semesters';
-import { buildWeeklyGrid } from '@/lib/weekly-grid';
 import { Enrollment, Semester } from '@/types/api';
+import {
+  WeeklyGrid,
+  accentForCourse,
+  DAY_LABELS_VI,
+  DAY_LABELS_EN,
+  ORDERED_DAYS,
+  type WeeklyGridAgendaItem,
+} from '@/components/schedule/weekly-grid';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
@@ -61,37 +68,8 @@ type DayAgendaItem = {
   status?: string;
 };
 
-const DAY_LABELS_VI: Record<number, string> = {
-  1: 'Chủ Nhật',
-  2: 'Thứ Hai',
-  3: 'Thứ Ba',
-  4: 'Thứ Tư',
-  5: 'Thứ Năm',
-  6: 'Thứ Sáu',
-  7: 'Thứ Bảy',
-};
-
-const DAY_LABELS_EN: Record<number, string> = {
-  1: 'Sunday',
-  2: 'Monday',
-  3: 'Tuesday',
-  4: 'Wednesday',
-  5: 'Thursday',
-  6: 'Friday',
-  7: 'Saturday',
-};
-
-// Standard academic week display order: Monday to Sunday
-const ORDERED_DAYS = [2, 3, 4, 5, 6, 7, 1];
-
-/**
- * Unified enterprise academic theme for all class blocks across all roles.
- * Clean, consistent, and distraction-free institutional styling without rainbow colors.
- */
-const UNIFIED_COURSE_ACCENT =
-  'bg-primary/[0.04] dark:bg-primary/[0.08] text-foreground border-primary/25 dark:border-primary/35 hover:border-primary/60 hover:bg-primary/[0.08] dark:hover:bg-primary/[0.12]';
-
-const accentForCourse = (_courseCode?: string): string => UNIFIED_COURSE_ACCENT;
+// Day labels, week ordering, and the unified block accent now live in the
+// shared weekly-grid component alongside the grid renderer itself.
 
 export default function SchedulePage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
@@ -283,10 +261,16 @@ export default function SchedulePage() {
     );
   }, [locale, selectedSemester, semesters]);
 
-  const weeklyGrid = useMemo(() => buildWeeklyGrid(agenda), [agenda]);
-
   const handlePrint = () => {
     window.print();
+  };
+
+  /** Opens the class detail modal with exactly the agenda fields it shows. */
+  const openDetail = (item: WeeklyGridAgendaItem) => {
+    setSelectedDetail({
+      ...item,
+      courseName: item.courseName ?? item.courseCode,
+    });
   };
 
   const copy =
@@ -594,260 +578,22 @@ export default function SchedulePage() {
                   </div>
                 </CardHeader>
                 <CardContent className="p-4 sm:p-6">
-                  {/* Desktop / Tablet Weekly Grid */}
-                  <div className="hidden md:block">
-                    <div
-                      className="grid gap-2 overflow-x-auto pb-2"
-                      style={{ gridTemplateColumns: '72px repeat(7, minmax(130px, 1fr))' }}
-                      role="table"
-                      aria-label={copy.weeklyGrid}
-                    >
-                      <div style={{ gridColumn: 1, gridRow: 1 }} />
-                      {ORDERED_DAYS.map((dayNum, colIndex) => {
-                        const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
-                        const isToday = dayNum === todayDow;
-                        return (
-                          <div
-                            key={`grid-header-${dayNum}`}
-                            className={`rounded-lg py-2.5 px-1 text-center transition-all ${
-                              isToday
-                                ? 'border border-primary/50 bg-primary/10 text-primary shadow-sm font-black'
-                                : 'bg-secondary/40 text-foreground font-bold'
-                            }`}
-                            style={{ gridColumn: colIndex + 2, gridRow: 1 }}
-                          >
-                            <div className="text-xs uppercase tracking-wider">{dayName}</div>
-                            {isToday ? (
-                              <span className="mt-0.5 inline-block rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                {copy.today}
-                              </span>
-                            ) : null}
-                          </div>
-                        );
-                      })}
-
-                      {weeklyGrid.slots.map((slot, slotIndex) => (
-                        <Fragment key={`slot-${slot}`}>
-                          <div
-                            className="flex items-start justify-end pr-2 pt-2 text-xs font-semibold tabular-nums text-muted-foreground"
-                            style={{ gridColumn: 1, gridRow: slotIndex + 2 }}
-                          >
-                            {slot}
-                          </div>
-                          {ORDERED_DAYS.map((dayNum, colIndex) => {
-                            const cellItems = weeklyGrid.cells[`${dayNum}-${slot}`] ?? [];
-                            const isToday = dayNum === todayDow;
-
-                            if (cellItems.length === 0) {
-                              // Skip rendering cell if this time slot is covered by an earlier meeting spanning downwards
-                              const isCoveredByEarlier = agenda.some(
-                                (m) => m.dayOfWeek === dayNum && m.startTime < slot && slot < m.endTime,
-                              );
-                              if (isCoveredByEarlier) {
-                                return null;
-                              }
-
-                              return (
-                                <div
-                                  key={`cell-${dayNum}-${slot}`}
-                                  className={`min-h-[105px] rounded-lg border border-dashed border-border/70 transition hover:border-primary/40 hover:bg-card/90 ${
-                                    isToday ? 'bg-primary/[0.02] border-primary/20' : 'bg-card/60'
-                                  }`}
-                                  style={{ gridColumn: colIndex + 2, gridRow: slotIndex + 2 }}
-                                />
-                              );
-                            }
-
-                            const rowSpan = Math.max(...cellItems.map((item) => item.span ?? 1));
-                            return (
-                              <div
-                                key={`cell-${dayNum}-${slot}`}
-                                className="flex min-w-0 flex-col gap-1.5"
-                                style={{
-                                  gridColumn: colIndex + 2,
-                                  gridRow: `${slotIndex + 2} / span ${rowSpan}`,
-                                }}
-                              >
-                                {cellItems.map((item) => {
-                                  const matchingAgenda = agenda.find((a) => a.id === item.id);
-                                  const courseName = getLocalizedName(
-                                    locale,
-                                    {
-                                      code: item.courseCode,
-                                      name: item.courseName,
-                                      nameEn: item.courseNameEn,
-                                      nameVi: item.courseNameVi,
-                                    },
-                                    item.courseName,
-                                  );
-
-                                  const isMorning = (item.startTime || '').localeCompare('12:00') < 0;
-                                  const isAfternoon =
-                                    (item.startTime || '').localeCompare('12:00') >= 0 &&
-                                    (item.startTime || '').localeCompare('18:00') < 0;
-                                  const shiftBadge = isMorning
-                                    ? (locale === 'vi' ? 'Sáng' : 'AM')
-                                    : isAfternoon
-                                    ? (locale === 'vi' ? 'Chiều' : 'PM')
-                                    : (locale === 'vi' ? 'Tối' : 'Eve');
-
-                                  return (
-                                    <div
-                                      key={item.id}
-                                      onClick={() => {
-                                        setSelectedDetail({
-                                          courseCode: item.courseCode,
-                                          courseName: item.courseName ?? item.courseCode,
-                                          courseNameEn: item.courseNameEn,
-                                          courseNameVi: item.courseNameVi,
-                                          sectionNumber: item.sectionNumber,
-                                          dayOfWeek: item.dayOfWeek,
-                                          startTime: item.startTime,
-                                          endTime: item.endTime,
-                                          building: item.building,
-                                          roomNumber: item.roomNumber,
-                                          credits: matchingAgenda?.credits,
-                                          lecturerName: matchingAgenda?.lecturerName,
-                                          status: matchingAgenda?.status,
-                                        });
-                                      }}
-                                      className={`flex-1 rounded-lg border p-2.5 text-xs leading-tight transition-all hover:scale-[1.01] hover:shadow-md cursor-pointer ${accentForCourse(
-                                        item.courseCode,
-                                      )}`}
-                                      title={`${item.courseCode} - ${item.startTime}-${item.endTime} (${copy.clickToViewDetails})`}
-                                    >
-                                      <div className="flex items-center justify-between gap-1">
-                                        <span className="font-mono text-[11px] font-extrabold tracking-wide">
-                                          {item.courseCode}
-                                        </span>
-                                        <div className="flex items-center gap-1">
-                                          <span className="rounded bg-background/80 px-1.5 py-0.5 text-[9px] font-semibold text-foreground border border-border/40">
-                                            {item.sectionNumber}
-                                          </span>
-                                          <span className="rounded bg-primary/10 text-primary px-1.5 py-0.5 text-[9px] font-bold">
-                                            {shiftBadge}
-                                          </span>
-                                        </div>
-                                      </div>
-                                      <div
-                                        className="mt-1.5 font-bold text-[12px] leading-snug line-clamp-2 text-foreground"
-                                        title={courseName}
-                                      >
-                                        {courseName}
-                                      </div>
-                                      <div className="mt-2 space-y-1 text-[10px] text-muted-foreground border-t border-current/10 pt-1.5">
-                                        <div className="flex items-center justify-between gap-1">
-                                          <span className="inline-flex items-center gap-1 font-medium">
-                                            <Clock className="h-3 w-3 text-primary" />
-                                            {item.startTime}-{item.endTime}
-                                          </span>
-                                          {item.roomNumber ? (
-                                            <span className="inline-flex items-center gap-1 font-bold text-foreground">
-                                              <MapPin className="h-3 w-3 text-primary" />
-                                              {item.building ? `${item.building}-` : ''}
-                                              {item.roomNumber}
-                                            </span>
-                                          ) : null}
-                                        </div>
-                                        {matchingAgenda?.lecturerName ? (
-                                          <div className="flex items-center gap-1 truncate text-foreground/80 font-medium" title={matchingAgenda.lecturerName}>
-                                            <GraduationCap className="h-3 w-3 shrink-0 text-primary" />
-                                            <span className="truncate">{matchingAgenda.lecturerName}</span>
-                                          </div>
-                                        ) : null}
-                                      </div>
-                                    </div>
-                                  );
-                                })}
-                              </div>
-                            );
-                          })}
-                        </Fragment>
-                      ))}
-                    </div>
-                  </div>
-
-                  {/* Mobile stacked fallback */}
-                  <div className="grid gap-4 md:hidden">
-                    {ORDERED_DAYS.map((dayNum) => {
-                      const dayName = locale === 'vi' ? DAY_LABELS_VI[dayNum] : DAY_LABELS_EN[dayNum];
-                      const items = agendaByDay[dayNum] ?? [];
-                      const isToday = dayNum === todayDow;
-
-                      return (
-                        <div
-                          key={`mobile-day-${dayNum}`}
-                          className={`rounded-lg border p-4 transition-all ${
-                            isToday
-                              ? 'border-primary/50 bg-primary/[0.04]'
-                              : 'border-border/70 bg-card'
-                          }`}
-                        >
-                          <div className="mb-3 flex items-center justify-between">
-                            <div className="flex items-center gap-2">
-                              <h3 className="font-bold text-foreground text-sm">{dayName}</h3>
-                              {isToday ? (
-                                <span className="rounded-md bg-primary px-2 py-0.5 text-[9px] font-bold text-primary-foreground">
-                                  {copy.today}
-                                </span>
-                              ) : null}
-                            </div>
-                            <span className="text-xs text-muted-foreground font-semibold">
-                              {items.length} {items.length === 1 ? copy.item : copy.items}
-                            </span>
-                          </div>
-
-                          {items.length === 0 ? (
-                            <p className="text-xs text-muted-foreground italic">{copy.noMeetings}</p>
-                          ) : (
-                            <div className="space-y-2.5">
-                              {items.map((item) => (
-                                <div
-                                  key={item.id}
-                                  onClick={() => setSelectedDetail(item)}
-                                  className={`rounded-lg border p-3 text-xs transition hover:shadow-sm cursor-pointer ${accentForCourse(
-                                    item.courseCode,
-                                  )}`}
-                                >
-                                  <div className="flex items-center justify-between">
-                                    <span className="font-mono font-bold">{item.courseCode}</span>
-                                    <span className="rounded bg-background/60 px-1.5 py-0.5 text-[10px]">
-                                      {copy.sectionPrefix} {item.sectionNumber}
-                                    </span>
-                                  </div>
-                                  <div className="mt-1 font-semibold text-foreground text-xs">
-                                    {getLocalizedCourseLabel(
-                                      locale,
-                                      {
-                                        code: item.courseCode,
-                                        name: item.courseName,
-                                        nameEn: item.courseNameEn,
-                                        nameVi: item.courseNameVi,
-                                      },
-                                      item.courseName,
-                                    )}
-                                  </div>
-                                  <div className="mt-2 flex items-center gap-3 text-[11px] text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1">
-                                      <Clock className="h-3 w-3" />
-                                      {item.startTime} - {item.endTime}
-                                    </span>
-                                    {item.roomNumber ? (
-                                      <span className="inline-flex items-center gap-1 font-medium text-foreground">
-                                        <MapPin className="h-3 w-3" />
-                                        {item.building ? `${item.building}-` : ''}
-                                        {item.roomNumber}
-                                      </span>
-                                    ) : null}
-                                  </div>
-                                </div>
-                              ))}
-                            </div>
-                          )}
-                        </div>
-                      );
-                    })}
-                  </div>
+                  <WeeklyGrid
+                    items={agenda}
+                    locale={locale}
+                    todayDow={todayDow}
+                    onItemSelect={openDetail}
+                    labels={{
+                      gridAriaLabel: copy.weeklyGrid,
+                      today: copy.today,
+                      sectionPrefix: copy.sectionPrefix,
+                      roomPending: copy.roomPending,
+                      noSlot: copy.noMeetings,
+                      blockHint: copy.clickToViewDetails,
+                      item: copy.item,
+                      items: copy.items,
+                    }}
+                  />
                 </CardContent>
               </Card>
             </div>

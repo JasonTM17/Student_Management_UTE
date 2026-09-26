@@ -3,6 +3,7 @@ package io.campuscore.restfulapi.academic.service;
 import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.EnrollmentResponse;
 import io.campuscore.restfulapi.academic.web.AcademicMutationDtos.GradeUpdate;
+import io.campuscore.restfulapi.audit.AdminAuditRecorder;
 import io.campuscore.restfulapi.web.DomainException;
 import java.sql.Timestamp;
 import java.math.BigDecimal;
@@ -35,6 +36,7 @@ public class AcademicMutationService {
     private static final String USER = "\"campuscore_auth\".\"User\"";
     private static final String GRADE_ITEM = "\"academic\".\"GradeItem\"";
     private static final String STUDENT_GRADE = "\"academic\".\"StudentGrade\"";
+    private static final String ENROLLMENT_EVENT = "\"academic\".\"EnrollmentEvent\"";
     /**
      * Statuses that may still receive or publish grades. Without the guard a
      * crafted API call could grade — and resurrect as COMPLETED — an
@@ -46,15 +48,18 @@ public class AcademicMutationService {
     private final NamedParameterJdbcTemplate jdbc;
     private final AcademicEnrollmentReadService reads;
     private final RegistrationService registration;
+    private final AdminAuditRecorder audit;
     private final boolean postgres;
 
     public AcademicMutationService(
             NamedParameterJdbcTemplate jdbc,
             AcademicEnrollmentReadService reads,
-            RegistrationService registration) {
+            RegistrationService registration,
+            AdminAuditRecorder audit) {
         this.jdbc = jdbc;
         this.reads = reads;
         this.registration = registration;
+        this.audit = audit;
         this.postgres = databaseIsPostgres(jdbc);
     }
 
@@ -78,10 +83,33 @@ public class AcademicMutationService {
         registration.drop(enrollmentId, studentId, roles, idempotencyKey);
     }
 
+    /** Compatibility entry point; hard deletes without a known actor record no audit trail. */
     @Transactional
     public void deleteEnrollment(String enrollmentId) {
+        deleteEnrollment(enrollmentId, null);
+    }
+
+    /**
+     * Admin hard delete (audit S4): a hard delete also erases the student's
+     * grade history, so it now leaves both an EnrollmentEvent row (action
+     * ADMIN_DELETE, in the same table the enroll/drop lifecycle uses) and an
+     * AdminAudit row with the before-state, joining the caller's transaction
+     * so a rolled-back delete cannot claim to have happened.
+     */
+    @Transactional
+    public void deleteEnrollment(String enrollmentId, String actorId) {
         Map<String, Object> enrollment = enrollment(enrollmentId);
         String status = String.valueOf(enrollment.get("status"));
+        jdbc.update(
+                "INSERT INTO " + ENROLLMENT_EVENT
+                        + " (\"id\", \"enrollmentId\", \"studentId\", \"sectionId\", \"action\", \"actorId\")"
+                        + " VALUES (:id, :enrollmentId, :studentId, :sectionId, 'ADMIN_DELETE', :actorId)",
+                new MapSqlParameterSource()
+                        .addValue("id", UUID.randomUUID().toString())
+                        .addValue("enrollmentId", enrollmentId)
+                        .addValue("studentId", enrollment.get("student_id"))
+                        .addValue("sectionId", enrollment.get("section_id"))
+                        .addValue("actorId", actorId == null || actorId.isBlank() ? "system" : actorId));
         jdbc.update(
                 "DELETE FROM " + ENROLLMENT + " WHERE \"id\" = :id",
                 new MapSqlParameterSource("id", enrollmentId));
@@ -90,6 +118,18 @@ public class AcademicMutationService {
                     "UPDATE " + SECTION + " SET \"enrolledCount\" = GREATEST(0, \"enrolledCount\" - 1),"
                             + " \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :sectionId",
                     new MapSqlParameterSource("sectionId", enrollment.get("section_id")));
+        }
+        if (actorId != null && !actorId.isBlank()) {
+            audit.recordDeletion(
+                    actorId,
+                    null,
+                    "ENROLLMENT",
+                    enrollmentId,
+                    Map.of(
+                            "studentId", String.valueOf(enrollment.get("student_id")),
+                            "sectionId", String.valueOf(enrollment.get("section_id")),
+                            "status", status,
+                            "gradeStatus", String.valueOf(enrollment.get("grade_status"))));
         }
     }
 
@@ -151,8 +191,20 @@ public class AcademicMutationService {
         return csv.toString();
     }
 
+    /** Compatibility entry point; grade saves without a known actor record no audit trail. */
     @Transactional
     public void updateGrades(String sectionId, String lecturerId, boolean admin, List<GradeUpdate> grades) {
+        updateGrades(sectionId, lecturerId, admin, null, grades);
+    }
+
+    /**
+     * Saves draft grades. When an ADMIN (not the owning lecturer) performs the
+     * save, an AdminAudit row records the actor and section (audit S3-quick);
+     * the permission model itself is unchanged.
+     */
+    @Transactional
+    public void updateGrades(
+            String sectionId, String lecturerId, boolean admin, String actorId, List<GradeUpdate> grades) {
         requireSection(sectionId);
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
@@ -246,10 +298,27 @@ public class AcademicMutationService {
                 "UPDATE " + ENROLLMENT + " SET \"finalGrade\" = :finalGrade, \"letterGrade\" = :letterGrade,"
                         + " \"gradeStatus\" = 'DRAFT', \"updatedAt\" = CURRENT_TIMESTAMP WHERE \"id\" = :id",
                 enrollmentBatch.toArray(new MapSqlParameterSource[0]));
+
+        if (admin && actorId != null && !actorId.isBlank()) {
+            audit.record(actorId, null, "GRADE_UPDATE_BY_ADMIN", "SECTION", sectionId,
+                    "Admin " + actorId + " saved draft grades for " + effectiveGrades.size()
+                            + " enrollment(s) in section " + sectionId);
+        }
     }
 
+    /** Compatibility entry point; publishes without a known actor record no audit trail. */
     @Transactional
     public void publishGrades(String sectionId, String lecturerId, boolean admin) {
+        publishGrades(sectionId, lecturerId, admin, null);
+    }
+
+    /**
+     * Publishes grades officially. When an ADMIN (not the owning lecturer)
+     * publishes, an AdminAudit row records the actor and section (audit
+     * S3-quick); the permission model itself is unchanged.
+     */
+    @Transactional
+    public void publishGrades(String sectionId, String lecturerId, boolean admin, String actorId) {
         requireSection(sectionId);
         if (!admin && !ownsSection(sectionId, lecturerId)) {
             throw problem(HttpStatus.FORBIDDEN, "SECTION_FORBIDDEN", "Section is not assigned to the current lecturer");
@@ -290,6 +359,11 @@ public class AcademicMutationService {
             // graded yet, or the only graded rows sit in a non-gradeable
             // (dropped/cancelled) enrollment that publish must not resurrect.
             throw problem(HttpStatus.CONFLICT, "GRADES_EMPTY", "No complete grades are ready to publish");
+        }
+        if (admin && actorId != null && !actorId.isBlank()) {
+            audit.record(actorId, null, "GRADE_PUBLISH_BY_ADMIN", "SECTION", sectionId,
+                    "Admin " + actorId + " published official grades for section " + sectionId
+                            + " (" + updated + " enrollment(s))");
         }
     }
 

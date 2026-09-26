@@ -37,6 +37,12 @@ public class RateLimitFilter extends OncePerRequestFilter {
 
     private static final Set<String> MUTATING_METHODS = Set.of("POST", "PUT", "PATCH", "DELETE");
 
+    /** Audit S6: mail sends are capped at 5 per hour per identity. */
+    static final int MAIL_LIMIT_PER_HOUR = 5;
+
+    /** Audit S6: password-reset issuance is capped at 3 per hour per identity. */
+    static final int PASSWORD_RESET_LIMIT_PER_HOUR = 3;
+
     @Override
     protected void doFilterInternal(
             HttpServletRequest request,
@@ -118,25 +124,34 @@ public class RateLimitFilter extends OncePerRequestFilter {
     }
 
     /**
-     * X-Real-IP / X-Forwarded-For are client-controlled unless the request
-     * arrives through a trusted reverse proxy. When proxy-header trust is
-     * disabled (the default for direct deployments and local dev), fall back
-     * to the socket address so attackers cannot rotate spoofed forwarded
-     * headers to evade IP-keyed limits.
+     * Client-controlled forwarded headers are honored only behind a trusted
+     * reverse proxy, and even then the RIGHTMOST X-Forwarded-For element is
+     * used: proxies append the address they saw, so the rightmost entry is the
+     * one the trusted proxy added and the leftmost entries are whatever the
+     * client spoofed. Render appends the real client IP last. X-Real-IP is a
+     * single overwrite-style header, so it is trusted only when the deployment
+     * additionally opts in via {@code app.rate-limit.trust-real-ip}. When
+     * proxy-header trust is disabled (the default for direct deployments and
+     * local dev), fall back to the socket address so attackers cannot rotate
+     * spoofed forwarded headers to evade IP-keyed limits.
      */
-    private String resolveClientIp(HttpServletRequest request) {
+    String resolveClientIp(HttpServletRequest request) {
         if (properties.isTrustProxyHeaders()) {
-            String xRealIp = request.getHeader("X-Real-IP");
-            if (xRealIp != null && !xRealIp.isBlank()) {
-                return xRealIp.trim();
+            // Explicit opt-in: the operator vouches that X-Real-IP is
+            // overwritten by the trusted proxy, so it is authoritative.
+            if (properties.isTrustRealIp()) {
+                String xRealIp = request.getHeader("X-Real-IP");
+                if (xRealIp != null && !xRealIp.isBlank()) {
+                    return xRealIp.trim();
+                }
             }
 
             String xForwardedFor = request.getHeader("X-Forwarded-For");
             if (xForwardedFor != null && !xForwardedFor.isBlank()) {
                 String[] parts = xForwardedFor.split(",");
-                if (parts.length > 0) {
-                    String candidate = parts[0].trim();
-                    if (!candidate.isBlank()) {
+                for (int index = parts.length - 1; index >= 0; index--) {
+                    String candidate = parts[index].trim();
+                    if (!candidate.isEmpty()) {
                         return candidate;
                     }
                 }
@@ -156,6 +171,15 @@ public class RateLimitFilter extends OncePerRequestFilter {
         }
         if (uri.startsWith("/api/v1/auth/refresh")) {
             return new RateLimitPolicy(RateLimitCategory.AUTH_REFRESH, 30, 60);
+        }
+        // Dedicated tight policies (audit S6): outbound mail and password-reset
+        // issuance are expensive and abuse-prone, so they get their own
+        // per-identity buckets far below the default POST limit.
+        if (uri.startsWith("/api/v1/mail/")) {
+            return new RateLimitPolicy(RateLimitCategory.MAIL_MUTATION, MAIL_LIMIT_PER_HOUR, 3600);
+        }
+        if (uri.startsWith("/api/v1/users/") && uri.endsWith("/password-reset")) {
+            return new RateLimitPolicy(RateLimitCategory.PASSWORD_RESET, PASSWORD_RESET_LIMIT_PER_HOUR, 3600);
         }
         if (uri.startsWith("/api/v1/academic/me/enrollments")
                 || uri.startsWith("/api/v1/academic/enrollments")
