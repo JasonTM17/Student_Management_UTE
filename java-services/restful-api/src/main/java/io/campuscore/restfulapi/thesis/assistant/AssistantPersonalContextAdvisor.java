@@ -117,7 +117,7 @@ public class AssistantPersonalContextAdvisor {
      * {@link #isEnrollmentListIntent(String)}.
      */
     private static final Pattern ENROLLMENT_LIST_INTENT = Pattern.compile(
-            "(?:lớp|lop|học\\s*phần|hoc\\s*phan|class).*?(?:nào|nao|gì|gi|which)"
+            "(?:lớp|lop|học\\s*phần|hoc\\s*phan|class).*?(?:nào|nao|gì|gi|which)\\b"
                     + "|(?:đã\\s*)?đăng\\s*ký.*?(?:lớp|lop|học\\s*phần|hoc\\s*phan|class)"
                     + "|(?:da\\s*)?dang\\s*ky.*?(?:lop|hoc\\s*phan|class)"
                     + "|(?:lớp|lop|học\\s*phần|hoc\\s*phan).*?(?:đã\\s*)?đăng\\s*ký"
