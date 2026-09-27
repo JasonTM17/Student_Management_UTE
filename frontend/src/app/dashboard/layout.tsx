@@ -28,6 +28,7 @@ import {
   GraduationCap,
   LayoutDashboard,
   LogOut,
+  Mail,
   Megaphone,
   Menu,
   Palette,
@@ -72,7 +73,8 @@ type DashboardMenuLabelKey =
   | 'announcements'
   | 'notifications'
   | 'teachingSchedule'
-  | 'gradeManagement';
+  | 'gradeManagement'
+  | 'mailCompose';
 
 type DashboardMenuSectionKey = 'overview' | 'academic' | 'teaching' | 'campus';
 
@@ -130,6 +132,7 @@ const lecturerMenuSections: readonly DashboardMenuSectionConfig[] = [
       { href: '/dashboard/lecturer/schedule', icon: Calendar, labelKey: 'teachingSchedule' },
       { href: '/dashboard/lecturer/grades', icon: FileText, labelKey: 'gradeManagement' },
       { href: '/dashboard/lecturer/attendance', icon: CalendarCheck, labelKey: 'attendance' },
+      { href: '/dashboard/lecturer/mail', icon: Mail, labelKey: 'mailCompose' },
     ],
   },
   {
@@ -428,6 +431,10 @@ export default function DashboardLayout({
       '/dashboard/lecturer/announcements': {
         title: messages.dashboardShell.menu.announcements,
         description: messages.dashboardShell.routeDescriptions.lecturerAnnouncements,
+      },
+      '/dashboard/lecturer/mail': {
+        title: messages.dashboardShell.menu.mailCompose,
+        description: messages.dashboardShell.routeDescriptions.lecturerMail,
       },
     }),
     [messages],
