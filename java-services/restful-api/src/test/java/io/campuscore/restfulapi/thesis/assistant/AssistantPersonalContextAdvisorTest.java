@@ -213,6 +213,60 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
+    void detectsEnrollmentListIntentsInVietnamese() {
+        assertTrue(advisor.handles("Học kỳ này tôi đang đăng ký những lớp học phần nào?"));
+        assertTrue(advisor.handles("tôi đã đăng ký những lớp nào"));
+        assertTrue(advisor.handles("tôi dang ky nhung lop nao roi?"));
+        assertTrue(advisor.handles("what classes am I registered in?"));
+
+        // Schedule wording stays handled by this advisor's timetable branch
+        // (pre-existing SCHEDULE_INTENT) rather than the new enrollment-list one.
+        assertTrue(advisor.handles("lịch học tuần này của tôi"));
+        // How-to / policy wording about registration stays on the knowledge path.
+        assertFalse(advisor.handles("tôi muốn biết cách đăng ký học phần"));
+        assertFalse(advisor.handles("cho tôi hướng dẫn đăng ký học phần với"));
+        assertFalse(advisor.handles("lớp học phần SE401 còn chỗ không"));
+    }
+
+    @Test
+    void answersCurrentTermEnrollmentListInVietnamese() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "07:00", "09:30",
+                                new ClassroomSummary("c1", "A", "101")))),
+                enrollment("SE403", "Cấu trúc dữ liệu và giải thuật", "Data Structures", CURRENT_TERM_START,
+                        List.of()),
+                enrollment("SE201", "Công nghệ phần mềm", "Software Engineering", OLD_TERM_START,
+                        List.of(new SectionScheduleResponse("s3", 4, "13:00", "15:30",
+                                new ClassroomSummary("c3", "B", "202"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Học kỳ này tôi đang đăng ký những lớp học phần nào?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.citations().isEmpty());
+        String answer = response.answer();
+        assertTrue(answer.contains("Học kỳ này bạn đang đăng ký 2 lớp (6 tín chỉ)"), answer);
+        assertTrue(answer.contains("SE401 - Lập trình Java nâng cao — lớp SE401-01 — trạng thái ENROLLED"), answer);
+        assertTrue(answer.contains("SE403 - Cấu trúc dữ liệu và giải thuật — lớp SE403-01"), answer);
+        assertFalse(answer.contains("SE201"), "older-term enrollments must not leak into the current list");
+    }
+
+    @Test
+    void answersFriendlyEmptyMessageWhenNoCurrentTermEnrollment() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollmentWithStatus("SE401", "COMPLETED", CURRENT_TERM_START, List.of())));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "tôi đã đăng ký những lớp nào"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("chưa đăng ký lớp học phần nào trong học kỳ hiện tại"),
+                response.answer());
+    }
+
+    @Test
     void answersStudentGradesFromRealRows() {
         when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
                 new AcademicEnrollmentReadDtos.GradeSummary(

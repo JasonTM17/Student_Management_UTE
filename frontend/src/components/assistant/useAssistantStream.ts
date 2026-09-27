@@ -27,6 +27,13 @@ import {
   resolveStudentAssistantQuery,
 } from '@/lib/assistant-student-resolver';
 import { inspectAssistantInput, isSensitiveGuardReason } from '@/lib/assistant-input-guard';
+import {
+  canAttemptReconciliation,
+  hasOrphanedSendLock,
+  nextReconciliationBackoffMs,
+  remainingReconcileMs,
+  startReconciliationBudget,
+} from '@/lib/assistant-stream-helpers';
 
 export interface UseAssistantStreamOptions {
   locale: Locale;
@@ -128,6 +135,10 @@ export function useAssistantStream({
   const [state, dispatch] = useReducer(assistantReducer, initialState);
 
   const isSendingRef = useRef(false);
+  // Ownership token for the send lock (see sendMessage's finally): releases are
+  // keyed to the owning generation so a stale cleanup can never clear a newer
+  // turn's lock, while every ownership-transfer path releases the lock itself.
+  const lockGenerationRef = useRef<number>();
   const abortRef = useRef<AbortController | null>(null);
   const requestGenerationRef = useRef(0);
   const activeRequestIdRef = useRef<string>();
@@ -155,6 +166,7 @@ export function useAssistantStream({
       requestGenerationRef.current += 1;
       abortRef.current?.abort();
       isSendingRef.current = false;
+      lockGenerationRef.current = undefined;
     };
   }, []);
 
@@ -232,6 +244,22 @@ export function useAssistantStream({
     ],
   );
 
+  // Declared before sendMessage so the orphan-lock self-heal in the guard can
+  // abort a stale stream. It captures no reactive values (deps []).
+  const abortStream = useCallback(() => {
+    requestGenerationRef.current += 1;
+    abortRef.current?.abort();
+    isSendingRef.current = false;
+    lockGenerationRef.current = undefined;
+    setIsSending(false);
+    activeRequestIdRef.current = undefined;
+    retryRequestIdRef.current = undefined;
+    activeConversationIdRef.current = undefined;
+    retryConversationIdRef.current = undefined;
+    activePromptRef.current = undefined;
+    casResolvedRef.current = false;
+  }, []);
+
   const sendMessage = useCallback(
     async (
       event?: FormEvent<HTMLFormElement> | React.SyntheticEvent,
@@ -240,9 +268,27 @@ export function useAssistantStream({
     ) => {
       event?.preventDefault();
       const message = (retryPrompt ?? input).trim();
-      if (!message || isSending || isSendingRef.current) return;
+      if (!message) return;
+      if (isSending || isSendingRef.current) {
+        // A previous turn's lock must never wedge the panel. When the visible
+        // conversation carries no pending message the lock is orphaned (its
+        // cleanup never ran): tell the server to cancel the stale turn, drop
+        // the stale stream, and continue with this send. A genuinely in-flight
+        // turn always keeps a pending message (assistant-start is dispatched
+        // synchronously with the lock) and still returns early here.
+        if (!hasOrphanedSendLock(state.messages)) return;
+        const staleRequestId = activeRequestIdRef.current;
+        if (staleRequestId) {
+          void thesisApi.cancelRequest(staleRequestId).catch(() => undefined);
+        }
+        abortStream();
+      }
       const isRetry = options?.retry === true;
+      // The generation doubles as the lock-ownership token (see the finally
+      // block), so it is taken before the lock is armed.
+      const generation = ++requestGenerationRef.current;
       isSendingRef.current = true;
+      lockGenerationRef.current = generation;
       setInput('');
       setLastPrompt(message);
       dispatch({ type: 'clear-error' });
@@ -273,7 +319,6 @@ export function useAssistantStream({
       // scrolled up reviewing history when they hit send.
       onNewExchange?.();
       const controller = new AbortController();
-      const generation = ++requestGenerationRef.current;
       casResolvedRef.current = false;
       const clientRequestId =
         activeRequestIdRef.current ??
@@ -404,9 +449,14 @@ export function useAssistantStream({
         // error, even when deltas were already rendered.
         // The two-argument thesisApi.chat(message, locale) compatibility contract
         // remains supported; reconciliation below supplies the conversation/key.
+        // The whole chain runs under an overall deadline, and every attempt under
+        // an axios timeout bounded by the remaining budget, so a stalled
+        // reconcile can never hold the send lock indefinitely.
         let reply: Awaited<ReturnType<typeof thesisApi.chat>> | undefined;
         let fallbackError: unknown;
-        for (let attempt = 0; attempt < 4; attempt += 1) {
+        const reconcileBudget = startReconciliationBudget(Date.now());
+        while (canAttemptReconciliation(reconcileBudget, Date.now())) {
+          reconcileBudget.attemptsStarted += 1;
           try {
             reply = await thesisApi.chat(
               message,
@@ -414,16 +464,27 @@ export function useAssistantStream({
               requestedConversationId,
               clientRequestId,
               scope,
+              {
+                timeoutMs: Math.max(
+                  1,
+                  remainingReconcileMs(reconcileBudget, Date.now()),
+                ),
+              },
             );
             break;
           } catch (error) {
             fallbackError = error;
-            if (apiErrorCode(error) !== 'TURN_IN_PROGRESS' || attempt === 3) break;
+            if (apiErrorCode(error) !== 'TURN_IN_PROGRESS') break;
             // The original stream may still be committing the same key. Keep
             // the idempotency key and briefly poll for its replayable result
             // instead of minting a second turn.
+            const delayMs = nextReconciliationBackoffMs(
+              reconcileBudget,
+              Date.now(),
+            );
+            if (delayMs === null) break;
             await new Promise((resolve) =>
-              globalThis.setTimeout(resolve, 250 * (attempt + 1)),
+              globalThis.setTimeout(resolve, delayMs),
             );
           }
         }
@@ -497,7 +558,17 @@ export function useAssistantStream({
           }
         }
       } finally {
-        if (isCurrentRequest()) {
+        // The send lock is released by its owner. Ownership transfers only
+        // happen in paths that release the lock themselves (abortStream,
+        // resetConversation, unmount, and the orphan self-heal in the guard),
+        // so a skipped release can never wedge the panel — while a late
+        // cleanup from a stale, hung request (its bounded reconcile attempt
+        // only times out after a newer send took over) can also never clear a
+        // newer turn's lock. The release deliberately does NOT depend on the
+        // request-generation comparison that guards the idempotency
+        // bookkeeping: a leaked lock silently swallowed every later send.
+        if (lockGenerationRef.current === generation) {
+          lockGenerationRef.current = undefined;
           isSendingRef.current = false;
           setIsSending(false);
           abortRef.current = null;
@@ -513,6 +584,7 @@ export function useAssistantStream({
       }
     },
     [
+      abortStream,
       applyStreamEvent,
       assistantMessages.blocked,
       assistantMessages.cancelled,
@@ -529,6 +601,7 @@ export function useAssistantStream({
       onNewExchange,
       onReconcileHistory,
       state.conversationId,
+      state.messages,
     ],
   );
 
@@ -575,19 +648,6 @@ export function useAssistantStream({
     }
   }, [lastPrompt, locale, scope, onReconcileHistory]);
 
-  const abortStream = useCallback(() => {
-    requestGenerationRef.current += 1;
-    abortRef.current?.abort();
-    isSendingRef.current = false;
-    setIsSending(false);
-    activeRequestIdRef.current = undefined;
-    retryRequestIdRef.current = undefined;
-    activeConversationIdRef.current = undefined;
-    retryConversationIdRef.current = undefined;
-    activePromptRef.current = undefined;
-    casResolvedRef.current = false;
-  }, []);
-
   const setFeedback = useCallback(
     async (
       messageId: string,
@@ -618,6 +678,7 @@ export function useAssistantStream({
       requestGenerationRef.current += 1;
       abortRef.current?.abort();
       isSendingRef.current = false;
+      lockGenerationRef.current = undefined;
       setIsSending(false);
       setLastPrompt(undefined);
       retryRequestIdRef.current = undefined;
