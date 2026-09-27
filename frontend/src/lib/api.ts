@@ -1478,6 +1478,89 @@ export type SectionAttendanceSummary = {
   attendanceRate: number;
 };
 
+// Mail API — lecturer/admin academic email dispatch (Java MailController).
+// Wire contract mirrors MailDtos.java: field-for-field, no client-side
+// renames. GET /mail/preview/{templateName} is opened directly in a new tab
+// (it returns text/html), so it has no axios wrapper — see
+// mailPreviewUrl() in lib/mail-compose.ts.
+export type MailNoticeRequest = {
+  to: string;
+  recipientName?: string;
+  category?: string;
+  title: string;
+  author?: string;
+  content: string;
+  highlights?: string[];
+  actionUrl?: string;
+  actionText?: string;
+};
+
+export type MailCourseItem = {
+  code: string;
+  name: string;
+  credits: number;
+  lecturer?: string;
+  schedule?: string;
+};
+
+export type MailRegistrationRequest = {
+  to: string;
+  studentName: string;
+  studentId: string;
+  department?: string;
+  semester?: string;
+  courses: MailCourseItem[];
+  totalCredits: number;
+};
+
+export type MailGradeItem = {
+  courseCode: string;
+  courseName: string;
+  credits: number;
+  score10: number;
+  scoreLetter?: string;
+};
+
+export type MailGradeAlertRequest = {
+  to: string;
+  studentName: string;
+  studentId: string;
+  semester?: string;
+  gpa4: number;
+  gpa10: number;
+  academicStanding?: string;
+  conductScore: number;
+  conductRank?: string;
+  grades: MailGradeItem[];
+};
+
+export type MailDispatchResponse = {
+  success: boolean;
+  message: string;
+  recipient: string;
+  template: string;
+  dispatchedAt: string;
+};
+
+export const mailApi = {
+  sendNotice: async (payload: MailNoticeRequest): Promise<MailDispatchResponse> => {
+    const response = await api.post<MailDispatchResponse>('/mail/notice', payload);
+    return response.data;
+  },
+  sendRegistration: async (
+    payload: MailRegistrationRequest,
+  ): Promise<MailDispatchResponse> => {
+    const response = await api.post<MailDispatchResponse>('/mail/registration', payload);
+    return response.data;
+  },
+  sendGradeAlert: async (
+    payload: MailGradeAlertRequest,
+  ): Promise<MailDispatchResponse> => {
+    const response = await api.post<MailDispatchResponse>('/mail/grade-alert', payload);
+    return response.data;
+  },
+};
+
 export const attendanceApi = {
   my: async (): Promise<AttendanceRecord[]> => {
     const response = await api.get<AttendanceRecord[]>('/attendance/my');
