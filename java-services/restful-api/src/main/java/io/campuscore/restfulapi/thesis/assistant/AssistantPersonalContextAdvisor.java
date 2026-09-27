@@ -109,8 +109,43 @@ public class AssistantPersonalContextAdvisor {
                     + "|(?:my\\s+)?(?:grades?|scores?|marks?|transcript)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /**
+     * First-person "which sections am I registered in?" listing questions
+     * ("Học kỳ này tôi đang đăng ký những lớp học phần nào?"). A class/section
+     * word followed by an interrogative, or a đăng ký/registered phrase next to
+     * one — always combined with a first-person pronoun in
+     * {@link #isEnrollmentListIntent(String)}.
+     */
+    private static final Pattern ENROLLMENT_LIST_INTENT = Pattern.compile(
+            "(?:lớp|lop|học\\s*phần|hoc\\s*phan|class).*?(?:nào|nao|gì|gi|which)"
+                    + "|(?:đã\\s*)?đăng\\s*ký.*?(?:lớp|lop|học\\s*phần|hoc\\s*phan|class)"
+                    + "|(?:da\\s*)?dang\\s*ky.*?(?:lop|hoc\\s*phan|class)"
+                    + "|(?:lớp|lop|học\\s*phần|hoc\\s*phan).*?(?:đã\\s*)?đăng\\s*ký"
+                    + "|registered\\s+(?:in|for)\\s+(?:any\\s+|my\\s+)?(?:classes|sections?|courses?)"
+                    + "|registere?d\\s+(?:in|for)\\b",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * How-to / policy wording ("cách đăng ký", "hướng dẫn đăng ký", "thủ tục",
+     * "làm sao…") turns an enrollment mention into a general knowledge
+     * question; those stay on the RAG path instead of listing personal rows.
+     */
+    private static final Pattern ENROLLMENT_HOWTO_INTENT = Pattern.compile(
+            "cách|cach|làm\\s*sao|lam\\s*sao|thế\\s*nào|the\\s*nao|như\\s*thế\\s*nào|nhu\\s*the\\s*nao"
+                    + "|hướng\\s*dẫn|huong\\s*dan|thủ\\s*tục|thu\\s*tuc"
+                    + "|quy\\s*định|quy\\s*dinh|điều\\s*kiện|dieu\\s*kien",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static boolean isConductIntent(String message) {
         return StringUtils.hasText(message) && CONDUCT_INTENT.matcher(message).find();
+    }
+
+    /** First-person listing of the asker's own current class sections. */
+    private static boolean isEnrollmentListIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && ENROLLMENT_LIST_INTENT.matcher(message).find();
     }
 
     /** Grades intent requires a first-person marker so policy questions stay on the knowledge path. */
@@ -162,12 +197,13 @@ public class AssistantPersonalContextAdvisor {
         this.conductService = conductService;
     }
 
-    /** True when the question is clearly about personal schedule, grades, conduct, or thesis status. */
+    /** True when the question is clearly about personal schedule, enrollment list, grades, conduct, or thesis status. */
     public boolean handles(String message) {
         return message != null && (SCHEDULE_INTENT.matcher(message).find()
                 || isThesisPersonalIntent(message)
                 || isConductIntent(message)
-                || isGradesIntent(message));
+                || isGradesIntent(message)
+                || isEnrollmentListIntent(message));
     }
 
     /**
@@ -247,6 +283,13 @@ public class AssistantPersonalContextAdvisor {
         if (isGradesIntent(message)) {
             if (StringUtils.hasText(studentId)) {
                 return gradesAnswer(studentId, locale);
+            }
+            return null;
+        }
+        if (isEnrollmentListIntent(message)) {
+            // The section list is student-owned; staff questions fall through to RAG.
+            if (StringUtils.hasText(studentId)) {
+                return enrollmentListAnswer(studentId, locale);
             }
             return null;
         }
@@ -471,18 +514,7 @@ public class AssistantPersonalContextAdvisor {
         if (active.isEmpty()) {
             return noClassesMessage(locale);
         }
-        Instant currentTermStart = active.stream()
-                .map(item -> item.section() != null && item.section().semester() != null
-                        ? item.section().semester().startDate()
-                        : null)
-                .filter(Instant.class::isInstance)
-                .map(Instant.class::cast)
-                .max(Comparator.naturalOrder())
-                .orElse(null);
-        List<EnrollmentResponse> currentTerm = active.stream()
-                .filter(item -> item.section() != null && item.section().semester() != null
-                        && item.section().semester().startDate().equals(currentTermStart))
-                .toList();
+        List<EnrollmentResponse> currentTerm = currentTermEnrollments(active);
 
         List<Slot> slots = new ArrayList<>();
         for (EnrollmentResponse item : currentTerm) {
@@ -511,6 +543,69 @@ public class AssistantPersonalContextAdvisor {
                 ? semesterLabel(currentTerm.get(0).section().semester(), locale)
                 : null;
         return timetableAnswer(slots, termName, locale, requestedDay, false);
+    }
+
+    /**
+     * "Học kỳ này tôi đang đăng ký những lớp học phần nào?" — the asker's
+     * current-term section list built from real enrollments with the same
+     * active-status filter and semester selection the timetable uses.
+     */
+    private String enrollmentListAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<EnrollmentResponse> active = enrollments.findStudentEnrollments(studentId, null).stream()
+                .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
+                .toList();
+        List<EnrollmentResponse> currentTerm = currentTermEnrollments(active);
+        StringBuilder answer = new StringBuilder();
+        int rendered = 0;
+        int credits = 0;
+        for (EnrollmentResponse item : currentTerm) {
+            if (item.section() == null) continue;
+            String courseCode = item.section().course() != null ? item.section().course().code() : null;
+            String courseName = courseLabel(item.section().course(), locale);
+            String label = courseCode != null
+                    ? courseName != null ? courseCode + " - " + courseName : courseCode
+                    : courseName;
+            answer.append("\n• ").append(StringUtils.hasText(label) ? label : (vi ? "Học phần" : "Course"));
+            if (StringUtils.hasText(item.section().sectionNumber())) {
+                answer.append(vi ? " — lớp " : " — section ").append(item.section().sectionNumber());
+            }
+            answer.append(vi ? " — trạng thái " : " — status ").append(item.status());
+            answer.append("\n");
+            if (item.section().course() != null) {
+                credits += item.section().course().credits();
+            }
+            rendered += 1;
+        }
+        if (rendered == 0) {
+            return noEnrollmentsMessage(vi);
+        }
+        answer.insert(0, vi
+                ? "Học kỳ này bạn đang đăng ký " + rendered + " lớp (" + credits + " tín chỉ):\n"
+                : "This term you are registered in " + rendered + " sections (" + credits + " credits):\n");
+        answer.append(vi
+                ? "\nBạn có thể xem lịch học dạng lưới ở trang Thời khóa biểu."
+                : "\nYou can see these sections as a weekly grid on the Schedule page.");
+        return answer.toString();
+    }
+
+    /**
+     * The latest-semester slice of the active enrollments — the same
+     * current-semester selection the personal timetable uses.
+     */
+    private static List<EnrollmentResponse> currentTermEnrollments(List<EnrollmentResponse> active) {
+        Instant currentTermStart = active.stream()
+                .map(item -> item.section() != null && item.section().semester() != null
+                        ? item.section().semester().startDate()
+                        : null)
+                .filter(Instant.class::isInstance)
+                .map(Instant.class::cast)
+                .max(Comparator.naturalOrder())
+                .orElse(null);
+        return active.stream()
+                .filter(item -> item.section() != null && item.section().semester() != null
+                        && item.section().semester().startDate().equals(currentTermStart))
+                .toList();
     }
 
     private String lecturerAnswer(String lecturerId, String locale, Integer requestedDay) {
@@ -684,6 +779,15 @@ public class AssistantPersonalContextAdvisor {
                 ? "Bạn hiện chưa có lớp học phần nào đang hoạt động, nên mình chưa có lịch học để hiển thị. "
                         + "Bạn có thể đăng ký học phần ở khu Đăng ký học phần."
                 : "You have no active course sections right now, so there is no personal schedule to show. "
+                        + "You can register for sections in the Course Registration area.";
+    }
+
+    /** Friendly empty answer for the enrollment-list intent. */
+    private static String noEnrollmentsMessage(boolean vi) {
+        return vi
+                ? "Bạn chưa đăng ký lớp học phần nào trong học kỳ hiện tại. "
+                        + "Bạn có thể đăng ký học phần ở khu Đăng ký học phần."
+                : "You are not registered in any course section for the current term. "
                         + "You can register for sections in the Course Registration area.";
     }
 

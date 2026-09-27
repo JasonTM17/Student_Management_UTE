@@ -114,7 +114,7 @@ test('assistant history routes URI-encode owner-scoped identifiers', () => {
   const source = fs.readFileSync(path.join(root, 'src/lib/thesis-api.ts'), 'utf8');
   assert.match(source, /conversations\/\$\{encodeURIComponent\(conversationId\)\}\/messages/);
   assert.match(source, /delete\(`\/assistant\/conversations\/\$\{encodeURIComponent\(conversationId\)\}`\)/);
-  assert.match(source, /post<AssistantReply>\('\/assistant\/chat'/);
+  assert.match(source, /post<AssistantReply>\(\s*'\/assistant\/chat'/);
   assert.doesNotMatch(source, /post<AssistantReply>\('\/thesis\/assistant\/chat'/);
 });
 

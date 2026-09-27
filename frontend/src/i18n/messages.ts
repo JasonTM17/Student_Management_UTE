@@ -1951,6 +1951,9 @@ export const en = {
     untitledConversation: 'Campus conversation',
     model: 'Source note',
     stop: 'Stop generating',
+    responding: 'Responding…',
+    respondingHint:
+      'Responding… the composer is locked until this answer finishes. Press Stop to unlock.',
     retry: 'Retry',
     quotaExceeded: 'Daily assistant limit reached. Try again tomorrow or continue with the cited guidance.',
     blockedLabel: 'Blocked request',
@@ -4124,6 +4127,9 @@ export const vi: I18nMessages = {
     untitledConversation: 'Hội thoại CampusUTE',
     model: 'Ghi chú nguồn',
     stop: 'Dừng tạo câu trả lời',
+    responding: 'Đang trả lời…',
+    respondingHint:
+      'Đang trả lời… ô nhập tạm khóa cho đến khi câu trả lời xong. Nhấn Dừng để mở khóa.',
     retry: 'Thử lại',
     quotaExceeded: 'Bạn đã chạm giới hạn trợ lý trong ngày. Hãy thử lại vào ngày mai hoặc tiếp tục với hướng dẫn có trích dẫn.',
     blockedLabel: 'Câu hỏi đã bị chặn',

@@ -1,6 +1,12 @@
 'use client';
 
-import type { FormEvent, KeyboardEvent, RefObject } from 'react';
+import {
+  type FormEvent,
+  type KeyboardEvent,
+  type RefObject,
+  useEffect,
+  useRef,
+} from 'react';
 import { Send, Square } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { useI18n } from '@/i18n';
@@ -39,6 +45,15 @@ export function AssistantComposer({
 }: AssistantComposerProps) {
   const { messages } = useI18n();
 
+  // While a turn is in flight the textarea is disabled (locked panel), which
+  // also drops focus; hand focus back the moment the turn finishes so the
+  // student can keep typing without an extra click.
+  const wasSendingRef = useRef(false);
+  useEffect(() => {
+    if (wasSendingRef.current && !isSending) inputRef.current?.focus();
+    wasSendingRef.current = isSending;
+  }, [inputRef, isSending]);
+
   const handleKeyDown = (event: KeyboardEvent<HTMLTextAreaElement>) => {
     if (!handleComposerSubmitKeyDown(event)) return;
     event.currentTarget.form?.requestSubmit();
@@ -60,7 +75,8 @@ export function AssistantComposer({
           autoComplete="off"
           rows={2}
           maxLength={2000}
-          className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground md:text-sm"
+          disabled={isSending}
+          className="min-h-12 flex-1 resize-none border-0 bg-transparent px-1 py-1 text-base leading-6 text-foreground outline-none placeholder:text-muted-foreground disabled:cursor-not-allowed disabled:opacity-70 md:text-sm"
           aria-label={messages.assistant.placeholder}
           aria-describedby="assistant-composer-hint assistant-composer-count"
         />
@@ -68,12 +84,12 @@ export function AssistantComposer({
           <Button
             type="button"
             variant="secondary"
-            size="icon"
-            className="min-h-11 min-w-11 rounded-xl"
+            className="min-h-11 gap-1.5 rounded-xl px-3"
             onClick={onStop}
             aria-label={messages.assistant.stop}
           >
             <Square className="h-4 w-4" aria-hidden="true" />
+            <span>{messages.assistant.responding}</span>
           </Button>
         ) : (
           <Button
@@ -94,7 +110,13 @@ export function AssistantComposer({
           <span className="inline-flex h-5 w-5 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
             <AssistantMascot className="h-3.5 w-3.5" active={isSending} />
           </span>
-          <span id="assistant-composer-hint">{messages.assistant.composerHint}</span>
+          {/* aria-live announces the lock: users hear why the composer stopped
+              accepting input instead of a silent dead panel. */}
+          <span id="assistant-composer-hint" aria-live="polite">
+            {isSending
+              ? messages.assistant.respondingHint
+              : messages.assistant.composerHint}
+          </span>
         </span>
         <span id="assistant-composer-count">{input.length}/2000</span>
       </div>
