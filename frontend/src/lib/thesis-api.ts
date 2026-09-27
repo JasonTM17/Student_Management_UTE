@@ -1,4 +1,5 @@
 import api, { API_BASE_URL, createRequestId, refreshSessionSingleFlight } from '@/lib/api';
+import { CANCEL_REQUEST_TIMEOUT_MS } from '@/lib/assistant-stream-helpers';
 import {
   createAssistantSseParser,
   parseAssistantStreamEvent,
@@ -899,14 +900,21 @@ export const thesisApi = {
     conversationId?: string,
     clientRequestId = createAssistantRequestId(),
     scope?: 'academic' | 'specialized',
+    options?: { timeoutMs?: number },
   ): Promise<AssistantReply> => {
-    const response = await api.post<AssistantReply>('/assistant/chat', {
-      message,
-      locale,
-      clientRequestId,
-      ...(conversationId ? { conversationId } : {}),
-      ...(scope ? { scope } : {}),
-    });
+    const response = await api.post<AssistantReply>(
+      '/assistant/chat',
+      {
+        message,
+        locale,
+        clientRequestId,
+        ...(conversationId ? { conversationId } : {}),
+        ...(scope ? { scope } : {}),
+      },
+      // The JSON reconciliation chain passes the remaining deadline budget so
+      // a stalled POST can never hold the send lock past the overall deadline.
+      options?.timeoutMs ? { timeout: options.timeoutMs } : undefined,
+    );
     return response.data;
   },
 
@@ -1088,8 +1096,12 @@ export const thesisApi = {
   cancelRequest: async (
     clientRequestId: string,
   ): Promise<{ status: number }> => {
+    // An explicit timeout keeps a hung cancel from wedging the panel; callers
+    // treat a failed cancel as best-effort.
     const response = await api.post(
       `/assistant/requests/${encodeURIComponent(clientRequestId)}/cancel`,
+      undefined,
+      { timeout: CANCEL_REQUEST_TIMEOUT_MS },
     );
     return { status: response.status };
   },
