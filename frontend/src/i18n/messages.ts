@@ -1495,6 +1495,11 @@ export const en = {
       unavailableTitle: 'Dashboard unavailable',
       loading: 'Loading dashboard',
     },
+    gradesVisuals: {
+      progressStripTitle: 'Progress by semester',
+      progressStripAriaLabel: 'Semester progress overview',
+      gpaLabel: 'GPA',
+    },
   },
   certificates: {
     serviceBadge: 'Self-service draft • Not an issued document',
@@ -3816,6 +3821,11 @@ export const vi: I18nMessages = {
       loadFailed: 'Hiện chưa thể tải dữ liệu Cổng Sinh viên của bạn.',
       unavailableTitle: 'Cổng Sinh viên chưa sẵn sàng',
       loading: 'Đang tải Cổng Sinh viên',
+    },
+    gradesVisuals: {
+      progressStripTitle: 'Tiến bộ theo học kỳ',
+      progressStripAriaLabel: 'Tổng quan tiến bộ theo học kỳ',
+      gpaLabel: 'GPA',
     },
   },
   certificates: {
