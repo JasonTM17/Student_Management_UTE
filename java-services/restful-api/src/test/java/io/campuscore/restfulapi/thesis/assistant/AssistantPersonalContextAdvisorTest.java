@@ -5,9 +5,13 @@ import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertNull;
 import static org.junit.jupiter.api.Assertions.assertTrue;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
@@ -30,6 +34,8 @@ import java.util.UUID;
 import java.util.ArrayList;
 import org.junit.jupiter.api.Test;
 import org.springframework.dao.DataAccessResourceFailureException;
+import org.springframework.jdbc.core.namedparam.MapSqlParameterSource;
+import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
 import org.springframework.security.oauth2.jwt.Jwt;
 
 class AssistantPersonalContextAdvisorTest {
@@ -247,10 +253,31 @@ class AssistantPersonalContextAdvisorTest {
         assertEquals("PERSONAL_CONTEXT", response.reasonCode());
         assertTrue(response.citations().isEmpty());
         String answer = response.answer();
-        assertTrue(answer.contains("Học kỳ này bạn đang đăng ký 2 lớp (6 tín chỉ)"), answer);
+        assertTrue(answer.contains("Học kỳ này bạn đang đăng ký 2 lớp (6 tín chỉ theo dữ liệu đăng ký của bạn)"), answer);
         assertTrue(answer.contains("SE401 - Lập trình Java nâng cao — lớp SE401-01 — trạng thái ENROLLED"), answer);
         assertTrue(answer.contains("SE403 - Cấu trúc dữ liệu và giải thuật — lớp SE403-01"), answer);
         assertFalse(answer.contains("SE201"), "older-term enrollments must not leak into the current list");
+        assertTrue(answer.contains("tính trực tiếp từ hồ sơ đăng ký học phần"), answer);
+    }
+
+    @Test
+    void enrollmentListCreditsComeFromTheRegistrationSnapshotWhenAvailable() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        RegistrationService registrationService = mock(RegistrationService.class);
+        AssistantPersonalContextAdvisor ledgerAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, registrationService);
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE013", "Lập trình Web nâng cao", "Advanced Web", CURRENT_TERM_START, List.of()),
+                enrollment("SE014", "Kiến trúc Microservices", "Microservices", CURRENT_TERM_START, List.of())));
+        // The registration ledger counts creditsSnapshot, not the current catalog credits.
+        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
+                .thenReturn(15);
+
+        ChatResponse response = ledgerAdvisor.answer(
+                chatRequest("vi", "Học kỳ này tôi đang đăng ký những lớp học phần nào?"), jwtStudent());
+
+        assertTrue(response.answer().contains("(15 tín chỉ theo dữ liệu đăng ký của bạn)"),
+                response.answer());
     }
 
     @Test
@@ -281,11 +308,6 @@ class AssistantPersonalContextAdvisorTest {
                         "sem-2026a", "Semester A", "Học kỳ A", "sem-2026a",
                         new java.math.BigDecimal("7.0"), new java.math.BigDecimal("6.5"),
                         new java.math.BigDecimal("6.7"), null, "PENDING", "ENROLLED")));
-        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(
-                new AcademicEnrollmentReadDtos.TranscriptResponse(
-                        new AcademicEnrollmentReadDtos.TranscriptSummary(
-                                new java.math.BigDecimal("3.21"), 74, 86),
-                        List.of()));
 
         ChatResponse response = advisor.answer(chatRequest("vi", "điểm của tôi thế nào?"), jwtStudent());
 
@@ -293,11 +315,36 @@ class AssistantPersonalContextAdvisorTest {
         assertEquals("PERSONAL_CONTEXT", response.reasonCode());
         String answer = response.answer();
         assertTrue(answer.contains("Kết quả học tập của bạn"), answer);
-        assertTrue(answer.contains("GPA 3.21"), answer);
-        assertTrue(answer.contains("74 tín chỉ đạt"), answer);
+        // D-Q3: cumulative GPA4 + credits are computed IN CODE from the grade
+        // rows (only lettered rows count), never read from a model or a summary.
+        assertTrue(answer.contains("Tích lũy: 3 tín chỉ, GPA 4.00 (thang 4)"), answer);
+        assertTrue(answer.contains("Học kỳ gần nhất (Học kỳ A): 3 tín chỉ, GPA 4.00 (thang 4)"), answer);
         assertTrue(answer.contains("SE401"), answer);
         assertTrue(answer.contains("8.7 (A)"), answer);
         assertTrue(answer.contains("chưa công bố"), answer);
+    }
+
+    @Test
+    void gradesAnswerSeparatesCumulativeFromLatestSemester() {
+        // Newest semester first, matching the repository order
+        // (academic year DESC, semester startDate DESC). The newest term is
+        // still in progress (no letters) and must not shadow the last graded one.
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
+                gradeRow("s0", "SE013", 3, null, "sem-cur", "HK1 2026-2027"),
+                gradeRow("s1x", "SE501", 3, "A", "sem-b", "HK2 2025-2026"),
+                gradeRow("s1y", "SE502", 3, "B", "sem-b", "HK2 2025-2026"),
+                gradeRow("s1w", "SE503", 2, "F", "sem-b", "HK2 2025-2026"),
+                gradeRow("s2z", "SE101", 3, "C", "sem-a", "HK1 2025-2026")));
+
+        ChatResponse response = advisor.answer(chatRequest("vi", "GPA của tôi bao nhiêu?"), jwtStudent());
+
+        String answer = response.answer();
+        // Cumulative: (4*3 + 3*3 + 0*2 + 2*3) / 11 = 27/11 = 2.45; earned (non-F) = 9.
+        assertTrue(answer.contains("Tích lũy: 9 tín chỉ, GPA 2.45 (thang 4)"), answer);
+        // Latest semester WITH published grades only: (4*3 + 3*3 + 0*2) / 8 = 21/8 = 2.63; earned = 6.
+        assertTrue(answer.contains("Học kỳ gần nhất (HK2 2025-2026): 6 tín chỉ, GPA 2.63 (thang 4)"), answer);
+        assertFalse(answer.contains("Học kỳ gần nhất (HK1 2026-2027)"),
+                "an in-progress term must not be reported as the latest graded semester");
     }
 
     @Test
@@ -417,6 +464,193 @@ class AssistantPersonalContextAdvisorTest {
         assertNotNull(response);
         assertTrue(response.answer().contains("Thứ Năm 13:00-15:30 — SE402 - Phát triển ứng dụng web (phòng A 102)"),
                 response.answer());
+    }
+
+    @Test
+    void detectsCreditsRemainingIntents() {
+        assertTrue(advisor.handles("Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"));
+        assertTrue(advisor.handles("con lai bao nhieu tin chi"));
+        assertTrue(advisor.handles("còn thiếu mấy tín chỉ"));
+        assertTrue(advisor.handles("hạn mức tín chỉ của tôi"));
+        assertTrue(advisor.handles("how many credits do I have left?"));
+
+        // Policy / how-to wording stays on the knowledge path.
+        assertFalse(advisor.handles("cách đăng ký học phần"));
+        assertFalse(advisor.handles("quy trình xin nâng hạn mức tín chỉ như thế nào?"));
+        assertFalse(advisor.handles("học phí kỳ này bao nhiêu?"));
+    }
+
+    @Test
+    void answersCreditsRemainingFromTheRegistrationSummaryPath() {
+        RegistrationService registrationService = mock(RegistrationService.class);
+        AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, null, null, registrationService);
+        when(registrationService.summary("student-profile", null)).thenReturn(
+                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                        "round-1", 30, 15, 15, List.of("e1", "e2", "e3", "e4", "e5")));
+
+        ChatResponse response = summaryAdvisor.answer(
+                chatRequest("vi", "Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.citations().isEmpty());
+        String answer = response.answer();
+        assertTrue(answer.contains("Đã đăng ký: 15 tín chỉ"), answer);
+        assertTrue(answer.contains("Hạn mức: 30 tín chỉ"), answer);
+        assertTrue(answer.contains("Còn lại có thể đăng ký: 15 tín chỉ"), answer);
+        // limit 30 = approved raise above the 28 standard; the note must say so.
+        assertTrue(answer.contains("đã được Phòng Đào tạo phê duyệt"), answer);
+        assertTrue(answer.contains("28"), answer);
+        assertTrue(answer.contains("hồ sơ đăng ký học phần"), answer);
+    }
+
+    @Test
+    void creditsRemainingAtTheStandardLimitOmitsTheApprovedNote() {
+        RegistrationService registrationService = mock(RegistrationService.class);
+        AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, null, null, registrationService);
+        when(registrationService.summary("student-profile", null)).thenReturn(
+                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                        "round-1", 28, 15, 13, List.of("e1")));
+
+        ChatResponse response = summaryAdvisor.answer(
+                chatRequest("vi", "còn thiếu mấy tín chỉ nữa là chạm hạn mức?"), jwtStudent());
+
+        assertTrue(response.answer().contains("Còn lại có thể đăng ký: 13 tín chỉ"), response.answer());
+        assertFalse(response.answer().contains("phê duyệt"), response.answer());
+    }
+
+    @Test
+    void creditsRemainingWithoutTheSummaryPathFallsBackToKnowledge() {
+        assertNull(advisor.answer(chatRequest("vi", "Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"), jwtStudent()));
+    }
+
+    @Test
+    void detectsSectionDetailIntents() {
+        assertTrue(advisor.handles("Lớp SE013 học phòng nào, giờ nào?"));
+        assertTrue(advisor.handles("lớp SE014-01 học thứ mấy, ở phòng nào?"));
+        assertTrue(advisor.handles("Lịch của lớp SE015 thế nào?"));
+
+        // Code without a room/time question stays off this intent (and off the
+        // advisor entirely — no other intent claims "còn chỗ" questions).
+        assertFalse(advisor.handles("lớp học phần SE401 còn chỗ trống không"));
+    }
+
+    @Test
+    void answersRegisteredSectionDetailFromTheTimetableData() {
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE013", "Lập trình Web nâng cao với React & Node.js",
+                        "Advanced Web with React & Node.js", CURRENT_TERM_START,
+                        List.of(new SectionScheduleResponse("s1", 2, "09:45", "12:15",
+                                new ClassroomSummary("c1", "A", "103"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Lớp SE013 học phòng nào, giờ nào?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Thông tin lớp SE013"), answer);
+        assertTrue(answer.contains("Thứ Hai 09:45-12:15"), answer);
+        assertTrue(answer.contains("(phòng A 103)"), answer);
+        assertTrue(answer.contains("theo thời khóa biểu đã đăng ký của bạn"), answer);
+        assertFalse(answer.contains("không tìm thấy"), answer);
+    }
+
+    @Test
+    void answersCatalogSectionThatTheStudentHasNotRegistered() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor catalogAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
+                enrollment("SE401", "Lập trình Java nâng cao", "Advanced Java", CURRENT_TERM_START, List.of())));
+        Map<String, Object> row = new HashMap<>();
+        row.put("section_number", "SE099-01");
+        row.put("course_code", "SE099");
+        row.put("course_name", "Học máy ứng dụng");
+        row.put("course_name_vi", "Học máy ứng dụng");
+        row.put("course_name_en", "Applied Machine Learning");
+        row.put("semester_name", "Học kỳ hiện tại");
+        row.put("schedule_day", 3);
+        row.put("schedule_start", "07:00");
+        row.put("schedule_end", "09:30");
+        row.put("room_building", "B");
+        row.put("room_number", "204");
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of(row));
+
+        ChatResponse response = catalogAdvisor.answer(
+                chatRequest("vi", "Lớp SE099 học phòng nào, giờ nào?"), jwtStudent());
+
+        String answer = response.answer();
+        assertTrue(answer.contains("SE099"), answer);
+        assertTrue(answer.contains("có trong danh mục"), answer);
+        assertTrue(answer.contains("chưa đăng ký lớp này"), answer);
+        assertTrue(answer.contains("Thứ Ba 07:00-09:30"), answer);
+        assertTrue(answer.contains("(phòng B 204)"), answer);
+    }
+
+    @Test
+    void unknownSectionCodeSaysSoAndPointsToRegistrationWithoutClaimingAbsence() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor catalogAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+        when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of());
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of());
+
+        ChatResponse response = catalogAdvisor.answer(
+                chatRequest("vi", "Lớp XX999 học phòng nào, giờ nào?"), jwtStudent());
+
+        String answer = response.answer();
+        assertTrue(answer.contains("không tìm thấy mã lớp XX999"), answer);
+        assertTrue(answer.contains("Đăng ký học phần"), answer);
+    }
+
+    @Test
+    void detectsThesisNounLuanVanAndAnswersOnlyFromRealRows() {
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor thesisAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, null);
+
+        assertTrue(thesisAdvisor.handles("Đồ án/luận văn của tôi đang tiến triển thế nào?"));
+        assertTrue(thesisAdvisor.handles("luan van cua toi the nao roi"));
+
+        // D-Q6: with no registration rows the answer says so — nothing invented.
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of());
+        ChatResponse empty = thesisAdvisor.answer(
+                chatRequest("vi", "luận văn của tôi đang tiến triển thế nào?"), jwtStudent());
+        assertNotNull(empty);
+        assertTrue(empty.answer().contains("Bạn chưa đăng ký đồ án/luận văn trong đợt nào"), empty.answer());
+        assertTrue(empty.answer().contains("Khóa luận tốt nghiệp"), empty.answer());
+        assertFalse(empty.answer().contains("PENDING"), empty.answer());
+
+        // With rows, every shown value comes from those rows.
+        Map<String, Object> row = new HashMap<>();
+        row.put("group_id", "g1");
+        row.put("group_status", "ACTIVE");
+        row.put("approval_status", "APPROVED");
+        row.put("topic_id", "t1");
+        row.put("topic_title", "Hệ thống gợi ý học tập");
+        row.put("topic_status", "APPROVED");
+        row.put("final_score", null);
+        row.put("round_name", "Đợt 1 KLTN 2026-2027");
+        row.put("round_status", "REGISTRATION_OPEN");
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of(row));
+        ChatResponse grounded = thesisAdvisor.answer(
+                chatRequest("vi", "luận văn của tôi đang tiến triển thế nào?"), jwtStudent());
+        assertTrue(grounded.answer().contains("Đợt 1 KLTN 2026-2027"), grounded.answer());
+        assertTrue(grounded.answer().contains("Hệ thống gợi ý học tập"), grounded.answer());
+        assertTrue(grounded.answer().contains("APPROVED"), grounded.answer());
+    }
+
+    private static AcademicEnrollmentReadDtos.GradeSummary gradeRow(
+            String id, String courseCode, int credits, String letter, String semesterId, String semesterName) {
+        return new AcademicEnrollmentReadDtos.GradeSummary(
+                id, courseCode, "Học phần " + courseCode, "Course " + courseCode,
+                "Học phần " + courseCode, credits, courseCode + "-01", "GV Demo",
+                semesterName, semesterName, semesterName, semesterId,
+                null, null,
+                new java.math.BigDecimal("7.0"), letter, "PUBLISHED", "COMPLETED");
     }
 
     private static ChatRequest chatRequest(String locale, String message) {

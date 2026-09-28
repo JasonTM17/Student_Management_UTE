@@ -1,5 +1,8 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
+import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
+import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
+import io.campuscore.restfulapi.academic.registration.RegistrationService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
@@ -10,14 +13,17 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
-import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.TranscriptResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
 import io.campuscore.restfulapi.thesis.service.ThesisLecturerWorkloadService;
+import io.campuscore.restfulapi.web.DomainException;
+import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.Comparator;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -79,7 +85,7 @@ public class AssistantPersonalContextAdvisor {
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern THESIS_NOUN = Pattern.compile(
-            "đề\\s*tài|de\\s*tai|khóa\\s*luận|khoa\\s*luan|đồ\\s*án|do\\s*an|tiểu\\s*luận|tieu\\s*luan|kltn|tlcn|hội\\s*đồng|hoi\\s*dong|\\bthesis\\b|\\btopics?\\b|\\bcouncils?\\b",
+            "đề\\s*tài|de\\s*tai|khóa\\s*luận|khoa\\s*luan|luận\\s*văn|luan\\s*van|đồ\\s*án|do\\s*an|tiểu\\s*luận|tieu\\s*luan|kltn|tlcn|hội\\s*đồng|hoi\\s*dong|\\bthesis\\b|\\btopics?\\b|\\bcouncils?\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE | Pattern.UNICODE_CHARACTER_CLASS);
 
     private static final Pattern THESIS_ARCHIVE_INTENT = Pattern.compile(
@@ -136,6 +142,37 @@ public class AssistantPersonalContextAdvisor {
                     + "|quy\\s*định|quy\\s*dinh|điều\\s*kiện|dieu\\s*kien",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /**
+     * "Tôi còn bao nhiêu tín chỉ được đăng ký nữa?" — the personal registration
+     * budget question. Answered from the same read path the registration
+     * summary endpoint uses (credit limit, used, remaining). Policy wording
+     * about raising the limit stays on the knowledge path.
+     */
+    private static final Pattern CREDITS_REMAINING_INTENT = Pattern.compile(
+            "còn\\s*bao\\s*nhiêu\\s*(?:được\\s*đăng\\s*ký\\s*)?tín\\s*chỉ|con\\s*bao\\s*nhieu\\s*(?:duoc\\s*dang\\s*ky\\s*)?tin\\s*chi"
+                    + "|còn\\s*lạ[ií]\\s*(?:được\\s*)?bao\\s*nhiêu\\s*tín\\s*chỉ|con\\s*lai\\s*(?:duoc\\s*)?bao\\s*nhieu\\s*tin\\s*chi"
+                    + "|còn\\s*thiếu\\s*(?:mấy|bao\\s*nhiêu)\\s*tín\\s*chỉ|con\\s*thieu\\s*(?:may|bao\\s*nhieu)\\s*tin\\s*chi"
+                    + "|hạn\\s*mức\\s*tín\\s*chỉ|han\\s*muc\\s*tin\\s*chi"
+                    + "|credits?\\s+(?:do\\s+i\\s+have\\s+)?(?:left|remaining)|remaining\\s+credits?",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** Credit-limit policy wording ("xin nâng hạn mức") stays on the knowledge path. */
+    private static final Pattern CREDITS_POLICY_INTENT = Pattern.compile(
+            "nâng\\s*hạn\\s*mức|nang\\s*han\\s*muc|quy\\s*trình|quy\\s*trinh|đơn\\s*xin|don\\s*xin",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** A section / course code as printed on the portal ("SE013", "SE013-01"). */
+    private static final Pattern SECTION_CODE = Pattern.compile(
+            "(?<![A-Za-z0-9])[A-Z]{2}\\d{3}(?![0-9A-Za-z])");
+
+    /** "Lớp SE013 học phòng nào, giờ nào?" — a specific section's room/time question. */
+    private static final Pattern SECTION_DETAIL_HINT = Pattern.compile(
+            "học\\s*phòng|hoc\\s*phong|ở\\s*phòng|o\\s*phong|phòng\\s*nào|phong\\s*nao|phòng\\s*học|phong\\s*hoc"
+                    + "|giờ\\s*nào|gio\\s*nao|tiết\\s*nào|tiet\\s*nao|giờ\\s*học|gio\\s*hoc|ca\\s*nào|ca\\s*nao"
+                    + "|lịch\\s*của\\s*lớp|lich\\s*cua\\s*lop|học\\s*ở\\s*đâu|hoc\\s*o\\s*dau|học\\s*thứ|hoc\\s*thu"
+                    + "|(?:what|which)\\s+(?:room|time|period|building)|(?:when|what\\s+time)\\s+(?:is|does)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     private static boolean isConductIntent(String message) {
         return StringUtils.hasText(message) && CONDUCT_INTENT.matcher(message).find();
     }
@@ -144,8 +181,27 @@ public class AssistantPersonalContextAdvisor {
     private static boolean isEnrollmentListIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
         if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        if (isSectionDetailIntent(message)) return false;
         return FIRST_PERSON_PRONOUN.matcher(message).find()
                 && ENROLLMENT_LIST_INTENT.matcher(message).find();
+    }
+
+    /**
+     * Personal registration-budget questions answered from the registration
+     * summary read path. How-to wording ("xin nâng hạn mức") stays knowledge.
+     */
+    private static boolean isCreditsRemainingIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
+        if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
+        return CREDITS_REMAINING_INTENT.matcher(message).find();
+    }
+
+    /** "Lớp SE013 học phòng nào, giờ nào?" — a concrete section code plus room/time wording. */
+    private static boolean isSectionDetailIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        return SECTION_CODE.matcher(message).find()
+                && SECTION_DETAIL_HINT.matcher(message).find();
     }
 
     /** Grades intent requires a first-person marker so policy questions stay on the knowledge path. */
@@ -175,6 +231,7 @@ public class AssistantPersonalContextAdvisor {
     private final AcademicSectionReadService sections;
     private final ThesisLecturerWorkloadService lecturerWorkload;
     private final AcademicConductService conductService;
+    private final RegistrationService registrationService;
     private final NamedParameterJdbcTemplate jdbc;
 
     public AssistantPersonalContextAdvisor(
@@ -183,18 +240,30 @@ public class AssistantPersonalContextAdvisor {
         this(enrollments, sections, null, null, null);
     }
 
+    /** Compatibility constructor retained for focused advisor tests. */
+    public AssistantPersonalContextAdvisor(
+            AcademicEnrollmentReadService enrollments,
+            AcademicSectionReadService sections,
+            ThesisLecturerWorkloadService lecturerWorkload,
+            NamedParameterJdbcTemplate jdbc,
+            AcademicConductService conductService) {
+        this(enrollments, sections, lecturerWorkload, jdbc, conductService, null);
+    }
+
     @Autowired
     public AssistantPersonalContextAdvisor(
             AcademicEnrollmentReadService enrollments,
             AcademicSectionReadService sections,
             @Autowired(required = false) ThesisLecturerWorkloadService lecturerWorkload,
             @Autowired(required = false) NamedParameterJdbcTemplate jdbc,
-            @Autowired(required = false) AcademicConductService conductService) {
+            @Autowired(required = false) AcademicConductService conductService,
+            @Autowired(required = false) RegistrationService registrationService) {
         this.enrollments = enrollments;
         this.sections = sections;
         this.lecturerWorkload = lecturerWorkload;
         this.jdbc = jdbc;
         this.conductService = conductService;
+        this.registrationService = registrationService;
     }
 
     /** True when the question is clearly about personal schedule, enrollment list, grades, conduct, or thesis status. */
@@ -203,7 +272,9 @@ public class AssistantPersonalContextAdvisor {
                 || isThesisPersonalIntent(message)
                 || isConductIntent(message)
                 || isGradesIntent(message)
-                || isEnrollmentListIntent(message));
+                || isEnrollmentListIntent(message)
+                || isCreditsRemainingIntent(message)
+                || isSectionDetailIntent(message));
     }
 
     /**
@@ -280,6 +351,22 @@ public class AssistantPersonalContextAdvisor {
             }
             return null;
         }
+        if (isCreditsRemainingIntent(message)) {
+            // The registration budget is student-owned; without the summary read
+            // path (or a profile) the question falls back to the knowledge path.
+            if (StringUtils.hasText(studentId) && registrationService != null) {
+                return creditsRemainingAnswer(studentId, locale);
+            }
+            return null;
+        }
+        if (isSectionDetailIntent(message)) {
+            // Section room/time lookups are answered from the student's own
+            // registered sections first, then the published catalog.
+            if (StringUtils.hasText(studentId)) {
+                return sectionDetailAnswer(studentId, locale, message);
+            }
+            return null;
+        }
         if (isGradesIntent(message)) {
             if (StringUtils.hasText(studentId)) {
                 return gradesAnswer(studentId, locale);
@@ -304,7 +391,13 @@ public class AssistantPersonalContextAdvisor {
         return null;
     }
 
-    /** Personal grades answer grounded in the asker's real grade rows and transcript. */
+    /**
+     * Personal grades answer grounded in the asker's real grade rows. The
+     * cumulative GPA (4.0 scale) and credit totals are computed IN CODE across
+     * every published semester — never summed by a model — and the latest
+     * semester's figures are shown separately and labeled, because the two are
+     * routinely confused (production audit D-Q3).
+     */
     private String gradesAnswer(String studentId, String locale) {
         boolean vi = "vi".equals(locale);
         List<GradeSummary> grades = enrollments.findStudentGrades(studentId, null);
@@ -316,17 +409,47 @@ public class AssistantPersonalContextAdvisor {
         StringBuilder answer = new StringBuilder();
         answer.append(vi ? "Kết quả học tập của bạn:\n" : "Your academic results:\n");
 
-        TranscriptResponse transcript = enrollments.findStudentTranscript(studentId);
-        if (transcript != null && transcript.summary() != null) {
-            answer.append("\n")
-                    .append(vi ? "Tích lũy: GPA " : "Cumulative: GPA ")
-                    .append(transcript.summary().cumulativeGpa())
-                    .append(vi ? " | " : " | ")
-                    .append(transcript.summary().totalCreditsEarned())
-                    .append(vi ? " tín chỉ đạt" : " credits earned")
-                    .append(vi ? " / " : " / ")
-                    .append(transcript.summary().totalCreditsAttempted())
-                    .append(vi ? " thực học\n" : " attempted\n");
+        // Grades come ordered newest semester first, so the first group is the
+        // latest semester and the running total is the cumulative record.
+        Map<String, List<GradeSummary>> bySemester = new LinkedHashMap<>();
+        for (GradeSummary grade : grades) {
+            bySemester.computeIfAbsent(grade.semesterId(), ignored -> new ArrayList<>()).add(grade);
+        }
+        GradeTotals cumulative = new GradeTotals();
+        GradeSummary latestName = null;
+        for (List<GradeSummary> rows : bySemester.values()) {
+            GradeTotals semester = new GradeTotals();
+            rows.forEach(semester::add);
+            cumulative.merge(semester);
+            // The "latest semester" figures are the newest semester WITH
+            // published grades — an in-progress current term (no letters yet)
+            // must not shadow the last graded one.
+            if (latestName == null && semester.gpaCredits > 0) {
+                latestName = rows.isEmpty() ? null : rows.get(0);
+            }
+        }
+        if (cumulative.gpaCredits == 0) {
+            answer.append("\n").append(vi
+                    ? "Chưa có học kỳ nào có điểm đã công bố — các học phần đang học sẽ xuất hiện sau khi có điểm.\n"
+                    : "No published grades yet — in-progress courses will appear once graded.\n");
+        } else {
+            answer.append("\n").append(vi ? "Tích lũy: " : "Cumulative: ")
+                    .append(cumulative.earnedCredits).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                    .append(cumulative.gpa())
+                    .append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
+            if (latestName != null) {
+                GradeTotals latest = new GradeTotals();
+                bySemester.get(latestName.semesterId()).forEach(latest::add);
+                String latestLabel = vi
+                        ? firstText(latestName.semesterNameVi(), latestName.semester())
+                        : firstText(latestName.semesterNameEn(), latestName.semester());
+                answer.append(vi ? "Học kỳ gần nhất (" : "Most recent semester (")
+                        .append(StringUtils.hasText(latestLabel) ? latestLabel : (vi ? "học kỳ gần nhất" : "latest semester"))
+                        .append(vi ? "): " : "): ")
+                        .append(latest.earnedCredits).append(vi ? " tín chỉ, GPA " : " credits, GPA ")
+                        .append(latest.gpa())
+                        .append(vi ? " (thang 4)\n" : " (4.0 scale)\n");
+            }
         }
 
         int rendered = 0;
@@ -357,7 +480,66 @@ public class AssistantPersonalContextAdvisor {
                     ? "\nBạn có thể xem chi tiết từng cột điểm ở trang Bảng điểm."
                     : "\nYou can review each score component on the Grades page.");
         }
+        answer.append(vi
+                ? "\n(Số liệu GPA và tín chỉ được tính trực tiếp từ bảng điểm đã công bố của bạn.)"
+                : "\n(GPA and credit figures are computed directly from your published transcript.)");
         return answer.toString();
+    }
+
+    /** Running GPA-4.0 totals over published grade rows (audit D-Q3: computed in code, never by the model). */
+    private static final class GradeTotals {
+        private BigDecimal points = BigDecimal.ZERO;
+        private int gpaCredits;
+        private int earnedCredits;
+
+        private void add(GradeSummary grade) {
+            String letter = grade.letterGrade();
+            // Ungraded rows (letter null) contribute to neither GPA nor credits.
+            if (letter == null) {
+                return;
+            }
+            BigDecimal point = GRADE_POINTS.get(letter);
+            if (point == null) {
+                return;
+            }
+            points = points.add(point.multiply(BigDecimal.valueOf(grade.credits())));
+            gpaCredits += grade.credits();
+            if (!"F".equals(grade.letterGrade())) {
+                earnedCredits += grade.credits();
+            }
+        }
+
+        private void merge(GradeTotals other) {
+            points = points.add(other.points);
+            gpaCredits += other.gpaCredits;
+            earnedCredits += other.earnedCredits;
+        }
+
+        private BigDecimal gpa() {
+            return gpaCredits == 0
+                    ? BigDecimal.ZERO.setScale(2)
+                    : points.divide(BigDecimal.valueOf(gpaCredits), 2, RoundingMode.HALF_UP);
+        }
+    }
+
+    /** The official HCMUTE 10-point letter → 4.0 table, matching AcademicEnrollmentReadService. */
+    private static final Map<String, BigDecimal> GRADE_POINTS = Map.ofEntries(
+            Map.entry("A+", BigDecimal.valueOf(4.0)),
+            Map.entry("A", BigDecimal.valueOf(4.0)),
+            Map.entry("A-", BigDecimal.valueOf(3.7)),
+            Map.entry("B+", BigDecimal.valueOf(3.5)),
+            Map.entry("B", BigDecimal.valueOf(3.0)),
+            Map.entry("B-", BigDecimal.valueOf(2.7)),
+            Map.entry("C+", BigDecimal.valueOf(2.5)),
+            Map.entry("C", BigDecimal.valueOf(2.0)),
+            Map.entry("C-", BigDecimal.valueOf(1.7)),
+            Map.entry("D+", BigDecimal.valueOf(1.5)),
+            Map.entry("D", BigDecimal.valueOf(1.0)),
+            Map.entry("D-", BigDecimal.valueOf(0.7)),
+            Map.entry("F", BigDecimal.ZERO));
+
+    private static String firstText(String first, String second) {
+        return StringUtils.hasText(first) ? first : second;
     }
 
     private static String courseText(GradeSummary grade, boolean vi) {
@@ -405,8 +587,205 @@ public class AssistantPersonalContextAdvisor {
         return answer.toString();
     }
 
-    private String lecturerThesisAnswer(String lecturerId, String locale) {
-        if (lecturerWorkload == null) return null;
+    /**
+     * "Tôi còn bao nhiêu tín chỉ được đăng ký nữa?" — answered from the same
+     * read path the /me/registration/summary endpoint uses, so limit, used and
+     * remaining can never disagree with the portal (audit D-Q5). An approved
+     * limit raise (30 instead of the 28 standard) is called out explicitly.
+     */
+    private String creditsRemainingAnswer(String studentId, String locale) {
+        boolean vi = "vi".equals(locale);
+        SummaryResponse summary;
+        try {
+            summary = registrationService.summary(studentId, null);
+        } catch (DomainException exception) {
+            // No open registration round (or no active profile): the personal
+            // numbers do not exist right now. The knowledge path still answers
+            // the credit-limit policy, so fall through instead of inventing one.
+            LOG.info("registration summary unavailable for credits-remaining question: {}", exception.code());
+            return null;
+        }
+        int remaining = Math.max(0, summary.creditsRemaining());
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Hạn mức đăng ký tín chỉ học kỳ này của bạn:\n"
+                : "Your course registration budget for this term:\n");
+        answer.append("\n• ").append(vi ? "Đã đăng ký: " : "Registered: ")
+                .append(summary.creditsUsed()).append(vi ? " tín chỉ\n" : " credits\n");
+        answer.append("• ").append(vi ? "Hạn mức: " : "Credit limit: ")
+                .append(summary.creditLimit()).append(vi ? " tín chỉ\n" : " credits\n");
+        answer.append("• ").append(vi ? "Còn lại có thể đăng ký: " : "Still available: ")
+                .append(remaining).append(vi ? " tín chỉ\n" : " credits\n");
+        if (summary.creditLimit() > CreditLimitApplicationService.STANDARD_LIMIT) {
+            answer.append(vi
+                    ? "\nHạn mức " + summary.creditLimit() + " tín chỉ là mức đã được Phòng Đào tạo phê duyệt nâng từ mức chuẩn "
+                            + CreditLimitApplicationService.STANDARD_LIMIT + " tín chỉ.\n"
+                    : "\nYour " + summary.creditLimit() + "-credit limit was approved by the Academic Affairs Office above the standard "
+                            + CreditLimitApplicationService.STANDARD_LIMIT + " credits.\n");
+        }
+        answer.append(vi
+                ? "\n(Số liệu tính trực tiếp từ hồ sơ đăng ký học phần của bạn.) Bạn có thể đăng ký thêm học phần ở khu Đăng ký học phần."
+                : "\n(Figures come directly from your registration records.) You can add more sections in the Course Registration area.");
+        return answer.toString();
+    }
+
+    /**
+     * "Lớp SE013 học phòng nào, giờ nào?" — resolves the code against the
+     * student's own registered sections first (same data path as the timetable,
+     * audit D-Q7), then the published catalog. An unknown code says so and
+     * points to the registration page without claiming a data absence that the
+     * catalog contradicts.
+     */
+    private String sectionDetailAnswer(String studentId, String locale, String message) {
+        boolean vi = "vi".equals(locale);
+        java.util.regex.Matcher matcher = SECTION_CODE.matcher(message);
+        if (!matcher.find()) {
+            return null;
+        }
+        String code = matcher.group();
+        List<EnrollmentResponse> active = enrollments.findStudentEnrollments(studentId, null).stream()
+                .filter(item -> ACTIVE_ENROLLMENT_STATUSES.contains(item.status()))
+                .toList();
+        List<EnrollmentResponse> currentTerm = currentTermEnrollments(active);
+        EnrollmentResponse registered = matchByCode(currentTerm, code)
+                .or(() -> matchByCode(active, code))
+                .orElse(null);
+        if (registered != null && registered.section() != null) {
+            String courseCode = registered.section().course() != null ? registered.section().course().code() : null;
+            String courseName = courseLabel(registered.section().course(), locale);
+            String label = courseCode != null
+                    ? courseName != null ? courseCode + " - " + courseName : courseCode
+                    : courseName;
+            StringBuilder answer = new StringBuilder();
+            answer.append(vi ? "Thông tin lớp " : "Details for section ").append(code);
+            if (StringUtils.hasText(label)) {
+                answer.append(" — ").append(label);
+            }
+            if (StringUtils.hasText(registered.section().sectionNumber())) {
+                answer.append(vi ? " (lớp " : " (section ").append(registered.section().sectionNumber()).append(")");
+            }
+            answer.append(vi ? ":\n" : ":\n");
+            List<SectionScheduleResponse> schedules = registered.section().schedules() == null
+                    ? List.of() : registered.section().schedules();
+            if (schedules.isEmpty()) {
+                answer.append("\n").append(vi
+                        ? "Lớp này chưa có lịch học được công bố. Bạn xem lại ở trang Thời khóa biểu sau khi lịch được cập nhật."
+                        : "This section has no published schedule yet. Check the Schedule page once it is updated.");
+                return answer.toString();
+            }
+            schedules.stream()
+                    .sorted(Comparator.comparingInt(SectionScheduleResponse::dayOfWeek)
+                            .thenComparing(SectionScheduleResponse::startTime))
+                    .forEach(schedule -> {
+                        int day = schedule.dayOfWeek() == 0 ? 7 : schedule.dayOfWeek();
+                        answer.append("\n• ").append((vi ? DAY_LABELS_VI : DAY_LABELS_EN)[day])
+                                .append(" ").append(schedule.startTime()).append("-").append(schedule.endTime());
+                        if (schedule.classroom() != null) {
+                            String room = trimJoin(schedule.classroom().building(), schedule.classroom().roomNumber());
+                            if (StringUtils.hasText(room)) {
+                                answer.append(vi ? " (phòng " : " (room ").append(room).append(")");
+                            }
+                        }
+                        answer.append("\n");
+                    });
+            answer.append(vi
+                    ? "\n(theo thời khóa biểu đã đăng ký của bạn)"
+                    : "\n(from your registered timetable)");
+            return answer.toString();
+        }
+
+        // Not among the student's sections: check the published catalog before
+        // claiming anything about the code.
+        if (jdbc == null) {
+            return vi
+                    ? "Mình chưa tra cứu được danh mục lớp lúc này. Bạn kiểm tra mã lớp " + code
+                            + " ở khu Đăng ký học phần nhé."
+                    : "I could not check the section catalog right now. Please verify section " + code
+                            + " in the Course Registration area.";
+        }
+        List<Map<String, Object>> catalogRows = jdbc.queryForList(
+                "SELECT section.\"sectionNumber\" AS section_number, course.\"code\" AS course_code,"
+                        + " course.\"name\" AS course_name, course.\"nameEn\" AS course_name_en, course.\"nameVi\" AS course_name_vi,"
+                        + " semester.\"name\" AS semester_name, semester.\"nameVi\" AS semester_name_vi, semester.\"nameEn\" AS semester_name_en,"
+                        + " schedule.\"dayOfWeek\" AS schedule_day, schedule.\"startTime\" AS schedule_start, schedule.\"endTime\" AS schedule_end,"
+                        + " classroom.\"building\" AS room_building, classroom.\"roomNumber\" AS room_number"
+                        + " FROM academic.\"Section\" section"
+                        + " JOIN academic.\"Course\" course ON course.\"id\" = section.\"courseId\""
+                        + " LEFT JOIN academic.\"Semester\" semester ON semester.\"id\" = section.\"semesterId\""
+                        + " LEFT JOIN academic.\"SectionSchedule\" schedule ON schedule.\"sectionId\" = section.\"id\""
+                        + " LEFT JOIN academic.\"Classroom\" classroom ON classroom.\"id\" = schedule.\"classroomId\""
+                        + " WHERE section.\"status\" <> 'ARCHIVED'"
+                        + " AND (UPPER(course.\"code\") = :code OR UPPER(section.\"sectionNumber\") IN (:code, :codePrefix))",
+                new MapSqlParameterSource()
+                        .addValue("code", code)
+                        .addValue("codePrefix", code + "-%"));
+        if (catalogRows.isEmpty()) {
+            return vi
+                    ? "Mình không tìm thấy mã lớp " + code + " trong danh mục học phần hiện có. "
+                            + "Bạn kiểm tra lại mã ở khu Đăng ký học phần nhé."
+                    : "I could not find section " + code + " in the current course catalog. "
+                            + "Please double-check the code in the Course Registration area.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi ? "Lớp " : "Section ").append(code);
+        String courseName = vi
+                ? firstText(text(catalogRows.get(0), "course_name_vi"), firstText(text(catalogRows.get(0), "course_name"), text(catalogRows.get(0), "course_name_en")))
+                : firstText(text(catalogRows.get(0), "course_name_en"), text(catalogRows.get(0), "course_name"));
+        if (StringUtils.hasText(courseName)) {
+            answer.append(" — ").append(courseName);
+        }
+        answer.append(vi
+                ? " có trong danh mục, nhưng bạn chưa đăng ký lớp này.\n\nLịch học được công bố:"
+                : " exists in the catalog, but you are not registered in it.\n\nPublished schedule:");
+        boolean hasSchedule = false;
+        for (Map<String, Object> row : catalogRows) {
+            Object day = row.get("schedule_day");
+            if (day == null) {
+                continue;
+            }
+            hasSchedule = true;
+            int dayNumber = ((Number) day).intValue();
+            answer.append("\n• ").append((vi ? DAY_LABELS_VI : DAY_LABELS_EN)[dayNumber == 0 ? 7 : dayNumber])
+                    .append(" ").append(text(row, "schedule_start")).append("-").append(text(row, "schedule_end"));
+            String room = trimJoin(text(row, "room_building"), text(row, "room_number"));
+            if (StringUtils.hasText(room)) {
+                answer.append(vi ? " (phòng " : " (room ").append(room).append(")");
+            }
+            answer.append("\n");
+        }
+        if (!hasSchedule) {
+            answer.append("\n• ").append(vi
+                    ? "chưa có lịch học được công bố cho lớp này."
+                    : "no schedule published for this section yet.");
+        }
+        answer.append(vi
+                ? "\n\nNếu muốn học lớp này, bạn đăng ký ở khu Đăng ký học phần khi đợt còn mở."
+                : "\n\nTo take this section, register for it in the Course Registration area while a round is open.");
+        return answer.toString();
+    }
+
+    /** The student's enrollment whose course code or section number matches the asked code. */
+    private static java.util.Optional<EnrollmentResponse> matchByCode(List<EnrollmentResponse> candidates, String code) {
+        String normalized = code.toUpperCase(java.util.Locale.ROOT);
+        return candidates.stream()
+                .filter(item -> item.section() != null)
+                .filter(item -> {
+                    String courseCode = item.section().course() != null ? item.section().course().code() : null;
+                    String sectionNumber = item.section().sectionNumber();
+                    return normalized.equalsIgnoreCase(courseCode)
+                            || normalized.equalsIgnoreCase(sectionNumber)
+                            || (StringUtils.hasText(sectionNumber)
+                                    && sectionNumber.toUpperCase(java.util.Locale.ROOT).startsWith(normalized + "-"));
+                })
+                .findFirst();
+    }
+
+    private static String text(Map<String, Object> row, String key) {
+        Object value = row.get(key);
+        return value == null ? null : String.valueOf(value).trim();
+    }
+
+    private String lecturerThesisAnswer(String lecturerId, String locale) {        if (lecturerWorkload == null) return null;
         boolean vi = "vi".equals(locale);
         var workload = lecturerWorkload.workload(lecturerId);
         if (workload == null || (workload.topics().isEmpty() && workload.councils().isEmpty() && workload.gradingTasks().isEmpty())) {
@@ -475,9 +854,13 @@ public class AssistantPersonalContextAdvisor {
                         + "ORDER BY r.created_at DESC",
                 new MapSqlParameterSource("studentId", studentId));
         if (rows.isEmpty()) {
+            // Audit D-Q6: when there are no registration rows the answer says so
+            // plainly; nothing may be invented (topic, status, cohort year).
             return vi
-                    ? "Bạn hiện chưa đăng ký tham gia nhóm hoặc đề tài khóa luận nào. Bạn có thể theo dõi các đợt mở đăng ký tại trang Khóa luận tốt nghiệp."
-                    : "You are not currently registered in any thesis group or topic. You can check open registration rounds on the Thesis page.";
+                    ? "Bạn chưa đăng ký đồ án/luận văn trong đợt nào. "
+                            + "Khi có đợt mở đăng ký, bạn sẽ xem và đăng ký ở trang Khóa luận tốt nghiệp."
+                    : "You have not registered for a thesis or capstone project in any round yet. "
+                            + "You can view and register in open rounds on the Thesis page.";
         }
         StringBuilder answer = new StringBuilder();
         answer.append(vi ? "Thông tin đăng ký khóa luận của bạn:\n" : "Your thesis registration status:\n");
@@ -548,7 +931,10 @@ public class AssistantPersonalContextAdvisor {
     /**
      * "Học kỳ này tôi đang đăng ký những lớp học phần nào?" — the asker's
      * current-term section list built from real enrollments with the same
-     * active-status filter and semester selection the timetable uses.
+     * active-status filter and semester selection the timetable uses. The
+     * credit total is summed in CODE from the student's own registration rows
+     * (the creditsSnapshot the registration endpoint counts) and the source is
+     * labeled, so the model can never add or invent the number (audit D-Q1).
      */
     private String enrollmentListAnswer(String studentId, String locale) {
         boolean vi = "vi".equals(locale);
@@ -558,7 +944,6 @@ public class AssistantPersonalContextAdvisor {
         List<EnrollmentResponse> currentTerm = currentTermEnrollments(active);
         StringBuilder answer = new StringBuilder();
         int rendered = 0;
-        int credits = 0;
         for (EnrollmentResponse item : currentTerm) {
             if (item.section() == null) continue;
             String courseCode = item.section().course() != null ? item.section().course().code() : null;
@@ -572,21 +957,54 @@ public class AssistantPersonalContextAdvisor {
             }
             answer.append(vi ? " — trạng thái " : " — status ").append(item.status());
             answer.append("\n");
-            if (item.section().course() != null) {
-                credits += item.section().course().credits();
-            }
             rendered += 1;
         }
         if (rendered == 0) {
             return noEnrollmentsMessage(vi);
         }
+        int credits = sumRegisteredCredits(currentTerm);
         answer.insert(0, vi
-                ? "Học kỳ này bạn đang đăng ký " + rendered + " lớp (" + credits + " tín chỉ):\n"
-                : "This term you are registered in " + rendered + " sections (" + credits + " credits):\n");
+                ? "Học kỳ này bạn đang đăng ký " + rendered + " lớp (" + credits + " tín chỉ theo dữ liệu đăng ký của bạn):\n"
+                : "This term you are registered in " + rendered + " sections (" + credits
+                        + " credits, from your registration records):\n");
+        answer.append(vi
+                ? "\n(Tổng tín chỉ được tính trực tiếp từ hồ sơ đăng ký học phần của bạn.)"
+                : "\n(The credit total is computed directly from your registration records.)");
         answer.append(vi
                 ? "\nBạn có thể xem lịch học dạng lưới ở trang Thời khóa biểu."
                 : "\nYou can see these sections as a weekly grid on the Schedule page.");
         return answer.toString();
+    }
+
+    /**
+     * Credit total for the listed enrollments, counted the same way the
+     * registration summary endpoint counts it: SUM(creditsSnapshot) over the
+     * student's own active rows. Falls back to the current course catalog
+     * credits when the ledger is unavailable.
+     */
+    private int sumRegisteredCredits(List<EnrollmentResponse> currentTerm) {
+        List<String> ids = currentTerm.stream()
+                .map(EnrollmentResponse::id)
+                .filter(StringUtils::hasText)
+                .toList();
+        if (jdbc != null && !ids.isEmpty()) {
+            try {
+                Integer snapshot = jdbc.queryForObject(
+                        "SELECT COALESCE(SUM(\"creditsSnapshot\"), 0) FROM academic.\"Enrollment\" WHERE \"id\" IN (:ids)",
+                        new MapSqlParameterSource("ids", ids),
+                        Integer.class);
+                if (snapshot != null) {
+                    return snapshot;
+                }
+            } catch (RuntimeException exception) {
+                LOG.warn("creditsSnapshot lookup failed with {}; falling back to course credits",
+                        exception.getClass().getSimpleName());
+            }
+        }
+        return currentTerm.stream()
+                .filter(item -> item.section() != null && item.section().course() != null)
+                .mapToInt(item -> item.section().course().credits())
+                .sum();
     }
 
     /**

@@ -16,6 +16,13 @@ public record AssistantProperties(
     /** Retrieval window default, exposed as {@code assistant.top-k}. */
     public static final int DEFAULT_TOP_K = 5;
 
+    /**
+     * Documents injected into the provider prompt (and surfaced as citations).
+     * Retrieval still fetches the wider top-k window for scoped filters; only
+     * the prompt material is trimmed to this many top ranked sources.
+     */
+    public static final int PROMPT_DOCUMENT_LIMIT = 3;
+
     @ConstructorBinding
     public AssistantProperties {
         maxContextChars = clamp(maxContextChars, 256, 6_000);

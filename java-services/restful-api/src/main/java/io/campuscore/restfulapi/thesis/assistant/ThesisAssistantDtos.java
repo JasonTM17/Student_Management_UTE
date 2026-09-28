@@ -88,16 +88,36 @@ public final class ThesisAssistantDtos {
             boolean replayed,
             String terminalStatus,
             String conversationId,
-            String messageId) {
+            String messageId,
+            java.time.Instant resetAt) {
         public ChatResponse(String answer, String model, boolean degraded, String reasonCode,
                 String locale, List<Citation> citations) {
-            this(answer, model, degraded, reasonCode, locale, citations, null, null, null, false, null, null, null);
+            this(answer, model, degraded, reasonCode, locale, citations,
+                    null, null, null, false, null, null, null, null);
         }
 
         public ChatResponse(String answer, String model, boolean degraded, String reasonCode,
                 String locale, List<Citation> citations, String conversationId, String messageId) {
-            this(answer, model, degraded, reasonCode, locale, citations, null, null, null, false, null,
-                    conversationId, messageId);
+            this(answer, model, degraded, reasonCode, locale, citations,
+                    null, null, null, false, null, conversationId, messageId, null);
+        }
+
+        /** Arity-compatible bridge for pre-resetAt call sites; {@code resetAt} stays null. */
+        public ChatResponse(String answer, String model, boolean degraded, String reasonCode,
+                String locale, List<Citation> citations, UUID requestId, UUID clientRequestId,
+                UUID turnId, boolean replayed, String terminalStatus, String conversationId, String messageId) {
+            this(answer, model, degraded, reasonCode, locale, citations, requestId, clientRequestId,
+                    turnId, replayed, terminalStatus, conversationId, messageId, null);
+        }
+
+        /**
+         * When the answer was quota-degraded (QUOTA_EXCEEDED), the instant the
+         * student's daily quota resets (next midnight Asia/Ho_Chi_Minh); null otherwise.
+         */
+        public ChatResponse withResetAt(java.time.Instant quotaResetAt) {
+            return new ChatResponse(answer, model, degraded, reasonCode, locale, citations,
+                    requestId, clientRequestId, turnId, replayed, terminalStatus,
+                    conversationId, messageId, quotaResetAt);
         }
     }
 

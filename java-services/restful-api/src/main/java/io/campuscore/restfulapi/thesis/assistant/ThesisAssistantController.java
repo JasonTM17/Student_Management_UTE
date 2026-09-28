@@ -120,10 +120,51 @@ public class ThesisAssistantController {
         }
         String owner = subject(actor);
         if (remoteRag()) {
-            return ragGateway.chat(request, owner);
+            return chatRemoteWithFallback(request, owner);
         }
         return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
                 request.clientRequestId(), request.scope());
+    }
+
+    /**
+     * Remote RAG with the local-grounded fallback chain (chatbot-excellence):
+     * a transient gateway failure, timeout, or a remote NO_MATCH falls back to
+     * the local lexical KB within a small budget; when even that is empty, the
+     * deterministic curated fallback answers instead. A RAG outage is therefore
+     * a 200 degraded response, never a 5xx and never an empty body.
+     */
+    private ChatResponse chatRemoteWithFallback(ChatRequest request, String owner) {
+        try {
+            ChatResponse remote = ragGateway.chat(request, owner);
+            if (!"NO_MATCH".equals(remote == null ? null : remote.reasonCode())) {
+                return remote;
+            }
+            return localGroundedFallback(request);
+        } catch (DomainException exception) {
+            if (isFallbackEligible(exception)) {
+                return localGroundedFallback(request);
+            }
+            throw exception;
+        }
+    }
+
+    /** Gateway failures this deployment can ride through with the local KB. */
+    private boolean isFallbackEligible(DomainException exception) {
+        return ragGateway.isTransientFailure(exception)
+                || (exception.code() != null && exception.code().startsWith("RAG_"));
+    }
+
+    /** Best-effort local answer; the curated fallback covers even a failed local read. */
+    private ChatResponse localGroundedFallback(ChatRequest request) {
+        try {
+            ChatResponse fallback = assistant.groundedFallback(request.message(), request.locale());
+            if (fallback != null) {
+                return fallback;
+            }
+        } catch (Exception exception) {
+            LOG.warn("local knowledge fallback failed with {}", exception.getClass().getSimpleName());
+        }
+        return ThesisAssistantService.curatedFallback(AssistantInputGuard.normalizeLocale(request.locale()));
     }
 
     /** Deprecated compatibility alias; clients should use /chat. */
@@ -183,7 +224,7 @@ public class ThesisAssistantController {
             if (personal != null) {
                 personalContext.stream(personal, request, sink);
             } else if (remoteRag()) {
-                ragGateway.stream(request, owner, sink);
+                streamRemoteWithFallback(request, owner, sink);
             } else {
                 assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
                         request.clientRequestId(), sink, request.scope());
@@ -351,6 +392,64 @@ public class ThesisAssistantController {
 
     private boolean remoteRag() {
         return ragGateway != null && ragGateway.enabled();
+    }
+
+    /**
+     * SSE flavour of the fallback chain: a transient gateway failure or a
+     * remote NO_MATCH emits the local KB answer (or the curated fallback) as a
+     * replace/done sequence, so the stream always terminates with usable text
+     * instead of a bare error frame.
+     */
+    void streamRemoteWithFallback(ChatRequest request, String owner,
+            Consumer<ThesisAssistantService.StreamEvent> sink) {
+        String locale = AssistantInputGuard.normalizeLocale(request.locale());
+        boolean[] forwarded = { false };
+        Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
+            if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
+                emitStreamFallback(request, locale, sink, forwarded[0]);
+                return;
+            }
+            forwarded[0] = true;
+            sink.accept(event);
+        };
+        try {
+            ragGateway.stream(request, owner, intercept);
+        } catch (DomainException exception) {
+            if (isFallbackEligible(exception)) {
+                emitStreamFallback(request, locale, sink, forwarded[0]);
+                return;
+            }
+            throw exception;
+        }
+    }
+
+    private void emitStreamFallback(ChatRequest request, String locale,
+            Consumer<ThesisAssistantService.StreamEvent> sink, boolean alreadyForwarded) {
+        ChatResponse fallback = localGroundedFallback(request);
+        if (!alreadyForwarded) {
+            // Nothing crossed the wire yet, so the fallback is a complete stream.
+            sink.accept(new ThesisAssistantService.StreamMeta(
+                    UUID.randomUUID(), request.clientRequestId(), null, null,
+                    ThesisAssistantService.MODEL, locale));
+            sink.accept(new ThesisAssistantService.StreamDelta(0, fallback.answer(),
+                    fallback.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
+                            .filter(java.util.Objects::nonNull).toList()));
+            fallback.citations().forEach(citation -> sink.accept(
+                    new ThesisAssistantService.StreamCitation(citation)));
+        } else {
+            // Remote frames already streamed: replace them, never append.
+            sink.accept(new ThesisAssistantService.StreamReplace(fallback.answer(),
+                    fallback.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
+                            .filter(java.util.Objects::nonNull).toList(),
+                    "ANSWERED"));
+        }
+        sink.accept(new ThesisAssistantService.StreamDone(parseMessageId(fallback.messageId()),
+                fallback.reasonCode(), true, "COMPLETED"));
+    }
+
+    private static UUID parseMessageId(String messageId) {
+        if (messageId == null || messageId.isBlank()) return null;
+        try { return UUID.fromString(messageId); } catch (IllegalArgumentException ignored) { return null; }
     }
 
     private static void send(SseEmitter emitter, ThesisAssistantService.StreamEvent event) {
