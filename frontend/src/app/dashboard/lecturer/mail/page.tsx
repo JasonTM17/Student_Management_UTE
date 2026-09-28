@@ -27,7 +27,9 @@ import {
   parseHighlightLines,
   parseNumericInput,
   registrationFormIssues,
+  rowCreditsValid,
   sumCourseCredits,
+  toWireInt,
   type MailComposeTemplate,
   type MailErrorKind,
   type MailFieldIssue,
@@ -389,7 +391,9 @@ export default function LecturerMailComposePage() {
         courses: courses.map((row) => ({
           code: row.code.trim(),
           name: row.name.trim(),
-          credits: parseNumericInput(row.credits) ?? 0,
+          // Integer wire contract: "2,5" rounds instead of failing bean
+          // validation with a fractional JSON number.
+          credits: toWireInt(parseNumericInput(row.credits)),
           lecturer: optionalText(row.lecturer),
           schedule: optionalText(row.schedule),
         })),
@@ -408,12 +412,14 @@ export default function LecturerMailComposePage() {
           ? copy.standings[gradeAlert.academicStanding as (typeof ACADEMIC_STANDINGS)[number]]
           : '',
       ),
-      conductScore: parseNumericInput(gradeAlert.conductScore) ?? 0,
+      // The backend types conductScore as an int: "87,5" must leave as 88,
+      // not 87.5 (which bean validation rejects with a 400).
+      conductScore: toWireInt(parseNumericInput(gradeAlert.conductScore)),
       conductRank: optionalText(gradeAlert.conductRank),
       grades: grades.map((row) => ({
         courseCode: row.courseCode.trim(),
         courseName: row.courseName.trim(),
-        credits: parseNumericInput(row.credits) ?? 0,
+        credits: toWireInt(parseNumericInput(row.credits)),
         score10: parseNumericInput(row.score10) ?? 0,
         scoreLetter: letterFor(row) || undefined,
       })),
@@ -752,6 +758,9 @@ export default function LecturerMailComposePage() {
                                       inputMode="numeric"
                                       placeholder={copy.fields.credits}
                                       value={row.credits}
+                                      className={cn(attemptedSend && !rowCreditsValid(row.credits) && INVALID_BORDER)}
+                                      aria-invalid={attemptedSend && !rowCreditsValid(row.credits) ? true : undefined}
+                                      error={issueText('creditsInvalid')}
                                       onChange={(event) => setCourses((current) => current.map((item, i) => (i === index ? { ...item, credits: event.target.value } : item)))}
                                     />
                                   </Field>
@@ -932,6 +941,9 @@ export default function LecturerMailComposePage() {
                                       inputMode="numeric"
                                       placeholder={copy.fields.credits}
                                       value={row.credits}
+                                      className={cn(attemptedSend && !rowCreditsValid(row.credits) && INVALID_BORDER)}
+                                      aria-invalid={attemptedSend && !rowCreditsValid(row.credits) ? true : undefined}
+                                      error={issueText('creditsInvalid')}
                                       onChange={(event) => setGrades((current) => current.map((item, i) => (i === index ? { ...item, credits: event.target.value } : item)))}
                                     />
                                   </Field>
