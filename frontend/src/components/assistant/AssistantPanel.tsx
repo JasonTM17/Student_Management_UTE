@@ -687,7 +687,9 @@ export function AssistantPanel() {
                   fallback chain, not the reviewed corpus; offer the same
                   retry affordance as a hard error so the user can re-ask
                   once the provider recovers instead of staring at a
-                  dead-end badge. */}
+                  dead-end badge. Quota-exceeded is excluded: retrying a
+                  daily-quota refusal cannot succeed before the reset time,
+                  so that state keeps its own recovery message. */}
               {!state.error &&
               lastPrompt &&
               (() => {
@@ -697,6 +699,7 @@ export function AssistantPanel() {
                   last.role === 'assistant' &&
                   !last.pending &&
                   last.degraded === true &&
+                  last.reasonCode !== 'QUOTA_EXCEEDED' &&
                   !(last.citations && last.citations.length > 0)
                 );
               })() ? (
