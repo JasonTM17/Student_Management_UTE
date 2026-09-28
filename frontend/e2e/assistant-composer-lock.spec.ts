@@ -13,6 +13,10 @@ const composerName = /Ask about registration, schedules, announcements|Hỏi v�
 const sendButtonName = /Send message|Gửi tin nhắn/i;
 const stopButtonName = /Stop generating|Dừng tạo câu trả lời/i;
 const chatLogName = /Campus helpdesk|Trợ lý học vụ CampusUTE/i;
+// The user bubble carries the assistant "you" label (EN/VN); the assistant
+// bubbles carry chatLogName above. The dashboard renders Vietnamese by default
+// on unprefixed routes, so both spellings must stay covered.
+const userMessageName = /\bYou\b|Bạn/i;
 
 async function login(page: Page) {
   await page.goto('/login?portal=student');
@@ -97,12 +101,14 @@ test('composer locks while the assistant is answering and unlocks when the turn 
   await expect(stopButton).toContainText(/Responding…|Đang trả lời…/i);
   await expect(page.getByRole('dialog')).toContainText(/the composer is locked|ô nhập tạm khóa/i);
   // The user message itself must still be visible (the send was not swallowed).
-  await expect(page.getByRole('article', { name: chatLogName })).toContainText(
+  // Assert the user bubble ("You"/"Bạn") — the assistant article is the pending
+  // typing indicator at this point and never carries the question text.
+  await expect(page.getByRole('article', { name: userMessageName })).toContainText(
     'What campus guidance is available for new learners?',
   );
 
   releaseStream();
-  await expect(page.getByRole('article', { name: chatLogName })).toContainText('Use the published thesis guide.');
+  await expect(page.getByRole('article', { name: chatLogName }).last()).toContainText('Use the published thesis guide.');
   await expect(composer).toBeEnabled();
   await expect(page.getByRole('button', { name: sendButtonName })).toBeVisible();
 });
@@ -123,11 +129,13 @@ test('a settled conversation accepts the next send immediately (no stuck lock)',
 
   await composer.fill('first question');
   await page.getByRole('button', { name: sendButtonName }).click();
-  await expect(page.getByRole('article', { name: chatLogName })).toContainText('First grounded answer.');
+  // The latest assistant bubble is the answer under test; a multi-turn log
+  // keeps every earlier bubble, so scope with .last() to stay strict-mode safe.
+  await expect(page.getByRole('article', { name: chatLogName }).last()).toContainText('First grounded answer.');
   await expect(composer).toBeEnabled();
 
   await composer.fill('second question');
   await page.getByRole('button', { name: sendButtonName }).click();
-  await expect(page.getByRole('article', { name: chatLogName })).toContainText('Second grounded answer.');
+  await expect(page.getByRole('article', { name: chatLogName }).last()).toContainText('Second grounded answer.');
   expect(streamCalls).toBe(2);
 });
