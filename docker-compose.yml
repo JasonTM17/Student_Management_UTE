@@ -26,6 +26,33 @@ services:
       - "127.0.0.1:${MAILPIT_UI_HOST_PORT:-8025}:8025"
     restart: unless-stopped
 
+  # One-shot, idempotent provisioning of the Assistant RLS runtime role
+  # (Wave 1.1). Flyway V84 intentionally creates the role NOLOGIN and never
+  # sets a password, and it targets the Supabase-managed `postgres` role that
+  # this vanilla bootstrap (POSTGRES_USER=campuscore) never creates — so a
+  # fresh volume used to fail V84 and then the runtime verifier. This step
+  # runs BEFORE any service that applies migrations (rag-service runs Flyway
+  # for the course stack) and is safe to re-run: it only resets the runtime
+  # password when the role is NOLOGIN or a probe connection with
+  # ASSISTANT_DB_PASSWORD fails. The default below is a dev-only non-secret;
+  # a public host must set ASSISTANT_DB_PASSWORD explicitly.
+  assistant-db-provisioner:
+    image: node:20-alpine
+    working_dir: /provision
+    volumes:
+      - ./scripts/provision-assistant-runtime.mjs:/provision/provision-assistant-runtime.mjs:ro
+    environment:
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD:-dev-only-not-a-secret-16+}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+    command: ["node", "/provision/provision-assistant-runtime.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+    mem_limit: 128m
+
   rag-service:
     build:
       context: .
@@ -37,6 +64,8 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      # Dedicated assistant RLS runtime login; provisioned one-shot above.
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD:-dev-only-not-a-secret-16+}
       DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-2000}
       DB_VALIDATION_TIMEOUT_MS: ${DB_VALIDATION_TIMEOUT_MS:-1000}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-local-course-health-key}
@@ -67,6 +96,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      assistant-db-provisioner:
+        condition: service_completed_successfully
     healthcheck:
       test: ["CMD-SHELL", "wget --no-verbose --tries=1 --header=\"X-Health-Key: $${HEALTH_READINESS_KEY}\" -O- http://localhost:4011/api/v1/health/readiness >/dev/null"]
       interval: 10s
@@ -89,6 +120,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful}
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      # Dedicated assistant RLS runtime login; provisioned one-shot above. A
+      # missing value would degrade the assistant (503) instead of killing boot.
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD:-dev-only-not-a-secret-16+}
       DB_CONNECTION_TIMEOUT_MS: ${DB_CONNECTION_TIMEOUT_MS:-2000}
       DB_VALIDATION_TIMEOUT_MS: ${DB_VALIDATION_TIMEOUT_MS:-1000}
       JWT_SECRET: ${JWT_SECRET:-local-course-jwt-secret-change-me}
@@ -134,6 +168,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      assistant-db-provisioner:
+        condition: service_completed_successfully
       mailpit:
         condition: service_started
       rag-service:

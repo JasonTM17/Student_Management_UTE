@@ -31,6 +31,9 @@ public class AssistantDatabaseConfiguration {
     public static final String JDBC_TEMPLATE = "assistantNamedParameterJdbcTemplate";
     public static final String TRANSACTION_MANAGER = "assistantTransactionManager";
 
+    private static final org.slf4j.Logger ASSISTANT_PROVISIONING_LOG =
+            org.slf4j.LoggerFactory.getLogger(AssistantDatabaseConfiguration.class);
+
     /** The dedicated pool makes the primary datasource explicit so Flyway/JPA keep their existing role. */
     @Bean(name = "dataSource")
     @Primary
@@ -54,7 +57,7 @@ public class AssistantDatabaseConfiguration {
 
     @Bean(name = DATA_SOURCE, destroyMethod = "close")
     @Profile("!test")
-    HikariDataSource assistantDataSource(
+    DataSource assistantDataSource(
             @Value("${assistant.datasource.url:}") String url,
             @Value("${assistant.datasource.username:}") String username,
             @Value("${assistant.datasource.password:}") String password,
@@ -64,20 +67,16 @@ public class AssistantDatabaseConfiguration {
         if (testMode) {
             throw new IllegalStateException("Assistant RLS test mode is forbidden outside the test profile");
         }
-        if (url == null || url.isBlank() || !url.startsWith("jdbc:postgresql://")) {
-            throw new IllegalStateException("A PostgreSQL Assistant datasource URL is required");
-        }
-        if (!isRuntimeLogin(username)) {
-            throw new IllegalStateException("Assistant datasource must use the dedicated runtime login");
-        }
-        if (password == null || password.isBlank()) {
-            throw new IllegalStateException("Assistant runtime login credentials are required");
-        }
-        if (maximumPoolSize < 1 || maximumPoolSize > 4) {
-            throw new IllegalStateException("Assistant connection pool maximum must be between 1 and 4");
-        }
-        if (connectionTimeoutMs < 1000 || connectionTimeoutMs > 60000) {
-            throw new IllegalStateException("Assistant connection timeout must be between 1 and 60 seconds");
+        // Wave 1.2: an unprovisioned runtime role degrades the assistant feature
+        // instead of killing the boot. Every provisioning-shaped failure below
+        // returns a fail-closed datasource; the RLS verifier then marks the
+        // AssistantRlsState DEGRADED and chat endpoints answer 503.
+        String provisioningProblem = provisioningProblem(url, username, password, maximumPoolSize, connectionTimeoutMs);
+        if (provisioningProblem != null) {
+            ASSISTANT_PROVISIONING_LOG.error(
+                    "{}; assistant chat endpoints will answer 503 {} until provisioning is repaired",
+                    provisioningProblem, UnavailableAssistantDataSource.UNAVAILABLE_REASON);
+            return new UnavailableAssistantDataSource(provisioningProblem);
         }
         rejectCredentialsEmbeddedInUrl(url);
 
@@ -92,6 +91,32 @@ public class AssistantDatabaseConfiguration {
         config.setValidationTimeout(Math.min(3000, connectionTimeoutMs));
         config.setInitializationFailTimeout(5000);
         return new HikariDataSource(config);
+    }
+
+    /**
+     * Classifies an unprovisioned assistant runtime environment. Returns
+     * {@code null} when the configuration can build a real pool. The
+     * credentials-embedded-in-URL guard below stays a hard invariant: it is a
+     * code-level security rule, not an environment provisioning gap.
+     */
+    private static String provisioningProblem(
+            String url, String username, String password, int maximumPoolSize, long connectionTimeoutMs) {
+        if (url == null || url.isBlank() || !url.startsWith("jdbc:postgresql://")) {
+            return "A PostgreSQL Assistant datasource URL is required";
+        }
+        if (!isRuntimeLogin(username)) {
+            return "Assistant datasource must use the dedicated runtime login";
+        }
+        if (password == null || password.isBlank()) {
+            return "Assistant runtime login credentials are required";
+        }
+        if (maximumPoolSize < 1 || maximumPoolSize > 4) {
+            return "Assistant connection pool maximum must be between 1 and 4";
+        }
+        if (connectionTimeoutMs < 1000 || connectionTimeoutMs > 60000) {
+            return "Assistant connection timeout must be between 1 and 60 seconds";
+        }
+        return null;
     }
 
     /** H2 is permitted only in an explicitly active test profile with test-mode enabled. */

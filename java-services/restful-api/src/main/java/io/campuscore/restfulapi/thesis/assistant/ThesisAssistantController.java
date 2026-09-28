@@ -46,6 +46,7 @@ public class ThesisAssistantController {
     private final ThesisAssistantService assistant;
     private final RagAssistantGateway ragGateway;
     private final AssistantPersonalContextAdvisor personalContext;
+    private final AssistantRlsState rlsState;
 
     /** Compatibility constructor for focused controller tests. */
     public ThesisAssistantController(ThesisAssistantService assistant) {
@@ -57,14 +58,36 @@ public class ThesisAssistantController {
         this(assistant, ragGateway, null);
     }
 
-    @Autowired
+    /** Compatibility constructor: no RLS state means the degraded gate is inactive. */
     public ThesisAssistantController(
             ThesisAssistantService assistant,
             RagAssistantGateway ragGateway,
             AssistantPersonalContextAdvisor personalContext) {
+        this(assistant, ragGateway, personalContext, null);
+    }
+
+    @Autowired
+    public ThesisAssistantController(
+            ThesisAssistantService assistant,
+            RagAssistantGateway ragGateway,
+            AssistantPersonalContextAdvisor personalContext,
+            @org.springframework.beans.factory.annotation.Autowired(required = false) AssistantRlsState rlsState) {
         this.assistant = assistant;
         this.ragGateway = ragGateway;
         this.personalContext = personalContext;
+        this.rlsState = rlsState;
+    }
+
+    /**
+     * Wave 1.2: when the RLS runtime verifier could not prove the isolation
+     * boundary, assistant chat degrades loudly (503) instead of silently
+     * failing against an unprovisioned datasource.
+     */
+    private void requireAssistantRlsAvailable() {
+        if (rlsState != null && !rlsState.verified()) {
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "ASSISTANT_RLS_UNAVAILABLE",
+                    "Assistant RLS runtime verification failed; assistant features are temporarily unavailable");
+        }
     }
 
     @Operation(summary = "Gửi câu hỏi tới Trợ lý AI (JSON Block Mode)", description = "Hỏi đáp quy chế đào tạo, thời khóa biểu, tiến độ và đề tài khóa luận với mô hình AI RAG")
@@ -76,6 +99,7 @@ public class ThesisAssistantController {
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
+        requireAssistantRlsAvailable();
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
         if (!guard.allowed()) {
@@ -127,6 +151,7 @@ public class ThesisAssistantController {
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
     public SseEmitter stream(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
             HttpServletRequest httpRequest) {
+        requireAssistantRlsAvailable();
         SseEmitter emitter = new SseEmitter(120_000L);
         // Emit an SSE comment frame while the emitter is open so a proxy or CDN
         // cannot idle-kill the connection during a slow model start. Comment
