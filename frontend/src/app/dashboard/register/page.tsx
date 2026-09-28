@@ -1,6 +1,7 @@
 'use client';
 
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
+import { usePathname, useRouter, useSearchParams } from 'next/navigation';
 import {
   AlertCircle,
   CalendarClock,
@@ -62,6 +63,22 @@ const ACTIVE_ENROLLMENT_STATUSES = new Set(['ENROLLED', 'CONFIRMED', 'PENDING'])
 
 const CURRICULUM_FILTERS: CurriculumFilter[] = ['ALL', 'MANDATORY', 'ELECTIVE', 'OUTSIDE'];
 
+const SORT_MODES: SectionSortMode[] = ['code', 'credits', 'seats'];
+
+/** URL keys for the persisted browse filters (Advisor #8). */
+function parseFilterParams(params: URLSearchParams) {
+  const q = params.get('q') ?? '';
+  const curriculum = CURRICULUM_FILTERS.find((filter) => filter === params.get('curriculum')) ?? null;
+  const sort = SORT_MODES.find((mode) => mode === params.get('sort')) ?? null;
+  return {
+    q,
+    curriculum,
+    seatsOnly: params.get('seats') === '1',
+    noConflictOnly: params.get('noconflict') === '1',
+    sort,
+  };
+}
+
 const SEVEN_DAYS_MS = 7 * 24 * 60 * 60 * 1000;
 
 /** Groups the catalog by course so each course header owns its section rows. */
@@ -118,6 +135,77 @@ export default function RegisterPage() {
   // Feedback item 10: enrollment failures also render inline above the
   // catalog instead of vanishing with the toast.
   const [actionError, setActionError] = useState('');
+
+  // ---- filters persist in the URL (Advisor #8): read once on mount, then
+  // mirror every change back with router.replace so copying the URL
+  // reproduces the same filtered view after a reload. ----
+  const router = useRouter();
+  const pathname = usePathname();
+  const searchParams = useSearchParams();
+  const [filtersHydrated, setFiltersHydrated] = useState(false);
+  const hydratedRef = useRef(false);
+
+  useEffect(() => {
+    if (hydratedRef.current) {
+      return;
+    }
+    hydratedRef.current = true;
+    const parsed = parseFilterParams(searchParams);
+    if (parsed.q) {
+      setSearchText(parsed.q);
+    }
+    if (parsed.curriculum) {
+      setCurriculumFilter(parsed.curriculum);
+    }
+    if (parsed.seatsOnly) {
+      setSeatsOnly(true);
+    }
+    if (parsed.noConflictOnly) {
+      setNoConflictOnly(true);
+    }
+    if (parsed.sort) {
+      setSortMode(parsed.sort);
+    }
+    setFiltersHydrated(true);
+  }, [searchParams]);
+
+  useEffect(() => {
+    if (!filtersHydrated) {
+      return;
+    }
+    const params = new URLSearchParams();
+    if (searchText.trim()) {
+      params.set('q', searchText.trim());
+    }
+    if (curriculumFilter !== 'ALL') {
+      params.set('curriculum', curriculumFilter);
+    }
+    if (seatsOnly) {
+      params.set('seats', '1');
+    }
+    if (noConflictOnly) {
+      params.set('noconflict', '1');
+    }
+    if (sortMode !== 'code') {
+      params.set('sort', sortMode);
+    }
+    const query = params.toString();
+    // Reading window.location keeps the comparison cheap and avoids a
+    // replace-loop: the effect does not depend on searchParams.
+    const currentQuery = window.location.search.replace(/^\?/, '');
+    if (query !== currentQuery) {
+      router.replace(query ? `${pathname}?${query}` : pathname, { scroll: false });
+    }
+  }, [
+    curriculumFilter,
+    filtersHydrated,
+    noConflictOnly,
+    pathname,
+    router,
+    searchText,
+    seatsOnly,
+    sortMode,
+  ]);
 
   // On desktop the credit-limit policy stays expanded above the catalog; on
   // mobile the catalog leads and the policy collapses behind a toggle.
