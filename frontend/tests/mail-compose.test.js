@@ -232,6 +232,91 @@ test('optional text and highlight chips never leak blank or duplicate values', a
   assert.deepEqual(helpers.parseHighlightLines('A\n\n B \nA\nC'), ['A', 'B', 'C']);
 });
 
+test('toWireInt rounds form values to the integer the wire contract expects', async (t) => {
+  const helpers = await getHelpers();
+  await t.test('the PR #8 regression: "87,5" must leave as 88, not 87.5', () => {
+    // parseNumericInput accepts the Vietnamese comma decimal, so the page
+    // hands the raw 87.5 to the payload builder — which must round it.
+    const parsed = helpers.parseNumericInput('87,5');
+    assert.equal(parsed, 87.5);
+    assert.equal(helpers.toWireInt(parsed), 88);
+  });
+  await t.test('half-down, negative, and already-int values round correctly', () => {
+    assert.equal(helpers.toWireInt(86.4), 86);
+    assert.equal(helpers.toWireInt(-2.5), -2);
+    assert.equal(helpers.toWireInt(95), 95);
+  });
+  await t.test('null/empty input falls back (default 0) instead of sending null', () => {
+    assert.equal(helpers.toWireInt(null), 0);
+    assert.equal(helpers.toWireInt(undefined), 0);
+    assert.equal(helpers.toWireInt(null, 1), 1);
+  });
+});
+
+test('credits cells validate instead of silently clamping negatives to zero', async (t) => {
+  const helpers = await getHelpers();
+  await t.test('rowCreditsValid: empty allowed, negative and junk rejected', () => {
+    assert.equal(helpers.rowCreditsValid(''), true);
+    assert.equal(helpers.rowCreditsValid('   '), true);
+    assert.equal(helpers.rowCreditsValid('3'), true);
+    assert.equal(helpers.rowCreditsValid(0), true);
+    assert.equal(helpers.rowCreditsValid('2,5'), true, 'decimals are legal input and round at payload time');
+    assert.equal(helpers.rowCreditsValid(-2), false);
+    assert.equal(helpers.rowCreditsValid('-2'), false);
+    assert.equal(helpers.rowCreditsValid('-1,5'), false);
+    assert.equal(helpers.rowCreditsValid('abc'), false);
+  });
+
+  await t.test('registrationFormIssues flags a negative-credits row', () => {
+    assert.deepEqual(
+      helpers.registrationFormIssues({
+        to: 'sv@student.ute.edu.vn',
+        studentName: 'Nguyen Van A',
+        studentId: '22110001',
+        courses: [{ code: 'SE013', name: 'Web', credits: '-2' }],
+      }),
+      ['creditsInvalid'],
+    );
+    assert.deepEqual(
+      helpers.registrationFormIssues({
+        to: 'sv@student.ute.edu.vn',
+        studentName: 'Nguyen Van A',
+        studentId: '22110001',
+        courses: [{ code: 'SE013', name: 'Web', credits: '3' }],
+      }),
+      [],
+    );
+  });
+
+  await t.test('gradeAlertFormIssues flags negative row credits separately from bad scores', () => {
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({
+        to: 'sv@student.ute.edu.vn',
+        studentName: 'Nguyen Van A',
+        studentId: '22110001',
+        gpa4: '',
+        gpa10: '',
+        conductScore: '87,5',
+        grades: [{ courseCode: 'SE001', courseName: 'Intro', credits: '-3', score10: '8' }],
+      }),
+      ['creditsInvalid'],
+      'conductScore "87,5" itself stays valid; the negative credits are the issue',
+    );
+    assert.deepEqual(
+      helpers.gradeAlertFormIssues({
+        to: 'sv@student.ute.edu.vn',
+        studentName: 'Nguyen Van A',
+        studentId: '22110001',
+        gpa4: '',
+        gpa10: '',
+        conductScore: '',
+        grades: [{ courseCode: 'SE001', courseName: 'Intro', credits: '3', score10: '8' }],
+      }),
+      [],
+    );
+  });
+});
+
 test('mail compose wiring is registered across api, layout, routes, and i18n', () => {
   const api = read('src/lib/api.ts');
   assert.match(api, /export const mailApi/);
@@ -250,6 +335,9 @@ test('mail compose wiring is registered across api, layout, routes, and i18n', (
   assert.match(page, /mailApi\.sendGradeAlert/);
   assert.match(page, /mailPreviewUrl\(API_BASE_URL, template\)/);
   assert.match(page, /classifyMailError/);
+  // PR #8 follow-ups: int wire values and credits validation, not silent clamps.
+  assert.match(page, /conductScore: toWireInt\(parseNumericInput\(gradeAlert\.conductScore\)\)/);
+  assert.match(page, /rowCreditsValid/);
 
   assert.ok(
     fs.existsSync(path.join(root, 'src/app/[locale]/dashboard/lecturer/mail/page.tsx')),

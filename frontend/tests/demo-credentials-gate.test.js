@@ -45,3 +45,43 @@ test('the quick-fill panel is hidden whenever a password is missing', () => {
   assert.match(helper[0], /if \(!SHOW_DEMO_CREDENTIALS \|\| !password\)/, 'a missing password must hide the panel');
   assert.match(helper[0], /return null/);
 });
+
+/**
+ * Roadmap 1.5b: a deployment whose quick-fill still shows a known-stale seed
+ * password warns inline instead of letting the value be submitted. The
+ * predicate is a pure helper so the page itself stays free of literals.
+ */
+const ts = require('typescript');
+
+function loadDemoCredentialsModule() {
+  const source = fs.readFileSync(path.join(root, 'src/lib/demo-credentials.ts'), 'utf8');
+  const output = ts.transpileModule(source, {
+    compilerOptions: { module: ts.ModuleKind.CommonJS, target: ts.ScriptTarget.ES2020 },
+  }).outputText;
+  const loadedModule = { exports: {} };
+  Function('module', 'exports', output)(loadedModule, loadedModule.exports);
+  return loadedModule.exports;
+}
+
+test('the stale quick-fill predicate flags rotated seed defaults only', () => {
+  const { isStaleDemoPassword } = loadDemoCredentialsModule();
+  assert.equal(isStaleDemoPassword('admin123'), true, 'the old admin seed must be flagged stale');
+  assert.equal(isStaleDemoPassword(' password123'), false, 'values only match exactly');
+  assert.equal(isStaleDemoPassword(''), false);
+  assert.equal(isStaleDemoPassword(undefined), false);
+});
+
+test('the login page warns on stale quick-fill values and never auto-submits', () => {
+  // The page delegates to the helper (no literal) and renders the warning.
+  assert.match(loginPage, /isStaleDemoPassword\(demoCredentials\.password\)/);
+  assert.match(loginPage, /role="note"/, 'the stale warning must be announced next to the credential');
+  // The warning copy ships through the i18n dictionaries, not page literals.
+  const messages = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+  assert.match(messages, /staleDemoPasswordWarning:[\s\S]*?password123 per the updated guide/);
+  assert.match(
+    messages.slice(messages.indexOf('export const vi')),
+    /staleDemoPasswordWarning:[\s\S]*?dùng password123 theo hướng dẫn mới/,
+  );
+  // Quick-fill is fill-only: no submit() call anywhere on the page.
+  assert.doesNotMatch(loginPage, /\.submit\(\)|requestSubmit/, 'quick-fill must not auto-submit the form');
+});

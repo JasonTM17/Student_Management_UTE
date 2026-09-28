@@ -4,14 +4,26 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import javax.sql.DataSource;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
 import org.springframework.beans.factory.SmartInitializingSingleton;
 import org.springframework.context.annotation.Profile;
 import org.springframework.stereotype.Component;
 
-/** Refuses production startup unless the dedicated login actually encounters enabled RLS policies. */
+/**
+ * Verifies that the dedicated login actually encounters enabled RLS policies.
+ *
+ * <p>On success the shared {@link AssistantRlsState} flips to VERIFIED. On any
+ * failure the boot continues (Wave 1.2): the verifier logs an ERROR and leaves
+ * the state DEGRADED, so assistant chat endpoints answer 503
+ * ASSISTANT_RLS_UNAVAILABLE while the rest of the API keeps serving. Environments
+ * provisioned by {@code scripts/provision-assistant-runtime.mjs} (Render
+ * production included) still verify and are unaffected.</p>
+ */
 @Component
 @Profile("persistence & !test")
 public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
+    private static final Logger LOG = LoggerFactory.getLogger(AssistantRlsRuntimeVerifier.class);
     private static final String VERIFY_SQL = """
             SELECT current_user, session_user, r.rolcanlogin, r.rolsuper, r.rolcreatedb,
                    r.rolcreaterole, r.rolinherit, r.rolreplication, r.rolbypassrls, r.rolconnlimit,
@@ -92,11 +104,14 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
             """;
 
     private final DataSource dataSource;
+    private final AssistantRlsState state;
 
     public AssistantRlsRuntimeVerifier(
             @org.springframework.beans.factory.annotation.Qualifier(AssistantDatabaseConfiguration.DATA_SOURCE)
-            DataSource assistantDataSource) {
+            DataSource assistantDataSource,
+            AssistantRlsState state) {
         this.dataSource = assistantDataSource;
+        this.state = state;
     }
 
     @Override
@@ -132,16 +147,32 @@ public class AssistantRlsRuntimeVerifier implements SmartInitializingSingleton {
                     || result.getLong("assistant_triggers") != 0
                     || result.getLong("api_roles_with_access") != 0
                     || result.getInt("server_version_num") < 150000) {
-                throw new IllegalStateException("Assistant RLS runtime database role or policy verification failed");
+                String reason = "Assistant RLS runtime database role or policy verification failed";
+                LOG.error("{}; assistant chat endpoints will answer 503 {} until provisioning is repaired",
+                        reason, UnavailableAssistantDataSource.UNAVAILABLE_REASON);
+                state.markDegraded(reason);
+                return;
             }
             if (result.next()) {
-                throw new IllegalStateException("Assistant runtime identity query returned multiple rows");
+                String reason = "Assistant runtime identity query returned multiple rows";
+                LOG.error("{}; assistant chat endpoints will answer 503 {}",
+                        reason, UnavailableAssistantDataSource.UNAVAILABLE_REASON);
+                state.markDegraded(reason);
+                return;
             }
+            state.markVerified("Assistant RLS runtime role, policies and isolation boundary verified");
+            LOG.info("Assistant RLS runtime verification passed");
         } catch (Exception failure) {
-            if (failure instanceof IllegalStateException stateFailure) {
-                throw stateFailure;
-            }
-            throw new IllegalStateException("Assistant RLS runtime database verification failed", failure);
+            // Deliberately degrade instead of killing the boot (Wave 1.2): a
+            // missing role or password must not take down registration,
+            // catalog, and thesis flows that do not depend on the assistant.
+            String reason = failure instanceof IllegalStateException stateFailure
+                    ? stateFailure.getMessage()
+                    : "Assistant RLS runtime database verification failed: "
+                            + failure.getClass().getSimpleName();
+            LOG.error("{}; assistant chat endpoints will answer 503 {} until provisioning is repaired",
+                    reason, UnavailableAssistantDataSource.UNAVAILABLE_REASON, failure);
+            state.markDegraded(reason);
         }
     }
 }

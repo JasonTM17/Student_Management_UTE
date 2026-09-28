@@ -460,6 +460,10 @@ export const en = {
     showPassword: 'Show password',
     hidePassword: 'Hide password',
     signingIn: 'Signing in',
+    // Shown next to the quick-fill credential when the deployment still
+    // publishes a known-stale seed password (roadmap 1.5b).
+    staleDemoPasswordWarning:
+      'This demo password is stale — use password123 per the updated guide.',
     reasonMessages: {
       sessionExpired: {
         title: 'Your session ended',
@@ -664,6 +668,8 @@ export const en = {
     creditLimitRetryWarning: 'The approved credit limit could not be loaded. Retry to register safely.',
     outsideWarningBanner:
       'This class is outside your curriculum — you can still register, but double-check with your academic advisor.',
+    scheduleNoneWarning:
+      'This class has no published schedule yet — its real sessions may overlap the timetable you already have.',
     railWarningsTitle: 'Notes',
     warningOutsideLine: '{section} is outside your curriculum',
     warningConflictLine: '{section} conflicts with your registered timetable',
@@ -1412,6 +1418,7 @@ export const en = {
       studentIdRequired: 'Student ID is required.',
       coursesRequired: 'Add at least one course row.',
       courseRowsInvalid: 'Every course row needs a code and a name.',
+      creditsInvalid: 'Credits must be a whole number of 0 or more.',
       gradesRequired: 'Add at least one graded course row.',
       gradeRowsInvalid:
         'Every row needs a course code, a name, and a score between 0 and 10.',
@@ -2779,6 +2786,10 @@ export const vi: I18nMessages = {
     showPassword: 'Hiện mật khẩu',
     hidePassword: 'Ẩn mật khẩu',
     signingIn: 'Đang đăng nhập',
+    // Hiện cạnh mật khẩu quick-fill khi bản triển khai vẫn công bố seed
+    // password cũ đã được xoay (roadmap 1.5b).
+    staleDemoPasswordWarning:
+      'Mật khẩu demo này đã cũ — dùng password123 theo hướng dẫn mới.',
     reasonMessages: {
       sessionExpired: {
         title: 'Lần đăng nhập của bạn đã kết thúc',
@@ -2982,6 +2993,8 @@ export const vi: I18nMessages = {
     creditLimitRetryWarning: 'Chưa tải được hạn mức tín chỉ đã duyệt. Vui lòng thử lại để đăng ký an toàn.',
     outsideWarningBanner:
       'Lớp ngoài chương trình — bạn vẫn có thể đăng ký, hãy chắc chắn với cố vấn học tập.',
+    scheduleNoneWarning:
+      'Lớp chưa có lịch học công bố — lịch thực tế có thể trùng với TKB hiện tại của bạn.',
     railWarningsTitle: 'Lưu ý',
     warningOutsideLine: '{section} nằm ngoài chương trình học tập',
     warningConflictLine: '{section} trùng lịch với lớp đã đăng ký',
@@ -3727,6 +3740,7 @@ export const vi: I18nMessages = {
       studentIdRequired: 'Chưa nhập mã số sinh viên.',
       coursesRequired: 'Thêm ít nhất một dòng học phần.',
       courseRowsInvalid: 'Mỗi dòng học phần cần mã học phần và tên học phần.',
+      creditsInvalid: 'Số tín chỉ phải là số nguyên không âm.',
       gradesRequired: 'Thêm ít nhất một dòng học phần có điểm.',
       gradeRowsInvalid:
         'Mỗi dòng cần mã học phần, tên học phần và điểm trong khoảng 0–10.',

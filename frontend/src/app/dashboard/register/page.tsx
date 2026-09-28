@@ -445,12 +445,22 @@ export default function RegisterPage() {
       toast.error(message);
       return;
     }
+    // Soft policy warnings stack in one banner: an outside-curriculum class
+    // and a schedule-less class each warn, but neither blocks the confirm
+    // (roadmap 1.6 — nobody silently registers a "ghost" section, yet the
+    // choice stays with the student).
+    const warnings: string[] = [];
+    if (section.curriculumRelevance === 'OUTSIDE') {
+      warnings.push(copy.outsideWarningBanner);
+    }
+    if ((section.schedules ?? []).length === 0) {
+      warnings.push(copy.scheduleNoneWarning);
+    }
     const ok = await confirm({
       title: copy.confirmRegister,
       message: copy.confirmRegisterMessage.replace('{section}', sectionLabel(section, sectionId)),
       confirmText: copy.register,
-      // Soft policy: outside-curriculum classes warn but never block.
-      warning: section.curriculumRelevance === 'OUTSIDE' ? copy.outsideWarningBanner : undefined,
+      warning: warnings.length > 0 ? warnings.join(' ') : undefined,
     });
     if (!ok) return;
     setPending(sectionId);

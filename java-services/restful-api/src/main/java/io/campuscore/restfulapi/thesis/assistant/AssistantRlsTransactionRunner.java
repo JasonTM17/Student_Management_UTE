@@ -3,8 +3,10 @@ package io.campuscore.restfulapi.thesis.assistant;
 import io.campuscore.restfulapi.thesis.assistant.AssistantRlsBoundary.Access;
 import java.sql.PreparedStatement;
 import java.util.function.Supplier;
+import org.springframework.dao.DataAccessResourceFailureException;
 import org.springframework.jdbc.core.ConnectionCallback;
 import org.springframework.jdbc.core.namedparam.NamedParameterJdbcTemplate;
+import org.springframework.transaction.CannotCreateTransactionException;
 import org.springframework.transaction.PlatformTransactionManager;
 import org.springframework.transaction.support.TransactionTemplate;
 
@@ -65,20 +67,33 @@ public final class AssistantRlsTransactionRunner {
     }
 
     private <T> T executeTransaction(AssistantRlsContext.Identity identity, Work<T> work) throws Throwable {
-        Outcome<T> outcome = transaction.execute(status -> {
-            if (!testMode) {
-                if (identity == null) {
-                    throw new IllegalStateException("Assistant database context is missing");
+        Outcome<T> outcome;
+        try {
+            outcome = transaction.execute(status -> {
+                if (!testMode) {
+                    if (identity == null) {
+                        throw new IllegalStateException("Assistant database context is missing");
+                    }
+                    bindTransactionContext(identity);
                 }
-                bindTransactionContext(identity);
-            }
-            try {
-                return new Outcome<>(work.run(), null);
-            } catch (Throwable failure) {
-                status.setRollbackOnly();
-                return new Outcome<>(null, failure);
-            }
-        });
+                try {
+                    return new Outcome<>(work.run(), null);
+                } catch (Throwable failure) {
+                    status.setRollbackOnly();
+                    return new Outcome<>(null, failure);
+                }
+            });
+        } catch (CannotCreateTransactionException failure) {
+            // TransactionTemplate opens the connection BEFORE the callback runs,
+            // so a dead database surfaces here as a TransactionException — outside
+            // the Outcome capture above and outside every `catch (DataAccessException)`
+            // degrade guard in ThesisAssistantService (retrieval, history, turns).
+            // Translate it into the DataAccessException family so a database outage
+            // takes the designed degraded path (e.g. KNOWLEDGE_UNAVAILABLE) instead
+            // of surfacing as an unhandled HTTP 500.
+            throw new DataAccessResourceFailureException(
+                    "Assistant RLS transaction could not open a database connection", failure);
+        }
         if (outcome == null) {
             return null;
         }

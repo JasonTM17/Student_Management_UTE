@@ -22,6 +22,28 @@ services:
       retries: 10
     restart: unless-stopped
 
+  # One-shot, idempotent provisioning of the Assistant RLS runtime role
+  # (Wave 1.1). The e2e API applies Flyway itself, and V84 targets the
+  # Supabase-managed `postgres` role plus a NOLOGIN runtime role, so this step
+  # must complete before restful-api boots. Idempotent: re-runs only reset the
+  # runtime password when the role is NOLOGIN or the probe connection fails.
+  # The default below is a dev-only non-secret for disposable e2e stacks.
+  assistant-db-provisioner:
+    image: node:20-alpine
+    working_dir: /provision
+    volumes:
+      - ./scripts/provision-assistant-runtime.mjs:/provision/provision-assistant-runtime.mjs:ro
+    environment:
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD:-dev-only-not-a-secret-16+}
+      SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful_e2e}
+      SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
+      SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+    command: ["node", "/provision/provision-assistant-runtime.mjs"]
+    depends_on:
+      postgres:
+        condition: service_healthy
+    restart: "no"
+
   restful-api:
     build:
       # The Dockerfile copies the reactor from repository-root paths; keeping
@@ -43,6 +65,9 @@ services:
       SPRING_DATASOURCE_URL: jdbc:postgresql://postgres:5432/${POSTGRES_DB:-campuscore_restful_e2e}?currentSchema=thesis
       SPRING_DATASOURCE_USERNAME: ${POSTGRES_USER:-campuscore}
       SPRING_DATASOURCE_PASSWORD: ${POSTGRES_PASSWORD:-campuscore_password}
+      # Dedicated assistant RLS runtime login; provisioned one-shot above. The
+      # e2e assistant journeys need the role verified, not degraded.
+      ASSISTANT_DB_PASSWORD: ${ASSISTANT_DB_PASSWORD:-dev-only-not-a-secret-16+}
       HEALTH_READINESS_KEY: ${HEALTH_READINESS_KEY:-edge-e2e-readiness-key-12345}
       INTERNAL_SERVICE_TOKEN: ${INTERNAL_SERVICE_TOKEN:-edge-e2e-internal-service-token-12345}
       JWT_SECRET: ${JWT_SECRET:-edge-e2e-jwt-secret-0123456789abcdef}
@@ -71,6 +96,8 @@ services:
     depends_on:
       postgres:
         condition: service_healthy
+      assistant-db-provisioner:
+        condition: service_completed_successfully
     healthcheck:
       test:
         [

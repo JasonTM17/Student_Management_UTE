@@ -1,0 +1,4 @@
+-- H2 twin of V86 is intentionally a data no-op: the reduced H2 migration
+-- chain does not create the academic tables this data migration touches
+-- (registration rounds and section schedules exist only in the full
+-- PostgreSQL chain, where the real data changes run).

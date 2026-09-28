@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.web;
 
+import io.campuscore.restfulapi.thesis.assistant.AssistantRlsState;
 import io.swagger.v3.oas.annotations.Operation;
 import io.swagger.v3.oas.annotations.Parameter;
 import io.swagger.v3.oas.annotations.responses.ApiResponse;
@@ -7,8 +8,10 @@ import io.swagger.v3.oas.annotations.tags.Tag;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.time.Instant;
+import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import org.springframework.beans.factory.ObjectProvider;
 import org.springframework.beans.factory.annotation.Value;
 import org.springframework.dao.DataAccessException;
 import org.springframework.http.HttpStatus;
@@ -26,12 +29,15 @@ public class HealthController {
 
     private final String readinessKey;
     private final JdbcOperations jdbc;
+    private final ObjectProvider<AssistantRlsState> assistantRlsState;
 
     public HealthController(
             @Value("${health.readiness-key:}") String readinessKey,
-            JdbcOperations jdbc) {
+            JdbcOperations jdbc,
+            ObjectProvider<AssistantRlsState> assistantRlsState) {
         this.readinessKey = readinessKey;
         this.jdbc = jdbc;
+        this.assistantRlsState = assistantRlsState;
     }
 
     @GetMapping("/liveness")
@@ -67,10 +73,21 @@ public class HealthController {
                     exception);
         }
 
-        return Map.of(
-                "status", "ready",
-                "service", "restful-api",
-                "dependencies", List.of("postgresql"),
-                "timestamp", Instant.now());
+        Map<String, Object> payload = new LinkedHashMap<>();
+        payload.put("status", "ready");
+        payload.put("service", "restful-api");
+        // Wave 1.2: the assistant RLS runtime degrades without killing the boot,
+        // so readiness surfaces its verdict without failing the primary probe.
+        // The bean only exists in persistence (non-test) deployments.
+        AssistantRlsState rls = assistantRlsState.getIfAvailable();
+        if (rls != null) {
+            payload.put("assistantRls", rls.verified() ? "verified" : "degraded");
+            if (!rls.verified()) {
+                payload.put("assistantRlsReason", rls.reason());
+            }
+        }
+        payload.put("dependencies", List.of("postgresql"));
+        payload.put("timestamp", Instant.now());
+        return payload;
     }
 }
