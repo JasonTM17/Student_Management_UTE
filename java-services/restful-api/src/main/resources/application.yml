@@ -137,6 +137,20 @@ assistant:
   retention-days: ${ASSISTANT_RETENTION_DAYS:90}
   # Lexical retrieval window (documents handed to the provider), clamped 3-10.
   top-k: ${ASSISTANT_TOP_K:5}
+  # Lexical-first fast path (chatbot latency): when local curated-KB retrieval
+  # returns a confident top document, the JSON and SSE chat routes answer
+  # immediately from that document (reasonCode ANSWERED, model
+  # curated-lexical-fast, real citations) instead of paying the remote
+  # RAG -> DeepSeek round-trip. Weak, scoped-out or empty lexical windows
+  # escalate to the remote RAG chain exactly as before.
+  lexical-fast-path: ${ASSISTANT_LEXICAL_FAST_PATH:true}
+  # Minimum retrieval score of the TOP document that counts as a confident
+  # fast-path match. The score is the repository's own ranking expression
+  # summed over retrieval terms (title substring 3, content substring 1,
+  # title whole-word 4, content whole-word 2); 10 = at least one retrieval
+  # phrase hits both the title and the content, which the seeded campus
+  # topics clear with margin. Clamped 0-100.
+  lexical-confident-score: ${ASSISTANT_LEXICAL_CONFIDENT_SCORE:10}
   recovery-delay-ms: ${ASSISTANT_RECOVERY_DELAY_MS:30000}
   recovery-initial-delay-ms: ${ASSISTANT_RECOVERY_INITIAL_DELAY_MS:30000}
   rag:

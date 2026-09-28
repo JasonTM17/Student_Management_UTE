@@ -113,8 +113,12 @@ public class ThesisAssistantKnowledgeRepository {
         }
         String scoreExpression = String.join(" + ", scoreTerms);
 
+        // lexical_score is the same ranking expression that drives ORDER BY,
+        // surfaced per row so the lexical fast path can gate on the retrieval
+        // engine's own confidence instead of recomputing a second score.
         String sql = "SELECT p.source_id AS id, p.slug, p.locale, p.title, p.content, p.source, p.domain, p.revision_id, p.version AS revision_version, "
-                + "rel.id AS release_id, rel.corpus_version, rel.corpus_hash "
+                + "rel.id AS release_id, rel.corpus_version, rel.corpus_hash, "
+                + "(" + scoreExpression + ") AS lexical_score "
                 + "FROM assistant.knowledge_runtime_state s "
                 + "JOIN assistant.knowledge_release rel ON rel.id = s.active_release_id AND rel.status = 'PUBLISHED' "
                 + "JOIN assistant.knowledge_runtime_document p ON p.release_id = rel.id "
@@ -137,7 +141,8 @@ public class ThesisAssistantKnowledgeRepository {
             }
             String legacyScoreExpression = scoreExpression.replace("p.", "r.");
             String legacySql = "SELECT CAST(d.id AS VARCHAR) AS id, d.slug, r.locale, r.title, r.content, r.source, 'THESIS' AS domain, r.id AS revision_id, r.version AS revision_version, "
-                    + "NULL AS release_id, NULL AS corpus_version, NULL AS corpus_hash "
+                    + "NULL AS release_id, NULL AS corpus_version, NULL AS corpus_hash, "
+                    + "(" + legacyScoreExpression + ") AS lexical_score "
                     + "FROM assistant.knowledge_document d "
                     + "JOIN assistant.knowledge_document_revision r ON r.document_id = d.id AND r.state = 'PUBLISHED' "
                     + "WHERE d.active = TRUE AND d.visibility = 'PUBLIC' "
@@ -167,7 +172,8 @@ public class ThesisAssistantKnowledgeRepository {
                 resultSet.getInt("revision_version"),
                 resultSet.getString("corpus_version"),
                 resultSet.getString("corpus_hash"),
-                resultSet.getObject("release_id", UUID.class));
+                resultSet.getObject("release_id", UUID.class),
+                resultSet.getInt("lexical_score"));
     }
 
     public record KnowledgeDocument(
@@ -185,19 +191,33 @@ public class ThesisAssistantKnowledgeRepository {
             Integer revisionVersion,
             String corpusVersion,
             String corpusHash,
-            UUID releaseId) {
+            UUID releaseId,
+            int lexicalScore) {
         public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source) {
-            this(id, slug, locale, title, content, source, "THESIS", null, null, null, null, null, null, null, null);
+            this(id, slug, locale, title, content, source, "THESIS", null, null, null, null, null, null, null, null, 0);
         }
 
         public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source,
             String catalogEntityType, String catalogEntityId, Instant catalogUpdatedAt) {
-            this(id, slug, locale, title, content, source, "ACADEMIC_CATALOG", catalogEntityType, catalogEntityId, catalogUpdatedAt, null, null, null, null, null);
+            this(id, slug, locale, title, content, source, "ACADEMIC_CATALOG", catalogEntityType, catalogEntityId, catalogUpdatedAt, null, null, null, null, null, 0);
         }
 
         public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source,
                 String domain, UUID revisionId, Integer revisionVersion) {
-            this(id, slug, locale, title, content, source, domain, null, null, null, revisionId, revisionVersion, null, null, null);
+            this(id, slug, locale, title, content, source, domain, null, null, null, revisionId, revisionVersion, null, null, null, 0);
+        }
+
+        /**
+         * Pre-fast-path arity bridge: every fixture that predates the exposed
+         * retrieval score binds {@code lexicalScore = 0}, which the confidence
+         * gate reads as "never confident" so those documents can only ever feed
+         * the provider path, never the lexical fast path.
+         */
+        public KnowledgeDocument(String id, String slug, String locale, String title, String content, String source,
+                String domain, String catalogEntityType, String catalogEntityId, Instant catalogUpdatedAt,
+                UUID revisionId, Integer revisionVersion, String corpusVersion, String corpusHash, UUID releaseId) {
+            this(id, slug, locale, title, content, source, domain, catalogEntityType, catalogEntityId, catalogUpdatedAt,
+                    revisionId, revisionVersion, corpusVersion, corpusHash, releaseId, 0);
         }
     }
 }

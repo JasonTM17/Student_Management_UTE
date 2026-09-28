@@ -11,7 +11,9 @@ public record AssistantProperties(
         int globalDailyQuota,
         int retentionDays,
         boolean quotaEnforced,
-        Integer topK) {
+        Integer topK,
+        Boolean lexicalFastPath,
+        Integer lexicalConfidentScore) {
 
     /** Retrieval window default, exposed as {@code assistant.top-k}. */
     public static final int DEFAULT_TOP_K = 5;
@@ -23,6 +25,18 @@ public record AssistantProperties(
      */
     public static final int PROMPT_DOCUMENT_LIMIT = 3;
 
+    /**
+     * Default retrieval score a top document must reach before the lexical
+     * fast path answers without the remote RAG round-trip. The score is the
+     * repository's own ranking expression summed over retrieval terms
+     * (title substring 3, content substring 1, title whole-word 4, content
+     * whole-word 2). Ten therefore means at least one retrieval phrase hits
+     * BOTH the title and the content of the top document — the seeded campus
+     * topics ("đăng ký học phần", "học phí", "nghỉ học") clear it by a wide
+     * margin, while an incidental single-term overlap stays below it.
+     */
+    public static final int DEFAULT_LEXICAL_CONFIDENT_SCORE = 10;
+
     @ConstructorBinding
     public AssistantProperties {
         maxContextChars = clamp(maxContextChars, 256, 6_000);
@@ -33,6 +47,12 @@ public record AssistantProperties(
         // Absent configuration binds null, which keeps the historical default
         // instead of clamping 0 up to the floor.
         topK = clamp(topK == null ? DEFAULT_TOP_K : topK, 3, 10);
+        // The lexical fast path is ON by default (env ASSISTANT_LEXICAL_FAST_PATH);
+        // an explicit false is the only way to switch it off.
+        lexicalFastPath = lexicalFastPath == null || lexicalFastPath;
+        lexicalConfidentScore = lexicalConfidentScore == null
+                ? DEFAULT_LEXICAL_CONFIDENT_SCORE
+                : Math.max(0, Math.min(100, lexicalConfidentScore));
     }
 
     /** Convenience constructor preserving the pre-top-k arity for tests. */
@@ -40,6 +60,13 @@ public record AssistantProperties(
             int globalDailyQuota, int retentionDays, boolean quotaEnforced) {
         this(maxContextChars, maxMessageChars, userDailyQuota, globalDailyQuota, retentionDays,
                 quotaEnforced, DEFAULT_TOP_K);
+    }
+
+    /** Arity bridge for the top-k era; the fast-path switches keep their defaults. */
+    public AssistantProperties(int maxContextChars, int maxMessageChars, int userDailyQuota,
+            int globalDailyQuota, int retentionDays, boolean quotaEnforced, Integer topK) {
+        this(maxContextChars, maxMessageChars, userDailyQuota, globalDailyQuota, retentionDays,
+                quotaEnforced, topK, null, null);
     }
 
     private static int clamp(int value, int minimum, int maximum) {

@@ -7,6 +7,14 @@ export interface ChatMessage {
   citations?: AssistantCitation[];
   degraded?: boolean;
   reasonCode?: string;
+  /**
+   * True when the message is a locally synthesized terminal fence outcome
+   * (reconciliation 404 turn-not-found, a 409 whose code is anything other
+   * than TURN_IN_PROGRESS, quota, auth/forbidden): the turn's idempotency key
+   * was retired server-side, so the UI must not offer the degraded-answer
+   * retry affordance on it. See AssistantPanel's documented exclusion list.
+   */
+  terminalFence?: boolean;
   model?: string;
   pending?: boolean;
   feedback?: 'UP' | 'DOWN';
@@ -65,6 +73,7 @@ export type AssistantReplyPatch = {
   model?: string;
   degraded?: boolean;
   reasonCode?: string;
+  terminalFence?: boolean;
   locale?: 'en' | 'vi';
   citations?: AssistantCitation[];
   messageId?: string | null;
@@ -156,6 +165,7 @@ export function assistantReducer(
           pending: true,
           degraded: undefined,
           reasonCode: undefined,
+          terminalFence: undefined,
         };
       } else {
         messages.push({
@@ -223,6 +233,7 @@ export function assistantReducer(
         citations: action.reply.citations ?? current.citations,
         degraded: action.reply.degraded ?? current.degraded,
         reasonCode: action.reply.reasonCode ?? current.reasonCode,
+        terminalFence: action.reply.terminalFence ?? current.terminalFence,
         model: action.reply.model ?? current.model,
         pending: false,
         id: action.reply.messageId ?? current.id,
