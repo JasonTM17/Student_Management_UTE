@@ -597,6 +597,61 @@ public class ThesisAssistantService {
         return curatedFallback(normalizedLocale);
     }
 
+    /** Model name marking a lexical fast-path answer from the reviewed curated corpus. */
+    public static final String FAST_PATH_MODEL = "curated-lexical-fast";
+
+    /**
+     * Lexical-first fast path (chatbot latency): run the same local retrieval the
+     * fallback chain uses, and when the top document is a CONFIDENT match, answer
+     * from the reviewed curated corpus immediately instead of paying the remote
+     * RAG → DeepSeek round-trip (6.9–9.2 s measured; this path answers in well
+     * under a second).
+     *
+     * <p>Confidence is the retrieval engine's own score: the repository ranks
+     * candidates with a per-term expression (title substring 3, content substring
+     * 1, title whole-word 4, content whole-word 2) and now surfaces that score.
+     * A top document at or above {@code assistant.lexical-confident-score} means
+     * the question's retrieval phrases hit the document's title and content —
+     * the seeded campus topics clear it; incidental single-term overlaps do not.
+     *
+     * <p>The gate is deliberately placed AFTER every structural pre-check: the
+     * public-scope signal, the registration/credit-limit scoping and the
+     * sensitive/injection input guard all run inside {@link #retrieve}, so an
+     * off-topic, policy-scoped-out or guarded question degrades to an empty or
+     * low-scoring window and returns {@code null} — the caller then escalates to
+     * remote RAG exactly as before.
+     *
+     * @return a non-degraded ANSWERED response carrying real citations and the
+     *         {@link #FAST_PATH_MODEL} model name, or {@code null} when the
+     *         caller must proceed with the existing RAG-first chain.
+     */
+    public ChatResponse lexicalFastPath(String message, String locale, String scope) {
+        if (properties == null || !properties.lexicalFastPath()) return null;
+        String normalized = AssistantInputGuard.normalizeMessage(message);
+        if (normalized.isBlank()) return null;
+        // The remote gateway enforces its own limit; an oversized message is
+        // that path's contract, not the local retrieval's.
+        if (normalized.length() > properties.maxMessageChars()) return null;
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        LexicalResult result;
+        try {
+            result = java.util.concurrent.CompletableFuture
+                    .supplyAsync(() -> retrieve(normalized, normalizedLocale, scope))
+                    .get(LOCAL_FALLBACK_BUDGET_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return null;
+        } catch (Exception exception) {
+            // Timeout, rejection, or an unexpected retrieval failure: a fast
+            // path must never turn into an error, only into an escalation.
+            return null;
+        }
+        if (result.error() || result.documents().isEmpty()) return null;
+        if (result.documents().get(0).lexicalScore() < properties.lexicalConfidentScore()) return null;
+        return new ChatResponse(result.answer(), FAST_PATH_MODEL, false, "ANSWERED",
+                normalizedLocale, primaryCitations(result.citations()));
+    }
+
     private static ChatResponse withDegraded(ChatResponse response) {
         return new ChatResponse(response.answer(), response.model(), true, response.reasonCode(),
                 response.locale(), response.citations(), response.requestId(), response.clientRequestId(),
