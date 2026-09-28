@@ -537,6 +537,16 @@ export function useAssistantStream({
             // a duplicate.
           } else {
             const kind = terminalFailure.kind;
+            // Governance (turn fencing): this branch is reached only when JSON
+            // reconciliation returned a TERMINAL 4xx — 404 turn-not-found, a 409
+            // whose code is anything other than TURN_IN_PROGRESS
+            // (IDEMPOTENCY_CONFLICT, FAILED_AMBIGUOUS, STALE_LEASE), quota, or
+            // auth/forbidden. The server fence owns these outcomes (see
+            // ThesisAssistantTurnRepository: the same clientRequestId replays,
+            // polls, or 409s — it never redispatches), and the idempotency key
+            // was retired below. Mark the message terminalFence so the panel's
+            // degraded-retry affordance excludes it; only TURN_IN_PROGRESS is
+            // allowed to escalate into a retryable error.
             dispatch({
               type: 'complete',
               reply: {
@@ -550,6 +560,7 @@ export function useAssistantStream({
                       : assistantMessages.sessionExpired,
                 degraded: true,
                 reasonCode: kind === 'quota' ? 'QUOTA_EXCEEDED' : 'KNOWLEDGE_UNAVAILABLE',
+                terminalFence: true,
               },
             });
             // Quota and authorization failures are terminal for this turn.

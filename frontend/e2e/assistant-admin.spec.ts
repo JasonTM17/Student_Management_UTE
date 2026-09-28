@@ -268,6 +268,41 @@ test('assistant quota failure stays terminal when stream reconciliation is unava
   expect(fallbackCalls).toBe(1);
 });
 
+test('assistant retry stays offered on a degraded answer without citations', async ({ page }) => {
+  await mockAssistantShell(page);
+  await page.route('**/api/v1/assistant/chat/stream', (route) =>
+    route.fulfill({
+      status: 200,
+      headers: {
+        'Content-Type': 'text/event-stream',
+        'Cache-Control': 'no-cache',
+        Connection: 'keep-alive',
+      },
+      body: [
+        'event: meta\n',
+        'data: {"requestId":"11111111-1111-4111-8111-111111111111","clientRequestId":"22222222-2222-4222-8222-222222222222","turnId":"33333333-3333-4333-8333-333333333333","conversationId":"44444444-4444-4444-8444-444444444444","model":"lexical-fallback","locale":"en"}\n\n',
+        'event: delta\n',
+        'data: {"sequence":0,"text":"Answered from the reviewed fallback while the provider recovers."}\n\n',
+        'event: done\n',
+        `data: {"messageId":"${assistantMessageId}","reasonCode":"KNOWLEDGE_UNAVAILABLE","degraded":true}\n\n`,
+      ].join(''),
+    }),
+  );
+
+  await login(page, student);
+  await openAssistantAndSubmit(page, 'How can I contact the campus helpdesk?');
+
+  const dialog = page.getByRole('dialog');
+  await expect(dialog.getByRole('article', { name: /Campus helpdesk|Trợ lý học vụ CampusUTE/i }))
+    .toContainText('Answered from the reviewed fallback while the provider recovers.');
+  await expect(dialog.getByRole('alert')).toHaveCount(0);
+  // A degraded answer that COMPLETED through the fallback chain is retryable:
+  // re-asking once the provider recovers is meaningful. Only the fenced
+  // terminal states (404 / 409-conflict / quota) keep the no-retry contract
+  // pinned by the specs above.
+  await expect(dialog.getByRole('button', { name: /^Retry$|^Thử lại$/i })).toHaveCount(1);
+});
+
 test('assistant does not retry a terminal reconciliation 404 after a transient stream failure', async ({ page }) => {
   await mockAssistantShell(page);
   let streamCalls = 0;
