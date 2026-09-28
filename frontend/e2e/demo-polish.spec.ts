@@ -259,6 +259,9 @@ async function mockStudent(page: Page, singleTerm = false) {
         roles: ['STUDENT'],
         studentId: 'student-profile',
       },
+      // The profile page's 2FA card loads the account's two-factor status on
+      // mount (api.ts authApi.getTwoFactorStatus → /me/two-factor).
+      '/api/v1/me/two-factor': { enabled: false },
       '/api/v1/semesters': { data: terms },
       '/api/v1/notifications/my': { data: [] },
       // The sidebar badge reads the server-side counter (api.ts
@@ -439,12 +442,15 @@ test('demo polish: feedback surfaces stay scannable on registration and schedule
 
   await page.goto('/en/dashboard/register');
   // Browse-first: the catalog renders immediately behind one unified search;
-  // typing narrows it to the SE101 groups.
+  // typing narrows it to the SE101 groups. The course group card renders
+  // "{code} — {name}" as one line inside the toggle button, so assert the
+  // group's labeled <section> region rather than an exact standalone code node.
   const search = page.getByLabel('Search sections by code or name');
   await expect(search).toBeVisible();
   await expect(page.getByText('SE101').filter({ visible: true }).first()).toBeVisible();
   await search.fill('SE101');
-  await expect(page.getByText('SE101', { exact: true }).filter({ visible: true }).first()).toBeVisible();
+  await expect(page.getByRole('region', { name: 'SE101 Software Engineering' })).toBeVisible();
+  await expect(page.getByRole('region', { name: /AI201/ })).toHaveCount(0);
   await expect(page.getByText('2 classes').filter({ visible: true }).first()).toBeVisible();
   await expect(page.getByRole('button', { name: 'Drop course' }).first()).toBeVisible();
   await noOverflow(page);
@@ -496,7 +502,9 @@ test('demo polish: profile exposes photo upload and password visibility controls
   const errors = await mockStudent(page);
   await page.goto('/en/dashboard/profile');
   await expect(page.getByText('Upload photo')).toBeVisible();
-  await expect(page.getByRole('button', { name: 'Show password' })).toHaveCount(3);
+  // Three password-change fields plus the 2FA confirmation field (each renders
+  // its own Show password toggle).
+  await expect(page.getByRole('button', { name: 'Show password' })).toHaveCount(4);
   await noOverflow(page);
   expect(errors).toEqual([]);
 });
