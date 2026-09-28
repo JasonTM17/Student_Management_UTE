@@ -615,7 +615,7 @@ export default function SchedulePage() {
                       key={`day-tab-${dayNum}`}
                       type="button"
                       onClick={() => setSelectedDayTab(dayNum)}
-                      className={`flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all ${
+                      className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all ${
                         isSelected
                           ? 'bg-primary text-primary-foreground shadow-md'
                           : 'border border-border bg-card text-foreground hover:bg-secondary'

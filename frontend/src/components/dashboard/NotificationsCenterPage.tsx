@@ -356,7 +356,7 @@ export default function NotificationsCenterPage() {
                       <div className="flex flex-wrap items-center gap-4 pt-1">
                         <LocalizedLink
                           href={resolveNotificationTarget(item)}
-                          className="inline-flex min-h-8 items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
+                          className="inline-flex min-h-10 items-center gap-1.5 text-xs font-semibold text-primary hover:underline"
                           onClick={() => {
                             if (!item.isRead) void markRead(item.id);
                           }}
