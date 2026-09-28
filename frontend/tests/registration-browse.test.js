@@ -207,3 +207,26 @@ test('the shipped page keeps the shared day mapping and error fallback wiring', 
   // Error mapping falls back to the shared campus-error mapper.
   assert.match(page, /campusCodeMessage\(cause, messages\.common\.campusErrors\)/);
 });
+
+test('schedule-less sections show the chip and a soft (non-blocking) enroll warning', () => {
+  const page = fs.readFileSync(path.join(root, 'src/app/dashboard/register/page.tsx'), 'utf8');
+  const messages = fs.readFileSync(path.join(root, 'src/i18n/messages.ts'), 'utf8');
+
+  // The "Chưa có lịch" chip exists for sections with an empty schedule list.
+  assert.match(page, /schedules\.length === 0 \? \(/, 'the schedule chip branch must exist');
+  assert.match(page, /\{copy\.scheduleNone\}/);
+
+  // Enroll guard: the confirm dialog warns about schedule-less sections while
+  // still allowing the confirm (soft policy), stacked with the
+  // outside-curriculum warning when both apply.
+  assert.match(page, /scheduleNoneWarning/);
+  assert.match(page, /warnings\.push\(copy\.scheduleNoneWarning\)/);
+  assert.match(page, /warnings\.join\(' '\)/);
+
+  // The warning copy ships in both dictionaries.
+  assert.match(messages, /scheduleNoneWarning:[\s\S]*?no published schedule yet/);
+  assert.match(
+    messages.slice(messages.indexOf('export const vi')),
+    /scheduleNoneWarning:[\s\S]*?Lớp chưa có lịch học công bố/,
+  );
+});

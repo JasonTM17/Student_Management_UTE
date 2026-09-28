@@ -392,12 +392,17 @@
     font-size: 0.875rem;
     font-weight: 700;
     transition: transform 200ms var(--portal-ease);
+    /* The link lives at a fixed position above the page even while translated
+       off-screen; keep it out of the hit-test path so it can never intercept
+       a click meant for the page. Keyboard focus is its only activation path. */
+    pointer-events: none;
   }
 
   .portal-skip-link:focus-visible {
     transform: translateY(0);
     outline: 0.1875rem solid var(--portal-sidebar-strong);
     outline-offset: 0.125rem;
+    pointer-events: auto;
   }
 
   .portal-shell table {
@@ -450,6 +455,23 @@
     --info-bg: hsl(var(--status-info) / 0.12);
     --info-border: hsl(var(--status-info) / 0.35);
     --info-text: hsl(var(--status-info-foreground));
+  }
+
+  /*
+   * Toast layer stays out of the hit-test path. Sonner renders its viewport as
+   * `position: fixed` with `z-index: 999999999`, and below 600px its own CSS
+   * stretches it across the full viewport width — a transparent fixed layer
+   * that can swallow real pointer clicks aimed at the page (roadmap 1.5).
+   * The wrapper therefore ignores pointer events entirely; each rendered
+   * toast re-enables them, so toasts themselves (close buttons, actions) stay
+   * interactive while the empty strip around them can never intercept.
+   */
+  [data-sonner-toaster] {
+    pointer-events: none;
+  }
+
+  [data-sonner-toast] {
+    pointer-events: auto;
   }
 
   [data-sonner-toast][data-type='success'] {

@@ -79,6 +79,33 @@ export function parseNumericInput(value: number | string | null | undefined): nu
   return Number.isFinite(parsed) ? parsed : null;
 }
 
+/**
+ * Coerces a parsed form value into the int the wire contract expects.
+ * The backend DTOs type conductScore and credits as integers, so a value
+ * like "87,5" must round (to 88) before it reaches the payload — sending the
+ * raw fraction is a guaranteed 400. Null (field left empty) falls back.
+ */
+export function toWireInt(value: number | null | undefined, fallback = 0): number {
+  if (value === null || value === undefined || !Number.isFinite(value)) {
+    return fallback;
+  }
+  return Math.round(value);
+}
+
+/**
+ * Whether a course/grade table credits cell is acceptable for the payload.
+ * An empty cell is allowed (it sends 0); anything present must parse to a
+ * non-negative number. Negative or unparseable input must surface as a
+ * validation issue instead of being silently clamped or zeroed.
+ */
+export function rowCreditsValid(credits: number | string): boolean {
+  if (String(credits).trim() === '') {
+    return true;
+  }
+  const parsed = parseNumericInput(credits);
+  return parsed !== null && parsed >= 0;
+}
+
 export interface MailGradeRow {
   credits: number | string;
   score10: number | string;
@@ -123,6 +150,7 @@ export type MailFieldIssue =
   | 'studentIdRequired'
   | 'coursesRequired'
   | 'courseRowsInvalid'
+  | 'creditsInvalid'
   | 'gradesRequired'
   | 'gradeRowsInvalid'
   | 'gpaInvalid'
@@ -155,7 +183,7 @@ export interface MailRegistrationFormInput {
   to: string;
   studentName: string;
   studentId: string;
-  courses: ReadonlyArray<{ code: string; name: string }>;
+  courses: ReadonlyArray<{ code: string; name: string; credits?: number | string }>;
 }
 
 export function registrationFormIssues(form: MailRegistrationFormInput): MailFieldIssue[] {
@@ -174,8 +202,15 @@ export function registrationFormIssues(form: MailRegistrationFormInput): MailFie
   }
   if (form.courses.length === 0) {
     issues.push('coursesRequired');
-  } else if (form.courses.some((course) => !course.code.trim() || !course.name.trim())) {
-    issues.push('courseRowsInvalid');
+  } else {
+    if (form.courses.some((course) => !course.code.trim() || !course.name.trim())) {
+      issues.push('courseRowsInvalid');
+    }
+    // Negative (or junk) credits must block the send with an inline message —
+    // never a silent clamp to 0, which used to fabricate a course load.
+    if (form.courses.some((course) => !rowCreditsValid(course.credits ?? ''))) {
+      issues.push('creditsInvalid');
+    }
   }
   return issues;
 }
@@ -221,14 +256,24 @@ export function gradeAlertFormIssues(form: MailGradeAlertFormInput): MailFieldIs
     found.push('gradesRequired');
   } else {
     const rowsValid = form.grades.every(
-      (row) => row.courseCode.trim() && row.courseName.trim() && scoreRowValid(row.score10),
+      (row) =>
+        row.courseCode.trim()
+        && row.courseName.trim()
+        && scoreRowValid(row.score10),
     );
     if (!rowsValid) {
       found.push('gradeRowsInvalid');
     }
+    // Credits get their own issue so the inline message can point at the
+    // credits cell instead of the score cell: negative or junk input blocks
+    // the send rather than being silently clamped into the payload.
+    if (form.grades.some((row) => !rowCreditsValid(row.credits))) {
+      found.push('creditsInvalid');
+    }
   }
   return [...new Set(found)];
-}function scoreRowValid(score10: number | string): boolean {
+}
+function scoreRowValid(score10: number | string): boolean {
   const score = parseNumericInput(score10);
   return score !== null && score >= 0 && score <= 10;
 }

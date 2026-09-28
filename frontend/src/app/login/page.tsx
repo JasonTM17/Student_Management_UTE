@@ -12,6 +12,7 @@ import { Input } from '@/components/ui/input';
 import { useI18n } from '@/i18n';
 import type { User } from '@/types/api';
 import { campusCodeMessage, type CampusErrorCopy } from '@/lib/campus-error';
+import { isStaleDemoPassword } from '@/lib/demo-credentials';
 import {
   LOGIN_PORTALS,
   parseLoginPortal,
@@ -69,7 +70,6 @@ export default function LoginPage() {
   const [password, setPassword] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
-  const [isClientReady, setIsClientReady] = useState(false);
   const [noticeDismissed, setNoticeDismissed] = useState(false);
   const [formError, setFormError] = useState('');
   // Two-factor step 2: set after the password answered with a challenge.
@@ -85,10 +85,6 @@ export default function LoginPage() {
   const portalCopy = messages.login.portals[portal];
   // Memoized so the prefill effect below depends on a stable reference.
   const demoCredentials = useMemo(() => demoCredentialsFor(portal), [portal]);
-
-  useEffect(() => {
-    setIsClientReady(true);
-  }, []);
 
   useEffect(() => {
     setFormError('');
@@ -306,6 +302,10 @@ export default function LoginPage() {
             <button
               type="button"
               onClick={() => {
+                // Fill-only by design: quick-fill never auto-submits, so a
+                // stale deployment value (isStaleDemoPassword above) lands in
+                // the field with its warning instead of firing a login that
+                // cannot succeed.
                 setEmail(demoCredentials.email);
                 setPassword(demoCredentials.password);
               }}
@@ -321,6 +321,15 @@ export default function LoginPage() {
               {demoCredentials.password}
             </span>
           </div>
+          {isStaleDemoPassword(demoCredentials.password) ? (
+            <p
+              role="note"
+              className="flex items-start gap-1.5 rounded-md border border-amber-500/40 bg-amber-500/10 px-2 py-1.5 text-[11px] font-medium leading-4 text-amber-700 dark:text-amber-400"
+            >
+              <span aria-hidden="true">⚠</span>
+              {messages.login.staleDemoPasswordWarning}
+            </p>
+          ) : null}
           <p className="text-[11px] text-muted-foreground pt-1 border-t border-primary/10">
             {locale === 'vi'
               ? '💡 Đây là tài khoản demo dùng để trải nghiệm đầy đủ các tính năng của hệ thống CampusUTE.'
@@ -456,7 +465,7 @@ export default function LoginPage() {
               />
             </div>
 
-            <Button type="submit" className="w-full" disabled={isVerifying || !isClientReady}>
+            <Button type="submit" className="w-full" disabled={isVerifying}>
               {isVerifying ? (
                 <span className="inline-flex items-center gap-2">
                   <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
@@ -548,7 +557,6 @@ export default function LoginPage() {
                   aria-label={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                   title={showPassword ? messages.login.hidePassword : messages.login.showPassword}
                   aria-pressed={showPassword}
-                  disabled={!isClientReady}
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -560,7 +568,17 @@ export default function LoginPage() {
             />
           </div>
 
-          <Button type="submit" className="w-full" disabled={isLoading || !isClientReady}>
+          {/*
+            No hydration gate on this button: gating submit on a
+            post-hydration effect (`disabled` until an effect flips a flag)
+            left the button dead to real pointer clicks and Enter-in-password
+            for the whole pre-effect window — long enough under production
+            latency/throttling that probe clicks were swallowed entirely
+            (council roadmap 1.5). The inputs carry no `name`, so the only
+            pre-hydration fallback is a harmless same-URL navigation, never a
+            credential leak; once React is live the submit handler takes over.
+          */}
+          <Button type="submit" className="w-full" disabled={isLoading}>
             {isLoading ? (
               <span className="inline-flex items-center gap-2">
                 <span className="h-4 w-4 animate-spin rounded-full border-2 border-primary-foreground/40 border-t-primary-foreground" />
