@@ -8,7 +8,13 @@ import { metricToneClass } from '@/components/ui/status';
 import { useRequireAuth } from '@/context/AuthContext';
 import { gradesApi, semestersApi } from '@/lib/api';
 import { getLocalizedFlatLabel, getLocalizedName } from '@/lib/academic-content';
-import { StudentGradeRecord, Semester } from '@/types/api';
+import {
+  SCORE_TIER_BAR_CLASS,
+  scoreBarPercent,
+  scoreTier,
+  semesterProgressCards,
+} from '@/lib/grade-visuals';
+import { StudentGradeRecord, Semester, StudentTranscript } from '@/types/api';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { Select } from '@/components/ui/select';
@@ -47,11 +53,43 @@ function isFiniteScore(value: number | null | undefined): value is number {
   return typeof value === 'number' && Number.isFinite(value);
 }
 
+/**
+ * One-row score bar for the grades list (roadmap 3.5): width = score/10,
+ * colour tier ≥ 8 green, 5–8 amber, < 5 red. Hidden entirely for unpublished
+ * scores so a missing result never renders as a fake 0% bar.
+ */
+function GradeMiniBar({
+  score,
+  ariaLabelPrefix,
+}: {
+  score: number | null | undefined;
+  ariaLabelPrefix: string;
+}) {
+  const tier = scoreTier(score);
+  if (!tier) {
+    return null;
+  }
+  const percent = scoreBarPercent(score);
+  return (
+    <div
+      role="img"
+      aria-label={`${ariaLabelPrefix}: ${Math.round(percent)}%`}
+      className="h-1.5 w-16 overflow-hidden rounded-full bg-secondary"
+    >
+      <div
+        className={`h-full rounded-full ${SCORE_TIER_BAR_CLASS[tier]}`}
+        style={{ width: `${percent}%` }}
+      />
+    </div>
+  );
+}
+
 export default function GradesPage() {
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, formatNumber, messages } = useI18n();
   const [grades, setGrades] = useState<StudentGradeRecord[]>([]);
   const [semesters, setSemesters] = useState<Semester[]>([]);
+  const [transcript, setTranscript] = useState<StudentTranscript | null>(null);
   const [selectedSemester, setSelectedSemester] = useState('');
   const [selectedRecord, setSelectedRecord] = useState<StudentGradeRecord | null>(null);
   const [isLoading, setIsLoading] = useState(true);
@@ -102,6 +140,33 @@ export default function GradesPage() {
     void fetchGrades();
   }, [fetchGrades, hasAccess]);
 
+  // Additive feed for the "Tiến bộ theo học kỳ" strip: the cumulative
+  // transcript endpoint, independent from the per-semester grades list above
+  // so neither fetch can break the other. A failed transcript just hides the
+  // strip — the published-grades list stays fully usable.
+  useEffect(() => {
+    if (!hasAccess) {
+      return;
+    }
+
+    let cancelled = false;
+    gradesApi
+      .getMyTranscript()
+      .then((data) => {
+        if (!cancelled) {
+          setTranscript(data);
+        }
+      })
+      .catch(() => {
+        if (!cancelled) {
+          setTranscript(null);
+        }
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [hasAccess]);
+
   const selectedSemesterName = useMemo(() => {
     return (
       getLocalizedName(
@@ -138,6 +203,14 @@ export default function GradesPage() {
       return groups;
     }, {});
   }, [grades, locale]);
+
+  // Timeline strip source: one compact card per transcript semester (roadmap
+  // 3.5). Empty while the transcript is missing or failed — the strip then
+  // stays hidden instead of showing a bare heading.
+  const progressCards = useMemo(
+    () => semesterProgressCards(transcript?.semesters),
+    [transcript],
+  );
 
   const copy =
     locale === 'vi'
@@ -320,6 +393,53 @@ export default function GradesPage() {
             </Card>
           </div>
 
+          {progressCards.length > 0 ? (
+            <section
+              aria-label={
+                messages.studentDashboard.gradesVisuals.progressStripAriaLabel
+              }
+            >
+              <h2 className="text-sm font-semibold text-foreground">
+                {messages.studentDashboard.gradesVisuals.progressStripTitle}
+              </h2>
+              <div className="mt-3 flex snap-x gap-3 overflow-x-auto pb-2">
+                {progressCards.map((card) => {
+                  const cardName = getLocalizedFlatLabel(
+                    locale,
+                    card.semesterName,
+                    card.semesterNameEn,
+                    card.semesterNameVi,
+                    card.semesterName,
+                  );
+                  return (
+                    <div
+                      key={card.semesterId}
+                      className="w-44 shrink-0 snap-start rounded-xl border border-border/70 bg-card p-3 shadow-xs"
+                    >
+                      <p
+                        className="truncate text-xs font-semibold text-foreground"
+                        title={cardName}
+                      >
+                        {cardName}
+                      </p>
+                      <div className="mt-1.5 flex items-baseline justify-between gap-2">
+                        <span className="text-lg font-bold tabular-nums text-foreground">
+                          {card.gpa === null ? '—' : card.gpa.toFixed(2)}
+                        </span>
+                        <span className="text-[11px] text-muted-foreground">
+                          {formatNumber(card.creditsEarned)} {copy.creditsWord}
+                        </span>
+                      </div>
+                      <p className="mt-0.5 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
+                        {messages.studentDashboard.gradesVisuals.gpaLabel}
+                      </p>
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
+          ) : null}
+
           <div className="space-y-6">
             {Object.entries(groupedGrades).map(([semesterName, records]) => (
               <Card key={semesterName} variant="muted">
@@ -424,6 +544,10 @@ export default function GradesPage() {
                               </dt>
                               <dd className="mt-1 text-foreground font-bold text-base text-primary">
                                 {scoreLabel(record.finalGrade)}
+                                <GradeMiniBar
+                                  score={record.finalGrade}
+                                  ariaLabelPrefix={copy.tableHeaders.score}
+                                />
                               </dd>
                             </div>
                             <div>
@@ -507,8 +631,16 @@ export default function GradesPage() {
                             <td className="px-2 py-4 text-center text-foreground font-medium">
                               {scoreLabel(finalExamScore)}
                             </td>
-                            <td className="px-2 py-4 text-center text-foreground font-bold">
-                              {scoreLabel(record.finalGrade)}
+                            <td className="px-2 py-4 text-center">
+                              <div className="flex flex-col items-center gap-1.5">
+                                <span className="font-bold text-foreground">
+                                  {scoreLabel(record.finalGrade)}
+                                </span>
+                                <GradeMiniBar
+                                  score={record.finalGrade}
+                                  ariaLabelPrefix={copy.tableHeaders.score}
+                                />
+                              </div>
                             </td>
                             <td className="px-2 py-4 text-center">
                               {record.letterGrade ? (

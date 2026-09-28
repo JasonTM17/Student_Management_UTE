@@ -478,7 +478,7 @@ export default function EnrollmentsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('curriculum')}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   activeTab === 'curriculum'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -495,7 +495,7 @@ export default function EnrollmentsPage() {
               <button
                 type="button"
                 onClick={() => setActiveTab('enrollments')}
-                className={`flex items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
+                className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   activeTab === 'enrollments'
                     ? 'bg-primary text-primary-foreground shadow-sm'
                     : 'bg-secondary/40 text-muted-foreground hover:bg-secondary hover:text-foreground'
@@ -524,7 +524,7 @@ export default function EnrollmentsPage() {
                     type="button"
                     aria-pressed={statusFilter === btn.key}
                     onClick={() => setStatusFilter(btn.key)}
-                    className={`rounded-md px-3 py-1 font-medium transition ${
+                    className={`inline-flex min-h-10 items-center rounded-md px-3 py-1 font-medium transition ${
                       statusFilter === btn.key
                         ? 'bg-foreground text-background font-semibold'
                         : 'border border-border/80 bg-card text-muted-foreground hover:text-foreground'
