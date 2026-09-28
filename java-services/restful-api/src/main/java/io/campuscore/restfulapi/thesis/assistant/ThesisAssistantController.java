@@ -132,8 +132,16 @@ public class ThesisAssistantController {
      * the local lexical KB within a small budget; when even that is empty, the
      * deterministic curated fallback answers instead. A RAG outage is therefore
      * a 200 degraded response, never a 5xx and never an empty body.
+     *
+     * <p>Lexical-first fast path (chatbot latency): a confident local KB match
+     * answers before the gateway is ever contacted; only a weak or empty
+     * lexical window reaches remote RAG.
      */
     private ChatResponse chatRemoteWithFallback(ChatRequest request, String owner) {
+        ChatResponse fastPath = lexicalFastPathOrNull(request);
+        if (fastPath != null) {
+            return fastPath;
+        }
         try {
             ChatResponse remote = ragGateway.chat(request, owner);
             if (!"NO_MATCH".equals(remote == null ? null : remote.reasonCode())) {
@@ -145,6 +153,20 @@ public class ThesisAssistantController {
                 return localGroundedFallback(request);
             }
             throw exception;
+        }
+    }
+
+    /**
+     * Best-effort fast-path probe. Any failure here — retrieval outage, budget
+     * timeout, unexpected guard state — returns {@code null} so the request
+     * escalates along the unchanged RAG-first chain.
+     */
+    private ChatResponse lexicalFastPathOrNull(ChatRequest request) {
+        try {
+            return assistant.lexicalFastPath(request.message(), request.locale(), request.scope());
+        } catch (Exception exception) {
+            LOG.warn("lexical fast path skipped with {}", exception.getClass().getSimpleName());
+            return null;
         }
     }
 
@@ -398,11 +420,17 @@ public class ThesisAssistantController {
      * SSE flavour of the fallback chain: a transient gateway failure or a
      * remote NO_MATCH emits the local KB answer (or the curated fallback) as a
      * replace/done sequence, so the stream always terminates with usable text
-     * instead of a bare error frame.
+     * instead of a bare error frame. A confident lexical match short-circuits
+     * the gateway entirely with a complete meta/delta/citation/done sequence.
      */
     void streamRemoteWithFallback(ChatRequest request, String owner,
             Consumer<ThesisAssistantService.StreamEvent> sink) {
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
+        ChatResponse fastPath = lexicalFastPathOrNull(request);
+        if (fastPath != null) {
+            emitLexicalFastPath(fastPath, request, locale, sink);
+            return;
+        }
         boolean[] forwarded = { false };
         Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
             if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
@@ -421,6 +449,26 @@ public class ThesisAssistantController {
             }
             throw exception;
         }
+    }
+
+    /**
+     * A fast-path SSE answer is a complete stream: nothing crossed the wire
+     * before it, so meta opens, the cited delta carries the whole answer, and
+     * done closes non-degraded. No turn is persisted — identical to the
+     * existing local-grounded fallback contract the clients already render.
+     */
+    private void emitLexicalFastPath(ChatResponse fastPath, ChatRequest request, String locale,
+            Consumer<ThesisAssistantService.StreamEvent> sink) {
+        sink.accept(new ThesisAssistantService.StreamMeta(
+                UUID.randomUUID(), request.clientRequestId(), null, null,
+                ThesisAssistantService.FAST_PATH_MODEL, locale));
+        sink.accept(new ThesisAssistantService.StreamDelta(0, fastPath.answer(),
+                fastPath.citations().stream().map(ThesisAssistantDtos.Citation::sourceId)
+                        .filter(java.util.Objects::nonNull).toList()));
+        fastPath.citations().forEach(citation -> sink.accept(
+                new ThesisAssistantService.StreamCitation(citation)));
+        sink.accept(new ThesisAssistantService.StreamDone(null, fastPath.reasonCode(),
+                fastPath.degraded(), "COMPLETED"));
     }
 
     private void emitStreamFallback(ChatRequest request, String locale,

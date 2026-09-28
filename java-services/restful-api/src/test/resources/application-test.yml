@@ -17,6 +17,11 @@ assistant:
   # H2-focused legacy fixtures predate the V16 runtime projection. Production
   # keeps this false so a missing projection is a hard startup/runtime defect.
   legacy-retrieval-fallback: true
+  # The lexical fast path stays OFF in the test profile so every existing
+  # Spring test keeps exercising the unchanged RAG-first chain. The fast-path
+  # behaviour is covered by ThesisAssistantLexicalFastPathTest (unit) and
+  # ThesisAssistantLexicalFastPathWebTest, which flips it back on explicitly.
+  lexical-fast-path: false
   retention:
     enabled: false
 

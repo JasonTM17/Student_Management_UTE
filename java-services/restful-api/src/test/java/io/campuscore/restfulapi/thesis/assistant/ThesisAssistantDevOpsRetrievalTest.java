@@ -140,9 +140,13 @@ class ThesisAssistantDevOpsRetrievalTest {
         assertTrue(statement.contains("THEN 4") && statement.contains("THEN 2"),
                 "the word-boundary bonus is missing from the score");
         int orderBy = statement.indexOf("ORDER BY");
-        assertTrue(statement.indexOf("THEN 4") > orderBy
-                        && statement.indexOf("THEN 4") < statement.indexOf("LIMIT :limit"),
-                "the word-boundary weight must drive the ordering, not sit in the projection");
+        // The lexical fast path surfaces the same score in the SELECT projection
+        // (lexical_score), so the projection now legitimately carries THEN 4/2.
+        // The ordering copy must still sit between ORDER BY and LIMIT so the
+        // ranking stays score-driven.
+        String orderingClause = statement.substring(orderBy, statement.indexOf("LIMIT :limit"));
+        assertTrue(orderingClause.contains("THEN 4") && orderingClause.contains("THEN 2"),
+                "the word-boundary weight must drive the ordering, not only sit in the projection: " + statement);
         // The padded term is bound as data, so no delimiter can break the literal.
         assertEquals(" ci/cd ", parameters.getValue().getValue("word0"));
         assertEquals("%ci/cd%", parameters.getValue().getValue("term0"));
