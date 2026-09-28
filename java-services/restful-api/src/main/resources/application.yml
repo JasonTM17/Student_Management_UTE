@@ -157,6 +157,14 @@ assistant:
     connect-timeout-ms: ${ASSISTANT_SUPABASE_CONNECT_TIMEOUT_MS:2000}
     read-timeout-ms: ${ASSISTANT_SUPABASE_READ_TIMEOUT_MS:30000}
 
+academic:
+  enrolled-count:
+    # Wave 1.4: hourly enrolledCount reconcile. The job only WARNs on drift
+    # unless repair is explicitly enabled by an operator.
+    reconcile-delay-ms: ${ACADEMIC_ENROLLED_COUNT_RECONCILE_DELAY_MS:3600000}
+    reconcile-initial-delay-ms: ${ACADEMIC_ENROLLED_COUNT_RECONCILE_INITIAL_DELAY_MS:120000}
+    repair: ${ACADEMIC_ENROLLED_COUNT_REPAIR:false}
+
 mail:
   from: ${MAIL_FROM:no-reply@campuscore.local}
   sender-name: ${MAIL_SENDER_NAME:CampusUTE - Đại học Công Nghệ Kĩ thuật TP.HCM}
