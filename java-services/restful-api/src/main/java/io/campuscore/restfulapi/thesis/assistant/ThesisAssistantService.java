@@ -543,6 +543,91 @@ public class ThesisAssistantService {
         return properties == null ? DEFAULT_TOP_K : properties.topK();
     }
 
+    /**
+     * Documents actually injected into the provider prompt (and shown as
+     * citations). Retrieval keeps its wider {@code topK} candidate window for
+     * scoping filters, but the model only ever sees the top ranked sources —
+     * five citations of prompt material were pure latency for direct lookups.
+     */
+    static final int PROMPT_DOCUMENT_LIMIT = AssistantProperties.PROMPT_DOCUMENT_LIMIT;
+
+    /** Wall-clock budget for the local lexical fallback when the RAG gateway is down. */
+    public static final long LOCAL_FALLBACK_BUDGET_MS = 1_000L;
+
+    /**
+     * The instant the student's daily quota resets: next midnight Asia/
+     * Ho_Chi_Minh, matching the quota bucket key in AssistantTimezone.
+     */
+    static java.time.Instant nextQuotaResetAt() {
+        return AssistantTimezone.currentBucketDate().plusDays(1)
+                .atStartOfDay(AssistantTimezone.ZONE).toInstant();
+    }
+
+    /**
+     * Local-grounded fallback for the JSON path when the remote RAG gateway
+     * fails transiently, times out, or returns NO_MATCH: run the local lexical
+     * KB search within a small budget and answer from the top published
+     * document WITH citations. This mirrors the PROVIDER_DISABLED local-grounded
+     * pattern: degraded=true, the curated-lexical model name marks the source,
+     * and the answer is never empty — a failed gateway degrades to the curated
+     * fallback text below instead of a 5xx.
+     */
+    public ChatResponse groundedFallback(String message, String locale) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        ChatResponse lexical;
+        try {
+            final String normalized = AssistantInputGuard.normalizeMessage(message);
+            lexical = java.util.concurrent.CompletableFuture
+                    .supplyAsync(() -> lexicalAnswer(normalized, normalizedLocale))
+                    .get(LOCAL_FALLBACK_BUDGET_MS, java.util.concurrent.TimeUnit.MILLISECONDS);
+        } catch (InterruptedException exception) {
+            Thread.currentThread().interrupt();
+            return curatedFallback(normalizedLocale);
+        } catch (Exception exception) {
+            // Timeout, rejection, or an unexpected retrieval failure: the
+            // fallback must still answer, never throw.
+            return curatedFallback(normalizedLocale);
+        }
+        if ("ANSWERED".equals(lexical.reasonCode()) && !lexical.citations().isEmpty()) {
+            // Local KB answered within budget: keep the top answer with its
+            // citations, mark degraded so clients know the remote RAG path was
+            // bypassed (existing local-grounded convention).
+            return withDegraded(lexical);
+        }
+        return curatedFallback(normalizedLocale);
+    }
+
+    private static ChatResponse withDegraded(ChatResponse response) {
+        return new ChatResponse(response.answer(), response.model(), true, response.reasonCode(),
+                response.locale(), response.citations(), response.requestId(), response.clientRequestId(),
+                response.turnId(), response.replayed(), response.terminalStatus(), response.conversationId(),
+                response.messageId(), response.resetAt());
+    }
+
+    /**
+     * Deterministic Vietnamese/English fallback answer used when even the local
+     * KB has nothing: a brief apology, three portal pointers, and the Phòng Đào
+     * tạo contact. Never empty, never a 5xx.
+     */
+    static ChatResponse curatedFallback(String locale) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        boolean vi = "vi".equals(normalizedLocale);
+        String text = vi
+                ? "Mình rất tiếc, trợ lý chưa kết nối được kho kiến thức để tra cứu câu hỏi này lúc này. "
+                        + "Bạn có thể thử lại sau ít phút, hoặc:\n\n"
+                        + "• Xem quy chế và hướng dẫn học vụ ở mục Cẩm nang sinh viên.\n"
+                        + "• Tra cứu lớp học phần và thời khóa biểu ở trang Đăng ký học phần / Thời khóa biểu.\n"
+                        + "• Theo dõi các thông báo mới nhất ở trang Thông báo.\n\n"
+                        + "Nếu vẫn chưa được giải quyết, bạn hãy liên hệ Phòng Đào tạo để được hỗ trợ nhé."
+                : "Sorry, the assistant could not reach the knowledge base for this question right now. "
+                        + "Please try again in a few minutes, or:\n\n"
+                        + "• Read academic regulations in the Student Handbook section.\n"
+                        + "• Check sections and timetables on the Course Registration / Schedule pages.\n"
+                        + "• Follow the latest updates on the Announcements page.\n\n"
+                        + "If the issue persists, please contact the Academic Affairs Office.";
+        return new ChatResponse(text, MODEL, true, "ANSWERED", normalizedLocale, List.of());
+    }
+
     /** Pure lexical path used by tests and by safe fallback when persistence is unavailable. */
     public ChatResponse answer(String message, String locale) {
         return lexicalAnswer(message, locale);
@@ -724,6 +809,7 @@ public class ThesisAssistantService {
         String reason = lexical.documents().isEmpty() ? "NO_MATCH"
                 : synthesisRequired ? "PROVIDER_DISABLED" : "RAG_GROUNDED";
         boolean degraded = synthesisRequired && !lexical.documents().isEmpty();
+        java.time.Instant quotaResetAt = null;
         String answer = lexical.answer();
         List<ProviderSegment> emittedSegments = new ArrayList<>();
         StringBuilder providerAnswer = new StringBuilder();
@@ -835,6 +921,7 @@ public class ThesisAssistantService {
                     reason = "QUOTA_EXCEEDED";
                     degraded = true;
                     answer = lexical.answer();
+                    quotaResetAt = nextQuotaResetAt();
                 } else if (!"DISPATCHED".equals(dispatch.reasonCode())) {
                     throw problem(409, dispatch.reasonCode(), "The assistant turn lease is no longer current");
                 }
@@ -859,10 +946,12 @@ public class ThesisAssistantService {
                             reason.equals("ANSWERED") ? deepSeek.model() : MODEL, answer, degraded, reason,
                             terminalCitations, this::fenceExpired);
             for (Citation citation : terminal.citations()) emit(sink, new StreamCitation(citation));
-            emit(sink, new StreamDone(terminal.messageId(), reason, degraded, terminal.terminalStatus()));
+            emit(sink, new StreamDone(terminal.messageId(), reason, degraded, terminal.terminalStatus(),
+                    "QUOTA_EXCEEDED".equals(reason) ? quotaResetAt : null));
             return new ChatResponse(terminal.answer(), terminal.model(), terminal.degraded(), terminal.reasonCode(), normalizedLocale,
                     terminal.citations(), requestId, clientRequestId, reservation.turnId(), false, terminal.terminalStatus(),
-                    terminal.conversationId().toString(), terminal.messageId().toString());
+                    terminal.conversationId().toString(), terminal.messageId().toString(),
+                    "QUOTA_EXCEEDED".equals(reason) ? quotaResetAt : null);
         } catch (DomainException exception) {
             if (isTransientTerminalRace(exception.code())) {
                 // A cancel, purge, or lease fence can win after one provider
@@ -919,12 +1008,18 @@ public class ThesisAssistantService {
                     response = new ChatResponse(lexical.answer(), MODEL, true, "PROVIDER_UNAVAILABLE", requestedLocale, fallbackCitations);
                 }
             } else if (!lexical.citations().isEmpty()) {
+                String degradedReason = deepSeek == null || !deepSeek.usable()
+                        ? "PROVIDER_DISABLED" : "QUOTA_EXCEEDED";
                 response = new ChatResponse(lexical.answer(), MODEL, true,
-                        deepSeek == null || !deepSeek.usable() ? "PROVIDER_DISABLED" : "QUOTA_EXCEEDED", requestedLocale, fallbackCitations);
+                        degradedReason, requestedLocale, fallbackCitations);
+                if ("QUOTA_EXCEEDED".equals(degradedReason)) {
+                    response = response.withResetAt(nextQuotaResetAt());
+                }
             }
             UUID messageId = legacyHistory.appendMessage(conversation, "ASSISTANT", response.answer(), response.model(), response.degraded(), response.reasonCode());
             legacyHistory.appendCitations(messageId, response.citations());
-            return new ChatResponse(response.answer(), response.model(), response.degraded(), response.reasonCode(), response.locale(), response.citations(), conversation.toString(), messageId.toString());
+            return new ChatResponse(response.answer(), response.model(), response.degraded(), response.reasonCode(), response.locale(), response.citations(), conversation.toString(), messageId.toString())
+                    .withResetAt(response.resetAt());
         } catch (DataAccessException exception) {
             return new ChatResponse(lexical.answer(), MODEL, true, "HISTORY_UNAVAILABLE", requestedLocale, fallbackCitations);
         }
@@ -996,10 +1091,15 @@ public class ThesisAssistantService {
             // that happen to mention a deadline, classes, or credit counts.
             documents = registrationDocuments;
         }
-        List<Citation> citations = documents.stream().map(ThesisAssistantService::citation).toList();
+        // The model prompt only carries the top ranked documents: five cited
+        // sources were pure prompt weight for direct lookups. Retrieval keeps
+        // its wider candidate window above; this trims what is injected.
+        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> promptDocuments = documents.stream()
+                .limit(PROMPT_DOCUMENT_LIMIT).toList();
+        List<Citation> citations = promptDocuments.stream().map(ThesisAssistantService::citation).toList();
         String answer = normalizeAssistantCopy(documents.isEmpty() ? noMatchMessage(locale)
                 : answerFromDocument(message, documents.get(0)), locale);
-        String context = buildGroundedContext(documents,
+        String context = buildGroundedContext(promptDocuments,
                 properties == null ? Integer.MAX_VALUE : properties.maxContextChars());
         List<String> sourceIds = citations.stream().map(Citation::sourceId).filter(value -> value != null && !value.isBlank()).toList();
         String snapshotMaterial = documents.stream().map(document -> String.join("|",
@@ -1341,7 +1441,12 @@ public class ThesisAssistantService {
     public record StreamCitation(Citation citation) implements StreamEvent {
         @JsonProperty("type") public String type() { return "citation"; }
     }
-    public record StreamDone(UUID messageId, String reasonCode, boolean degraded, String terminalStatus) implements StreamEvent {
+    public record StreamDone(UUID messageId, String reasonCode, boolean degraded, String terminalStatus, java.time.Instant resetAt) implements StreamEvent {
+        /** Pre-resetAt arity retained for existing emitters; {@code resetAt} stays null. */
+        public StreamDone(UUID messageId, String reasonCode, boolean degraded, String terminalStatus) {
+            this(messageId, reasonCode, degraded, terminalStatus, null);
+        }
+
         @JsonProperty("type") public String type() { return "done"; }
     }
     public record StreamError(String code, boolean retryable) implements StreamEvent {
