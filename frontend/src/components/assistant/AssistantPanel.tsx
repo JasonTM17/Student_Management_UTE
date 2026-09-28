@@ -682,6 +682,42 @@ export function AssistantPanel() {
                   ) : null}
                 </div>
               ) : null}
+
+              {/* A degraded answer without citations answered from the
+                  fallback chain, not the reviewed corpus; offer the same
+                  retry affordance as a hard error so the user can re-ask
+                  once the provider recovers instead of staring at a
+                  dead-end badge. Quota-exceeded is excluded: retrying a
+                  daily-quota refusal cannot succeed before the reset time,
+                  so that state keeps its own recovery message. */}
+              {!state.error &&
+              lastPrompt &&
+              (() => {
+                const last = state.messages[state.messages.length - 1];
+                return (
+                  last &&
+                  last.role === 'assistant' &&
+                  !last.pending &&
+                  last.degraded === true &&
+                  last.reasonCode !== 'QUOTA_EXCEEDED' &&
+                  !(last.citations && last.citations.length > 0)
+                );
+              })() ? (
+                <div className="pl-9">
+                  <Button
+                    type="button"
+                    variant="ghost"
+                    size="sm"
+                    className="min-h-10 px-0 text-muted-foreground hover:bg-transparent hover:underline"
+                    onClick={(event) =>
+                      void sendMessage(event, lastPrompt, { retry: true })
+                    }
+                  >
+                    <RotateCcw className="mr-1 h-3.5 w-3.5" aria-hidden="true" />
+                    {messages.assistant.retry}
+                  </Button>
+                </div>
+              ) : null}
               </div>
 
               {/* Keep the scroll-to-bottom action inside the log viewport so

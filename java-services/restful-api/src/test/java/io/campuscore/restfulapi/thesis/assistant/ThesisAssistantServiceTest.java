@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
@@ -631,5 +632,180 @@ class ThesisAssistantServiceTest {
                                 + "Withdrawal is allowed during the first2 weeks of a regular semester.\n\n"
                                 + "## Credit Load Rules- The maximum is24 credits.\n\n"
                                 + "Credit limits: minimum of14 credits and up to28 credits. Summer terms allow8 to 10 credits.", "en"));
+    }
+
+    @Test
+    void quotaExceededAnswerCarriesTheNextIctMidnightResetAt() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "55555555-5555-5555-5555-555555555555", "topic", "en", "Topic", "Grounded answer", "office");
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+        when(provider.model()).thenReturn("deepseek-v4-flash");
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(false, false, "QUOTA_EXCEEDED"));
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("curated-lexical-rag"),
+                eq("Grounded answer"), eq(true), eq("QUOTA_EXCEEDED"), anyList(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, message, "Grounded answer", "curated-lexical-rag", true,
+                        "QUOTA_EXCEEDED", List.of(), false, "COMPLETED"));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        ChatResponse response = service.answer("topic compare multiple conditions", "en", null, "owner-quota", request);
+
+        assertEquals("QUOTA_EXCEEDED", response.reasonCode());
+        assertTrue(response.degraded());
+        assertNotNull(response.resetAt());
+        // resetAt must be midnight in Asia/Ho_Chi_Minh on the day after the
+        // current quota bucket (the bounds above pin it against rollover races).
+        java.time.ZonedDateTime ict = response.resetAt().atZone(java.time.ZoneId.of("Asia/Ho_Chi_Minh"));
+        assertEquals(0, ict.getHour());
+        assertEquals(0, ict.getMinute());
+        assertEquals(0, ict.getSecond());
+    }
+
+    @Test
+    void groundedFallbackAnswersFromLocalKnowledgeWithCitationsWhenGatewayIsDown() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "66666666-6666-6666-6666-666666666666", "dang-ky-de-tai", "vi",
+                "Điều kiện đăng ký đề tài khóa luận", "Tích lũy tối thiểu 110 tín chỉ để đăng ký đề tài.",
+                "handbook");
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of(document));
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .groundedFallback("Điều kiện đăng ký đề tài là gì?", "vi");
+
+        assertEquals("ANSWERED", response.reasonCode());
+        assertTrue(response.degraded(), "the local-grounded fallback must be marked degraded");
+        assertEquals("curated-lexical-rag", response.model());
+        assertEquals(1, response.citations().size());
+        assertEquals("66666666-6666-6666-6666-666666666666", response.citations().get(0).sourceId());
+        assertTrue(response.answer().contains("110 tín chỉ"), response.answer());
+    }
+
+    @Test
+    void groundedFallbackUsesTheCuratedTextWithThreePointersWhenLocalSearchIsEmpty() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .groundedFallback("asdkjhaskjdh kjahsdkjh?", "vi");
+
+        assertTrue(response.degraded());
+        assertEquals("ANSWERED", response.reasonCode());
+        assertTrue(response.citations().isEmpty());
+        String answer = response.answer();
+        assertTrue(answer.contains("Phòng Đào tạo"), answer);
+        assertTrue(answer.contains("Cẩm nang sinh viên"), answer);
+        assertEquals(3, countBullets(answer));
+    }
+
+    private static int countBullets(String text) {
+        int count = 0;
+        for (String line : text.split("\n", -1)) {
+            if (line.startsWith("• ")) count++;
+        }
+        return count;
+    }
+
+    @Test
+    void groundedFallbackDegradesToCuratedTextWhenTheLocalBudgetIsExceeded() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                "77777777-7777-7777-7777-777777777777", "topic", "vi", "Đề tài", "Nội dung đề tài", "handbook");
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenAnswer(invocation -> {
+            Thread.sleep(1_500L);
+            return List.of(document);
+        });
+
+        ChatResponse response = new ThesisAssistantService(knowledge)
+                .groundedFallback("Điều kiện đăng ký đề tài là gì?", "vi");
+
+        assertTrue(response.degraded());
+        assertTrue(response.answer().contains("Phòng Đào tạo"), response.answer());
+        assertTrue(response.citations().isEmpty());
+    }
+
+    @Test
+    void providerPromptOnlyCarriesTheTopThreeDocuments() {
+        ThesisAssistantKnowledgeRepository knowledge = mock(ThesisAssistantKnowledgeRepository.class);
+        DeepSeekClient provider = mock(DeepSeekClient.class);
+        ThesisAssistantRepository history = mock(ThesisAssistantRepository.class);
+        ThesisAssistantTurnRepository turns = mock(ThesisAssistantTurnRepository.class);
+        ThesisAssistantCatalogRepository catalog = mock(ThesisAssistantCatalogRepository.class);
+        List<ThesisAssistantKnowledgeRepository.KnowledgeDocument> documents = new ArrayList<>();
+        for (int index = 1; index <= 5; index++) {
+            documents.add(new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
+                    "00000000-0000-0000-0000-00000000000" + index, "topic-" + index, "en",
+                    "Topic " + index, "compare multiple conditions details " + index, "office"));
+        }
+        when(knowledge.search(anyString(), anyList(), anyInt())).thenReturn(documents);
+        when(catalog.search(anyString(), anyList(), anyInt())).thenReturn(List.of());
+        when(provider.model()).thenReturn("deepseek-v4-flash");
+
+        UUID request = UUID.randomUUID();
+        UUID turn = UUID.randomUUID();
+        UUID conversation = UUID.randomUUID();
+        UUID message = UUID.randomUUID();
+        when(turns.reserve(anyString(), eq(request), anyString(), isNull(), eq("en"), anyString(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.Reservation(
+                        ThesisAssistantTurnRepository.ReservationStatus.NEW, turn, conversation, 1L, true, null, null, false));
+        when(turns.markSnapshotReady(eq(turn), anyString(), eq(1L), anyString(),
+                any(java.util.function.Consumer.class))).thenReturn(true);
+        when(turns.dispatch(eq(turn), anyString(), eq(1L), anyInt(), anyInt(),
+                any(java.util.function.Consumer.class)))
+                .thenReturn(new ThesisAssistantTurnRepository.DispatchDecision(true, true, "DISPATCHED"));
+        when(turns.complete(eq(turn), anyString(), eq(1L), anyString(), eq("deepseek-v4-flash"),
+                anyString(), eq(false), eq("ANSWERED"), anyList(), any(java.util.function.Consumer.class)))
+                .thenAnswer(invocation -> new ThesisAssistantTurnRepository.TerminalResult(
+                        conversation, message, invocation.getArgument(5, String.class), "deepseek-v4-flash", false,
+                        "ANSWERED", invocation.getArgument(8, List.class), false, "COMPLETED"));
+        List<AssistantCompletionProvider.CompletionRequest> captured = new ArrayList<>();
+        String firstAllowedId = "00000000-0000-0000-0000-000000000001";
+        doAnswer(invocation -> {
+            captured.add(invocation.getArgument(0));
+            @SuppressWarnings("unchecked")
+            java.util.function.Consumer<ProviderSegment> sink = invocation.getArgument(1);
+            sink.accept(new ProviderSegment(0, "Synthesized answer", List.of(firstAllowedId)));
+            return new CompletionResult("Synthesized answer", List.of(), "stop");
+        }).when(provider).complete(any(AssistantCompletionProvider.CompletionRequest.class),
+                any(java.util.function.Consumer.class), any(java.util.function.BooleanSupplier.class));
+
+        ThesisAssistantService service = new ThesisAssistantService(knowledge, provider, history, turns, catalog,
+                new AssistantCancellationRegistry(),
+                new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
+                new AssistantProperties(6000, 2000, 20, 200, 90, true));
+
+        ChatResponse response = service.answer("topic compare multiple conditions", "en", null, "owner-trim", request);
+
+        assertEquals("ANSWERED", response.reasonCode());
+        assertEquals(1, captured.size());
+        // D-latency: the prompt (context + allowed source ids) carries top-3, not top-5.
+        assertEquals(3, captured.get(0).sourceIds().size());
+        assertEquals(3, captured.get(0).context().split("(?m)^### ", -1).length - 1);
+        assertEquals(3, response.citations().size());
     }
 }
