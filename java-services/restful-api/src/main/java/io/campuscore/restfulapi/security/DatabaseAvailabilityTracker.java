@@ -28,4 +28,14 @@ public final class DatabaseAvailabilityTracker {
         long lastFailure = LAST_FAILURE_MS.get();
         return lastFailure > 0L && (System.currentTimeMillis() - lastFailure) < OUTAGE_COOLDOWN_MS;
     }
+
+    /**
+     * Timestamp of the most recent recorded failure (0 = none). Lets a
+     * long-running request whose own filters recorded the outage at entry —
+     * and whose layered timeouts then outlive the 5s cooldown — still prove
+     * the database was down when it started.
+     */
+    public static long lastFailureAt() {
+        return LAST_FAILURE_MS.get();
+    }
 }

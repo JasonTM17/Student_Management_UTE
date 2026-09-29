@@ -584,6 +584,20 @@ public class ThesisAssistantService {
      * fallback text below instead of a 5xx.
      */
     public ChatResponse groundedFallback(String message, String locale) {
+        return groundedFallback(message, locale, false);
+    }
+
+    /**
+     * @param dbDownAtRequestStart true when the caller proved the database was
+     *        already unavailable when this request began (the account-state
+     *        filter recorded a failure after the request started). Layered
+     *        timeouts (gateway 15s > local budget 5s > Hikari 15s) mean a
+     *        stopped database surfaces here only as a budget timeout long
+     *        after the availability cooldown expired — the flag carries the
+     *        proof, and the outage contract (KNOWLEDGE_UNAVAILABLE, degraded,
+     *        no citations) must win over the curated content fallback.
+     */
+    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         // A stopped database fails retrieval slower than every layered timeout
         // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
@@ -601,8 +615,12 @@ public class ThesisAssistantService {
             Thread.currentThread().interrupt();
             return curatedFallback(normalizedLocale);
         } catch (Exception exception) {
-            // Timeout, rejection, or an unexpected retrieval failure: the
-            // fallback must still answer, never throw.
+            // Budget timeout / rejection: answer anyway, never throw. When the
+            // database was already down when the request began, the precise
+            // outage contract wins over the curated content fallback.
+            if (dbDownAtRequestStart) {
+                return knowledgeUnavailableResponse(locale, null);
+            }
             return curatedFallback(normalizedLocale);
         }
         if ("ANSWERED".equals(lexical.reasonCode()) && !lexical.citations().isEmpty()) {
@@ -619,6 +637,9 @@ public class ThesisAssistantService {
             // ANSWERED here made a DB outage indistinguishable from "no
             // matching document".
             return withDegraded(lexical);
+        }
+        if (dbDownAtRequestStart) {
+            return knowledgeUnavailableResponse(locale, null);
         }
         return curatedFallback(normalizedLocale);
     }
