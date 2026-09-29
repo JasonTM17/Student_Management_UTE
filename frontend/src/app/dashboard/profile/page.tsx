@@ -490,7 +490,9 @@ export default function ProfilePage() {
               </div>
               <div className="min-w-0 flex-1 space-y-2">
                 <div className="text-lg font-semibold text-foreground">
-                  {user?.firstName} {user?.lastName}
+                  {/* Display order matches the rest of the portal (sidebar, topbar):
+                      family name first — "Nguyễn Tiến Sơn", not "Tiến Sơn Nguyễn". */}
+                  {user?.lastName} {user?.firstName}
                 </div>
                 <div className="text-sm text-muted-foreground">{user?.email}</div>
                 <div className="flex flex-wrap items-center gap-2">

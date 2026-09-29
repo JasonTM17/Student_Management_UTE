@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useState } from 'react';
 import { useParams } from 'next/navigation';
 import {
   CalendarDays,
@@ -35,33 +35,34 @@ export default function ThesisRoundDetailPage() {
     messages.common.statuses[status.toUpperCase() as keyof typeof messages.common.statuses] ??
     messages.common.statuses.UNKNOWN;
 
-  useEffect(() => {
+  const reload = useCallback(async (signal: { cancelled: boolean }) => {
     if (!roundId) return;
-    let cancelled = false;
-    const load = async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-        const [roundsData, topicsData, groupsData] = await Promise.all([
-          thesisApi.listRounds(),
-          thesisApi.listTopics(roundId),
-          thesisApi.listGroups(roundId),
-        ]);
-        if (cancelled) return;
-        setRound(roundsData.find((r) => r.id === roundId) ?? null);
-        setTopics(topicsData);
-        setGroups(groupsData);
-      } catch {
-        if (!cancelled) setError(messages.thesis.loadFailed);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-    void load();
-    return () => {
-      cancelled = true;
-    };
+    setIsLoading(true);
+    setError('');
+    try {
+      const [roundsData, topicsData, groupsData] = await Promise.all([
+        thesisApi.listRounds(),
+        thesisApi.listTopics(roundId),
+        thesisApi.listGroups(roundId),
+      ]);
+      if (signal.cancelled) return;
+      setRound(roundsData.find((r) => r.id === roundId) ?? null);
+      setTopics(topicsData);
+      setGroups(groupsData);
+    } catch {
+      if (!signal.cancelled) setError(messages.thesis.loadFailed);
+    } finally {
+      if (!signal.cancelled) setIsLoading(false);
+    }
   }, [roundId, messages.thesis.loadFailed]);
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void reload(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [reload]);
 
   if (isLoading) {
     return <LoadingState label={messages.thesis.loading} />;
@@ -73,7 +74,7 @@ export default function ThesisRoundDetailPage() {
         title={messages.thesis.loadFailed}
         description={error || messages.thesis.noRound}
         retryLabel={messages.thesis.retry}
-        onRetry={() => window.location.reload()}
+        onRetry={() => void reload({ cancelled: false })}
       />
     );
   }

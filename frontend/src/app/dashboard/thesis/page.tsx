@@ -338,48 +338,49 @@ export default function ThesisPage() {
     }
   };
 
-  useEffect(() => {
-    let cancelled = false;
-
-    const loadRounds = async () => {
-      setIsLoading(true);
-      setError('');
-      try {
-        const nextRounds = await thesisApi.listRounds();
-        if (cancelled) return;
-        const sortedRounds = [...nextRounds].sort((a, b) => {
-          const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
-          const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
-          if (isOpenA !== isOpenB) return isOpenA - isOpenB;
-          const isKltnA = a.thesisType === 'KLTN' ? 0 : 1;
-          const isKltnB = b.thesisType === 'KLTN' ? 0 : 1;
-          if (isKltnA !== isKltnB) return isKltnA - isKltnB;
-          return (b.registrationStart || '').localeCompare(a.registrationStart || '');
-        });
-        setRounds(sortedRounds);
-        setSelectedRoundId((current) => {
-          if (explicitRoundId && sortedRounds.some((r) => r.id === explicitRoundId)) {
-            return explicitRoundId;
-          }
-          if (current) return current;
-          const preferred =
-            sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
-            sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
-            sortedRounds[0];
-          return preferred?.id || '';
-        });
-      } catch {
-        if (!cancelled) setError(messages.thesis.loadFailed);
-      } finally {
-        if (!cancelled) setIsLoading(false);
-      }
-    };
-
-    void loadRounds();
-    return () => {
-      cancelled = true;
-    };
+  // Rounds loader is a callback so the error-state retry can re-fetch in
+  // place instead of reloading the whole page (every other page re-fetches).
+  const loadRounds = useCallback(async (signal: { cancelled: boolean }) => {
+    setIsLoading(true);
+    setError('');
+    try {
+      const nextRounds = await thesisApi.listRounds();
+      if (signal.cancelled) return;
+      const sortedRounds = [...nextRounds].sort((a, b) => {
+        const isOpenA = a.status === 'REGISTRATION_OPEN' ? 0 : 1;
+        const isOpenB = b.status === 'REGISTRATION_OPEN' ? 0 : 1;
+        if (isOpenA !== isOpenB) return isOpenA - isOpenB;
+        const isKltnA = a.thesisType === 'KLTN' ? 0 : 1;
+        const isKltnB = b.thesisType === 'KLTN' ? 0 : 1;
+        if (isKltnA !== isKltnB) return isKltnA - isKltnB;
+        return (b.registrationStart || '').localeCompare(a.registrationStart || '');
+      });
+      setRounds(sortedRounds);
+      setSelectedRoundId((current) => {
+        if (explicitRoundId && sortedRounds.some((r) => r.id === explicitRoundId)) {
+          return explicitRoundId;
+        }
+        if (current) return current;
+        const preferred =
+          sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN' && r.thesisType === 'KLTN') ||
+          sortedRounds.find((r) => r.status === 'REGISTRATION_OPEN') ||
+          sortedRounds[0];
+        return preferred?.id || '';
+      });
+    } catch {
+      if (!signal.cancelled) setError(messages.thesis.loadFailed);
+    } finally {
+      if (!signal.cancelled) setIsLoading(false);
+    }
   }, [explicitRoundId, messages.thesis.loadFailed]);
+
+  useEffect(() => {
+    const signal = { cancelled: false };
+    void loadRounds(signal);
+    return () => {
+      signal.cancelled = true;
+    };
+  }, [loadRounds]);
 
   // The round default above is a student-facing preference. A lecturer whose
   // supervision lives in another round would otherwise land on an empty
@@ -1388,7 +1389,7 @@ export default function ThesisPage() {
         title={messages.thesis.loadFailed}
         description={error}
         retryLabel={messages.thesis.retry}
-        onRetry={() => window.location.reload()}
+        onRetry={() => void loadRounds({ cancelled: false })}
       />
     );
   }
@@ -1626,6 +1627,7 @@ export default function ThesisPage() {
               <input
                 id="thesis-report-file"
                 type="file"
+                aria-label={messages.thesis.report.pickFile}
                 accept=".pdf,.doc,.docx"
                 onChange={(e) => setReportFile(e.target.files?.[0] ?? null)}
                 disabled={isActionPending}
@@ -1978,9 +1980,11 @@ export default function ThesisPage() {
             <div className="space-y-6">
               {/* Tab Navigation for Lecturer */}
               <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
-                <div className="flex flex-wrap items-center gap-2">
+                <div className="flex flex-wrap items-center gap-2" role="tablist" aria-label={pageCopy.tabTopicsAndSupervisors}>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={lecturerTab === 'supervision'}
                     onClick={() => {
                       userChoseTabRef.current = true;
                       setLecturerTab('supervision');
@@ -2007,6 +2011,8 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={lecturerTab === 'defense'}
                     onClick={() => {
                       userChoseTabRef.current = true;
                       setLecturerTab('defense');
@@ -2033,6 +2039,8 @@ export default function ThesisPage() {
                   </button>
                   <button
                     type="button"
+                    role="tab"
+                    aria-selected={lecturerTab === 'repository'}
                     onClick={() => {
                       userChoseTabRef.current = true;
                       setLecturerTab('repository');

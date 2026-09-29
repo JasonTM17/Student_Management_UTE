@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import { Check, Clock3, FileText, UsersRound } from 'lucide-react';
 import { LinkButton } from '@/components/ui/link-button';
+import { Select } from '@/components/ui/select';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -145,17 +146,13 @@ export default function ThesisProgressPage() {
       />
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex min-w-[15rem] flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {messages.thesis.selectRound}
-          <select
-            value={workspace.selectedRoundId}
-            onChange={(event) => workspace.setSelectedRoundId(event.target.value)}
-            className="h-11 rounded-lg border border-border/80 bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={messages.thesis.selectRound}
-          >
-            {workspace.rounds.map((round) => <option key={round.id} value={round.id}>{round.name}</option>)}
-          </select>
-        </label>
+        <Select
+          label={messages.thesis.selectRound}
+          value={workspace.selectedRoundId}
+          onChange={(event) => workspace.setSelectedRoundId(event.target.value)}
+          aria-label={messages.thesis.selectRound}
+          options={workspace.rounds.map((round) => ({ value: round.id, label: round.name }))}
+        />
         <div className="rounded-md bg-secondary px-3 py-1.5 text-sm font-medium text-foreground">
           {messages.thesis.progressCurrentStage}: {messages.thesis.progressSteps[Math.max(progressIndex, 0)]}
         </div>

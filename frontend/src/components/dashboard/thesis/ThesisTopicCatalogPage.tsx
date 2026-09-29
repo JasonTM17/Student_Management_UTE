@@ -7,6 +7,7 @@ import { LocalizedLink } from '@/components/LocalizedLink';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { LinkButton } from '@/components/ui/link-button';
+import { Select } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -196,33 +197,25 @@ export default function ThesisTopicCatalogPage() {
       </div>
 
       <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-        <label className="flex min-w-[15rem] flex-1 flex-col gap-2 text-xs font-semibold uppercase tracking-[0.16em] text-muted-foreground">
-          {messages.thesis.selectRound}
-          <select
-            value={workspace.selectedRoundId}
-            onChange={(event) => workspace.setSelectedRoundId(event.target.value)}
-            className="h-11 rounded-lg border border-border/80 bg-card px-3 text-sm font-medium normal-case tracking-normal text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-            aria-label={messages.thesis.selectRound}
-          >
-            {workspace.cohortGroups && workspace.cohortGroups.length > 0 ? (
-              workspace.cohortGroups.map((group) => (
-                <optgroup key={group.cohort} label={group.cohort}>
-                  {group.rounds.map((round) => (
-                    <option key={round.id} value={round.id}>
-                      {round.name}
-                    </option>
-                  ))}
-                </optgroup>
-              ))
-            ) : (
-              workspace.rounds.map((round) => (
-                <option key={round.id} value={round.id}>
-                  {round.name}
-                </option>
-              ))
-            )}
-          </select>
-        </label>
+        <Select
+          label={messages.thesis.selectRound}
+          value={workspace.selectedRoundId}
+          onChange={(event) => workspace.setSelectedRoundId(event.target.value)}
+          aria-label={messages.thesis.selectRound}
+          groups={
+            workspace.cohortGroups && workspace.cohortGroups.length > 0
+              ? workspace.cohortGroups.map((group) => ({
+                  label: group.cohort,
+                  options: group.rounds.map((round) => ({ value: round.id, label: round.name })),
+                }))
+              : undefined
+          }
+          options={
+            workspace.cohortGroups && workspace.cohortGroups.length > 0
+              ? undefined
+              : workspace.rounds.map((round) => ({ value: round.id, label: round.name }))
+          }
+        />
         {workspace.selectedRound ? (
           <div className="sm:self-end sm:pb-1">
             <StatusBadge status={workspace.selectedRound.status} />

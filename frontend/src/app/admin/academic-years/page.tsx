@@ -147,6 +147,7 @@ export default function AdminAcademicYearsPage() {
           updated: 'Đã cập nhật niên khóa',
           created: 'Đã tạo niên khóa',
           saveFailed: 'Hiện chưa thể lưu niên khóa.',
+          endDateBeforeStart: 'Ngày kết thúc phải sau ngày bắt đầu.',
           editTitle: 'Chỉnh sửa niên khóa',
           createTitle: 'Tạo niên khóa',
           yearLabel: 'Năm',
@@ -188,6 +189,7 @@ export default function AdminAcademicYearsPage() {
           updated: 'Academic year updated',
           created: 'Academic year created',
           saveFailed: 'The academic year could not be saved.',
+          endDateBeforeStart: 'End date must be after the start date.',
           editTitle: 'Edit academic year',
           createTitle: 'Create academic year',
           yearLabel: 'Year',
@@ -264,6 +266,12 @@ export default function AdminAcademicYearsPage() {
 
   const handleSubmit = async (event: React.FormEvent) => {
     event.preventDefault();
+    // A year that ends before it starts is always a typo; catch it client-side
+    // instead of round-tripping to the API for a generic rejection.
+    if (formData.startDate && formData.endDate && formData.endDate < formData.startDate) {
+      toast.error(copy.endDateBeforeStart);
+      return;
+    }
     setIsSaving(true);
 
     try {
@@ -316,7 +324,7 @@ export default function AdminAcademicYearsPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
-                  aria-label="Tìm kiếm năm học"
+                  aria-label={copy.searchLabel}
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>

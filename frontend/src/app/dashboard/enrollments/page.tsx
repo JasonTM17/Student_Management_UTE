@@ -31,6 +31,7 @@ import {
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { campusErrorMessage } from '@/lib/campus-error';
+import { dayLabel } from '@/components/schedule/weekly-grid';
 import { toast } from 'sonner';
 
 const statusTone: Record<string, string> = {
@@ -42,27 +43,9 @@ const statusTone: Record<string, string> = {
 };
 
 function getDayName(day: number, locale: 'en' | 'vi') {
-  // DB convention: 1 = Sunday/Chủ nhật, 2 = Monday/Thứ hai, ..., 7 = Saturday/Thứ bảy (0 = Sunday)
-  const normalizedDay = day === 0 ? 1 : day;
-  const viMap: Record<number, string> = {
-    1: 'Chủ nhật',
-    2: 'Thứ hai',
-    3: 'Thứ ba',
-    4: 'Thứ tư',
-    5: 'Thứ năm',
-    6: 'Thứ sáu',
-    7: 'Thứ bảy',
-  };
-  const enMap: Record<number, string> = {
-    1: 'Sunday',
-    2: 'Monday',
-    3: 'Tuesday',
-    4: 'Wednesday',
-    5: 'Thursday',
-    6: 'Friday',
-    7: 'Saturday',
-  };
-  return (locale === 'vi' ? viMap[normalizedDay] : enMap[normalizedDay]) ?? '';
+  // Shared with the weekly grid so every schedule view uses one day-name
+  // source; 0 is a legacy Sunday encoding that folds into 1.
+  return dayLabel(locale, day === 0 ? 1 : day);
 }
 
 export default function EnrollmentsPage() {
@@ -474,9 +457,11 @@ export default function EnrollmentsPage() {
           </div>
 
           <div className="flex flex-wrap items-center justify-between gap-3 border-b border-border/70 pb-3">
-            <div className="flex items-center gap-2">
+            <div className="flex items-center gap-2" role="tablist" aria-label={copy.tabCurriculum}>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === 'curriculum'}
                 onClick={() => setActiveTab('curriculum')}
                 className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   activeTab === 'curriculum'
@@ -494,6 +479,8 @@ export default function EnrollmentsPage() {
               </button>
               <button
                 type="button"
+                role="tab"
+                aria-selected={activeTab === 'enrollments'}
                 onClick={() => setActiveTab('enrollments')}
                 className={`flex min-h-10 items-center gap-2 rounded-lg px-4 py-2 text-sm font-semibold transition ${
                   activeTab === 'enrollments'

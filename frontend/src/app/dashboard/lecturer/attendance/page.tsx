@@ -43,6 +43,7 @@ import {
   WorkspacePanel,
 } from '@/components/dashboard/WorkspaceSurface';
 import { metricToneClass } from '@/components/ui/status';
+import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
 import { useI18n } from '@/i18n';
 import { toast } from 'sonner';
 
@@ -66,6 +67,7 @@ export default function LecturerAttendancePage() {
   const { hasAccess, isLoading: authLoading } = useRequireAuth(['LECTURER']);
   const { locale, formatNumber, messages } = useI18n();
   const copy = messages.lecturerAttendance;
+  const { confirm, confirmationDialog } = useConfirmationDialog();
 
   const [semesters, setSemesters] = useState<Semester[]>([]);
   const [selectedSemester, setSelectedSemester] = useState('');
@@ -204,7 +206,17 @@ export default function LecturerAttendancePage() {
     toast.info(copy.markAllPresent);
   };
 
-  const handleResetStatuses = () => {
+  const handleResetStatuses = async () => {
+    const hasMarks = roster.some((row) => row.status !== null || row.notes.trim() !== '');
+    if (!hasMarks) return;
+    const shouldReset = await confirm({
+      title: copy.resetTitle,
+      message: copy.resetMessage,
+      confirmText: copy.resetConfirm,
+      cancelText: messages.common.actions.cancel,
+      variant: 'destructive',
+    });
+    if (!shouldReset) return;
     setRoster((prev) => prev.map((row) => ({ ...row, status: null, notes: '' })));
   };
 
@@ -220,7 +232,7 @@ export default function LecturerAttendancePage() {
       }));
 
     if (records.length === 0) {
-      toast.warning('Vui lòng chọn trạng thái điểm danh cho ít nhất 1 sinh viên');
+      toast.warning(copy.noStatusSelected);
       return;
     }
 
@@ -311,7 +323,7 @@ export default function LecturerAttendancePage() {
   }, []);
 
   if (authLoading) {
-    return <LoadingState label="Đang xác thực thông tin giảng viên..." />;
+    return <LoadingState label={copy.loadingAuth} />;
   }
 
   if (!hasAccess) {
@@ -668,6 +680,7 @@ export default function LecturerAttendancePage() {
           </div>
         </WorkspacePanel>
       )}
+      {confirmationDialog}
     </div>
   );
 }

@@ -350,7 +350,7 @@ export default function AdminClassroomsPage() {
                   value={searchInput}
                   onChange={(event) => setSearchInput(event.target.value)}
                   placeholder={copy.searchPlaceholder}
-                  aria-label="Tìm kiếm phòng học"
+                  aria-label={copy.searchLabel}
                   icon={<Search className="h-4 w-4" />}
                 />
               </div>
