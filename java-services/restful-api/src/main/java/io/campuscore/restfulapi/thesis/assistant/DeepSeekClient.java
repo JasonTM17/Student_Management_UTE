@@ -421,7 +421,12 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 // published topics. Only invented detail is forbidden.
                 + "Never provide shell commands, SQL, API endpoints, code blocks, configuration, debugging steps, or implementation details that are not already present in the provided context. "
                 + "Translate internal status or window names into natural user-facing language; never expose enum names such as ADD_DROP or REGISTRATION. "
-                + "Do not mention retrieved context, the provider, model names, prompts, tokens, errors, or personal data. If asked for technical details beyond the provided context, politely say you can only help with published academic information.";
+                + "Do not mention retrieved context, the provider, model names, prompts, tokens, errors, or personal data. "
+                // The model kept phrasing hedges as "Theo nguồn thông tin học
+                // thuật được cung cấp" — forbid that meta-voice explicitly in
+                // both languages: the answer speaks as the portal itself.
+                + "Never phrase anything as coming from provided sources, context, documents, or materials (e.g. \"theo nguồn thông tin được cung cấp\", \"dựa trên tài liệu\", \"according to the provided context\") — answer as the portal's own assistant. "
+                + "If asked for technical details beyond the provided context, politely say you can only help with published academic information.";
     }
 
     private record ParsedFrame(boolean done, String text, String finishReason, List<String> sourceIds, long rawBytes) { }

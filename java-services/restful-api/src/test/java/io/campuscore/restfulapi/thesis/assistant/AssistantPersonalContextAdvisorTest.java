@@ -68,6 +68,24 @@ class AssistantPersonalContextAdvisorTest {
     }
 
     @Test
+    void examTimetableQuestionsNeverResolveAsPersonalSchedule() {
+        // "Lịch thi cuối kỳ" shares the "lịch" noun with personal timetables
+        // but is a public knowledge topic — the advisor must stay out of it so
+        // the asker's own class rows are never presented as the exam schedule.
+        assertFalse(advisor.handles("Lịch thi cuối kỳ khi nào?"));
+        assertFalse(advisor.handles("lịch thi kết thúc học phần học kỳ này"));
+        assertFalse(advisor.handles("kỳ thi cuối kỳ tổ chức ở đâu?"));
+        assertFalse(advisor.handles("When is the final exam schedule?"));
+        // Bare "lịch" without a qualifier is not a personal-timetable intent
+        // either; it belongs to the knowledge path like other ambiguous asks.
+        assertFalse(advisor.handles("lịch thi cuối kỳ"));
+        // The personal timetable intents that already worked must keep working
+        // after the bare-noun fix.
+        assertTrue(advisor.handles("Lịch của tôi thế nào?"));
+        assertTrue(advisor.handles("xem lịch học của tôi"));
+    }
+
+    @Test
     void detectsThesisWorkloadIntentsInVietnameseAndEnglish() {
         assertTrue(advisor.handles("Tôi có đề tài đồ án nào đang hướng dẫn?"));
         assertTrue(advisor.handles("đề tài khóa luận của tôi"));
