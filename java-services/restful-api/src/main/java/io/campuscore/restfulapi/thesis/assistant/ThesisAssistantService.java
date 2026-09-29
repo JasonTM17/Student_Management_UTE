@@ -600,6 +600,130 @@ public class ThesisAssistantService {
     /** Model name marking a lexical fast-path answer from the reviewed curated corpus. */
     public static final String FAST_PATH_MODEL = "curated-lexical-fast";
 
+    /** Model name marking a locally-composed conversational reply (greeting, thanks, identity). */
+    public static final String CONVERSATIONAL_MODEL = "campuscore-conversational";
+
+    /**
+     * Conversational openers ("hi", "Xin chào, bạn có thể giúp gì cho tôi?",
+     * "Cảm ơn") are personal-data-free small talk: they must NOT fall through
+     * to the knowledge fallback ("Mình chưa tìm thấy hướng dẫn...") that a
+     * retrieval miss produces. Resolved here with a fixed persona reply — no
+     * retrieval, no provider, effectively instant — and returned with reason
+     * code CONVERSATIONAL. The caller runs the full input guard BEFORE this
+     * tier, so the text below never sees hostile input.
+     *
+     * @return a grounded local reply, or {@code null} when the message is a
+     *         real academic question that must go down the knowledge path.
+     */
+    static ChatResponse conversationalAnswer(String message, String locale) {
+        if (message == null || message.isBlank()) return null;
+        String normalized = message.toLowerCase(java.util.Locale.ROOT)
+                .replaceAll("[!.,;:?~\\s]+$", "").trim();
+        if (normalized.isEmpty()) return null;
+        boolean vi = "vi".equals(AssistantInputGuard.normalizeLocale(locale));
+        boolean matches = (patternOf(CONVERSATIONAL_OPENERS).matcher(normalized).find())
+                || (patternOf(CONVERSATIONAL_IDENTITY).matcher(normalized).find())
+                || (patternOf(CONVERSATIONAL_CAPABILITY).matcher(normalized).find())
+                || (patternOf(CONVERSATIONAL_THANKS).matcher(normalized).find())
+                || (patternOf(CONVERSATIONAL_BYE).matcher(normalized).find());
+        if (!matches) return null;
+        String text;
+        if (patternOf(CONVERSATIONAL_THANKS).matcher(normalized).find()) {
+            text = vi
+                    ? "Không có gì ạ! Nếu bạn cần tra cứu thêm về học phần, lịch học, điểm, điểm rèn luyện hay quy chế học vụ, cứ hỏi mình nhé."
+                    : "You're welcome! If you need anything else about sections, timetables, grades, conduct scores, or academic regulations, just ask.";
+        } else if (patternOf(CONVERSATIONAL_BYE).matcher(normalized).find()) {
+            text = vi
+                    ? "Tạm biệt bạn! Khi nào cần hỗ trợ học vụ, bạn quay lại hỏi mình bất cứ lúc nào nhé."
+                    : "Goodbye! Come back any time you need help with academic questions.";
+        } else if (patternOf(CONVERSATIONAL_IDENTITY).matcher(normalized).find()
+                || patternOf(CONVERSATIONAL_CAPABILITY).matcher(normalized).find()) {
+            text = vi
+                    ? "Mình là trợ lý AI của Cổng học vụ CampusUTE, được cấu hình chuyên sâu cho dữ liệu của trường và của chính tài khoản bạn.\n\n"
+                            + "Mình có thể giúp:\n"
+                            + "• Tra cứu lớp học phần, giảng viên, phòng học và thời khóa biểu cá nhân.\n"
+                            + "• Tính hạn mức đăng ký tín chỉ còn lại của bạn.\n"
+                            + "• Tổng hợp điểm, GPA và điểm rèn luyện theo học kỳ.\n"
+                            + "• Hướng dẫn quy trình đăng ký đề tài khóa luận và theo dõi nhóm.\n"
+                            + "• Giải đáp quy chế, quy định học vụ công khai.\n\n"
+                            + "Bạn hỏi bằng tiếng Việt hoặc tiếng Anh đều được nhé."
+                    : "I'm the AI assistant of the CampusUTE portal, configured with the university's data and your own account context.\n\n"
+                            + "I can help with:\n"
+                            + "• Looking up sections, lecturers, rooms and your personal timetable.\n"
+                            + "• Calculating your remaining registration credit budget.\n"
+                            + "• Summarizing your grades, GPA and conduct score by semester.\n"
+                            + "• Guiding you through thesis topic registration and group tracking.\n"
+                            + "• Answering public academic regulations.\n\n"
+                            + "Ask me in Vietnamese or English.";
+        } else {
+            text = vi
+                    ? "Chào bạn! Mình là trợ lý học vụ của CampusUTE.\n\n"
+                            + "Bạn có thể hỏi mình về:\n"
+                            + "• Lớp học phần, thời khóa biểu, phòng học của bạn.\n"
+                            + "• Điểm số, GPA, điểm rèn luyện.\n"
+                            + "• Hạn mức tín chỉ còn được đăng ký.\n"
+                            + "• Quy chế, quy trình đăng ký học phần và khóa luận.\n\n"
+                            + "Bạn muốn tìm hiểu điều gì trước?"
+                    : "Hello! I'm the CampusUTE academic assistant.\n\n"
+                            + "You can ask me about:\n"
+                            + "• Your sections, timetable and classrooms.\n"
+                            + "• Grades, GPA and conduct scores.\n"
+                            + "• Your remaining registration credit budget.\n"
+                            + "• Regulations and how to register for sections or thesis topics.\n\n"
+                            + "What would you like to know first?";
+        }
+        return new ChatResponse(text, CONVERSATIONAL_MODEL, false, "CONVERSATIONAL",
+                AssistantInputGuard.normalizeLocale(locale), List.of());
+    }
+
+    /**
+     * Emits a fully local response (conversational tier) as a complete SSE
+     * conversation turn: meta with the response's own model, one replace
+     * delta, and a completed done frame. Used by the stream endpoint for
+     * answers that never touch retrieval or the provider.
+     */
+    static void streamLocalResponse(ChatResponse response, UUID clientRequestId, java.util.function.Consumer<StreamEvent> sink) {
+        sink.accept(new StreamMeta(UUID.randomUUID(), clientRequestId, null, null,
+                response.model(), response.locale()));
+        sink.accept(new StreamReplace(response.answer(), List.of(), response.reasonCode()));
+        sink.accept(new StreamDone(null, response.reasonCode(), response.degraded(), "COMPLETED"));
+    }
+
+    private static java.util.regex.Pattern patternOf(List<String> alternatives) {
+        // UNICODE_CHARACTER_CLASS makes \b treat Vietnamese letters as word
+        // characters: without it, "hiện" matched \bhi\b because "ệ" is a
+        // non-word ASCII boundary — the greeting tier hijacked real questions
+        // containing it.
+        return java.util.regex.Pattern.compile(String.join("|", alternatives),
+                java.util.regex.Pattern.CASE_INSENSITIVE | java.util.regex.Pattern.UNICODE_CASE
+                        | java.util.regex.Pattern.UNICODE_CHARACTER_CLASS);
+    }
+
+    private static final List<String> CONVERSATIONAL_OPENERS = List.of(
+            "\\bhi\\b", "\\bhello\\b", "\\bhey\\b", "\\balo\\b", "\\bchao\\b",
+            "chào\\b", "xin\\s*chào", "chào\\s*bạn", "chào\\s*bộ\\s*phận",
+            "chào\\s*buổi\\s*(?:sáng|trưa|chiều|tối)", "chao\\s*buoi",
+            "\\bhalo\\b", "\\bhai\\b", "\\bhihi\\b", "\\blol\\b");
+
+    private static final List<String> CONVERSATIONAL_IDENTITY = List.of(
+            "bạn\\s*là\\s*(?:ai|cái\\s*gì|gì)", "ban\\s*la\\s*(?:ai|gi)",
+            "bạn\\s*là\\s*(?:trợ\\s*lý|ai\\s*vậy|ai\\s*thế)", "\\bwho\\s+are\\s+you\\b",
+            "bạn\\s*hoạt\\s*động\\s*(?:như\\s*thế\\s*nào|ra\\s*sao)", "cách\\s*bạn\\s*hoạt\\s*động");
+
+    private static final List<String> CONVERSATIONAL_CAPABILITY = List.of(
+            "bạn\\s*(?:có\\s*thể|có\\s*thể\\s*giúp|làm\\s*được)\\s*(?:gì|những\\s*gì|cái\\s*gì|gì\\s*được)",
+            "bạn\\s*giúp\\s*(?:gì|được\\s*gì|cái\\s*gì)",
+            "(?:giúp|help)\\s*(?:mình|tôi|me|my)\\s*(?:gì|với\\s*gì)",
+            "\\bwhat\\s+(?:can|do)\\s+you\\s+(?:help|do)\\b", "bạn\\s*biết\\s*(?:gì|những\\s*gì)");
+
+    private static final List<String> CONVERSATIONAL_THANKS = List.of(
+            "cảm\\s*ơn", "cam\\s*on", "\\bcám\\s*ơn\\b", "\\bthanks?\\b", "\\bthank\\s*you\\b",
+            "\\bthx\\b", "\\bty\\b", "\\bot çok\\b", "\\bhiểu\\s*rồi\\b", "\\bok\\s*cảm\\s*ơn\\b");
+
+    private static final List<String> CONVERSATIONAL_BYE = List.of(
+            "tạm\\s*biệt", "tam\\s*biet", "\\bbye\\b", "\\bgoodbye\\b", "\\bsee\\s+you\\b",
+            "\\bbai\\b", "hẹn\\s*gặp\\s*lại");
+
     /**
      * Lexical-first fast path (chatbot latency): run the same local retrieval the
      * fallback chain uses, and when the top document is a CONFIDENT match, answer
