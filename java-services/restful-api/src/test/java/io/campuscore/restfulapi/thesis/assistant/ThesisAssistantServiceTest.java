@@ -175,7 +175,8 @@ class ThesisAssistantServiceTest {
 
         assertEquals("NO_MATCH", response.reasonCode());
         assertTrue(response.citations().isEmpty());
-        assertTrue(response.answer().contains("chưa tìm thấy hướng dẫn phù hợp"));
+        assertTrue(response.answer().contains("chưa tìm thấy nội dung khớp"));
+        assertTrue(response.answer().contains("Điểm số, GPA"));
         verifyNoInteractions(knowledge);
     }
 
