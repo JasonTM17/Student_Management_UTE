@@ -59,6 +59,11 @@ public class AccountStateFilter extends OncePerRequestFilter {
                 } catch (org.springframework.dao.DataAccessException exception) {
                     DatabaseAvailabilityTracker.recordFailure();
                     if (isDegradableEndpoint(uri)) {
+                        // Mark THIS request so its controller can honour the
+                        // outage contract even after its layered timeouts (15s
+                        // gateway > 5s fallback budget > Hikari 15s) outlive
+                        // the tracker's cooldown.
+                        request.setAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE, Boolean.TRUE);
                         chain.doFilter(request, response);
                         return;
                     }

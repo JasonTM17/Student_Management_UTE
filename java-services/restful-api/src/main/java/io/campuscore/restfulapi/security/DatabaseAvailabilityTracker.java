@@ -13,6 +13,9 @@ public final class DatabaseAvailabilityTracker {
     private static final long OUTAGE_COOLDOWN_MS = 5000L;
     private static final AtomicLong LAST_FAILURE_MS = new AtomicLong(0L);
 
+    /** Request attribute marking a request whose account-state check hit a dead database. */
+    public static final String REQUEST_ATTRIBUTE = "campuscore.db-unavailable";
+
     private DatabaseAvailabilityTracker() {
     }
 
@@ -27,5 +30,15 @@ public final class DatabaseAvailabilityTracker {
     public static boolean isRecentlyUnavailable() {
         long lastFailure = LAST_FAILURE_MS.get();
         return lastFailure > 0L && (System.currentTimeMillis() - lastFailure) < OUTAGE_COOLDOWN_MS;
+    }
+
+    /**
+     * Timestamp of the most recent recorded failure (0 = none). Lets a
+     * long-running request whose own filters recorded the outage at entry —
+     * and whose layered timeouts then outlive the 5s cooldown — still prove
+     * the database was down when it started.
+     */
+    public static long lastFailureAt() {
+        return LAST_FAILURE_MS.get();
     }
 }

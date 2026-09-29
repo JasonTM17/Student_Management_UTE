@@ -12,9 +12,11 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
 import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.service.AcademicAttendanceReadService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
+import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
@@ -22,6 +24,7 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
@@ -659,6 +662,285 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(grounded.answer().contains("Đợt 1 KLTN 2026-2027"), grounded.answer());
         assertTrue(grounded.answer().contains("Hệ thống gợi ý học tập"), grounded.answer());
         assertTrue(grounded.answer().contains("APPROVED"), grounded.answer());
+    }
+
+    // ------------------------------------------------------------------
+    // giang-vien-1-5: the five verified lecturer phrasings that were wrongly
+    // rejected to RAG although the APIs hold the asker's own data.
+    // ------------------------------------------------------------------
+
+    @Test
+    void detectsLecturerPersonalIntents() {
+        assertTrue(advisor.handles("Kỳ này tôi phụ trách dạy những lớp học phần nào?"));
+        assertTrue(advisor.handles("Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"));
+        assertTrue(advisor.handles("Điểm học phần tôi phụ trách hiện đã có chưa?"));
+        assertTrue(advisor.handles("Tôi đang hướng dẫn tổng cộng bao nhiêu sinh viên?"));
+        assertTrue(advisor.handles("Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"));
+
+        // Public knowledge topics stay off the personal path: exam timetables,
+        // admission cut-offs, and policy wordings (supervision cap, attendance
+        // rules) must never be answered from the asker's own rows.
+        assertFalse(advisor.handles("lịch thi cuối kỳ"));
+        assertFalse(advisor.handles("Em hỏi điểm chuẩn ngành X"));
+        assertFalse(advisor.handles("Trường quy định bao nhiêu sinh viên hướng dẫn tối đa?"));
+        assertFalse(advisor.handles("Quy định chuyên cần lớp SE401 như thế nào?"));
+    }
+
+    @Test
+    void answersLecturerSectionListFromTeachingAssignments() {
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec1", "SE402-01", "SE402", "Phát triển ứng dụng web",
+                        "Web Application Development", "Phát triển ứng dụng web", 3, 35, 13, "CNTT", "CNTT", "CNTT",
+                        "OPEN", List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                .SectionScheduleResponse("s1", 5, "13:00", "15:30", "A", "102",
+                                new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                        .ClassroomSummary("c1", "A", "102"))))));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Kỳ này tôi phụ trách dạy những lớp học phần nào?"), jwtLecturer());
+
+        // Regression: before the fix the enrollment-list branch returned null
+        // for a lecturer and the question fell to RAG despite 16 assigned rows.
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("SE402"), response.answer());
+    }
+
+    @Test
+    void answersLecturerWorkloadSummaryWithoutInternalTerms() {
+        ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
+        AssistantPersonalContextAdvisor workloadAdvisor =
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, null, null);
+        var topicA = new ThesisLecturerWorkloadService.SupervisedTopic(
+                UUID.randomUUID(), "Đề tài A", "PUBLISHED",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 3, 1);
+        var topicB = new ThesisLecturerWorkloadService.SupervisedTopic(
+                UUID.randomUUID(), "Đề tài B", "PUBLISHED",
+                UUID.randomUUID(), "Đợt 1 KLTN 2026", "REGISTRATION_OPEN", null, 2, 0);
+        when(workloadService.workload("lecturer-profile")).thenReturn(
+                new ThesisLecturerWorkloadService.LecturerWorkload(List.of(topicA, topicB), List.of(), List.of()));
+
+        ChatResponse response = workloadAdvisor.answer(
+                chatRequest("vi", "Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        // Totals are summed in code over the topics: 3 + 2 = 5 groups, 1 pending.
+        assertTrue(answer.contains("tổng cộng 5 nhóm sinh viên trên 2 đề tài"), answer);
+        assertTrue(answer.contains("1 nhóm đang chờ duyệt"), answer);
+        // The group number is a GROUP count — the wording must never claim a
+        // raw student headcount, and no internal field name may leak.
+        assertFalse(answer.contains("groupCount"), answer);
+        assertTrue(answer.contains("Đề tài A"), answer);
+    }
+
+    @Test
+    void answersLecturerGradingStatusFromAssignedSections() {
+        when(sectionService.findLecturerGradingSections("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerGradingSectionResponse("id1", "sec1", "SE402-01", "SE402",
+                        "Phát triển ứng dụng web", "Web Application Development", "Phát triển ứng dụng web",
+                        3, "CNTT", "CNTT", "CNTT",
+                        "HK1 2026-2027", "HK1 2026-2027", "HK1 2026-2027", "HK1 2026-2027",
+                        35L, 20L, 12L, "PARTIAL", true)));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("20/35 SV đã có điểm"), answer);
+        assertTrue(answer.contains("12 đã công bố"), answer);
+        assertTrue(answer.contains("PARTIAL"), answer);
+    }
+
+    @Test
+    void answersLecturerGradingWithoutAssignmentHonestly() {
+        when(sectionService.findLecturerGradingSections("lecturer-profile", null)).thenReturn(List.of());
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("chưa được phân công nhập điểm"), response.answer());
+    }
+
+    @Test
+    void answersLecturerAttendanceAbsencesForToday() {
+        AcademicAttendanceReadService attendanceService = mock(AcademicAttendanceReadService.class);
+        AssistantPersonalContextAdvisor attendanceAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, null, null, null, attendanceService);
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
+                        "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+        when(attendanceService.findLecturerAttendance(eq("lecturer-profile"), eq("sec-401"), anyString()))
+                .thenReturn(List.of(new AcademicAttendanceReadDtos.AttendanceResponse(
+                        "att1", "student-1", "sec-401", Instant.now(), "ABSENT", "Không lý do", Instant.now(),
+                        new AcademicAttendanceReadDtos.StudentSummary("student-1", "SV001",
+                                new AcademicAttendanceReadDtos.UserSummary("u1", "sv001@campuscore.edu",
+                                        "Văn A", "Nguyễn")),
+                        new AcademicAttendanceReadDtos.SectionSummary("sec-401", "SE401-01", "sem1",
+                                new AcademicAttendanceReadDtos.CourseSummary("c1", "SE401",
+                                        "Lập trình Java nâng cao", null, null)))));
+
+        ChatResponse response = attendanceAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("Sinh viên vắng mặt lớp SE401"), answer);
+        assertTrue(answer.contains("Nguyễn Văn A (SV001)"), answer);
+        assertTrue(answer.contains("Không lý do"), answer);
+    }
+
+    @Test
+    void answersLecturerAttendanceWithoutAbsencesAndWithoutData() {
+        AcademicAttendanceReadService attendanceService = mock(AcademicAttendanceReadService.class);
+        AssistantPersonalContextAdvisor attendanceAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, null, null, null, attendanceService);
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
+                        "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+        when(attendanceService.findLecturerAttendance(eq("lecturer-profile"), eq("sec-401"), anyString()))
+                .thenReturn(List.of(attendanceRow("PRESENT")));
+
+        ChatResponse allPresent = attendanceAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), jwtLecturer());
+        assertTrue(allPresent.answer().contains("Không có sinh viên nào vắng mặt"), allPresent.answer());
+
+        when(attendanceService.findLecturerAttendance(eq("lecturer-profile"), eq("sec-401"), anyString()))
+                .thenReturn(List.of());
+        ChatResponse noData = attendanceAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), jwtLecturer());
+        assertTrue(noData.answer().contains("chưa thấy dữ liệu điểm danh"), noData.answer());
+    }
+
+    @Test
+    void lecturerAttendanceForAnUnassignedCodeSaysSoWithoutGuessing() {
+        AcademicAttendanceReadService attendanceService = mock(AcademicAttendanceReadService.class);
+        AssistantPersonalContextAdvisor attendanceAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, null, null, null, attendanceService);
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                new LecturerScheduleResponse("id1", "sec-401", "SE401-01", "SE401",
+                        "Lập trình Java nâng cao", "Advanced Java", "Lập trình Java nâng cao",
+                        3, 45, 40, "CNTT", "CNTT", "CNTT", "OPEN", List.of())));
+
+        ChatResponse response = attendanceAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE999 hôm nay có ai vắng mặt không?"), jwtLecturer());
+
+        assertNotNull(response);
+        String answer = response.answer();
+        assertTrue(answer.contains("không tìm thấy lớp SE999"), answer);
+        org.mockito.Mockito.verify(attendanceService, org.mockito.Mockito.never())
+                .findLecturerAttendance(anyString(), anyString(), anyString());
+    }
+
+    /**
+     * Objection (1) gate — MANDATORY: a student-actor JWT carries no lecturerId,
+     * so all three lecturer branches must return null (fall back to RAG)
+     * WITHOUT calling any read service. The services throw 403 on a missing
+     * profile claim and answer() only catches DataAccessException, so an
+     * unguarded call would turn the question into an HTTP error.
+     */
+    @Test
+    void studentActorNeverTriggersLecturerPersonalBranches() {
+        ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
+        AcademicAttendanceReadService attendanceService = mock(AcademicAttendanceReadService.class);
+        AssistantPersonalContextAdvisor guardedAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, workloadService, null, null, null, attendanceService);
+        Jwt studentActor = new Jwt("token", Instant.now(), Instant.now().plusSeconds(600),
+                Map.of("alg", "HS256"), new HashMap<>(Map.of(
+                        "sub", "someone", "roles", List.of("STUDENT"), "studentId", "student-profile")));
+
+        assertNull(guardedAdvisor.answer(
+                chatRequest("vi", "Khối lượng hướng dẫn của tôi hiện tại là bao nhiêu?"), studentActor));
+        assertNull(guardedAdvisor.answer(
+                chatRequest("vi", "Điểm học phần tôi phụ trách hiện đã có chưa?"), studentActor));
+        assertNull(guardedAdvisor.answer(
+                chatRequest("vi", "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?"), studentActor));
+
+        org.mockito.Mockito.verifyNoInteractions(workloadService, sectionService, attendanceService);
+    }
+
+    // ------------------------------------------------------------------
+    // ca-nhan-1: graduation-credit-gap questions must be answered from the
+    // student's own transcript, not hijacked into the semester credit limit.
+    // ------------------------------------------------------------------
+
+    @Test
+    void answersGraduationCreditsRemainingFromRealGrades() {
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
+                gradeRow("g1", "SE101", 60, "A", "sem-a", "HK1 2025-2026"),
+                gradeRow("g2", "SE102", 40, "B", "sem-a", "HK1 2025-2026")));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        String answer = response.answer();
+        assertTrue(answer.contains("còn thiếu 43"), answer);
+        assertTrue(answer.contains("100/143"), answer);
+        // Regression: the semester registration-budget answer must not leak in.
+        assertFalse(answer.contains("Hạn mức đăng ký"), answer);
+    }
+
+    @Test
+    void graduationRequirementAlreadyMetReportsCompletion() {
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
+                gradeRow("g1", "SE101", 60, "A", "sem-a", "HK1 2025-2026"),
+                gradeRow("g2", "SE102", 40, "B", "sem-a", "HK1 2025-2026")));
+
+        // Requirement 90 below the accumulated 100 — no gap may be invented.
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 90 tín chỉ tốt nghiệp?"), jwtStudent());
+
+        String answer = response.answer();
+        assertTrue(answer.contains("đã tích lũy đủ 100 tín chỉ"), answer);
+        assertTrue(answer.contains("đáp ứng mức 90 tín chỉ tốt nghiệp"), answer);
+        assertFalse(answer.contains("còn thiếu"), answer);
+    }
+
+    @Test
+    void graduationCreditsWithoutPublishedGradesSaysSo() {
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of());
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"), jwtStudent());
+
+        assertNotNull(response);
+        assertTrue(response.answer().contains("chưa có tín chỉ tích lũy nào được công bố"), response.answer());
+    }
+
+    @Test
+    void singleDigitCreditCountsStayOffTheGraduationIntent() {
+        // A one-digit number does not match the 2-3 digit graduation pattern...
+        assertFalse(advisor.handles("còn thiếu 7 tín chỉ để đủ tốt nghiệp"));
+        // ... and without a graduation number the question keeps the semester
+        // registration-budget intent (existing behavior).
+        assertTrue(advisor.handles("Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"));
+    }
+
+    @Test
+    void graduationCreditsWithLecturerActorFallsBackToKnowledge() {
+        assertNull(advisor.answer(
+                chatRequest("vi", "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?"), jwtLecturer()));
+        org.mockito.Mockito.verifyNoInteractions(enrollmentService);
+    }
+
+    private static AcademicAttendanceReadDtos.AttendanceResponse attendanceRow(String status) {
+        return new AcademicAttendanceReadDtos.AttendanceResponse(
+                "att-" + status, "student-1", "sec-401", Instant.now(), status, null, Instant.now(),
+                new AcademicAttendanceReadDtos.StudentSummary("student-1", "SV001",
+                        new AcademicAttendanceReadDtos.UserSummary("u1", "sv001@campuscore.edu",
+                                "Văn A", "Nguyễn")),
+                new AcademicAttendanceReadDtos.SectionSummary("sec-401", "SE401-01", "sem1",
+                        new AcademicAttendanceReadDtos.CourseSummary("c1", "SE401",
+                                "Lập trình Java nâng cao", null, null)));
     }
 
     private static AcademicEnrollmentReadDtos.GradeSummary gradeRow(

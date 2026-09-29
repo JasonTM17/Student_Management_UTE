@@ -3,9 +3,11 @@ package io.campuscore.restfulapi.thesis.assistant;
 import io.campuscore.restfulapi.academic.registration.CreditLimitApplicationService;
 import io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse;
 import io.campuscore.restfulapi.academic.registration.RegistrationService;
+import io.campuscore.restfulapi.academic.service.AcademicAttendanceReadService;
 import io.campuscore.restfulapi.academic.service.AcademicConductService;
 import io.campuscore.restfulapi.academic.service.AcademicEnrollmentReadService;
 import io.campuscore.restfulapi.academic.service.AcademicSectionReadService;
+import io.campuscore.restfulapi.academic.web.AcademicAttendanceReadDtos.AttendanceResponse;
 import io.campuscore.restfulapi.academic.web.AcademicConductDtos.StudentConductSummaryDto;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.ClassroomSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.CourseSummary;
@@ -13,6 +15,7 @@ import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.Enrollme
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.GradeSummary;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SectionScheduleResponse;
 import io.campuscore.restfulapi.academic.web.AcademicEnrollmentReadDtos.SemesterSummary;
+import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerGradingSectionResponse;
 import io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos.LecturerScheduleResponse;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatRequest;
 import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.ChatResponse;
@@ -77,6 +80,56 @@ public class AssistantPersonalContextAdvisor {
                     + "|phụ\\s*trách\\s*(?:dạy|giảng)|phu\\s*trach\\s*(?:day|giang)"
                     + "|lớp\\s*(?:học\\s*phần\\s*)?nào[^?!.]{0,40}?(?:dạy|phụ\\s*trách)|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)"
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Policy wording that turns a supervision phrase into a general knowledge
+     * question. "Trường quy định bao nhiêu sinh viên hướng dẫn tối đa?" asks
+     * about the rule, not the asker's own workload, so it must stay on the
+     * knowledge path (same convention as {@link #THESIS_POLICY_OR_GENERAL_INTENT}).
+     */
+    private static final Pattern WORDING_POLICY_INTENT = Pattern.compile(
+            "quy\\s*định|quy\\s*dinh|điều\\s*kiện|dieu\\s*kien|quy\\s*chế|quy\\s*che"
+                    + "|tối\\s*đa|toi\\s*da|hạn\\s*mức|han\\s*muc|chính\\s*sách",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Lecturer supervision-workload phrasings ("Khối lượng hướng dẫn của tôi
+     * hiện tại là bao nhiêu?", "Tôi đang hướng dẫn tổng cộng bao nhiêu sinh
+     * viên?") are personal workload questions even without a thesis noun.
+     */
+    private static final Pattern LECTURER_WORKLOAD_INTENT = Pattern.compile(
+            "khối\\s*lượng\\s*(?:hướng\\s*dẫn|công\\s*tác)|khoi\\s*luong\\s*(?:huong\\s*dan|cong\\s*tac)"
+                    + "|hướng\\s*dẫn\\s*tổng\\s*cộng|huong\\s*dan\\s*tong\\s*cong"
+                    + "|bao\\s*nhiêu\\s*sinh\\s*viên\\s*hướng\\s*dẫn|bao\\s*nhieu\\s*sinh\\s*vien\\s*huong\\s*dan"
+                    + "|(?:my|total)\\s+(?:thesis\\s+)?workload|supervis\\w*\\s+(?:how\\s+many|total)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Lecturer grade-entry phrasings ("Điểm học phần tôi phụ trách hiện đã có
+     * chưa?") ask about the sections the asker teaches, not the asker's own
+     * transcript — gated against {@link #isGradesIntent(String)}.
+     */
+    private static final Pattern LECTURER_GRADING_INTENT = Pattern.compile(
+            "điểm\\s*học\\s*phần[^?!.]{0,30}(?:phụ\\s*trách|dạy)"
+                    + "|(?:phụ\\s*trách|dạy)[^?!.]{0,30}điểm[^?!.]{0,30}(?:đã\\s*)?(?:có|nhập|chưa)"
+                    + "|grading\\s+status",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /** Attendance wording next to a concrete section code ("SE401 ... vắng mặt"). */
+    private static final Pattern ATTENDANCE_WORDING_INTENT = Pattern.compile(
+            "vắng|nghỉ|học\\s*đủ|học\\s*du|chuyên\\s*cần|chuyen\\s*can|absent|attendance",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Teaching-list hint inside an enrollment-list phrasing — a lecturer asking
+     * "Kỳ này tôi phụ trách dạy những lớp học phần nào?" wants their own
+     * teaching assignment list, not the student enrollment list.
+     */
+    private static final Pattern LECTURER_TEACHING_LIST_HINT = Pattern.compile(
+            "phụ\\s*trách\\s*dạy|phu\\s*trach\\s*day"
+                    + "|lớp\\s*(?:học\\s*phần\\s*)?nào[^?!.]{0,40}?(?:dạy|phụ\\s*trách)"
+                    + "|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
@@ -188,6 +241,20 @@ public class AssistantPersonalContextAdvisor {
             "nâng\\s*hạn\\s*mức|nang\\s*han\\s*muc|quy\\s*trình|quy\\s*trinh|đơn\\s*xin|don\\s*xin",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
+    /**
+     * Graduation-credit questions that carry the requirement number in the
+     * sentence ("Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?").
+     * Two or three digits directly before "tín chỉ ... tốt nghiệp". A bare
+     * "còn thiếu bao nhiêu tín chỉ" without the graduation number keeps the
+     * registration-budget answer. Checked BEFORE
+     * {@link #isCreditsRemainingIntent(String)} so the semester limit cannot
+     * hijack the question.
+     */
+    private static final Pattern GRADUATION_CREDITS_INTENT = Pattern.compile(
+            "(\\d{2,3})\\s*tín\\s*ch[^?!.]{0,15}tốt\\s*nghiệp"
+                    + "|(\\d{2,3})\\s*tin\\s*chi[^?!.]{0,15}tot\\s*nghiep",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
     /** A section / course code as printed on the portal ("SE013", "SE013-01"). */
     private static final Pattern SECTION_CODE = Pattern.compile(
             "(?<![A-Za-z0-9])[A-Z]{2}\\d{3}(?![0-9A-Za-z])");
@@ -249,6 +316,35 @@ public class AssistantPersonalContextAdvisor {
                 && THESIS_NOUN.matcher(message).find();
     }
 
+    /** Lecturer supervision-workload question; policy wording stays on the knowledge path. */
+    private static boolean isLecturerWorkloadIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && LECTURER_WORKLOAD_INTENT.matcher(message).find();
+    }
+
+    /** Lecturer grade-entry question; the asker's own transcript wording wins instead. */
+    private static boolean isLecturerGradingIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (isGradesIntent(message)) return false;
+        return FIRST_PERSON_PRONOUN.matcher(message).find()
+                && LECTURER_GRADING_INTENT.matcher(message).find();
+    }
+
+    /** Attendance wording next to a concrete section code; policy wording stays on the knowledge path. */
+    private static boolean isAttendanceIntent(String message) {
+        if (!StringUtils.hasText(message)) return false;
+        if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
+        return SECTION_CODE.matcher(message).find()
+                && ATTENDANCE_WORDING_INTENT.matcher(message).find();
+    }
+
+    /** "…đủ 143 tín chỉ tốt nghiệp?" — carries the graduation requirement number in the sentence. */
+    private static boolean isGraduationCreditsIntent(String message) {
+        return StringUtils.hasText(message) && GRADUATION_CREDITS_INTENT.matcher(message).find();
+    }
+
     private static final String[] DAY_LABELS_VI =
             {"", "Chủ Nhật", "Thứ Hai", "Thứ Ba", "Thứ Tư", "Thứ Năm", "Thứ Sáu", "Thứ Bảy"};
     private static final String[] DAY_LABELS_EN =
@@ -259,6 +355,7 @@ public class AssistantPersonalContextAdvisor {
     private final ThesisLecturerWorkloadService lecturerWorkload;
     private final AcademicConductService conductService;
     private final RegistrationService registrationService;
+    private final AcademicAttendanceReadService academicAttendance;
     private final NamedParameterJdbcTemplate jdbc;
 
     public AssistantPersonalContextAdvisor(
@@ -277,6 +374,17 @@ public class AssistantPersonalContextAdvisor {
         this(enrollments, sections, lecturerWorkload, jdbc, conductService, null);
     }
 
+    /** Compatibility constructor retained for focused advisor tests. */
+    public AssistantPersonalContextAdvisor(
+            AcademicEnrollmentReadService enrollments,
+            AcademicSectionReadService sections,
+            ThesisLecturerWorkloadService lecturerWorkload,
+            NamedParameterJdbcTemplate jdbc,
+            AcademicConductService conductService,
+            RegistrationService registrationService) {
+        this(enrollments, sections, lecturerWorkload, jdbc, conductService, registrationService, null);
+    }
+
     @Autowired
     public AssistantPersonalContextAdvisor(
             AcademicEnrollmentReadService enrollments,
@@ -284,13 +392,15 @@ public class AssistantPersonalContextAdvisor {
             @Autowired(required = false) ThesisLecturerWorkloadService lecturerWorkload,
             @Autowired(required = false) NamedParameterJdbcTemplate jdbc,
             @Autowired(required = false) AcademicConductService conductService,
-            @Autowired(required = false) RegistrationService registrationService) {
+            @Autowired(required = false) RegistrationService registrationService,
+            @Autowired(required = false) AcademicAttendanceReadService academicAttendance) {
         this.enrollments = enrollments;
         this.sections = sections;
         this.lecturerWorkload = lecturerWorkload;
         this.jdbc = jdbc;
         this.conductService = conductService;
         this.registrationService = registrationService;
+        this.academicAttendance = academicAttendance;
     }
 
     /** True when the question is clearly about personal schedule, enrollment list, grades, conduct, or thesis status. */
@@ -301,10 +411,14 @@ public class AssistantPersonalContextAdvisor {
         // the asker's own teaching/attendance rows.
         if (EXAM_SCHEDULE_INTENT.matcher(message).find()) return false;
         return SCHEDULE_INTENT.matcher(message).find()
+                || isLecturerWorkloadIntent(message)
+                || isLecturerGradingIntent(message)
+                || isAttendanceIntent(message)
                 || isThesisPersonalIntent(message)
                 || isConductIntent(message)
                 || isGradesIntent(message)
                 || isEnrollmentListIntent(message)
+                || isGraduationCreditsIntent(message)
                 || isCreditsRemainingIntent(message)
                 || isSectionDetailIntent(message);
     }
@@ -376,6 +490,39 @@ public class AssistantPersonalContextAdvisor {
             return null;
         }
         String studentId = claim(actor, "studentId");
+        String lecturerId = claim(actor, "lecturerId");
+        // Lecturer-only branches: each one must require BOTH the lecturer
+        // profile claim AND its service. A student-actor JWT (no lecturerId)
+        // falls through to RAG instead of hitting a read service that would
+        // throw 403 (requireProfileId) on the missing profile claim — answer()
+        // only catches DataAccessException, so that 403 would escape as an
+        // HTTP error for an innocent question.
+        if (isLecturerWorkloadIntent(message)) {
+            if (StringUtils.hasText(lecturerId) && lecturerWorkload != null) {
+                return lecturerThesisAnswer(lecturerId, locale);
+            }
+            return null;
+        }
+        if (isLecturerGradingIntent(message)) {
+            if (StringUtils.hasText(lecturerId) && sections != null) {
+                return lecturerGradingAnswer(lecturerId, locale);
+            }
+            return null;
+        }
+        if (isAttendanceIntent(message)) {
+            if (StringUtils.hasText(lecturerId) && academicAttendance != null) {
+                return lecturerAttendanceAnswer(lecturerId, locale, message);
+            }
+            return null;
+        }
+        if (isGraduationCreditsIntent(message)) {
+            // The graduation-credit gap is student-owned; without a student
+            // profile the question falls back to the knowledge path.
+            if (StringUtils.hasText(studentId)) {
+                return graduationCreditsAnswer(studentId, locale, message);
+            }
+            return null;
+        }
         if (isConductIntent(message)) {
             // Conduct summaries are student-owned; staff questions fall through to RAG policy answers.
             if (StringUtils.hasText(studentId) && conductService != null) {
@@ -406,9 +553,16 @@ public class AssistantPersonalContextAdvisor {
             return null;
         }
         if (isEnrollmentListIntent(message)) {
-            // The section list is student-owned; staff questions fall through to RAG.
+            // The section list is student-owned. A lecturer asking "Kỳ này tôi
+            // phụ trách dạy những lớp học phần nào?" wants their teaching
+            // assignments, so the teaching-list phrasing answers from the
+            // lecturer schedule; other lecturer phrasings fall through to RAG.
             if (StringUtils.hasText(studentId)) {
                 return enrollmentListAnswer(studentId, locale);
+            }
+            if (StringUtils.hasText(lecturerId) && sections != null
+                    && LECTURER_TEACHING_LIST_HINT.matcher(message).find()) {
+                return lecturerAnswer(lecturerId, locale, null);
             }
             return null;
         }
@@ -416,7 +570,6 @@ public class AssistantPersonalContextAdvisor {
         if (StringUtils.hasText(studentId)) {
             return studentAnswer(studentId, locale, requestedDay);
         }
-        String lecturerId = claim(actor, "lecturerId");
         if (StringUtils.hasText(lecturerId)) {
             return lecturerAnswer(lecturerId, locale, requestedDay);
         }
@@ -827,6 +980,21 @@ public class AssistantPersonalContextAdvisor {
         }
         StringBuilder answer = new StringBuilder();
         if (!workload.topics().isEmpty()) {
+            // Workload totals are summed IN CODE over the asker's own topics —
+            // group counts are per student GROUP (the unit the workload query
+            // aggregates), so the wording says "nhóm sinh viên", never a bare
+            // student headcount.
+            int totalGroups = workload.topics().stream()
+                    .mapToInt(ThesisLecturerWorkloadService.SupervisedTopic::groupCount).sum();
+            int pendingGroups = workload.topics().stream()
+                    .mapToInt(ThesisLecturerWorkloadService.SupervisedTopic::pendingGroupCount).sum();
+            answer.append(vi
+                    ? "Bạn đang hướng dẫn tổng cộng " + totalGroups + " nhóm sinh viên trên "
+                            + workload.topics().size() + " đề tài, trong đó " + pendingGroups
+                            + " nhóm đang chờ duyệt.\n"
+                    : "You are supervising " + totalGroups + " student groups across "
+                            + workload.topics().size() + " topics, with " + pendingGroups
+                            + " group(s) pending approval.\n");
             answer.append(vi ? "Danh sách đề tài khóa luận bạn đang hướng dẫn:\n" : "Thesis topics you are supervising:\n");
             for (var topic : workload.topics()) {
                 answer.append("\n• ").append(topic.title());
@@ -869,6 +1037,181 @@ public class AssistantPersonalContextAdvisor {
                 ? "\nBạn có thể xem chi tiết và xét duyệt nhóm tại trang Quản lý Khóa luận."
                 : "\nYou can review details and approve student groups on the Thesis Management page.");
         return answer.toString();
+    }
+
+    /**
+     * "Điểm học phần tôi phụ trách hiện đã có chưa?" — grade-entry status of
+     * the sections the asker teaches, read from the same workspace path the
+     * /sections/my/grading endpoint uses. An empty assignment list says so
+     * instead of inventing zero sections.
+     */
+    private String lecturerGradingAnswer(String lecturerId, String locale) {
+        boolean vi = "vi".equals(locale);
+        List<LecturerGradingSectionResponse> rows = sections.findLecturerGradingSections(lecturerId, null);
+        if (rows == null || rows.isEmpty()) {
+            return vi
+                    ? "Bạn chưa được phân công nhập điểm học phần nào kỳ này."
+                    : "You are not assigned to enter grades for any course section this term.";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Tình trạng nhập điểm các lớp học phần bạn phụ trách:\n"
+                : "Grade-entry status for the sections you teach:\n");
+        for (LecturerGradingSectionResponse row : rows) {
+            String courseName = vi
+                    ? firstText(row.courseNameVi(), firstText(row.courseName(), row.courseNameEn()))
+                    : firstText(row.courseNameEn(), firstText(row.courseName(), row.courseNameVi()));
+            String label = StringUtils.hasText(row.courseCode())
+                    ? (StringUtils.hasText(courseName) ? row.courseCode() + " - " + courseName : row.courseCode())
+                    : courseName;
+            answer.append("\n• ").append(StringUtils.hasText(label) ? label : (vi ? "Học phần" : "Course"));
+            if (StringUtils.hasText(row.sectionNumber())) {
+                answer.append(vi ? " (lớp " : " (section ").append(row.sectionNumber()).append(")");
+            }
+            answer.append(vi ? ": " : ": ")
+                    .append(row.gradedCount()).append("/").append(row.enrolledCount())
+                    .append(vi ? " SV đã có điểm, " : " students graded, ")
+                    .append(row.publishedCount()).append(vi ? " đã công bố" : " published")
+                    .append(" — ").append(row.gradeStatus()).append("\n");
+        }
+        answer.append(vi
+                ? "\nBạn có thể nhập và công bố điểm ở trang Nhập điểm."
+                : "\nYou can enter and publish grades on the Grade Entry page.");
+        return answer.toString();
+    }
+
+    /**
+     * "Sinh viên lớp SE401 hôm nay có ai vắng mặt không?" — resolves the asked
+     * code against the lecturer's own teaching assignments first; a code
+     * outside those assignments is reported as such instead of guessed. The
+     * day is the asker's "today" on the campus calendar
+     * ({@link AssistantTimezone#ZONE}, the same source the timetable uses).
+     */
+    private String lecturerAttendanceAnswer(String lecturerId, String locale, String message) {
+        boolean vi = "vi".equals(locale);
+        java.util.regex.Matcher matcher = SECTION_CODE.matcher(message);
+        if (!matcher.find()) {
+            return null;
+        }
+        String code = matcher.group();
+        String sectionId = resolveLecturerSectionId(lecturerId, code);
+        if (sectionId == null) {
+            return vi
+                    ? "Mình không tìm thấy lớp " + code
+                            + " trong các lớp học phần bạn đang phụ trách kỳ này, nên chưa tra được điểm danh. "
+                            + "Bạn kiểm tra lại mã lớp ở trang Lịch giảng dạy nhé."
+                    : "I could not find section " + code
+                            + " among the sections you teach this term, so I cannot look up its attendance. "
+                            + "Please double-check the code on the Teaching Schedule page.";
+        }
+        java.time.LocalDate today = java.time.LocalDate.now(AssistantTimezone.ZONE);
+        String dayLabel = today.format(java.time.format.DateTimeFormatter.ofPattern("dd/MM"));
+        List<AttendanceResponse> rows = academicAttendance.findLecturerAttendance(lecturerId, sectionId, today.toString());
+        if (rows == null || rows.isEmpty()) {
+            return vi
+                    ? "Mình chưa thấy dữ liệu điểm danh nào cho lớp " + code + " ngày " + dayLabel
+                            + ". Buổi học có thể chưa được điểm danh."
+                    : "I have no attendance records for section " + code + " on " + dayLabel + " yet.";
+        }
+        List<AttendanceResponse> absent = rows.stream()
+                .filter(row -> "ABSENT".equalsIgnoreCase(row.status()))
+                .toList();
+        if (absent.isEmpty()) {
+            return vi
+                    ? "Không có sinh viên nào vắng mặt ở lớp " + code + " ngày " + dayLabel + "."
+                    : "No students were absent in section " + code + " on " + dayLabel + ".";
+        }
+        StringBuilder answer = new StringBuilder();
+        answer.append(vi
+                ? "Sinh viên vắng mặt lớp " + code + " ngày " + dayLabel + ":\n"
+                : "Students absent in section " + code + " on " + dayLabel + ":\n");
+        for (AttendanceResponse row : absent) {
+            String name = studentDisplayName(row);
+            answer.append("\n• ").append(StringUtils.hasText(name) ? name : (vi ? "Sinh viên" : "Student"));
+            String studentCode = row.student() != null && StringUtils.hasText(row.student().studentId())
+                    ? row.student().studentId() : row.studentId();
+            if (StringUtils.hasText(studentCode)) {
+                answer.append(" (").append(studentCode).append(")");
+            }
+            if (StringUtils.hasText(row.notes())) {
+                answer.append(vi ? " — ghi chú: " : " — notes: ").append(row.notes());
+            }
+            answer.append("\n");
+        }
+        answer.append(vi
+                ? "\nBạn có thể cập nhật điểm danh ở trang Điểm danh."
+                : "\nYou can update attendance on the Attendance page.");
+        return answer.toString();
+    }
+
+    /** The lecturer's assigned section whose course code or section number matches the asked code. */
+    private String resolveLecturerSectionId(String lecturerId, String code) {
+        String normalized = code.toUpperCase(java.util.Locale.ROOT);
+        for (LecturerScheduleResponse section : sections.findLecturerSchedule(lecturerId, null)) {
+            String sectionNumber = section.sectionNumber();
+            if (normalized.equalsIgnoreCase(section.courseCode())
+                    || normalized.equalsIgnoreCase(sectionNumber)
+                    || (StringUtils.hasText(sectionNumber)
+                            && sectionNumber.toUpperCase(java.util.Locale.ROOT).startsWith(normalized + "-"))) {
+                return section.sectionId();
+            }
+        }
+        return null;
+    }
+
+    private static String studentDisplayName(AttendanceResponse row) {
+        var user = row.student() != null ? row.student().user() : null;
+        if (user == null) {
+            return null;
+        }
+        String last = user.lastName();
+        String first = user.firstName();
+        if (!StringUtils.hasText(last)) {
+            return first;
+        }
+        if (!StringUtils.hasText(first)) {
+            return last;
+        }
+        return last + " " + first;
+    }
+
+    /**
+     * "Còn thiếu bao nhiêu tín chỉ để đủ 143 tín chỉ tốt nghiệp?" — the gap to
+     * the graduation requirement named in the sentence, computed from the
+     * student's own published grade rows (the same source and the same
+     * GRADE_POINTS math the GPA answer uses, never a model estimate). Only a
+     * requirement larger than the accumulated credits reports a gap.
+     */
+    private String graduationCreditsAnswer(String studentId, String locale, String message) {
+        boolean vi = "vi".equals(locale);
+        java.util.regex.Matcher matcher = GRADUATION_CREDITS_INTENT.matcher(message);
+        if (!matcher.find()) {
+            return null;
+        }
+        String digits = matcher.group(1) != null ? matcher.group(1) : matcher.group(2);
+        int required = Integer.parseInt(digits);
+        List<GradeSummary> grades = enrollments.findStudentGrades(studentId, null);
+        if (grades == null || grades.isEmpty()) {
+            return vi
+                    ? "Bạn chưa có tín chỉ tích lũy nào được công bố, nên mình chưa thể tính khoảng cách tới mức "
+                            + required + " tín chỉ tốt nghiệp. Số liệu sẽ có sau khi điểm của bạn được công bố."
+                    : "You have no published credits yet, so I cannot compute the gap to the " + required
+                            + "-credit graduation requirement.";
+        }
+        GradeTotals cumulative = new GradeTotals();
+        grades.forEach(cumulative::add);
+        int earned = cumulative.earnedCredits;
+        if (required > earned) {
+            return vi
+                    ? "Để đủ " + required + " tín chỉ tốt nghiệp, bạn còn thiếu " + (required - earned)
+                            + " tín chỉ (đã tích lũy " + earned + "/" + required + ")."
+                    : "To reach the " + required + "-credit graduation requirement, you still need " + (required - earned)
+                            + " credits (accumulated " + earned + "/" + required + ").";
+        }
+        return vi
+                ? "Bạn đã tích lũy đủ " + earned + " tín chỉ, đáp ứng mức " + required + " tín chỉ tốt nghiệp."
+                : "You have accumulated " + earned + " credits, which meets the " + required
+                        + "-credit graduation requirement.";
     }
 
     private String studentThesisAnswer(String studentId, String locale) {

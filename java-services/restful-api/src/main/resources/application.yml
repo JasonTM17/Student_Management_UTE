@@ -158,7 +158,11 @@ assistant:
     service-token: ${ASSISTANT_RAG_SERVICE_TOKEN:}
     service-mode: ${ASSISTANT_RAG_SERVICE_MODE:false}
     connect-timeout-ms: ${ASSISTANT_RAG_CONNECT_TIMEOUT_MS:1000}
-    read-timeout-ms: ${ASSISTANT_RAG_READ_TIMEOUT_MS:30000}
+    # Read timeout covers the whole remote chain (retrieval + DeepSeek
+    # generation) on the JSON path. Normal chains answer in 4-10s; past 15s
+    # the controller degrades to the local lexical fallback instead of
+    # keeping the user waiting 30s. Operators can override via env.
+    read-timeout-ms: ${ASSISTANT_RAG_READ_TIMEOUT_MS:15000}
   supabase:
     enabled: ${ASSISTANT_SUPABASE_ENABLED:false}
     url: ${SUPABASE_URL:}
