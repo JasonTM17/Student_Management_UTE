@@ -218,8 +218,10 @@ test('feedback polish: curriculum counts stay localized and enrolled schedules u
   assert.match(page, /aria-pressed=\{statusFilter === btn\.key\}/);
   assert.match(page, /filterNotStarted: 'Not completed'/);
   assert.match(page, /\{copy\.semesterPrefix\} \{sem\} - \{courseCountLabel\(courses\.length\)\}/);
-  assert.match(page, /DB convention: 1 = Sunday\/Chủ nhật/);
-  assert.match(page, /const normalizedDay = day === 0 \? 1 : day/);
+  // Day names come from the shared weekly-grid source (single day-name source
+  // of truth across every schedule view), with the legacy 0=Sunday fold kept.
+  assert.match(page, /import \{ dayLabel \} from '@\/components\/schedule\/weekly-grid';/);
+  assert.match(page, /return dayLabel\(locale, day === 0 \? 1 : day\);/);
   assert.doesNotMatch(page, /\$\{formatNumber\(curriculumCourses\.length\)\} môn/);
   assert.doesNotMatch(page, /\$\{formatNumber\(completedCurriculum\.length\)\} môn/);
   assert.doesNotMatch(page, /\$\{formatNumber\(inProgressCurriculum\.length\)\} môn/);
