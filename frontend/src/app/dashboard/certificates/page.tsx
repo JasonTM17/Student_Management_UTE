@@ -4,7 +4,8 @@ import React, { useState, useEffect, useMemo } from 'react';
 import { useRequireAuth } from '@/context/AuthContext';
 import { useI18n } from '@/i18n';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
-import { LoadingState } from '@/components/ui/state-block';
+import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
+import { EmptyState, LoadingState } from '@/components/ui/state-block';
 import { curriculumApi } from '@/lib/api';
 import { MyCurriculumResponse } from '@/types/api';
 import { Button } from '@/components/ui/button';
@@ -17,6 +18,7 @@ import {
   Building,
   Briefcase,
   Info,
+  ShieldX,
   TriangleAlert,
 } from 'lucide-react';
 
@@ -29,88 +31,15 @@ type CertificatePurpose =
 
 interface PurposeOption {
   id: CertificatePurpose;
-  titleVi: string;
-  titleEn: string;
-  decreeVi: string;
-  decreeEn: string;
-  bodyVi: string;
-  bodyEn: string;
-  defaultRecipientVi: string;
-  defaultRecipientEn: string;
   icon: React.ElementType;
 }
 
 const PURPOSE_OPTIONS: PurposeOption[] = [
-  {
-    id: 'MILITARY_DEFERMENT',
-    titleVi: 'Tạm hoãn nghĩa vụ quân sự',
-    titleEn: 'Military Service Deferment',
-    decreeVi: 'Theo Nghị định 13/2016/NĐ-CP & Luật Nghĩa vụ quân sự',
-    decreeEn: 'Per Decree 13/2016/ND-CP & Military Service Law',
-    bodyVi:
-      'Bổ túc hồ sơ xin tạm hoãn gọi nhập ngũ trong thời gian đào tạo đại học chính quy theo quy định của pháp luật.',
-    bodyEn:
-      'Completing documentation for temporary deferment of military enlistment during full-time undergraduate studies per national regulations.',
-    defaultRecipientVi: 'Ban Chỉ huy Quân sự cấp Xã/Phường/Thị trấn và Ban CHQS cấp Quận/Huyện/Thị xã',
-    defaultRecipientEn: 'Local Military Command at Commune/Ward and District Levels',
-    icon: ShieldCheckIcon,
-  },
-  {
-    id: 'STUDENT_LOAN',
-    titleVi: 'Vay vốn Ngân hàng Chính sách Xã hội',
-    titleEn: 'Social Policy Student Loan',
-    decreeVi: 'Theo Quyết định số 157/2007/QĐ-TTg & QĐ 05/2022/QĐ-TTg của Thủ tướng Chính phủ',
-    decreeEn: 'Per Decision 157/2007/QD-TTg & Decision 05/2022/QD-TTg by Prime Minister',
-    bodyVi:
-      'Làm thủ tục đề nghị vay vốn chương trình tín dụng học sinh, sinh viên có hoàn cảnh khó khăn tại Ngân hàng Chính sách Xã hội.',
-    bodyEn:
-      'Applying for preferential student loan program at the Bank for Social Policies for tuition and living expenses.',
-    defaultRecipientVi: 'Ngân hàng Chính sách Xã hội địa phương nơi sinh viên đăng ký cư trú',
-    defaultRecipientEn: 'Local Bank for Social Policies where the student resides',
-    icon: Building,
-  },
-  {
-    id: 'BUS_PASS',
-    titleVi: 'Đăng ký vé tháng xe buýt sinh viên',
-    titleEn: 'Student Bus Pass Application',
-    decreeVi: 'Chính sách trợ giá vận tải công cộng học sinh - sinh viên TP.HCM',
-    decreeEn: 'Ho Chi Minh City Public Transit Student Subsidy Policy',
-    bodyVi:
-      'Đăng ký làm thẻ vé tháng hoặc mua vé tập xe buýt ưu đãi dành cho học sinh, sinh viên trên địa bàn Thành phố Hồ Chí Minh.',
-    bodyEn:
-      'Registering for monthly subsidized student bus passes across the Ho Chi Minh City transit network.',
-    defaultRecipientVi: 'Trung tâm Quản lý Giao thông công cộng TP. Hồ Chí Minh và các đơn vị vận tải xe buýt',
-    defaultRecipientEn: 'HCMC Public Transport Management Center and Bus Transit Agencies',
-    icon: Bus,
-  },
-  {
-    id: 'TAX_EXEMPTION',
-    titleVi: 'Giảm trừ gia cảnh thuế TNCN cho phụ huynh',
-    titleEn: 'Personal Income Tax Family Exemption',
-    decreeVi: 'Căn cứ Thông tư 111/2013/TT-BTC của Bộ Tài chính',
-    decreeEn: 'Per Circular 111/2013/TT-BTC by Ministry of Finance',
-    bodyVi:
-      'Làm thủ tục kê khai giảm trừ gia cảnh người phụ thuộc là con đang theo học đại học cho người nộp thuế thu nhập cá nhân.',
-    bodyEn:
-      'Submitting dependent deduction proof for personal income tax declaration of parents/guardians.',
-    defaultRecipientVi: 'Cơ quan Thuế hoặc Cơ quan, đơn vị nơi cha/mẹ người nộp thuế công tác',
-    defaultRecipientEn: 'Tax Administration Authority or Parent/Guardian Employer',
-    icon: FileCheck,
-  },
-  {
-    id: 'INTERNSHIP',
-    titleVi: 'Giấy giới thiệu liên hệ thực tập tốt nghiệp',
-    titleEn: 'Internship Recommendation Letter',
-    decreeVi: 'Theo Kế hoạch đào tạo thực hành và thực tập doanh nghiệp HCMUTE',
-    decreeEn: 'Per HCMUTE Practical Training and Corporate Internship Program',
-    bodyVi:
-      'Liên hệ cơ quan, doanh nghiệp để thực tập tốt nghiệp và tiếp cận môi trường thực tế phục vụ chương trình đào tạo kỹ sư/cử nhân.',
-    bodyEn:
-      'Contacting corporate partner organizations for graduation internship and professional practice.',
-    defaultRecipientVi: 'Ban Giám đốc và Phòng Nhân sự / Đào tạo Quý Cơ quan, Doanh nghiệp',
-    defaultRecipientEn: 'Management Board & Human Resources Department of Partner Enterprises',
-    icon: Briefcase,
-  },
+  { id: 'MILITARY_DEFERMENT', icon: ShieldCheckIcon },
+  { id: 'STUDENT_LOAN', icon: Building },
+  { id: 'BUS_PASS', icon: Bus },
+  { id: 'TAX_EXEMPTION', icon: FileCheck },
+  { id: 'INTERNSHIP', icon: Briefcase },
 ];
 
 // Small local icon so the purpose list keeps its shield glyph without
@@ -140,7 +69,6 @@ export default function CertificatesPage() {
   // student attributes instead of a forbidden state.
   const { user, hasAccess, isLoading: authLoading } = useRequireAuth(['STUDENT']);
   const { locale, messages, formatDate } = useI18n();
-  const isVi = locale === 'vi';
   const certCopy = messages.certificates;
 
   const [selectedPurpose, setSelectedPurpose] = useState<CertificatePurpose>('MILITARY_DEFERMENT');
@@ -167,6 +95,7 @@ export default function CertificatesPage() {
     () => PURPOSE_OPTIONS.find((p) => p.id === selectedPurpose) || PURPOSE_OPTIONS[0],
     [selectedPurpose]
   );
+  const activePurposeCopy = certCopy.purposes[activeOption.id];
 
   // Identity comes only from the signed-in session. When a field is missing we
   // render an em-dash — never another student's name or MSSV.
@@ -203,6 +132,19 @@ export default function CertificatesPage() {
 
   const missing = certCopy.missingValue;
 
+  // The vi template carries {day}/{month}/{year}; the en template carries {date}
+  // through the locale formatter. Replacing every placeholder on the active
+  // template is a no-op for the ones it does not use.
+  const cityDateLine = certCopy.cityDateLine
+    .replace('{day}', String(today.getDate()))
+    .replace('{month}', String(today.getMonth() + 1))
+    .replace('{year}', String(today.getFullYear()))
+    .replace('{date}', formatDate(today, { month: 'long', day: 'numeric', year: 'numeric' }));
+
+  // Without any identity claim there is nothing to prefill, so the page says so
+  // instead of rendering a sheet of em-dashes.
+  const hasIdentity = Boolean(studentName || studentId);
+
   if (authLoading) {
     return (
       <div className="min-h-screen py-6 px-4 max-w-7xl mx-auto">
@@ -215,37 +157,32 @@ export default function CertificatesPage() {
   }
 
   return (
-    <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto">
-      {/* Header Banner - Screen Only */}
-      <div className="print:hidden mb-8 border-b border-border pb-6">
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
-          <div>
-            <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800 mb-2">
-              <TriangleAlert className="h-3.5 w-3.5" />
-              <span>{certCopy.serviceBadge}</span>
-            </div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-foreground">
-              {certCopy.pageTitle}
-            </h1>
-            <p className="mt-1 text-sm text-muted-foreground max-w-3xl">
-              {certCopy.pageDescription}
-            </p>
-          </div>
-          <div className="flex items-center gap-3">
-            <Button
-              onClick={handlePrint}
-              className="bg-primary hover:bg-primary/90 text-primary-foreground shadow-sm flex items-center gap-2 font-medium"
-            >
-              <Printer className="h-4 w-4" />
-              <span>{certCopy.printAction}</span>
-            </Button>
-          </div>
-        </div>
-      </div>
+    <div className="min-h-screen py-6 px-4 sm:px-6 lg:px-8 max-w-7xl mx-auto space-y-8">
+      <PageHeader
+        eyebrow={<SectionEyebrow>{certCopy.eyebrow}</SectionEyebrow>}
+        title={certCopy.pageTitle}
+        tabLabel={certCopy.tabLabel}
+        description={certCopy.pageDescription}
+        actions={
+          <Button
+            type="button"
+            onClick={handlePrint}
+            className="flex items-center gap-2 font-medium shadow-sm"
+          >
+            <Printer className="h-4 w-4" />
+            <span>{certCopy.printAction}</span>
+          </Button>
+        }
+      />
 
       <div className="grid grid-cols-1 lg:grid-cols-12 gap-8">
         {/* Purpose Selector Panel - Screen Only */}
         <div className="print:hidden lg:col-span-5 space-y-6">
+          <div className="inline-flex items-center gap-2 px-2.5 py-1 rounded-md text-xs font-semibold bg-amber-50 text-amber-800 dark:bg-amber-950/40 dark:text-amber-300 border border-amber-200 dark:border-amber-800">
+            <TriangleAlert className="h-3.5 w-3.5" />
+            <span>{certCopy.serviceBadge}</span>
+          </div>
+
           <div className="bg-card border border-border rounded-xl p-5 shadow-sm">
             <h2 className="text-base font-semibold text-foreground flex items-center gap-2 mb-3">
               <Award className="h-4 w-4 text-primary" />
@@ -255,6 +192,7 @@ export default function CertificatesPage() {
               {PURPOSE_OPTIONS.map((opt) => {
                 const Icon = opt.icon;
                 const isSelected = opt.id === selectedPurpose;
+                const optionCopy = certCopy.purposes[opt.id];
                 return (
                   <button
                     key={opt.id}
@@ -275,11 +213,11 @@ export default function CertificatesPage() {
                     </div>
                     <div className="min-w-0 flex-1">
                       <div className="text-sm font-semibold text-foreground flex items-center justify-between">
-                        <span>{isVi ? opt.titleVi : opt.titleEn}</span>
+                        <span>{optionCopy.title}</span>
                         {isSelected && <Check className="h-4 w-4 text-primary shrink-0 ml-2" />}
                       </div>
                       <p className="text-xs text-muted-foreground mt-0.5 line-clamp-2">
-                        {isVi ? opt.decreeVi : opt.decreeEn}
+                        {optionCopy.decree}
                       </p>
                     </div>
                   </button>
@@ -302,7 +240,7 @@ export default function CertificatesPage() {
                 rows={2}
                 value={customRecipient}
                 onChange={(e) => setCustomRecipient(e.target.value)}
-                placeholder={isVi ? activeOption.defaultRecipientVi : activeOption.defaultRecipientEn}
+                placeholder={activePurposeCopy.defaultRecipient}
                 className="w-full text-xs sm:text-sm p-3 rounded-lg border border-input bg-background focus:outline-none focus:ring-2 focus:ring-primary/30"
               />
               <p className="text-[11px] text-muted-foreground mt-1">{certCopy.recipientHelper}</p>
@@ -317,11 +255,24 @@ export default function CertificatesPage() {
                 {certCopy.issuedByValue}. {certCopy.issuedByNote}
               </p>
             </div>
+            {!curriculumData && (
+              <div className="flex items-start gap-2 border-t border-border/60 pt-2">
+                <TriangleAlert className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0 mt-0.5" />
+                <p>{certCopy.curriculumHint}</p>
+              </div>
+            )}
           </div>
         </div>
 
         {/* Printable Preview Document Sheet */}
         <div className="lg:col-span-7">
+          {!hasIdentity ? (
+            <EmptyState
+              icon={ShieldX}
+              title={certCopy.identityMissingTitle}
+              description={certCopy.identityMissingDescription}
+            />
+          ) : (
           <div className="bg-white text-slate-900 border border-slate-200 rounded-xl shadow-md p-6 sm:p-10 font-serif leading-relaxed text-sm print:p-0 print:border-none print:shadow-none print:m-0 print:w-full">
             {/* Honest preview banner: the first thing any reader sees, on screen
                 and on paper. This page never mints an official document. */}
@@ -355,11 +306,7 @@ export default function CertificatesPage() {
                   {certCopy.independenceHeader}
                 </p>
                 <div className="w-24 h-[1.5px] bg-slate-900 mx-auto my-1"></div>
-                <p className="text-[11px] italic text-slate-600 mt-1">
-                  {isVi
-                    ? `Thành phố Hồ Chí Minh, ngày ${today.getDate()} tháng ${today.getMonth() + 1} năm ${today.getFullYear()}`
-                    : `Ho Chi Minh City, ${formatDate(today, { month: 'long', day: 'numeric', year: 'numeric' })}`}
-                </p>
+                <p className="text-[11px] italic text-slate-600 mt-1">{cityDateLine}</p>
               </div>
             </div>
 
@@ -412,15 +359,15 @@ export default function CertificatesPage() {
               <div className="pt-3 border-t border-slate-200 space-y-2">
                 <p>
                   <strong className="text-slate-950">{certCopy.purposeLabel} </strong>
-                  <span>{isVi ? activeOption.bodyVi : activeOption.bodyEn}</span>
+                  <span>{activePurposeCopy.body}</span>
                 </p>
                 <p className="text-xs italic text-slate-600">
                   <span>{certCopy.legalBasisLabel} </span>
-                  {isVi ? activeOption.decreeVi : activeOption.decreeEn}
+                  {activePurposeCopy.decree}
                 </p>
                 <p>
                   <strong className="text-slate-950">{certCopy.recipientLineLabel} </strong>
-                  <span>{customRecipient.trim() || (isVi ? activeOption.defaultRecipientVi : activeOption.defaultRecipientEn)}</span>
+                  <span>{customRecipient.trim() || activePurposeCopy.defaultRecipient}</span>
                 </p>
               </div>
             </div>
@@ -446,6 +393,7 @@ export default function CertificatesPage() {
               </div>
             </div>
           </div>
+          )}
         </div>
       </div>
     </div>

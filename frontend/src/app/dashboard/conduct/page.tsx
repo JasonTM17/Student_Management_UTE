@@ -30,7 +30,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Modal } from '@/components/ui/modal';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
-import { LoadingState, ErrorState } from '@/components/ui/state-block';
+import { LoadingState, ErrorState, EmptyState } from '@/components/ui/state-block';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 
 const conductCopy = {
@@ -651,6 +651,15 @@ export default function StudentConductPage() {
           </div>
         </CardHeader>
         <CardContent className="p-0">
+          {(activeSemesterScore?.activities || []).length === 0 ? (
+            <EmptyState
+              icon={HeartHandshake}
+              title={messages.conduct.activitiesEmptyTitle}
+              description={messages.conduct.activitiesEmptyDescription}
+              className="border-none bg-transparent shadow-none"
+            />
+          ) : (
+            <>
           <div className="divide-y divide-border/60 sm:hidden">
             {(activeSemesterScore?.activities || []).map((act) => {
               const details = activityDetails(act);
@@ -756,6 +765,8 @@ export default function StudentConductPage() {
               </tbody>
             </table>
           </div>
+            </>
+          )}
         </CardContent>
       </Card>
 
