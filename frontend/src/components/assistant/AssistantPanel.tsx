@@ -482,7 +482,7 @@ export function AssistantPanel() {
             tabIndex={-1}
             aria-labelledby="assistant-panel-title"
             aria-describedby="assistant-panel-description"
-            className="relative flex h-full flex-col overscroll-contain overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-[min(42rem,calc(100dvh-2rem))] md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
+            className="relative flex h-full supports-[height:100dvh]:h-[100dvh] flex-col overscroll-contain overflow-hidden border border-primary/25 bg-card shadow-[0_20px_50px_rgba(0,35,90,0.22)] pb-[env(safe-area-inset-bottom)] md:h-[min(42rem,calc(100dvh-2rem))] md:max-h-[min(42rem,calc(100dvh-2rem))] md:rounded-2xl md:pb-0"
           >
             {/* Header with quick New Chat and a neutral assistant identity indicator */}
             <header className="flex items-center justify-between gap-3 border-b border-primary-foreground/15 bg-gradient-to-r from-primary via-[#004eab] to-[#005fcf] px-4 py-3 text-white shadow-sm dark:from-[#0b3a70] dark:via-[#004eab] dark:to-[#005fcf]">
