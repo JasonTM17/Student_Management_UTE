@@ -374,7 +374,10 @@ export function AssistantPanel() {
   };
 
   const selectConversation = async (conversation: AssistantConversation) => {
-    if (isSending) return;
+    if (isSending) {
+      setAnnouncement(messages.assistant.busyNotice);
+      return;
+    }
     setHistoryStatus('loading');
     selectedHistoryRef.current = true;
     try {
@@ -391,7 +394,10 @@ export function AssistantPanel() {
   };
 
   const createConversation = async () => {
-    if (isSending) return;
+    if (isSending) {
+      setAnnouncement(messages.assistant.busyNotice);
+      return;
+    }
     if (state.messages.length === 0) {
       selectedHistoryRef.current = true;
       resetConversation(state.conversationId);
@@ -411,7 +417,11 @@ export function AssistantPanel() {
   };
 
   const deleteConversation = async (conversationId: string) => {
-    if (isSending || deletingConversationId) return;
+    if (isSending) {
+      setAnnouncement(messages.assistant.busyNotice);
+      return;
+    }
+    if (deletingConversationId) return;
     const shouldDelete = await confirm({
       title: messages.assistant.deleteConversation,
       message:
