@@ -34,6 +34,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Modal } from '@/components/ui/modal';
+import { Select } from '@/components/ui/select';
 import { statusToneClass, type StatusTone } from '@/components/ui/status';
 import { EmptyState, ErrorState, LoadingState } from '@/components/ui/state-block';
 import { useConfirmationDialog } from '@/components/ui/use-confirmation-dialog';
@@ -95,6 +96,54 @@ function userStatusTone(status: string): StatusTone {
     default:
       return 'neutral';
   }
+}
+
+interface RoleTabButtonProps {
+  active: boolean;
+  /** Extra classes applied while the tab is active (tone overrides on top of the default variant). */
+  activeClassName: string;
+  /** Overrides the shared inactive treatment when a surface needs a transparent chip. */
+  inactiveClassName?: string;
+  className?: string;
+  onClick: () => void;
+  disabled?: boolean;
+  title?: string;
+  children: React.ReactNode;
+}
+
+// Compact role filter/switcher chip built on the shared Button so every tab
+// inherits the same focus-visible ring and disabled treatment; per-tab tones
+// stay in the caller.
+function RoleTabButton({
+  active,
+  activeClassName,
+  inactiveClassName,
+  className,
+  onClick,
+  disabled,
+  title,
+  children,
+}: RoleTabButtonProps) {
+  return (
+    <Button
+      type="button"
+      size="sm"
+      variant={active ? 'default' : 'secondary'}
+      aria-pressed={active}
+      onClick={onClick}
+      disabled={disabled}
+      title={title}
+      className={cn(
+        'h-auto px-3 py-1.5 text-xs',
+        className,
+        active
+          ? activeClassName
+          : inactiveClassName ?? 'bg-secondary/40 text-muted-foreground hover:bg-secondary/40 hover:text-foreground',
+      )}
+    >
+      {children}
+    </Button>
+  );
 }
 
 export default function AdminUsersPage() {
@@ -286,10 +335,10 @@ export default function AdminUsersPage() {
           createdUser: 'Đã tạo người dùng thành công',
           saveFailed: 'Hiện chưa thể lưu hồ sơ người dùng.',
           editTitle: 'Chỉnh sửa tài khoản người dùng',
-          createStudentTitle: 'Thêm Mới Tài Khoản Sinh Viên',
-          createLecturerTitle: 'Thêm Mới Tài Khoản Giảng Viên',
-          createAdminTitle: 'Thêm Mới Tài Khoản Quản Trị Viên',
-          emailLabel: 'Địa chỉ Email trường cấp',
+          createStudentTitle: 'Thêm mới tài khoản sinh viên',
+          createLecturerTitle: 'Thêm mới tài khoản giảng viên',
+          createAdminTitle: 'Thêm mới tài khoản quản trị viên',
+          emailLabel: 'Địa chỉ email trường cấp',
           issuedSecretTitle: 'Hệ thống tự cấp mật khẩu tạm thời',
           issuedSecretNote:
             'Bạn không cần nhập mật khẩu khởi tạo. Sau khi tạo, hệ thống sinh một mật khẩu tạm thời dùng một lần và người dùng phải đổi ngay khi đăng nhập đầu tiên.',
@@ -339,13 +388,13 @@ export default function AdminUsersPage() {
           rolesShort: {
             ADMIN: 'Quản trị',
           },
-          accountSectionTitle: '1. Thông Tin Tài Khoản & Đăng Nhập',
+          accountSectionTitle: '1. Thông tin tài khoản & đăng nhập',
           accountSectionHint: 'Định danh đăng nhập và bảo mật tài khoản',
           lastNamePlaceholder: 'Nguyễn Văn',
           firstNamePlaceholder: 'An',
           initialStatusLabel: 'Trạng thái tài khoản ban đầu:',
           initialStatusActive: 'Đang hoạt động (ACTIVE)',
-          assignmentSectionTitle: '2. Hồ Sơ Phân Công Học Vụ',
+          assignmentSectionTitle: '2. Hồ sơ phân công học vụ',
           assignmentHints: {
             STUDENT: 'Thông tin hồ sơ đào tạo sinh viên chính quy',
             LECTURER: 'Thông tin học hàm và bộ môn giảng dạy',
@@ -366,7 +415,7 @@ export default function AdminUsersPage() {
           facultyManagedHint:
             'Khoa / Viện đào tạo của sinh viên do Phòng Đào tạo gán cùng chương trình đào tạo sau khi tài khoản được tạo.',
           selectFacultyPlaceholder: '-- Chọn Khoa / Viện đào tạo --',
-          employeeIdLabel: 'Mã số Giảng viên (MSGV) *',
+          employeeIdLabel: 'Mã số giảng viên (MSGV) *',
           employeeIdDescription: 'Mã định danh cán bộ giảng dạy và chấm thi luận văn',
           employeeIdPlaceholder: 'ví dụ: GV2026001 hoặc GV2026002',
           academicTitleLabel: 'Học hàm / Học vị',
@@ -387,11 +436,11 @@ export default function AdminUsersPage() {
           specializationDescription:
             'Ví dụ: Trí tuệ nhân tạo, Hệ thống nhúng, Kỹ thuật phần mềm',
           specializationPlaceholder: 'ví dụ: Kỹ thuật phần mềm & AI',
-          adminPermissionsTitle: 'Phân quyền Quản Trị Hệ Thống',
+          adminPermissionsTitle: 'Phân quyền quản trị hệ thống',
           adminPermissionsDescription:
             'Tài khoản có toàn quyền truy cập phân hệ Quản trị viện, quản lý danh mục người dùng, giảng viên, môn học, lớp học phần, bảng tin thông báo và cấu hình trường học.',
-          createStudentAction: '+ Tạo Tài Khoản Sinh Viên',
-          createLecturerAction: '+ Tạo Tài Khoản Giảng Viên',
+          createStudentAction: '+ Tạo tài khoản sinh viên',
+          createLecturerAction: '+ Tạo tài khoản giảng viên',
         }
       : {
           loading: 'Loading user management',
@@ -534,11 +583,11 @@ export default function AdminUsersPage() {
           specializationDescription:
             'e.g. Artificial Intelligence, Embedded Systems, Software Engineering',
           specializationPlaceholder: 'e.g. Software Engineering & AI',
-          adminPermissionsTitle: 'System Administration Permissions',
+          adminPermissionsTitle: 'System administration permissions',
           adminPermissionsDescription:
             'This account has full access to the administration modules, managing users, lecturers, courses, sections, notices, and school configuration.',
-          createStudentAction: '+ Create Student Account',
-          createLecturerAction: '+ Create Lecturer Account',
+          createStudentAction: '+ Create student account',
+          createLecturerAction: '+ Create lecturer account',
         };
 
   const statusLabel = (status: string | null | undefined) =>
@@ -851,69 +900,49 @@ export default function AdminUsersPage() {
               <span className="text-xs font-semibold text-muted-foreground mr-1">
                 {copy.filterByRole}
               </span>
-              <button
-                type="button"
+              <RoleTabButton
+                active={roleFilter === 'ALL'}
+                activeClassName="shadow-xs"
                 onClick={() => {
                   setRoleFilter('ALL');
                   setPage(1);
                 }}
-                className={cn(
-                  'rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                  roleFilter === 'ALL'
-                    ? 'bg-primary text-primary-foreground shadow-xs'
-                    : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
-                )}
               >
                 {roleFilter === 'ALL' ? copy.filterAll(totalItems) : copy.filterAllNoCount}
-              </button>
-              <button
-                type="button"
+              </RoleTabButton>
+              <RoleTabButton
+                active={roleFilter === 'STUDENT'}
+                activeClassName="bg-status-info text-status-info-foreground shadow-xs hover:bg-status-info/90"
                 onClick={() => {
                   setRoleFilter('STUDENT');
                   setPage(1);
                 }}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                  roleFilter === 'STUDENT'
-                    ? 'bg-status-info text-status-info-foreground shadow-xs'
-                    : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
-                )}
               >
                 <GraduationCap className="h-3.5 w-3.5" />
                 {copy.roles.STUDENT}
-              </button>
-              <button
-                type="button"
+              </RoleTabButton>
+              <RoleTabButton
+                active={roleFilter === 'LECTURER'}
+                activeClassName="bg-status-success text-status-success-foreground shadow-xs hover:bg-status-success/90"
                 onClick={() => {
                   setRoleFilter('LECTURER');
                   setPage(1);
                 }}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                  roleFilter === 'LECTURER'
-                    ? 'bg-status-success text-status-success-foreground shadow-xs'
-                    : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
-                )}
               >
                 <School className="h-3.5 w-3.5" />
                 {copy.roles.LECTURER}
-              </button>
-              <button
-                type="button"
+              </RoleTabButton>
+              <RoleTabButton
+                active={roleFilter === 'ADMIN'}
+                activeClassName="bg-status-neutral text-status-neutral-foreground shadow-xs hover:bg-status-neutral/90"
                 onClick={() => {
                   setRoleFilter('ADMIN');
                   setPage(1);
                 }}
-                className={cn(
-                  'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-xs font-medium transition',
-                  roleFilter === 'ADMIN'
-                    ? 'bg-status-neutral text-status-neutral-foreground shadow-xs'
-                    : 'bg-secondary/40 text-muted-foreground hover:text-foreground',
-                )}
               >
                 <ShieldCheck className="h-3.5 w-3.5" />
                 {copy.roles.ADMIN}
-              </button>
+              </RoleTabButton>
             </div>
 
             <form onSubmit={handleSearch} className="flex flex-col gap-3 md:flex-row md:items-end md:justify-between">
@@ -1142,51 +1171,42 @@ export default function AdminUsersPage() {
                   </p>
                 </div>
                 <div className="flex items-center gap-1.5 rounded-lg border border-border bg-background p-1">
-                  <button
-                    type="button"
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'STUDENT'}
+                    activeClassName="bg-blue-600 text-white shadow-xs hover:bg-blue-600/90"
                     onClick={() => {
                       setFormData((c) => ({ ...c, role: 'STUDENT' }));
                     }}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                      formData.role === 'STUDENT'
-                        ? 'bg-blue-600 text-white shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
                   >
                     <GraduationCap className="h-3.5 w-3.5" />
                     {copy.roles.STUDENT}
-                  </button>
-                  <button
-                    type="button"
+                  </RoleTabButton>
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'LECTURER'}
+                    activeClassName="bg-emerald-600 text-white shadow-xs hover:bg-emerald-600/90"
                     onClick={() => {
                       setFormData((c) => ({ ...c, role: 'LECTURER' }));
                     }}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                      formData.role === 'LECTURER'
-                        ? 'bg-emerald-600 text-white shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground',
-                    )}
                   >
                     <School className="h-3.5 w-3.5" />
                     {copy.roles.LECTURER}
-                  </button>
-                  <button
-                    type="button"
+                  </RoleTabButton>
+                  <RoleTabButton
+                    className="rounded-md font-semibold"
+                    inactiveClassName="bg-transparent text-muted-foreground hover:bg-transparent hover:text-foreground"
+                    active={formData.role === 'ADMIN'}
+                    activeClassName="bg-purple-600 text-white shadow-xs hover:bg-purple-600/90"
                     onClick={() => setFormData((c) => ({ ...c, role: 'ADMIN' }))}
                     disabled={!isSuperAdmin}
                     title={!isSuperAdmin ? copy.errors.adminReserved : undefined}
-                    className={cn(
-                      'inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-semibold transition',
-                      formData.role === 'ADMIN'
-                        ? 'bg-purple-600 text-white shadow-xs'
-                        : 'text-muted-foreground hover:text-foreground disabled:cursor-not-allowed disabled:opacity-50',
-                    )}
                   >
                     <ShieldCheck className="h-3.5 w-3.5" />
                     {copy.rolesShort.ADMIN}
-                  </button>
+                  </RoleTabButton>
                 </div>
               </div>
             </div>
@@ -1344,34 +1364,31 @@ export default function AdminUsersPage() {
 
                   <div className="grid grid-cols-2 gap-3">
                     <AdminFormField label={copy.cohortLabel}>
-                      <select
+                      <Select
                         value={formData.year}
                         onChange={(e) => setFormData((c) => ({ ...c, year: e.target.value }))}
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <option value="1">{copy.yearOptions['1']}</option>
-                        <option value="2">{copy.yearOptions['2']}</option>
-                        <option value="3">{copy.yearOptions['3']}</option>
-                        <option value="4">{copy.yearOptions['4']}</option>
-                      </select>
+                        options={[
+                          { value: '1', label: copy.yearOptions['1'] },
+                          { value: '2', label: copy.yearOptions['2'] },
+                          { value: '3', label: copy.yearOptions['3'] },
+                          { value: '4', label: copy.yearOptions['4'] },
+                        ]}
+                      />
                     </AdminFormField>
 
                     <AdminFormField label={copy.curriculumLabel}>
-                      <select
+                      <Select
                         value={formData.curriculumId || (curricula[0]?.id ?? '')}
                         onChange={(e) => setFormData((c) => ({ ...c, curriculumId: e.target.value }))}
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        {curricula.length > 0 ? (
-                          curricula.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.nameVi || c.name} {c.totalCredits ? `(${c.totalCredits} TC)` : ''}
-                            </option>
-                          ))
-                        ) : (
-                          <option value="">{locale === 'vi' ? '-- Đang tải CTĐT --' : '-- Loading Curricula --'}</option>
-                        )}
-                      </select>
+                        options={
+                          curricula.length > 0
+                            ? curricula.map((curriculum) => ({
+                                value: curriculum.id,
+                                label: `${curriculum.nameVi || curriculum.name}${curriculum.totalCredits ? ` (${curriculum.totalCredits} TC)` : ''}`,
+                              }))
+                            : [{ value: '', label: locale === 'vi' ? '-- Đang tải CTĐT --' : '-- Loading Curricula --' }]
+                        }
+                      />
                     </AdminFormField>
                   </div>
 
@@ -1379,15 +1396,14 @@ export default function AdminUsersPage() {
                     {/* AdminUserCreateRequest accepts departmentId but the student
                         profile writer ignores it — show the field as office-assigned
                         instead of collecting a value the server will drop. */}
-                    <select
+                    <Select
                       value=""
                       disabled
                       aria-disabled="true"
                       title={copy.facultyManagedHint}
-                      className="flex h-11 w-full cursor-not-allowed rounded-md border border-input bg-muted/50 px-3 py-2 text-sm text-muted-foreground"
-                    >
-                      <option value="">{copy.facultyManagedHint}</option>
-                    </select>
+                      options={[{ value: '', label: copy.facultyManagedHint }]}
+                      className="cursor-not-allowed bg-muted/50 text-muted-foreground"
+                    />
                   </AdminFormField>
                 </div>
               )}
@@ -1414,34 +1430,33 @@ export default function AdminUsersPage() {
                       label={copy.academicTitleLabel}
                       description={copy.academicTitleManagedHint}
                     >
-                      <select
+                      <Select
                         value={formData.academicTitle}
                         onChange={(e) => setFormData((c) => ({ ...c, academicTitle: e.target.value }))}
                         disabled
                         title={copy.academicTitleManagedHint}
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:cursor-not-allowed disabled:opacity-60"
-                      >
-                        <option value="PGS.TS.">{copy.academicTitleOptions['PGS.TS.']}</option>
-                        <option value="GS.TS.">{copy.academicTitleOptions['GS.TS.']}</option>
-                        <option value="TS.">{copy.academicTitleOptions['TS.']}</option>
-                        <option value="ThS.">{copy.academicTitleOptions['ThS.']}</option>
-                        <option value="KS.">{copy.academicTitleOptions['KS.']}</option>
-                      </select>
+                        options={[
+                          { value: 'PGS.TS.', label: copy.academicTitleOptions['PGS.TS.'] },
+                          { value: 'GS.TS.', label: copy.academicTitleOptions['GS.TS.'] },
+                          { value: 'TS.', label: copy.academicTitleOptions['TS.'] },
+                          { value: 'ThS.', label: copy.academicTitleOptions['ThS.'] },
+                          { value: 'KS.', label: copy.academicTitleOptions['KS.'] },
+                        ]}
+                      />
                     </AdminFormField>
 
                     <AdminFormField label={copy.departmentLabel}>
-                      <select
+                      <Select
                         value={formData.departmentId}
                         onChange={(e) => setFormData((c) => ({ ...c, departmentId: e.target.value }))}
-                        className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring"
-                      >
-                        <option value="">{copy.selectDepartmentPlaceholder}</option>
-                        {departments.map((d) => (
-                          <option key={d.id} value={d.id}>
-                            {d.name} {d.code ? `(${d.code})` : ''}
-                          </option>
-                        ))}
-                      </select>
+                        options={[
+                          { value: '', label: copy.selectDepartmentPlaceholder },
+                          ...departments.map((department) => ({
+                            value: department.id,
+                            label: `${department.name}${department.code ? ` (${department.code})` : ''}`,
+                          })),
+                        ]}
+                      />
                     </AdminFormField>
                   </div>
 
@@ -1487,17 +1502,19 @@ export default function AdminUsersPage() {
                             : undefined
                         }
                       >
-                        <select
+                        <Select
                           value={formData.role}
                           disabled={isSelfEditing}
                           onChange={(e) => setFormData((c) => ({ ...c, role: e.target.value as ManagedRole }))}
-                          className="flex h-11 w-full rounded-md border border-input bg-background px-3 py-2 text-sm text-foreground outline-none transition focus-visible:ring-2 focus-visible:ring-ring disabled:opacity-60 disabled:cursor-not-allowed"
-                        >
-                          <option value="ADMIN">{copy.roles.ADMIN}</option>
-                          {isSuperAdmin && <option value="SUPER_ADMIN">{copy.roles.SUPER_ADMIN}</option>}
-                          <option value="STUDENT">{copy.roles.STUDENT}</option>
-                          <option value="LECTURER">{copy.roles.LECTURER}</option>
-                        </select>
+                          options={[
+                            { value: 'ADMIN', label: copy.roles.ADMIN },
+                            ...(isSuperAdmin
+                              ? [{ value: 'SUPER_ADMIN', label: copy.roles.SUPER_ADMIN }]
+                              : []),
+                            { value: 'STUDENT', label: copy.roles.STUDENT },
+                            { value: 'LECTURER', label: copy.roles.LECTURER },
+                          ]}
+                        />
                       </AdminFormField>
                     );
                   })()}
