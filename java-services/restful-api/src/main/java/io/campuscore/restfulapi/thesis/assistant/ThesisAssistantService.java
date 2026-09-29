@@ -1620,6 +1620,22 @@ public class ThesisAssistantService {
                         + "• Exam schedules, tuition, graduation requirements, dormitory.";
     }
     private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
+
+    /**
+     * Canonical degraded answer for a knowledge-store outage reaching the
+     * controller layer (ledger reserve/complete DataAccessExceptions on the
+     * local path). Must stay byte-compatible with the outage contract the
+     * compose runtime probes and {@code databaseOutageReturnsExplicitDegraded
+     * ResponseWithoutCitations} pin: KNOWLEDGE_UNAVAILABLE, degraded, no
+     * citations — not the curated fallback, which carries reasonCode ANSWERED.
+     */
+    public static ChatResponse knowledgeUnavailableResponse(String locale, java.util.UUID clientRequestId) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        return new ChatResponse(unavailableMessage(normalizedLocale), MODEL, true, "KNOWLEDGE_UNAVAILABLE",
+                normalizedLocale, List.of(), java.util.UUID.randomUUID(), clientRequestId,
+                null, false, "FAILED_PRE_DISPATCH", null, null);
+    }
+
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
     static String guardMessage(String reasonCode, String locale) {
