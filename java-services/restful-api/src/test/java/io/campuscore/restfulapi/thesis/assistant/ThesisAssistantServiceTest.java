@@ -751,7 +751,7 @@ class ThesisAssistantServiceTest {
         var document = new ThesisAssistantKnowledgeRepository.KnowledgeDocument(
                 "77777777-7777-7777-7777-777777777777", "topic", "vi", "Đề tài", "Nội dung đề tài", "handbook");
         when(knowledge.search(anyString(), anyList(), anyInt())).thenAnswer(invocation -> {
-            Thread.sleep(1_500L);
+            Thread.sleep(ThesisAssistantService.LOCAL_FALLBACK_BUDGET_MS + 1_000L); // exceed the raised fallback ceiling
             return List.of(document);
         });
 
