@@ -138,7 +138,10 @@ public class ThesisAssistantController {
             return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
                     request.clientRequestId(), request.scope());
         } catch (DataAccessException exception) {
-            return assistant.groundedFallback(request.message(), locale);
+            // Preserve the outage contract (KNOWLEDGE_UNAVAILABLE, degraded, no
+            // citations) rather than the curated fallback, whose ANSWERED
+            // reason code would mask the outage from the runtime probes.
+            return ThesisAssistantService.knowledgeUnavailableResponse(locale, request.clientRequestId());
         }
     }
 
