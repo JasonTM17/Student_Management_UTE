@@ -40,8 +40,12 @@ async function freeCourseForRegister(page: Page) {
   // SE402 section's Register button stays disabled as a duplicate course
   // until that enrollment is dropped. Drop it first so the register path is
   // the one under test.
-  const dropButton = page.locator('article').filter({ hasText: /SE402-01/ })
-    .getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
+  // Wait for the section card to mount before probing the drop button — the
+  // catalog streams in after navigation, and an early isVisible() probe reads
+  // "absent" while the list is still loading.
+  const sectionCard = page.locator('article').filter({ hasText: /SE402-01/ });
+  await expect(sectionCard).toBeVisible({ timeout: 20_000 });
+  const dropButton = sectionCard.getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
   if (await dropButton.isVisible().catch(() => false)) {
     await dropButton.click();
     await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
