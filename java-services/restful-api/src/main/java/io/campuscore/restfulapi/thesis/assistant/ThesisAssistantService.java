@@ -557,7 +557,13 @@ public class ThesisAssistantService {
     static final int PROMPT_DOCUMENT_LIMIT = AssistantProperties.PROMPT_DOCUMENT_LIMIT;
 
     /** Wall-clock budget for the local lexical fallback when the RAG gateway is down. */
-    public static final long LOCAL_FALLBACK_BUDGET_MS = 1_000L;
+    // Ceiling, not a wait: healthy retrieval answers in well under 100ms. The
+    // budget must still cover the degenerate case — with the database just
+    // stopped, Hikari spends ~2-3s evicting its dead pooled connections before
+    // retrieval can fail, and a 1s ceiling turned that outage into a
+    // TimeoutException, masking KNOWLEDGE_UNAVAILABLE behind the curated
+    // fallback (compose outage probe regression).
+    public static final long LOCAL_FALLBACK_BUDGET_MS = 5_000L;
 
     /**
      * The instant the student's daily quota resets: next midnight Asia/
