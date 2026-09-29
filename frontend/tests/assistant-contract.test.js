@@ -1381,3 +1381,13 @@ test('hook still simulates the SSE sequence for locally answered smalltalk', () 
   assert.match(hookSource, /messageId: `local-resolved-\$\{Date\.now\(\)\}`/);
   assert.match(hookSource, /reasonCode: 'LOCAL_ASSIST'/);
 });
+
+test('mobile assistant sheet keeps the dynamic-viewport keyboard fix pinned', () => {
+  const layoutSource = fs.readFileSync(path.join(root, 'src/app/layout.tsx'), 'utf8');
+  assert.match(layoutSource, /viewportFit:\s*'cover'/, 'viewport export must set viewportFit cover');
+
+  const panelSource = fs.readFileSync(path.join(root, 'src/components/assistant/AssistantPanel.tsx'), 'utf8');
+  assert.match(panelSource, /supports-\[height:100dvh\]:h-\[100dvh\]/, 'mobile sheet must fill the dynamic viewport');
+  assert.match(panelSource, /md:h-\[min\(42rem,calc\(100dvh-2rem\)\)\]/, 'desktop floating card pin must stay');
+  assert.doesNotMatch(panelSource, /className="relative flex h-full flex-col/, 'bare h-full without a dvh fallback must not return');
+});

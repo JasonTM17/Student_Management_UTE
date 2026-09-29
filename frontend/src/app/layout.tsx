@@ -26,6 +26,10 @@ import { JsonLd } from "@/components/seo/JsonLd";
 export const dynamic = 'force-dynamic';
 
 export const viewport: Viewport = {
+  // viewport-fit=cover enables env(safe-area-inset-bottom), consumed by the
+  // assistant panel (AssistantPanel.tsx) so the composer clears the iOS home
+  // indicator. Harmless on desktop.
+  viewportFit: 'cover',
   themeColor: [
     { media: '(prefers-color-scheme: light)', color: '#F9F9FF' },
     { media: '(prefers-color-scheme: dark)', color: '#12161d' },

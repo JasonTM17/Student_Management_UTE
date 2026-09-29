@@ -557,7 +557,13 @@ public class ThesisAssistantService {
     static final int PROMPT_DOCUMENT_LIMIT = AssistantProperties.PROMPT_DOCUMENT_LIMIT;
 
     /** Wall-clock budget for the local lexical fallback when the RAG gateway is down. */
-    public static final long LOCAL_FALLBACK_BUDGET_MS = 1_000L;
+    // Ceiling, not a wait: healthy retrieval answers in well under 100ms. The
+    // budget must still cover the degenerate case — with the database just
+    // stopped, Hikari spends ~2-3s evicting its dead pooled connections before
+    // retrieval can fail, and a 1s ceiling turned that outage into a
+    // TimeoutException, masking KNOWLEDGE_UNAVAILABLE behind the curated
+    // fallback (compose outage probe regression).
+    public static final long LOCAL_FALLBACK_BUDGET_MS = 5_000L;
 
     /**
      * The instant the student's daily quota resets: next midnight Asia/
@@ -578,7 +584,27 @@ public class ThesisAssistantService {
      * fallback text below instead of a 5xx.
      */
     public ChatResponse groundedFallback(String message, String locale) {
+        return groundedFallback(message, locale, false);
+    }
+
+    /**
+     * @param dbDownAtRequestStart true when the caller proved the database was
+     *        already unavailable when this request began (the account-state
+     *        filter recorded a failure after the request started). Layered
+     *        timeouts (gateway 15s > local budget 5s > Hikari 15s) mean a
+     *        stopped database surfaces here only as a budget timeout long
+     *        after the availability cooldown expired — the flag carries the
+     *        proof, and the outage contract (KNOWLEDGE_UNAVAILABLE, degraded,
+     *        no citations) must win over the curated content fallback.
+     */
+    public ChatResponse groundedFallback(String message, String locale, boolean dbDownAtRequestStart) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        // A stopped database fails retrieval slower than every layered timeout
+        // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
+        // recognised BEFORE any retrieval attempt: the tracker already knows.
+        if (io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.isRecentlyUnavailable()) {
+            return knowledgeUnavailableResponse(locale, null);
+        }
         ChatResponse lexical;
         try {
             final String normalized = AssistantInputGuard.normalizeMessage(message);
@@ -589,8 +615,12 @@ public class ThesisAssistantService {
             Thread.currentThread().interrupt();
             return curatedFallback(normalizedLocale);
         } catch (Exception exception) {
-            // Timeout, rejection, or an unexpected retrieval failure: the
-            // fallback must still answer, never throw.
+            // Budget timeout / rejection: answer anyway, never throw. When the
+            // database was already down when the request began, the precise
+            // outage contract wins over the curated content fallback.
+            if (dbDownAtRequestStart) {
+                return knowledgeUnavailableResponse(locale, null);
+            }
             return curatedFallback(normalizedLocale);
         }
         if ("ANSWERED".equals(lexical.reasonCode()) && !lexical.citations().isEmpty()) {
@@ -598,6 +628,18 @@ public class ThesisAssistantService {
             // citations, mark degraded so clients know the remote RAG path was
             // bypassed (existing local-grounded convention).
             return withDegraded(lexical);
+        }
+        if ("KNOWLEDGE_UNAVAILABLE".equals(lexical.reasonCode())) {
+            // The knowledge STORE itself is down (both remote and local read
+            // the same database). Relay the precise outage contract instead of
+            // masking it as a content miss: the runtime probes pin
+            // KNOWLEDGE_UNAVAILABLE + degraded + no citations, and a curated
+            // ANSWERED here made a DB outage indistinguishable from "no
+            // matching document".
+            return withDegraded(lexical);
+        }
+        if (dbDownAtRequestStart) {
+            return knowledgeUnavailableResponse(locale, null);
         }
         return curatedFallback(normalizedLocale);
     }
@@ -1620,6 +1662,22 @@ public class ThesisAssistantService {
                         + "• Exam schedules, tuition, graduation requirements, dormitory.";
     }
     private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
+
+    /**
+     * Canonical degraded answer for a knowledge-store outage reaching the
+     * controller layer (ledger reserve/complete DataAccessExceptions on the
+     * local path). Must stay byte-compatible with the outage contract the
+     * compose runtime probes and {@code databaseOutageReturnsExplicitDegraded
+     * ResponseWithoutCitations} pin: KNOWLEDGE_UNAVAILABLE, degraded, no
+     * citations — not the curated fallback, which carries reasonCode ANSWERED.
+     */
+    public static ChatResponse knowledgeUnavailableResponse(String locale, java.util.UUID clientRequestId) {
+        String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        return new ChatResponse(unavailableMessage(normalizedLocale), MODEL, true, "KNOWLEDGE_UNAVAILABLE",
+                normalizedLocale, List.of(), java.util.UUID.randomUUID(), clientRequestId,
+                null, false, "FAILED_PRE_DISPATCH", null, null);
+    }
+
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
     static String guardMessage(String reasonCode, String locale) {

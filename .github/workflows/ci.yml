@@ -243,6 +243,7 @@ jobs:
           readiness_code="$(curl --max-time 30 --silent --output /dev/null --write-out '%{http_code}' -H 'X-Health-Key: local-course-health-key' http://127.0.0.1:4010/api/v1/health/readiness)"
           test "$readiness_code" = "503"
           outage="$(curl --max-time 30 --fail --silent --show-error -H 'Content-Type: application/json' -H "Authorization: Bearer $token" -d '{"message":"Điều kiện đăng ký đề tài là gì?","locale":"vi","clientRequestId":"00000000-0000-0000-0000-000000000002"}' http://127.0.0.1:4010/api/v1/assistant/chat)"
+          echo "OUTAGE-DEBUG: $outage"
           OUTAGE="$outage" python3 -c 'import json, os; data=json.loads(os.environ["OUTAGE"]); assert data["reasonCode"] == "KNOWLEDGE_UNAVAILABLE" and data["degraded"] is True and data["citations"] == []'
           docker compose start postgres
           docker compose up -d --wait
