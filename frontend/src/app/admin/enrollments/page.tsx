@@ -180,13 +180,9 @@ export default function AdminEnrollmentsPage() {
       setCourses(coursesResult.value.data || []);
     }
     if (semestersResult.status === 'rejected' || coursesResult.status === 'rejected') {
-      setReferenceError(
-        locale === 'vi'
-          ? 'Bộ lọc học kỳ hoặc môn học chưa tải được đầy đủ.'
-          : 'Semester or course filter options could not be fully loaded.',
-      );
+      setReferenceError(messages.admin.enrollments.filterLoadFailed);
     }
-  }, [locale]);
+  }, [messages]);
 
   const fetchSectionsForCourse = useCallback(async (courseId: string) => {
     if (!courseId) {

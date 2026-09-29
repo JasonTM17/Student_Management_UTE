@@ -302,8 +302,12 @@ test('deep persona route matrix has a bounded timeout large enough for cold comp
   assert.match(spec, /'\/dashboard\/conduct'/);
   assert.match(spec, /'\/dashboard\/editor'/);
   assert.match(spec, /'\/admin\/editor'/);
-  assert.match(adminEditor, /redirect\('\/dashboard\/editor'\)/);
-  assert.match(localizedAdminEditor, /redirect\(`\/\$\{locale\}\/dashboard\/editor`\)/);
+  // admin/editor forwards to the editor workspace through the shared client
+  // shim pattern (LoadingState + router.replace) and keeps deep links like
+  // ?editId=... intact; the [locale] tree re-exports the canonical shim.
+  assert.match(adminEditor, /router\.replace\(/);
+  assert.match(adminEditor, /href\('\/dashboard\/editor'\)/);
+  assert.match(localizedAdminEditor, /export \{ default \} from '\.\.\/\.\.\/\.\.\/admin\/editor\/page';/);
 });
 
 test('thesis lecturer-student multi-role flow provides group approval, rejection, and topic proposal', () => {
