@@ -71,6 +71,11 @@ public class AssistantPersonalContextAdvisor {
                     + "|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|\\btkb\\b"
                     + "|(?:thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\\s*nay|ngày\\s*mai|chủ\\s*nhật|hom\\s*nay|ngay\\s*mai|chu\\s*nhat)\\s*(?:tôi\\s*)?(?:có\\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca)"
                     + "|học\\s*ngày\\s*nào|hoc\\s*ngay\\s*nao|m[oô]n\\s*nào\\s*học|mon\\s*nao\\s*hoc|tiết\\s*học|buổi\\s*học|ca\\s*học|ca\\s*dạy|tiết\\s*dạy"
+                    // Lecturer teaching-load phrasings ("Kỳ này tôi phụ trách
+                    // dạy những lớp học phần nào?") are the asker's own
+                    // teaching timetable, not a public catalog question.
+                    + "|phụ\\s*trách\\s*(?:dạy|giảng)|phu\\s*trach\\s*(?:day|giang)"
+                    + "|lớp\\s*(?:học\\s*phần\\s*)?nào[^?!.]{0,40}?(?:dạy|phụ\\s*trách)|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)"
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -126,7 +131,14 @@ public class AssistantPersonalContextAdvisor {
                     + "|kết\\s*quả\\s*học\\s*tập|ket\\s*qua\\s*hoc\\s*tap"
                     + "|xếp\\s*loại\\s*học\\s*lực|xep\\s*loai\\s*hoc\\s*luc"
                     + "|\\bgpa\\b|\\bgpa\\s*của|\\bgpa\\s*cua"
-                    + "|(?:điểm|diem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)?"
+                    // The suffix group is deliberately NOT optional: with a
+                    // trailing "?" the bare word "điểm" matched every message
+                    // containing it ("điểm chuẩn ngành X") and the first-person
+                    // gate then served the student's own transcript instead of
+                    // the public knowledge path. A bare "điểm" only counts as a
+                    // personal-grades signal when a possessive follows.
+                    + "|(?:điểm|diem)\\s*(?:số|so|tổng\\s*kết|tong\\s*ket|thành\\s*phần|thanh\\s*phan|quá\\s*trình|qua\\s*trinh|học\\s*kỳ|hoc\\s*ky|học\\s*tập|hoc\\s*tap)"
+                    + "|(?:điểm|diem)\\s*(?:của|cua)\\s*(?:tôi|mình|em|toi|minh)"
                     + "|(?:my\\s+)?(?:grades?|scores?|marks?|transcript)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 

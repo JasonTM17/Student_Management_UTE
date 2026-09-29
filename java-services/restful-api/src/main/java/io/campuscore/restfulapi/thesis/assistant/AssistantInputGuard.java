@@ -28,7 +28,11 @@ public final class AssistantInputGuard {
     // the English-only list let "bỏ qua tất cả hướng dẫn..." reach the provider.
     private static final Pattern PROMPT_INJECTION = Pattern.compile(
             "(?i)(?:ignore\\s+(?:all\\s+)?previous\\s+instructions|disregard\\s+(?:the\\s+)?system\\s+prompt|reveal\\s+(?:the\\s+)?system\\s+prompt|(?:print|show|give\\s+me|what\\s+is)\\s+(?:the\\s+)?(?:system\\s+prompt|api[\\s_-]?key|jwt[\\s_-]?secret|database\\s+password|admin\\s+password)|developer\\s+message|jailbreak|prompt\\s+injection\\s+(?:attack|payload|attempt)|do\\s+anything\\s+now|dan\\s+mode"
-                    + "|(?:bỏ\\s*qua|quên\\s*(?:đi|hết)?|không\\s+tuân\\s+theo|bỏ\\s*mặc)\\s+(?:tất\\s*cả\\s+|mọi\\s+|các\\s+|những\\s+)?(?:hướng\\s+dẫn|chỉ\\s+dẫn|lệnh|quy\\s+định|prompt)"
+                    // "quy định"/"lệnh" alone are academic nouns — "bỏ qua quy
+                    // định về số tín chỉ" and "bỏ qua lệnh điểm danh" are
+                    // legitimate regulation questions, so only system-scoped
+                    // objects mark an injection attempt here.
+                    + "|(?:bỏ\\s*qua|quên\\s*(?:đi|hết)?|không\\s+tuân\\s+theo|bỏ\\s*mặc)\\s+(?:tất\\s*cả\\s+|mọi\\s+|các\\s+|những\\s+)?(?:hướng\\s+dẫn|chỉ\\s+dẫn|prompt|lệnh\\s+hệ\\s+thống|quy\\s+định\\s+hệ\\s+thống)"
                     + "|(?:bạn\\s+là\\s+(?:một\\s+)?)?(?:ai|trợ\\s+lý)\\s+không\\s+giới\\s+hạn|(?:hạ|sửa|thay\\s+đổi)\\s+điểm\\s+(?:cho\\s+|của\\s+)?(?:sinh\\s+viên|môn)"
                     + "|vô\\s*hiệu\\s+(?:hóa\\s+)?(?:lệnh|hướng\\s+dẫn|chỉ\\s+dẫn)"
                     + "|(?:in|đọc|xem|hiển\\s*thị|lấy|cho\\s+(?:tôi|ta)\\s+xem)\\s+(?:ra\\s+|cho\\s+(?:tôi|ta)\\s+)?(?:toàn\\s*bộ\\s+)?(?:system\\s+prompt|prompt\\s+hệ\\s+thống|câu\\s+lệnh\\s+hệ\\s+thống|lệnh\\s+hệ\\s+thống|api[\\s_-]?key|jwt[\\s_-]?secret|mật\\s*khẩu|password)"
