@@ -127,8 +127,11 @@ export function sanitizeStreamingMarkdown(text: string): string {
   out = out.replace(/!?\[[^\]]*\]\([^)]*$/, '');
   // Bare open bracket: [label… or ![alt…
   out = out.replace(/!?\[[^\]]*$/, '');
-  // Unbalanced inline code span.
-  if (countMatches(out, /`/g) % 2 === 1) {
+  // Unbalanced inline code span — but never eat a trailing code fence: a
+  // buffer ending in ``` (or ```lang) is an opening fence, and stripping one
+  // backtick left a literal `` rendered to the user until the next chunk
+  // rebalanced it.
+  if (countMatches(out, /`/g) % 2 === 1 && !/```[\w+-]*$/.test(out)) {
     out = out.replace(/`[^`\n]*$/, '');
   }
   // Unbalanced emphasis markers, longest first.
