@@ -5,6 +5,7 @@ import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyBoolean;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.never;
@@ -118,7 +119,7 @@ class ThesisAssistantControllerTest {
                         "RAG service request failed"));
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-1", "kb-1", "Cách chọn đề tài khóa luận", "Cẩm nang", "vi", "Chọn đề tài theo chuyên ngành");
-        when(assistant.groundedFallback(anyString(), anyString())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean())).thenReturn(new ChatResponse(
                 "Câu trả lời từ kho kiến thức nội bộ.", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
@@ -143,7 +144,7 @@ class ThesisAssistantControllerTest {
                 "vi", List.of()));
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-2", "kb-2", "Đăng ký học phần", "Cẩm nang", "vi", "Các bước đăng ký học phần");
-        when(assistant.groundedFallback(anyString(), anyString())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean())).thenReturn(new ChatResponse(
                 "Các bước đăng ký học phần...", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
@@ -166,7 +167,7 @@ class ThesisAssistantControllerTest {
         when(ragGateway.isTransientFailure(conflict)).thenReturn(false);
 
         assertThrows(DomainException.class, () -> controller.chat(request("Học phí tính thế nào?"), actor()));
-        verify(assistant, never()).groundedFallback(anyString(), anyString());
+        verify(assistant, never()).groundedFallback(anyString(), anyString(), anyBoolean());
     }
 
     @Test
@@ -180,7 +181,7 @@ class ThesisAssistantControllerTest {
                         "RAG service request failed"))
                 .when(ragGateway).stream(any(), anyString(), any());
         // Local KB also empty: the curated fallback must still answer.
-        when(assistant.groundedFallback(anyString(), anyString()))
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean()))
                 .thenThrow(new IllegalStateException("knowledge unavailable"));
 
         List<ThesisAssistantService.StreamEvent> events = new ArrayList<>();
@@ -209,7 +210,7 @@ class ThesisAssistantControllerTest {
         }).when(ragGateway).stream(any(), anyString(), any());
         ThesisAssistantDtos.Citation citation = new ThesisAssistantDtos.Citation(
                 "kb-3", "kb-3", "Đăng ký học phần", "Cẩm nang", "vi", "Các bước đăng ký học phần");
-        when(assistant.groundedFallback(anyString(), anyString())).thenReturn(new ChatResponse(
+        when(assistant.groundedFallback(anyString(), anyString(), anyBoolean())).thenReturn(new ChatResponse(
                 "Các bước đăng ký học phần...", ThesisAssistantService.MODEL, true, "ANSWERED",
                 "vi", List.of(citation)));
 
