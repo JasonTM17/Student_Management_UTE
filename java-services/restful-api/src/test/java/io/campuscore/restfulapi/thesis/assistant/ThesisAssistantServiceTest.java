@@ -1,6 +1,7 @@
 package io.campuscore.restfulapi.thesis.assistant;
 
 import static org.junit.jupiter.api.Assertions.assertEquals;
+import static org.junit.jupiter.api.Assertions.assertFalse;
 import static org.junit.jupiter.api.Assertions.assertNotNull;
 import static org.junit.jupiter.api.Assertions.assertThrows;
 import static org.junit.jupiter.api.Assertions.assertTrue;
@@ -151,6 +152,19 @@ class ThesisAssistantServiceTest {
         assertEquals("curated-lexical-rag", response.model());
         assertEquals("vi", response.locale());
         assertTrue(response.citations().isEmpty());
+    }
+
+    @Test
+    void campusVocabularyAdmitsFacultyAndMajorQuestionsPastTheScopeGate() {
+        // "Trường có những ngành nào?" was refused by the pre-gate before the
+        // query ran; the V87 faculties-and-majors FAQ answers it, so the gate
+        // must admit the core campus vocabulary it covers.
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Trường có những ngành nào?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Trường có khoa nào?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("Chuyên ngành công nghệ phần mềm học gì?"));
+        assertTrue(ThesisAssistantService.hasPublicScopeSignal("What majors does the school offer?"));
+        // Off-topic chatter stays out.
+        assertFalse(ThesisAssistantService.hasPublicScopeSignal("Thời tiết hôm nay thế nào?"));
     }
 
     @Test

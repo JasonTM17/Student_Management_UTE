@@ -266,6 +266,11 @@ public class ThesisAssistantService {
             "classroom", "room", "phan",
             "hoc", "dang\\s+ky", "dang\\s+nhap", "lich", "diem", "bang\\s+diem", "tin\\s+chi", "hoc\\s+ky",
             "hoc\\s+phi", "thong\\s+bao", "luan\\s+van", "do\\s+an", "de\\s+tai", "bao\\s+ve", "giang\\s+vien",
+            // "Trường có những ngành nào?" was refused by this gate before the
+            // query ran: truong/nganh/chuyen-nganh/dao-tao are core campus
+            // vocabulary and the V87 faculties-and-majors document answers them.
+            "truong", "nganh", "chuyen\\s+nganh", "nganh\\s+dao\\s+tao", "dao\\s+tao",
+            "major", "majors", "school",
             "khoa", "bo\\s+mon", "sinh\\s+vien", "cong", "chuong\\s+trinh", "tien\\s+quyet", "song\\s+hanh",
             "thi", "hoc\\s+bong", "tot\\s+nghiep", "thuc\\s+tap", "thu\\s+vien", "ky\\s+tuc\\s+xa",
             "tai\\s+khoan", "mat\\s+khau", "nghien\\s+cuu", "phuc\\s+khao", "rut\\s+hoc\\s+phan", "hoc\\s+lai",
