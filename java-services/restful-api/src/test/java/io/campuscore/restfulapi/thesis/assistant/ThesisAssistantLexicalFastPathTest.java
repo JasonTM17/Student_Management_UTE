@@ -27,6 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.UUID;
 import java.util.function.Consumer;
+import org.springframework.mock.web.MockHttpServletRequest;
 import org.junit.jupiter.api.Test;
 import org.springframework.security.oauth2.jwt.Jwt;
 
@@ -177,7 +178,7 @@ class ThesisAssistantLexicalFastPathTest {
                 "Các bước đăng ký học phần...", ThesisAssistantService.FAST_PATH_MODEL, false,
                 "ANSWERED", "vi", List.of(citation)));
 
-        ChatResponse response = controller.chat(request("Đăng ký học phần thế nào?"), actor());
+        ChatResponse response = controller.chat(request("Đăng ký học phần thế nào?"), actor(), new MockHttpServletRequest());
 
         assertEquals("ANSWERED", response.reasonCode());
         assertEquals(ThesisAssistantService.FAST_PATH_MODEL, response.model());
@@ -197,7 +198,7 @@ class ThesisAssistantLexicalFastPathTest {
         when(ragGateway.chat(any(), anyString())).thenReturn(new ChatResponse(
                 "Câu trả lời từ RAG.", "deepseek-v4-flash", false, "ANSWERED", "vi", List.of()));
 
-        ChatResponse response = controller.chat(request("Quy trình xin nghỉ học thế nào?"), actor());
+        ChatResponse response = controller.chat(request("Quy trình xin nghỉ học thế nào?"), actor(), new MockHttpServletRequest());
 
         assertEquals("ANSWERED", response.reasonCode());
         assertEquals("deepseek-v4-flash", response.model());
@@ -215,7 +216,7 @@ class ThesisAssistantLexicalFastPathTest {
         when(ragGateway.chat(any(), anyString())).thenReturn(new ChatResponse(
                 "Câu trả lời từ RAG.", "deepseek-v4-flash", false, "ANSWERED", "vi", List.of()));
 
-        ChatResponse response = controller.chat(request("Học phí tính thế nào?"), actor());
+        ChatResponse response = controller.chat(request("Học phí tính thế nào?"), actor(), new MockHttpServletRequest());
 
         assertEquals("ANSWERED", response.reasonCode());
         verify(ragGateway).chat(any(), anyString());
@@ -234,7 +235,7 @@ class ThesisAssistantLexicalFastPathTest {
                 "ANSWERED", "vi", List.of(citation)));
 
         List<StreamEvent> events = new ArrayList<>();
-        controller.streamRemoteWithFallback(request("Đăng ký học phần thế nào?"), "owner-fast", events::add);
+        controller.streamRemoteWithFallback(request("Đăng ký học phần thế nào?"), "owner-fast", events::add, new MockHttpServletRequest());
 
         assertEquals(4, events.size());
         assertTrue(events.get(0) instanceof StreamMeta meta
@@ -263,7 +264,7 @@ class ThesisAssistantLexicalFastPathTest {
         }).when(ragGateway).stream(any(), anyString(), any());
 
         List<StreamEvent> events = new ArrayList<>();
-        controller.streamRemoteWithFallback(request("Quy trình xin nghỉ học thế nào?"), "owner-miss", events::add);
+        controller.streamRemoteWithFallback(request("Quy trình xin nghỉ học thế nào?"), "owner-miss", events::add, new MockHttpServletRequest());
 
         assertTrue(events.stream().anyMatch(event -> event instanceof ThesisAssistantService.StreamDelta delta
                 && delta.text().contains("Trả lời từ RAG.")));

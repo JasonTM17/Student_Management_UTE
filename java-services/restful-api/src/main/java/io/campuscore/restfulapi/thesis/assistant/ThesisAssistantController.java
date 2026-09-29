@@ -100,8 +100,11 @@ public class ThesisAssistantController {
     })
     @PostMapping("/chat")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
-    public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
+    public ChatResponse chat(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
+            HttpServletRequest httpRequest) {
         requireAssistantRlsAvailable();
+        boolean dbDownAtRequestStart = Boolean.TRUE.equals(
+                httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE));
         AssistantInputGuard.GuardResult guard = AssistantInputGuard.inspect(request.message());
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
         if (!guard.allowed()) {
@@ -129,7 +132,7 @@ public class ThesisAssistantController {
         }
         String owner = subject(actor);
         if (remoteRag()) {
-            return chatRemoteWithFallback(request, owner);
+            return chatRemoteWithFallback(request, owner, dbDownAtRequestStart);
         }
         // The local path touches the turn ledger (reserve/complete) outside the
         // service's own DomainException guard: a ledger outage used to escape
@@ -157,11 +160,7 @@ public class ThesisAssistantController {
      * answers before the gateway is ever contacted; only a weak or empty
      * lexical window reaches remote RAG.
      */
-    private ChatResponse chatRemoteWithFallback(ChatRequest request, String owner) {
-        // Capture the request start so the fallback can prove the database was
-        // already down when the request began even after the layered timeouts
-        // outlived the availability tracker's cooldown.
-        long requestStartMillis = System.currentTimeMillis();
+    private ChatResponse chatRemoteWithFallback(ChatRequest request, String owner, boolean dbDownAtRequestStart) {
         ChatResponse fastPath = lexicalFastPathOrNull(request);
         if (fastPath != null) {
             return fastPath;
@@ -171,10 +170,10 @@ public class ThesisAssistantController {
             if (!"NO_MATCH".equals(remote == null ? null : remote.reasonCode())) {
                 return remote;
             }
-            return localGroundedFallback(request, requestStartMillis);
+            return localGroundedFallback(request, dbDownAtRequestStart);
         } catch (DomainException exception) {
             if (isFallbackEligible(exception)) {
-                return localGroundedFallback(request, requestStartMillis);
+                return localGroundedFallback(request, dbDownAtRequestStart);
             }
             throw exception;
         }
@@ -203,13 +202,11 @@ public class ThesisAssistantController {
     /**
      * Best-effort local answer; the curated fallback covers even a failed
      * local read. When the account-state filter recorded a database failure
-     * after this request started, the outage contract (KNOWLEDGE_UNAVAILABLE)
-     * wins over the curated fallback regardless of how long the layered
-     * timeouts took.
+     * within this request (attribute set at filter time), the outage contract
+     * (KNOWLEDGE_UNAVAILABLE) wins over the curated fallback regardless of how
+     * long the layered timeouts took.
      */
-    private ChatResponse localGroundedFallback(ChatRequest request, long requestStartMillis) {
-        boolean dbDownAtRequestStart =
-                DatabaseAvailabilityTracker.lastFailureAt() >= requestStartMillis;
+    private ChatResponse localGroundedFallback(ChatRequest request, boolean dbDownAtRequestStart) {
         try {
             ChatResponse fallback = assistant.groundedFallback(request.message(), request.locale(), dbDownAtRequestStart);
             if (fallback != null) {
@@ -233,8 +230,9 @@ public class ThesisAssistantController {
     @Deprecated
     @PostMapping("/chat/complete")
     @PreAuthorize("hasAnyRole('STUDENT','LECTURER','ADMIN','SUPER_ADMIN','TRUONG_KHOA')")
-    public ChatResponse complete(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor) {
-        return chat(request, actor);
+    public ChatResponse complete(@Valid @RequestBody ChatRequest request, @AuthenticationPrincipal Jwt actor,
+            HttpServletRequest httpRequest) {
+        return chat(request, actor, httpRequest);
     }
 
     /** Comment frame cadence: a proxy/CDN idle timeout is typically 30-60 s. */
@@ -293,7 +291,7 @@ public class ThesisAssistantController {
                 if (personal != null) {
                     personalContext.stream(personal, request, sink);
                 } else if (remoteRag()) {
-                    streamRemoteWithFallback(request, owner, sink);
+                    streamRemoteWithFallback(request, owner, sink, httpRequest);
                 } else {
                     assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
                             request.clientRequestId(), sink, request.scope());
@@ -472,9 +470,10 @@ public class ThesisAssistantController {
      * the gateway entirely with a complete meta/delta/citation/done sequence.
      */
     void streamRemoteWithFallback(ChatRequest request, String owner,
-            Consumer<ThesisAssistantService.StreamEvent> sink) {
+            Consumer<ThesisAssistantService.StreamEvent> sink, HttpServletRequest httpRequest) {
         String locale = AssistantInputGuard.normalizeLocale(request.locale());
-        long requestStartMillis = System.currentTimeMillis();
+        boolean dbDownAtRequestStart = Boolean.TRUE.equals(
+                httpRequest.getAttribute(DatabaseAvailabilityTracker.REQUEST_ATTRIBUTE));
         ChatResponse fastPath = lexicalFastPathOrNull(request);
         if (fastPath != null) {
             emitLexicalFastPath(fastPath, request, locale, sink);
@@ -483,7 +482,7 @@ public class ThesisAssistantController {
         boolean[] forwarded = { false };
         Consumer<ThesisAssistantService.StreamEvent> intercept = event -> {
             if (event instanceof ThesisAssistantService.StreamDone done && "NO_MATCH".equals(done.reasonCode())) {
-                emitStreamFallback(request, locale, sink, forwarded[0], requestStartMillis);
+                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart);
                 return;
             }
             forwarded[0] = true;
@@ -493,7 +492,7 @@ public class ThesisAssistantController {
             ragGateway.stream(request, owner, intercept);
         } catch (DomainException exception) {
             if (isFallbackEligible(exception)) {
-                emitStreamFallback(request, locale, sink, forwarded[0], requestStartMillis);
+                emitStreamFallback(request, locale, sink, forwarded[0], dbDownAtRequestStart);
                 return;
             }
             throw exception;
@@ -522,8 +521,8 @@ public class ThesisAssistantController {
 
     private void emitStreamFallback(ChatRequest request, String locale,
             Consumer<ThesisAssistantService.StreamEvent> sink, boolean alreadyForwarded,
-            long requestStartMillis) {
-        ChatResponse fallback = localGroundedFallback(request, requestStartMillis);
+            boolean dbDownAtRequestStart) {
+        ChatResponse fallback = localGroundedFallback(request, dbDownAtRequestStart);
         if (!alreadyForwarded) {
             // Nothing crossed the wire yet, so the fallback is a complete stream.
             sink.accept(new ThesisAssistantService.StreamMeta(

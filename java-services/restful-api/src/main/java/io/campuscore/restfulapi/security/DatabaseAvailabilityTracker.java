@@ -13,6 +13,9 @@ public final class DatabaseAvailabilityTracker {
     private static final long OUTAGE_COOLDOWN_MS = 5000L;
     private static final AtomicLong LAST_FAILURE_MS = new AtomicLong(0L);
 
+    /** Request attribute marking a request whose account-state check hit a dead database. */
+    public static final String REQUEST_ATTRIBUTE = "campuscore.db-unavailable";
+
     private DatabaseAvailabilityTracker() {
     }
 
