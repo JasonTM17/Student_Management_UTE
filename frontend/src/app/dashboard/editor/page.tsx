@@ -55,6 +55,7 @@ import {
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
+import { Select } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { PageHeader, SectionEyebrow } from '@/components/ui/page-header';
 import { LoadingState } from '@/components/ui/state-block';
@@ -72,6 +73,17 @@ import { useUnsavedChangesGuard } from '@/lib/use-unsaved-changes-guard';
 import { WorkspaceForbiddenState } from '@/components/ProtectedRoute';
 import { cn } from '@/lib/utils';
 import { shouldSeedDefaultEditorDocument } from '@/lib/editor-document';
+import {
+  EDITOR_BLOCK_HTML,
+  EDITOR_BLOCK_TYPES,
+  EDITOR_SEED_HTML,
+  EDITOR_SEED_MARKDOWN,
+  EDITOR_TEMPLATE_HTML,
+  EDITOR_TEMPLATE_IDS,
+  type EditorBlockType,
+  type EditorTemplateId,
+} from '@/lib/editor-templates';
+import { getMessages } from '@/i18n/messages';
 
 export interface ContentBlock {
   id: string;
@@ -82,119 +94,28 @@ export interface ContentBlock {
   htmlContent: string;
 }
 
-const DEFAULT_BLOCKS: ContentBlock[] = [
-  {
-    id: 'block-header',
-    type: 'header',
-    title: '1. Tiêu ngữ Quốc hiệu & Tên Trường',
-    description: 'Header chính thức: ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH, Tiêu đề thông báo học vụ',
+interface EditorBlockCopy {
+  title: string;
+  description: string;
+}
+
+/**
+ * The block list is metadata (titles/descriptions) from the `editor.blocks`
+ * messages plus the shared HTML bodies from lib/editor-templates.ts.
+ */
+function buildDefaultBlocks(copy: Record<EditorBlockType, EditorBlockCopy>): ContentBlock[] {
+  return EDITOR_BLOCK_TYPES.map((type) => ({
+    id: `block-${type}`,
+    type,
+    title: copy[type].title,
+    description: copy[type].description,
     enabled: true,
-    htmlContent: `  <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
-    <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
-  </div>`,
-  },
-  {
-    id: 'block-recipient',
-    type: 'recipient',
-    title: '2. Dòng Kính gửi Tiếp nhận',
-    description: 'Dòng Kính gửi trang trọng đến Toàn thể Giảng viên, Cán bộ và Sinh viên',
-    enabled: true,
-    htmlContent: `  <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
-    <strong style="color: #1d4ed8; font-size: 14px;">Kính gửi:</strong> Toàn thể Giảng viên, Cán bộ học vụ và Sinh viên hệ đào tạo chính quy.
-  </div>`,
-  },
-  {
-    id: 'block-summary',
-    type: 'summary',
-    title: '3. Căn cứ & Mục tiêu Kế hoạch',
-    description: 'Căn cứ đề án đào tạo và thông báo các mốc triển khai học vụ',
-    enabled: true,
-    htmlContent: `  <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">1. Kế hoạch đào tạo & Đăng ký tín chỉ</h3>
-  <p>Nhà trường thông báo kế hoạch tổ chức học vụ và thời gian mở cổng đăng ký tín chỉ học phần đợt mới:</p>`,
-  },
-  {
-    id: 'block-table',
-    type: 'table',
-    title: '4. Bảng Lịch trình & Mốc thời gian',
-    description: 'Bảng các đợt đăng ký tín chỉ, thời gian bắt đầu - kết thúc và đối tượng',
-    enabled: true,
-    htmlContent: `  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-    <thead>
-      <tr style="background-color: #f1f5f9; text-align: left;">
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Đợt đăng ký</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Thời gian bắt đầu</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Thời gian kết thúc</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Đối tượng</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
-      </tr>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
-      </tr>
-    </tbody>
-  </table>`,
-  },
-  {
-    id: 'block-clauses',
-    type: 'clauses',
-    title: '5. Các Điều khoản Quy chế & Hạn mức',
-    description: 'Hạn mức tín chỉ theo quy chế hiện hành; đăng ký vượt hạn mức chỉ khi có đơn được Phòng Đào tạo phê duyệt',
-    enabled: true,
-    htmlContent: `  <div style="margin-bottom: 20px;">
-    <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">2. Quy định thực hiện và Hạn mức tín chỉ</h3>
-    <p><strong>- Hạn mức tín chỉ:</strong> Sinh viên đăng ký theo hạn mức quy định trong quy chế hiện hành. Việc đăng ký vượt hạn mức chỉ được chấp nhận khi có đơn và được Phòng Đào tạo phê duyệt.</p>
-    <p><strong>- Hủy học phần:</strong> Thời hạn xin rút/hủy học phần kết thúc vào tuần thứ 2 kể từ ngày bắt đầu học kỳ.</p>
-  </div>`,
-  },
-  {
-    id: 'block-notice',
-    type: 'notice',
-    title: '6. Hộp Cảnh báo & Lưu ý Quan trọng',
-    description: 'Khung Callout màu vàng nổi bật cảnh báo điều kiện tiên quyết và địa điểm hỗ trợ',
-    enabled: true,
-    htmlContent: `  <div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
-    <strong style="color: #a16207;">Lưu ý quan trọng:</strong> Sinh viên kiểm tra điều kiện tiên quyết và lịch học trước khi xác nhận. Mọi thắc mắc liên hệ Phòng Đào tạo (P. A1-201) trong giờ hành chính.
-  </div>`,
-  },
-  {
-    id: 'block-signoff',
-    type: 'signoff',
-    title: '7. Nơi nhận & Dấu Mộc Đỏ Điện Tử e-Office',
-    description: 'Nơi nhận và chỗ trống dành cho chữ ký số / con dấu điện tử e-Office của đơn vị ban hành',
-    enabled: true,
-    htmlContent: `  <table style="width: 100%; margin-top: 32px; border: none;">
-    <tr>
-      <td style="width: 50%; vertical-align: top; border: none;">
-        <p style="font-size: 12px; margin: 0; line-height: 1.6; color: #64748b;">
-          <strong><em>Nơi nhận:</em></strong><br/>
-          - Như kính gửi;<br/>
-          - Ban Giám hiệu (để b/c);<br/>
-          - Phòng Đào tạo, VP các Khoa;<br/>
-          - Lưu: VT, CTSV.
-        </p>
-      </td>
-      <td style="width: 50%; text-align: right; vertical-align: top; border: none;">
-        <p style="font-weight: bold; margin: 0; text-transform: uppercase; font-size: 13px; color: #334155;">HIỆU TRƯỞNG</p>
-        <div style="display: inline-block; margin: 8px 0; padding: 4px 12px; border: 2px dashed #dc2626; border-radius: 6px; background-color: #fef2f2; color: #b91c1c; font-size: 11px; font-weight: bold; text-align: center;">
-          [CHỖ KÝ SỐ / CON DẤU ĐIỆN TỬ E-OFFICE]
-        </div>
-        <p style="font-weight: bold; margin: 4px 0 0 0; color: #0284c7; font-size: 14px;">[Họ tên &amp; học hàm người ký]</p>
-      </td>
-    </tr>
-  </table>`,
-  },
-];
+    htmlContent: EDITOR_BLOCK_HTML[type],
+  }));
+}
+
+const PRIORITY_VALUES = ['URGENT', 'HIGH', 'NORMAL', 'LOW'] as const;
+const TARGET_ROLE_VALUES = ['ALL', 'STUDENT', 'LECTURER'] as const;
 
 const STORAGE_KEY = 'campuscore_editor_document';
 const EDITOR_TYPE_KEY = 'campuscore_editor_engine';
@@ -207,211 +128,14 @@ interface StoredDocument {
   updatedAt: string;
 }
 
-const DEFAULT_TINYMCE_VI = `
-<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
-  <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
-    <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">THÔNG BÁO HỌC VỤ & HƯỚNG DẪN ĐÀO TẠO</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Học kỳ ... - Năm học ...] | [Đơn vị ban hành]</p>
-  </div>
-
-  <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
-    <strong style="color: #1d4ed8; font-size: 14px;">Kính gửi:</strong> Toàn thể Giảng viên, Cán bộ học vụ và Sinh viên hệ đào tạo chính quy.
-  </div>
-
-  <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">1. Kế hoạch đào tạo & Đăng ký tín chỉ</h3>
-  <p>Nhà trường thông báo kế hoạch tổ chức học vụ và thời gian mở cổng đăng ký tín chỉ học phần đợt mới:</p>
-  
-  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-    <thead>
-      <tr style="background-color: #f1f5f9; text-align: left;">
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Đợt đăng ký</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Thời gian bắt đầu</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Thời gian kết thúc</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Đối tượng</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
-      </tr>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Đợt 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - dd/mm/yyyy]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Đối tượng sinh viên]</td>
-      </tr>
-    </tbody>
-  </table>
-
-  <div style="background-color: #fefce8; border-left: 4px solid #eab308; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
-    <strong style="color: #a16207;">Lưu ý quan trọng:</strong> Sinh viên kiểm tra điều kiện tiên quyết và lịch học trước khi xác nhận.
-  </div>
-</div>
-`;
-
-const DEFAULT_TINYMCE_EN = `
-<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
-  <div style="text-align: center; border-bottom: 2px solid #0284c7; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px; letter-spacing: 1px;">HCMC UNIVERSITY OF TECHNOLOGY AND ENGINEERING</h4>
-    <h2 style="margin: 8px 0 0 0; color: #0f172a; font-size: 22px; font-weight: 700;">ACADEMIC NOTICE & GOVERNANCE POLICY</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">[Term ... - Academic Year ...] | [Issuing office]</p>
-  </div>
-
-  <div style="background-color: #eff6ff; border-left: 4px solid #3b82f6; padding: 14px 18px; border-radius: 6px; margin-bottom: 20px;">
-    <strong style="color: #1d4ed8; font-size: 14px;">Attention:</strong> All Faculty Members, Academic Staff, and Enrolled Students.
-  </div>
-
-  <h3 style="color: #0369a1; font-size: 16px; border-bottom: 1px solid #e2e8f0; padding-bottom: 6px;">1. Course Registration Milestones</h3>
-  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-    <thead>
-      <tr style="background-color: #f1f5f9; text-align: left;">
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Batch</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Start Time</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">End Time</th>
-        <th style="border: 1px solid #cbd5e1; padding: 10px; font-weight: 600;">Target Cohort</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Phase 1</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Target cohort]</td>
-      </tr>
-      <tr>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">Phase 2</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[HH:mm - Mon DD, YYYY]</td>
-        <td style="border: 1px solid #cbd5e1; padding: 10px;">[Target cohort]</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-`;
-
-const defaultEditorDocument = (inVietnamese: boolean) =>
-  inVietnamese
-    ? { title: 'Thông báo kế hoạch tổ chức học vụ học kỳ mới', content: DEFAULT_TINYMCE_VI }
-    : { title: 'Official Academic Schedule Notice', content: DEFAULT_TINYMCE_EN };
-
-const DEFAULT_MARKDOWN_VI = `# ĐỀ CƯƠNG HỌC PHẦN & TÀI LIỆU HƯỚNG DẪN
-
-> [!NOTE]
-> Tài liệu này được soạn thảo trực tiếp trên **Trình soạn thảo học vụ CampusCore**. Hỗ trợ bảng biểu, công thức, mã nguồn và hộp cảnh báo chuẩn institutional.
-
-### 1. Mục tiêu và Chuẩn đầu ra (CLO)
-- [ ] Nắm vững kiến trúc hệ thống và nguyên lý thiết kế cơ sở dữ liệu phân tán.
-- [ ] Xây dựng giải pháp đảm bảo tính sẵn sàng cao (High Availability).
-- [ ] Triển khai kiểm thử hồi quy và đo lường hiệu năng.
-
-### 2. Kế hoạch học tập và phân bổ thời lượng
-| Tuần | Chủ đề đào tạo | Hình thức | Chuẩn đầu ra |
-| :--- | :--- | :--- | :--- |
-| Tuần 1-3 | Tổng quan kiến trúc hướng dịch vụ | Lý thuyết & Demo | CLO-1 |
-| Tuần 4-7 | Thiết kế CSDL & Tối ưu hóa truy vấn | Thực hành Lab | CLO-2 |
-| Tuần 8-12 | Báo cáo tiến độ đồ án & Phản biện | Thuyết trình nhóm | CLO-3 |
-`;
-
-const TEMPLATES = [
-  {
-    id: 'council-decision',
-    nameVi: 'Quyết định Thành lập Hội đồng Bảo vệ KLTN',
-    nameEn: 'Thesis Defense Council Establishment Decision',
-    descVi: 'Mẫu quyết định bổ nhiệm Chủ tịch, Thư ký và Ủy viên theo quy chế R6.',
-    descEn: 'Decision template appointing the chair, secretary and members under regulation R6.',
-    contentVi: `
-<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
-  <div style="text-align: center; border-bottom: 2px solid #0d509d; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
-    <h2 style="margin: 8px 0 0 0; color: #0d509d; font-size: 20px; font-weight: bold;">QUYẾT ĐỊNH THÀNH LẬP HỘI ĐỒNG CHẤM BẢO VỆ KHÓA LUẬN TỐT NGHIỆP</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Căn cứ Quy chế đào tạo đại học và Đề án tổ chức đánh giá tốt nghiệp</p>
-  </div>
-  <p><strong>HIỆU TRƯỞNG TRƯỜNG ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH QUYẾT ĐỊNH:</strong></p>
-  <p><strong>Điều 1.</strong> Thành lập Hội đồng chấm bảo vệ Khóa luận tốt nghiệp chuyên ngành Kỹ thuật Phần mềm gồm các thành viên:</p>
-  <ul>
-    <li><strong>Ghế 1 (Chủ tịch):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
-    <li><strong>Ghế 2 (Thư ký):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
-    <li><strong>Ghế 3 (Ủy viên):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
-    <li><strong>Ghế 4 (Ủy viên):</strong> [Họ tên - học hàm, chức danh giảng dạy]</li>
-  </ul>
-  <p><strong>Điều 2.</strong> Hội đồng có nhiệm vụ tổ chức chấm điểm bảo vệ công tâm, minh bạch theo Quy định R1–R9.</p>
-  <table style="width: 100%; margin-top: 24px; border: none;">
-    <tr>
-      <td style="width: 50%; vertical-align: top; border: none;">
-        <p style="font-size: 11px; margin: 0; line-height: 1.5;"><strong><em>Nơi nhận:</em></strong><br/>- Như Điều 1;<br/>- Ban Giám hiệu (để b/c);<br/>- Phòng ĐT, VP Khoa CNTT;<br/>- Lưu: VT.</p>
-      </td>
-      <td style="width: 50%; text-align: right; vertical-align: top; border: none;">
-        <p style="font-weight: bold; margin: 0; text-transform: uppercase;">HIỆU TRƯỞNG</p>
-        <div style="height: 48px;"></div>
-        <p style="font-weight: bold; margin: 0; color: #0d509d;">[Họ tên &amp; học hàm người ký]</p>
-      </td>
-    </tr>
-  </table>
-</div>
-`,
-  },
-  {
-    id: 'registration-notice',
-    nameVi: 'Thông báo Mở Cổng Đăng ký Tín chỉ & Hạn mức',
-    nameEn: 'Course Registration & Credit Limit Official Notice',
-    descVi: 'Thông báo khung giờ đăng ký, điều kiện tiên quyết và hạn mức tín chỉ tối đa.',
-    descEn: 'Registration windows, prerequisites and the term credit cap notice.',
-    contentVi: DEFAULT_TINYMCE_VI,
-  },
-  {
-    id: 'scholarship-notice',
-    nameVi: 'Thông báo Xét duyệt Học bổng Khuyến khích Học tập',
-    nameEn: 'Merit-based Scholarship Evaluation Notice',
-    descVi: 'Tiêu chuẩn xét cấp học bổng loại Xuất sắc, Giỏi và Khá cho sinh viên.',
-    descEn: 'Criteria for Excellent, Very good and Good scholarship consideration.',
-    contentVi: `
-<div style="font-family: Arial, sans-serif; line-height: 1.6; color: #1e293b;">
-  <div style="text-align: center; border-bottom: 2px solid #16a34a; padding-bottom: 12px; margin-bottom: 20px;">
-    <h4 style="margin: 0; text-transform: uppercase; color: #64748b; font-size: 13px;">ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT THÀNH PHỐ HỒ CHÍ MINH</h4>
-    <h2 style="margin: 8px 0 0 0; color: #15803d; font-size: 20px; font-weight: bold;">THÔNG BÁO XÉT CẤP HỌC BỔNG KHUYẾN KHÍCH HỌC TẬP</h2>
-    <p style="margin: 4px 0 0 0; color: #64748b; font-size: 13px;">Học kỳ [ ... ] - Năm học [ ... ]</p>
-  </div>
-  <p>Phòng Đào tạo thông báo điều kiện và định mức xét học bổng khuyến khích học tập kỳ này:</p>
-  <table style="width: 100%; border-collapse: collapse; margin: 16px 0;">
-    <thead>
-      <tr style="background-color: #f0fdf4;">
-        <th style="border: 1px solid #bbf7d0; padding: 10px;">Xếp loại</th>
-        <th style="border: 1px solid #bbf7d0; padding: 10px;">Điểm GPA (thang 4)</th>
-        <th style="border: 1px solid #bbf7d0; padding: 10px;">Điểm rèn luyện</th>
-        <th style="border: 1px solid #bbf7d0; padding: 10px;">Định mức</th>
-      </tr>
-    </thead>
-    <tbody>
-      <tr>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">Xuất sắc</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">≥ 3.60</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">≥ 90</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">120% Học phí</td>
-      </tr>
-      <tr>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">Giỏi</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">3.20 - 3.59</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">≥ 80</td>
-        <td style="border: 1px solid #bbf7d0; padding: 10px;">100% Học phí</td>
-      </tr>
-    </tbody>
-  </table>
-</div>
-`,
-  },
-];
-
 export default function AcademicEditorPage() {
   const { user, hasAccess, isLoading: authLoading, isForbidden } = useRequireAuth([
     'ADMIN',
     'SUPER_ADMIN',
   ]);
-  const { locale, formatDate } = useI18n();
+  const { locale, formatDate, messages } = useI18n();
   const isVi = locale === 'vi';
+  const editorCopy = messages.editor;
 
   // Navigation tab state: 'announcement' (Editor) | 'hero' (Site Controls) | 'templates' (Document Library)
   const [activeTab, setActiveTab] = useState<'announcement' | 'hero' | 'templates'>('announcement');
@@ -445,8 +169,8 @@ export default function AcademicEditorPage() {
   const defaultBodyFor = useCallback(
     () =>
       editorType === 'tinymce'
-        ? (isVi ? DEFAULT_TINYMCE_VI : DEFAULT_TINYMCE_EN)
-        : DEFAULT_MARKDOWN_VI,
+        ? (isVi ? EDITOR_SEED_HTML.vi : EDITOR_SEED_HTML.en)
+        : EDITOR_SEED_MARKDOWN,
     [editorType, isVi],
   );
   const unsaved = useUnsavedChangesGuard({
@@ -457,9 +181,14 @@ export default function AcademicEditorPage() {
     enabled: !isPublishingNotice,
   });
 
-  // Sortable Content Blocks Builder State
+  // Sortable Content Blocks Builder State. Block titles/descriptions come from
+  // the `editor.blocks` messages, HTML bodies from lib/editor-templates.ts.
   const [showBlockBuilder, setShowBlockBuilder] = useState(true);
-  const [blocks, setBlocks] = useState<ContentBlock[]>(DEFAULT_BLOCKS);
+  const defaultBlocks = useMemo(
+    () => buildDefaultBlocks(messages.editor.blocks),
+    [messages.editor.blocks],
+  );
+  const [blocks, setBlocks] = useState<ContentBlock[]>(defaultBlocks);
   const [hasUnsavedNoticeOrder, setHasUnsavedNoticeOrder] = useState(false);
   // The pinned-notices list is a `tbody` SortableList, which cannot carry its own
   // live region, so the page keeps the sentence here and renders it below.
@@ -598,9 +327,13 @@ export default function AcademicEditorPage() {
     if (!shouldSeedDefaultEditorDocument({ hasStoredDraft: false, editingId: editingIdRef.current })) {
       return;
     }
-    const seed = defaultEditorDocument(seedLocaleRef.current);
-    setTitle(seed.title);
-    setContent(seed.content);
+    // The seed is frozen at mount locale (seedLocaleRef) so a later locale
+    // switch never reseeds over an in-progress edit or a hydrated draft.
+    const seedMessages = getMessages(seedLocaleRef.current ? 'vi' : 'en');
+    setTitle(
+      seedLocaleRef.current ? seedMessages.editor.seedTitleVi : seedMessages.editor.seedTitleEn,
+    );
+    setContent(seedLocaleRef.current ? EDITOR_SEED_HTML.vi : EDITOR_SEED_HTML.en);
   }, []);
 
   // Load site appearance for Hero control tab
@@ -727,7 +460,7 @@ export default function AcademicEditorPage() {
 
   // Reset blocks to default order
   const handleResetBlocks = () => {
-    setBlocks(DEFAULT_BLOCKS);
+    setBlocks(defaultBlocks);
     toast.info(isVi ? 'Đã khôi phục các khối cấu trúc mẫu mặc định.' : 'Reset blocks to default.');
   };
 
@@ -1251,13 +984,13 @@ export default function AcademicEditorPage() {
             <CardHeader>
               <CardTitle className="flex items-center gap-2 text-base">
                 <Sliders className="h-5 w-5 text-primary" />
-                {isVi ? 'Cấu Hình Banner & Tên Trường Trên Trang Chủ' : 'Homepage Hero Banner & University Identity'}
+                {editorCopy.heroCardTitle}
               </CardTitle>
             </CardHeader>
             <CardContent className="space-y-5">
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {isVi ? 'Tên trường / Nhãn Eyebrow (Hiển thị đầu trang chủ)' : 'University Name / Eyebrow Badge'}
+                  {editorCopy.heroEyebrowLabel}
                 </label>
                 <Input
                   value={heroEyebrow}
@@ -1269,7 +1002,7 @@ export default function AcademicEditorPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {isVi ? 'Tiêu đề chính (Hero Title)' : 'Hero Title'}
+                  {editorCopy.heroTitleLabel}
                 </label>
                 <Input
                   value={heroTitle}
@@ -1281,7 +1014,7 @@ export default function AcademicEditorPage() {
 
               <div>
                 <label className="mb-1 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {isVi ? 'Đoạn giới thiệu (Hero Description)' : 'Hero Description'}
+                  {editorCopy.heroDescriptionLabel}
                 </label>
                 <Textarea
                   value={heroDescription}
@@ -1293,7 +1026,7 @@ export default function AcademicEditorPage() {
 
               <div>
                 <label className="mb-1.5 block text-xs font-semibold uppercase tracking-wider text-muted-foreground">
-                  {isVi ? 'Màu sắc điểm nhấn (Accent Theme)' : 'Accent Theme'}
+                  {editorCopy.heroAccentLabel}
                 </label>
                 <div className="flex flex-wrap gap-3">
                   {SITE_APPEARANCE_ACCENTS.map((accent) => (
@@ -1317,7 +1050,7 @@ export default function AcademicEditorPage() {
               {/* Live Preview Box */}
               <div className="rounded-xl border border-border/80 bg-muted/30 p-5">
                 <div className="text-xs font-bold uppercase tracking-wider text-muted-foreground mb-3">
-                  {isVi ? 'Xem trước giao diện Banner Trang chủ:' : 'Homepage Live Preview:'}
+                  {editorCopy.heroLivePreview}
                 </div>
                 <div className="border-l-4 border-[var(--portal-chrome-accent)] pl-5 py-2 space-y-2">
                   <SectionEyebrow>{heroEyebrow}</SectionEyebrow>
@@ -1338,7 +1071,7 @@ export default function AcademicEditorPage() {
                   className="gap-2 bg-primary text-primary-foreground font-semibold px-6 shadow-sm"
                 >
                   <Save className="h-4 w-4" />
-                  {isSavingHero ? (isVi ? 'Đang xuất bản...' : 'Publishing...') : (isVi ? 'Xuất bản lên Trang chủ' : 'Publish to Homepage')}
+                  {isSavingHero ? editorCopy.heroPublishing : editorCopy.heroPublish}
                 </Button>
               </div>
             </CardContent>
@@ -1356,9 +1089,7 @@ export default function AcademicEditorPage() {
                   <div className="flex items-center gap-2 font-medium">
                     <Sparkles className="h-4 w-4 text-amber-600 dark:text-amber-400 shrink-0" />
                     <span>
-                      {isVi
-                        ? `Đang ở chế độ chỉnh sửa bài viết đã lưu: "${title || editingId}"`
-                        : `Editing saved notice: "${title || editingId}"`}
+                      {editorCopy.editingBanner.replace('{title}', title || editingId)}
                     </span>
                   </div>
                   <Button
@@ -1368,7 +1099,7 @@ export default function AcademicEditorPage() {
                     onClick={handleCancelEdit}
                     className="h-7 text-xs font-semibold text-amber-700 hover:bg-amber-500/20 dark:text-amber-300"
                   >
-                    {isVi ? 'Hủy sửa / Tạo bài mới' : 'Cancel Edit'}
+                    {editorCopy.cancelEdit}
                   </Button>
                 </div>
               )}
@@ -1390,30 +1121,35 @@ export default function AcademicEditorPage() {
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
                     {copy.priorityLabel}
                   </label>
-                  <select
+                  <Select
+                    aria-label={copy.priorityLabel}
                     value={priority}
-                    onChange={(e) => setPriority(e.target.value as any)}
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="URGENT">{isVi ? 'Khẩn cấp (Urgent)' : 'Urgent'}</option>
-                    <option value="HIGH">{isVi ? 'Ưu tiên cao (High)' : 'High'}</option>
-                    <option value="NORMAL">{isVi ? 'Bình thường (Normal)' : 'Normal'}</option>
-                    <option value="LOW">{isVi ? 'Thông tin chung (Low)' : 'Low'}</option>
-                  </select>
+                    onChange={(e) =>
+                      setPriority(e.target.value as (typeof PRIORITY_VALUES)[number])
+                    }
+                    options={PRIORITY_VALUES.map((value) => ({
+                      value,
+                      label: editorCopy.priorityOptions[value],
+                    }))}
+                    className="h-10"
+                  />
                 </div>
                 <div className="sm:col-span-1 lg:col-span-3">
                   <label className="mb-1.5 block text-xs font-semibold uppercase tracking-[0.12em] text-muted-foreground whitespace-nowrap">
                     {copy.targetRoleLabel}
                   </label>
-                  <select
+                  <Select
+                    aria-label={copy.targetRoleLabel}
                     value={targetRole}
-                    onChange={(e) => setTargetRole(e.target.value as any)}
-                    className="h-10 w-full rounded-md border border-input bg-background px-3 py-2 text-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
-                  >
-                    <option value="ALL">{isVi ? 'Toàn trường (All)' : 'All'}</option>
-                    <option value="STUDENT">{isVi ? 'Chỉ Sinh viên (Students)' : 'Students'}</option>
-                    <option value="LECTURER">{isVi ? 'Chỉ Giảng viên (Lecturers)' : 'Lecturers'}</option>
-                  </select>
+                    onChange={(e) =>
+                      setTargetRole(e.target.value as (typeof TARGET_ROLE_VALUES)[number])
+                    }
+                    options={TARGET_ROLE_VALUES.map((value) => ({
+                      value,
+                      label: editorCopy.targetRoleOptions[value],
+                    }))}
+                    className="h-10"
+                  />
                 </div>
               </div>
 
@@ -1426,10 +1162,10 @@ export default function AcademicEditorPage() {
                     size="sm"
                     onClick={handlePreviewCurrentDraft}
                     className="gap-1.5 border-primary/40 text-primary hover:bg-primary/10"
-                    title={isVi ? 'Xem trước công văn chuẩn e-Office' : 'Preview document'}
+                    title={editorCopy.previewActionTitle}
                   >
                     <Eye className="h-4 w-4" />
-                    {isVi ? 'Xem trước' : 'Preview'}
+                    {editorCopy.previewAction}
                   </Button>
                   <Button
                     type="button"
@@ -1449,7 +1185,7 @@ export default function AcademicEditorPage() {
                     className="gap-1.5"
                   >
                     <Download className="h-4 w-4" />
-                    {editorType === 'tinymce' ? (isVi ? 'Tải HTML' : 'Export HTML') : (isVi ? 'Tải .md' : 'Export .md')}
+                    {editorType === 'tinymce' ? editorCopy.exportHtml : editorCopy.exportMarkdown}
                   </Button>
                   <Button
                     type="button"
@@ -1471,10 +1207,10 @@ export default function AcademicEditorPage() {
                       disabled={isPublishingNotice}
                       size="sm"
                       className="gap-1.5 bg-blue-600 hover:bg-blue-700 text-white font-semibold shadow-xs"
-                      title={isVi ? 'Lưu nội dung cập nhật vào cơ sở dữ liệu' : 'Save changes to database'}
+                      title={editorCopy.saveChangesTitle}
                     >
                       <Save className="h-4 w-4" />
-                      {isPublishingNotice ? (isVi ? 'Đang lưu...' : 'Saving...') : (isVi ? 'Lưu cập nhật' : 'Save Changes')}
+                      {isPublishingNotice ? editorCopy.saving : editorCopy.saveChanges}
                     </Button>
                   ) : null}
                   <Button
@@ -1486,9 +1222,9 @@ export default function AcademicEditorPage() {
                   >
                     <Send className="h-4 w-4" />
                     {isPublishingNotice
-                      ? (isVi ? 'Đang gửi...' : 'Publishing...')
+                      ? editorCopy.publishing
                       : editingId
-                      ? (isVi ? 'Đăng thành bài mới' : 'Publish as New')
+                      ? editorCopy.publishNew
                       : copy.publishAnnouncement}
                   </Button>
                   <Button
@@ -1572,15 +1308,13 @@ export default function AcademicEditorPage() {
                   </div>
                   <div>
                     <CardTitle className="text-sm font-bold text-foreground flex items-center gap-2">
-                      <span>{isVi ? 'Khung Lắp Ghép Khối Cấu Trúc Văn Bản' : 'Institutional Content Blocks Builder'}</span>
+                      <span>{editorCopy.blockBuilderTitle}</span>
                       <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
-                        {isVi ? 'Sắp xếp trực quan' : 'Drag & Drop'}
+                        {editorCopy.blockBuilderBadge}
                       </span>
                     </CardTitle>
                     <p className="text-[11.5px] text-muted-foreground">
-                      {isVi
-                        ? 'Kéo thả các khối cấu trúc chuẩn hành chính (Quốc hiệu, Kính gửi, Kế hoạch, Bảng biểu, Điều khoản, Con dấu) rồi đưa vào văn bản soạn thảo'
-                        : 'Drag & drop institutional blocks to insert directly into official document'}
+                      {editorCopy.blockBuilderHint}
                     </p>
                   </div>
                 </div>
@@ -1594,13 +1328,7 @@ export default function AcademicEditorPage() {
                   >
                     <ListOrdered className="h-3.5 w-3.5" />
                     <span>
-                      {showBlockBuilder
-                        ? isVi
-                          ? 'Thu gọn khung khối'
-                          : 'Collapse Blocks'
-                        : isVi
-                          ? 'Mở khung cấu trúc khối'
-                          : 'Open Content Blocks'}
+                      {showBlockBuilder ? editorCopy.collapseBlocks : editorCopy.openBlocks}
                     </span>
                     {showBlockBuilder ? (
                       <ChevronUp className="h-3.5 w-3.5 ml-0.5" />
@@ -1617,9 +1345,7 @@ export default function AcademicEditorPage() {
                   <div className="text-xs text-muted-foreground flex items-center gap-1.5">
                     <Sparkles className="h-3.5 w-3.5 text-amber-500 shrink-0" />
                     <span>
-                      {isVi
-                        ? 'Giữ chuột vào biểu tượng tay cầm ⠿ để kéo thả đổi vị trí các khối. Tích chọn để đưa vào văn bản.'
-                        : 'Drag handle ⠿ to reorder blocks. Check boxes to include in compiled document.'}
+                      {editorCopy.blockDragHint}
                     </span>
                   </div>
                   <div className="flex items-center gap-2">
@@ -1631,7 +1357,7 @@ export default function AcademicEditorPage() {
                       className="h-7 text-xs text-muted-foreground hover:text-foreground"
                     >
                       <RotateCcw className="h-3.5 w-3.5 mr-1" />
-                      {isVi ? 'Khôi phục thứ tự mẫu' : 'Reset Blocks'}
+                      {editorCopy.resetBlocks}
                     </Button>
                     <Button
                       type="button"
@@ -1641,7 +1367,7 @@ export default function AcademicEditorPage() {
                       className="h-7 gap-1 bg-emerald-600 hover:bg-emerald-700 dark:bg-emerald-700 dark:hover:bg-emerald-800 text-white text-xs font-semibold shadow-xs"
                     >
                       <Sparkles className="h-3.5 w-3.5" />
-                      {isVi ? 'Chèn tất cả khối vào văn bản' : 'Insert All Blocks'}
+                      {editorCopy.insertAllBlocks}
                     </Button>
                   </div>
                 </div>
@@ -1665,8 +1391,8 @@ export default function AcademicEditorPage() {
                       <div className="flex items-center gap-3 min-w-0">
                         <DragHandle
                           className="cursor-grab hover:text-primary active:cursor-grabbing"
-                          label={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
-                          title={isVi ? 'Kéo để đổi thứ tự khối' : 'Drag to reorder'}
+                          label={editorCopy.dragHandleLabel}
+                          title={editorCopy.dragHandleLabel}
                         />
                         <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-primary/10 text-[11px] font-bold text-primary">
                           {String(index + 1).padStart(2, '0')}
@@ -1676,7 +1402,7 @@ export default function AcademicEditorPage() {
                           checked={block.enabled}
                           onChange={() => handleToggleBlock(block.id)}
                           className="h-4 w-4 rounded border-input text-primary focus:ring-primary cursor-pointer"
-                          title={isVi ? 'Bật/tắt khối này' : 'Toggle block'}
+                          title={editorCopy.toggleBlockTitle}
                         />
                         <div className="min-w-0">
                           <p className="text-xs font-semibold text-foreground truncate">
@@ -1695,10 +1421,10 @@ export default function AcademicEditorPage() {
                           size="sm"
                           onClick={() => handleInsertSingleBlock(block)}
                           className="h-6 px-2 text-[11px] font-medium"
-                          title={isVi ? 'Chèn riêng khối này vào cuối nội dung' : 'Append this block'}
+                          title={editorCopy.appendBlockTitle}
                         >
                           <Plus className="h-3 w-3 mr-0.5" />
-                          {isVi ? 'Chèn khối' : 'Append'}
+                          {editorCopy.appendBlock}
                         </Button>
                       </div>
                     </div>
@@ -1718,15 +1444,13 @@ export default function AcademicEditorPage() {
                   </div>
                   <div>
                     <CardTitle className="text-xs font-bold text-foreground flex items-center gap-2">
-                      <span>{isVi ? 'Thư Viện Ảnh Bìa Học Thuật HCMUTE' : 'HCMUTE Editorial Cover Gallery'}</span>
+                      <span>{editorCopy.coverGalleryTitle}</span>
                       <span className="rounded-md bg-primary/10 px-2 py-0.5 text-[10.5px] font-semibold text-primary">
                         8K Nano Banana
                       </span>
                     </CardTitle>
                     <p className="text-[11px] text-muted-foreground">
-                      {isVi
-                        ? '1-Click gắn ảnh bìa chuẩn học thuật vào đầu văn bản công văn / thông báo trước khi xuất bản'
-                        : '1-Click attach high-resolution academic header banner to document'}
+                      {editorCopy.coverGalleryHint}
                     </p>
                   </div>
                 </div>
@@ -1739,7 +1463,7 @@ export default function AcademicEditorPage() {
                     className="h-7 text-xs font-medium text-destructive hover:bg-destructive/10"
                   >
                     <X className="h-3.5 w-3.5 mr-1" />
-                    {isVi ? 'Gỡ ảnh bìa' : 'Remove Banner'}
+                    {editorCopy.removeBanner}
                   </Button>
                 ) : null}
               </div>
@@ -2020,34 +1744,38 @@ export default function AcademicEditorPage() {
         </div>
       )}
 
-      {/* TAB 3: TEMPLATES REPOSITORY */}
+      {/* TAB 3: TEMPLATES REPOSITORY. Names/descriptions from `editor.templates`
+          messages; HTML bodies from lib/editor-templates.ts. */}
       {activeTab === 'templates' && (
         <div className="grid gap-5 md:grid-cols-2">
-          {TEMPLATES.map((tmpl) => (
-            <Card key={tmpl.id} className="flex flex-col justify-between hover:border-primary/50 transition-colors">
-              <CardHeader>
-                <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
-                  <BookOpen className="h-4 w-4 text-primary" />
-                  {isVi ? tmpl.nameVi : tmpl.nameEn}
-                </CardTitle>
-                <p className="text-xs text-muted-foreground mt-1">
-                  {isVi ? tmpl.descVi : tmpl.descEn}
-                </p>
-              </CardHeader>
-              <CardContent className="pt-2 flex justify-end gap-2 border-t border-border/50">
-                <Button
-                  type="button"
-                  variant="default"
-                  size="sm"
-                  onClick={() => applyTemplate(tmpl.contentVi, isVi ? tmpl.nameVi : tmpl.nameEn)}
-                  className="gap-1.5 text-xs font-semibold"
-                >
-                  <Send className="h-3.5 w-3.5" />
-                  {isVi ? 'Nạp vào Trình soạn thảo' : 'Load into Editor'}
-                </Button>
-              </CardContent>
-            </Card>
-          ))}
+          {EDITOR_TEMPLATE_IDS.map((templateId) => {
+            const templateCopy = editorCopy.templates[templateId];
+            return (
+              <Card key={templateId} className="flex flex-col justify-between hover:border-primary/50 transition-colors">
+                <CardHeader>
+                  <CardTitle className="text-base font-bold text-slate-800 dark:text-slate-100 flex items-center gap-2">
+                    <BookOpen className="h-4 w-4 text-primary" />
+                    {templateCopy.name}
+                  </CardTitle>
+                  <p className="text-xs text-muted-foreground mt-1">
+                    {templateCopy.description}
+                  </p>
+                </CardHeader>
+                <CardContent className="pt-2 flex justify-end gap-2 border-t border-border/50">
+                  <Button
+                    type="button"
+                    variant="default"
+                    size="sm"
+                    onClick={() => applyTemplate(EDITOR_TEMPLATE_HTML[templateId], templateCopy.name)}
+                    className="gap-1.5 text-xs font-semibold"
+                  >
+                    <Send className="h-3.5 w-3.5" />
+                    {editorCopy.loadIntoEditor}
+                  </Button>
+                </CardContent>
+              </Card>
+            );
+          })}
         </div>
       )}
 
@@ -2081,14 +1809,10 @@ export default function AcademicEditorPage() {
       {/* RT-P3-3: unsaved-changes confirm for destructive in-page actions */}
       <UnsavedChangesConfirmDialog
         open={unsaved.confirmOpen}
-        title={isVi ? 'Nội dung chưa được lưu' : 'Unsaved changes'}
-        description={
-          isVi
-            ? 'Bạn có nội dung chưa được lưu. Tiếp tục sẽ mất các thay đổi chưa phát hành. Tiếp tục?'
-            : 'You have unsaved changes. Continuing will discard anything not yet published. Continue?'
-        }
-        confirmLabel={isVi ? 'Tiếp tục' : 'Continue'}
-        cancelLabel={isVi ? 'Ở lại soạn thảo' : 'Keep editing'}
+        title={editorCopy.unsavedTitle}
+        description={editorCopy.unsavedDescription}
+        confirmLabel={editorCopy.unsavedConfirm}
+        cancelLabel={editorCopy.unsavedKeep}
         onConfirm={unsaved.confirmLeave}
         onCancel={unsaved.cancelLeave}
       />
