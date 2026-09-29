@@ -45,9 +45,11 @@ async function freeCourseForRegister(page: Page) {
   if (await dropButton.isVisible().catch(() => false)) {
     await dropButton.click();
     await confirmDialogAction(page, /^drop course$|^hủy đăng ký$/i);
-    await expect(page.getByText(/enrollment updated|đã cập nhật đăng ký/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    // The success toast and sonner's aria-live mirror carry the same copy,
+    // so assert on the first match instead of a strict-unique locator.
+    await expect(
+      page.getByText(/enrollment updated|đã cập nhật đăng ký/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
   }
 }
 
@@ -190,9 +192,11 @@ test.describe('student workspace', () => {
     await expect(registerButton).toBeEnabled({ timeout: 15_000 });
     await registerButton.click();
     await confirmDialogAction(page, /^register$|^đăng ký$/i);
-    await expect(page.getByText(/enrollment updated|đã cập nhật đăng ký/i)).toBeVisible({
-      timeout: 15_000,
-    });
+    // The success toast and sonner's aria-live mirror carry the same copy,
+    // so assert on the first match instead of a strict-unique locator.
+    await expect(
+      page.getByText(/enrollment updated|đã cập nhật đăng ký/i).first(),
+    ).toBeVisible({ timeout: 15_000 });
     await dismissMobileSidebar(page);
     const dropButton = page.locator('article').filter({ hasText: /SE402-01/ })
       .getByRole('button', { name: /^drop course$|^hủy đăng ký$/i });
