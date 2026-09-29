@@ -186,7 +186,7 @@ export default function AdminCreditLimitApplicationsPage() {
               <ClipboardCheck className="h-5 w-5" aria-hidden="true" />
             </div>
             <div>
-              <p className="font-semibold text-foreground">28 {messages.courseRegistration.creditsUnit} · {copy.approve} = 30</p>
+              <p className="font-semibold text-foreground">{copy.limitExplainer}</p>
               <p className="mt-1 leading-6 text-muted-foreground">{copy.description}</p>
             </div>
           </CardContent>

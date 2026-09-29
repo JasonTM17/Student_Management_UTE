@@ -273,6 +273,7 @@ export default function LecturerAnnouncementsPage() {
             <button
               key={tab.id}
               type="button"
+              aria-pressed={selectedCategory === tab.id}
               onClick={() => setSelectedCategory(tab.id)}
               className={cn(
                 'rounded-lg px-3 py-1.5 text-xs font-semibold transition-colors',

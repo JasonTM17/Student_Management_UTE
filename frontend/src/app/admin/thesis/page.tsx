@@ -56,6 +56,23 @@ function getThesisErrorCode(error: unknown): string {
   return data?.code ?? '';
 }
 
+/**
+ * Round window timestamps follow the ACTIVE app locale, not the browser's:
+ * a Vietnamese page must never render "9/15/2026, 7:00:00 AM".
+ */
+function formatRoundWindow(locale: string, startIso: string, endIso: string): string {
+  const tag = locale === 'vi' ? 'vi-VN' : 'en-US';
+  const formatter = new Intl.DateTimeFormat(tag, {
+    day: '2-digit',
+    month: '2-digit',
+    year: 'numeric',
+    hour: '2-digit',
+    minute: '2-digit',
+    hour12: false,
+  });
+  return `${formatter.format(new Date(startIso))} → ${formatter.format(new Date(endIso))}`;
+}
+
 export default function AdminThesisPage() {
   const {
     user,
@@ -478,7 +495,7 @@ export default function AdminThesisPage() {
                         <div>
                           <CardTitle className="text-lg">{round.name}</CardTitle>
                           <CardDescription className="mt-1">
-                            {messages.thesis.admin.thesisTypeOptions[round.thesisType as keyof typeof messages.thesis.admin.thesisTypeOptions] ?? round.thesisType} · {new Date(round.registrationStart).toLocaleString()} → {new Date(round.registrationEnd).toLocaleString()}
+                            {messages.thesis.admin.thesisTypeOptions[round.thesisType as keyof typeof messages.thesis.admin.thesisTypeOptions] ?? round.thesisType} · {formatRoundWindow(locale, round.registrationStart, round.registrationEnd)}
                           </CardDescription>
                         </div>
                       </div>
@@ -676,6 +693,7 @@ export default function AdminThesisPage() {
                                                 type="button"
                                                 className="text-muted-foreground hover:text-destructive p-1 transition-colors"
                                                 title={messages.thesis.councils.removeMember}
+                                                aria-label={messages.thesis.councils.removeMember}
                                                 onClick={() => void handleRemoveMember(council.id, m.lecturerId, round.id)}
                                                 disabled={isSaving}
                                               >
@@ -895,26 +913,20 @@ export default function AdminThesisPage() {
                   <span className="text-muted-foreground">{messages.thesis.councils.nextSeatRequired}</span>
                   <span className="font-semibold text-primary">{nextRoleLabel}</span>
                 </div>
-                <label className="flex flex-col gap-2 text-sm font-medium text-foreground">
-                  {messages.thesis.councils.selectLecturer}
-                  <select
-                    className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
-                    value={selectedLecturerId}
-                    onChange={(e) => setSelectedLecturerId(e.target.value)}
-                  >
-                    <option value="">-- {messages.thesis.councils.selectLecturer} --</option>
-                    {availableLecturers.map((l) => {
-                      const name = l.user
+                <Select
+                  label={messages.thesis.councils.selectLecturer}
+                  value={selectedLecturerId}
+                  onChange={(e) => setSelectedLecturerId(e.target.value)}
+                  options={[
+                    { value: '', label: `-- ${messages.thesis.councils.selectLecturer} --` },
+                    ...availableLecturers.map((l) => ({
+                      value: l.id,
+                      label: l.user
                         ? `${l.user.lastName} ${l.user.firstName} (${l.employeeId || l.user.email})`
-                        : l.id;
-                      return (
-                        <option key={l.id} value={l.id}>
-                          {name}
-                        </option>
-                      );
-                    })}
-                  </select>
-                </label>
+                        : l.id,
+                    })),
+                  ]}
+                />
                 {lecturerLoadError ? (
                   <div className="flex items-center justify-between gap-3 rounded-md border border-status-warning/30 bg-status-warning/10 px-3 py-2 text-xs text-status-warning-foreground">
                     <span>{messages.thesis.councils.lecturerLoadFailed}</span>
@@ -973,18 +985,15 @@ export default function AdminThesisPage() {
                       {messages.thesis.councils.noAssignedTopics}
                     </p>
                   ) : (
-                    <select
-                      className="flex h-10 w-full rounded-lg border border-input bg-background px-3 py-2 text-sm ring-offset-background file:border-0 file:bg-transparent file:text-sm file:font-medium placeholder:text-muted-foreground focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2 disabled:cursor-not-allowed disabled:opacity-50"
+                    <Select
+                      aria-label={messages.thesis.councils.selectTopic}
                       value={selectedTopicIdToAssign}
                       onChange={(e) => setSelectedTopicIdToAssign(e.target.value)}
-                    >
-                      <option value="">-- {messages.thesis.councils.selectTopic} --</option>
-                      {assignableTopics.map((t) => (
-                        <option key={t.id} value={t.id}>
-                          {t.title}
-                        </option>
-                      ))}
-                    </select>
+                      options={[
+                        { value: '', label: `-- ${messages.thesis.councils.selectTopic} --` },
+                        ...assignableTopics.map((t) => ({ value: t.id, label: t.title })),
+                      ]}
+                    />
                   )}
                 </label>
                 <div className="flex justify-end gap-2 pt-2">

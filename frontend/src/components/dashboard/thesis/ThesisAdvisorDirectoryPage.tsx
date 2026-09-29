@@ -195,41 +195,61 @@ interface DataTableProps<T> {
 
 function DataTable<T>({ columns, rows, rowKey, caption }: DataTableProps<T>) {
   return (
-    <div className="overflow-x-auto">
-      <table className="w-full min-w-[880px] border-collapse text-left text-sm">
-        <caption className="sr-only">{caption}</caption>
-        <thead>
-          <tr className="border-b border-border bg-secondary/40">
-            {columns.map((column) => (
-              <th
-                key={column.key}
-                scope="col"
-                className={cn(
-                  'px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground',
-                  column.align === 'right' && 'text-right',
-                )}
-              >
-                {column.title}
-              </th>
-            ))}
-          </tr>
-        </thead>
-        <tbody>
-          {rows.map((row) => (
-            <tr key={rowKey(row)} className="border-b border-border/70 last:border-b-0 hover:bg-secondary/30">
+    <>
+      {/* Desktop: full-width table with horizontal scroll fallback */}
+      <div className="hidden overflow-x-auto md:block">
+        <table className="w-full min-w-[880px] border-collapse text-left text-sm">
+          <caption className="sr-only">{caption}</caption>
+          <thead>
+            <tr className="border-b border-border bg-secondary/40">
               {columns.map((column) => (
-                <td
+                <th
                   key={column.key}
-                  className={cn('px-4 py-3 align-middle', column.align === 'right' && 'text-right')}
+                  scope="col"
+                  className={cn(
+                    'px-4 py-3 text-xs font-bold uppercase tracking-wide text-muted-foreground',
+                    column.align === 'right' && 'text-right',
+                  )}
                 >
-                  {column.render(row)}
-                </td>
+                  {column.title}
+                </th>
               ))}
             </tr>
-          ))}
-        </tbody>
-      </table>
-    </div>
+          </thead>
+          <tbody>
+            {rows.map((row) => (
+              <tr key={rowKey(row)} className="border-b border-border/70 last:border-b-0 hover:bg-secondary/30">
+                {columns.map((column) => (
+                  <td
+                    key={column.key}
+                    className={cn('px-4 py-3 align-middle', column.align === 'right' && 'text-right')}
+                  >
+                    {column.render(row)}
+                  </td>
+                ))}
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {/* Mobile: one card per row, reusing each column's renderer */}
+      <div className="space-y-3 md:hidden" role="list" aria-label={caption}>
+        {rows.map((row) => (
+          <div key={rowKey(row)} role="listitem" className="rounded-xl border border-border/80 bg-card p-4 shadow-2xs">
+            <dl className="space-y-3">
+              {columns.map((column) => (
+                <div key={column.key} className={cn(column.align === 'right' && 'text-right')}>
+                  <dt className="text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
+                    {column.title}
+                  </dt>
+                  <dd className="mt-1">{column.render(row)}</dd>
+                </div>
+              ))}
+            </dl>
+          </div>
+        ))}
+      </div>
+    </>
   );
 }
 
