@@ -112,6 +112,13 @@ public class ThesisAssistantController {
                     ThesisAssistantService.MODEL, true, "TECHNICAL_REQUEST_BLOCKED", locale, List.of(),
                     UUID.randomUUID(), request.clientRequestId(), null, false, "REJECTED", null, null);
         }
+        // Conversational openers (greeting, thanks, identity) resolve locally
+        // before anything else: they must never fall through to a knowledge
+        // miss, and they are not charged against the daily RAG quota.
+        ChatResponse conversational = ThesisAssistantService.conversationalAnswer(request.message(), locale);
+        if (conversational != null) {
+            return conversational;
+        }
         if (personalContext != null && personalContext.handles(request.message())) {
             ChatResponse personal = personalContext.answer(request, actor);
             if (personal != null) {
@@ -241,15 +248,23 @@ public class ThesisAssistantController {
                 emitter.complete();
                 return emitter;
             }
-            ChatResponse personal = personalContext != null && personalContext.handles(request.message())
-                    ? personalContext.answer(request, actor) : null;
-            if (personal != null) {
-                personalContext.stream(personal, request, sink);
-            } else if (remoteRag()) {
-                streamRemoteWithFallback(request, owner, sink);
+            // Same conversational tier as the JSON path: openers answer
+            // locally, never fall through to a knowledge miss.
+            ChatResponse conversational = ThesisAssistantService.conversationalAnswer(request.message(),
+                    AssistantInputGuard.normalizeLocale(request.locale()));
+            if (conversational != null) {
+                ThesisAssistantService.streamLocalResponse(conversational, request.clientRequestId(), sink);
             } else {
-                assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
-                        request.clientRequestId(), sink, request.scope());
+                ChatResponse personal = personalContext != null && personalContext.handles(request.message())
+                        ? personalContext.answer(request, actor) : null;
+                if (personal != null) {
+                    personalContext.stream(personal, request, sink);
+                } else if (remoteRag()) {
+                    streamRemoteWithFallback(request, owner, sink);
+                } else {
+                    assistant.stream(request.message(), request.locale(), request.conversationId(), owner,
+                            request.clientRequestId(), sink, request.scope());
+                }
             }
             emitter.complete();
         } catch (DomainException exception) {
