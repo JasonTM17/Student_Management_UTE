@@ -1590,7 +1590,30 @@ public class ThesisAssistantService {
     private static List<Citation> primaryCitations(List<Citation> citations) {
         return citations == null || citations.isEmpty() ? List.of() : List.of(citations.get(0));
     }
-    private static String noMatchMessage(String locale) { return "vi".equals(locale) ? "Mình chưa tìm thấy hướng dẫn phù hợp trong kho kiến thức công khai. Bạn thử nêu rõ học phần, học kỳ hoặc mục học vụ cần hỏi nhé." : "I could not find matching public guidance. Try naming the course, semester, or campus service you need."; }
+    /**
+     * A knowledge miss must still teach the user what IS askable: the generic
+     * "not found" line alone read as broken for open-ended questions, so the
+     * reply now lists the portal's covered topics as concrete prompts.
+     */
+    private static String noMatchMessage(String locale) {
+        return "vi".equals(locale)
+                ? "Mình chưa tìm thấy nội dung khớp câu hỏi này trong kho kiến thức công khai. "
+                        + "Bạn thử hỏi lại theo một trong các chủ đề mình trả lời tốt nhé:\n\n"
+                        + "• Lớp học phần, giảng viên, phòng học và thời khóa biểu cá nhân.\n"
+                        + "• Điểm số, GPA, điểm rèn luyện theo học kỳ.\n"
+                        + "• Hạn mức tín chỉ còn được đăng ký và cách đăng ký học phần.\n"
+                        + "• Các khoa, ngành đào tạo và danh mục học phần của trường.\n"
+                        + "• Quy trình đăng ký đề tài khóa luận và quy chế học vụ.\n"
+                        + "• Lịch thi, học phí, điều kiện xét tốt nghiệp, ký túc xá."
+                : "I could not find content matching this question in the public knowledge base. "
+                        + "Try asking about a topic I answer well:\n\n"
+                        + "• Your sections, lecturers, rooms and personal timetable.\n"
+                        + "• Your grades, GPA and conduct score by semester.\n"
+                        + "• Your remaining registration credit budget and how to register.\n"
+                        + "• The university's faculties, majors and course catalog.\n"
+                        + "• Thesis topic registration and academic regulations.\n"
+                        + "• Exam schedules, tuition, graduation requirements, dormitory.";
+    }
     private static String unavailableMessage(String locale) { return "vi".equals(locale) ? "Kho kiến thức CampusCore hiện chưa khả dụng. Vui lòng thử lại sau." : "The CampusCore knowledge base is currently unavailable. Please try again later."; }
     private static String sensitiveMessage(String locale) { return "vi".equals(locale) ? "Vui lòng không nhập email, số điện thoại, mã sinh viên hoặc thông tin bí mật vào trợ lý." : "Please do not enter email addresses, phone numbers, student IDs, or secrets into the assistant."; }
     private static String promptInjectionMessage(String locale) { return "vi".equals(locale) ? "Trợ lý chỉ xử lý câu hỏi học vụ công khai và không thể thực hiện yêu cầu thay đổi chỉ dẫn hệ thống." : "The assistant only handles public academic questions and cannot follow requests to change its system instructions."; }
