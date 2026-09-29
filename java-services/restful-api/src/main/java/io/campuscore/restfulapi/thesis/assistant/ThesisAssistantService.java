@@ -585,6 +585,12 @@ public class ThesisAssistantService {
      */
     public ChatResponse groundedFallback(String message, String locale) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
+        // A stopped database fails retrieval slower than every layered timeout
+        // (gateway 15s > local budget 5s > Hikari 15s), so the outage must be
+        // recognised BEFORE any retrieval attempt: the tracker already knows.
+        if (io.campuscore.restfulapi.security.DatabaseAvailabilityTracker.isRecentlyUnavailable()) {
+            return knowledgeUnavailableResponse(locale, null);
+        }
         ChatResponse lexical;
         try {
             final String normalized = AssistantInputGuard.normalizeMessage(message);
