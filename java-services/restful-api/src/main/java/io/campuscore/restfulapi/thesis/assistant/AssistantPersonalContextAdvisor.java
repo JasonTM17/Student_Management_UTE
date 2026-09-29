@@ -66,12 +66,27 @@ public class AssistantPersonalContextAdvisor {
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
 
     private static final Pattern SCHEDULE_INTENT = Pattern.compile(
-            "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)?"
-                    + "|lich\\s*(?:hoc|day|giang\\s*day|tuan|hom\\s*nay|ngay\\s*mai|cua\\s*toi|thu\\s*[2-7]|thu\\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\\s*nhat|t[2-7]|cn)?"
+            "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)"
+                    + "|lich\\s*(?:hoc|day|giang\\s*day|tuan|hom\\s*nay|ngay\\s*mai|cua\\s*toi|thu\\s*[2-7]|thu\\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\\s*nhat|t[2-7]|cn)"
                     + "|thời\\s*(?:khoá|khóa|khoa)\\s*biểu|thoi\\s*khoa\\s*bieu|\\btkb\\b"
                     + "|(?:thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|hôm\\s*nay|ngày\\s*mai|chủ\\s*nhật|hom\\s*nay|ngay\\s*mai|chu\\s*nhat)\\s*(?:tôi\\s*)?(?:có\\s*)?(?:học|dạy|lịch|tiết|môn|buổi|ca)"
                     + "|học\\s*ngày\\s*nào|hoc\\s*ngay\\s*nao|m[oô]n\\s*nào\\s*học|mon\\s*nao\\s*hoc|tiết\\s*học|buổi\\s*học|ca\\s*học|ca\\s*dạy|tiết\\s*dạy"
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
+            Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
+
+    /**
+     * Exam-timetable questions ("Lịch thi cuối kỳ khi nào?") are a PUBLIC
+     * knowledge topic, not the asker's teaching/attendance timetable. Checked
+     * before {@link #SCHEDULE_INTENT} so the bare-noun fix above (which no
+     * longer matches a lone "lịch") cannot send exam wording to the personal
+     * path either, and so "lịch thi" never hijacks the personal answer.
+     */
+    private static final Pattern EXAM_SCHEDULE_INTENT = Pattern.compile(
+            "lịch\\s*thi|lich\\s*thi"
+                    + "|thi\\s*(?:cuối\\s*kỳ|cuối\\s*ky|kết\\s*thúc|học\\s*phần|hoc\\s*phan|tốt\\s*nghiệp|tot\\s*nghiep|lại|bù|bu)"
+                    + "|thi\\s*(?:cuoi\\s*ky|ket\\s*thuc|tot\\s*nghiep)"
+                    + "|kỳ\\s*thi|ky\\s*thi|khoá\\s*thi|khóa\\s*thi|khoa\\s*thi|phòng\\s*thi|phong\\s*thi"
+                    + "|(?:final\\s+)?exam\\s*(?:schedule|timetable|period|session)?\\b",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     private static final Pattern FIRST_PERSON_PRONOUN = Pattern.compile(
@@ -268,13 +283,18 @@ public class AssistantPersonalContextAdvisor {
 
     /** True when the question is clearly about personal schedule, enrollment list, grades, conduct, or thesis status. */
     public boolean handles(String message) {
-        return message != null && (SCHEDULE_INTENT.matcher(message).find()
+        if (message == null) return false;
+        // Exam timetables are a public knowledge topic even though they share
+        // the "lịch" noun with personal timetables — never answer them from
+        // the asker's own teaching/attendance rows.
+        if (EXAM_SCHEDULE_INTENT.matcher(message).find()) return false;
+        return SCHEDULE_INTENT.matcher(message).find()
                 || isThesisPersonalIntent(message)
                 || isConductIntent(message)
                 || isGradesIntent(message)
                 || isEnrollmentListIntent(message)
                 || isCreditsRemainingIntent(message)
-                || isSectionDetailIntent(message));
+                || isSectionDetailIntent(message);
     }
 
     /**
