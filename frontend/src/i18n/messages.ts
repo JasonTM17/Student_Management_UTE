@@ -1018,6 +1018,10 @@ export const en = {
       specializationManagedHint:
         'The specialization is set by the Academic Office in the lecturer directory after the account is created.',
     },
+    // Admin enrollment records: shared fallback copy for reference filters.
+    enrollments: {
+      filterLoadFailed: 'Semester or course filter options could not be fully loaded.',
+    },
     // Admin broadcast console: one notification, one named recipient.
     notifications: {
       eyebrow: 'Single-recipient mode',
@@ -3346,6 +3350,10 @@ export const vi: I18nMessages = {
         'Khoa / Viện đào tạo của sinh viên do Phòng Đào tạo gán cùng chương trình đào tạo sau khi tài khoản được tạo.',
       specializationManagedHint:
         'Lĩnh vực chuyên môn do Phòng Đào tạo cập nhật trong danh bạ Giảng viên sau khi tạo tài khoản.',
+    },
+    // Bản ghi đăng ký học phần của quản trị viên: câu dự phòng dùng chung cho bộ lọc.
+    enrollments: {
+      filterLoadFailed: 'Bộ lọc học kỳ hoặc môn học chưa tải được đầy đủ.',
     },
     notifications: {
       eyebrow: 'Chế độ gửi đích danh',
