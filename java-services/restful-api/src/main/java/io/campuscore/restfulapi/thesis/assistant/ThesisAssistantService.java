@@ -599,6 +599,15 @@ public class ThesisAssistantService {
             // bypassed (existing local-grounded convention).
             return withDegraded(lexical);
         }
+        if ("KNOWLEDGE_UNAVAILABLE".equals(lexical.reasonCode())) {
+            // The knowledge STORE itself is down (both remote and local read
+            // the same database). Relay the precise outage contract instead of
+            // masking it as a content miss: the runtime probes pin
+            // KNOWLEDGE_UNAVAILABLE + degraded + no citations, and a curated
+            // ANSWERED here made a DB outage indistinguishable from "no
+            // matching document".
+            return withDegraded(lexical);
+        }
         return curatedFallback(normalizedLocale);
     }
 
