@@ -6,6 +6,7 @@ import io.campuscore.restfulapi.thesis.assistant.ThesisAssistantDtos.FeedbackReq
 import io.campuscore.restfulapi.web.DomainException;
 import jakarta.servlet.http.HttpServletRequest;
 import jakarta.servlet.http.HttpServletResponse;
+import org.springframework.dao.DataAccessException;
 import jakarta.validation.Valid;
 import java.util.List;
 import java.util.UUID;
@@ -129,8 +130,16 @@ public class ThesisAssistantController {
         if (remoteRag()) {
             return chatRemoteWithFallback(request, owner);
         }
-        return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
-                request.clientRequestId(), request.scope());
+        // The local path touches the turn ledger (reserve/complete) outside the
+        // service's own DomainException guard: a ledger outage used to escape
+        // as DataAccessException and surface as a 500. The degraded contract is
+        // a 200 with no persistence, never a 5xx, so it is honoured here too.
+        try {
+            return assistant.answer(request.message(), request.locale(), request.conversationId(), owner,
+                    request.clientRequestId(), request.scope());
+        } catch (DataAccessException exception) {
+            return assistant.groundedFallback(request.message(), locale);
+        }
     }
 
     /**

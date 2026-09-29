@@ -634,12 +634,14 @@ export function useAssistantStream({
         // Completion won the terminal CAS. Reconcile the committed replay before
         // aborting the reader so a late Stop click cannot erase the answer.
         try {
+          const casBudget = startReconciliationBudget(Date.now());
           const reply = await thesisApi.chat(
             activePromptRef.current ?? lastPrompt ?? '',
             locale,
             activeConversationIdRef.current,
             requestId,
             scope,
+            { timeoutMs: Math.max(1, remainingReconcileMs(casBudget, Date.now())) },
           );
           casResolvedRef.current = true;
           dispatch({
