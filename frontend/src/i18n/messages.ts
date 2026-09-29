@@ -1550,6 +1550,169 @@ export const en = {
     genderFemale: 'Female',
     genderOther: 'Other',
     missingValue: '—',
+    tabLabel: 'Certificates',
+    eyebrow: 'Student services',
+    identityMissingTitle: 'Not enough information to draft a certificate',
+    identityMissingDescription:
+      'Your session does not carry a name or student ID claim, so the certificate draft cannot be prefilled. Sign in with your student account or contact the Academic Affairs Office.',
+    curriculumHint:
+      'Curriculum data (major / cohort) is unavailable right now — select your major and cohort in your profile so the certificate shows the right program.',
+    cityDateLine: 'Ho Chi Minh City, {date}',
+    purposes: {
+      MILITARY_DEFERMENT: {
+        title: 'Military Service Deferment',
+        decree: 'Per Decree 13/2016/ND-CP & Military Service Law',
+        body: 'Completing documentation for temporary deferment of military enlistment during full-time undergraduate studies per national regulations.',
+        defaultRecipient:
+          'Local Military Command at Commune/Ward and District Levels',
+      },
+      STUDENT_LOAN: {
+        title: 'Social Policy Student Loan',
+        decree:
+          'Per Decision 157/2007/QD-TTg & Decision 05/2022/QD-TTg by Prime Minister',
+        body: 'Applying for preferential student loan program at the Bank for Social Policies for tuition and living expenses.',
+        defaultRecipient:
+          'Local Bank for Social Policies where the student resides',
+      },
+      BUS_PASS: {
+        title: 'Student Bus Pass Application',
+        decree: 'Ho Chi Minh City Public Transit Student Subsidy Policy',
+        body: 'Registering for monthly subsidized student bus passes across the Ho Chi Minh City transit network.',
+        defaultRecipient:
+          'HCMC Public Transport Management Center and Bus Transit Agencies',
+      },
+      TAX_EXEMPTION: {
+        title: 'Personal Income Tax Family Exemption',
+        decree: 'Per Circular 111/2013/TT-BTC on personal income tax',
+        body: 'Submitting dependent deduction proof for personal income tax declaration of parents/guardians.',
+        defaultRecipient:
+          'Tax Administration Authority or Parent/Guardian Employer',
+      },
+      INTERNSHIP: {
+        title: 'Internship Recommendation Letter',
+        decree: 'Per HCMUTE Practical Training and Corporate Internship Program',
+        body: 'Contacting corporate partner organizations for graduation internship and professional practice.',
+        defaultRecipient:
+          'Management Board & Human Resources Department of Partner Enterprises',
+      },
+    },
+  },
+  editor: {
+    seedTitleVi: 'Thông báo kế hoạch tổ chức học vụ học kỳ mới',
+    seedTitleEn: 'Official Academic Schedule Notice',
+    blocks: {
+      header: {
+        title: '1. National header & university name',
+        description:
+          'Official header: HCMC UNIVERSITY OF TECHNOLOGY AND ENGINEERING, academic notice title',
+      },
+      recipient: {
+        title: '2. Recipient salutation line',
+        description:
+          'Formal salutation addressed to all lecturers, staff, and students',
+      },
+      summary: {
+        title: '3. Basis & plan objectives',
+        description:
+          'Training programme basis and academic milestone announcements',
+      },
+      table: {
+        title: '4. Schedule & milestone table',
+        description:
+          'Registration windows with start, end, and target cohort',
+      },
+      clauses: {
+        title: '5. Regulations & credit caps',
+        description:
+          'Credit caps under current regulations; over-cap enrollment needs OAA approval',
+      },
+      notice: {
+        title: '6. Warning & important notes box',
+        description:
+          'Highlighted callout for prerequisites and support contacts',
+      },
+      signoff: {
+        title: '7. Recipients & e-Office digital seal',
+        description:
+          'Recipients and space for the issuing office digital signature / seal',
+      },
+    },
+    templates: {
+      'council-decision': {
+        name: 'Thesis Defense Council Establishment Decision',
+        description:
+          'Decision template appointing the chair, secretary and members under regulation R6.',
+      },
+      'registration-notice': {
+        name: 'Course Registration & Credit Limit Official Notice',
+        description:
+          'Registration windows, prerequisites and the term credit cap notice.',
+      },
+      'scholarship-notice': {
+        name: 'Merit-based Scholarship Evaluation Notice',
+        description:
+          'Criteria for Excellent, Very good and Good scholarship consideration.',
+      },
+    },
+    loadIntoEditor: 'Load into Editor',
+    priorityOptions: {
+      URGENT: 'Urgent',
+      HIGH: 'High',
+      NORMAL: 'Normal',
+      LOW: 'Low',
+    },
+    targetRoleOptions: {
+      ALL: 'All',
+      STUDENT: 'Students',
+      LECTURER: 'Lecturers',
+    },
+    editingBanner: 'Editing saved notice: "{title}"',
+    cancelEdit: 'Cancel Edit',
+    previewAction: 'Preview',
+    previewActionTitle: 'Preview document',
+    exportHtml: 'Export HTML',
+    exportMarkdown: 'Export .md',
+    saveChanges: 'Save Changes',
+    saveChangesTitle: 'Save changes to database',
+    saving: 'Saving...',
+    publishNew: 'Publish as New',
+    publishing: 'Publishing...',
+    blockBuilderTitle: 'Institutional Content Blocks Builder',
+    blockBuilderBadge: 'Drag & Drop',
+    blockBuilderHint:
+      'Drag & drop institutional blocks to insert directly into official document',
+    blockDragHint:
+      'Drag handle ⠿ to reorder blocks. Check boxes to include in compiled document.',
+    collapseBlocks: 'Collapse Blocks',
+    openBlocks: 'Open Content Blocks',
+    resetBlocks: 'Reset Blocks',
+    insertAllBlocks: 'Insert All Blocks',
+    dragHandleLabel: 'Drag to reorder',
+    toggleBlockTitle: 'Toggle block',
+    appendBlock: 'Append',
+    appendBlockTitle: 'Append this block',
+    coverGalleryTitle: 'HCMUTE Editorial Cover Gallery',
+    coverGalleryHint:
+      '1-Click attach high-resolution academic header banner to document',
+    removeBanner: 'Remove Banner',
+    heroCardTitle: 'Homepage Hero Banner & University Identity',
+    heroEyebrowLabel: 'University Name / Eyebrow Badge',
+    heroTitleLabel: 'Hero Title',
+    heroDescriptionLabel: 'Hero Description',
+    heroAccentLabel: 'Accent Theme',
+    heroLivePreview: 'Homepage Live Preview:',
+    heroPublishing: 'Publishing...',
+    heroPublish: 'Publish to Homepage',
+    unsavedTitle: 'Unsaved changes',
+    unsavedDescription:
+      'You have unsaved changes. Continuing will discard anything not yet published. Continue?',
+    unsavedConfirm: 'Continue',
+    unsavedKeep: 'Keep editing',
+  },
+  conduct: {
+    activitiesEmptyTitle: 'No conduct activities this semester',
+    activitiesEmptyDescription:
+      'Approved extracurricular activities for the selected semester will appear here once they are recorded.',
   },
   profile: {
     eyebrow: 'Account settings',
@@ -3882,6 +4045,169 @@ export const vi: I18nMessages = {
     genderFemale: 'Nữ',
     genderOther: 'Khác',
     missingValue: '—',
+    tabLabel: 'Chứng chỉ',
+    eyebrow: 'Dịch vụ sinh viên',
+    identityMissingTitle: 'Chưa đủ thông tin để lập giấy xác nhận',
+    identityMissingDescription:
+      'Phiên đăng nhập chưa mang họ tên hoặc MSSV, nên bản thảo không thể điền sẵn thông tin. Hãy đăng nhập bằng tài khoản sinh viên hoặc liên hệ Phòng Đào tạo.',
+    curriculumHint:
+      'Chưa tải được dữ liệu chương trình đào tạo (ngành/khóa) — hãy chọn ngành và khóa của bạn trong hồ sơ để giấy xác nhận hiển thị đúng chương trình.',
+    cityDateLine: 'Thành phố Hồ Chí Minh, ngày {day} tháng {month} năm {year}',
+    purposes: {
+      MILITARY_DEFERMENT: {
+        title: 'Tạm hoãn nghĩa vụ quân sự',
+        decree: 'Theo Nghị định 13/2016/NĐ-CP & Luật Nghĩa vụ quân sự',
+        body: 'Bổ túc hồ sơ xin tạm hoãn gọi nhập ngũ trong thời gian đào tạo đại học chính quy theo quy định của pháp luật.',
+        defaultRecipient:
+          'Ban Chỉ huy Quân sự cấp Xã/Phường/Thị trấn và Ban CHQS cấp Quận/Huyện/Thị xã',
+      },
+      STUDENT_LOAN: {
+        title: 'Vay vốn Ngân hàng Chính sách Xã hội',
+        decree:
+          'Theo Quyết định số 157/2007/QĐ-TTg & QĐ 05/2022/QĐ-TTg của Thủ tướng Chính phủ',
+        body: 'Làm thủ tục đề nghị vay vốn chương trình tín dụng học sinh, sinh viên có hoàn cảnh khó khăn tại Ngân hàng Chính sách Xã hội.',
+        defaultRecipient:
+          'Ngân hàng Chính sách Xã hội địa phương nơi sinh viên đăng ký cư trú',
+      },
+      BUS_PASS: {
+        title: 'Đăng ký vé tháng xe buýt sinh viên',
+        decree: 'Chính sách trợ giá vận tải công cộng học sinh - sinh viên TP.HCM',
+        body: 'Đăng ký làm thẻ vé tháng hoặc mua vé tập xe buýt ưu đãi dành cho học sinh, sinh viên trên địa bàn Thành phố Hồ Chí Minh.',
+        defaultRecipient:
+          'Trung tâm Quản lý Giao thông công cộng TP. Hồ Chí Minh và các đơn vị vận tải xe buýt',
+      },
+      TAX_EXEMPTION: {
+        title: 'Giảm trừ gia cảnh thuế TNCN cho phụ huynh',
+        decree: 'Căn cứ Thông tư 111/2013/TT-BTC về thuế thu nhập cá nhân',
+        body: 'Làm thủ tục kê khai giảm trừ gia cảnh người phụ thuộc là con đang theo học đại học cho người nộp thuế thu nhập cá nhân.',
+        defaultRecipient:
+          'Cơ quan Thuế hoặc Cơ quan, đơn vị nơi cha/mẹ người nộp thuế công tác',
+      },
+      INTERNSHIP: {
+        title: 'Giấy giới thiệu liên hệ thực tập tốt nghiệp',
+        decree: 'Theo Kế hoạch đào tạo thực hành và thực tập doanh nghiệp HCMUTE',
+        body: 'Liên hệ cơ quan, doanh nghiệp để thực tập tốt nghiệp và tiếp cận môi trường thực tế phục vụ chương trình đào tạo kỹ sư/cử nhân.',
+        defaultRecipient:
+          'Ban Giám đốc và Phòng Nhân sự / Đào tạo Quý Cơ quan, Doanh nghiệp',
+      },
+    },
+  },
+  editor: {
+    seedTitleVi: 'Thông báo kế hoạch tổ chức học vụ học kỳ mới',
+    seedTitleEn: 'Official Academic Schedule Notice',
+    blocks: {
+      header: {
+        title: '1. Tiêu ngữ Quốc hiệu & Tên Trường',
+        description:
+          'Header chính thức: ĐẠI HỌC CÔNG NGHỆ KỸ THUẬT TP. HỒ CHÍ MINH, Tiêu đề thông báo học vụ',
+      },
+      recipient: {
+        title: '2. Dòng Kính gửi Tiếp nhận',
+        description:
+          'Dòng Kính gửi trang trọng đến Toàn thể Giảng viên, Cán bộ và Sinh viên',
+      },
+      summary: {
+        title: '3. Căn cứ & Mục tiêu Kế hoạch',
+        description:
+          'Căn cứ đề án đào tạo và thông báo các mốc triển khai học vụ',
+      },
+      table: {
+        title: '4. Bảng Lịch trình & Mốc thời gian',
+        description:
+          'Bảng các đợt đăng ký tín chỉ, thời gian bắt đầu - kết thúc và đối tượng',
+      },
+      clauses: {
+        title: '5. Các Điều khoản Quy chế & Hạn mức',
+        description:
+          'Hạn mức tín chỉ theo quy chế hiện hành; đăng ký vượt hạn mức chỉ khi có đơn được Phòng Đào tạo phê duyệt',
+      },
+      notice: {
+        title: '6. Hộp Cảnh báo & Lưu ý Quan trọng',
+        description:
+          'Khung Callout màu vàng nổi bật cảnh báo điều kiện tiên quyết và địa điểm hỗ trợ',
+      },
+      signoff: {
+        title: '7. Nơi nhận & Dấu Mộc Đỏ Điện Tử e-Office',
+        description:
+          'Nơi nhận và chỗ trống dành cho chữ ký số / con dấu điện tử e-Office của đơn vị ban hành',
+      },
+    },
+    templates: {
+      'council-decision': {
+        name: 'Quyết định Thành lập Hội đồng Bảo vệ KLTN',
+        description:
+          'Mẫu quyết định bổ nhiệm Chủ tịch, Thư ký và Ủy viên theo quy chế R6.',
+      },
+      'registration-notice': {
+        name: 'Thông báo Mở Cổng Đăng ký Tín chỉ & Hạn mức',
+        description:
+          'Thông báo khung giờ đăng ký, điều kiện tiên quyết và hạn mức tín chỉ tối đa.',
+      },
+      'scholarship-notice': {
+        name: 'Thông báo Xét duyệt Học bổng Khuyến khích Học tập',
+        description:
+          'Tiêu chuẩn xét cấp học bổng loại Xuất sắc, Giỏi và Khá cho sinh viên.',
+      },
+    },
+    loadIntoEditor: 'Nạp vào Trình soạn thảo',
+    priorityOptions: {
+      URGENT: 'Khẩn cấp',
+      HIGH: 'Ưu tiên cao',
+      NORMAL: 'Bình thường',
+      LOW: 'Thông tin chung',
+    },
+    targetRoleOptions: {
+      ALL: 'Toàn trường',
+      STUDENT: 'Sinh viên',
+      LECTURER: 'Giảng viên',
+    },
+    editingBanner: 'Đang ở chế độ chỉnh sửa bài viết đã lưu: "{title}"',
+    cancelEdit: 'Hủy sửa / Tạo bài mới',
+    previewAction: 'Xem trước',
+    previewActionTitle: 'Xem trước công văn chuẩn e-Office',
+    exportHtml: 'Tải HTML',
+    exportMarkdown: 'Tải .md',
+    saveChanges: 'Lưu cập nhật',
+    saveChangesTitle: 'Lưu nội dung cập nhật vào cơ sở dữ liệu',
+    saving: 'Đang lưu...',
+    publishNew: 'Đăng thành bài mới',
+    publishing: 'Đang gửi...',
+    blockBuilderTitle: 'Khung Lắp Ghép Khối Cấu Trúc Văn Bản',
+    blockBuilderBadge: 'Sắp xếp trực quan',
+    blockBuilderHint:
+      'Kéo thả các khối cấu trúc chuẩn hành chính (Quốc hiệu, Kính gửi, Kế hoạch, Bảng biểu, Điều khoản, Con dấu) rồi đưa vào văn bản soạn thảo',
+    blockDragHint:
+      'Giữ chuột vào biểu tượng tay cầm ⠿ để kéo thả đổi vị trí các khối. Tích chọn để đưa vào văn bản.',
+    collapseBlocks: 'Thu gọn khung khối',
+    openBlocks: 'Mở khung cấu trúc khối',
+    resetBlocks: 'Khôi phục thứ tự mẫu',
+    insertAllBlocks: 'Chèn tất cả khối vào văn bản',
+    dragHandleLabel: 'Kéo để đổi thứ tự khối',
+    toggleBlockTitle: 'Bật/tắt khối này',
+    appendBlock: 'Chèn khối',
+    appendBlockTitle: 'Chèn riêng khối này vào cuối nội dung',
+    coverGalleryTitle: 'Thư Viện Ảnh Bìa Học Thuật HCMUTE',
+    coverGalleryHint:
+      '1-Click gắn ảnh bìa chuẩn học thuật vào đầu văn bản công văn / thông báo trước khi xuất bản',
+    removeBanner: 'Gỡ ảnh bìa',
+    heroCardTitle: 'Cấu Hình Banner & Tên Trường Trên Trang Chủ',
+    heroEyebrowLabel: 'Tên trường / Nhãn Eyebrow (Hiển thị đầu trang chủ)',
+    heroTitleLabel: 'Tiêu đề chính (Hero Title)',
+    heroDescriptionLabel: 'Đoạn giới thiệu (Hero Description)',
+    heroAccentLabel: 'Màu sắc điểm nhấn (Accent Theme)',
+    heroLivePreview: 'Xem trước giao diện Banner Trang chủ:',
+    heroPublishing: 'Đang xuất bản...',
+    heroPublish: 'Xuất bản lên Trang chủ',
+    unsavedTitle: 'Nội dung chưa được lưu',
+    unsavedDescription:
+      'Bạn có nội dung chưa được lưu. Tiếp tục sẽ mất các thay đổi chưa phát hành. Tiếp tục?',
+    unsavedConfirm: 'Tiếp tục',
+    unsavedKeep: 'Ở lại soạn thảo',
+  },
+  conduct: {
+    activitiesEmptyTitle: 'Chưa có hoạt động rèn luyện trong học kỳ này',
+    activitiesEmptyDescription:
+      'Hoạt động phong trào đã được duyệt của học kỳ đang chọn sẽ xuất hiện tại đây sau khi được ghi nhận.',
   },
   profile: {
     eyebrow: 'Cài đặt tài khoản',
