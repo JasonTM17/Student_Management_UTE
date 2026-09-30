@@ -105,6 +105,14 @@ public class PeopleReadService {
                 || authorities.contains("ROLE_SUPER_ADMIN");
     }
 
+    /**
+     * The academic-affairs statuses that actually exist in the data (the
+     * schema default, and the only value every seed writes). Anything else was
+     * previously accepted silently and filtered to an always-empty result, so
+     * an unknown token is now a client error instead of a lie-by-empty-page.
+     */
+    public static final Set<String> STUDENT_STATUSES = Set.of("ACTIVE");
+
     private static String normalizeStatus(String status) {
         if (status == null) {
             return null;
@@ -113,7 +121,12 @@ public class PeopleReadService {
         if (trimmed.isEmpty()) {
             throw new IllegalArgumentException("status must not be blank");
         }
-        return trimmed;
+        String canonical = trimmed.toUpperCase(java.util.Locale.ROOT);
+        if (!STUDENT_STATUSES.contains(canonical)) {
+            throw new IllegalArgumentException(
+                    "Unknown student status: " + status + " (allowed: " + String.join(", ", STUDENT_STATUSES) + ")");
+        }
+        return canonical;
     }
 
     private static PageMeta meta(long total, int page, int limit) {

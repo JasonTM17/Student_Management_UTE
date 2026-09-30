@@ -1,5 +1,6 @@
 package io.campuscore.restfulapi.people;
 
+import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
@@ -17,8 +18,9 @@ import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.context.ActiveProfiles;
 import org.springframework.test.context.TestPropertySource;
-import org.springframework.test.web.servlet.request.RequestPostProcessor;
 import org.springframework.test.web.servlet.MockMvc;
+import org.springframework.test.web.servlet.MvcResult;
+import org.springframework.test.web.servlet.request.RequestPostProcessor;
 
 @SpringBootTest
 @AutoConfigureMockMvc
@@ -270,6 +272,35 @@ class PeopleReadPersistenceTest {
                         .with(adminJwt()))
                 .andExpect(status().isBadRequest())
                 .andExpect(jsonPath("$.code").value("INVALID_REQUEST"));
+    }
+
+    @Test
+    void studentStatusFilterRejectsUnknownEnumsInsteadOfReturningASilentEmptyPage() throws Exception {
+        // Regression for the docs/data enum drift: the endpoint documentation
+        // claimed ENROLLED/LEAVE/GRADUATED while the data only ever holds
+        // ACTIVE, and an unknown token used to slip through as a filter and
+        // return an always-empty 200. Unknown values are client errors now.
+        insertStudent("student-active", "S010", "ACTIVE", 2, BASE_TIME, "department-se");
+
+        for (String invalid : java.util.List.of("ENROLLED", "LEAVE", "GRADUATED", "NOT_A_STATUS")) {
+            MvcResult rejected = mvc.perform(get("/api/v1/students")
+                            .queryParam("status", invalid)
+                            .with(adminJwt()))
+                    .andExpect(status().isBadRequest())
+                    .andReturn();
+            assertThat(rejected.getResponse().getContentAsString())
+                    .as("status=%s must be rejected with INVALID_REQUEST", invalid)
+                    .contains("INVALID_REQUEST");
+        }
+
+        // The canonical enum stays functional; input case is normalized.
+        mvc.perform(get("/api/v1/students")
+                        .queryParam("status", "active")
+                        .with(adminJwt()))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.meta.total").value(1))
+                .andExpect(jsonPath("$.data[0].id").value("student-active"))
+                .andExpect(jsonPath("$.data[0].status").value("ACTIVE"));
     }
 
     private void createTables() {

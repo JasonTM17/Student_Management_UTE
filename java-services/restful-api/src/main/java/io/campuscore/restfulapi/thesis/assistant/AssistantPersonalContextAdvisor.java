@@ -1353,29 +1353,12 @@ public class AssistantPersonalContextAdvisor {
 
     /**
      * Credit total for the listed enrollments, counted the same way the
-     * registration summary endpoint counts it: SUM(creditsSnapshot) over the
-     * student's own active rows. Falls back to the current course catalog
-     * credits when the ledger is unavailable.
+     * registration summary endpoint counts it: the CURRENT course credits of
+     * each enrolled section (section -> course), not the enrollment-time
+     * snapshot — a snapshot raised after registration would drift from the
+     * summary the student sees on the registration page.
      */
     private int sumRegisteredCredits(List<EnrollmentResponse> currentTerm) {
-        List<String> ids = currentTerm.stream()
-                .map(EnrollmentResponse::id)
-                .filter(StringUtils::hasText)
-                .toList();
-        if (jdbc != null && !ids.isEmpty()) {
-            try {
-                Integer snapshot = jdbc.queryForObject(
-                        "SELECT COALESCE(SUM(\"creditsSnapshot\"), 0) FROM academic.\"Enrollment\" WHERE \"id\" IN (:ids)",
-                        new MapSqlParameterSource("ids", ids),
-                        Integer.class);
-                if (snapshot != null) {
-                    return snapshot;
-                }
-            } catch (RuntimeException exception) {
-                LOG.warn("creditsSnapshot lookup failed with {}; falling back to course credits",
-                        exception.getClass().getSimpleName());
-            }
-        }
         return currentTerm.stream()
                 .filter(item -> item.section() != null && item.section().course() != null)
                 .mapToInt(item -> item.section().course().credits())
