@@ -210,8 +210,14 @@ public class ThesisAssistantInternalController {
         if (!properties.serviceMode()) {
             throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_DISABLED", "RAG service mode is disabled");
         }
-        if (!properties.tokenConfigured()) {
-            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_TOKEN_MISSING", "RAG service token is not configured");
+        if (!properties.tokenConfigured()
+                // Round-2 sweep static-1: the committed compose default must
+                // fail closed — these endpoints are permitAll + rate-limit
+                // whitelisted, so a known-default token would leave the
+                // LLM-consuming chat open (same stance as JwtSecretPolicy).
+                || "local-rag-service-token-change-me".equals(properties.serviceToken())) {
+            throw new DomainException(HttpStatus.SERVICE_UNAVAILABLE, "RAG_SERVICE_TOKEN_MISSING",
+                    "RAG service token is not configured (the committed default is rejected)");
         }
         if (token == null || token.isBlank()) {
             throw new DomainException(HttpStatus.FORBIDDEN, "RAG_SERVICE_UNAUTHORIZED", "RAG service token is required");

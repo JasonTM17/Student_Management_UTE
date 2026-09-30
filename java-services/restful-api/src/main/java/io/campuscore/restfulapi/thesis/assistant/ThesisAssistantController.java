@@ -134,8 +134,10 @@ public class ThesisAssistantController {
         // Off-topic general questions ("Con gà có mấy cái chân") carry no
         // academic signal, so the campus corpus could never ground them; the
         // provider answers them directly instead of the KB miss (owner
-        // request 2026-09-30).
-        ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale, request.clientRequestId());
+        // request 2026-09-30). Scope='specialized' skips this: the
+        // professional corpus is the right source there (round-2 chat-1).
+        ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(), locale,
+                request.clientRequestId(), request.scope());
         if (general != null) {
             return general;
         }
@@ -301,7 +303,8 @@ public class ThesisAssistantController {
                     personalContext.stream(personal, request, sink);
                 } else {
                     ChatResponse general = assistant.generalAnswerIfOffTopic(request.message(),
-                            AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId());
+                            AssistantInputGuard.normalizeLocale(request.locale()), request.clientRequestId(),
+                            request.scope());
                     if (general != null) {
                         ThesisAssistantService.streamLocalResponse(general, request.clientRequestId(), sink);
                     } else if (remoteRag()) {

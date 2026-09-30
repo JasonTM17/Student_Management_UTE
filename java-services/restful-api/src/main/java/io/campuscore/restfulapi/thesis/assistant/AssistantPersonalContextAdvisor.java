@@ -448,8 +448,11 @@ public class AssistantPersonalContextAdvisor {
         if (!StringUtils.hasText(message)) return false;
         if (ENROLLMENT_HOWTO_INTENT.matcher(message).find()) return false;
         if (CREDITS_POLICY_INTENT.matcher(message).find()) return false;
-        return FIRST_PERSON_PRONOUN.matcher(message).find()
-                && PENDING_GRADES_INTENT.matcher(message).find();
+        // Round-2 sweep chat-3: Vietnamese drops the pronoun constantly
+        // ("còn bao nhiêu môn chưa có điểm") — the FIRST_PERSON gate used to
+        // route exactly that to the KB miss. The pattern itself is specific
+        // enough (môn + chưa có điểm) that the pronoun gate is redundant.
+        return PENDING_GRADES_INTENT.matcher(message).find();
     }
 
     /** "Lớp SE013 học phòng nào, giờ nào?" — a concrete section code plus room/time wording. */

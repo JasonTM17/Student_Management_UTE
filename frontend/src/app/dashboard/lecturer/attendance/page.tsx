@@ -81,6 +81,8 @@ export default function LecturerAttendancePage() {
   const [error, setError] = useState('');
 
   const [roster, setRoster] = useState<StudentRowState[]>([]);
+  // Rows cleared via Reset whose RESET entry has not been saved yet.
+  const [resetStudentIds, setResetStudentIds] = useState<Set<string>>(new Set());
   const [sectionSummary, setSectionSummary] = useState<SectionAttendanceSummary | null>(null);
 
   // 1. Fetch semesters
@@ -162,6 +164,7 @@ export default function LecturerAttendancePage() {
       });
 
       setRoster(rows);
+      setResetStudentIds(new Set());
       setSectionSummary(summary);
     } catch {
       setError(copy.saveFailed);
@@ -217,19 +220,36 @@ export default function LecturerAttendancePage() {
       variant: 'destructive',
     });
     if (!shouldReset) return;
+    // Remember which rows had marks so handleSave can send RESET entries for
+    // them — otherwise the backend kept the stale row and the reset silently
+    // no-opped (round-2 sweep finding write-1).
+    setResetStudentIds(
+      new Set(
+        roster
+          .filter((row) => row.status !== null || row.notes.trim() !== '')
+          .map((row) => row.studentId),
+      ),
+    );
     setRoster((prev) => prev.map((row) => ({ ...row, status: null, notes: '' })));
   };
 
   const handleSave = async () => {
     if (!selectedSectionId || roster.length === 0) return;
 
-    const records: StudentAttendanceEntry[] = roster
+    const marked = roster
       .filter((row): row is StudentRowState & { status: AttendanceStatus } => row.status !== null)
       .map((row) => ({
         studentId: row.studentId,
         status: row.status,
         notes: row.notes.trim() || undefined,
       }));
+    // Rows cleared via Reset but not yet re-marked travel as RESET entries so
+    // the backend deletes their stale records instead of silently keeping them.
+    const resets = roster
+      .filter((row) => row.status === null && resetStudentIds.has(row.studentId))
+      .map((row) => ({ studentId: row.studentId, status: 'RESET' as const }));
+
+    const records: StudentAttendanceEntry[] = [...marked, ...resets];
 
     if (records.length === 0) {
       toast.warning(copy.noStatusSelected);
@@ -246,6 +266,7 @@ export default function LecturerAttendancePage() {
       toast.success(
         copy.savedSuccess.replace('{count}', String(response.updatedCount)),
       );
+      setResetStudentIds(new Set());
 
       // Refresh section summary after saving
       const summary = await attendanceApi.getSectionSummary(selectedSectionId).catch(() => null);

@@ -20,6 +20,10 @@ public final class AssistantInputGuard {
     private static final Pattern TECHNICAL_REQUEST = Pattern.compile(
             "(?i)(?:"
                     + "\\b(?:curl|wget|invoke-webrequest|iwr|docker(?:\\s+compose)?|docker-compose|kubectl|helm|psql|mysql|redis-cli|npm|pnpm|yarn|bun|npx|mvnw?|gradlew?|git\\s+(?:push|pull|clone|commit|rebase|merge|remote|repo|command)|powershell|pwsh|bash)\\b"
+                    // Round-2 sweep chat-2: natural phrasing slipped past the
+                    // old list ("Viết giúp câu JDBC connect tới postgres của
+                    // trường") — bare jdbc/postgres tokens are technical here.
+                    + "|\\bjdbc\\b|\\bpostgres(?:ql)?\\b"
                     + "|\\b(?:api\\s+(?:endpoint|endpoints|chatbot)|api\\s+key|system\\s+prompt|developer\\s+message|stack\\s+trace|traceback|deepseek(?:[- ]v?\\d+)?|provider|llm|jwt|database\\s+(?:password|credentials?))\\b"
                     + "|\\b(?:cho\\s+(?:tôi|ta)|xin|give\\s+me|show|provide|send)\\b.{0,80}\\b(?:api|endpoint|system\\s+prompt|developer\\s+message|câu\\s+lệnh|lệnh|command)\\b"
                     + "|\\b(?:bạn|bot|trợ\\s+lý|hệ\\s+thống|you|assistant)\\b.{0,40}\\b(?:đang\\s+(?:sử\\s+dụng|dùng|chạy)\\s+)?(?:mô\\s+hình|model|llm|provider|deepseek)\\b"

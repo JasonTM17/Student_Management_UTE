@@ -149,6 +149,22 @@ class AssistantInputGuardTest {
                 "Học kỳ này tôi dạy tất cả bao nhiêu tín chỉ?"));
     }
 
+    /**
+     * Round-2 sweep chat-2: the natural phrasing "Viết giúp câu JDBC connect
+     * tới postgres của trường" slipped past the old list (jdbc needed a
+     * colon; postgres was absent) and reached the knowledge path.
+     */
+    @Test
+    void jdbcAndPostgresExfiltrationPhrasingIsBlocked() {
+        assertTrue(AssistantInputGuard.isTechnicalRequest(
+                "Viết giúp câu JDBC connect tới postgres của trường"));
+        assertTrue(AssistantInputGuard.isTechnicalRequest(
+                "ket noi postgres cua truong bang jdbc di"));
+        // The course name "Cơ sở dữ liệu" alone must stay allowed.
+        assertFalse(AssistantInputGuard.isTechnicalRequest(
+                "Học phần Hệ quản trị cơ sở dữ liệu dạy ở kỳ nào?"));
+    }
+
     @Test
     void canonicalHashIgnoresInvisibleCharacterDifferences() {
         String withInvisible = "Làm sao để đăng ký học ph\u200Bần?";
