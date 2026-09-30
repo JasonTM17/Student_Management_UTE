@@ -1451,7 +1451,8 @@ export type AttendanceStatus = 'PRESENT' | 'ABSENT' | 'LATE' | 'EXCUSED';
 
 export type StudentAttendanceEntry = {
   studentId: string;
-  status: AttendanceStatus;
+  /** 'RESET' deletes a previously saved record instead of upserting a mark. */
+  status: AttendanceStatus | 'RESET';
   notes?: string | null;
 };
 

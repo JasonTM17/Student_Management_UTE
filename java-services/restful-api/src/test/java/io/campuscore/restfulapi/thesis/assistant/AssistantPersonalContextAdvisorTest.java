@@ -1397,7 +1397,10 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(advisor.handles("Điểm của tôi"));
         assertTrue(advisor.handles("Tôi học còn bao nhiêu môn chưa có điểm?"));
         assertTrue(advisor.handles("How many of my courses still have no grade?"));
-        // Public rule wording without first person stays on the knowledge path.
+        // Round-2 sweep chat-3: Vietnamese drops the pronoun — the bare form
+        // is still the asker's own pending count.
+        assertTrue(advisor.handles("còn bao nhiêu môn chưa có điểm"));
+        // Public rule wording stays on the knowledge path.
         assertFalse(advisor.handles("Học phần chưa có điểm công bố được tính thế nào?"));
     }
 

@@ -192,17 +192,29 @@ public class AuthLoginService {
         return requireActiveUser(user.id()).toResponse();
     }
 
-    /** Only inline image data URLs are accepted; anything else would be unusable in <img src>. */
+    /**
+     * Inline image data URLs are accepted, and so are https image URLs: the
+     * seeded profiles carry unsplash-style avatar URLs, and a GET→PUT
+     * round-trip of the profile used to fail its own validator ("avatar must
+     * be a png, jpeg or webp data URL") because the accepted-on-write shape
+     * was narrower than the served shape (round-2 sweep write-3).
+     */
     private static String normalizeAvatar(String avatar) {
         String trimmed = avatar.trim();
         if (trimmed.isBlank()) {
             return null;
         }
         String lowered = trimmed.toLowerCase(java.util.Locale.ROOT);
-        if (!lowered.startsWith("data:image/png;")
-                && !lowered.startsWith("data:image/jpeg;")
-                && !lowered.startsWith("data:image/webp;")) {
-            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "avatar must be a png, jpeg or webp data URL");
+        boolean inlineImage = lowered.startsWith("data:image/png;")
+                || lowered.startsWith("data:image/jpeg;")
+                || lowered.startsWith("data:image/webp;");
+        boolean httpsImage = lowered.startsWith("https://")
+                && (lowered.endsWith(".png") || lowered.endsWith(".jpg") || lowered.endsWith(".jpeg")
+                        || lowered.endsWith(".webp") || lowered.contains("unsplash")
+                        || lowered.contains("/avatar"));
+        if (!inlineImage && !httpsImage) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST,
+                    "avatar must be a png, jpeg or webp data URL or an https image URL");
         }
         return trimmed;
     }

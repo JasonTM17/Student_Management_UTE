@@ -248,6 +248,12 @@ app:
     # history, so they are DISABLED unless a deployment opts in. Local and
     # evaluation builds set DEMO_ACCOUNTS_ENABLED=true; a public host must not.
     accounts-enabled: ${DEMO_ACCOUNTS_ENABLED:false}
+    # Demo override: when > 0, EVERY student's effective registration credit
+    # limit becomes this value (bypasses the 28-credit standard and the
+    # raise-application flow). 0 keeps the standard/approved behaviour.
+    # See CreditLimitApplicationService.effectiveLimit (round-2 static-4).
+    # (demo.* keys mirror the REGISTRATION_CREDIT_LIMIT_OVERRIDE env var.)
+    credit-limit-override: ${REGISTRATION_CREDIT_LIMIT_OVERRIDE:0}
     # Optional scope: comma-separated role names, e.g. STUDENT or STUDENT,LECTURER.
     # When set AND accounts-enabled=true, only demo accounts holding one of these
     # roles become ACTIVE; the rest are LOCKED. Empty (default) keeps the

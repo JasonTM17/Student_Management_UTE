@@ -496,6 +496,20 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     }
 
     await launcher.click();
+    // PR #29: the mobile nav slot is now a real route to the specialized
+    // workspace, so it navigates instead of opening the floating drawer.
+    // The floating desktop launcher keeps the drawer contract.
+    if (viewport.width < 768) {
+      await page.waitForURL(/assistant-specialized/, { timeout: 15_000 });
+      const workspace = page.locator('main');
+      await expect(workspace).toBeVisible();
+      const box = await workspace.boundingBox();
+      expect(box).not.toBeNull();
+      expect(box!.x).toBeGreaterThanOrEqual(0);
+      expect(box!.y).toBeGreaterThanOrEqual(0);
+      expect(box!.x + box!.width).toBeLessThanOrEqual(viewport.width);
+      continue;
+    }
     const panel = page.getByRole('dialog');
     await expect(panel).toBeVisible();
     const panelBox = await panel.boundingBox();
@@ -504,15 +518,6 @@ test('assistant launcher and panel stay clear of mobile navigation and viewport 
     expect(panelBox!.y).toBeGreaterThanOrEqual(0);
     expect(panelBox!.x + panelBox!.width).toBeLessThanOrEqual(viewport.width);
     expect(panelBox!.y + panelBox!.height).toBeLessThanOrEqual(viewport.height);
-    if (viewport.width < 768) {
-      // The mobile assistant is a full-screen sheet (fixed inset-0), not the
-      // old floating card that sat above the nav bar. Assert it fills the
-      // viewport (the within-edges checks above still bound it).
-      expect(Math.round(panelBox!.x)).toBe(0);
-      expect(Math.round(panelBox!.y)).toBe(0);
-      expect(Math.round(panelBox!.width)).toBeGreaterThanOrEqual(viewport.width - 1);
-      expect(Math.round(panelBox!.height)).toBeGreaterThanOrEqual(viewport.height - 1);
-    }
     await page.getByRole('button', { name: assistantCloseName }).click();
   }
 });

@@ -327,7 +327,14 @@ public class ThesisAssistantService {
             // ever ran.
             "devops", "ci[/+-]cd", "cicd", "ci", "cd", "pipeline", "pipelines",
             "docker", "container", "containers", "kubernetes", "deploy", "deployment",
-            "deployments", "runbook");
+            "deployments", "runbook",
+            // Round-2 sweep static-3: course-name vocabulary missing from the
+            // gate — "Nhập môn lập trình là gì?" was hijacked into the general
+            // fallback while the SPECIALIZED corpus owns a document for it.
+            "lap\s*trinh", "giai\s*thuat", "co\s*so\s*du\s*lieu", "csdl",
+            "ky\s*thuat\s*phan\s*mem", "he\s*dieu\s*hanh", "mang\s*may\s*tinh",
+            "tri\s*tue\s*nhan\s*tao", "kien\s*truc\s*may\s*tinh", "an\s*toan\s*thong\s*tin",
+            "solid", "design\s*pattern", "oop", "tdd", "unit\s*test");
     /**
      * Retrieval is deliberately scoped before the database query.  A generic
      * lexical overlap (for example "thời" or "hôm nay") is not evidence that
@@ -808,14 +815,19 @@ public class ThesisAssistantService {
      * miss. The provider now answers it directly with the general prompt —
      * no retrieved context, no citations, no quota charge, never persisted.
      * Academic-signal questions return {@code null} and keep the grounded RAG
-     * path; a provider miss also returns {@code null} so the caller falls
-     * back to the normal chain (owner request 2026-09-30).
+     * path; scope='specialized' also returns {@code null} because the
+     * professional corpus is the RIGHT source there — the lexical gate cannot
+     * see specialist terms like "SOLID" and used to hijack those questions
+     * into ungrounded general prose (round-2 sweep chat-1); a provider miss
+     * also returns {@code null} so the caller falls back to the normal chain
+     * (owner request 2026-09-30).
      */
-    public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId) {
+    public ChatResponse generalAnswerIfOffTopic(String message, String locale, UUID clientRequestId, String scope) {
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         String normalized = AssistantInputGuard.normalizeMessage(message);
         if (normalized.isBlank()) return null;
         if (hasPublicScopeSignal(normalized)) return null;
+        if ("specialized".equalsIgnoreCase(scope)) return null;
         if (deepSeek == null || !deepSeek.usable()) return null;
         String generated;
         try {
