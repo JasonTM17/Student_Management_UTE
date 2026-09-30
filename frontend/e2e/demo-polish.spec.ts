@@ -446,7 +446,10 @@ test('demo polish: feedback surfaces stay scannable on registration and schedule
   // "{code} — {name}" as one line inside the toggle button, so assert the
   // group's labeled <section> region rather than an exact standalone code node.
   const search = page.getByLabel('Search sections by code or name');
-  await expect(search).toBeVisible();
+  // The register page is the heaviest compile in the suite; under CI load
+  // hydration can exceed the default 5s, so give the box a 15s budget like
+  // the portal-professional specs do.
+  await expect(search).toBeVisible({ timeout: 15_000 });
   await expect(page.getByText('SE101').filter({ visible: true }).first()).toBeVisible();
   await search.fill('SE101');
   await expect(page.getByRole('region', { name: 'SE101 Software Engineering' })).toBeVisible();
