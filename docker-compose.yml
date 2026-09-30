@@ -77,7 +77,7 @@ services:
       # accounts on every boot and silently overrode the API's opt-in above.
       DEMO_ACCOUNTS_ENABLED: ${DEMO_ACCOUNTS_ENABLED:-true}
       ASSISTANT_RAG_SERVICE_MODE: "true"
-      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
+      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-dev-rag-service-token-rotate-before-exposing}
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "disabled"
       DEEPSEEK_ENABLED: ${DEEPSEEK_ENABLED:-false}
       DEEPSEEK_API_KEY: ${DEEPSEEK_API_KEY:-}
@@ -136,7 +136,7 @@ services:
       DEMO_ACCOUNTS_ENABLED: ${DEMO_ACCOUNTS_ENABLED:-true}
       ASSISTANT_KNOWLEDGE_AUTHORITY_MODE: "sql"
       ASSISTANT_RAG_BASE_URL: http://rag-service:4011/internal/rag/assistant
-      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-local-rag-service-token-change-me}
+      ASSISTANT_RAG_SERVICE_TOKEN: ${ASSISTANT_RAG_SERVICE_TOKEN:-dev-rag-service-token-rotate-before-exposing}
       ASSISTANT_RETENTION_ENABLED: "false"
       # Mail is opt-in. Enable it only with a real SMTP password file; the
       # local Mailpit container remains available for an explicit opt-in.
