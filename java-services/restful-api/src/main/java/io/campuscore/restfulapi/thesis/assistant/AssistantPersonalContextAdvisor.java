@@ -68,6 +68,15 @@ public class AssistantPersonalContextAdvisor {
     /** Enrollment statuses that still bind a seat, matching the web portal. */
     private static final Set<String> ACTIVE_ENROLLMENT_STATUSES = Set.of("ENROLLED", "CONFIRMED", "PENDING");
 
+    /**
+     * Thesis group size requirement. Mirrors the private
+     * {@code ThesisMutationService.MIN_GROUP_MEMBERS}/{@code MAX_GROUP_MEMBERS}
+     * (thesis/service/ThesisMutationService.java:44-45) and the same 3–4 band
+     * the progress read path flags as {@code GROUP_INVALID_MEMBER_COUNT}.
+     */
+    private static final int GROUP_MIN_MEMBERS = 3;
+    private static final int GROUP_MAX_MEMBERS = 4;
+
     private static final Pattern SCHEDULE_INTENT = Pattern.compile(
             "lịch\\s*(?:học|dạy|giảng\\s*dạy|tuần|hôm\\s*nay|ngày\\s*mai|của\\s*tôi|thứ\\s*[2-7]|thứ\\s*(?:hai|ba|tư|bốn|năm|sáu|bảy)|chủ\\s*nhật|t[2-7]|cn)"
                     + "|lich\\s*(?:hoc|day|giang\\s*day|tuan|hom\\s*nay|ngay\\s*mai|cua\\s*toi|thu\\s*[2-7]|thu\\s*(?:hai|ba|tu|bon|nam|sau|bay)|chu\\s*nhat|t[2-7]|cn)"
@@ -79,6 +88,18 @@ public class AssistantPersonalContextAdvisor {
                     // teaching timetable, not a public catalog question.
                     + "|phụ\\s*trách\\s*(?:dạy|giảng)|phu\\s*trach\\s*(?:day|giang)"
                     + "|lớp\\s*(?:học\\s*phần\\s*)?nào[^?!.]{0,40}?(?:dạy|phụ\\s*trách)|lop\\s*(?:hoc\\s*phan\\s*)?nao[^?!.]{0,40}?(?:day|phu\\s*trach)"
+                    // xrole-6: "Học kỳ này tôi phụ trách những lớp nào?" — the
+                    // verb sits BEFORE the lớp noun, which both lớp-first
+                    // alternatives above miss, and there is no "dạy" after
+                    // phụ trách for the verb-first line to catch. The
+                    // interrogative "nào" stays required so a public "ai phụ
+                    // trách lớp này" question does not become a personal
+                    // timetable request. Wukong: the branch must carry a
+                    // first-person marker — a third-person "Giáo viên phụ trách
+                    // lớp nào?" is public catalog knowledge, not the asker's
+                    // own timetable.
+                    + "|tôi\\s*[^?!.]{0,12}?phụ\\s*trách[^?!.]{0,25}?lớp\\s*(?:học\\s*phần\\s*)?nào"
+                    + "|toi\\s*[^?!.]{0,12}?phu\\s*trach[^?!.]{0,25}?lop\\s*(?:hoc\\s*phan\\s*)?nao"
                     + "|(my\\s+)?(class\\s+|teaching\\s+)?schedule|timetable|my\\s+classes|(classes|teaching)\\s+(today|tomorrow|on\\s+\\w+)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -90,7 +111,14 @@ public class AssistantPersonalContextAdvisor {
      */
     private static final Pattern WORDING_POLICY_INTENT = Pattern.compile(
             "quy\\s*định|quy\\s*dinh|điều\\s*kiện|dieu\\s*kien|quy\\s*chế|quy\\s*che"
-                    + "|tối\\s*đa|toi\\s*da|hạn\\s*mức|han\\s*muc|chính\\s*sách",
+                    // The trailing \b on the tone-free "toi da" is load-bearing:
+                    // without it the pattern matched the "da" inside "dang" and
+                    // blocked "nhung nhom sinh vien nao toi dang huong dan" —
+                    // an ordinary supervision question that merely begins the
+                    // word "đang", not the policy word "tối đa". The accented
+                    // "tối đa" needs no boundary because the diacritics already
+                    // make it a distinct token.
+                    + "|tối\\s*đa|toi\\s*da\\b|hạn\\s*mức|han\\s*muc|chính\\s*sách",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
     /**
@@ -102,6 +130,15 @@ public class AssistantPersonalContextAdvisor {
             "khối\\s*lượng\\s*(?:hướng\\s*dẫn|công\\s*tác)|khoi\\s*luong\\s*(?:huong\\s*dan|cong\\s*tac)"
                     + "|hướng\\s*dẫn\\s*tổng\\s*cộng|huong\\s*dan\\s*tong\\s*cong"
                     + "|bao\\s*nhiêu\\s*sinh\\s*viên\\s*hướng\\s*dẫn|bao\\s*nhieu\\s*sinh\\s*vien\\s*huong\\s*dan"
+                    // xrole-7: "Những nhóm sinh viên nào tôi đang hướng dẫn?" —
+                    // the group noun sits before the verb, and the ongoing-verb
+                    // form sits before the group/student noun. Both orders route
+                    // to the existing workload composer (topics + group counts);
+                    // the first-person pronoun and policy-wording gates in
+                    // isLecturerWorkloadIntent still exclude rule questions like
+                    // "Trường quy định bao nhiêu nhóm hướng dẫn tối đa?".
+                    + "|(?:nhóm|nhom)[^?!.]{0,40}?(?:hướng\\s*dẫn|huong\\s*dan)"
+                    + "|(?:đang|dang)\\s*(?:hướng\\s*dẫn|huong\\s*dan)[^?!.]{0,40}?(?:nhóm|nhom|sinh\\s*viên|sinh\\s*vien)"
                     + "|(?:my|total)\\s+(?:thesis\\s+)?workload|supervis\\w*\\s+(?:how\\s+many|total)",
             Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE);
 
@@ -329,6 +366,13 @@ public class AssistantPersonalContextAdvisor {
     private static boolean isLecturerWorkloadIntent(String message) {
         if (!StringUtils.hasText(message)) return false;
         if (WORDING_POLICY_INTENT.matcher(message).find()) return false;
+        // How-to / advice wording ("ở trang nào", "có nên ... mới") is a
+        // knowledge question even when it names supervision groups — answering
+        // it with the asker's own workload list was a Wukong-flagged drift.
+        if (Pattern.compile("trang\\s*nào|có\\s*nên|nên\\s*không|ở\\s*đâu",
+                Pattern.CASE_INSENSITIVE | Pattern.UNICODE_CASE).matcher(message).find()) {
+            return false;
+        }
         return FIRST_PERSON_PRONOUN.matcher(message).find()
                 && LECTURER_WORKLOAD_INTENT.matcher(message).find();
     }
@@ -447,7 +491,8 @@ public class AssistantPersonalContextAdvisor {
             // Do not fall through to public RAG: it must never invent or expose personal data.
             LOG.warn("personal schedule lookup failed with {}", exception.getClass().getSimpleName());
             return new ChatResponse(fallbackMessage(locale), MODEL, true, UNAVAILABLE_REASON_CODE,
-                    locale, List.of());
+                    locale, List.of(), UUID.randomUUID(),
+                    request != null ? request.clientRequestId() : null, null, false, null, null, null);
         }
         if (answer == null) {
             return null;
@@ -455,7 +500,14 @@ public class AssistantPersonalContextAdvisor {
         if (!AssistantOutputGuard.isSafe(answer)) {
             answer = ThesisAssistantService.technicalOutputMessage(locale);
         }
-        return new ChatResponse(answer, MODEL, false, REASON_CODE, locale, List.of());
+        // xrole-15: the client correlates intercepted personal answers with its
+        // pending request by clientRequestId, exactly like the RAG and rejected
+        // paths (ThesisAssistantController echoes request.clientRequestId()).
+        // The six-argument constructor left it null, so the answer could not be
+        // matched to the request it belongs to.
+        return new ChatResponse(answer, MODEL, false, REASON_CODE, locale, List.of(),
+                UUID.randomUUID(), request != null ? request.clientRequestId() : null,
+                null, false, null, null, null);
     }
 
     /** Emits the personal answer over the SSE contract as meta → replace → done. */
@@ -1223,11 +1275,23 @@ public class AssistantPersonalContextAdvisor {
                         + "-credit graduation requirement.";
     }
 
+    /**
+     * xrole-4: "Nhóm luận văn của tôi là nhóm nào, có những ai?" — beyond the
+     * topic line the answer now names the group the asker belongs to: the
+     * asker's role (leader or member, read from {@code leader_student_id} /
+     * {@code is_leader}), the member roster and headcount compared with the
+     * 3–4 requirement, and the approval status with its reason when one is
+     * stored. Every value is echoed from the same group read path the web
+     * portal uses (thesis_group / thesis_group_member joined to the student
+     * profiles, cf. ThesisGroupReadRepository.hydrate) — no name, role, or
+     * count is ever invented; unreadable member rows are simply omitted.
+     */
     private String studentThesisAnswer(String studentId, String locale) {
         if (jdbc == null) return null;
         boolean vi = "vi".equals(locale);
         List<Map<String, Object>> rows = jdbc.queryForList(
                 "SELECT g.id AS group_id, g.status AS group_status, g.approval_status, "
+                        + "g.leader_student_id, g.rejection_reason, "
                         + "t.id AS topic_id, t.title AS topic_title, t.status AS topic_status, "
                         + "t.final_score, r.name AS round_name, r.status AS round_status "
                         + "FROM thesis.thesis_group_member m "
@@ -1246,12 +1310,44 @@ public class AssistantPersonalContextAdvisor {
                     : "You have not registered for a thesis or capstone project in any round yet. "
                             + "You can view and register in open rounds on the Thesis page.";
         }
+        // The roster query mirrors ThesisGroupReadRepository.hydrate: member
+        // identity comes from the linked student profile, external members from
+        // their recorded display name.
+        List<Object> groupIds = rows.stream()
+                .map(row -> row.get("group_id"))
+                .filter(java.util.Objects::nonNull)
+                .distinct()
+                .map(row -> (Object) row)
+                .toList();
+        Map<String, List<Map<String, Object>>> rosterByGroup = new LinkedHashMap<>();
+        if (!groupIds.isEmpty()) {
+            for (Map<String, Object> member : jdbc.queryForList(
+                    "SELECT m.group_id, m.student_id, m.is_leader, m.member_order, "
+                            + "m.display_name, m.is_external, "
+                            + "s.\"studentId\" AS student_number, "
+                            + "u.\"firstName\" AS first_name, u.\"lastName\" AS last_name "
+                            + "FROM thesis.thesis_group_member m "
+                            + "LEFT JOIN campuscore_auth.\"Student\" s ON s.\"id\" = m.student_id "
+                            + "LEFT JOIN campuscore_auth.\"User\" u ON u.\"id\" = s.\"userId\" "
+                            + "WHERE m.group_id IN (:ids) "
+                            + "ORDER BY m.group_id, m.member_order",
+                    new MapSqlParameterSource("ids", groupIds))) {
+                String groupId = text(member, "group_id");
+                if (!StringUtils.hasText(groupId)) {
+                    continue;
+                }
+                rosterByGroup.computeIfAbsent(groupId, ignored -> new ArrayList<>()).add(member);
+            }
+        }
+
         StringBuilder answer = new StringBuilder();
         answer.append(vi ? "Thông tin đăng ký khóa luận của bạn:\n" : "Your thesis registration status:\n");
         for (Map<String, Object> row : rows) {
             String roundName = (String) row.get("round_name");
             String topicTitle = (String) row.get("topic_title");
             String approvalStatus = (String) row.get("approval_status");
+            String rejectionReason = text(row, "rejection_reason");
+            String leaderStudentId = text(row, "leader_student_id");
             Object finalScore = row.get("final_score");
 
             answer.append("\n• ").append(StringUtils.hasText(roundName) ? roundName : (vi ? "Đợt khóa luận" : "Thesis Round"));
@@ -1260,8 +1356,68 @@ public class AssistantPersonalContextAdvisor {
             } else {
                 answer.append(vi ? "\n  - Đề tài: Chưa chọn đề tài" : "\n  - Topic: Not selected yet");
             }
+
+            List<Map<String, Object>> members = rosterByGroup
+                    .getOrDefault(text(row, "group_id"), List.of()).stream()
+                    .filter(member -> StringUtils.hasText(text(member, "student_id"))
+                            || StringUtils.hasText(memberName(member)))
+                    .toList();
+            boolean askerIsLeader = studentId.equalsIgnoreCase(leaderStudentId)
+                    || members.stream().anyMatch(member ->
+                            studentId.equalsIgnoreCase(text(member, "student_id")) && truthy(member.get("is_leader")));
+            if (!members.isEmpty()) {
+                int count = members.size();
+                answer.append(vi ? "\n  - Nhóm: " : "\n  - Group: ").append(count)
+                        .append(vi ? " thành viên (yêu cầu " : " members (requirement ")
+                        .append(GROUP_MIN_MEMBERS).append("-").append(GROUP_MAX_MEMBERS)
+                        .append(vi ? ")" : ")");
+                if (count < GROUP_MIN_MEMBERS) {
+                    answer.append(vi
+                            ? " — còn thiếu " + (GROUP_MIN_MEMBERS - count) + " so với tối thiểu " + GROUP_MIN_MEMBERS
+                            : " — " + (GROUP_MIN_MEMBERS - count) + " short of the minimum of " + GROUP_MIN_MEMBERS);
+                } else if (count <= GROUP_MAX_MEMBERS) {
+                    answer.append(vi ? " — đủ số lượng theo yêu cầu" : " — size requirement met");
+                } else {
+                    answer.append(vi
+                            ? " — vượt quá tối đa " + GROUP_MAX_MEMBERS
+                            : " — above the maximum of " + GROUP_MAX_MEMBERS);
+                }
+                answer.append(vi ? "\n  - Vai trò của bạn: " : "\n  - Your role: ")
+                        .append(askerIsLeader
+                                ? (vi ? "Nhóm trưởng" : "Group leader")
+                                : (vi ? "Thành viên" : "Member"));
+                answer.append(vi ? "\n  - Thành viên:\n" : "\n  - Members:\n");
+                int order = 1;
+                for (Map<String, Object> member : members) {
+                    String name = memberName(member);
+                    String studentNumber = text(member, "student_number");
+                    // Never fall back to the raw internal student_id: the chat
+                    // answer is user-facing copy, and an internal identifier is
+                    // not something to surface when the roster lacks a name.
+                    String label = firstText(name, studentNumber);
+                    if (!StringUtils.hasText(label)) {
+                        continue;
+                    }
+                    answer.append("    ").append(order++).append(". ").append(label);
+                    boolean memberLeader = truthy(member.get("is_leader"))
+                            || (StringUtils.hasText(leaderStudentId)
+                                    && leaderStudentId.equalsIgnoreCase(text(member, "student_id")));
+                    if (memberLeader) {
+                        answer.append(vi ? " (nhóm trưởng)" : " (leader)");
+                    }
+                    answer.append("\n");
+                }
+            } else if (StringUtils.hasText(leaderStudentId)) {
+                answer.append(vi ? "\n  - Vai trò của bạn: " : "\n  - Your role: ")
+                        .append(askerIsLeader
+                                ? (vi ? "Nhóm trưởng" : "Group leader")
+                                : (vi ? "Thành viên" : "Member"));
+            }
             if (StringUtils.hasText(approvalStatus)) {
                 answer.append(vi ? "\n  - Trạng thái duyệt: " : "\n  - Approval status: ").append(approvalStatus);
+                if (StringUtils.hasText(rejectionReason)) {
+                    answer.append(vi ? " — lý do: " : " — reason: ").append(rejectionReason);
+                }
             }
             if (finalScore != null) {
                 answer.append(vi ? "\n  - Điểm tổng kết: " : "\n  - Final score: ").append(finalScore);
@@ -1272,6 +1428,37 @@ public class AssistantPersonalContextAdvisor {
                 ? "\nBạn có thể xem chi tiết tiến độ tại trang Khóa luận tốt nghiệp."
                 : "\nYou can track your thesis progress on the Thesis page.");
         return answer.toString();
+    }
+
+    /**
+     * Member display name from the roster row, matching the portal read path:
+     * external members carry their recorded display name, registered students
+     * the family-name-first profile name (same order as
+     * {@link #studentDisplayName}). Null when the row carries no name at all —
+     * never a placeholder invented for a missing person.
+     */
+    private static String memberName(Map<String, Object> member) {
+        if (truthy(member.get("is_external"))) {
+            String display = text(member, "display_name");
+            return StringUtils.hasText(display) ? display : null;
+        }
+        String first = text(member, "first_name");
+        String last = text(member, "last_name");
+        if (!StringUtils.hasText(last)) {
+            return StringUtils.hasText(first) ? first : null;
+        }
+        if (!StringUtils.hasText(first)) {
+            return last;
+        }
+        return last + " " + first;
+    }
+
+    /** JDBC booleans arrive as Boolean or "true" depending on the driver/case. */
+    private static boolean truthy(Object value) {
+        if (value instanceof Boolean flag) {
+            return flag;
+        }
+        return value != null && "true".equalsIgnoreCase(String.valueOf(value));
     }
 
     private String studentAnswer(String studentId, String locale, Integer requestedDay) {
