@@ -155,8 +155,10 @@ Module `thesis` đáp ứng trọn vẹn yêu cầu "Quản lý đề tài" (pla
 3–5 GV (chủ tịch + thư ký), điểm cuối = trung bình thành phần, cấm GVHD chấm đề tài
 mình hướng dẫn, công bố kết quả cho sinh viên.
 
-**Tài khoản**: Admin (`admin@campuscore.edu`) giữ vai trò `TRUONG_KHOA` (tạo đợt,
-thành lập hội đồng, công bố kết quả). Giảng viên/Sinh viên dùng tài khoản demo mặc định.
+**Tài khoản**: Admin (`admin@campuscore.edu`) thao tác quản trị luận văn bằng vai trò
+`ADMIN` (tạo đợt, thành lập hội đồng, công bố kết quả). Từ V89, `TRUONG_KHOA` là vai trò
+riêng của giảng viên mang chức danh (demo: `truongkhoa@campuscore.demo`) và không còn
+gắn cho tài khoản Admin. Giảng viên/Sinh viên dùng tài khoản demo mặc định.
 
 **Cảnh báo trước khi demo**:
 - Dùng **một tab duy nhất** (đa tab có thể gặp race refresh gây đăng xuất nhầm).
@@ -191,7 +193,7 @@ thành lập hội đồng, công bố kết quả). Giảng viên/Sinh viên d�
    *(Tùy chọn API/Swagger `http://127.0.0.1:4010/swagger-ui.html` hoặc curl để kiểm thử backend trực tiếp)*:
 
    ```powershell
-   # 1) Admin lập hội đồng (ADMIN hoặc TRUONG_KHOA), gán đề tài, đủ 3-5 ghế:
+   # 1) Admin (ADMIN) hoặc trưởng khoa (TRUONG_KHOA) lập hội đồng, gán đề tài, đủ 3-5 ghế:
    POST /api/v1/thesis/councils                 {"roundId":"<RID>","name":"Hoi dong KLTN"}
    POST /api/v1/thesis/councils/{CID}/members   {"lecturerId":"lecturer-profile","memberRole":"CHAIR"}
    POST /api/v1/thesis/councils/{CID}/members   {"lecturerId":"lecturer-profile-002","memberRole":"SECRETARY"}
