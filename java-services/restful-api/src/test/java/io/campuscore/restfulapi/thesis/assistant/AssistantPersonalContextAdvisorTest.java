@@ -510,11 +510,16 @@ class AssistantPersonalContextAdvisorTest {
     @Test
     void answersCreditsRemainingFromTheRegistrationSummaryPath() {
         RegistrationService registrationService = mock(RegistrationService.class);
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
         AssistantPersonalContextAdvisor summaryAdvisor = new AssistantPersonalContextAdvisor(
-                enrollmentService, sectionService, null, null, null, registrationService);
+                enrollmentService, sectionService, null, jdbc, null, registrationService);
         when(registrationService.summary("student-profile", null)).thenReturn(
                 new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
                         "round-1", 30, 15, 15, List.of("e1", "e2", "e3", "e4", "e5")));
+        // The approval provenance is asserted only when an APPROVED
+        // application exists; the ledger is queried before the wording.
+        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
+                .thenReturn(1);
 
         ChatResponse response = summaryAdvisor.answer(
                 chatRequest("vi", "Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"), jwtStudent());
@@ -526,8 +531,8 @@ class AssistantPersonalContextAdvisorTest {
         assertTrue(answer.contains("Đã đăng ký: 15 tín chỉ"), answer);
         assertTrue(answer.contains("Hạn mức: 30 tín chỉ"), answer);
         assertTrue(answer.contains("Còn lại có thể đăng ký: 15 tín chỉ"), answer);
-        // limit 30 = approved raise above the 28 standard; the note must say so.
-        assertTrue(answer.contains("đã được Phòng Đào tạo phê duyệt"), answer);
+        // limit 30 with an approved application: the note names the approval.
+        assertTrue(answer.contains("đơn xin nâng hạn mức đã được duyệt"), answer);
         assertTrue(answer.contains("28"), answer);
         assertTrue(answer.contains("hồ sơ đăng ký học phần"), answer);
     }
@@ -1196,6 +1201,168 @@ class AssistantPersonalContextAdvisorTest {
                 semesterName, semesterName, semesterName, semesterId,
                 null, null,
                 new java.math.BigDecimal("7.0"), letter, "PUBLISHED", "COMPLETED");
+    }
+
+    // ------------------------------------------------------------------
+    // Production audit (chatbot-production-audit, run dwfrun-94cb7693): the
+    // three HIGH findings plus the interception gaps they exposed.
+    // ------------------------------------------------------------------
+
+    @Test
+    void interceptsDayWithClassPhrasingsOnThePersonalPath() {
+        // Audit ca-nhan Q2 / giang-vien Q7: "hôm nay tôi có lớp (học) không"
+        // used to miss SCHEDULE_INTENT (no "lớp" in the noun group) and reach
+        // RAG, where an exhausted quota silently answered with regulations.
+        assertTrue(advisor.handles("Hôm nay tôi có lớp học không?"));
+        assertTrue(advisor.handles("Hôm nay tôi có lớp nào không?"));
+        assertTrue(advisor.handles("Thứ Hai hàng tuần tôi có môn nào, học mấy giờ, ở phòng nào?"));
+    }
+
+    @Test
+    void interceptsPossessiveGradesPhrasingWithGap() {
+        // Audit ca-nhan Q6: "Điểm các môn của tôi trong học kỳ 2..." — the
+        // possessive can sit a few words after "điểm".
+        assertTrue(advisor.handles("Điểm các môn của tôi trong học kỳ 2 năm học 2025-2026 như thế nào?"));
+        // Public wording without the first-person possessive stays knowledge.
+        assertFalse(advisor.handles("Điểm các môn học được tính theo thang nào?"));
+    }
+
+    @Test
+    void gradesAnswerCumulativeMatchesTheTranscriptSummary() {
+        // HIGH audit finding: the chat counted every retake attempt (57
+        // credits / GPA 3.07 in production) while the transcript page shows
+        // best attempt per course (38 / 3.11). The composer must render the
+        // summary's numbers, not its own accumulation.
+        when(enrollmentService.findStudentGrades("student-profile", null)).thenReturn(List.of(
+                gradeRow("g1", "SE401", 3, "B", "sem-2", "HK2 2025-2026"),
+                gradeRow("g2", "SE401", 3, "A", "sem-2", "HK2 2025-2026"),
+                gradeRow("g3", "SE407", 3, "B+", "sem-1", "HK1 2025-2026")));
+        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(
+                new AcademicEnrollmentReadDtos.TranscriptResponse(
+                        new AcademicEnrollmentReadDtos.TranscriptSummary(
+                                new java.math.BigDecimal("3.17"), 6, 6,
+                                new AcademicEnrollmentReadDtos.TranscriptBasisNote(
+                                        "GPA và tín chỉ tính theo điểm tốt nhất mỗi môn (chính sách học lại)",
+                                        "GPA and credits use your best attempt per course (retake policy)")),
+                        List.of()));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "GPA của tôi hiện tại là bao nhiêu?"), jwtStudent());
+
+        String answer = response.answer();
+        assertTrue(answer.contains("Tích lũy: 6 tín chỉ, GPA 3.17 (thang 4)"), answer);
+        // 6 = best-per-course from the summary; the all-attempt figure would
+        // be 9 — the old bug.
+        assertFalse(answer.contains("9 tín chỉ"), "the all-attempt accumulation must not survive");
+        assertTrue(answer.contains("bản tóm tắt Bảng điểm"), answer);
+    }
+
+    @Test
+    void interceptsAndAnswersAccumulatedCreditsQuestion() {
+        // Audit ca-nhan Q11: "Tôi đã tích lũy được bao nhiêu tín chỉ?" was
+        // answered with the credit-LIMIT regulation although the transcript
+        // summary holds the number.
+        assertTrue(advisor.handles("Tôi đã tích lũy được bao nhiêu tín chỉ?"));
+        when(enrollmentService.findStudentTranscript("student-profile")).thenReturn(
+                new AcademicEnrollmentReadDtos.TranscriptResponse(
+                        new AcademicEnrollmentReadDtos.TranscriptSummary(
+                                new java.math.BigDecimal("3.11"), 38, 40,
+                                new AcademicEnrollmentReadDtos.TranscriptBasisNote(
+                                        "GPA và tín chỉ tính theo điểm tốt nhất mỗi môn (chính sách học lại)",
+                                        "GPA and credits use your best attempt per course (retake policy)")),
+                        List.of()));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Tôi đã tích lũy được bao nhiêu tín chỉ?"), jwtStudent());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("tích lũy được 38 tín chỉ"), response.answer());
+        assertFalse(response.answer().contains("Giới hạn tín chỉ"), response.answer());
+    }
+
+    @Test
+    void answersLecturerTeachingCreditsFromAssignedSections() {
+        // HIGH audit finding: "Học kỳ này tôi dạy tất cả bao nhiêu tín chỉ?"
+        // reached the LLM, which claimed the data did not exist although
+        // /sections/my/schedule carries every section's credits.
+        assertTrue(advisor.handles("Học kỳ này tôi dạy tất cả bao nhiêu tín chỉ?"));
+        assertFalse(advisor.handles("Quy định số tín chỉ giảng viên phải dạy mỗi học kỳ là bao nhiêu?"));
+        when(sectionService.findLecturerSchedule("lecturer-profile", null)).thenReturn(List.of(
+                lecturerSection("sec1", "SE401", "Lập trình web", 3),
+                lecturerSection("sec2", "SE402", "Cơ sở dữ liệu", 3),
+                lecturerSection("sec3", "SE409", "An toàn thông tin", 4)));
+
+        ChatResponse response = advisor.answer(
+                chatRequest("vi", "Học kỳ này tôi dạy tất cả bao nhiêu tín chỉ?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("3 lớp học phần"), response.answer());
+        assertTrue(response.answer().contains("10 tín chỉ"), response.answer());
+    }
+
+    @Test
+    void adviseeRosterListsNamesInsteadOfWorkloadCounts() {
+        // Audit giang-vien Q5: "Tôi đang hướng dẫn những sinh viên nào?"
+        // printed the workload boilerplate without a single name.
+        ThesisLecturerWorkloadService workloadService = mock(ThesisLecturerWorkloadService.class);
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor rosterAdvisor =
+                new AssistantPersonalContextAdvisor(enrollmentService, sectionService, workloadService, jdbc, null);
+        assertTrue(rosterAdvisor.handles("Tôi đang hướng dẫn những sinh viên nào?"));
+
+        Map<String, Object> member = new HashMap<>();
+        member.put("topic_title", "Hệ thống quản lý sinh viên");
+        member.put("student_id", "student-user-9");
+        member.put("first_name", "Minh Anh");
+        member.put("last_name", "Nguyễn");
+        member.put("student_number", "20140123");
+        member.put("is_external", false);
+        when(jdbc.queryForList(anyString(), any(MapSqlParameterSource.class))).thenReturn(List.of(member));
+
+        ChatResponse response = rosterAdvisor.answer(
+                chatRequest("vi", "Tôi đang hướng dẫn những sinh viên nào?"), jwtLecturer());
+
+        assertNotNull(response);
+        assertEquals("PERSONAL_CONTEXT", response.reasonCode());
+        assertTrue(response.answer().contains("Hệ thống quản lý sinh viên"), response.answer());
+        assertTrue(response.answer().contains("Nguyễn Minh Anh"), response.answer());
+        // The internal user id must never surface in user-facing copy.
+        assertFalse(response.answer().contains("student-user-9"), response.answer());
+    }
+
+    @Test
+    void creditsAnswerStatesRaisedLimitWithoutInventingProvenance() {
+        // Audit ca-nhan Q4 (low): the composer asserted "Phòng Đào tạo phê
+        // duyệt" from the limit number alone. With no approved application
+        // visible the wording must stay neutral.
+        RegistrationService registrationService = mock(RegistrationService.class);
+        NamedParameterJdbcTemplate jdbc = mock(NamedParameterJdbcTemplate.class);
+        AssistantPersonalContextAdvisor creditsAdvisor = new AssistantPersonalContextAdvisor(
+                enrollmentService, sectionService, null, jdbc, null, registrationService);
+        when(registrationService.summary("student-profile", null)).thenReturn(
+                new io.campuscore.restfulapi.academic.registration.RegistrationDtos.SummaryResponse(
+                        "round-1", 30, 16, 14, List.of()));
+        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
+                .thenReturn(0);
+
+        ChatResponse response = creditsAdvisor.answer(
+                chatRequest("vi", "Kỳ này tôi còn được đăng ký bao nhiêu tín chỉ nữa?"), jwtStudent());
+
+        assertTrue(response.answer().contains("Hạn mức áp dụng cho đợt đăng ký hiện tại là 30 tín chỉ"),
+                response.answer());
+        assertFalse(response.answer().contains("phê duyệt"), response.answer());
+    }
+
+    private static LecturerScheduleResponse lecturerSection(
+            String sectionId, String courseCode, String title, int credits) {
+        return new LecturerScheduleResponse("id-" + sectionId, sectionId, sectionId + "-01", courseCode,
+                title, title, title, credits, 40, 12, "CNTT", "ICT", "CNTT", "OPEN",
+                List.of(new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                        .SectionScheduleResponse("sch-" + sectionId, 2, "07:00", "09:30", "A", "101",
+                        new io.campuscore.restfulapi.academic.web.AcademicSectionReadDtos
+                                .ClassroomSummary("room-" + sectionId, "A", "101"))));
     }
 
     private static ChatRequest chatRequest(String locale, String message) {

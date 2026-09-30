@@ -823,4 +823,41 @@ class ThesisAssistantServiceTest {
         assertEquals(3, captured.get(0).context().split("(?m)^### ", -1).length - 1);
         assertEquals(3, response.citations().size());
     }
+
+    /**
+     * Production audit (kien-thuc): the remote provider leaked corpus-adjacent
+     * hedges ("chưa có trong thông tin được công bố ở đây", "Tôi chỉ có thể
+     * giúp về...") and mid-word capital glue ("dựngRiêng", "hoãn thiSinh"),
+     * plus the grade-table colon ("B+:3.5"). The deterministic copy layer must
+     * repair all three.
+     */
+    @Test
+    void copyLayerRepairsAuditLeakPhrasingsGlueAndVoice() {
+        // Meta-voice → portal voice, pronoun unified.
+        assertEquals("Học phí theo tín chỉ hiện chưa được công bố.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Học phí theo tín chỉ hiện chưa có trong thông tin được công bố ở đây.", "vi"));
+        assertEquals("Mình chỉ hỗ trợ dữ liệu học vụ công khai",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Tôi chỉ có thể giúp về dữ liệu học vụ mà tôi hỗ trợ", "vi"));
+        assertEquals("Thời gian mở cửa cụ thể ngoài mùa thi chưa được quy định.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Thời gian mở cửa cụ thể ngoài mùa thi chưa được quy định trong thông tin hiện có.", "vi"));
+        // Mid-word lowercase→uppercase jump gains its missing space.
+        assertEquals("Khoa Xây dựng Riêng Khoa Công nghệ Thông tin",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "Khoa Xây dựngRiêng Khoa Công nghệ Thông tin", "vi"));
+        assertEquals("# Thủ tục xin hoãn thi\n\nSinh viên vắng thi phải nộp đơn",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "# Thủ tục xin hoãn thiSinh viên vắng thi phải nộp đơn", "vi"));
+        // Grade-table colon after a sign; clock times stay intact.
+        assertEquals("B+: 3.5 và C+: 2.5",
+                ThesisAssistantService.normalizeAssistantCopy("B+:3.5 và C+:2.5", "vi"));
+        assertEquals("Mở cửa từ 07:00 đến 19:00",
+                ThesisAssistantService.normalizeAssistantCopy("Mở cửa từ 07:00 đến 19:00", "vi"));
+        // English side of the meta-voice rewrite.
+        assertEquals("The tuition table is not published by the portal.",
+                ThesisAssistantService.normalizeAssistantCopy(
+                        "The tuition table is not available in the provided information.", "en"));
+    }
 }

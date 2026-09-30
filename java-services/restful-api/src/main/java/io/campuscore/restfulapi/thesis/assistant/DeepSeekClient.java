@@ -426,6 +426,12 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 // thuật được cung cấp" — forbid that meta-voice explicitly in
                 // both languages: the answer speaks as the portal itself.
                 + "Never phrase anything as coming from provided sources, context, documents, or materials (e.g. \"theo nguồn thông tin được cung cấp\", \"dựa trên tài liệu\", \"according to the provided context\") — answer as the portal's own assistant. "
+                // The audit caught the model still leaking corpus voice through
+                // a second family of hedges: "chưa có trong thông tin được công
+                // bố ở đây", "thông tin hiện có", "chưa được nêu", plus the
+                // first-person "Tôi". Ban those explicitly and pin the pronoun.
+                + "When information is absent, state the fact as the portal (\"Cổng học vụ chưa công bố X\") — never \"ở đây\", \"thông tin được công bố ở đây\", \"thông tin hiện có\", \"chưa được nêu\", or \"không có trong dữ liệu ... mà tôi hỗ trợ\". "
+                + "In Vietnamese answers always refer to yourself as \"mình\", never \"Tôi\"; address the user as \"bạn\". "
                 + "If asked for technical details beyond the provided context, politely say you can only help with published academic information.";
     }
 

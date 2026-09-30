@@ -71,7 +71,12 @@ public class ThesisAssistantKnowledgeRepository {
      * Lexical retrieval over the active published release. A non-blank scope
      * NARROWS the corpus — it can never widen access beyond the existing
      * active+PUBLIC gates. {@code specialized} restricts results to documents
-     * published in the SPECIALIZED domain (the curated professional corpus).
+     * published in the SPECIALIZED domain (the curated professional corpus);
+     * the DEFAULT (unscoped) view EXCLUDES that domain entirely. An OWASP
+     * engineering document once surfaced as a citation for a student's
+     * exam-deferral question (production audit kien-thuc) because the generic
+     * search let professional-domain rows compete with campus policy docs —
+     * a specialty corpus is opt-in, not part of the public student window.
      */
     public List<KnowledgeDocument> search(String locale, List<String> terms, int limit, String scope) {
         // The service budget is 16 terms and puts folded-phrase aliases first;
@@ -123,7 +128,7 @@ public class ThesisAssistantKnowledgeRepository {
                 + "JOIN assistant.knowledge_release rel ON rel.id = s.active_release_id AND rel.status = 'PUBLISHED' "
                 + "JOIN assistant.knowledge_runtime_document p ON p.release_id = rel.id "
                 + "WHERE s.singleton = TRUE AND p.active = TRUE AND p.visibility = 'PUBLIC' "
-                + (specializedScope ? "AND p.domain = 'SPECIALIZED' " : "")
+                + (specializedScope ? "AND p.domain = 'SPECIALIZED' " : "AND p.domain <> 'SPECIALIZED' ")
                 + "AND p.locale IN (:locale, 'both') "
                 + "AND (" + String.join(" OR ", predicates) + ") "
                 + "ORDER BY CASE WHEN p.locale = :locale THEN 0 ELSE 1 END, "

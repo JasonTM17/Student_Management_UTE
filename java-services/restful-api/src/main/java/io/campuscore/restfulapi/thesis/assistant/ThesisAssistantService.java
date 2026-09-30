@@ -109,6 +109,50 @@ public class ThesisAssistantService {
             java.util.regex.Pattern.compile("(?<=[\\p{Ll}])(#{1,6})[ \\t]+");
     private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_LABEL_COLON = java.util.regex.Pattern.compile(
             "(?<=[\\p{L}])(:)(?=\\d)");
+    /**
+     * Grade-table glue "B+:3.5" / "C+:2.5" — the colon sits after a sign, not
+     * a letter, so the label rule above misses it. Times ("07:30") keep their
+     * digit-before-colon and stay untouched. (Audit kien-thuc Q10.)
+     */
+    private static final java.util.regex.Pattern NUMBER_GLUE_AFTER_SIGN_COLON = java.util.regex.Pattern.compile(
+            "(?<=[A-Za-z][+\\-])(:)(?=\\d)");
+    /**
+     * Mid-token lowercase→uppercase jump: the provider concatenates Vietnamese
+     * word pairs without a space ("dựngRiêng"). The split is restricted to
+     * letter runs that carry at least one non-ASCII character: pure camelCase
+     * identifiers ("CampusCore", "DeepSeek", "iPhone") are legitimate and must
+     * never be broken. Unaccented ASCII joins ("thiSinh") are covered by the
+     * heading allowlist rules instead. (Audit kien-thuc Q11;
+     * assistant-output-guard.ts mirrors this rule.)
+     */
+    private static final java.util.regex.Pattern WORD_CAP_JUMP = java.util.regex.Pattern.compile(
+            "(?<=[\\p{Ll}])(?=[\\p{Lu}][\\p{Ll}])");
+
+    static String repairCapitalWordGlue(String text) {
+        if (text == null || text.isEmpty()) return text;
+        java.util.regex.Matcher matcher = WORD_CAP_JUMP.matcher(text);
+        StringBuilder out = new StringBuilder();
+        int appended = 0;
+        while (matcher.find()) {
+            int pos = matcher.start();
+            int left = pos;
+            while (left > 0 && Character.isLetter(text.charAt(left - 1))) left--;
+            // The split is decided by the LOWERCASE side of the jump: a
+            // Vietnamese glue word carries its own diacritics ("dựngRiêng").
+            // A pure-ASCII left side is a camelCase identifier running into
+            // the next word ("CampusCoreMở") — splitting there would break the
+            // brand token, and the heading allowlist rules cover that join
+            // with a block break instead.
+            String before = text.substring(left, pos);
+            boolean vietnameseBefore = before.chars().anyMatch(ch -> ch > 127);
+            if (!vietnameseBefore) continue;
+            out.append(text, appended, pos).append(' ');
+            appended = pos;
+        }
+        if (appended == 0) return text;
+        out.append(text, appended, text.length());
+        return out.toString();
+    }
     private static final java.util.regex.Pattern HEADING_SENTENCE_GLUE = java.util.regex.Pattern.compile(
             "(?m)(\\d+\\.\\s+(?:Truy cập và chọn học phần|Đăng ký lớp|Xử lý các thông báo từ hệ thống|"
                     + "Lưu ý về thời gian đăng ký|Kiểm tra điều kiện học phần|Access and select courses|"
@@ -126,6 +170,8 @@ public class ThesisAssistantService {
                     + "Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|"
                     + "Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|"
                     + "Lưu ý về học phần điều kiện|Thời gian đăng ký|"
+                    // Audit kien-thuc Q9 run 2 emitted "# Thủ tục xin hoãn thiSinh viên vắng thi…"
+                    + "Thủ tục xin hoãn thi|Thủ tục hoãn thi|Quy định hoãn thi|Chính sách miễn giảm học phí|"
                     + "How to register for a course in CampusCore|Course registration on CampusCore|"
                     + "When you see a system message|If Registration Is Blocked|What Happens During Add/Drop|Add/Drop Period|"
                     + "Credit Load Rules|"
@@ -328,6 +374,7 @@ public class ThesisAssistantService {
         out = ENGLISH_NUMBER_GLUE_AFTER_WORD.matcher(out).replaceAll("$0 ");
         out = ENGLISH_NUMBER_GLUE_BEFORE_WORD.matcher(out).replaceAll(" $0");
         out = NUMBER_GLUE_AFTER_LABEL_COLON.matcher(out).replaceAll("$1 ");
+        out = NUMBER_GLUE_AFTER_SIGN_COLON.matcher(out).replaceAll("$1 ");
         return separateWordsFromNumbers(out);
     }
 
@@ -455,6 +502,11 @@ public class ThesisAssistantService {
         if (text == null || text.isBlank()) return text;
         String normalizedLocale = AssistantInputGuard.normalizeLocale(locale);
         String out = normalizeNumberSpacing(text);
+        // Mid-word lowercase→uppercase jump (audit kien-thuc Q11: the model
+        // emits concatenated Vietnamese pairs — "dựngRiêng"). Pure camelCase
+        // identifiers are left intact; the ASCII-only join "hoãn thiSinh" is
+        // split by the heading allowlist below.
+        out = repairCapitalWordGlue(out);
         out = HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
         out = MARKDOWN_HEADING_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
         out = MARKDOWN_HEADING_DASH_SENTENCE_GLUE.matcher(out).replaceAll("$1\n\n");
@@ -477,9 +529,27 @@ public class ThesisAssistantService {
                     .replaceAll("\\bADD_DROP\\b", "add/drop period")
                     .replaceAll("(?i)\\bthe\\s+REGISTRATION\\b", "the registration period")
                     .replaceAll("\\bREGISTRATION\\b", "registration period")
-                    .replaceAll("(?i)\\bperiod(?:\\s+period)+\\b", "period");
+                    .replaceAll("(?i)\\bperiod(?:\\s+period)+\\b", "period")
+                    // Meta-voice backstop (audit kien-thuc): even with the
+                    // prompt prohibition, the model kept referring to its own
+                    // information set ("not in the available/provided
+                    // information"). Rewrite the known variants to speak as
+                    // the portal.
+                    .replaceAll("(?i)not (?:available|contained|present|found|listed) (?:in|from) the (?:available|provided|published)(?: academic)? (?:information|data|context|sources)",
+                            "not published by the portal")
+                    .replaceAll("(?i)\\bin the (?:available|provided)(?: academic)? (?:information|data|sources)\\b",
+                            "in the published academic information");
         }
         return out
+                .replaceAll("(?iu)chưa có trong thông tin(?: được công bố)?(?: ở đây| tại đây)?",
+                        "chưa được công bố")
+                .replaceAll("(?iu)không có trong dữ liệu học vụ(?: của bạn)?(?: mà tôi hỗ trợ)?",
+                        "chưa được Cổng học vụ công bố")
+                .replaceAll("(?iu)(?:dữ liệu học vụ) mà tôi hỗ trợ", "dữ liệu học vụ công khai")
+                .replaceAll("(?iu)chưa(?: được)? quy định trong thông tin(?: hiện có| được cung cấp)",
+                        "chưa được quy định")
+                .replaceAll("(?iu)\\bchưa được nêu\\b", "chưa công bố")
+                .replaceAll("(?iu)\\bTôi chỉ có thể giúp(?: về)?", "Mình chỉ hỗ trợ")
                 .replaceAll("Đợt\\s+ADD_DROP_OPEN\\b", "Đợt bổ sung/rút học phần đang mở")
                 .replaceAll("(?iu)đợt\\s+ADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
                 .replaceAll("\\bADD_DROP_OPEN\\b", "đợt bổ sung/rút học phần đang mở")
@@ -662,7 +732,14 @@ public class ThesisAssistantService {
      * @return a grounded local reply, or {@code null} when the message is a
      *         real academic question that must go down the knowledge path.
      */
+    /** Echo-capable form: the JSON path returns the tier answer directly, so
+     *  the client's correlation id must survive into the response (audit
+     *  ca-nhan Q12 returned clientRequestId=null on a CONVERSATIONAL answer). */
     static ChatResponse conversationalAnswer(String message, String locale) {
+        return conversationalAnswer(message, locale, null);
+    }
+
+    static ChatResponse conversationalAnswer(String message, String locale, java.util.UUID clientRequestId) {
         if (message == null || message.isBlank()) return null;
         String normalized = message.toLowerCase(java.util.Locale.ROOT)
                 .replaceAll("[!.,;:?~\\s]+$", "").trim();
@@ -720,7 +797,8 @@ public class ThesisAssistantService {
                             + "What would you like to know first?";
         }
         return new ChatResponse(text, CONVERSATIONAL_MODEL, false, "CONVERSATIONAL",
-                AssistantInputGuard.normalizeLocale(locale), List.of());
+                AssistantInputGuard.normalizeLocale(locale), List.of(),
+                java.util.UUID.randomUUID(), clientRequestId, null, false, "COMPLETED", null, null);
     }
 
     /**
@@ -750,7 +828,15 @@ public class ThesisAssistantService {
             "\\bhi\\b", "\\bhello\\b", "\\bhey\\b", "\\balo\\b", "\\bchao\\b",
             "chào\\b", "xin\\s*chào", "chào\\s*bạn", "chào\\s*bộ\\s*phận",
             "chào\\s*buổi\\s*(?:sáng|trưa|chiều|tối)", "chao\\s*buoi",
-            "\\bhalo\\b", "\\bhai\\b", "\\bhihi\\b", "\\blol\\b");
+            "\\bhalo\\b",
+            // "hai" as a greeting must not hijack the weekday word: the audit's
+            // "Thứ Hai hàng tuần tôi có môn nào..." opened with the self-intro
+            // because \bhai\b matched the "Hai" in "Thứ Hai" (case-insensitive
+            // word boundary). The lookbehinds reject "thứ "/"thu " (accented and
+            // unaccented) directly before the token; each is fixed width, which
+            // Java lookbehind requires.
+            "(?<!thứ\\s)(?<!thu\\s)\\bhai\\b",
+            "\\bhihi\\b", "\\blol\\b");
 
     private static final List<String> CONVERSATIONAL_IDENTITY = List.of(
             "bạn\\s*là\\s*(?:ai|cái\\s*gì|gì)", "ban\\s*la\\s*(?:ai|gi)",

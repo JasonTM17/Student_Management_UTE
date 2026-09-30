@@ -21,6 +21,8 @@ const STACK_TRACE = /(?:exception\s+in\s+thread|traceback\s*\(most\s+recent\s+ca
 const ENGLISH_NUMBER_GLUE_AFTER_WORD = /(?<![\p{L}\p{N}_])(?:of|from|to|up to|at least|at most|minimum|maximum)(?=\d)/gu;
 const ENGLISH_NUMBER_GLUE_BEFORE_WORD = /(?<=\d)(?:credits?|courses?|weeks?|days?|students?|members?|terms?|months?)(?![\p{L}])/gu;
 const NUMBER_GLUE_AFTER_LABEL_COLON = /(?<=[\p{L}])(:)(?=\d)/gu;
+/** Grade-table glue "B+:3.5" — colon after a sign; times keep digit-before-colon. */
+const NUMBER_GLUE_AFTER_SIGN_COLON = /(?<=[A-Za-z][+\-])(:)(?=\d)/gu;
 /** Characters that make up an identifier, URL, email address or anchor. */
 const TOKEN_CHARS = /[A-Za-z0-9._+#?&=~/@%-]/;
 /** A run carrying one of these is a link, address or anchor, not prose. */
@@ -57,7 +59,33 @@ export function separateWordsFromNumbers(value: string): string {
     },
   );
 }
-const MARKDOWN_HEADING_SENTENCE_GLUE = /^(#{1,6}[ \t]+(?:Cách đăng ký học phần trên CampusCore|Cách đăng ký học phần|Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|Lưu ý về học phần điều kiện|Thời gian đăng ký|How to register for a course in CampusCore|Course registration on CampusCore|When you see a system message|If Registration Is Blocked|What Happens During Add\/Drop|Add\/Drop Period|Credit Load Rules|Related Rules to Keep in Mind|Prerequisites and Limits|Prerequisites and Retakes|Course requirements|Registration timing|Registering for a Course|Prerequisites and Related Requirements|During Add\/Drop|Withdrawal and Credit Workload|Retakes and Grade Improvement|Prerequisites and Related Courses|Credit Limits))[ \t]*(?=[\p{Lu}\p{N}•*-])/gimu;
+/**
+ * Mid-word lowercase→uppercase jump: the remote provider concatenates
+ * Vietnamese word pairs without a space ("Xây dựngRiêng", "hoãn thiSinh viên").
+ * Vietnamese prose never legitimately runs a lowercase letter straight into an
+ * uppercase-starting syllable, so a space is restored at each jump — URL, email
+ * and anchor tokens are skipped via isTokenLike. Mirrors the server
+ * WORD_CAP_GLUE pass in ThesisAssistantService.normalizeAssistantCopy.
+ */
+const WORD_CAP_GLUE = /(?<=[\p{Ll}])(?=[\p{Lu}][\p{Ll}])/gu;
+
+export function separateGluedWords(value: string): string {
+  return value.replace(WORD_CAP_GLUE, (_match, offset: number, whole: string) => {
+    // The jump sits inside a letter run; expand it over every Unicode letter.
+    let start = offset;
+    while (start > 0 && /[\p{L}]/u.test(whole[start - 1])) start -= 1;
+    let end = offset;
+    while (end < whole.length && /[\p{L}]/u.test(whole[end])) end += 1;
+    const run = whole.slice(start, end);
+    // The decision rests on the LOWERCASE side of the jump: Vietnamese glue
+    // carries diacritics on its own word ("dựngRiêng"). A pure-ASCII left
+    // side is a camelCase identifier ("CampusCoreMở") — never split there;
+    // that join is covered by the heading allowlist instead.
+    if (start === end || !/[^\x00-\x7F]/.test(whole.slice(start, offset))) return '';
+    return ' ';
+  });
+}
+const MARKDOWN_HEADING_SENTENCE_GLUE = /^(#{1,6}[ \t]+(?:Cách đăng ký học phần trên CampusCore|Cách đăng ký học phần|Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|Lưu ý về học phần điều kiện|Thời gian đăng ký|Thủ tục xin hoãn thi|Thủ tục hoãn thi|Quy định hoãn thi|Chính sách miễn giảm học phí|How to register for a course in CampusCore|Course registration on CampusCore|When you see a system message|If Registration Is Blocked|What Happens During Add\/Drop|Add\/Drop Period|Credit Load Rules|Related Rules to Keep in Mind|Prerequisites and Limits|Prerequisites and Retakes|Course requirements|Registration timing|Registering for a Course|Prerequisites and Related Requirements|During Add\/Drop|Withdrawal and Credit Workload|Retakes and Grade Improvement|Prerequisites and Related Courses|Credit Limits))[ \t]*(?=[\p{Lu}\p{N}•*-])/gimu;
 const MARKDOWN_HEADING_DASH_SENTENCE_GLUE = /^(#{1,6}[ \t]+[^\r\n]*?\S)[ \t]*(?=-[ \t]+(?:A|An|Before|Check|Each|If|Open|Prerequisite|Prerequisites|Review|Sections|The|This|To|Use|While|When|You|Bạn|Các|Cần|Chọn|Hãy|Khi|Kiểm|Lớp|Mở|Nếu|Xem|Để|Đợt)\b)/gimu;
 const EMPHASIZED_HEADING_SENTENCE_GLUE = /^((?:\*\*|__)(?:Cách đăng ký học phần trên CampusCore|Cách đăng ký học phần|Đăng ký học phần trên CampusCore|Đăng ký học phần|Các bước đăng ký|Khi gặp thông báo từ hệ thống|Khi gặp thông báo|Lưu ý về điều kiện học phần|Lưu ý về học phần điều kiện|Thời gian đăng ký|How to register for a course in CampusCore|Course registration on CampusCore|When you see a system message|If Registration Is Blocked|What Happens During Add\/Drop|Add\/Drop Period|Credit Load Rules|Related Rules to Keep in Mind|Prerequisites and Limits|Prerequisites and Retakes|Course requirements|Registration timing|Registering for a Course|Prerequisites and Related Requirements|During Add\/Drop|Withdrawal and Credit Workload|Retakes and Grade Improvement|Prerequisites and Related Courses|Credit Limits)(?:\*\*|__))[ \t]*(?=[\p{Lu}\p{N}•*-])/gimu;
 const EMPHASIZED_HEADING_DASH_SENTENCE_GLUE = /^((?:\*\*|__)[^\r\n]*?\S)[ \t]*(?=-[ \t]+(?:A|An|Before|Check|Each|If|Open|Prerequisite|Prerequisites|Review|Sections|The|This|To|Use|While|When|You|Bạn|Các|Cần|Chọn|Hãy|Khi|Kiểm|Lớp|Mở|Nếu|Xem|Để|Đợt)\b)/gimu;
@@ -157,10 +185,11 @@ function normalizeAssistantOutput(value: string): string {
  * remote answers that predate the latest provider boundary.
  */
 export function normalizeAssistantCopy(value: string, locale: string = 'vi'): string {
-  const repaired = separateWordsFromNumbers(value)
+  const repaired = separateGluedWords(separateWordsFromNumbers(value))
     .replace(ENGLISH_NUMBER_GLUE_AFTER_WORD, '$& ')
     .replace(ENGLISH_NUMBER_GLUE_BEFORE_WORD, ' $&')
     .replace(NUMBER_GLUE_AFTER_LABEL_COLON, '$1 ')
+    .replace(NUMBER_GLUE_AFTER_SIGN_COLON, '$1 ')
     .replace(MARKDOWN_HEADING_SENTENCE_GLUE, '$1\n\n')
     .replace(MARKDOWN_HEADING_DASH_SENTENCE_GLUE, '$1\n\n')
     .replace(EMPHASIZED_HEADING_SENTENCE_GLUE, '$1\n\n')
@@ -173,6 +202,15 @@ export function normalizeAssistantCopy(value: string, locale: string = 'vi'): st
   const glued = repairBulletGlue(repairEmphasisGlue(repaired));
   if (locale === 'en') {
     return glued
+      // Meta-voice backstop mirroring the server normalizeAssistantCopy: the
+      // model refers to its own information set ("not in the available
+      // information"); the answer must speak as the portal (audit kien-thuc).
+      .replace(
+        /not (?:available|contained|present|found|listed) (?:in|from) the (?:available|provided|published)(?: academic)? (?:information|data|context|sources)/gi,
+        'not published by the portal',
+      )
+      .replace(/\bin the (?:available|provided)(?: academic)? (?:information|data|sources)\b/gi,
+        'in the published academic information')
       .replace(/\bthe\s+ADD_DROP_OPEN\b/gi, 'the open add/drop period')
       .replace(/\bADD_DROP_OPEN\b/g, 'the open add/drop period')
       .replace(/\bthe\s+REGISTRATION_OPEN\b/gi, 'the open registration period')
@@ -195,7 +233,18 @@ export function normalizeAssistantCopy(value: string, locale: string = 'vi'): st
     .replace(/\bADD_DROP\b/g, 'đợt bổ sung/rút học phần')
     .replace(/Đợt\s+REGISTRATION\b/g, 'Đợt đăng ký')
     .replace(/đợt\s+REGISTRATION\b/gi, 'đợt đăng ký')
-    .replace(/\bREGISTRATION\b/g, 'đợt đăng ký');
+    .replace(/\bREGISTRATION\b/g, 'đợt đăng ký')
+    // Meta-voice backstop mirroring the server normalizeAssistantCopy (audit
+    // kien-thuc): the model hedged with "chưa có trong thông tin được công bố
+    // ở đây" / "dữ liệu học vụ mà tôi hỗ trợ" / switching to "Tôi" — the answer
+    // must speak as the portal, in "mình". Ordered specific-to-general, same
+    // as the server chain.
+    .replace(/chưa(?: được)? quy định trong thông tin(?: hiện có| được cung cấp| được công bố)?/gi, 'chưa được quy định')
+    .replace(/chưa có trong thông tin(?: được công bố)?(?: ở đây| tại đây)?/gi, 'chưa được công bố')
+    .replace(/(?:không có|chưa có) trong (?:dữ liệu|nội dung) học vụ(?: mà tôi hỗ trợ)?/gi, 'chưa được Cổng học vụ công bố')
+    .replace(/(?:dữ liệu|nội dung) học vụ(?: của bạn)? mà tôi hỗ trợ/gi, 'dữ liệu học vụ công khai')
+    .replace(/\bchưa được nêu\b/gi, 'chưa công bố')
+    .replace(/\bTôi chỉ có thể giúp(?: về)?/g, 'Mình chỉ hỗ trợ');
 }
 
 /** Returns true when text is safe to show as an assistant answer. */
