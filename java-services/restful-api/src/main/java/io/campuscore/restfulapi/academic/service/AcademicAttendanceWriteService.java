@@ -82,9 +82,17 @@ public class AcademicAttendanceWriteService {
             }
 
             String upperStatus = entry.status() != null ? entry.status().trim().toUpperCase() : "";
+            // "RESET" clears a previously saved record for (student, section,
+            // date) instead of writing a new one — round-2 sweep finding
+            // write-1: the UI's Reset button saved rows the backend silently
+            // kept, so a lecturer could never un-mark an attendance entry.
+            if ("RESET".equals(upperStatus)) {
+                targetStudentIds.add(normalizedStudentId);
+                continue;
+            }
             if (!ALLOWED_STATUSES.contains(upperStatus)) {
                 throw new DomainException(HttpStatus.BAD_REQUEST, "INVALID_ATTENDANCE_STATUS",
-                        "Invalid attendance status: " + entry.status() + ". Allowed: " + ALLOWED_STATUSES);
+                        "Invalid attendance status: " + entry.status() + ". Allowed: " + ALLOWED_STATUSES + ", RESET");
             }
 
             targetStudentIds.add(normalizedStudentId);
@@ -99,7 +107,8 @@ public class AcademicAttendanceWriteService {
                     now));
         }
 
-        // Delete existing records for (sectionId, date, studentIds) to ensure idempotent replacement
+        // Delete existing records for (sectionId, date, studentIds) to ensure idempotent replacement;
+        // RESET entries are deleted only (they contribute no insert row).
         repository.deleteAttendanceRecords(normalizedSectionId, normalizedDate, targetStudentIds);
 
         // Batch insert the attendance rows
@@ -109,7 +118,9 @@ public class AcademicAttendanceWriteService {
                 normalizedSectionId,
                 request.date(),
                 insertRows.size(),
-                "Attendance recorded successfully for " + insertRows.size() + " students");
+                insertRows.isEmpty()
+                        ? "Attendance records cleared for " + targetStudentIds.size() + " students"
+                        : "Attendance recorded successfully for " + insertRows.size() + " students");
     }
 
     private static Instant parseAndNormalizeDate(String value) {

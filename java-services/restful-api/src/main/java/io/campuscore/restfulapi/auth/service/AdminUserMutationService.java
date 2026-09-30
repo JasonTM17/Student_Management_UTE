@@ -289,9 +289,19 @@ public class AdminUserMutationService {
             revokeSessions(id);
         }
         if (requestedRole != null) {
+            // Round-2 sweep static-2: roles live in the JWT claims, and the
+            // account-state filter never re-derives them from the DB — a
+            // demoted admin's old access token kept ROLE_ADMIN until its 15
+            // -minute TTL. A genuine role change now cuts live sessions the
+            // same way deactivation does (same caveat: refresh rotation dies
+            // with the session rows).
+            boolean roleChanged = !hasRole(id, requestedRole);
             replaceSystemRole(id, requestedRole);
             removeObsoleteProfiles(id, requestedRole);
             ensureProfile(id, requestedRole, input);
+            if (roleChanged) {
+                revokeSessions(id);
+            }
         }
         // Records the transition, not the payload: the request map can carry a
         // credential, and a role or status change is what an investigation looks for.

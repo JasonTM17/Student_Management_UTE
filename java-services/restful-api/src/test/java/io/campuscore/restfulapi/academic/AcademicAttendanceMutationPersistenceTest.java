@@ -77,6 +77,53 @@ class AcademicAttendanceMutationPersistenceTest {
     }
 
     @Test
+    void resetEntryDeletesTheSavedRecord() throws Exception {
+        String initialPayload = """
+                {
+                    "date": "2026-08-25",
+                    "records": [
+                        {"studentId": "student-1", "status": "PRESENT"},
+                        {"studentId": "student-2", "status": "ABSENT"}
+                    ]
+                }
+                """;
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(initialPayload)
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk());
+
+        // Round-2 sweep write-1: a RESET entry must DELETE the saved row for
+        // that student instead of being ignored (the old contract kept the
+        // stale record while the UI reported the reset as saved).
+        String resetPayload = """
+                {
+                    "date": "2026-08-25",
+                    "records": [
+                        {"studentId": "student-1", "status": "RESET"},
+                        {"studentId": "student-2", "status": "ABSENT"}
+                    ]
+                }
+                """;
+        mvc.perform(put("/api/v1/attendance/sections/section-1")
+                        .contentType(MediaType.APPLICATION_JSON)
+                        .content(resetPayload)
+                        .with(lecturerJwt("lecturer-1")))
+                .andExpect(status().isOk())
+                .andExpect(jsonPath("$.updatedCount").value(1));
+
+        Integer gone = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\" = 'section-1' AND \"studentId\" = 'student-1'",
+                Integer.class);
+        assertThat(gone).isZero();
+
+        Integer kept = jdbc.queryForObject(
+                "SELECT COUNT(*) FROM \"academic\".\"Attendance\" WHERE \"sectionId\" = 'section-1' AND \"studentId\" = 'student-2' AND \"status\" = 'ABSENT'",
+                Integer.class);
+        assertThat(kept).isEqualTo(1);
+    }
+
+    @Test
     void recordAttendanceIsIdempotentOnReplay() throws Exception {
         String initialPayload = """
                 {

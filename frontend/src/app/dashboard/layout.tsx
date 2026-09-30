@@ -1372,16 +1372,11 @@ export default function DashboardLayout({
                 </LocalizedLink>
               );
             })}
-            <button
-              type="button"
+            <LocalizedLink
+              href="/dashboard/assistant-specialized"
               data-mobile-assistant-slot="true"
-              onClick={() => {
-                if (typeof window !== 'undefined') {
-                  window.dispatchEvent(new CustomEvent('open-campus-assistant'));
-                }
-              }}
-              aria-label={messages.assistant.open}
-              title={messages.assistant.open}
+              aria-label={messages.assistant.specializedLabel}
+              title={messages.assistant.slotLabel}
               className="flex min-h-11 min-w-0 w-full flex-col items-center justify-center gap-1 rounded-md px-1 py-1 text-xs font-medium text-muted-foreground transition-[background-color,color] duration-150 focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring hover:bg-secondary hover:text-foreground"
             >
               <AssistantMascot className="h-5 w-5 shrink-0" />
@@ -1391,7 +1386,7 @@ export default function DashboardLayout({
               >
                 {messages.assistant.slotLabel}
               </span>
-            </button>
+            </LocalizedLink>
           </div>
         </nav>
       ) : null}

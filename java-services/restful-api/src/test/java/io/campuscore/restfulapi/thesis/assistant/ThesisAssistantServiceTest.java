@@ -881,7 +881,7 @@ class ThesisAssistantServiceTest {
                 new DeepSeekProperties(true, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
                 null);
 
-        ChatResponse general = service.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null);
+        ChatResponse general = service.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null, null);
         assertNotNull(general);
         assertEquals("ANSWERED", general.reasonCode());
         assertEquals("Con gà có 2 chân.", general.answer());
@@ -889,12 +889,15 @@ class ThesisAssistantServiceTest {
         assertFalse(general.degraded());
 
         // Academic wording keeps the grounded RAG chain.
-        assertNull(service.generalAnswerIfOffTopic("Lịch thi cuối kỳ khi nào?", "vi", null));
+        assertNull(service.generalAnswerIfOffTopic("Lịch thi cuối kỳ khi nào?", "vi", null, null));
+        // Round-2 chat-1: scope='specialized' skips the general fallback — the
+        // professional corpus is the right source for those questions.
+        assertNull(service.generalAnswerIfOffTopic("SOLID là gì?", "vi", null, "specialized"));
         // Provider dead → null so the normal NO_MATCH/curated chain runs.
         ThesisAssistantService deadProvider = new ThesisAssistantService(knowledge, provider,
                 mock(ThesisAssistantRepository.class),
                 new DeepSeekProperties(false, "fixture", "https://api.deepseek.com", "deepseek-v4-flash", 8000, 800),
                 null);
-        assertNull(deadProvider.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null));
+        assertNull(deadProvider.generalAnswerIfOffTopic("Con gà có mấy cái chân", "vi", null, null));
     }
 }
