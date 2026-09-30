@@ -490,10 +490,16 @@ class AssistantPersonalContextAdvisorTest {
     @Test
     void detectsCreditsRemainingIntents() {
         assertTrue(advisor.handles("Tôi còn bao nhiêu tín chỉ được đăng ký nữa?"));
+        // Verb-first order from the production audit (xrole-2): the old
+        // quantity-first pattern missed it and the KB path answered "no data".
+        assertTrue(advisor.handles("Học kỳ này tôi còn được đăng ký bao nhiêu tín chỉ nữa?"));
+        assertTrue(advisor.handles("con duoc dang ky bao nhieu tin chi nua"));
         assertTrue(advisor.handles("con lai bao nhieu tin chi"));
         assertTrue(advisor.handles("còn thiếu mấy tín chỉ"));
         assertTrue(advisor.handles("hạn mức tín chỉ của tôi"));
         assertTrue(advisor.handles("how many credits do I have left?"));
+        // Policy wording still stays on the knowledge path.
+        assertFalse(advisor.handles("Quy trình xin nâng hạn mức tín chỉ?"));
 
         // Policy / how-to wording stays on the knowledge path.
         assertFalse(advisor.handles("cách đăng ký học phần"));
