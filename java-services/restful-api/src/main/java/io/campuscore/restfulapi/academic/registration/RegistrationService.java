@@ -755,11 +755,19 @@ public class RegistrationService {
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId));
     }
 
+    /**
+     * Quota counts the CURRENT credits of each enrolled section (section →
+     * course), not the snapshot taken at enroll time: when a course's credits
+     * are raised after a student registered, the stale snapshot under-counts
+     * the 30-credit cap and lets the student register past the limit.
+     */
     private int creditsUsed(String studentId, String semesterId) {
         Integer used = jdbc.queryForObject(
-                "SELECT COALESCE(SUM(\"creditsSnapshot\"), 0) FROM " + ENROLLMENT
-                        + " WHERE \"studentId\" = :studentId AND \"semesterId\" = :semesterId"
-                        + " AND \"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
+                "SELECT COALESCE(SUM(course.\"credits\"), 0) FROM " + ENROLLMENT + " enrollment"
+                        + " JOIN " + SECTION + " section ON section.\"id\" = enrollment.\"sectionId\""
+                        + " JOIN " + COURSE + " course ON course.\"id\" = section.\"courseId\""
+                        + " WHERE enrollment.\"studentId\" = :studentId AND enrollment.\"semesterId\" = :semesterId"
+                        + " AND enrollment.\"status\" IN ('ENROLLED', 'PENDING', 'CONFIRMED')",
                 new MapSqlParameterSource().addValue("studentId", studentId).addValue("semesterId", semesterId),
                 Integer.class);
         return used == null ? 0 : used;
