@@ -290,15 +290,15 @@ class AssistantPersonalContextAdvisorTest {
         when(enrollmentService.findStudentEnrollments("student-profile", null)).thenReturn(List.of(
                 enrollment("SE013", "Lập trình Web nâng cao", "Advanced Web", CURRENT_TERM_START, List.of()),
                 enrollment("SE014", "Kiến trúc Microservices", "Microservices", CURRENT_TERM_START, List.of())));
-        // The registration ledger counts creditsSnapshot, not the current catalog credits.
-        when(jdbc.queryForObject(anyString(), any(MapSqlParameterSource.class), eq(Integer.class)))
-                .thenReturn(15);
-
+        // Credits must match the registration summary endpoint: the CURRENT
+        // course credits of each enrolled section (3 + 3 = 6), never the stale
+        // enrollment snapshot.
         ChatResponse response = ledgerAdvisor.answer(
                 chatRequest("vi", "Học kỳ này tôi đang đăng ký những lớp học phần nào?"), jwtStudent());
 
-        assertTrue(response.answer().contains("(15 tín chỉ theo dữ liệu đăng ký của bạn)"),
+        assertTrue(response.answer().contains("(6 tín chỉ theo dữ liệu đăng ký của bạn)"),
                 response.answer());
+        assertFalse(response.answer().contains("(15 tín chỉ"), response.answer());
     }
 
     @Test

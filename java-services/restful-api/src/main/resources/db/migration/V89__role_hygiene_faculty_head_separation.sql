@@ -25,13 +25,6 @@ WHERE "roleId" = (SELECT "id" FROM campuscore_auth."Role" WHERE "name" = 'TRUONG
       WHERE office."name" IN ('ADMIN', 'SUPER_ADMIN')
   );
 
--- R2: no lecturer may hold the academic-affairs ADMIN role. academic."Lecturer"
--- is the single lecturer registry since V8 (campuscore_auth."Lecturer" became a
--- view over it).
-DELETE FROM campuscore_auth."UserRole"
-WHERE "roleId" = (SELECT "id" FROM campuscore_auth."Role" WHERE "name" = 'ADMIN')
-  AND "userId" IN (SELECT lecturer."userId" FROM academic."Lecturer" lecturer);
-
 -- The seeded faculty head becomes a proper lecturer: V31 created the account
 -- and its TRUONG_KHOA role but no LECTURER role and no academic."Lecturer" row,
 -- which contradicted R1's "faculty head is a job title on a lecturer" contract.
@@ -84,3 +77,14 @@ WHERE EXISTS (SELECT 1 FROM academic."Department" WHERE "id" = 'department-demo'
   AND NOT EXISTS (
       SELECT 1 FROM academic."Lecturer" WHERE "userId" = 'truongkhoa-user-002'
   );
+
+-- R2 (runs LAST, after every lecturer profile insert above): no lecturer may
+-- hold the academic-affairs ADMIN role. academic."Lecturer" is the single
+-- lecturer registry since V8 (campuscore_auth."Lecturer" became a view over
+-- it). Running after the inserts closes the ordering gap Wukong flagged: a
+-- faculty head who held ADMIN but lacked a Lecturer row is fully converted
+-- first, then the sweep strips ADMIN — so no account can end this migration
+-- as ADMIN + LECTURER.
+DELETE FROM campuscore_auth."UserRole"
+WHERE "roleId" = (SELECT "id" FROM campuscore_auth."Role" WHERE "name" = 'ADMIN')
+  AND "userId" IN (SELECT lecturer."userId" FROM academic."Lecturer" lecturer);
