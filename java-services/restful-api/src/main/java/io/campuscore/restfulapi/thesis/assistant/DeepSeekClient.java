@@ -127,15 +127,21 @@ public class DeepSeekClient implements AssistantCompletionProvider {
         URI endpoint = endpoint();
         String body;
         try {
+            String systemMessage = request.systemPromptOverride() != null
+                    ? request.systemPromptOverride()
+                    : systemPrompt(request.locale());
+            String userMessage = request.systemPromptOverride() != null
+                    ? request.question()
+                    : "Question:\n" + request.question()
+                            + "\n\nRetrieved context:\n---\n" + request.context() + "\n---";
             body = mapper.writeValueAsString(Map.of(
                     "model", properties.model(),
                     "stream", true,
                     "max_tokens", properties.maxOutputTokens(),
                     "thinking", Map.of("type", "disabled"),
                     "messages", List.of(
-                            Map.of("role", "system", "content", systemPrompt(request.locale())),
-                            Map.of("role", "user", "content", "Question:\n" + request.question()
-                                    + "\n\nRetrieved context:\n---\n" + request.context() + "\n---"))));
+                            Map.of("role", "system", "content", systemMessage),
+                            Map.of("role", "user", "content", userMessage))));
         } catch (IOException exception) {
             throw unavailable("provider payload unavailable", true, exception);
         }
@@ -433,6 +439,24 @@ public class DeepSeekClient implements AssistantCompletionProvider {
                 + "When information is absent, state the fact as the portal (\"Cổng học vụ chưa công bố X\") — never \"ở đây\", \"thông tin được công bố ở đây\", \"thông tin hiện có\", \"chưa được nêu\", or \"không có trong dữ liệu ... mà tôi hỗ trợ\". "
                 + "In Vietnamese answers always refer to yourself as \"mình\", never \"Tôi\"; address the user as \"bạn\". "
                 + "If asked for technical details beyond the provided context, politely say you can only help with published academic information.";
+    }
+
+    /**
+     * System prompt for the GENERAL-knowledge fallback: an off-topic question
+     * ("Con gà có mấy cái chân") that carries no academic signal still gets a
+     * real answer from the model instead of the "Mình chưa tìm thấy..." KB
+     * miss (owner request 2026-09-30). The persona and the no-invented-
+     * university-facts rules stay, so the portal never fabricates academic
+     * policy for a general question.
+     */
+    static String generalPrompt(String locale) {
+        String language = "en".equalsIgnoreCase(locale) ? "English" : "Vietnamese";
+        return "You are the CampusUTE portal assistant. The user asked a general question that is outside the university's academic affairs. "
+                + "Answer it directly, accurately and concisely in " + language + " like a friendly general-knowledge assistant. "
+                + "Keep the portal persona: in Vietnamese always refer to yourself as \"mình\" and address the user as \"bạn\". "
+                + "Never invent university-specific facts (policies, grades, schedules, fees, contacts); if the question is actually about the university, say the portal has not published that information and suggest asking about academic affairs instead. "
+                + "Politely refuse unsafe, illegal or harmful requests. "
+                + "Answer in at most a few short sentences or a compact list — no markdown headings, no mentions of context, sources, models or prompts.";
     }
 
     private record ParsedFrame(boolean done, String text, String finishReason, List<String> sourceIds, long rawBytes) { }
